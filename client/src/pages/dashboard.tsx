@@ -1,0 +1,261 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Session } from "@shared/schema";
+
+export default function Dashboard() {
+  const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
+  const [sessionName, setSessionName] = useState("");
+  const [sessionLocation, setSessionLocation] = useState("");
+
+  const { data: sessions, isLoading } = useQuery<Session[]>({
+    queryKey: ["/api/sessions"],
+  });
+
+  const createSession = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/sessions", {
+        name: sessionName,
+        location: sessionLocation || null,
+      });
+      return res.json();
+    },
+    onSuccess: (session: Session) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      setNewDialogOpen(false);
+      setSessionName("");
+      setSessionLocation("");
+      setLocation(`/session/${session.id}`);
+    },
+    onError: () => {
+      toast({ title: "Failed to create session", variant: "destructive" });
+    },
+  });
+
+  const deleteSession = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/sessions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      toast({ title: "Session deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete session", variant: "destructive" });
+    },
+  });
+
+  const formatDate = (date: string | Date | null) => {
+    if (!date) return "";
+    return new Date(date).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 max-w-5xl mx-auto">
+          <div className="flex items-center gap-2">
+            <Cable className="h-5 w-5 text-primary" />
+            <span className="font-semibold text-sm" data-testid="text-user-name">
+              {user?.firstName || "User"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => logout()}
+              data-testid="button-logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
+          <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">
+            Counting Sessions
+          </h1>
+          <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-new-session">
+                <Plus className="h-4 w-4" />
+                New Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>New Counting Session</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (sessionName.trim()) createSession.mutate();
+                }}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="session-name">Session Name</Label>
+                  <Input
+                    id="session-name"
+                    value={sessionName}
+                    onChange={(e) => setSessionName(e.target.value)}
+                    placeholder="e.g., Warehouse A - Bay 3"
+                    data-testid="input-session-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="session-location">Location (optional)</Label>
+                  <Input
+                    id="session-location"
+                    value={sessionLocation}
+                    onChange={(e) => setSessionLocation(e.target.value)}
+                    placeholder="e.g., Building 2, Dock 5"
+                    data-testid="input-session-location"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={!sessionName.trim() || createSession.isPending}
+                  data-testid="button-create-session"
+                >
+                  {createSession.isPending ? "Creating..." : "Create Session"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : !sessions?.length ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Cable className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-muted-foreground text-sm">No sessions yet. Create one to start counting reels.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {sessions.map((session) => (
+              <Card
+                key={session.id}
+                className="hover-elevate cursor-pointer"
+                data-testid={`card-session-${session.id}`}
+                onClick={() => setLocation(`/session/${session.id}`)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-sm truncate" data-testid={`text-session-name-${session.id}`}>
+                          {session.name}
+                        </h3>
+                        <Badge
+                          variant={session.status === "active" ? "default" : "secondary"}
+                          className="no-default-hover-elevate no-default-active-elevate"
+                          data-testid={`badge-session-status-${session.id}`}
+                        >
+                          {session.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+                        {session.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {session.location}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(session.startedAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`button-delete-session-${session.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Session?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete "{session.name}" and all its entries, photos, and pins.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteSession.mutate(session.id)}
+                              data-testid="button-confirm-delete"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

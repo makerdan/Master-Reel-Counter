@@ -3,14 +3,33 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/lib/theme-provider";
+import { useAuth } from "@/hooks/use-auth";
+import { Loader2 } from "lucide-react";
+import Landing from "@/pages/landing";
+import Dashboard from "@/pages/dashboard";
+import SessionPage from "@/pages/session";
 import NotFound from "@/pages/not-found";
 
-function Router() {
+function AuthRouter() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loading-spinner" />
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/">
+        {user ? <Dashboard /> : <Landing />}
+      </Route>
+      <Route path="/session/:id">
+        {user ? <SessionPage /> : <Landing />}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -19,10 +38,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <AuthRouter />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

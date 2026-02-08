@@ -1,0 +1,977 @@
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation, useRoute } from "wouter";
+import {
+  ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
+  RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Brain, Cable,
+  Save, X, Loader2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter,
+} from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useUpload } from "@/hooks/use-upload";
+import { useToast } from "@/hooks/use-toast";
+import type { Session, Entry, Photo, Pin } from "@shared/schema";
+
+const WIRE_TYPES = ["THHN", "XHHW", "USE-2", "MC Cable", "NM-B", "SER", "UFB", "Bare", "Other"];
+const GAUGES = ["14", "12", "10", "8", "6", "4", "3", "2", "1", "1/0", "2/0", "3/0", "4/0", "250", "300", "350", "500", "750"];
+const POSITIONS = ["Top", "Middle", "Bottom", "Floor"];
+const COLORS = ["Black", "White", "Red", "Blue", "Green", "Orange", "Yellow", "Brown", "Gray", "Purple", "Other"];
+
+interface LocalPin {
+  id: string;
+  x: number;
+  y: number;
+  label: string;
+  reelCount: number;
+}
+
+function formatElapsed(startDate: string | Date) {
+  const diff = Date.now() - new Date(startDate).getTime();
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+export default function SessionPage() {
+  const [, params] = useRoute("/session/:id");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const sessionId = params?.id ? parseInt(params.id) : 0;
+
+  const { data: session, isLoading: sessionLoading } = useQuery<Session>({
+    queryKey: ["/api/sessions", sessionId.toString()],
+    enabled: sessionId > 0,
+  });
+
+  const { data: entries = [], isLoading: entriesLoading } = useQuery<Entry[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "entries"],
+    enabled: sessionId > 0,
+  });
+
+  const { data: photos = [] } = useQuery<Photo[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "photos"],
+    enabled: sessionId > 0,
+  });
+
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4 space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">Session not found</p>
+            <Button variant="outline" className="mt-4" onClick={() => setLocation("/")}>
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <SessionWorkspace
+      session={session}
+      entries={entries}
+      entriesLoading={entriesLoading}
+      photos={photos}
+      sessionId={sessionId}
+    />
+  );
+}
+
+function SessionWorkspace({
+  session, entries, entriesLoading, photos, sessionId,
+}: {
+  session: Session;
+  entries: Entry[];
+  entriesLoading: boolean;
+  photos: Photo[];
+  sessionId: number;
+}) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [mode, setMode] = useState<string>("photo");
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+
+  const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
+
+  const exportCsv = () => {
+    const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Color", "Manufacturer", "Notes"];
+    const rows = entries.map((e, i) => [
+      i + 1, e.aisle, e.section, e.position || "", e.palletId || "", e.reelTag || "",
+      e.wireType || "", e.gauge || "", e.footage || "", e.color || "", e.manufacturer || "", e.notes || "",
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.map((v) => `"${v}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${session.name.replace(/\s+/g, "_")}_entries.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPdf = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const rowsHtml = entries.map((e, i) => `
+      <tr>
+        <td>${i + 1}</td><td>${e.aisle}</td><td>${e.section}</td><td>${e.position || ""}</td>
+        <td>${e.reelTag || ""}</td><td>${e.wireType || ""}</td><td>${e.gauge || ""}</td>
+        <td>${e.footage || ""}</td><td>${e.color || ""}</td>
+      </tr>
+    `).join("");
+    w.document.write(`<!DOCTYPE html><html><head><title>${session.name} - Report</title>
+      <style>body{font-family:Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%;margin-top:12px}
+      th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f0eb}
+      h1{font-size:18px}h2{font-size:14px;color:#666;margin-top:4px}</style></head><body>
+      <h1>Master Reel Counter - ${session.name}</h1>
+      <h2>Location: ${session.location || "N/A"} | Entries: ${entries.length} | Total Footage: ${totalFootage.toLocaleString()} ft</h2>
+      <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Color</th></tr></thead>
+      <tbody>${rowsHtml}</tbody></table>
+      <script>setTimeout(()=>window.print(),500)</script></body></html>`);
+    w.document.close();
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+        <div className="flex items-center justify-between gap-2 px-4 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-0">
+              <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="mono" data-testid="text-entry-count">{entries.length} entries</span>
+                <span className="mono" data-testid="text-elapsed">{formatElapsed(session.startedAt)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button size="sm" variant="outline" onClick={exportCsv} data-testid="button-export-csv">
+              <Download className="h-3 w-3" />
+              CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportPdf} data-testid="button-export-pdf">
+              <FileText className="h-3 w-3" />
+              PDF
+            </Button>
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
+        <Tabs value={mode} onValueChange={setMode}>
+          <TabsList className="w-full">
+            <TabsTrigger value="photo" className="flex-1" data-testid="tab-photo-mode">
+              <Camera className="h-4 w-4 mr-1" />
+              Section Photo
+            </TabsTrigger>
+            <TabsTrigger value="single" className="flex-1" data-testid="tab-single-mode">
+              <ListPlus className="h-4 w-4 mr-1" />
+              Single Entry
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="photo">
+            <PhotoMode sessionId={sessionId} photos={photos} />
+          </TabsContent>
+
+          <TabsContent value="single">
+            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} />
+          </TabsContent>
+        </Tabs>
+
+        <Separator />
+
+        <EntryTable
+          entries={entries}
+          loading={entriesLoading}
+          totalFootage={totalFootage}
+          sessionId={sessionId}
+          onEdit={(entry) => { setEditingEntry(entry); setMode("single"); }}
+        />
+      </div>
+
+      {editingEntry && (
+        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) setEditingEntry(null); }}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Entry #{editingEntry.id}</DialogTitle>
+            </DialogHeader>
+            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} />
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }) {
+  const { toast } = useToast();
+  const { uploadFile, isUploading } = useUpload();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [aisle, setAisle] = useState("");
+  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; dbId?: number }>>([]);
+  const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+  const [localPins, setLocalPins] = useState<LocalPin[]>([]);
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState("");
+
+  const [scale, setScale] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [rotation, setRotation] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const currentPhoto = uploadedPhotos[currentPhotoIdx];
+
+  useEffect(() => {
+    if (photos.length > 0 && uploadedPhotos.length === 0) {
+      setUploadedPhotos(photos.map((p) => ({
+        url: p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/objects/${p.objectStorageKey}`,
+        objectPath: p.objectStorageKey,
+        section: p.section || "",
+        dbId: p.id,
+      })));
+    }
+  }, [photos]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      const result = await uploadFile(file);
+      if (result) {
+        const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
+          objectStorageKey: result.objectPath,
+          originalFilename: file.name,
+          mimeType: file.type,
+          aisle,
+          section: "",
+        });
+        const savedPhoto = await res.json();
+        const photoUrl = result.objectPath.startsWith("/objects/") ? result.objectPath : `/objects/${result.objectPath}`;
+        setUploadedPhotos((prev) => [...prev, {
+          url: photoUrl,
+          objectPath: result.objectPath,
+          section: "",
+          dbId: savedPhoto.id,
+        }]);
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleContainerClick = (e: React.MouseEvent) => {
+    if (isPanning) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const rawX = (e.clientX - rect.left) / rect.width;
+    const rawY = (e.clientY - rect.top) / rect.height;
+
+    const cx = 0.5, cy = 0.5;
+    let relX = rawX - cx;
+    let relY = rawY - cy;
+
+    relX /= scale;
+    relY /= scale;
+
+    relX -= panX / rect.width;
+    relY -= panY / rect.height;
+
+    const rad = -(rotation * Math.PI) / 180;
+    const rotatedX = relX * Math.cos(rad) - relY * Math.sin(rad);
+    const rotatedY = relX * Math.sin(rad) + relY * Math.cos(rad);
+
+    const x = (rotatedX + cx) * 100;
+    const y = (rotatedY + cy) * 100;
+
+    if (x < 0 || x > 100 || y < 0 || y > 100) return;
+
+    const newPin: LocalPin = {
+      id: `pin-${Date.now()}`,
+      x,
+      y,
+      label: `${localPins.length + 1}`,
+      reelCount: 1,
+    };
+    setLocalPins((prev) => [...prev, newPin]);
+    setSelectedPinId(newPin.id);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest(".pin-marker")) return;
+    setIsPanning(true);
+    panStart.current = { x: e.clientX, y: e.clientY, panX, panY };
+    containerRef.current?.classList.add("grabbing");
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isPanning) return;
+    const dx = e.clientX - panStart.current.x;
+    const dy = e.clientY - panStart.current.y;
+    setPanX(panStart.current.panX + dx / scale);
+    setPanY(panStart.current.panY + dy / scale);
+  }, [isPanning, scale]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+    containerRef.current?.classList.remove("grabbing");
+  }, []);
+
+  useEffect(() => {
+    if (isPanning) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [isPanning, handleMouseMove, handleMouseUp]);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    setScale((s) => Math.min(5, Math.max(1, s + (e.deltaY < 0 ? 0.2 : -0.2))));
+  };
+
+  const createEntries = useMutation({
+    mutationFn: async () => {
+      const section = currentPhoto?.section || "";
+      for (const pin of localPins) {
+        await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
+          aisle,
+          section,
+          position: "Floor",
+          reelTag: `Pin ${pin.label}`,
+          notes: `Reel count: ${pin.reelCount}`,
+        });
+        if (currentPhoto?.dbId) {
+          await apiRequest("POST", `/api/photos/${currentPhoto.dbId}/pins`, {
+            xPercent: pin.x,
+            yPercent: pin.y,
+            label: pin.label,
+            reelCount: pin.reelCount,
+          });
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      setLocalPins([]);
+      toast({ title: `Created ${localPins.length} entries from pins` });
+    },
+    onError: () => {
+      toast({ title: "Failed to create entries", variant: "destructive" });
+    },
+  });
+
+  const analyzePhoto = async () => {
+    if (!currentPhoto) return;
+    setAiLoading(true);
+    setAiResult("");
+    try {
+      const res = await apiRequest("POST", "/api/ai/analyze", {
+        imageUrl: currentPhoto.url,
+        prompt: "Analyze this warehouse photo. Identify wire reels, their tags, wire types, gauges, and footage if visible. List each reel you can see with as much detail as possible.",
+      });
+      const data = await res.json();
+      setAiResult(data.result || "No results returned.");
+    } catch {
+      toast({ title: "AI analysis failed", variant: "destructive" });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const resetView = () => {
+    setScale(1);
+    setPanX(0);
+    setPanY(0);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="space-y-1">
+          <Label className="text-xs">Aisle</Label>
+          <Input
+            value={aisle}
+            onChange={(e) => setAisle(e.target.value)}
+            placeholder="Aisle"
+            inputMode="numeric"
+            className="w-24"
+            data-testid="input-photo-aisle"
+          />
+        </div>
+        <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            data-testid="button-upload-photos"
+          >
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            Upload Photos
+          </Button>
+        </div>
+      </div>
+
+      {uploadedPhotos.length > 0 && (
+        <>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={currentPhotoIdx <= 0}
+                onClick={() => { setCurrentPhotoIdx((i) => i - 1); setLocalPins([]); resetView(); }}
+                data-testid="button-prev-photo"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm mono" data-testid="text-photo-counter">
+                {currentPhotoIdx + 1} / {uploadedPhotos.length}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
+                onClick={() => { setCurrentPhotoIdx((i) => i + 1); setLocalPins([]); resetView(); }}
+                data-testid="button-next-photo"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs">Section</Label>
+              <Input
+                value={currentPhoto?.section || ""}
+                onChange={(e) => {
+                  setUploadedPhotos((prev) =>
+                    prev.map((p, i) => i === currentPhotoIdx ? { ...p, section: e.target.value } : p)
+                  );
+                }}
+                placeholder="Section"
+                inputMode="numeric"
+                className="w-24"
+                data-testid="input-photo-section"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <Button size="icon" variant="ghost" onClick={() => setScale((s) => Math.min(5, s + 0.5))} data-testid="button-zoom-in">
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant="ghost" onClick={() => setScale((s) => Math.max(1, s - 0.5))} data-testid="button-zoom-out">
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant="ghost" onClick={() => setRotation((r) => (r + 90) % 360)} data-testid="button-rotate">
+                <RotateCw className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {currentPhoto && (
+            <div
+              ref={containerRef}
+              className="photo-viewer-container w-full"
+              style={{ height: 400 }}
+              onMouseDown={handleMouseDown}
+              onClick={handleContainerClick}
+              onWheel={handleWheel}
+              data-testid="photo-viewer"
+            >
+              <img
+                src={currentPhoto.url}
+                alt="Section photo"
+                draggable={false}
+                className="w-full h-full object-contain select-none"
+                style={{
+                  transform: `scale(${scale}) translate(${panX}px, ${panY}px) rotate(${rotation}deg)`,
+                  transformOrigin: "center center",
+                }}
+              />
+              {localPins.map((pin) => (
+                <div
+                  key={pin.id}
+                  className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""}`}
+                  style={{
+                    left: `${pin.x}%`,
+                    top: `${pin.y}%`,
+                    backgroundColor: "hsl(25, 90%, 50%)",
+                    color: "white",
+                  }}
+                  onClick={(e) => { e.stopPropagation(); setSelectedPinId(pin.id); }}
+                  data-testid={`pin-${pin.id}`}
+                >
+                  {pin.label}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {localPins.length > 0 && (
+            <Card>
+              <CardHeader className="p-3">
+                <CardTitle className="text-sm">Placed Pins ({localPins.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 space-y-2">
+                {localPins.map((pin) => (
+                  <div key={pin.id} className="flex items-center gap-2">
+                    <Badge
+                      variant="default"
+                      className="no-default-hover-elevate no-default-active-elevate shrink-0"
+                      style={{ backgroundColor: "hsl(25, 90%, 50%)" }}
+                    >
+                      {pin.label}
+                    </Badge>
+                    <Label className="text-xs shrink-0">Reels:</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={pin.reelCount}
+                      onChange={(e) => {
+                        setLocalPins((prev) =>
+                          prev.map((p) => p.id === pin.id ? { ...p, reelCount: parseInt(e.target.value) || 1 } : p)
+                        );
+                      }}
+                      className="w-20"
+                      data-testid={`input-pin-reel-count-${pin.id}`}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setLocalPins((prev) => prev.filter((p) => p.id !== pin.id))}
+                      data-testid={`button-remove-pin-${pin.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex items-center gap-2 pt-2 flex-wrap">
+                  <Button
+                    onClick={() => createEntries.mutate()}
+                    disabled={createEntries.isPending}
+                    data-testid="button-create-entries-from-pins"
+                  >
+                    {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    Create Entries
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setLocalPins([])}
+                    data-testid="button-clear-pins"
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={analyzePhoto}
+              disabled={aiLoading}
+              data-testid="button-ai-assist"
+            >
+              {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+              AI Assist
+            </Button>
+          </div>
+
+          {aiResult && (
+            <Card>
+              <CardHeader className="p-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Brain className="h-4 w-4" />
+                  AI Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <p className="text-sm whitespace-pre-wrap text-muted-foreground" data-testid="text-ai-result">{aiResult}</p>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SingleEntryMode({
+  sessionId, editingEntry, onDoneEditing,
+}: {
+  sessionId: number;
+  editingEntry: Entry | null;
+  onDoneEditing: () => void;
+}) {
+  const { toast } = useToast();
+  const [keepLocation, setKeepLocation] = useState(false);
+  const [form, setForm] = useState({
+    aisle: editingEntry?.aisle || "",
+    section: editingEntry?.section || "",
+    position: editingEntry?.position || "",
+    palletId: editingEntry?.palletId || "",
+    reelTag: editingEntry?.reelTag || "",
+    wireType: editingEntry?.wireType || "",
+    gauge: editingEntry?.gauge || "",
+    footage: editingEntry?.footage?.toString() || "",
+    color: editingEntry?.color || "",
+    manufacturer: editingEntry?.manufacturer || "",
+    notes: editingEntry?.notes || "",
+  });
+
+  useEffect(() => {
+    if (editingEntry) {
+      setForm({
+        aisle: editingEntry.aisle || "",
+        section: editingEntry.section || "",
+        position: editingEntry.position || "",
+        palletId: editingEntry.palletId || "",
+        reelTag: editingEntry.reelTag || "",
+        wireType: editingEntry.wireType || "",
+        gauge: editingEntry.gauge || "",
+        footage: editingEntry.footage?.toString() || "",
+        color: editingEntry.color || "",
+        manufacturer: editingEntry.manufacturer || "",
+        notes: editingEntry.notes || "",
+      });
+    }
+  }, [editingEntry]);
+
+  const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
+
+  const saveEntry = useMutation({
+    mutationFn: async () => {
+      const body = {
+        aisle: form.aisle,
+        section: form.section,
+        position: form.position || null,
+        palletId: form.palletId.toUpperCase() || null,
+        reelTag: form.reelTag.toUpperCase() || null,
+        wireType: form.wireType || null,
+        gauge: form.gauge || null,
+        footage: form.footage ? parseInt(form.footage) : null,
+        color: form.color || null,
+        manufacturer: form.manufacturer || null,
+        notes: form.notes || null,
+      };
+
+      if (editingEntry) {
+        await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
+      } else {
+        await apiRequest("POST", `/api/sessions/${sessionId}/entries`, body);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      toast({ title: editingEntry ? "Entry updated" : "Entry saved" });
+      if (editingEntry) {
+        onDoneEditing();
+      } else {
+        const savedAisle = form.aisle;
+        const savedSection = form.section;
+        setForm({
+          aisle: keepLocation ? savedAisle : "",
+          section: keepLocation ? savedSection : "",
+          position: "", palletId: "", reelTag: "", wireType: "", gauge: "",
+          footage: "", color: "", manufacturer: "", notes: "",
+        });
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to save entry", variant: "destructive" });
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (form.aisle && form.section) saveEntry.mutate(); }}
+      className="space-y-3"
+    >
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">Aisle</Label>
+          <Input value={form.aisle} onChange={(e) => update("aisle", e.target.value)} inputMode="numeric" placeholder="Aisle" data-testid="input-aisle" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Section</Label>
+          <Input value={form.section} onChange={(e) => update("section", e.target.value)} inputMode="numeric" placeholder="Section" data-testid="input-section" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Position</Label>
+          <Select value={form.position} onValueChange={(v) => update("position", v)}>
+            <SelectTrigger data-testid="select-position"><SelectValue placeholder="Position" /></SelectTrigger>
+            <SelectContent>
+              {POSITIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">Pallet ID</Label>
+          <Input value={form.palletId} onChange={(e) => update("palletId", e.target.value.toUpperCase())} placeholder="Pallet ID" data-testid="input-pallet-id" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Reel Tag</Label>
+          <Input value={form.reelTag} onChange={(e) => update("reelTag", e.target.value.toUpperCase())} placeholder="Reel Tag" data-testid="input-reel-tag" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">Wire Type</Label>
+          <Select value={form.wireType} onValueChange={(v) => update("wireType", v)}>
+            <SelectTrigger data-testid="select-wire-type"><SelectValue placeholder="Type" /></SelectTrigger>
+            <SelectContent>
+              {WIRE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Gauge</Label>
+          <Select value={form.gauge} onValueChange={(v) => update("gauge", v)}>
+            <SelectTrigger data-testid="select-gauge"><SelectValue placeholder="Gauge" /></SelectTrigger>
+            <SelectContent>
+              {GAUGES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Footage</Label>
+          <Input type="number" value={form.footage} onChange={(e) => update("footage", e.target.value)} placeholder="Footage" data-testid="input-footage" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">Color</Label>
+          <Select value={form.color} onValueChange={(v) => update("color", v)}>
+            <SelectTrigger data-testid="select-color"><SelectValue placeholder="Color" /></SelectTrigger>
+            <SelectContent>
+              {COLORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Manufacturer</Label>
+          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value)} placeholder="Manufacturer" data-testid="input-manufacturer" />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">Notes</Label>
+        <Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Notes..." rows={2} data-testid="input-notes" />
+      </div>
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {!editingEntry && (
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={keepLocation}
+              onCheckedChange={(c) => setKeepLocation(!!c)}
+              data-testid="checkbox-keep-location"
+            />
+            Keep Location
+          </label>
+        )}
+        <div className="flex items-center gap-2 ml-auto">
+          {editingEntry && (
+            <Button type="button" variant="outline" onClick={onDoneEditing} data-testid="button-cancel-edit">
+              Cancel
+            </Button>
+          )}
+          <Button
+            type="submit"
+            disabled={!form.aisle || !form.section || saveEntry.isPending}
+            data-testid="button-save-entry"
+          >
+            {saveEntry.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {editingEntry ? "Update" : "Save Entry"}
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function EntryTable({
+  entries, loading, totalFootage, sessionId, onEdit,
+}: {
+  entries: Entry[];
+  loading: boolean;
+  totalFootage: number;
+  sessionId: number;
+  onEdit: (entry: Entry) => void;
+}) {
+  const { toast } = useToast();
+
+  const deleteEntry = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/entries/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      toast({ title: "Entry deleted" });
+    },
+  });
+
+  if (loading) {
+    return <Skeleton className="h-48 w-full" />;
+  }
+
+  if (entries.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <Cable className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-muted-foreground text-sm">No entries yet. Add reels using the form above.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="p-3">
+        <CardTitle className="text-sm">Entries ({entries.length})</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">#</TableHead>
+                <TableHead>Aisle</TableHead>
+                <TableHead>Section</TableHead>
+                <TableHead>Position</TableHead>
+                <TableHead>Reel Tag</TableHead>
+                <TableHead>Wire Type</TableHead>
+                <TableHead>Gauge</TableHead>
+                <TableHead>Footage</TableHead>
+                <TableHead>Color</TableHead>
+                <TableHead className="w-20">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entries.map((entry, idx) => (
+                <TableRow key={entry.id} data-testid={`row-entry-${entry.id}`}>
+                  <TableCell className="mono text-xs text-muted-foreground">{idx + 1}</TableCell>
+                  <TableCell className="text-xs">{entry.aisle}</TableCell>
+                  <TableCell className="text-xs">{entry.section}</TableCell>
+                  <TableCell className="text-xs">{entry.position || "-"}</TableCell>
+                  <TableCell className="text-xs mono">{entry.reelTag || "-"}</TableCell>
+                  <TableCell className="text-xs">{entry.wireType || "-"}</TableCell>
+                  <TableCell className="text-xs">{entry.gauge || "-"}</TableCell>
+                  <TableCell className="text-xs mono">{entry.footage?.toLocaleString() || "-"}</TableCell>
+                  <TableCell className="text-xs">{entry.color || "-"}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => onEdit(entry)}
+                        data-testid={`button-edit-entry-${entry.id}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            data-testid={`button-delete-entry-${entry.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Entry?</AlertDialogTitle>
+                            <AlertDialogDescription>This entry will be permanently removed.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteEntry.mutate(entry.id)}>Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={7} className="text-xs font-semibold">
+                  Total: {entries.length} entries
+                </TableCell>
+                <TableCell className="text-xs font-semibold mono" data-testid="text-total-footage">
+                  {totalFootage.toLocaleString()} ft
+                </TableCell>
+                <TableCell colSpan={2} />
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
