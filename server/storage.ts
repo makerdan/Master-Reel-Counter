@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql, count, sum } from "drizzle-orm";
 import {
   countingSessions,
   photos,
@@ -46,6 +46,7 @@ export interface IStorage {
   upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings>;
   getAllUserEntries(userId: string): Promise<Entry[]>;
   bulkUpdateEntries(entriesToUpdate: { id: number; data: Partial<Entry> }[]): Promise<void>;
+  getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -195,6 +196,27 @@ export class DatabaseStorage implements IStorage {
     for (const { id, data } of entriesToUpdate) {
       await db.update(entries).set(data).where(eq(entries.id, id));
     }
+  }
+
+  async getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number }>> {
+    const result = new Map<number, { entryCount: number; totalFootage: number }>();
+    if (sessionIds.length === 0) return result;
+    const rows = await db
+      .select({
+        sessionId: entries.sessionId,
+        entryCount: count(entries.id),
+        totalFootage: sum(entries.footage),
+      })
+      .from(entries)
+      .where(inArray(entries.sessionId, sessionIds))
+      .groupBy(entries.sessionId);
+    for (const row of rows) {
+      result.set(row.sessionId, {
+        entryCount: Number(row.entryCount),
+        totalFootage: Number(row.totalFootage) || 0,
+      });
+    }
+    return result;
   }
 }
 

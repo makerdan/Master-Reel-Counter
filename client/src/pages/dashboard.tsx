@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings } from "lucide-react";
+import {
+  Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings,
+  Pencil, Hash, Ruler, CheckCircle2, RotateCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,21 +12,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -32,6 +25,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Session } from "@shared/schema";
 
+type SessionWithStats = Session & { entryCount: number; totalFootage: number };
+
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -39,8 +34,11 @@ export default function Dashboard() {
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [sessionName, setSessionName] = useState("");
   const [sessionLocation, setSessionLocation] = useState("");
+  const [editingSession, setEditingSession] = useState<SessionWithStats | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editLocation, setEditLocation] = useState("");
 
-  const { data: sessions, isLoading } = useQuery<Session[]>({
+  const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
   });
 
@@ -76,6 +74,44 @@ export default function Dashboard() {
       toast({ title: "Failed to delete session", variant: "destructive" });
     },
   });
+
+  const updateSession = useMutation({
+    mutationFn: async ({ id, name, location }: { id: number; name: string; location: string }) => {
+      const res = await apiRequest("PATCH", `/api/sessions/${id}`, { name, location: location || null });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      setEditingSession(null);
+      toast({ title: "Session updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update session", variant: "destructive" });
+    },
+  });
+
+  const toggleStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const body: any = { status };
+      if (status === "completed") body.completedAt = new Date().toISOString();
+      else body.completedAt = null;
+      const res = await apiRequest("PATCH", `/api/sessions/${id}`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update session status", variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (session: SessionWithStats, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSession(session);
+    setEditName(session.name);
+    setEditLocation(session.location || "");
+  };
 
   const formatDate = (date: string | Date | null) => {
     if (!date) return "";
@@ -223,9 +259,45 @@ export default function Dashboard() {
                           <Clock className="h-3 w-3" />
                           {formatDate(session.startedAt)}
                         </span>
+                        <span className="flex items-center gap-1 mono" data-testid={`text-session-entries-${session.id}`}>
+                          <Hash className="h-3 w-3" />
+                          {session.entryCount} entries
+                        </span>
+                        {session.totalFootage > 0 && (
+                          <span className="flex items-center gap-1 mono" data-testid={`text-session-footage-${session.id}`}>
+                            <Ruler className="h-3 w-3" />
+                            {session.totalFootage.toLocaleString()} ft
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleStatus.mutate({
+                            id: session.id,
+                            status: session.status === "active" ? "completed" : "active",
+                          });
+                        }}
+                        data-testid={`button-toggle-status-${session.id}`}
+                      >
+                        {session.status === "active" ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={(e) => openEditDialog(session, e)}
+                        data-testid={`button-edit-session-${session.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -264,6 +336,50 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      <Dialog open={!!editingSession} onOpenChange={(o) => { if (!o) setEditingSession(null); }}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Edit Session</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (editingSession && editName.trim()) {
+                updateSession.mutate({ id: editingSession.id, name: editName, location: editLocation });
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="edit-session-name">Session Name</Label>
+              <Input
+                id="edit-session-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                data-testid="input-edit-session-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-session-location">Location</Label>
+              <Input
+                id="edit-session-location"
+                value={editLocation}
+                onChange={(e) => setEditLocation(e.target.value)}
+                data-testid="input-edit-session-location"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!editName.trim() || updateSession.isPending}
+              data-testid="button-save-session-edit"
+            >
+              {updateSession.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

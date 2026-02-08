@@ -37,7 +37,13 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const sessions = await storage.getUserSessions(userId);
-      res.json(sessions);
+      const sessionIds = sessions.map(s => s.id);
+      const stats = await storage.getSessionStats(sessionIds);
+      const sessionsWithStats = sessions.map(s => {
+        const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0 };
+        return { ...s, entryCount: st.entryCount, totalFootage: st.totalFootage };
+      });
+      res.json(sessionsWithStats);
     } catch (error) {
       console.error("Error fetching sessions:", error);
       res.status(500).json({ message: "Failed to fetch sessions" });
@@ -136,6 +142,14 @@ export async function registerRoutes(
       if (!photo) return res.status(404).json({ message: "Photo not found" });
       const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
       if (!session) return res.status(404).json({ message: "Photo not found" });
+      try {
+        const objectFile = await objectStorageService.getObjectEntityFile(
+          photo.objectStorageKey.startsWith("/objects/") ? photo.objectStorageKey : `/objects/${photo.objectStorageKey}`
+        );
+        await objectFile.delete();
+      } catch (err) {
+        console.warn("Could not delete object storage file:", err);
+      }
       await storage.deletePhoto(photo.id);
       res.json({ success: true });
     } catch (error) {
@@ -314,6 +328,70 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("AI analysis error:", error);
       res.status(500).json({ message: "AI analysis failed: " + (error.message || "Unknown error") });
+    }
+  });
+
+  app.get("/api/sessions/:id/export/pdf", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const session = await verifySessionOwnership(parseInt(req.params.id), userId);
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      const rawEntries = await storage.getSessionEntries(session.id);
+      const key = await getEncryptionKey(userId);
+      const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
+      const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+      const generatedAt = new Date().toISOString();
+      const rowsHtml = sessionEntries.map((e: any, i: number) => `
+        <tr>
+          <td>${i + 1}</td><td>${e.aisle || ""}</td><td>${e.section || ""}</td><td>${e.position || ""}</td>
+          <td>${e.palletId || ""}</td><td>${e.reelTag || ""}</td><td>${e.wireType || ""}</td>
+          <td>${e.gauge || ""}</td><td>${e.footage || ""}</td><td>${e.color || ""}</td>
+          <td>${e.manufacturer || ""}</td><td>${e.notes || ""}</td>
+        </tr>`).join("");
+      const html = `<!DOCTYPE html><html><head><title>${session.name} - Audit Report</title>
+        <style>
+          body{font-family:Arial,sans-serif;padding:24px;color:#333}
+          table{border-collapse:collapse;width:100%;margin-top:16px}
+          th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:11px}
+          th{background:#f5f0eb;font-weight:600}
+          h1{font-size:20px;margin:0}
+          .meta{font-size:12px;color:#666;margin-top:4px}
+          .audit{margin-top:24px;padding-top:12px;border-top:2px solid #ea580c;font-size:10px;color:#666}
+          .audit strong{color:#333}
+          .stamp{display:inline-block;border:2px solid #ea580c;padding:4px 12px;border-radius:4px;font-size:10px;font-weight:600;color:#ea580c;margin-top:8px}
+        </style>
+      </head><body>
+        <h1>Master Reel Counter - ${session.name}</h1>
+        <div class="meta">
+          Location: ${session.location || "N/A"}<br>
+          Status: ${session.status} | Entries: ${sessionEntries.length} | Total Footage: ${totalFootage.toLocaleString()} ft
+        </div>
+        <table>
+          <thead><tr>
+            <th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th>
+            <th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Color</th>
+            <th>Manufacturer</th><th>Notes</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <div class="audit">
+          <strong>Audit Trail</strong><br>
+          Report generated: ${generatedAt}<br>
+          Session created: ${new Date(session.startedAt).toISOString()}<br>
+          Last updated: ${new Date(session.lastUpdatedAt).toISOString()}<br>
+          ${session.completedAt ? `Completed: ${new Date(session.completedAt).toISOString()}<br>` : ""}
+          Entry count at generation: ${sessionEntries.length}<br>
+          Data encoding: ${key ? "Active (entries decrypted for export)" : "Off"}<br>
+          <div class="stamp">VERIFIED EXPORT - ${generatedAt}</div>
+        </div>
+        <script>setTimeout(()=>window.print(),500)</script>
+      </body></html>`;
+      res.setHeader("Content-Type", "text/html");
+      res.setHeader("Content-Disposition", `inline; filename="${session.name.replace(/\s+/g, "_")}_report.html"`);
+      res.send(html);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate report" });
     }
   });
 

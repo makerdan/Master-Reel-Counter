@@ -4,7 +4,7 @@ import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Brain, Cable,
-  Save, X, Loader2,
+  Save, X, Loader2, CheckCircle2, RotateCcw, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -126,8 +127,49 @@ function SessionWorkspace({
   const { toast } = useToast();
   const [mode, setMode] = useState<string>("photo");
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const [editSessionOpen, setEditSessionOpen] = useState(false);
+  const [editName, setEditName] = useState(session.name);
+  const [editLocation, setEditLocation] = useState(session.location || "");
 
   const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
+
+  const updateSession = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, {
+        name: editName,
+        location: editLocation || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      setEditSessionOpen(false);
+      toast({ title: "Session updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update session", variant: "destructive" });
+    },
+  });
+
+  const toggleStatus = useMutation({
+    mutationFn: async () => {
+      const newStatus = session.status === "active" ? "completed" : "active";
+      const body: any = { status: newStatus };
+      if (newStatus === "completed") body.completedAt = new Date().toISOString();
+      else body.completedAt = null;
+      const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      toast({ title: session.status === "active" ? "Session completed" : "Session reopened" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update status", variant: "destructive" });
+    },
+  });
 
   const exportCsv = () => {
     const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Color", "Manufacturer", "Notes"];
@@ -145,26 +187,38 @@ function SessionWorkspace({
     URL.revokeObjectURL(url);
   };
 
-  const exportPdf = () => {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    const rowsHtml = entries.map((e, i) => `
-      <tr>
-        <td>${i + 1}</td><td>${e.aisle}</td><td>${e.section}</td><td>${e.position || ""}</td>
-        <td>${e.reelTag || ""}</td><td>${e.wireType || ""}</td><td>${e.gauge || ""}</td>
-        <td>${e.footage || ""}</td><td>${e.color || ""}</td>
-      </tr>
-    `).join("");
-    w.document.write(`<!DOCTYPE html><html><head><title>${session.name} - Report</title>
-      <style>body{font-family:Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%;margin-top:12px}
-      th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f0eb}
-      h1{font-size:18px}h2{font-size:14px;color:#666;margin-top:4px}</style></head><body>
-      <h1>Master Reel Counter - ${session.name}</h1>
-      <h2>Location: ${session.location || "N/A"} | Entries: ${entries.length} | Total Footage: ${totalFootage.toLocaleString()} ft</h2>
-      <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Color</th></tr></thead>
-      <tbody>${rowsHtml}</tbody></table>
-      <script>setTimeout(()=>window.print(),500)</script></body></html>`);
-    w.document.close();
+  const exportPdf = async () => {
+    try {
+      const res = await apiRequest("GET", `/api/sessions/${sessionId}/export/pdf`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${session.name.replace(/\s+/g, "_")}_report.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      const w = window.open("", "_blank");
+      if (!w) return;
+      const rowsHtml = entries.map((e, i) => `
+        <tr>
+          <td>${i + 1}</td><td>${e.aisle}</td><td>${e.section}</td><td>${e.position || ""}</td>
+          <td>${e.reelTag || ""}</td><td>${e.wireType || ""}</td><td>${e.gauge || ""}</td>
+          <td>${e.footage || ""}</td><td>${e.color || ""}</td>
+        </tr>
+      `).join("");
+      w.document.write(`<!DOCTYPE html><html><head><title>${session.name} - Report</title>
+        <style>body{font-family:Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%;margin-top:12px}
+        th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f0eb}
+        h1{font-size:18px}h2{font-size:14px;color:#666;margin-top:4px}.audit{margin-top:20px;font-size:10px;color:#999;border-top:1px solid #ddd;padding-top:8px}</style></head><body>
+        <h1>Master Reel Counter - ${session.name}</h1>
+        <h2>Location: ${session.location || "N/A"} | Entries: ${entries.length} | Total Footage: ${totalFootage.toLocaleString()} ft</h2>
+        <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Color</th></tr></thead>
+        <tbody>${rowsHtml}</tbody></table>
+        <div class="audit">Generated: ${new Date().toISOString()} | Session started: ${new Date(session.startedAt).toISOString()}</div>
+        <script>setTimeout(()=>window.print(),500)</script></body></html>`);
+      w.document.close();
+    }
   };
 
   return (
@@ -175,8 +229,17 @@ function SessionWorkspace({
             <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="min-w-0">
-              <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
+            <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditSessionOpen(true); }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
+                <Badge
+                  variant={session.status === "active" ? "default" : "secondary"}
+                  className="no-default-hover-elevate no-default-active-elevate"
+                  data-testid="badge-session-status"
+                >
+                  {session.status}
+                </Badge>
+              </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="mono" data-testid="text-entry-count">{entries.length} entries</span>
                 <span className="mono" data-testid="text-elapsed">{formatElapsed(session.startedAt)}</span>
@@ -184,6 +247,19 @@ function SessionWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => toggleStatus.mutate()}
+              disabled={toggleStatus.isPending}
+              data-testid="button-toggle-session-status"
+            >
+              {session.status === "active" ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+            </Button>
             <Button size="sm" variant="outline" onClick={exportCsv} data-testid="button-export-csv">
               <Download className="h-3 w-3" />
               CSV
@@ -240,6 +316,48 @@ function SessionWorkspace({
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={editSessionOpen} onOpenChange={setEditSessionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Session</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (editName.trim()) updateSession.mutate();
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="edit-session-name">Session Name</Label>
+              <Input
+                id="edit-session-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                data-testid="input-edit-session-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-session-location">Location</Label>
+              <Input
+                id="edit-session-location"
+                value={editLocation}
+                onChange={(e) => setEditLocation(e.target.value)}
+                data-testid="input-edit-session-location"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!editName.trim() || updateSession.isPending}
+              data-testid="button-save-session-edit"
+            >
+              {updateSession.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -255,6 +373,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState("");
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
 
   const [scale, setScale] = useState(1);
   const [panX, setPanX] = useState(0);
@@ -383,31 +502,57 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const createEntries = useMutation({
     mutationFn: async () => {
       const section = currentPhoto?.section || "";
+      const errors: string[] = [];
+      const totalEntries = localPins.reduce((sum, pin) => sum + pin.reelCount, 0);
+      let completed = 0;
+      setBatchProgress({ current: 0, total: totalEntries, errors: [] });
+
       for (const pin of localPins) {
-        await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
-          aisle,
-          section,
-          position: "Floor",
-          reelTag: `Pin ${pin.label}`,
-          notes: `Reel count: ${pin.reelCount}`,
-        });
-        if (currentPhoto?.dbId) {
-          await apiRequest("POST", `/api/photos/${currentPhoto.dbId}/pins`, {
-            xPercent: pin.x,
-            yPercent: pin.y,
-            label: pin.label,
-            reelCount: pin.reelCount,
-          });
+        try {
+          const entryIds: number[] = [];
+          for (let r = 0; r < pin.reelCount; r++) {
+            const reelLabel = pin.reelCount > 1 ? `Pin ${pin.label} (${r + 1}/${pin.reelCount})` : `Pin ${pin.label}`;
+            const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
+              aisle,
+              section,
+              position: "Floor",
+              reelTag: reelLabel,
+              notes: pin.reelCount > 1 ? `Reel ${r + 1} of ${pin.reelCount} at pin ${pin.label}` : undefined,
+            });
+            const entry = await res.json();
+            entryIds.push(entry.id);
+            completed++;
+            setBatchProgress({ current: completed, total: totalEntries, errors });
+          }
+          if (currentPhoto?.dbId) {
+            const pinRes = await apiRequest("POST", `/api/photos/${currentPhoto.dbId}/pins`, {
+              xPercent: pin.x,
+              yPercent: pin.y,
+              label: pin.label,
+              reelCount: pin.reelCount,
+              entryId: entryIds[0],
+            });
+          }
+        } catch {
+          errors.push(`Pin ${pin.label}`);
+          setBatchProgress({ current: completed, total: totalEntries, errors });
         }
+      }
+      if (errors.length > 0) {
+        throw new Error(`Failed to create entries for: ${errors.join(", ")}`);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      const totalCreated = localPins.reduce((sum, pin) => sum + pin.reelCount, 0);
       setLocalPins([]);
-      toast({ title: `Created ${localPins.length} entries from pins` });
+      setBatchProgress(null);
+      toast({ title: `Created ${totalCreated} entries from ${localPins.length} pins` });
     },
-    onError: () => {
-      toast({ title: "Failed to create entries", variant: "destructive" });
+    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      toast({ title: error.message, variant: "destructive" });
+      setTimeout(() => setBatchProgress(null), 3000);
     },
   });
 
@@ -601,6 +746,23 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                     </Button>
                   </div>
                 ))}
+
+                {batchProgress && (
+                  <div className="space-y-2 pt-2" data-testid="batch-progress">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Creating entries...</span>
+                      <span>{batchProgress.current} / {batchProgress.total}</span>
+                    </div>
+                    <Progress value={(batchProgress.current / batchProgress.total) * 100} />
+                    {batchProgress.errors.length > 0 && (
+                      <div className="flex items-center gap-1 text-xs text-destructive">
+                        <AlertTriangle className="h-3 w-3" />
+                        Failed: {batchProgress.errors.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 pt-2 flex-wrap">
                   <Button
                     onClick={() => createEntries.mutate()}
@@ -608,11 +770,12 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                     data-testid="button-create-entries-from-pins"
                   >
                     {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    Create Entries
+                    Create {localPins.reduce((s, p) => s + p.reelCount, 0)} Entries
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => setLocalPins([])}
+                    disabled={createEntries.isPending}
                     data-testid="button-clear-pins"
                   >
                     Clear All
@@ -675,6 +838,8 @@ function SingleEntryMode({
     manufacturer: editingEntry?.manufacturer || "",
     notes: editingEntry?.notes || "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (editingEntry) {
@@ -691,10 +856,31 @@ function SingleEntryMode({
         manufacturer: editingEntry.manufacturer || "",
         notes: editingEntry.notes || "",
       });
+      setErrors({});
+      setTouched({});
     }
   }, [editingEntry]);
 
-  const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
+  const update = (field: string, value: string) => {
+    setForm((f) => ({ ...f, [field]: value }));
+    if (errors[field]) {
+      setErrors((e) => { const n = { ...e }; delete n[field]; return n; });
+    }
+  };
+
+  const markTouched = (field: string) => {
+    setTouched((t) => ({ ...t, [field]: true }));
+  };
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!form.aisle.trim()) newErrors.aisle = "Aisle is required";
+    if (!form.section.trim()) newErrors.section = "Section is required";
+    if (form.footage && isNaN(parseInt(form.footage))) newErrors.footage = "Must be a number";
+    setErrors(newErrors);
+    setTouched({ aisle: true, section: true, footage: true });
+    return Object.keys(newErrors).length === 0;
+  };
 
   const saveEntry = useMutation({
     mutationFn: async () => {
@@ -732,6 +918,8 @@ function SingleEntryMode({
           position: "", palletId: "", reelTag: "", wireType: "", gauge: "",
           footage: "", color: "", manufacturer: "", notes: "",
         });
+        setErrors({});
+        setTouched({});
       }
     },
     onError: () => {
@@ -739,19 +927,43 @@ function SingleEntryMode({
     },
   });
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validate()) saveEntry.mutate();
+  };
+
   return (
-    <form
-      onSubmit={(e) => { e.preventDefault(); if (form.aisle && form.section) saveEntry.mutate(); }}
-      className="space-y-3"
-    >
+    <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Aisle</Label>
-          <Input value={form.aisle} onChange={(e) => update("aisle", e.target.value)} inputMode="numeric" placeholder="Aisle" data-testid="input-aisle" />
+          <Label className="text-xs">Aisle <span className="text-destructive">*</span></Label>
+          <Input
+            value={form.aisle}
+            onChange={(e) => update("aisle", e.target.value)}
+            onBlur={() => markTouched("aisle")}
+            inputMode="numeric"
+            placeholder="Aisle"
+            className={touched.aisle && errors.aisle ? "border-destructive" : ""}
+            data-testid="input-aisle"
+          />
+          {touched.aisle && errors.aisle && (
+            <p className="text-xs text-destructive" data-testid="error-aisle">{errors.aisle}</p>
+          )}
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Section</Label>
-          <Input value={form.section} onChange={(e) => update("section", e.target.value)} inputMode="numeric" placeholder="Section" data-testid="input-section" />
+          <Label className="text-xs">Section <span className="text-destructive">*</span></Label>
+          <Input
+            value={form.section}
+            onChange={(e) => update("section", e.target.value)}
+            onBlur={() => markTouched("section")}
+            inputMode="numeric"
+            placeholder="Section"
+            className={touched.section && errors.section ? "border-destructive" : ""}
+            data-testid="input-section"
+          />
+          {touched.section && errors.section && (
+            <p className="text-xs text-destructive" data-testid="error-section">{errors.section}</p>
+          )}
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Position</Label>
@@ -796,7 +1008,18 @@ function SingleEntryMode({
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Footage</Label>
-          <Input type="number" value={form.footage} onChange={(e) => update("footage", e.target.value)} placeholder="Footage" data-testid="input-footage" />
+          <Input
+            type="number"
+            value={form.footage}
+            onChange={(e) => update("footage", e.target.value)}
+            onBlur={() => markTouched("footage")}
+            placeholder="Footage"
+            className={touched.footage && errors.footage ? "border-destructive" : ""}
+            data-testid="input-footage"
+          />
+          {touched.footage && errors.footage && (
+            <p className="text-xs text-destructive" data-testid="error-footage">{errors.footage}</p>
+          )}
         </div>
       </div>
 
@@ -840,7 +1063,7 @@ function SingleEntryMode({
           )}
           <Button
             type="submit"
-            disabled={!form.aisle || !form.section || saveEntry.isPending}
+            disabled={saveEntry.isPending}
             data-testid="button-save-entry"
           >
             {saveEntry.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
