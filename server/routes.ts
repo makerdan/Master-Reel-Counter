@@ -7,11 +7,19 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { openai } from "./replit_integrations/image/client";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema } from "@shared/schema";
+import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 
 async function verifySessionOwnership(sessionId: number, userId: string) {
   const session = await storage.getSession(sessionId);
   if (!session || session.userId !== userId) return null;
   return session;
+}
+
+async function getEncryptionKey(userId: string): Promise<Buffer | null> {
+  const settings = await storage.getUserSettings(userId);
+  if (!settings?.encodingEnabled || !settings.encryptionKey || !settings.encryptionSalt) return null;
+  const kek = deriveKEK(settings.encryptionSalt);
+  return unwrapKey(settings.encryptionKey, kek);
 }
 
 export async function registerRoutes(
@@ -135,13 +143,16 @@ export async function registerRoutes(
     }
   });
 
-  // Entries CRUD - all operations verify session ownership
+  // Entries CRUD - all operations verify session ownership + encoding
   app.get("/api/sessions/:sessionId/entries", isAuthenticated, async (req: any, res) => {
     try {
-      const session = await verifySessionOwnership(parseInt(req.params.sessionId), req.user.claims.sub);
+      const userId = req.user.claims.sub;
+      const session = await verifySessionOwnership(parseInt(req.params.sessionId), userId);
       if (!session) return res.status(404).json({ message: "Session not found" });
-      const entries = await storage.getSessionEntries(session.id);
-      res.json(entries);
+      const rawEntries = await storage.getSessionEntries(session.id);
+      const key = await getEncryptionKey(userId);
+      const result = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
+      res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch entries" });
     }
@@ -152,10 +163,14 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const session = await verifySessionOwnership(parseInt(req.params.sessionId), userId);
       if (!session) return res.status(404).json({ message: "Session not found" });
-      const data = insertEntrySchema.parse({ ...req.body, sessionId: session.id, userId });
+      let entryData = { ...req.body, sessionId: session.id, userId };
+      const key = await getEncryptionKey(userId);
+      if (key) entryData = encryptEntry(entryData, key) as any;
+      const data = insertEntrySchema.parse(entryData);
       const entry = await storage.createEntry(data);
       await storage.updateSession(session.id, {});
-      res.json(entry);
+      const result = key ? decryptEntry(entry, key) : entry;
+      res.json(result);
     } catch (error) {
       console.error("Error creating entry:", error);
       res.status(500).json({ message: "Failed to create entry" });
@@ -164,12 +179,17 @@ export async function registerRoutes(
 
   app.patch("/api/entries/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const entry = await storage.getEntry(parseInt(req.params.id));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const session = await verifySessionOwnership(entry.sessionId, req.user.claims.sub);
+      const session = await verifySessionOwnership(entry.sessionId, userId);
       if (!session) return res.status(404).json({ message: "Entry not found" });
-      const updated = await storage.updateEntry(entry.id, req.body);
-      res.json(updated);
+      const key = await getEncryptionKey(userId);
+      let updateData = req.body;
+      if (key) updateData = encryptEntry(updateData, key) as any;
+      const updated = await storage.updateEntry(entry.id, updateData);
+      const result = key && updated ? decryptEntry(updated, key) : updated;
+      res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to update entry" });
     }
@@ -297,16 +317,99 @@ export async function registerRoutes(
     }
   });
 
-  // Export session data (authenticated)
+  // Export session data (authenticated, decrypted)
   app.get("/api/sessions/:id/export", isAuthenticated, async (req: any, res) => {
     try {
-      const session = await verifySessionOwnership(parseInt(req.params.id), req.user.claims.sub);
+      const userId = req.user.claims.sub;
+      const session = await verifySessionOwnership(parseInt(req.params.id), userId);
       if (!session) return res.status(404).json({ message: "Session not found" });
-      const sessionEntries = await storage.getSessionEntries(session.id);
+      const rawEntries = await storage.getSessionEntries(session.id);
+      const key = await getEncryptionKey(userId);
+      const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       res.json({ session, entries: sessionEntries, photos: sessionPhotos });
     } catch (error) {
       res.status(500).json({ message: "Failed to export session" });
+    }
+  });
+
+  // User Settings
+  app.get("/api/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.getUserSettings(userId);
+      res.json(settings || { userId, encodingEnabled: false });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.post("/api/settings/encoding", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { enabled } = req.body;
+
+      const currentSettings = await storage.getUserSettings(userId);
+      const allEntries = await storage.getAllUserEntries(userId);
+
+      if (enabled) {
+        const salt = generateSalt();
+        const dataKey = generateDataKey();
+        const kek = deriveKEK(salt);
+        const wrappedKey = wrapKey(dataKey, kek);
+        const entriesToUpdate = allEntries.map(entry => ({
+          id: entry.id,
+          data: encryptEntry({
+            reelTag: entry.reelTag,
+            wireType: entry.wireType,
+            gauge: entry.gauge,
+            color: entry.color,
+            manufacturer: entry.manufacturer,
+            notes: entry.notes,
+            palletId: entry.palletId,
+            position: entry.position,
+          }, dataKey),
+        }));
+        if (entriesToUpdate.length > 0) {
+          await storage.bulkUpdateEntries(entriesToUpdate);
+        }
+        await storage.upsertUserSettings(userId, {
+          encodingEnabled: true,
+          encryptionKey: wrappedKey,
+          encryptionSalt: salt,
+        });
+        res.json({ success: true, encodingEnabled: true, entriesEncoded: entriesToUpdate.length });
+      } else {
+        if (currentSettings?.encodingEnabled && currentSettings.encryptionKey && currentSettings.encryptionSalt) {
+          const kek = deriveKEK(currentSettings.encryptionSalt);
+          const dataKey = unwrapKey(currentSettings.encryptionKey, kek);
+          const entriesToUpdate = allEntries.map(entry => ({
+            id: entry.id,
+            data: decryptEntry({
+              reelTag: entry.reelTag,
+              wireType: entry.wireType,
+              gauge: entry.gauge,
+              color: entry.color,
+              manufacturer: entry.manufacturer,
+              notes: entry.notes,
+              palletId: entry.palletId,
+              position: entry.position,
+            }, dataKey),
+          }));
+          if (entriesToUpdate.length > 0) {
+            await storage.bulkUpdateEntries(entriesToUpdate);
+          }
+        }
+        await storage.upsertUserSettings(userId, {
+          encodingEnabled: false,
+          encryptionKey: null,
+          encryptionSalt: null,
+        });
+        res.json({ success: true, encodingEnabled: false, entriesDecoded: allEntries.length });
+      }
+    } catch (error) {
+      console.error("Error toggling encoding:", error);
+      res.status(500).json({ message: "Failed to toggle encoding" });
     }
   });
 
@@ -322,7 +425,7 @@ export async function registerRoutes(
       res.json({
         session: { id: session.id, name: session.name, location: session.location, status: session.status, startedAt: session.startedAt },
         entries: sessionEntries.map(e => ({
-          id: e.id, section: e.section, aisle: e.aisle, palletNumber: e.palletNumber,
+          id: e.id, section: e.section, aisle: e.aisle, palletId: e.palletId,
           wireType: e.wireType, gauge: e.gauge, color: e.color, footage: e.footage,
           reelTag: e.reelTag, manufacturer: e.manufacturer, notes: e.notes, createdAt: e.createdAt,
         })),

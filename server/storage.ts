@@ -5,6 +5,7 @@ import {
   photos,
   entries,
   pins,
+  userSettings,
   type InsertSession,
   type Session,
   type InsertPhoto,
@@ -13,6 +14,7 @@ import {
   type Entry,
   type InsertPin,
   type Pin,
+  type UserSettings,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -39,6 +41,11 @@ export interface IStorage {
   getPhotoPins(photoId: number): Promise<Pin[]>;
   updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined>;
   deletePin(id: number): Promise<void>;
+
+  getUserSettings(userId: string): Promise<UserSettings | undefined>;
+  upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings>;
+  getAllUserEntries(userId: string): Promise<Entry[]>;
+  bulkUpdateEntries(entriesToUpdate: { id: number; data: Partial<Entry> }[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -158,6 +165,36 @@ export class DatabaseStorage implements IStorage {
 
   async deletePin(id: number): Promise<void> {
     await db.delete(pins).where(eq(pins.id, id));
+  }
+
+  async getUserSettings(userId: string): Promise<UserSettings | undefined> {
+    const [result] = await db.select().from(userSettings).where(eq(userSettings.userId, userId));
+    return result;
+  }
+
+  async upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings> {
+    const existing = await this.getUserSettings(userId);
+    if (existing) {
+      const [result] = await db.update(userSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(userSettings.userId, userId))
+        .returning();
+      return result;
+    }
+    const [result] = await db.insert(userSettings)
+      .values({ userId, ...data })
+      .returning();
+    return result;
+  }
+
+  async getAllUserEntries(userId: string): Promise<Entry[]> {
+    return db.select().from(entries).where(eq(entries.userId, userId));
+  }
+
+  async bulkUpdateEntries(entriesToUpdate: { id: number; data: Partial<Entry> }[]): Promise<void> {
+    for (const { id, data } of entriesToUpdate) {
+      await db.update(entries).set(data).where(eq(entries.id, id));
+    }
   }
 }
 

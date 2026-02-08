@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight } from "lucide-react";
+import { Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -99,6 +99,14 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setLocation("/settings")}
+              data-testid="button-settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
             <Button
               size="icon"
               variant="ghost"

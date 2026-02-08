@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import SessionPage from "@/pages/session";
+import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 function AuthRouter() {
@@ -29,6 +30,9 @@ function AuthRouter() {
       </Route>
       <Route path="/session/:id">
         {user ? <SessionPage /> : <Landing />}
+      </Route>
+      <Route path="/settings">
+        {user ? <SettingsPage /> : <Landing />}
       </Route>
       <Route component={NotFound} />
     </Switch>
