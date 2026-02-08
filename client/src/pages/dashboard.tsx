@@ -5,6 +5,7 @@ import {
   Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings,
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -135,22 +136,32 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setLocation("/settings")}
-              data-testid="button-settings"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => logout()}
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setLocation("/settings")}
+                  data-testid="button-settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Settings</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => logout()}
+                  data-testid="button-logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Sign out</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </header>
