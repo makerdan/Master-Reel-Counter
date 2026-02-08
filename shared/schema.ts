@@ -71,6 +71,15 @@ export const pins = pgTable("pins", {
   reelCount: integer("reel_count").default(1),
 });
 
+export const userSettings = pgTable("user_settings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().unique(),
+  encodingEnabled: boolean("encoding_enabled").notNull().default(false),
+  encryptionKey: text("encryption_key"),
+  encryptionSalt: text("encryption_salt"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertSessionSchema = createInsertSchema(countingSessions).omit({
   id: true,
   startedAt: true,
@@ -101,3 +110,5 @@ export type InsertEntry = z.infer<typeof insertEntrySchema>;
 export type Entry = typeof entries.$inferSelect;
 export type InsertPin = z.infer<typeof insertPinSchema>;
 export type Pin = typeof pins.$inferSelect;
+
+export type UserSettings = typeof userSettings.$inferSelect;
