@@ -74,12 +74,12 @@ export default function SettingsPage() {
           <div className="flex items-center gap-1">
             <ThemeToggle />
             <Button
-              size="icon"
+              size="sm"
               variant="ghost"
               onClick={() => logout()}
               data-testid="button-logout"
             >
-              <LogOut className="h-4 w-4" />
+              Sign Out
             </Button>
           </div>
         </div>
