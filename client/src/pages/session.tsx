@@ -381,7 +381,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; dbId?: number }>>([]);
+  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; dbId?: number; filename?: string; timestamp?: string }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [localPins, _setLocalPins] = useState<LocalPin[]>([]);
   const localPinsRef = useRef<LocalPin[]>([]);
@@ -447,6 +447,8 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         objectPath: p.objectStorageKey,
         section: p.section || "",
         dbId: p.id,
+        filename: p.originalFilename || undefined,
+        timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : undefined,
       })));
       const firstAisle = photos.find(p => p.aisle)?.aisle;
       if (firstAisle && !aisle) setAisle(firstAisle);
@@ -554,6 +556,8 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           objectPath: result.objectPath,
           section: "",
           dbId: savedPhoto.id,
+          filename: file.name,
+          timestamp: new Date().toLocaleString(),
         }]);
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
@@ -975,7 +979,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
           <Input
             value={aisle}
             onChange={(e) => setAisle(e.target.value)}
-            placeholder="Aisle"
+            placeholder="Aisle..."
             inputMode="numeric"
             className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "border-[hsl(145_55%_38%)]" : "border-[hsl(45_100%_45%)]"}`}
             data-testid="input-photo-aisle"
@@ -1021,46 +1025,54 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
 
       {uploadedPhotos.length > 0 && (
         <>
-          <div className="flex items-center justify-between gap-2 flex-wrap bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2">
-            <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-[hsl(25_60%_75%)]"
-                disabled={currentPhotoIdx <= 0}
-                onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
-                data-testid="button-prev-photo"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter">
-                {currentPhotoIdx + 1} / {uploadedPhotos.length}
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-[hsl(25_60%_75%)]"
-                disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
-                data-testid="button-next-photo"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+          <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 space-y-1">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="text-[hsl(25_60%_75%)]"
+                  disabled={currentPhotoIdx <= 0}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
+                  data-testid="button-prev-photo"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter">
+                  {currentPhotoIdx + 1} / {uploadedPhotos.length}
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="text-[hsl(25_60%_75%)]"
+                  disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
+                  data-testid="button-next-photo"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={currentPhoto?.section || ""}
+                  onChange={(e) => {
+                    setUploadedPhotos((prev) =>
+                      prev.map((p, i) => i === currentPhotoIdx ? { ...p, section: e.target.value } : p)
+                    );
+                  }}
+                  placeholder="Section..."
+                  inputMode="numeric"
+                  className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "border-[hsl(145_55%_38%)]" : "border-[hsl(45_100%_45%)]"}`}
+                  data-testid="input-photo-section"
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Input
-                value={currentPhoto?.section || ""}
-                onChange={(e) => {
-                  setUploadedPhotos((prev) =>
-                    prev.map((p, i) => i === currentPhotoIdx ? { ...p, section: e.target.value } : p)
-                  );
-                }}
-                placeholder="Section"
-                inputMode="numeric"
-                className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "border-[hsl(145_55%_38%)]" : "border-[hsl(45_100%_45%)]"}`}
-                data-testid="input-photo-section"
-              />
-            </div>
+            {currentPhoto && (
+              <div className="flex items-center gap-3 text-xs mono text-[hsl(25_40%_60%)] truncate" data-testid="text-photo-info">
+                {currentPhoto.filename && <span className="truncate max-w-[180px]" title={currentPhoto.filename}>{currentPhoto.filename}</span>}
+                {currentPhoto.timestamp && <span className="whitespace-nowrap">{currentPhoto.timestamp}</span>}
+              </div>
+            )}
           </div>
 
           {currentPhoto && (
