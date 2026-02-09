@@ -111,11 +111,16 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const session = await verifySessionOwnership(parseInt(req.params.sessionId), userId);
       if (!session) return res.status(404).json({ message: "Session not found" });
+      const displayName = req.user.claims.first_name
+        ? `${req.user.claims.first_name} ${req.user.claims.last_name || ""}`.trim()
+        : req.user.claims.email || userId;
       const photo = await storage.createPhoto({
         ...req.body,
         sessionId: session.id,
         userId,
+        uploadedBy: displayName,
       });
+      console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${session.id}, at=${photo.createdAt.toISOString()}`);
       res.json(photo);
     } catch (error) {
       console.error("Error creating photo:", error);
@@ -129,7 +134,13 @@ export async function registerRoutes(
       if (!photo) return res.status(404).json({ message: "Photo not found" });
       const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
       if (!session) return res.status(404).json({ message: "Photo not found" });
-      const updated = await storage.updatePhoto(photo.id, req.body);
+      const { aisle, section, rotation } = req.body;
+      const safeUpdate: Record<string, any> = {};
+      if (aisle !== undefined) safeUpdate.aisle = aisle;
+      if (section !== undefined) safeUpdate.section = section;
+      if (rotation !== undefined) safeUpdate.rotation = rotation;
+      if (Object.keys(safeUpdate).length === 0) return res.status(400).json({ message: "No valid fields to update" });
+      const updated = await storage.updatePhoto(photo.id, safeUpdate);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update photo" });

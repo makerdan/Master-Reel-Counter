@@ -28,6 +28,7 @@ export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").notNull(),
   userId: varchar("user_id").notNull(),
+  uploadedBy: text("uploaded_by"),
   objectStorageKey: text("object_storage_key").notNull(),
   originalFilename: text("original_filename"),
   mimeType: text("mime_type"),
