@@ -442,14 +442,26 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
   useEffect(() => {
     if (photos.length > 0 && uploadedPhotos.length === 0) {
-      setUploadedPhotos(photos.map((p) => ({
-        url: p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/objects/${p.objectStorageKey}`,
-        objectPath: p.objectStorageKey,
-        section: p.section || "",
-        dbId: p.id,
-        filename: p.originalFilename || undefined,
-        timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : undefined,
-      })));
+      const nameCounts: Record<string, number> = {};
+      setUploadedPhotos(photos.map((p) => {
+        let filename = p.originalFilename || undefined;
+        if (filename) {
+          const count = (nameCounts[filename] || 0) + 1;
+          nameCounts[filename] = count;
+          const dotIdx = filename.lastIndexOf(".");
+          const base = dotIdx > 0 ? filename.substring(0, dotIdx) : filename;
+          const ext = dotIdx > 0 ? filename.substring(dotIdx) : "";
+          filename = `${base}_${String(count).padStart(2, "0")}${ext}`;
+        }
+        return {
+          url: p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/objects/${p.objectStorageKey}`,
+          objectPath: p.objectStorageKey,
+          section: p.section || "",
+          dbId: p.id,
+          filename,
+          timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : undefined,
+        };
+      }));
       const firstAisle = photos.find(p => p.aisle)?.aisle;
       if (firstAisle && !aisle) setAisle(firstAisle);
     }
@@ -551,14 +563,21 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         });
         const savedPhoto = await res.json();
         const photoUrl = result.objectPath.startsWith("/objects/") ? result.objectPath : `/objects/${result.objectPath}`;
-        setUploadedPhotos((prev) => [...prev, {
-          url: photoUrl,
-          objectPath: result.objectPath,
-          section: "",
-          dbId: savedPhoto.id,
-          filename: file.name,
-          timestamp: new Date().toLocaleString(),
-        }]);
+        setUploadedPhotos((prev) => {
+          const existingCount = prev.filter((p) => p.filename?.replace(/_\d+(?=\.\w+$)/, "") === file.name || p.filename === file.name).length;
+          const dotIdx = file.name.lastIndexOf(".");
+          const base = dotIdx > 0 ? file.name.substring(0, dotIdx) : file.name;
+          const ext = dotIdx > 0 ? file.name.substring(dotIdx) : "";
+          const numberedName = `${base}_${String(existingCount + prev.length + 1).padStart(2, "0")}${ext}`;
+          return [...prev, {
+            url: photoUrl,
+            objectPath: result.objectPath,
+            section: "",
+            dbId: savedPhoto.id,
+            filename: numberedName,
+            timestamp: new Date().toLocaleString(),
+          }];
+        });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
       }
@@ -1039,7 +1058,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter">
-                  {currentPhotoIdx + 1} / {uploadedPhotos.length}
+                  {String(currentPhotoIdx + 1).padStart(2, "0")} / {String(uploadedPhotos.length).padStart(2, "0")}
                 </span>
                 <Button
                   size="icon"
@@ -1068,8 +1087,8 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               </div>
             </div>
             {currentPhoto && (
-              <div className="flex items-center gap-3 text-xs mono text-[hsl(25_40%_60%)] truncate" data-testid="text-photo-info">
-                {currentPhoto.filename && <span className="truncate max-w-[180px]" title={currentPhoto.filename}>{currentPhoto.filename}</span>}
+              <div className="flex items-center justify-center gap-3 text-xs mono text-[hsl(25_40%_60%)]" data-testid="text-photo-info">
+                {currentPhoto.filename && <span className="truncate max-w-[200px]" title={currentPhoto.filename}>{currentPhoto.filename}</span>}
                 {currentPhoto.timestamp && <span className="whitespace-nowrap">{currentPhoto.timestamp}</span>}
               </div>
             )}
