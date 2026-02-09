@@ -35,6 +35,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
+import { correctWireDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, COLOR_CODES } from "@/lib/wireReference";
 import type { Session, Entry, Photo, Pin } from "@shared/schema";
 
 const WIRE_TYPES = ["THHN", "XHHW", "USE-2", "MC Cable", "NM-B", "SER", "UFB", "Bare", "Other"];
@@ -52,6 +53,7 @@ interface LocalPin {
   vendorCode?: string;
   footage?: number;
   aiConfidence?: number;
+  correctionConfident?: boolean;
 }
 
 function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoAt: string | Date | null) {
@@ -706,7 +708,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
   const updatePinField = useCallback((pinId: string, field: keyof LocalPin, value: any) => {
     setLocalPins((prev) =>
-      prev.map((p) => p.id === pinId ? { ...p, [field]: value, ...(field === "wireDetails" ? { aiConfidence: undefined } : {}) } : p)
+      prev.map((p) => p.id === pinId ? { ...p, [field]: value, ...(field === "wireDetails" ? { aiConfidence: undefined, correctionConfident: undefined } : {}) } : p)
     );
   }, []);
 
@@ -716,7 +718,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       const src = prev[index];
       return prev.map((p, i) =>
         i === index + 1
-          ? { ...p, wireDetails: src.wireDetails, vendorCode: src.vendorCode, footage: src.footage, aiConfidence: undefined }
+          ? { ...p, wireDetails: src.wireDetails, vendorCode: src.vendorCode, footage: src.footage, aiConfidence: undefined, correctionConfident: undefined }
           : p
       );
     });
@@ -726,7 +728,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     setLocalPins((prev) =>
       prev.map((p) =>
         p.id === pinId
-          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, aiConfidence: undefined }
+          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, aiConfidence: undefined, correctionConfident: undefined }
           : p
       )
     );
@@ -834,9 +836,9 @@ ${filterInstruction}
 === WIRE CODE PATTERNS ===
 Format: [TYPE][SIZE][COLOR][FOOTAGE] or [TYPE][SIZE]-[VENDOR]
 
-Types: THHN, XHHW, MHF, URD, SER, RX, TC, TRIPLEX, USE, NM
-Sizes (AWG): 14, 12, 10, 8, 6, 4, 2, 1 | Aught: 1/0, 2/0, 3/0, 4/0 | kcmil: 250, 300, 350, 500, 750
-Colors: BK (black), WH (white), RD (red), BL (blue), GN (green), OR (orange), YL (yellow), GY (gray)
+Types: ${REF_WIRE_TYPES.join(", ")}
+Sizes (AWG): ${WIRE_GAUGES.join(", ")}
+Colors: ${COLOR_CODES.map(c => c).join(", ")}
 
 Examples: THHN4BK1000, XHHW350WH2500, URD404040-ALU, 4TRIPLEX, THHN12GNWH500
 
@@ -879,6 +881,8 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
         const parsed = JSON.parse(jsonStr);
         if (parsed.detected && Array.isArray(parsed.detected)) {
           let filledCount = 0;
+          let correctedCount = 0;
+          let flaggedCount = 0;
           setLocalPins((prev) =>
             prev.map((pin) => {
               const match = parsed.detected.find((d: any) => {
@@ -893,19 +897,30 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               if (match && match.wireDetails) {
                 filledCount++;
                 const details = String(match.wireDetails).toUpperCase().replace(/[^A-Z0-9/\-]/g, "");
-                const vendorMatch = details.match(/^(.+?)-(\w+)$/);
+                const knownVendors = ["COP", "ALU", "COR", "ALF"];
+                const vendorMatch = details.match(/^(.+)-([A-Z]+)$/);
+                const hasVendor = vendorMatch && knownVendors.includes(vendorMatch[2]);
+                const rawWire = hasVendor ? vendorMatch[1] : details;
+                const correction = correctWireDetails(rawWire);
+                const aiConf = typeof match.confidence === "number" ? match.confidence : 100;
+                if (correction.wasModified) correctedCount++;
+                if (!correction.confident) flaggedCount++;
                 return {
                   ...pin,
-                  wireDetails: vendorMatch ? vendorMatch[1] : details,
-                  vendorCode: vendorMatch ? vendorMatch[2] : pin.vendorCode,
+                  wireDetails: correction.correctedDetails,
+                  vendorCode: hasVendor ? vendorMatch[2] : pin.vendorCode,
                   footage: match.footage || pin.footage,
-                  aiConfidence: typeof match.confidence === "number" ? match.confidence : 100,
+                  aiConfidence: aiConf,
+                  correctionConfident: correction.confident,
                 };
               }
               return pin;
             })
           );
-          toast({ title: `AI filled ${filledCount} of ${localPins.length} pin fields` });
+          let msg = `AI filled ${filledCount} of ${localPins.length} pins`;
+          if (correctedCount > 0) msg += `, ${correctedCount} auto-corrected`;
+          if (flaggedCount > 0) msg += `, ${flaggedCount} need review`;
+          toast({ title: msg });
         }
       } catch {
         // JSON parse failed, raw result already shown
@@ -1197,7 +1212,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                         <td>
                           <input
                             type="text"
-                            className={`input-caps${pin.aiConfidence != null && pin.aiConfidence < 85 ? " low-confidence" : ""}`}
+                            className={`input-caps${(pin.aiConfidence != null && pin.aiConfidence < 85) || pin.correctionConfident === false ? " low-confidence" : ""}`}
                             value={pin.wireDetails || ""}
                             onChange={(e) => updatePinField(pin.id, "wireDetails", e.target.value.toUpperCase())}
                             autoComplete="off"

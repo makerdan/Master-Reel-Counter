@@ -566,7 +566,8 @@
   color: #ea580c;
 }
 .pin-entry-table .low-confidence {
-  border: 2px solid #ea580c !important;
+  border: 2px solid #f59e0b !important;
+  background-color: rgba(245, 158, 11, 0.1) !important;
 }
 .copy-down-btn,
 .clear-row-btn {
