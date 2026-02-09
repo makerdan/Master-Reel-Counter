@@ -735,28 +735,57 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       if (aiFilter.trim()) {
         filterInstruction = `\nFILTER: Only include tags containing or similar to "${aiFilter.trim()}" (allow up to 3 character differences for OCR errors).`;
       }
+      const section = currentPhoto?.section || "";
       const prompt = `You are a wire inventory tag reader analyzing a warehouse section photo.
 
-RED BOUNDING BOXES mark user-selected reel locations. Each box has a RED LABEL showing its position code.
+=== ANNOTATED IMAGE ===
+This photo shows wire reels in Aisle ${aisle}, Section ${section}.
+RED BOUNDING BOXES mark user-selected reel locations. Each box has a RED LABEL showing its position code (e.g., "01", "02").
 Positions to analyze: ${pinPositions.join(", ")}
 
+=== YOUR TASK ===
 For each RED BOUNDING BOX, locate and read the WHITE PAPER TAG attached to or near that wire reel.
 
-WHITE PAPER TAGS have BLACK BOLD TEXT - the primary wire category code.
-Wire code patterns: [TYPE][SIZE][COLOR][FOOTAGE] e.g., THHN4BK1000, XHHW350WH2500
+=== READING INSTRUCTIONS ===
+1. Find the RED BOUNDING BOX with its position label (e.g., "01")
+2. Look inside or immediately adjacent to that box for a WHITE PAPER TAG
+3. Read the BLACK BOLD TEXT printed on the tag - this is the wire category code
+4. Extract footage if visible (numeric value, typically 500-5000)
+
+=== WHITE PAPER TAG IDENTIFICATION ===
+- Bright WHITE rectangular background (high contrast against dark wire spools)
+- BLACK BOLD TEXT - the primary category/wire code you need to read
+- Size: approximately 2-4 inches, attached directly to wire reel
+- May include a checkmark but not always present
+${filterInstruction}
+
+=== WIRE CODE PATTERNS ===
+Format: [TYPE][SIZE][COLOR][FOOTAGE] or [TYPE][SIZE]-[VENDOR]
+
 Types: THHN, XHHW, MHF, URD, SER, RX, TC, TRIPLEX, USE, NM
-Sizes: 14, 12, 10, 8, 6, 4, 2, 1, 1/0, 2/0, 3/0, 4/0, 250, 300, 350, 500, 750
-Colors: BK, WH, RD, BL, GN, OR, YL, GY${filterInstruction}
+Sizes (AWG): 14, 12, 10, 8, 6, 4, 2, 1 | Aught: 1/0, 2/0, 3/0, 4/0 | kcmil: 250, 300, 350, 500, 750
+Colors: BK (black), WH (white), RD (red), BL (blue), GN (green), OR (orange), YL (yellow), GY (gray)
 
-IMPORTANT: Return position values exactly as listed above with zero-padded two-digit format (e.g., "01", "02", "03").
+Examples: THHN4BK1000, XHHW350WH2500, URD404040-ALU, 4TRIPLEX, THHN12GNWH500
 
-Return ONLY valid JSON:
+=== CRITICAL RULES ===
+- Use ONLY the position from the RED LABEL - do not guess positions
+- Report partial reads if full text is unclear (e.g., "THHN4??1000")
+- wireDetails should be ALL CAPS, no spaces, no special characters except hyphen for vendor codes
+- If a tag exists but is unreadable, include the position with wireDetails as "UNREADABLE"
+- Return position values exactly as listed above with zero-padded two-digit format (e.g., "01", "02", "03")
+
+=== JSON RESPONSE FORMAT ===
+Return ONLY valid JSON. Include a "confidence" field (0-100) for each detected item indicating how confident you are in the wireDetails reading:
 {
   "detected": [
-    {"position": "01", "wireDetails": "THHN1GN2500", "footage": 2500, "confidence": 95}
+    {"position": "01", "wireDetails": "THHN1GN2500", "footage": 2500, "confidence": 95},
+    {"position": "02", "wireDetails": "URD404040-ALU", "footage": null, "confidence": 60}
   ],
-  "notes": "Brief observation"
-}`;
+  "notes": "Brief observation about tag visibility/readability for each position"
+}
+
+If no tags are readable: {"detected": [], "notes": "Describe what was visible in each bounding box"}`;
 
       const res = await apiRequest("POST", "/api/ai/analyze", {
         imageUrl: currentPhoto.url,
