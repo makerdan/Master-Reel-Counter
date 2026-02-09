@@ -35,7 +35,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { correctWireDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, COLOR_CODES } from "@/lib/wireReference";
+import { correctWireDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, COLOR_CODES, VENDOR_CODES } from "@/lib/wireReference";
 import type { Session, Entry, Photo, Pin } from "@shared/schema";
 
 const WIRE_TYPES = ["THHN", "XHHW", "USE-2", "MC Cable", "NM-B", "SER", "UFB", "Bare", "Other"];
@@ -897,7 +897,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               if (match && match.wireDetails) {
                 filledCount++;
                 const details = String(match.wireDetails).toUpperCase().replace(/[^A-Z0-9/\-]/g, "");
-                const knownVendors = ["COP", "ALU", "COR", "ALF"];
+                const knownVendors = [...VENDOR_CODES, "COR"];
                 const vendorMatch = details.match(/^(.+)-([A-Z]+)$/);
                 const hasVendor = vendorMatch && knownVendors.includes(vendorMatch[2]);
                 const rawWire = hasVendor ? vendorMatch[1] : details;
