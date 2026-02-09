@@ -781,7 +781,11 @@ Return ONLY valid JSON:
               const match = parsed.detected.find((d: any) => {
                 const normPin = pin.label.trim().toUpperCase();
                 const normItem = String(d.position || "").trim().toUpperCase();
-                return normPin === normItem || normPin.startsWith(normItem) || normItem.startsWith(normPin);
+                if (normPin === normItem) return true;
+                const pinNum = parseInt(normPin, 10);
+                const itemNum = parseInt(normItem, 10);
+                if (!isNaN(pinNum) && !isNaN(itemNum) && pinNum === itemNum) return true;
+                return normPin.startsWith(normItem) || normItem.startsWith(normPin);
               });
               if (match && match.wireDetails) {
                 filledCount++;
