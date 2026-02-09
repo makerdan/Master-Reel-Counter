@@ -88,8 +88,8 @@ export default function Dashboard() {
       const res = await apiRequest("PATCH", `/api/sessions/${id}`, { name, location: location || null });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
       setEditingSession(null);
       toast({ title: "Session updated" });
     },
@@ -106,8 +106,8 @@ export default function Dashboard() {
       const res = await apiRequest("PATCH", `/api/sessions/${id}`, body);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
     },
     onError: () => {
       toast({ title: "Failed to update session status", variant: "destructive" });

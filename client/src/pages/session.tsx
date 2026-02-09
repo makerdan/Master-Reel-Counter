@@ -154,9 +154,9 @@ function SessionWorkspace({
       });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
       setEditSessionOpen(false);
       toast({ title: "Session updated" });
     },
@@ -174,9 +174,9 @@ function SessionWorkspace({
       const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, body);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
       toast({ title: session.status === "active" ? "Session completed" : "Session reopened" });
     },
     onError: () => {

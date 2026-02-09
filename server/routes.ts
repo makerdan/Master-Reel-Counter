@@ -80,12 +80,9 @@ export async function registerRoutes(
 
   app.patch("/api/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      console.log("[DEBUG] PATCH session req.body:", JSON.stringify(req.body));
       const session = await verifySessionOwnership(parseInt(req.params.id), req.user.claims.sub);
       if (!session) return res.status(404).json({ message: "Session not found" });
-      console.log("[DEBUG] Current session name:", session.name, "-> New name:", req.body.name);
       const updated = await storage.updateSession(session.id, req.body);
-      console.log("[DEBUG] Updated session name:", updated?.name);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update session" });
