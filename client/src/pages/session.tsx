@@ -4,7 +4,7 @@ import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Brain, Cable,
-  Save, X, Loader2, CheckCircle2, RotateCcw, AlertTriangle,
+  Save, X, Loader2, CheckCircle2, RotateCcw, AlertTriangle, Move,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -388,6 +388,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [rotation, setRotation] = useState(0);
+  const [panMode, setPanMode] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -434,7 +435,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   };
 
   const handleContainerClick = (e: React.MouseEvent) => {
-    if (isPanning) return;
+    if (isPanning || panMode) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -474,6 +475,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest(".pin-marker")) return;
+    if (!panMode && scale <= 1) return;
     setIsPanning(true);
     panStart.current = { x: e.clientX, y: e.clientY, panX, panY };
     containerRef.current?.classList.add("grabbing");
@@ -759,6 +761,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             <div
               ref={containerRef}
               className="photo-viewer-container w-full"
+              style={{ cursor: panMode ? "grab" : "crosshair" }}
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
               onWheel={handleWheel}
@@ -860,6 +863,14 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   data-testid="button-zoom-out"
                 >
                   <ZoomOut className="h-4 w-4" />
+                </button>
+                <button
+                  className={`photo-overlay-btn ${panMode ? "photo-overlay-btn-active" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); setPanMode((m) => !m); }}
+                  title={panMode ? "Exit pan mode (tap to place pins)" : "Enter pan mode (drag to move)"}
+                  data-testid="button-pan-mode"
+                >
+                  <Move className="h-4 w-4" />
                 </button>
               </div>
               <div className="photo-overlay-controls bottom-right">
