@@ -1039,11 +1039,12 @@ Return ONLY valid JSON:
                   value={aiFilter}
                   onChange={(e) => setAiFilter(e.target.value)}
                   placeholder="e.g. THHN, 4/0, BK (optional)"
-                  className="flex-1 min-w-[120px] rounded-md border px-3 py-2 text-sm"
+                  className="flex-1 min-w-[120px] rounded-md border border-black dark:border-white px-3 py-2 text-sm"
                   data-testid="input-ai-filter"
                 />
                 <Button
                   variant="outline"
+                  className="border-black dark:border-white"
                   onClick={analyzePhoto}
                   disabled={aiLoading}
                   data-testid="button-ai-assist"
