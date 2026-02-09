@@ -512,35 +512,43 @@
 .pin-entry-table th,
 .pin-entry-table td {
   padding: 8px;
-  border: 1px solid var(--border-color, #e7e5e4);
+  border: 1px solid hsl(18 40% 50% / 0.2);
   text-align: left;
   font-size: 14px;
 }
 .pin-entry-table th {
-  background: hsl(var(--muted));
+  background: hsl(25 15% 14%);
   font-weight: 600;
-  color: hsl(var(--muted-foreground));
+  color: hsl(25 60% 70%);
   text-decoration: underline;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
 }
 .pin-entry-table tr:hover {
-  background: hsl(var(--muted) / 0.5);
+  background: hsl(18 60% 30% / 0.08);
 }
 .pin-entry-table input,
 .pin-entry-table select {
   width: 100%;
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--foreground));
+  background: white;
+  border: 1px solid hsl(18 40% 50% / 0.4);
   color: hsl(var(--foreground));
   border-radius: 4px;
   padding: 6px 8px;
   font-size: 14px;
   font-family: var(--font-mono);
 }
+.dark .pin-entry-table input,
+.dark .pin-entry-table select {
+  background: hsl(25 10% 10%);
+  border-color: hsl(18 40% 50% / 0.4);
+}
 .pin-entry-table input:focus,
 .pin-entry-table select:focus {
   outline: none;
   border-color: #ea580c;
-  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2);
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25);
 }
 .pin-entry-table input::placeholder {
   color: hsl(var(--muted-foreground));
@@ -555,15 +563,19 @@
 .pin-position-cell {
   display: inline-block;
   padding: 4px 8px;
-  border: 1px solid hsl(var(--foreground));
+  border: 1px solid hsl(18 85% 32% / 0.5);
   border-radius: 4px;
-  background: hsl(var(--background));
+  background: hsl(18 85% 32% / 0.12);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-family: var(--font-mono);
   font-weight: 700;
   color: #ea580c;
+}
+.dark .pin-position-cell {
+  background: hsl(18 85% 32% / 0.2);
+  border-color: hsl(18 85% 48% / 0.4);
 }
 .pin-entry-table .low-confidence {
   border: 2px solid #f59e0b !important;
@@ -574,9 +586,9 @@
   width: 28px;
   height: 28px;
   border-radius: 4px;
-  background: hsl(var(--muted));
-  border: 1px solid hsl(var(--foreground));
-  color: hsl(var(--muted-foreground));
+  background: hsl(25 12% 18%);
+  border: 1px solid hsl(18 40% 50% / 0.3);
+  color: hsl(25 60% 70%);
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;

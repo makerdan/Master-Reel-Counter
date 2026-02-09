@@ -288,12 +288,12 @@ function SessionWorkspace({
 
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
         <Tabs value={mode} onValueChange={setMode}>
-          <TabsList className="w-full">
-            <TabsTrigger value="photo" className="flex-1" data-testid="tab-photo-mode">
+          <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
+            <TabsTrigger value="photo" className="flex-1 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode">
               <Camera className="h-4 w-4 mr-1" />
               Section Photo
             </TabsTrigger>
-            <TabsTrigger value="single" className="flex-1" data-testid="tab-single-mode">
+            <TabsTrigger value="single" className="flex-1 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode">
               <ListPlus className="h-4 w-4 mr-1" />
               Single Entry
             </TabsTrigger>
@@ -968,15 +968,16 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 rounded-md border border-[hsl(18_60%_30%/0.25)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4">
       <div className="flex items-end gap-2 flex-wrap">
         <div>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)] mb-1 block">Aisle</label>
           <Input
             value={aisle}
             onChange={(e) => setAisle(e.target.value)}
             placeholder="Aisle"
             inputMode="numeric"
-            className="w-24"
+            className="w-24 border-[hsl(18_40%_50%/0.4)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)]"
             data-testid="input-photo-aisle"
           />
         </div>
@@ -990,7 +991,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             onChange={handleFileUpload}
           />
           <Button
-            variant="outline"
+            className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             data-testid="button-upload-photos"
@@ -1003,23 +1004,25 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
 
       {uploadedPhotos.length > 0 && (
         <>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center justify-between gap-2 flex-wrap bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2">
             <div className="flex items-center gap-2">
               <Button
                 size="icon"
                 variant="ghost"
+                className="text-[hsl(25_60%_75%)]"
                 disabled={currentPhotoIdx <= 0}
                 onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
                 data-testid="button-prev-photo"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm mono" data-testid="text-photo-counter">
+              <span className="text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter">
                 {currentPhotoIdx + 1} / {uploadedPhotos.length}
               </span>
               <Button
                 size="icon"
                 variant="ghost"
+                className="text-[hsl(25_60%_75%)]"
                 disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
                 onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
                 data-testid="button-next-photo"
@@ -1028,6 +1031,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               </Button>
             </div>
             <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)] whitespace-nowrap">Sec:</label>
               <Input
                 value={currentPhoto?.section || ""}
                 onChange={(e) => {
@@ -1037,7 +1041,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 }}
                 placeholder="Section"
                 inputMode="numeric"
-                className="w-24"
+                className="w-24 border-[hsl(18_40%_50%/0.4)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)]"
                 data-testid="input-photo-section"
               />
             </div>
@@ -1182,19 +1186,18 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
 
           {localPins.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <label className="text-sm font-semibold text-muted-foreground whitespace-nowrap">Filter:</label>
+              <div className="flex items-center gap-2 flex-wrap bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_12%)] rounded-md px-3 py-2.5 border border-[hsl(18_60%_30%/0.2)]">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)] whitespace-nowrap">Filter:</label>
                 <input
                   type="text"
                   value={aiFilter}
                   onChange={(e) => setAiFilter(e.target.value)}
                   placeholder="e.g. THHN, 4/0, BK (optional)"
-                  className="flex-1 min-w-[120px] rounded-md border border-black dark:border-white px-3 py-2 text-sm"
+                  className="flex-1 min-w-[120px] rounded-md border border-[hsl(18_40%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(18_85%_48%)] focus:border-transparent"
                   data-testid="input-ai-filter"
                 />
                 <Button
-                  variant="outline"
-                  className="border-black dark:border-white"
+                  className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
                   onClick={analyzePhoto}
                   disabled={aiLoading}
                   data-testid="button-ai-assist"
@@ -1205,8 +1208,8 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               </div>
 
               {aiResult && (
-                <div className="text-xs text-muted-foreground p-2 rounded-md border" data-testid="text-ai-result">
-                  <span className="font-semibold">AI Notes:</span> {(() => {
+                <div className="text-xs text-[hsl(25_60%_70%)] p-2.5 rounded-md border border-[hsl(18_60%_30%/0.2)] bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_11%)]" data-testid="text-ai-result">
+                  <span className="font-semibold text-[hsl(18_80%_55%)]">AI Notes:</span> {(() => {
                     try {
                       let jsonStr = aiResult;
                       const jsonMatch = aiResult.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -1219,7 +1222,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 </div>
               )}
 
-              <div className="text-sm font-semibold text-muted-foreground" data-testid="text-pin-table-title">Enter Details for Each Position</div>
+              <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Position</div>
               <div className="overflow-x-auto">
                 <table className="pin-entry-table" data-testid="pin-entry-table">
                   <thead>
@@ -1332,6 +1335,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
 
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button
+                      className="bg-[hsl(145_60%_28%)] text-white border-[hsl(145_60%_22%)]"
                       onClick={() => createEntries.mutate()}
                       disabled={createEntries.isPending || !aisle}
                       data-testid="button-create-entries-from-pins"
@@ -1351,6 +1355,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
+                  className="border-[hsl(18_40%_50%/0.5)] text-[hsl(18_60%_40%)] dark:text-[hsl(25_60%_70%)] dark:border-[hsl(18_40%_50%/0.4)]"
                   onClick={() => { setLocalPins([]); setAiResult(""); }}
                   disabled={createEntries.isPending}
                   data-testid="button-clear-pins"
