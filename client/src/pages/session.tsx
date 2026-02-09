@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
-  RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Brain, Cable,
+  RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Brain, Cable,
   Save, X, Loader2, CheckCircle2, RotateCcw, AlertTriangle, Move,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -1574,88 +1574,118 @@ function EntryTable({
     );
   }
 
+  const grouped = entries.reduce<Record<string, typeof entries>>((acc, entry) => {
+    const key = `${entry.aisle || "—"}-${entry.section || "—"}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(entry);
+    return acc;
+  }, {});
+
+  const sectionKeys = Object.keys(grouped).sort();
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  const toggleSection = (key: string) => {
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   return (
     <Card>
       <CardHeader className="p-3">
-        <CardTitle className="text-sm">Entries ({entries.length})</CardTitle>
+        <CardTitle className="text-sm" data-testid="text-entries-title">Table View - {entries.length} Entries</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">#</TableHead>
-                <TableHead>Aisle</TableHead>
-                <TableHead>Section</TableHead>
-                <TableHead>Position</TableHead>
-                <TableHead>Reel Tag</TableHead>
-                <TableHead>Wire Type</TableHead>
-                <TableHead>Gauge</TableHead>
-                <TableHead>Footage</TableHead>
-                <TableHead>Color</TableHead>
-                <TableHead className="w-20">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {entries.map((entry, idx) => (
-                <TableRow key={entry.id} data-testid={`row-entry-${entry.id}`}>
-                  <TableCell className="mono text-xs text-muted-foreground">{idx + 1}</TableCell>
-                  <TableCell className="text-xs">{entry.aisle}</TableCell>
-                  <TableCell className="text-xs">{entry.section}</TableCell>
-                  <TableCell className="text-xs">{entry.position || "-"}</TableCell>
-                  <TableCell className="text-xs mono">{entry.reelTag || "-"}</TableCell>
-                  <TableCell className="text-xs">{entry.wireType || "-"}</TableCell>
-                  <TableCell className="text-xs">{entry.gauge || "-"}</TableCell>
-                  <TableCell className="text-xs mono">{entry.footage?.toLocaleString() || "-"}</TableCell>
-                  <TableCell className="text-xs">{entry.color || "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onEdit(entry)}
-                        data-testid={`button-edit-entry-${entry.id}`}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            data-testid={`button-delete-entry-${entry.id}`}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Entry?</AlertDialogTitle>
-                            <AlertDialogDescription>This entry will be permanently removed.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteEntry.mutate(entry.id)}>Delete</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell colSpan={7} className="text-xs font-semibold">
+          <table className="entries-table" data-testid="entries-table">
+            <thead>
+              <tr>
+                <th style={{ width: 40 }}>#</th>
+                <th>Aisle</th>
+                <th>Section</th>
+                <th>Reel Tag</th>
+                <th>Footage</th>
+                <th>Manufacturer</th>
+                <th style={{ width: 60 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sectionKeys.map((sectionKey) => {
+                const sectionEntries = grouped[sectionKey];
+                const isExpanded = expandedSections[sectionKey] ?? false;
+                const sectionFootage = sectionEntries.reduce((s, e) => s + (e.footage || 0), 0);
+                return (
+                  <Fragment key={sectionKey}>
+                    <tr
+                      className="section-header-row"
+                      onClick={() => toggleSection(sectionKey)}
+                      data-testid={`section-toggle-${sectionKey}`}
+                    >
+                      <td colSpan={7}>
+                        <div className="flex items-center gap-2">
+                          <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
+                          <span className="font-semibold">{sectionKey}</span>
+                          <span className="text-muted-foreground">({sectionEntries.length} entries, {sectionFootage.toLocaleString()} ft)</span>
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && sectionEntries.map((entry, idx) => (
+                      <tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
+                        <td className="mono text-muted-foreground">{idx + 1}</td>
+                        <td>{entry.aisle}</td>
+                        <td>{entry.section}</td>
+                        <td className="mono">{entry.reelTag || "-"}</td>
+                        <td className="mono">{entry.footage?.toLocaleString() || "-"}</td>
+                        <td>{entry.manufacturer || "-"}</td>
+                        <td>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => onEdit(entry)}
+                              data-testid={`button-edit-entry-${entry.id}`}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  data-testid={`button-delete-entry-${entry.id}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Entry?</AlertDialogTitle>
+                                  <AlertDialogDescription>This entry will be permanently removed.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteEntry.mutate(entry.id)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={4} className="font-semibold">
                   Total: {entries.length} entries
-                </TableCell>
-                <TableCell className="text-xs font-semibold mono" data-testid="text-total-footage">
+                </td>
+                <td className="font-semibold mono" data-testid="text-total-footage">
                   {totalFootage.toLocaleString()} ft
-                </TableCell>
-                <TableCell colSpan={2} />
-              </TableRow>
-            </TableFooter>
-          </Table>
+                </td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </CardContent>
     </Card>
