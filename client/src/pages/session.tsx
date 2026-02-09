@@ -289,11 +289,11 @@ function SessionWorkspace({
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
         <Tabs value={mode} onValueChange={setMode}>
           <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
-            <TabsTrigger value="photo" className="flex-1 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode">
+            <TabsTrigger value="photo" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode">
               <Camera className="h-4 w-4 mr-1" />
               Section Photo
             </TabsTrigger>
-            <TabsTrigger value="single" className="flex-1 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode">
+            <TabsTrigger value="single" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode">
               <ListPlus className="h-4 w-4 mr-1" />
               Single Entry
             </TabsTrigger>
@@ -977,7 +977,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             onChange={(e) => setAisle(e.target.value)}
             placeholder="Aisle"
             inputMode="numeric"
-            className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] ${aisle.trim() ? "border-[hsl(145_50%_35%/0.5)]" : "border-[hsl(18_85%_48%/0.6)]"}`}
+            className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "border-[hsl(145_55%_38%)]" : "border-[hsl(45_100%_45%)]"}`}
             data-testid="input-photo-aisle"
           />
         </div>
@@ -1057,7 +1057,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 }}
                 placeholder="Section"
                 inputMode="numeric"
-                className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] ${(currentPhoto?.section || "").trim() ? "border-[hsl(145_50%_35%/0.5)]" : "border-[hsl(18_85%_48%/0.6)]"}`}
+                className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "border-[hsl(145_55%_38%)]" : "border-[hsl(45_100%_45%)]"}`}
                 data-testid="input-photo-section"
               />
             </div>
