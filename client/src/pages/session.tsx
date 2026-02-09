@@ -371,6 +371,15 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [localPins, setLocalPins] = useState<LocalPin[]>([]);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
+  const [relabelValue, setRelabelValue] = useState("");
+  const dragRef = useRef<{
+    isDragging: boolean;
+    pinId: string | null;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  }>({ isDragging: false, pinId: null, startX: 0, startY: 0, moved: false });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState("");
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
@@ -498,6 +507,94 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     e.preventDefault();
     setScale((s) => Math.min(5, Math.max(1, s + (e.deltaY < 0 ? 0.2 : -0.2))));
   };
+
+  const screenToImagePercent = useCallback((clientX: number, clientY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const rawX = (clientX - rect.left) / rect.width;
+    const rawY = (clientY - rect.top) / rect.height;
+    const cx = 0.5, cy = 0.5;
+    let relX = rawX - cx;
+    let relY = rawY - cy;
+    relX /= scale;
+    relY /= scale;
+    relX -= panX / rect.width;
+    relY -= panY / rect.height;
+    const rad = -(rotation * Math.PI) / 180;
+    const rX = relX * Math.cos(rad) - relY * Math.sin(rad);
+    const rY = relX * Math.sin(rad) + relY * Math.cos(rad);
+    const x = Math.max(0, Math.min(100, (rX + cx) * 100));
+    const y = Math.max(0, Math.min(100, (rY + cy) * 100));
+    return { x, y };
+  }, [scale, panX, panY, rotation]);
+
+  const startPinDrag = useCallback((e: React.MouseEvent | React.TouchEvent, pinId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    dragRef.current = { isDragging: true, pinId, startX: clientX, startY: clientY, moved: false };
+
+    const moveHandler = (ev: MouseEvent | TouchEvent) => {
+      if (!dragRef.current.isDragging) return;
+      ev.preventDefault();
+      const cx = "touches" in ev ? (ev as TouchEvent).touches[0].clientX : (ev as MouseEvent).clientX;
+      const cy = "touches" in ev ? (ev as TouchEvent).touches[0].clientY : (ev as MouseEvent).clientY;
+      if (Math.abs(cx - dragRef.current.startX) > 3 || Math.abs(cy - dragRef.current.startY) > 3) {
+        dragRef.current.moved = true;
+      }
+      const pos = screenToImagePercent(cx, cy);
+      if (!pos) return;
+      const marker = document.querySelector(`[data-pin-id="${pinId}"]`) as HTMLElement;
+      if (marker) {
+        marker.classList.add("dragging");
+        marker.style.left = `${pos.x}%`;
+        marker.style.top = `${pos.y}%`;
+      }
+    };
+
+    const endHandler = (ev: MouseEvent | TouchEvent) => {
+      if (!dragRef.current.isDragging) return;
+      const cx = "changedTouches" in ev ? (ev as TouchEvent).changedTouches[0].clientX : (ev as MouseEvent).clientX;
+      const cy = "changedTouches" in ev ? (ev as TouchEvent).changedTouches[0].clientY : (ev as MouseEvent).clientY;
+      const pos = screenToImagePercent(cx, cy);
+      const marker = document.querySelector(`[data-pin-id="${pinId}"]`) as HTMLElement;
+      if (marker) marker.classList.remove("dragging");
+
+      if (pos && dragRef.current.moved) {
+        setLocalPins((prev) =>
+          prev.map((p) => p.id === pinId ? { ...p, x: pos.x, y: pos.y } : p)
+        );
+      }
+      dragRef.current = { isDragging: false, pinId: null, startX: 0, startY: 0, moved: false };
+      document.removeEventListener("mousemove", moveHandler);
+      document.removeEventListener("mouseup", endHandler);
+      document.removeEventListener("touchmove", moveHandler);
+      document.removeEventListener("touchend", endHandler);
+    };
+
+    document.addEventListener("mousemove", moveHandler);
+    document.addEventListener("mouseup", endHandler);
+    document.addEventListener("touchmove", moveHandler, { passive: false });
+    document.addEventListener("touchend", endHandler);
+  }, [screenToImagePercent]);
+
+  const openRelabel = useCallback((pinId: string) => {
+    const pin = localPins.find((p) => p.id === pinId);
+    if (pin) {
+      setRelabelPinId(pinId);
+      setRelabelValue(pin.label);
+    }
+  }, [localPins]);
+
+  const applyRelabel = useCallback(() => {
+    if (!relabelPinId || !relabelValue.trim()) return;
+    setLocalPins((prev) =>
+      prev.map((p) => p.id === relabelPinId ? { ...p, label: relabelValue.trim() } : p)
+    );
+    setRelabelPinId(null);
+    setRelabelValue("");
+  }, [relabelPinId, relabelValue]);
 
   const createEntries = useMutation({
     mutationFn: async () => {
@@ -684,16 +781,69 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 <div
                   key={pin.id}
                   className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""}`}
-                  style={{
-                    left: `${pin.x}%`,
-                    top: `${pin.y}%`,
-                    backgroundColor: "hsl(25, 90%, 50%)",
-                    color: "white",
+                  style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                  data-pin-id={pin.id}
+                  onMouseDown={(e) => {
+                    if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
+                    startPinDrag(e, pin.id);
+                  }}
+                  onTouchStart={(e) => {
+                    if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
+                    startPinDrag(e, pin.id);
                   }}
                   onClick={(e) => { e.stopPropagation(); setSelectedPinId(pin.id); }}
                   data-testid={`pin-${pin.id}`}
                 >
-                  {pin.label}
+                  <div className="pin-top-row">
+                    <button
+                      className="pin-delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocalPins((prev) => prev.filter((p) => p.id !== pin.id));
+                      }}
+                      title="Delete pin"
+                      data-testid={`button-delete-pin-${pin.id}`}
+                    >
+                      &times;
+                    </button>
+                    <div
+                      className="pin-label"
+                      onClick={(e) => { e.stopPropagation(); openRelabel(pin.id); }}
+                      title="Click to rename"
+                      data-testid={`label-pin-${pin.id}`}
+                    >
+                      {pin.label}
+                    </div>
+                  </div>
+                  <div className="pin-bottom-row">
+                    <button
+                      className="pin-count-btn minus"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocalPins((prev) =>
+                          prev.map((p) => p.id === pin.id ? { ...p, reelCount: Math.max(1, p.reelCount - 1) } : p)
+                        );
+                      }}
+                      title="Decrease count"
+                      data-testid={`button-minus-pin-${pin.id}`}
+                    >
+                      &minus;
+                    </button>
+                    <span className="pin-reel-count" data-testid={`count-pin-${pin.id}`}>{pin.reelCount}</span>
+                    <button
+                      className="pin-count-btn plus"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocalPins((prev) =>
+                          prev.map((p) => p.id === pin.id ? { ...p, reelCount: Math.min(99, p.reelCount + 1) } : p)
+                        );
+                      }}
+                      title="Increase count"
+                      data-testid={`button-plus-pin-${pin.id}`}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               ))}
               <div className="photo-overlay-controls top-right">
@@ -732,80 +882,41 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           )}
 
           {localPins.length > 0 && (
-            <Card>
-              <CardHeader className="p-3">
-                <CardTitle className="text-sm">Placed Pins ({localPins.length})</CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0 space-y-2">
-                {localPins.map((pin) => (
-                  <div key={pin.id} className="flex items-center gap-2">
-                    <Badge
-                      variant="default"
-                      className="no-default-hover-elevate no-default-active-elevate shrink-0"
-                      style={{ backgroundColor: "hsl(25, 90%, 50%)" }}
-                    >
-                      {pin.label}
-                    </Badge>
-                    <Label className="text-xs shrink-0">Reels:</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={pin.reelCount}
-                      onChange={(e) => {
-                        setLocalPins((prev) =>
-                          prev.map((p) => p.id === pin.id ? { ...p, reelCount: parseInt(e.target.value) || 1 } : p)
-                        );
-                      }}
-                      className="w-20"
-                      data-testid={`input-pin-reel-count-${pin.id}`}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setLocalPins((prev) => prev.filter((p) => p.id !== pin.id))}
-                      data-testid={`button-remove-pin-${pin.id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+            <div className="space-y-2">
+              {batchProgress && (
+                <div className="space-y-2" data-testid="batch-progress">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Creating entries...</span>
+                    <span>{batchProgress.current} / {batchProgress.total}</span>
                   </div>
-                ))}
-
-                {batchProgress && (
-                  <div className="space-y-2 pt-2" data-testid="batch-progress">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Creating entries...</span>
-                      <span>{batchProgress.current} / {batchProgress.total}</span>
+                  <Progress value={(batchProgress.current / batchProgress.total) * 100} />
+                  {batchProgress.errors.length > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-destructive">
+                      <AlertTriangle className="h-3 w-3" />
+                      Failed: {batchProgress.errors.join(", ")}
                     </div>
-                    <Progress value={(batchProgress.current / batchProgress.total) * 100} />
-                    {batchProgress.errors.length > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertTriangle className="h-3 w-3" />
-                        Failed: {batchProgress.errors.join(", ")}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 pt-2 flex-wrap">
-                  <Button
-                    onClick={() => createEntries.mutate()}
-                    disabled={createEntries.isPending}
-                    data-testid="button-create-entries-from-pins"
-                  >
-                    {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    Create {localPins.reduce((s, p) => s + p.reelCount, 0)} Entries
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setLocalPins([])}
-                    disabled={createEntries.isPending}
-                    data-testid="button-clear-pins"
-                  >
-                    Clear All
-                  </Button>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  onClick={() => createEntries.mutate()}
+                  disabled={createEntries.isPending}
+                  data-testid="button-create-entries-from-pins"
+                >
+                  {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Create {localPins.reduce((s, p) => s + p.reelCount, 0)} Entries from {localPins.length} Pins
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setLocalPins([])}
+                  disabled={createEntries.isPending}
+                  data-testid="button-clear-pins"
+                >
+                  Clear All
+                </Button>
+              </div>
+            </div>
           )}
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -835,6 +946,35 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           )}
         </>
       )}
+
+      <Dialog open={!!relabelPinId} onOpenChange={(open) => { if (!open) { setRelabelPinId(null); setRelabelValue(""); } }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Rename Pin</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Enter new shelf/spot code:</p>
+          <Input
+            value={relabelValue}
+            onChange={(e) => setRelabelValue(e.target.value)}
+            placeholder="e.g., 9001"
+            className="text-center font-mono text-lg"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); applyRelabel(); }
+              if (e.key === "Escape") { setRelabelPinId(null); setRelabelValue(""); }
+            }}
+            data-testid="input-relabel-pin"
+          />
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => { setRelabelPinId(null); setRelabelValue(""); }} data-testid="button-cancel-relabel">
+              Cancel
+            </Button>
+            <Button className="flex-1" onClick={applyRelabel} disabled={!relabelValue.trim()} data-testid="button-save-relabel">
+              Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
