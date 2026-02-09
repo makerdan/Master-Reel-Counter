@@ -393,6 +393,26 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const clampPan = useCallback((px: number, py: number, s: number) => {
+    const el = containerRef.current;
+    if (!el || s <= 1) return { x: 0, y: 0 };
+    const rect = el.getBoundingClientRect();
+    const maxPanX = (rect.width * (s - 1)) / (2 * s);
+    const maxPanY = (rect.height * (s - 1)) / (2 * s);
+    return {
+      x: Math.max(-maxPanX, Math.min(maxPanX, px)),
+      y: Math.max(-maxPanY, Math.min(maxPanY, py)),
+    };
+  }, []);
+
+  useEffect(() => {
+    const clamped = clampPan(panX, panY, scale);
+    if (clamped.x !== panX || clamped.y !== panY) {
+      setPanX(clamped.x);
+      setPanY(clamped.y);
+    }
+  }, [scale, panX, panY, clampPan]);
+
   const currentPhoto = uploadedPhotos[currentPhotoIdx];
 
   useEffect(() => {
@@ -485,9 +505,12 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     if (!isPanning) return;
     const dx = e.clientX - panStart.current.x;
     const dy = e.clientY - panStart.current.y;
-    setPanX(panStart.current.panX + dx / scale);
-    setPanY(panStart.current.panY + dy / scale);
-  }, [isPanning, scale]);
+    const rawX = panStart.current.panX + dx / scale;
+    const rawY = panStart.current.panY + dy / scale;
+    const clamped = clampPan(rawX, rawY, scale);
+    setPanX(clamped.x);
+    setPanY(clamped.y);
+  }, [isPanning, scale, clampPan]);
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
