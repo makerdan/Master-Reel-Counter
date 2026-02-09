@@ -748,10 +748,12 @@ Types: THHN, XHHW, MHF, URD, SER, RX, TC, TRIPLEX, USE, NM
 Sizes: 14, 12, 10, 8, 6, 4, 2, 1, 1/0, 2/0, 3/0, 4/0, 250, 300, 350, 500, 750
 Colors: BK, WH, RD, BL, GN, OR, YL, GY${filterInstruction}
 
+IMPORTANT: Return position values exactly as listed above with zero-padded two-digit format (e.g., "01", "02", "03").
+
 Return ONLY valid JSON:
 {
   "detected": [
-    {"position": "901", "wireDetails": "THHN1GN2500", "footage": 2500, "confidence": 95}
+    {"position": "01", "wireDetails": "THHN1GN2500", "footage": 2500, "confidence": 95}
   ],
   "notes": "Brief observation"
 }`;
