@@ -485,11 +485,18 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
     if (x < 0 || x > 100 || y < 0 || y > 100) return;
 
+    const existingNumbers = localPins
+      .map((p) => parseInt(p.label, 10))
+      .filter((n) => !isNaN(n));
+    let nextNumber = 1;
+    while (existingNumbers.includes(nextNumber)) {
+      nextNumber++;
+    }
     const newPin: LocalPin = {
       id: `pin-${Date.now()}`,
       x,
       y,
-      label: `${localPins.length + 1}`,
+      label: String(nextNumber).padStart(2, "0"),
       reelCount: 1,
     };
     setLocalPins((prev) => [...prev, newPin]);
@@ -1153,40 +1160,49 @@ Return ONLY valid JSON:
                 </table>
               </div>
 
-              {batchProgress && (
-                <div className="space-y-2" data-testid="batch-progress">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Creating entries...</span>
-                    <span>{batchProgress.current} / {batchProgress.total}</span>
-                  </div>
-                  <Progress value={(batchProgress.current / batchProgress.total) * 100} />
-                  {batchProgress.errors.length > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-destructive">
-                      <AlertTriangle className="h-3 w-3" />
-                      Failed: {batchProgress.errors.join(", ")}
+              {aiResult && (
+                <>
+                  {batchProgress && (
+                    <div className="space-y-2" data-testid="batch-progress">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Creating entries...</span>
+                        <span>{batchProgress.current} / {batchProgress.total}</span>
+                      </div>
+                      <Progress value={(batchProgress.current / batchProgress.total) * 100} />
+                      {batchProgress.errors.length > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-destructive">
+                          <AlertTriangle className="h-3 w-3" />
+                          Failed: {batchProgress.errors.join(", ")}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  onClick={() => createEntries.mutate()}
-                  disabled={createEntries.isPending}
-                  data-testid="button-create-entries-from-pins"
-                >
-                  {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  Create All Entries
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setLocalPins([])}
-                  disabled={createEntries.isPending}
-                  data-testid="button-clear-pins"
-                >
-                  Clear All
-                </Button>
-              </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      onClick={() => createEntries.mutate()}
+                      disabled={createEntries.isPending || !aisle}
+                      data-testid="button-create-entries-from-pins"
+                    >
+                      {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      Create All Entries
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => { setLocalPins([]); setAiResult(""); }}
+                      disabled={createEntries.isPending}
+                      data-testid="button-clear-pins"
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                  {!aisle && (
+                    <p className="text-xs text-center text-muted-foreground" data-testid="text-create-entries-hint">
+                      Fill in Aisle above to enable this button
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           )}
         </>
