@@ -709,6 +709,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       const totalCreated = localPins.reduce((sum, pin) => sum + pin.reelCount, 0);
       setLocalPins([]);
+      setAiResult("");
       setBatchProgress(null);
       toast({ title: `Created ${totalCreated} entries from ${localPins.length} pins` });
     },
@@ -858,7 +859,7 @@ Return ONLY valid JSON:
                 size="icon"
                 variant="ghost"
                 disabled={currentPhotoIdx <= 0}
-                onClick={() => { setCurrentPhotoIdx((i) => i - 1); setLocalPins([]); resetView(); }}
+                onClick={() => { setCurrentPhotoIdx((i) => i - 1); setLocalPins([]); setAiResult(""); resetView(); }}
                 data-testid="button-prev-photo"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -870,7 +871,7 @@ Return ONLY valid JSON:
                 size="icon"
                 variant="ghost"
                 disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                onClick={() => { setCurrentPhotoIdx((i) => i + 1); setLocalPins([]); resetView(); }}
+                onClick={() => { setCurrentPhotoIdx((i) => i + 1); setLocalPins([]); setAiResult(""); resetView(); }}
                 data-testid="button-next-photo"
               >
                 <ChevronRight className="h-4 w-4" />
