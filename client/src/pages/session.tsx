@@ -54,12 +54,19 @@ interface LocalPin {
   aiConfidence?: number;
 }
 
-function formatElapsed(startDate: string | Date) {
-  const diff = Date.now() - new Date(startDate).getTime();
+function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoAt: string | Date | null) {
+  if (!firstPhotoAt) return "No photos yet";
+  const fmt = (d: string | Date) => new Date(d).toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+  if (!lastPhotoAt || new Date(firstPhotoAt).getTime() === new Date(lastPhotoAt).getTime()) {
+    return fmt(firstPhotoAt);
+  }
+  const diff = new Date(lastPhotoAt).getTime() - new Date(firstPhotoAt).getTime();
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
+  const elapsed = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  return `${fmt(firstPhotoAt)} - ${fmt(lastPhotoAt)} (${elapsed})`;
 }
 
 export default function SessionPage() {
@@ -68,7 +75,7 @@ export default function SessionPage() {
   const { toast } = useToast();
   const sessionId = params?.id ? parseInt(params.id) : 0;
 
-  const { data: session, isLoading: sessionLoading } = useQuery<Session>({
+  const { data: session, isLoading: sessionLoading } = useQuery<Session & { firstPhotoAt: string | null; lastPhotoAt: string | null }>({
     queryKey: ["/api/sessions", sessionId.toString()],
     enabled: sessionId > 0,
   });
@@ -219,7 +226,7 @@ function SessionWorkspace({
         <h2>Location: ${session.location || "N/A"} | Entries: ${entries.length} | Total Footage: ${totalFootage.toLocaleString()} ft</h2>
         <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Color</th></tr></thead>
         <tbody>${rowsHtml}</tbody></table>
-        <div class="audit">Generated: ${new Date().toISOString()} | Session started: ${new Date(session.startedAt).toISOString()}</div>
+        <div class="audit">Generated: ${new Date().toISOString()} | First photo: ${session.firstPhotoAt ? new Date(session.firstPhotoAt).toISOString() : "N/A"} | Last photo: ${session.lastPhotoAt ? new Date(session.lastPhotoAt).toISOString() : "N/A"}</div>
         <script>setTimeout(()=>window.print(),500)</script></body></html>`);
       w.document.close();
     }
@@ -246,7 +253,7 @@ function SessionWorkspace({
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="mono" data-testid="text-entry-count">{entries.length} entries</span>
-                <span className="mono" data-testid="text-elapsed">{formatElapsed(session.startedAt)}</span>
+                <span className="mono" data-testid="text-session-time">{formatSessionTime(session.firstPhotoAt, session.lastPhotoAt)}</span>
               </div>
             </div>
           </div>
@@ -453,6 +460,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           dbId: savedPhoto.id,
         }]);
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";

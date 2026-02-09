@@ -38,10 +38,14 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const sessions = await storage.getUserSessions(userId);
       const sessionIds = sessions.map(s => s.id);
-      const stats = await storage.getSessionStats(sessionIds);
+      const [stats, photoTimes] = await Promise.all([
+        storage.getSessionStats(sessionIds),
+        storage.getSessionPhotoTimeRanges(sessionIds),
+      ]);
       const sessionsWithStats = sessions.map(s => {
         const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0 };
-        return { ...s, entryCount: st.entryCount, totalFootage: st.totalFootage };
+        const pt = photoTimes.get(s.id) || { firstPhotoAt: null, lastPhotoAt: null };
+        return { ...s, entryCount: st.entryCount, totalFootage: st.totalFootage, firstPhotoAt: pt.firstPhotoAt, lastPhotoAt: pt.lastPhotoAt };
       });
       res.json(sessionsWithStats);
     } catch (error) {
@@ -66,7 +70,9 @@ export async function registerRoutes(
     try {
       const session = await verifySessionOwnership(parseInt(req.params.id), req.user.claims.sub);
       if (!session) return res.status(404).json({ message: "Session not found" });
-      res.json(session);
+      const photoTimes = await storage.getSessionPhotoTimeRanges([session.id]);
+      const pt = photoTimes.get(session.id) || { firstPhotoAt: null, lastPhotoAt: null };
+      res.json({ ...session, firstPhotoAt: pt.firstPhotoAt, lastPhotoAt: pt.lastPhotoAt });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch session" });
     }
@@ -352,6 +358,8 @@ export async function registerRoutes(
       const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
       const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
       const generatedAt = new Date().toISOString();
+      const photoTimes = await storage.getSessionPhotoTimeRanges([session.id]);
+      const pt = photoTimes.get(session.id) || { firstPhotoAt: null, lastPhotoAt: null };
       const rowsHtml = sessionEntries.map((e: any, i: number) => `
         <tr>
           <td>${i + 1}</td><td>${e.aisle || ""}</td><td>${e.section || ""}</td><td>${e.position || ""}</td>
@@ -375,7 +383,8 @@ export async function registerRoutes(
         <h1>Master Reel Counter - ${session.name}</h1>
         <div class="meta">
           Location: ${session.location || "N/A"}<br>
-          Status: ${session.status} | Entries: ${sessionEntries.length} | Total Footage: ${totalFootage.toLocaleString()} ft
+          Status: ${session.status} | Entries: ${sessionEntries.length} | Total Footage: ${totalFootage.toLocaleString()} ft<br>
+          ${pt.firstPhotoAt ? `Session time: ${new Date(pt.firstPhotoAt).toISOString()} to ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toISOString() : "ongoing"}` : "No photos uploaded"}
         </div>
         <table>
           <thead><tr>
@@ -388,8 +397,8 @@ export async function registerRoutes(
         <div class="audit">
           <strong>Audit Trail</strong><br>
           Report generated: ${generatedAt}<br>
-          Session created: ${new Date(session.startedAt).toISOString()}<br>
-          Last updated: ${new Date(session.lastUpdatedAt).toISOString()}<br>
+          First photo: ${pt.firstPhotoAt ? new Date(pt.firstPhotoAt).toISOString() : "N/A"}<br>
+          Last photo: ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toISOString() : "N/A"}<br>
           ${session.completedAt ? `Completed: ${new Date(session.completedAt).toISOString()}<br>` : ""}
           Entry count at generation: ${sessionEntries.length}<br>
           Data encoding: ${key ? "Active (entries decrypted for export)" : "Off"}<br>
@@ -511,8 +520,10 @@ export async function registerRoutes(
       }
       const sessionEntries = await storage.getSessionEntries(session.id);
       const sessionPhotos = await storage.getSessionPhotos(session.id);
+      const photoTimes = await storage.getSessionPhotoTimeRanges([session.id]);
+      const pt = photoTimes.get(session.id) || { firstPhotoAt: null, lastPhotoAt: null };
       res.json({
-        session: { id: session.id, name: session.name, location: session.location, status: session.status, startedAt: session.startedAt },
+        session: { id: session.id, name: session.name, location: session.location, status: session.status, firstPhotoAt: pt.firstPhotoAt, lastPhotoAt: pt.lastPhotoAt },
         entries: sessionEntries.map(e => ({
           id: e.id, section: e.section, aisle: e.aisle, palletId: e.palletId,
           wireType: e.wireType, gauge: e.gauge, color: e.color, footage: e.footage,

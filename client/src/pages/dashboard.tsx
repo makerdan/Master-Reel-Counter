@@ -26,7 +26,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Session } from "@shared/schema";
 
-type SessionWithStats = Session & { entryCount: number; totalFootage: number };
+type SessionWithStats = Session & { entryCount: number; totalFootage: number; firstPhotoAt: string | null; lastPhotoAt: string | null };
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -266,9 +266,11 @@ export default function Dashboard() {
                             {session.location}
                           </span>
                         )}
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1" data-testid={`text-session-time-${session.id}`}>
                           <Clock className="h-3 w-3" />
-                          {formatDate(session.startedAt)}
+                          {session.firstPhotoAt
+                            ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
+                            : "No photos yet"}
                         </span>
                         <span className="flex items-center gap-1 mono" data-testid={`text-session-entries-${session.id}`}>
                           <Hash className="h-3 w-3" />

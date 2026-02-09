@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, inArray, sql, count, sum } from "drizzle-orm";
+import { eq, and, desc, inArray, sql, count, sum, min, max } from "drizzle-orm";
 import {
   countingSessions,
   photos,
@@ -47,6 +47,7 @@ export interface IStorage {
   getAllUserEntries(userId: string): Promise<Entry[]>;
   bulkUpdateEntries(entriesToUpdate: { id: number; data: Partial<Entry> }[]): Promise<void>;
   getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number }>>;
+  getSessionPhotoTimeRanges(sessionIds: number[]): Promise<Map<number, { firstPhotoAt: Date | null; lastPhotoAt: Date | null }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -214,6 +215,27 @@ export class DatabaseStorage implements IStorage {
       result.set(row.sessionId, {
         entryCount: Number(row.entryCount),
         totalFootage: Number(row.totalFootage) || 0,
+      });
+    }
+    return result;
+  }
+
+  async getSessionPhotoTimeRanges(sessionIds: number[]): Promise<Map<number, { firstPhotoAt: Date | null; lastPhotoAt: Date | null }>> {
+    const result = new Map<number, { firstPhotoAt: Date | null; lastPhotoAt: Date | null }>();
+    if (sessionIds.length === 0) return result;
+    const rows = await db
+      .select({
+        sessionId: photos.sessionId,
+        firstPhotoAt: min(photos.createdAt),
+        lastPhotoAt: max(photos.createdAt),
+      })
+      .from(photos)
+      .where(inArray(photos.sessionId, sessionIds))
+      .groupBy(photos.sessionId);
+    for (const row of rows) {
+      result.set(row.sessionId, {
+        firstPhotoAt: row.firstPhotoAt ? new Date(row.firstPhotoAt) : null,
+        lastPhotoAt: row.lastPhotoAt ? new Date(row.lastPhotoAt) : null,
       });
     }
     return result;
