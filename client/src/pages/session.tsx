@@ -48,6 +48,10 @@ interface LocalPin {
   y: number;
   label: string;
   reelCount: number;
+  wireDetails?: string;
+  vendorCode?: string;
+  footage?: number;
+  aiConfidence?: number;
 }
 
 function formatElapsed(startDate: string | Date) {
@@ -621,6 +625,34 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     setRelabelValue("");
   }, [relabelPinId, relabelValue]);
 
+  const updatePinField = useCallback((pinId: string, field: keyof LocalPin, value: any) => {
+    setLocalPins((prev) =>
+      prev.map((p) => p.id === pinId ? { ...p, [field]: value, ...(field === "wireDetails" ? { aiConfidence: undefined } : {}) } : p)
+    );
+  }, []);
+
+  const copyRowDown = useCallback((index: number) => {
+    setLocalPins((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const src = prev[index];
+      return prev.map((p, i) =>
+        i === index + 1
+          ? { ...p, wireDetails: src.wireDetails, vendorCode: src.vendorCode, footage: src.footage, aiConfidence: undefined }
+          : p
+      );
+    });
+  }, []);
+
+  const clearRow = useCallback((pinId: string) => {
+    setLocalPins((prev) =>
+      prev.map((p) =>
+        p.id === pinId
+          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, aiConfidence: undefined }
+          : p
+      )
+    );
+  }, []);
+
   const createEntries = useMutation({
     mutationFn: async () => {
       const section = currentPhoto?.section || "";
@@ -633,12 +665,14 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         try {
           const entryIds: number[] = [];
           for (let r = 0; r < pin.reelCount; r++) {
-            const reelLabel = pin.reelCount > 1 ? `Pin ${pin.label} (${r + 1}/${pin.reelCount})` : `Pin ${pin.label}`;
+            const reelLabel = pin.wireDetails || (pin.reelCount > 1 ? `Pin ${pin.label} (${r + 1}/${pin.reelCount})` : `Pin ${pin.label}`);
             const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
               aisle,
               section,
               position: "Floor",
               reelTag: reelLabel,
+              manufacturer: pin.vendorCode || undefined,
+              footage: pin.footage || undefined,
               notes: pin.reelCount > 1 ? `Reel ${r + 1} of ${pin.reelCount} at pin ${pin.label}` : undefined,
             });
             const entry = await res.json();
@@ -647,7 +681,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             setBatchProgress({ current: completed, total: totalEntries, errors });
           }
           if (currentPhoto?.dbId) {
-            const pinRes = await apiRequest("POST", `/api/photos/${currentPhoto.dbId}/pins`, {
+            await apiRequest("POST", `/api/photos/${currentPhoto.dbId}/pins`, {
               xPercent: pin.x,
               yPercent: pin.y,
               label: pin.label,
@@ -678,17 +712,89 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     },
   });
 
+  const [aiFilter, setAiFilter] = useState("");
+
   const analyzePhoto = async () => {
-    if (!currentPhoto) return;
+    if (!currentPhoto || localPins.length === 0) {
+      toast({ title: "Add pins to mark reel locations before running AI Assist", variant: "destructive" });
+      return;
+    }
     setAiLoading(true);
     setAiResult("");
     try {
+      const pinPositions = localPins.map((p) => p.label).sort();
+      let filterInstruction = "";
+      if (aiFilter.trim()) {
+        filterInstruction = `\nFILTER: Only include tags containing or similar to "${aiFilter.trim()}" (allow up to 3 character differences for OCR errors).`;
+      }
+      const prompt = `You are a wire inventory tag reader analyzing a warehouse section photo.
+
+RED BOUNDING BOXES mark user-selected reel locations. Each box has a RED LABEL showing its position code.
+Positions to analyze: ${pinPositions.join(", ")}
+
+For each RED BOUNDING BOX, locate and read the WHITE PAPER TAG attached to or near that wire reel.
+
+WHITE PAPER TAGS have BLACK BOLD TEXT - the primary wire category code.
+Wire code patterns: [TYPE][SIZE][COLOR][FOOTAGE] e.g., THHN4BK1000, XHHW350WH2500
+Types: THHN, XHHW, MHF, URD, SER, RX, TC, TRIPLEX, USE, NM
+Sizes: 14, 12, 10, 8, 6, 4, 2, 1, 1/0, 2/0, 3/0, 4/0, 250, 300, 350, 500, 750
+Colors: BK, WH, RD, BL, GN, OR, YL, GY${filterInstruction}
+
+Return ONLY valid JSON:
+{
+  "detected": [
+    {"position": "901", "wireDetails": "THHN1GN2500", "footage": 2500, "confidence": 95}
+  ],
+  "notes": "Brief observation"
+}`;
+
       const res = await apiRequest("POST", "/api/ai/analyze", {
         imageUrl: currentPhoto.url,
-        prompt: "Analyze this warehouse photo. Identify wire reels, their tags, wire types, gauges, and footage if visible. List each reel you can see with as much detail as possible.",
+        prompt,
       });
       const data = await res.json();
-      setAiResult(data.result || "No results returned.");
+      const resultText = data.result || "";
+      setAiResult(resultText);
+
+      try {
+        let jsonStr = resultText;
+        const jsonMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+          jsonStr = jsonMatch[1].trim();
+        } else {
+          const objMatch = resultText.match(/\{[\s\S]*\}/);
+          if (objMatch) jsonStr = objMatch[0];
+        }
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.detected && Array.isArray(parsed.detected)) {
+          let filledCount = 0;
+          setLocalPins((prev) =>
+            prev.map((pin) => {
+              const match = parsed.detected.find((d: any) => {
+                const normPin = pin.label.trim().toUpperCase();
+                const normItem = String(d.position || "").trim().toUpperCase();
+                return normPin === normItem || normPin.startsWith(normItem) || normItem.startsWith(normPin);
+              });
+              if (match && match.wireDetails) {
+                filledCount++;
+                const details = String(match.wireDetails).toUpperCase().replace(/[^A-Z0-9/\-]/g, "");
+                const vendorMatch = details.match(/^(.+?)-(\w+)$/);
+                return {
+                  ...pin,
+                  wireDetails: vendorMatch ? vendorMatch[1] : details,
+                  vendorCode: vendorMatch ? vendorMatch[2] : pin.vendorCode,
+                  footage: match.footage || pin.footage,
+                  aiConfidence: typeof match.confidence === "number" ? match.confidence : 100,
+                };
+              }
+              return pin;
+            })
+          );
+          toast({ title: `AI filled ${filledCount} of ${localPins.length} pin fields` });
+        }
+      } catch {
+        // JSON parse failed, raw result already shown
+      }
     } catch {
       toast({ title: "AI analysis failed", variant: "destructive" });
     } finally {
@@ -918,7 +1024,135 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           )}
 
           {localPins.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={aiFilter}
+                  onChange={(e) => setAiFilter(e.target.value)}
+                  placeholder="e.g. THHN, 4/0, BK (optional)"
+                  className="flex-1 min-w-[120px] rounded-md border px-3 py-2 text-sm"
+                  data-testid="input-ai-filter"
+                />
+                <Button
+                  variant="outline"
+                  onClick={analyzePhoto}
+                  disabled={aiLoading}
+                  data-testid="button-ai-assist"
+                >
+                  {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+                  AI Assist - Read Tags
+                </Button>
+              </div>
+
+              {aiResult && (
+                <div className="text-xs text-muted-foreground p-2 rounded-md border" data-testid="text-ai-result">
+                  <span className="font-semibold">AI Notes:</span> {(() => {
+                    try {
+                      let jsonStr = aiResult;
+                      const jsonMatch = aiResult.match(/```(?:json)?\s*([\s\S]*?)```/);
+                      if (jsonMatch) jsonStr = jsonMatch[1].trim();
+                      else { const objMatch = aiResult.match(/\{[\s\S]*\}/); if (objMatch) jsonStr = objMatch[0]; }
+                      const parsed = JSON.parse(jsonStr);
+                      return parsed.notes || "Analysis complete.";
+                    } catch { return aiResult.substring(0, 200); }
+                  })()}
+                </div>
+              )}
+
+              <div className="text-sm font-semibold text-muted-foreground" data-testid="text-pin-table-title">Enter Details for Each Position</div>
+              <div className="overflow-x-auto">
+                <table className="pin-entry-table" data-testid="pin-entry-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 70 }}>Reel #:</th>
+                      <th style={{ minWidth: 140 }}>Category:</th>
+                      <th style={{ width: 80 }}>Vendor Code:</th>
+                      <th style={{ width: 80 }}>Footage:</th>
+                      <th style={{ width: 60 }}>Reels:</th>
+                      <th style={{ width: 40 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {localPins.map((pin, index) => (
+                      <tr key={pin.id} data-testid={`pin-entry-row-${index}`}>
+                        <td>
+                          <span className="pin-position-cell">{pin.label}</span>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className={`input-caps${pin.aiConfidence != null && pin.aiConfidence < 85 ? " low-confidence" : ""}`}
+                            value={pin.wireDetails || ""}
+                            onChange={(e) => updatePinField(pin.id, "wireDetails", e.target.value.toUpperCase())}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="characters"
+                            data-testid={`input-wire-details-${index}`}
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={pin.vendorCode || ""}
+                            onChange={(e) => updatePinField(pin.id, "vendorCode", e.target.value)}
+                            data-testid={`select-vendor-code-${index}`}
+                          >
+                            <option value="">--</option>
+                            <option value="COP">COP</option>
+                            <option value="ALU">ALU</option>
+                            <option value="COR">COR</option>
+                            <option value="ALF">ALF</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={pin.footage ?? ""}
+                            onChange={(e) => updatePinField(pin.id, "footage", e.target.value ? parseInt(e.target.value) : undefined)}
+                            min={0}
+                            inputMode="decimal"
+                            autoComplete="off"
+                            data-testid={`input-footage-${index}`}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={pin.reelCount}
+                            onChange={(e) => updatePinField(pin.id, "reelCount", Math.max(1, parseInt(e.target.value) || 1))}
+                            min={1}
+                            inputMode="numeric"
+                            autoComplete="off"
+                            style={{ width: "100%" }}
+                            data-testid={`input-reels-${index}`}
+                          />
+                        </td>
+                        <td style={{ whiteSpace: "nowrap", textAlign: "center" }}>
+                          <button
+                            type="button"
+                            className="copy-down-btn"
+                            onClick={() => copyRowDown(index)}
+                            title="Copy to next row"
+                            data-testid={`button-copy-down-${index}`}
+                          >
+                            &#8595;
+                          </button>
+                          <button
+                            type="button"
+                            className="clear-row-btn"
+                            onClick={() => clearRow(pin.id)}
+                            title="Clear row"
+                            data-testid={`button-clear-row-${index}`}
+                          >
+                            &#10005;
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
               {batchProgress && (
                 <div className="space-y-2" data-testid="batch-progress">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -934,6 +1168,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   )}
                 </div>
               )}
+
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   onClick={() => createEntries.mutate()}
@@ -941,7 +1176,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   data-testid="button-create-entries-from-pins"
                 >
                   {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  Create {localPins.reduce((s, p) => s + p.reelCount, 0)} Entries from {localPins.length} Pins
+                  Create All Entries
                 </Button>
                 <Button
                   variant="outline"
@@ -953,32 +1188,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 </Button>
               </div>
             </div>
-          )}
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              onClick={analyzePhoto}
-              disabled={aiLoading}
-              data-testid="button-ai-assist"
-            >
-              {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-              AI Assist
-            </Button>
-          </div>
-
-          {aiResult && (
-            <Card>
-              <CardHeader className="p-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Brain className="h-4 w-4" />
-                  AI Analysis
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <p className="text-sm whitespace-pre-wrap text-muted-foreground" data-testid="text-ai-result">{aiResult}</p>
-              </CardContent>
-            </Card>
           )}
         </>
       )}

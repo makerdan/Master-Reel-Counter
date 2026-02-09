@@ -505,6 +505,119 @@
   background: #15803d;
 }
 
+.pin-entry-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pin-entry-table th,
+.pin-entry-table td {
+  padding: 8px;
+  border: 1px solid var(--border-color, #e7e5e4);
+  text-align: left;
+  font-size: 14px;
+}
+.pin-entry-table th {
+  background: hsl(var(--muted));
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-decoration: underline;
+}
+.pin-entry-table tr:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+.pin-entry-table input,
+.pin-entry-table select {
+  width: 100%;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--foreground));
+  color: hsl(var(--foreground));
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 14px;
+  font-family: var(--font-mono);
+}
+.pin-entry-table input:focus,
+.pin-entry-table select:focus {
+  outline: none;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2);
+}
+.pin-entry-table input::placeholder {
+  color: hsl(var(--muted-foreground));
+  font-family: var(--font-sans, 'Inter', sans-serif);
+}
+.pin-entry-table .input-caps {
+  text-transform: uppercase;
+}
+.pin-entry-table .input-caps::placeholder {
+  text-transform: none;
+}
+.pin-position-cell {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid hsl(var(--foreground));
+  border-radius: 4px;
+  background: hsl(var(--background));
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #ea580c;
+}
+.pin-entry-table .low-confidence {
+  border: 2px solid #ea580c !important;
+}
+.copy-down-btn,
+.clear-row-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--foreground));
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.copy-down-btn:hover {
+  background: #ea580c;
+  color: white;
+  border-color: #ea580c;
+}
+.clear-row-btn {
+  font-size: 12px;
+  margin-left: 4px;
+}
+.clear-row-btn:hover {
+  background: hsl(var(--destructive));
+  color: white;
+  border-color: hsl(var(--destructive));
+}
+
+@media (max-width: 640px) {
+  .pin-entry-table th,
+  .pin-entry-table td {
+    padding: 6px 4px;
+    font-size: 12px;
+  }
+  .pin-entry-table input,
+  .pin-entry-table select {
+    padding: 8px 6px;
+    font-size: 16px;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  .pin-entry-table input,
+  .pin-entry-table select {
+    min-height: 44px;
+  }
+}
+
 @media (max-width: 640px) {
   .pin-marker {
     min-width: 24px;
