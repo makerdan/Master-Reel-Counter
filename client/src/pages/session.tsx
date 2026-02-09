@@ -1190,14 +1190,6 @@ Return ONLY valid JSON:
                       {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                       Create All Entries
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => { setLocalPins([]); setAiResult(""); }}
-                      disabled={createEntries.isPending}
-                      data-testid="button-clear-pins"
-                    >
-                      Clear All
-                    </Button>
                   </div>
                   {!aisle && (
                     <p className="text-xs text-center text-muted-foreground" data-testid="text-create-entries-hint">
@@ -1206,6 +1198,17 @@ Return ONLY valid JSON:
                   )}
                 </>
               )}
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  onClick={() => { setLocalPins([]); setAiResult(""); }}
+                  disabled={createEntries.isPending}
+                  data-testid="button-clear-pins"
+                >
+                  Clear All
+                </Button>
+              </div>
             </div>
           )}
         </>
