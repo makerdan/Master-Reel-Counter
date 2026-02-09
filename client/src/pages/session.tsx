@@ -819,8 +819,7 @@ Return ONLY valid JSON:
   return (
     <div className="space-y-4">
       <div className="flex items-end gap-2 flex-wrap">
-        <div className="space-y-1">
-          <Label className="text-xs">Aisle</Label>
+        <div>
           <Input
             value={aisle}
             onChange={(e) => setAisle(e.target.value)}
@@ -878,7 +877,6 @@ Return ONLY valid JSON:
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-xs">Section</Label>
               <Input
                 value={currentPhoto?.section || ""}
                 onChange={(e) => {
