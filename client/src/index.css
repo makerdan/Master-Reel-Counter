@@ -325,6 +325,22 @@
   cursor: grabbing;
 }
 
+.photo-scroll-strip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12%;
+  z-index: 15;
+  cursor: default;
+  touch-action: auto;
+}
+.photo-scroll-strip.left {
+  left: 0;
+}
+.photo-scroll-strip.right {
+  right: 0;
+}
+
 .photo-overlay-controls {
   position: absolute;
   display: flex;

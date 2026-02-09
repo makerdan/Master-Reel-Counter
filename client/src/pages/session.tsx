@@ -667,6 +667,8 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
               onWheel={handleWheel}
               data-testid="photo-viewer"
             >
+              <div className="photo-scroll-strip left" onWheel={(e) => e.stopPropagation()} />
+              <div className="photo-scroll-strip right" onWheel={(e) => e.stopPropagation()} />
               <img
                 src={currentPhoto.url}
                 alt="Section photo"
