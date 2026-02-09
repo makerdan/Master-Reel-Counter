@@ -349,13 +349,10 @@
   z-index: 20;
   pointer-events: auto;
 }
-.photo-overlay-controls.top-right {
-  top: 8px;
+.photo-overlay-controls.right-strip {
+  top: 50%;
   right: 8px;
-}
-.photo-overlay-controls.bottom-right {
-  bottom: 8px;
-  right: 8px;
+  transform: translateY(-50%);
 }
 .photo-overlay-btn {
   width: 36px;

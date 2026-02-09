@@ -849,10 +849,11 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   </div>
                 </div>
               ))}
-              <div className="photo-overlay-controls top-right">
+              <div className="photo-overlay-controls right-strip">
                 <button
                   className="photo-overlay-btn"
                   onClick={(e) => { e.stopPropagation(); setScale((s) => Math.min(5, s + 0.5)); }}
+                  title="Zoom in"
                   data-testid="button-zoom-in"
                 >
                   <ZoomIn className="h-4 w-4" />
@@ -860,6 +861,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 <button
                   className="photo-overlay-btn"
                   onClick={(e) => { e.stopPropagation(); setScale((s) => Math.max(1, s - 0.5)); }}
+                  title="Zoom out"
                   data-testid="button-zoom-out"
                 >
                   <ZoomOut className="h-4 w-4" />
@@ -872,11 +874,10 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 >
                   <Move className="h-4 w-4" />
                 </button>
-              </div>
-              <div className="photo-overlay-controls bottom-right">
                 <button
                   className="photo-overlay-btn"
                   onClick={(e) => { e.stopPropagation(); setRotation((r) => (r + 90) % 360); }}
+                  title="Rotate clockwise"
                   data-testid="button-rotate-cw"
                 >
                   <RotateCw className="h-4 w-4" />
@@ -884,56 +885,12 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 <button
                   className="photo-overlay-btn"
                   onClick={(e) => { e.stopPropagation(); setRotation((r) => (r - 90 + 360) % 360); }}
+                  title="Rotate counter-clockwise"
                   data-testid="button-rotate-ccw"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </button>
               </div>
-            </div>
-          )}
-
-          {currentPhoto && (
-            <div className="flex items-center justify-center gap-2 flex-wrap" data-testid="photo-controls-bottom">
-              <button
-                className="photo-overlay-btn"
-                onClick={() => setScale((s) => Math.min(5, s + 0.5))}
-                title="Zoom in"
-                data-testid="button-zoom-in-bottom"
-              >
-                <ZoomIn className="h-4 w-4" />
-              </button>
-              <button
-                className="photo-overlay-btn"
-                onClick={() => setScale((s) => Math.max(1, s - 0.5))}
-                title="Zoom out"
-                data-testid="button-zoom-out-bottom"
-              >
-                <ZoomOut className="h-4 w-4" />
-              </button>
-              <button
-                className={`photo-overlay-btn ${panMode ? "photo-overlay-btn-active" : ""}`}
-                onClick={() => setPanMode((m) => !m)}
-                title={panMode ? "Exit pan mode (tap to place pins)" : "Enter pan mode (drag to move)"}
-                data-testid="button-pan-mode-bottom"
-              >
-                <Move className="h-4 w-4" />
-              </button>
-              <button
-                className="photo-overlay-btn"
-                onClick={() => setRotation((r) => (r + 90) % 360)}
-                title="Rotate clockwise"
-                data-testid="button-rotate-cw-bottom"
-              >
-                <RotateCw className="h-4 w-4" />
-              </button>
-              <button
-                className="photo-overlay-btn"
-                onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
-                title="Rotate counter-clockwise"
-                data-testid="button-rotate-ccw-bottom"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
             </div>
           )}
 
