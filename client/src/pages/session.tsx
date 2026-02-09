@@ -892,6 +892,51 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             </div>
           )}
 
+          {currentPhoto && (
+            <div className="flex items-center justify-center gap-2 flex-wrap" data-testid="photo-controls-bottom">
+              <button
+                className="photo-overlay-btn"
+                onClick={() => setScale((s) => Math.min(5, s + 0.5))}
+                title="Zoom in"
+                data-testid="button-zoom-in-bottom"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+              <button
+                className="photo-overlay-btn"
+                onClick={() => setScale((s) => Math.max(1, s - 0.5))}
+                title="Zoom out"
+                data-testid="button-zoom-out-bottom"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <button
+                className={`photo-overlay-btn ${panMode ? "photo-overlay-btn-active" : ""}`}
+                onClick={() => setPanMode((m) => !m)}
+                title={panMode ? "Exit pan mode (tap to place pins)" : "Enter pan mode (drag to move)"}
+                data-testid="button-pan-mode-bottom"
+              >
+                <Move className="h-4 w-4" />
+              </button>
+              <button
+                className="photo-overlay-btn"
+                onClick={() => setRotation((r) => (r + 90) % 360)}
+                title="Rotate clockwise"
+                data-testid="button-rotate-cw-bottom"
+              >
+                <RotateCw className="h-4 w-4" />
+              </button>
+              <button
+                className="photo-overlay-btn"
+                onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
+                title="Rotate counter-clockwise"
+                data-testid="button-rotate-ccw-bottom"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           {localPins.length > 0 && (
             <div className="space-y-2">
               {batchProgress && (
