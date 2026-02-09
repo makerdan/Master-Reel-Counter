@@ -673,7 +673,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             <div
               ref={containerRef}
               className="photo-viewer-container w-full"
-              style={{ height: 400 }}
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
               onWheel={handleWheel}
@@ -683,8 +682,9 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 src={currentPhoto.url}
                 alt="Section photo"
                 draggable={false}
-                className="w-full h-full object-contain select-none"
+                className="w-full select-none"
                 style={{
+                  display: "block",
                   transform: `scale(${scale}) translate(${panX}px, ${panY}px) rotate(${rotation}deg)`,
                   transformOrigin: "center center",
                 }}
