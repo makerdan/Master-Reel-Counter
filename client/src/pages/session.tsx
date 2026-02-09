@@ -147,10 +147,10 @@ function SessionWorkspace({
   const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
 
   const updateSession = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ name, location }: { name: string; location: string }) => {
       const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, {
-        name: editName,
-        location: editLocation || null,
+        name,
+        location: location || null,
       });
       return res.json();
     },
@@ -338,7 +338,7 @@ function SessionWorkspace({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (editName.trim()) updateSession.mutate();
+              if (editName.trim()) updateSession.mutate({ name: editName, location: editLocation });
             }}
             className="space-y-4"
           >
