@@ -818,7 +818,7 @@ Return ONLY valid JSON:
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-end gap-2 flex-wrap">
         <div className="space-y-1">
           <Label className="text-xs">Aisle</Label>
           <Input
@@ -830,7 +830,7 @@ Return ONLY valid JSON:
             data-testid="input-photo-aisle"
           />
         </div>
-        <div className="flex items-end gap-2">
+        <div>
           <input
             ref={fileInputRef}
             type="file"
