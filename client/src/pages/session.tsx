@@ -656,17 +656,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 data-testid="input-photo-section"
               />
             </div>
-            <div className="flex items-center gap-1">
-              <Button size="icon" variant="ghost" onClick={() => setScale((s) => Math.min(5, s + 0.5))} data-testid="button-zoom-in">
-                <ZoomIn className="h-4 w-4" />
-              </Button>
-              <Button size="icon" variant="ghost" onClick={() => setScale((s) => Math.max(1, s - 0.5))} data-testid="button-zoom-out">
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <Button size="icon" variant="ghost" onClick={() => setRotation((r) => (r + 90) % 360)} data-testid="button-rotate">
-                <RotateCw className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
 
           {currentPhoto && (
@@ -705,6 +694,38 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   {pin.label}
                 </div>
               ))}
+              <div className="photo-overlay-controls top-right">
+                <button
+                  className="photo-overlay-btn"
+                  onClick={(e) => { e.stopPropagation(); setScale((s) => Math.min(5, s + 0.5)); }}
+                  data-testid="button-zoom-in"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+                <button
+                  className="photo-overlay-btn"
+                  onClick={(e) => { e.stopPropagation(); setScale((s) => Math.max(1, s - 0.5)); }}
+                  data-testid="button-zoom-out"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="photo-overlay-controls bottom-right">
+                <button
+                  className="photo-overlay-btn"
+                  onClick={(e) => { e.stopPropagation(); setRotation((r) => (r + 90) % 360); }}
+                  data-testid="button-rotate-cw"
+                >
+                  <RotateCw className="h-4 w-4" />
+                </button>
+                <button
+                  className="photo-overlay-btn"
+                  onClick={(e) => { e.stopPropagation(); setRotation((r) => (r - 90 + 360) % 360); }}
+                  data-testid="button-rotate-ccw"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           )}
 
