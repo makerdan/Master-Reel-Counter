@@ -379,6 +379,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
   const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; dbId?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
@@ -968,25 +969,32 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
   };
 
   return (
-    <div className="space-y-4 rounded-md border border-[hsl(18_60%_30%/0.25)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4">
+    <div className="space-y-4 rounded-md border-2 border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4">
       <div className="flex items-end gap-2 flex-wrap">
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)] mb-1 block">Aisle</label>
           <Input
             value={aisle}
             onChange={(e) => setAisle(e.target.value)}
             placeholder="Aisle"
             inputMode="numeric"
-            className="w-24 border-[hsl(18_40%_50%/0.4)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)]"
+            className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] ${aisle.trim() ? "border-[hsl(145_50%_35%/0.5)]" : "border-[hsl(18_85%_48%/0.6)]"}`}
             data-testid="input-photo-aisle"
           />
         </div>
-        <div>
+        <div className="flex items-center gap-2">
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             multiple
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
             className="hidden"
             onChange={handleFileUpload}
           />
@@ -998,6 +1006,15 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
           >
             {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             Upload Photos
+          </Button>
+          <Button
+            className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={isUploading}
+            data-testid="button-take-photo"
+          >
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+            Take Photo
           </Button>
         </div>
       </div>
@@ -1031,7 +1048,6 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)] whitespace-nowrap">Sec:</label>
               <Input
                 value={currentPhoto?.section || ""}
                 onChange={(e) => {
@@ -1041,7 +1057,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 }}
                 placeholder="Section"
                 inputMode="numeric"
-                className="w-24 border-[hsl(18_40%_50%/0.4)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)]"
+                className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] ${(currentPhoto?.section || "").trim() ? "border-[hsl(145_50%_35%/0.5)]" : "border-[hsl(18_85%_48%/0.6)]"}`}
                 data-testid="input-photo-section"
               />
             </div>
