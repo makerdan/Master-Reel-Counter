@@ -46,8 +46,8 @@ export interface IStorage {
   upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings>;
   getAllUserEntries(userId: string): Promise<Entry[]>;
   bulkUpdateEntries(entriesToUpdate: { id: number; data: Partial<Entry> }[]): Promise<void>;
-  getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number }>>;
-  getSessionPhotoTimeRanges(sessionIds: number[]): Promise<Map<number, { firstPhotoAt: Date | null; lastPhotoAt: Date | null }>>;
+  getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number; sectionCount: number }>>;
+  getSessionPhotoStats(sessionIds: number[]): Promise<Map<number, { photoCount: number; firstPhotoAt: Date | null; lastPhotoAt: Date | null }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -199,14 +199,15 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number }>> {
-    const result = new Map<number, { entryCount: number; totalFootage: number }>();
+  async getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number; sectionCount: number }>> {
+    const result = new Map<number, { entryCount: number; totalFootage: number; sectionCount: number }>();
     if (sessionIds.length === 0) return result;
     const rows = await db
       .select({
         sessionId: entries.sessionId,
         entryCount: count(entries.id),
         totalFootage: sum(entries.footage),
+        sectionCount: sql<number>`count(distinct ${entries.section})`,
       })
       .from(entries)
       .where(inArray(entries.sessionId, sessionIds))
@@ -215,17 +216,19 @@ export class DatabaseStorage implements IStorage {
       result.set(row.sessionId, {
         entryCount: Number(row.entryCount),
         totalFootage: Number(row.totalFootage) || 0,
+        sectionCount: Number(row.sectionCount) || 0,
       });
     }
     return result;
   }
 
-  async getSessionPhotoTimeRanges(sessionIds: number[]): Promise<Map<number, { firstPhotoAt: Date | null; lastPhotoAt: Date | null }>> {
-    const result = new Map<number, { firstPhotoAt: Date | null; lastPhotoAt: Date | null }>();
+  async getSessionPhotoStats(sessionIds: number[]): Promise<Map<number, { photoCount: number; firstPhotoAt: Date | null; lastPhotoAt: Date | null }>> {
+    const result = new Map<number, { photoCount: number; firstPhotoAt: Date | null; lastPhotoAt: Date | null }>();
     if (sessionIds.length === 0) return result;
     const rows = await db
       .select({
         sessionId: photos.sessionId,
+        photoCount: count(photos.id),
         firstPhotoAt: min(photos.createdAt),
         lastPhotoAt: max(photos.createdAt),
       })
@@ -234,6 +237,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(photos.sessionId);
     for (const row of rows) {
       result.set(row.sessionId, {
+        photoCount: Number(row.photoCount),
         firstPhotoAt: row.firstPhotoAt ? new Date(row.firstPhotoAt) : null,
         lastPhotoAt: row.lastPhotoAt ? new Date(row.lastPhotoAt) : null,
       });

@@ -70,6 +70,9 @@ export const pins = pgTable("pins", {
   yPercent: real("y_percent").notNull(),
   label: text("label"),
   reelCount: integer("reel_count").default(1),
+  wireDetails: text("wire_details"),
+  vendorCode: text("vendor_code"),
+  footage: integer("footage"),
 });
 
 export const userSettings = pgTable("user_settings", {

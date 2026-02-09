@@ -382,6 +382,9 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [localPins, setLocalPins] = useState<LocalPin[]>([]);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [pinsLoaded, setPinsLoaded] = useState(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipAutoSave = useRef(false);
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
   const dragRef = useRef<{
@@ -434,8 +437,69 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         section: p.section || "",
         dbId: p.id,
       })));
+      const firstAisle = photos.find(p => p.aisle)?.aisle;
+      if (firstAisle && !aisle) setAisle(firstAisle);
     }
   }, [photos]);
+
+  useEffect(() => {
+    if (!currentPhoto?.dbId) {
+      setPinsLoaded(false);
+      return;
+    }
+    setPinsLoaded(false);
+    skipAutoSave.current = true;
+    const loadPins = async () => {
+      try {
+        const res = await apiRequest("GET", `/api/photos/${currentPhoto.dbId}/pins`);
+        const dbPins: Pin[] = await res.json();
+        const draftPins = dbPins.filter(p => !p.entryId);
+        if (draftPins.length > 0) {
+          setLocalPins(draftPins.map(p => ({
+            id: `pin-${p.id}`,
+            x: p.xPercent,
+            y: p.yPercent,
+            label: p.label || "01",
+            reelCount: p.reelCount || 1,
+            wireDetails: p.wireDetails || undefined,
+            vendorCode: p.vendorCode || undefined,
+            footage: p.footage || undefined,
+          })));
+        } else {
+          setLocalPins([]);
+        }
+      } catch {
+        setLocalPins([]);
+      }
+      setPinsLoaded(true);
+      setTimeout(() => { skipAutoSave.current = false; }, 500);
+    };
+    loadPins();
+  }, [currentPhoto?.dbId]);
+
+  useEffect(() => {
+    if (!currentPhoto?.dbId || !pinsLoaded || skipAutoSave.current) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        await apiRequest("PUT", `/api/photos/${currentPhoto.dbId}/draft-pins`, {
+          pins: localPins.map(p => ({
+            xPercent: p.x,
+            yPercent: p.y,
+            label: p.label,
+            reelCount: p.reelCount,
+            wireDetails: p.wireDetails || null,
+            vendorCode: p.vendorCode || null,
+            footage: p.footage || null,
+          })),
+        });
+      } catch {
+      }
+    }, 1000);
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [localPins, currentPhoto?.dbId, pinsLoaded]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -901,7 +965,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 size="icon"
                 variant="ghost"
                 disabled={currentPhotoIdx <= 0}
-                onClick={() => { setCurrentPhotoIdx((i) => i - 1); setLocalPins([]); setAiResult(""); resetView(); }}
+                onClick={() => { skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
                 data-testid="button-prev-photo"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -913,7 +977,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 size="icon"
                 variant="ghost"
                 disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                onClick={() => { setCurrentPhotoIdx((i) => i + 1); setLocalPins([]); setAiResult(""); resetView(); }}
+                onClick={() => { skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
                 data-testid="button-next-photo"
               >
                 <ChevronRight className="h-4 w-4" />

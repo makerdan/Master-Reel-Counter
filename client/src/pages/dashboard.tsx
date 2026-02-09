@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings,
-  Pencil, Hash, Ruler, CheckCircle2, RotateCcw,
+  Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Session } from "@shared/schema";
 
-type SessionWithStats = Session & { entryCount: number; totalFootage: number; firstPhotoAt: string | null; lastPhotoAt: string | null };
+type SessionWithStats = Session & {
+  entryCount: number;
+  totalFootage: number;
+  sectionCount: number;
+  photoCount: number;
+  firstPhotoAt: string | null;
+  lastPhotoAt: string | null;
+};
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -240,7 +247,7 @@ export default function Dashboard() {
             {sessions.map((session) => (
               <Card
                 key={session.id}
-                className="hover-elevate cursor-pointer"
+                className="hover-elevate cursor-pointer border border-black dark:border-white"
                 data-testid={`card-session-${session.id}`}
                 onClick={() => setLocation(`/session/${session.id}`)}
               >
@@ -272,9 +279,19 @@ export default function Dashboard() {
                             ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
                             : "No photos yet"}
                         </span>
+                        <span className="flex items-center gap-1 mono" data-testid={`text-session-photos-${session.id}`}>
+                          <Camera className="h-3 w-3" />
+                          {session.photoCount} photos
+                        </span>
+                        {session.sectionCount > 0 && (
+                          <span className="flex items-center gap-1 mono" data-testid={`text-session-sections-${session.id}`}>
+                            <Layers className="h-3 w-3" />
+                            {session.sectionCount} sections
+                          </span>
+                        )}
                         <span className="flex items-center gap-1 mono" data-testid={`text-session-entries-${session.id}`}>
                           <Hash className="h-3 w-3" />
-                          {session.entryCount} entries
+                          {session.entryCount} reels
                         </span>
                         {session.totalFootage > 0 && (
                           <span className="flex items-center gap-1 mono" data-testid={`text-session-footage-${session.id}`}>

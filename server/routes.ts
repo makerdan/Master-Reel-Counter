@@ -38,14 +38,14 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const sessions = await storage.getUserSessions(userId);
       const sessionIds = sessions.map(s => s.id);
-      const [stats, photoTimes] = await Promise.all([
+      const [stats, photoStats] = await Promise.all([
         storage.getSessionStats(sessionIds),
-        storage.getSessionPhotoTimeRanges(sessionIds),
+        storage.getSessionPhotoStats(sessionIds),
       ]);
       const sessionsWithStats = sessions.map(s => {
-        const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0 };
-        const pt = photoTimes.get(s.id) || { firstPhotoAt: null, lastPhotoAt: null };
-        return { ...s, entryCount: st.entryCount, totalFootage: st.totalFootage, firstPhotoAt: pt.firstPhotoAt, lastPhotoAt: pt.lastPhotoAt };
+        const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0, sectionCount: 0 };
+        const ps = photoStats.get(s.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
+        return { ...s, ...st, ...ps };
       });
       res.json(sessionsWithStats);
     } catch (error) {
@@ -70,9 +70,9 @@ export async function registerRoutes(
     try {
       const session = await verifySessionOwnership(parseInt(req.params.id), req.user.claims.sub);
       if (!session) return res.status(404).json({ message: "Session not found" });
-      const photoTimes = await storage.getSessionPhotoTimeRanges([session.id]);
-      const pt = photoTimes.get(session.id) || { firstPhotoAt: null, lastPhotoAt: null };
-      res.json({ ...session, firstPhotoAt: pt.firstPhotoAt, lastPhotoAt: pt.lastPhotoAt });
+      const photoStats = await storage.getSessionPhotoStats([session.id]);
+      const ps = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
+      res.json({ ...session, ...ps });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch session" });
     }
@@ -298,6 +298,42 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/photos/:photoId/draft-pins", isAuthenticated, async (req: any, res) => {
+    try {
+      const photo = await storage.getPhoto(parseInt(req.params.photoId));
+      if (!photo) return res.status(404).json({ message: "Photo not found" });
+      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
+      if (!session) return res.status(404).json({ message: "Photo not found" });
+      const { pins: pinData } = req.body;
+      if (!Array.isArray(pinData)) return res.status(400).json({ message: "pins must be an array" });
+      const existing = await storage.getPhotoPins(photo.id);
+      const draftIds = existing.filter(p => !p.entryId).map(p => p.id);
+      if (draftIds.length > 0) {
+        for (const id of draftIds) {
+          await storage.deletePin(id);
+        }
+      }
+      const saved = [];
+      for (const p of pinData) {
+        const pin = await storage.createPin({
+          photoId: photo.id,
+          xPercent: p.xPercent,
+          yPercent: p.yPercent,
+          label: p.label || null,
+          reelCount: p.reelCount || 1,
+          wireDetails: p.wireDetails || null,
+          vendorCode: p.vendorCode || null,
+          footage: p.footage || null,
+        });
+        saved.push(pin);
+      }
+      res.json(saved);
+    } catch (error) {
+      console.error("Error saving draft pins:", error);
+      res.status(500).json({ message: "Failed to save draft pins" });
+    }
+  });
+
   // AI Vision endpoint
   app.post("/api/ai/analyze", isAuthenticated, async (req: any, res) => {
     try {
@@ -358,8 +394,8 @@ export async function registerRoutes(
       const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
       const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
       const generatedAt = new Date().toISOString();
-      const photoTimes = await storage.getSessionPhotoTimeRanges([session.id]);
-      const pt = photoTimes.get(session.id) || { firstPhotoAt: null, lastPhotoAt: null };
+      const photoStats = await storage.getSessionPhotoStats([session.id]);
+      const pt = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
       const rowsHtml = sessionEntries.map((e: any, i: number) => `
         <tr>
           <td>${i + 1}</td><td>${e.aisle || ""}</td><td>${e.section || ""}</td><td>${e.position || ""}</td>
@@ -520,10 +556,10 @@ export async function registerRoutes(
       }
       const sessionEntries = await storage.getSessionEntries(session.id);
       const sessionPhotos = await storage.getSessionPhotos(session.id);
-      const photoTimes = await storage.getSessionPhotoTimeRanges([session.id]);
-      const pt = photoTimes.get(session.id) || { firstPhotoAt: null, lastPhotoAt: null };
+      const photoStats = await storage.getSessionPhotoStats([session.id]);
+      const ps = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
       res.json({
-        session: { id: session.id, name: session.name, location: session.location, status: session.status, firstPhotoAt: pt.firstPhotoAt, lastPhotoAt: pt.lastPhotoAt },
+        session: { id: session.id, name: session.name, location: session.location, status: session.status, firstPhotoAt: ps.firstPhotoAt, lastPhotoAt: ps.lastPhotoAt },
         entries: sessionEntries.map(e => ({
           id: e.id, section: e.section, aisle: e.aisle, palletId: e.palletId,
           wireType: e.wireType, gauge: e.gauge, color: e.color, footage: e.footage,
