@@ -382,7 +382,15 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [aisle, setAisle] = useState("");
   const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; dbId?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
-  const [localPins, setLocalPins] = useState<LocalPin[]>([]);
+  const [localPins, _setLocalPins] = useState<LocalPin[]>([]);
+  const localPinsRef = useRef<LocalPin[]>([]);
+  const setLocalPins = useCallback((updater: LocalPin[] | ((prev: LocalPin[]) => LocalPin[])) => {
+    _setLocalPins((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      localPinsRef.current = next;
+      return next;
+    });
+  }, []);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [pinsLoaded, setPinsLoaded] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -443,6 +451,27 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       if (firstAisle && !aisle) setAisle(firstAisle);
     }
   }, [photos]);
+
+  const flushSavePins = useCallback(async () => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    const photoDbId = uploadedPhotos[currentPhotoIdx]?.dbId;
+    const pins = localPinsRef.current;
+    if (!photoDbId) return;
+    try {
+      await apiRequest("PUT", `/api/photos/${photoDbId}/draft-pins`, {
+        pins: pins.map(p => ({
+          xPercent: p.x,
+          yPercent: p.y,
+          label: p.label,
+          reelCount: p.reelCount,
+          wireDetails: p.wireDetails || null,
+          vendorCode: p.vendorCode || null,
+          footage: p.footage || null,
+        })),
+      });
+    } catch {
+    }
+  }, [uploadedPhotos, currentPhotoIdx]);
 
   useEffect(() => {
     if (!currentPhoto?.dbId) {
@@ -980,7 +1009,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 size="icon"
                 variant="ghost"
                 disabled={currentPhotoIdx <= 0}
-                onClick={() => { skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
+                onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
                 data-testid="button-prev-photo"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -992,7 +1021,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 size="icon"
                 variant="ghost"
                 disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                onClick={() => { skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
+                onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
                 data-testid="button-next-photo"
               >
                 <ChevronRight className="h-4 w-4" />
