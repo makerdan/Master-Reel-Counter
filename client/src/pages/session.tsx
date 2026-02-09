@@ -1033,6 +1033,7 @@ Return ONLY valid JSON:
           {localPins.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-sm font-semibold text-muted-foreground whitespace-nowrap">Filter:</label>
                 <input
                   type="text"
                   value={aiFilter}
