@@ -1254,6 +1254,79 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
     }
   };
 
+  const analyzeCurrentPhotoOnly = async () => {
+    await flushSavePins();
+    const photo = currentPhoto;
+    if (!photo || !photo.dbId) {
+      toast({ title: "No photo selected", variant: "destructive" });
+      return;
+    }
+    if (localPins.length === 0) {
+      toast({ title: "No pins on this photo to analyze", variant: "destructive" });
+      return;
+    }
+
+    setAiLoading(true);
+    setAiResult("");
+    setAiProgressText(`Analyzing ${photo.filename || "current photo"}...`);
+
+    try {
+      const annotatedDataUrl = await renderAnnotatedImage(photo.url, localPins);
+      if (!annotatedDataUrl) {
+        toast({ title: "Failed to render annotated image", variant: "destructive" });
+        return;
+      }
+
+      const pinPositions = localPins.map((p) => p.label).sort();
+      let detailShotInfo: { isDetailShot: boolean; parentFilename?: string; parentSection?: string } | undefined;
+      if (photo.isDetailShot) {
+        const parentPhoto = photo.parentPhotoId ? uploadedPhotos.find(p => p.dbId === photo.parentPhotoId) : undefined;
+        detailShotInfo = {
+          isDetailShot: true,
+          parentFilename: parentPhoto?.filename,
+          parentSection: parentPhoto?.section,
+        };
+      }
+      const prompt = buildPrompt(pinPositions, photo.section || "", aiFilter, detailShotInfo);
+
+      const res = await apiRequest("POST", "/api/ai/analyze", {
+        imageDataUrl: annotatedDataUrl,
+        prompt,
+      });
+      const data = await res.json();
+      const resultText = data.result || "";
+      setAiResult(resultText);
+
+      const { updatedPins, filledCount, correctedCount, flaggedCount } = applyAiResultToPins(resultText, localPins);
+
+      try {
+        await apiRequest("PUT", `/api/photos/${photo.dbId}/draft-pins`, {
+          pins: updatedPins.map(p => ({
+            xPercent: p.x,
+            yPercent: p.y,
+            label: p.label,
+            reelCount: p.reelCount,
+            wireDetails: p.wireDetails || null,
+            vendorCode: p.vendorCode || null,
+            footage: p.footage || null,
+          })),
+        });
+      } catch {}
+
+      setLocalPins(updatedPins);
+
+      let msg = `AI analyzed this photo: filled ${filledCount} of ${localPins.length} pins`;
+      if (correctedCount > 0) msg += `, ${correctedCount} auto-corrected`;
+      if (flaggedCount > 0) msg += `, ${flaggedCount} need review`;
+      toast({ title: msg });
+    } catch (err) {
+      toast({ title: "AI analysis failed", variant: "destructive" });
+    } finally {
+      setAiLoading(false);
+      setAiProgressText("");
+    }
+  };
+
   const resetView = () => {
     setScale(1);
     setPanX(0);
@@ -1628,6 +1701,17 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               >
                 {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Brain className="h-5 w-5" />}
                 {aiLoading && aiProgressText ? aiProgressText : "AI Assist - Read All Tags"}
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full border-2 border-[hsl(18_60%_40%/0.5)] text-[hsl(18_60%_40%)] dark:text-[hsl(25_60%_70%)] dark:border-[hsl(18_40%_50%/0.4)] text-base font-semibold tracking-wide"
+                onClick={analyzeCurrentPhotoOnly}
+                disabled={aiLoading}
+                data-testid="button-ai-assist-current"
+              >
+                {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Brain className="h-5 w-5" />}
+                AI Assist - Read Tags from This Photo Only
               </Button>
               <div className="flex items-center gap-2 flex-wrap bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_12%)] rounded-md px-3 py-2 border border-[hsl(18_60%_30%/0.2)]">
                 <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)] whitespace-nowrap">Filter:</label>
