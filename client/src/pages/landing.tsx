@@ -1,4 +1,4 @@
-import { Cable, Camera, Brain, FileText, ClipboardList } from "lucide-react";
+import { Cable, Camera, Search, FileText, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -10,9 +10,9 @@ const features = [
     description: "Upload pallet photos, place pins on reels, and annotate sections visually.",
   },
   {
-    icon: Brain,
-    title: "AI Tag Reading",
-    description: "Use AI vision to automatically read reel tags and wire specifications.",
+    icon: Search,
+    title: "Catalog Lookup",
+    description: "Type a category code and auto-fill vendor, footage, wire type, and size from the catalog.",
   },
   {
     icon: FileText,
@@ -54,7 +54,7 @@ export default function Landing() {
             </h1>
 
             <p className="text-lg text-amber-100/70 max-w-lg mx-auto leading-relaxed">
-              Track wire reels across warehouse pallet sections with AI-powered image analysis
+              Track wire reels across warehouse pallet sections with photo annotation and catalog lookup
             </p>
 
             <div className="pt-4">
