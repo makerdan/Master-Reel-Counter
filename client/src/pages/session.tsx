@@ -1775,7 +1775,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                       data-testid="button-create-entries-from-pins"
                     >
                       {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      Create All Entries
+                      Add Reel(s) from Image
                     </Button>
                   </div>
                   {!aisle && (
