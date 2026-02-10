@@ -318,7 +318,10 @@ export function correctWireDetails(rawDetails: string): CorrectionResult {
     if (gaugeResult.corrected && gaugeResult.corrected !== gaugeResult.original) wasModified = true;
   }
 
-  const colorResult = matchColor(remaining);
+  const detectedType = (typeResult?.corrected || typeResult?.original || "").toUpperCase();
+  const skipColor = detectedType === "TC";
+
+  const colorResult = !skipColor ? matchColor(remaining) : null;
   if (colorResult) {
     parts.color = {
       original: colorResult.original,

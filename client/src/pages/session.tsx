@@ -1043,8 +1043,6 @@ Types: ${REF_WIRE_TYPES.join(", ")}
 Sizes (AWG): ${WIRE_GAUGES.join(", ")}
 Colors: ${COLOR_CODES.map(c => c).join(", ")}
 
-Note: TC wire types do NOT include a color code in their name (e.g., TC441000, not TC4BK1000).
-
 Examples: THHN4BK1000, XHHW350WH2500, URD404040-ALU, 4TRIPLEX, THHN8GN5000-COP, TC441000
 
 === CRITICAL RULES ===
