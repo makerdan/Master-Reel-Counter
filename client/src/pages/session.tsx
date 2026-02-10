@@ -905,6 +905,44 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
   const [aiFilter, setAiFilter] = useState("");
 
+  const renderAnnotatedImage = useCallback(async (): Promise<string | null> => {
+    if (!currentPhoto) return null;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0);
+        const boxSize = Math.max(60, Math.min(img.naturalWidth, img.naturalHeight) * 0.06);
+        const lineWidth = Math.max(3, boxSize * 0.06);
+        const fontSize = Math.max(16, boxSize * 0.45);
+        for (const pin of localPins) {
+          const cx = (pin.x / 100) * img.naturalWidth;
+          const cy = (pin.y / 100) * img.naturalHeight;
+          ctx.strokeStyle = "rgba(255, 0, 0, 0.9)";
+          ctx.lineWidth = lineWidth;
+          ctx.strokeRect(cx - boxSize / 2, cy - boxSize / 2, boxSize, boxSize);
+          ctx.fillStyle = "rgba(255, 0, 0, 0.85)";
+          ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          const labelWidth = ctx.measureText(pin.label).width + 10;
+          const labelHeight = fontSize + 6;
+          ctx.fillRect(cx - labelWidth / 2, cy - boxSize / 2 - labelHeight - 2, labelWidth, labelHeight);
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillText(pin.label, cx, cy - boxSize / 2 - 4);
+        }
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => resolve(null);
+      img.src = currentPhoto.url;
+    });
+  }, [currentPhoto, localPins]);
+
   const analyzePhoto = async () => {
     if (!currentPhoto || localPins.length === 0) {
       toast({ title: "Add pins to mark reel locations before running AI Assist", variant: "destructive" });
@@ -913,6 +951,12 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     setAiLoading(true);
     setAiResult("");
     try {
+      const annotatedDataUrl = await renderAnnotatedImage();
+      if (!annotatedDataUrl) {
+        toast({ title: "Failed to render annotated image for AI analysis", variant: "destructive" });
+        setAiLoading(false);
+        return;
+      }
       const pinPositions = localPins.map((p) => p.label).sort();
       let filterInstruction = "";
       if (aiFilter.trim()) {
@@ -971,7 +1015,7 @@ Return ONLY valid JSON. Include a "confidence" field (0-100) for each detected i
 If no tags are readable: {"detected": [], "notes": "Describe what was visible in each bounding box"}`;
 
       const res = await apiRequest("POST", "/api/ai/analyze", {
-        imageUrl: currentPhoto.url,
+        imageDataUrl: annotatedDataUrl,
         prompt,
       });
       const data = await res.json();

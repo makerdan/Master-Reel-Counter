@@ -344,13 +344,13 @@ export async function registerRoutes(
   // AI Vision endpoint
   app.post("/api/ai/analyze", isAuthenticated, async (req: any, res) => {
     try {
-      const { imageUrl, prompt } = req.body;
-      if (!imageUrl || !prompt) {
-        return res.status(400).json({ message: "imageUrl and prompt are required" });
+      const { imageUrl, imageDataUrl, prompt } = req.body;
+      if ((!imageUrl && !imageDataUrl) || !prompt) {
+        return res.status(400).json({ message: "imageUrl or imageDataUrl, and prompt are required" });
       }
 
-      let finalImageUrl = imageUrl;
-      if (imageUrl.startsWith("/objects/")) {
+      let finalImageUrl = imageDataUrl || imageUrl;
+      if (!imageDataUrl && imageUrl && imageUrl.startsWith("/objects/")) {
         try {
           const objectFile = await objectStorageService.getObjectEntityFile(imageUrl);
           const [metadata] = await objectFile.getMetadata();
