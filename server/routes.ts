@@ -5,7 +5,6 @@ import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
-import { openai } from "./replit_integrations/image/client";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema } from "@shared/schema";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 
@@ -338,56 +337,6 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error saving draft pins:", error);
       res.status(500).json({ message: "Failed to save draft pins" });
-    }
-  });
-
-  // AI Vision endpoint
-  app.post("/api/ai/analyze", isAuthenticated, async (req: any, res) => {
-    try {
-      const { imageUrl, imageDataUrl, prompt } = req.body;
-      if ((!imageUrl && !imageDataUrl) || !prompt) {
-        return res.status(400).json({ message: "imageUrl or imageDataUrl, and prompt are required" });
-      }
-
-      let finalImageUrl = imageDataUrl || imageUrl;
-      if (!imageDataUrl && imageUrl && imageUrl.startsWith("/objects/")) {
-        try {
-          const objectFile = await objectStorageService.getObjectEntityFile(imageUrl);
-          const [metadata] = await objectFile.getMetadata();
-          const chunks: Buffer[] = [];
-          const stream = objectFile.createReadStream();
-          for await (const chunk of stream) {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          }
-          const buffer = Buffer.concat(chunks);
-          const base64 = buffer.toString("base64");
-          const contentType = metadata.contentType || "image/jpeg";
-          finalImageUrl = `data:${contentType};base64,${base64}`;
-        } catch (err) {
-          console.error("Error reading image from object storage:", err);
-          return res.status(400).json({ message: "Failed to read image from storage" });
-        }
-      }
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: finalImageUrl } },
-            ],
-          },
-        ],
-        max_tokens: 1000,
-      });
-
-      const result = response.choices[0]?.message?.content || "";
-      res.json({ result });
-    } catch (error: any) {
-      console.error("AI analysis error:", error);
-      res.status(500).json({ message: "AI analysis failed: " + (error.message || "Unknown error") });
     }
   });
 

@@ -32,6 +32,59 @@ export interface CatalogEntry {
   description: string;
 }
 
+export interface ParsedCatalogEntry extends CatalogEntry {
+  wireType?: string;
+  wireSize?: string;
+  color?: string;
+  footage?: number;
+}
+
+export function parseCatalogEntry(entry: CatalogEntry): ParsedCatalogEntry {
+  const desc = entry.description;
+  let wireType: string | undefined;
+  let wireSize: string | undefined;
+  let color: string | undefined;
+  let footage: number | undefined;
+
+  for (const wt of [...WIRE_TYPES].sort((a, b) => b.length - a.length)) {
+    if (entry.catalog.toUpperCase().startsWith(wt)) {
+      wireType = wt;
+      break;
+    }
+  }
+  if (!wireType) {
+    for (const wt of [...WIRE_TYPES].sort((a, b) => b.length - a.length)) {
+      if (desc.toUpperCase().includes(wt)) {
+        wireType = wt;
+        break;
+      }
+    }
+  }
+
+  const sizeMatch = desc.match(/#?(\d+\/\d+|\d+)\s/);
+  if (sizeMatch) {
+    wireSize = sizeMatch[1];
+  }
+
+  const colorNames: Record<string, string> = {
+    BLACK: "BK", WHITE: "WH", GRAY: "GY", BLUE: "BL", RED: "RD",
+    YELLOW: "YL", ORANGE: "OR", GREEN: "GN", BROWN: "BR", PURPLE: "PR",
+  };
+  for (const [name, code] of Object.entries(colorNames)) {
+    if (desc.toUpperCase().includes(name)) {
+      color = code;
+      break;
+    }
+  }
+
+  const footageMatch = desc.match(/(\d+)'?\s*$/);
+  if (footageMatch) {
+    footage = parseInt(footageMatch[1]);
+  }
+
+  return { ...entry, wireType, wireSize, color, footage };
+}
+
 export const CATALOG: CatalogEntry[] = [
   { vendor: "ALU", catalog: "4TRIPLEX1500", description: "#4 TRIPLEX PERIWINKLE XLP" },
   { vendor: "ALU", catalog: "4TRIPLEX500", description: "#4 TRIPLEX PERIWINKLE COIL" },
@@ -220,6 +273,24 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "COP", catalog: "THHN8WH5000", description: "THHN 8 STR WHITE 5000'" },
   { vendor: "COP", catalog: "THHN8YL5000", description: "THHN 8 STR YELLOW 5000'" },
 ];
+
+export const PARSED_CATALOG: ParsedCatalogEntry[] = CATALOG.map(parseCatalogEntry);
+
+export function lookupCategory(query: string): ParsedCatalogEntry[] {
+  if (!query || query.length < 2) return [];
+  const upper = query.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+  const exact = PARSED_CATALOG.filter(e => e.catalog === upper);
+  if (exact.length > 0) return exact;
+
+  const prefix = PARSED_CATALOG.filter(e => e.catalog.startsWith(upper));
+  if (prefix.length > 0) return prefix.slice(0, 15);
+
+  const contains = PARSED_CATALOG.filter(e =>
+    e.catalog.includes(upper) || e.description.toUpperCase().includes(upper)
+  );
+  return contains.slice(0, 15);
+}
 
 const CATALOG_CODES = CATALOG.map(c => c.catalog);
 

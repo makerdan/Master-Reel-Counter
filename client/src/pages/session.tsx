@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
-  RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Brain, Cable,
+  RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Cable,
   Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { correctWireDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, COLOR_CODES, VENDOR_CODES } from "@/lib/wireReference";
+import { correctWireDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, COLOR_CODES, VENDOR_CODES, lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/wireReference";
 import type { Session, Entry, Photo, Pin } from "@shared/schema";
 
 const WIRE_TYPES = ["THHN", "XHHW", "USE-2", "MC Cable", "NM-B", "SER", "UFB", "Bare", "Other"];
@@ -70,8 +70,6 @@ interface LocalPin {
   wireDetails?: string;
   vendorCode?: string;
   footage?: number;
-  aiConfidence?: number;
-  correctionConfident?: boolean;
 }
 
 function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoAt: string | Date | null) {
@@ -407,10 +405,9 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     startY: number;
     moved: boolean;
   }>({ isDragging: false, pinId: null, startX: 0, startY: 0, moved: false });
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState("");
-  const [aiProgressText, setAiProgressText] = useState("");
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
+  const [activeSuggestionPin, setActiveSuggestionPin] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<ParsedCatalogEntry[]>([]);
 
   const [scale, setScale] = useState(1);
   const [panX, setPanX] = useState(0);
@@ -860,8 +857,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         if (p.id !== pinId) return p;
         const updates: Partial<LocalPin> = { [field]: value };
         if (field === "wireDetails") {
-          updates.aiConfidence = undefined;
-          updates.correctionConfident = undefined;
           const derived = deriveVendorCode(String(value || ""));
           if (derived) updates.vendorCode = derived;
         }
@@ -876,7 +871,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       const src = prev[index];
       return prev.map((p, i) =>
         i === index + 1
-          ? { ...p, wireDetails: src.wireDetails, vendorCode: src.vendorCode, footage: src.footage, aiConfidence: undefined, correctionConfident: undefined }
+          ? { ...p, wireDetails: src.wireDetails, vendorCode: src.vendorCode, footage: src.footage }
           : p
       );
     });
@@ -886,7 +881,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     setLocalPins((prev) =>
       prev.map((p) =>
         p.id === pinId
-          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, reelCount: 1, aiConfidence: undefined, correctionConfident: undefined }
+          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, reelCount: 1 }
           : p
       )
     );
@@ -963,367 +958,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     },
   });
 
-  const [aiFilter, setAiFilter] = useState("");
-
-  const renderAnnotatedImage = useCallback(async (photoUrl: string, pins: typeof localPins): Promise<string | null> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { resolve(null); return; }
-        ctx.drawImage(img, 0, 0);
-        const boxSize = Math.max(60, Math.min(img.naturalWidth, img.naturalHeight) * 0.06);
-        const lineWidth = Math.max(3, boxSize * 0.06);
-        const fontSize = Math.max(16, boxSize * 0.45);
-        for (const pin of pins) {
-          const cx = (pin.x / 100) * img.naturalWidth;
-          const cy = (pin.y / 100) * img.naturalHeight;
-          ctx.strokeStyle = "rgba(255, 0, 0, 0.9)";
-          ctx.lineWidth = lineWidth;
-          ctx.strokeRect(cx - boxSize / 2, cy - boxSize / 2, boxSize, boxSize);
-          ctx.fillStyle = "rgba(255, 0, 0, 0.85)";
-          ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "bottom";
-          const labelWidth = ctx.measureText(pin.label).width + 10;
-          const labelHeight = fontSize + 6;
-          ctx.fillRect(cx - labelWidth / 2, cy - boxSize / 2 - labelHeight - 2, labelWidth, labelHeight);
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillText(pin.label, cx, cy - boxSize / 2 - 4);
-        }
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
-      };
-      img.onerror = () => resolve(null);
-      img.src = photoUrl;
-    });
-  }, []);
-
-  const buildPrompt = useCallback((pinPositions: string[], photoSection: string, filter: string, detailShotInfo?: { isDetailShot: boolean; parentFilename?: string; parentSection?: string }) => {
-    let filterInstruction = "";
-    if (filter.trim()) {
-      filterInstruction = `\nFILTER: Only include tags containing or similar to "${filter.trim()}" (allow up to 3 character differences for OCR errors).`;
-    }
-    let detailContext = "";
-    if (detailShotInfo?.isDetailShot) {
-      detailContext = `\n\n=== DETAIL SHOT CONTEXT ===
-This is a CLOSE-UP / DETAIL photo taken to get a better view of specific wire reel tag(s).
-${detailShotInfo.parentFilename ? `Parent overview photo: ${detailShotInfo.parentFilename} (Section ${detailShotInfo.parentSection || "unknown"})` : ""}
-Because this is a close-up, the tag text should be larger and more readable than in an overview shot.
-Focus on reading the tag text as accurately as possible — this photo was taken specifically because the tag was hard to read in the wider shot.`;
-    }
-    return `You are a wire inventory tag reader analyzing a warehouse section photo.
-
-=== ANNOTATED IMAGE ===
-This photo shows wire reels in Aisle ${aisle}, Section ${photoSection}.
-RED BOUNDING BOXES mark user-selected reel locations. Each box has a RED LABEL showing its position code (e.g., "01", "02").
-Positions to analyze: ${pinPositions.join(", ")}${detailContext}
-
-=== YOUR TASK ===
-For each RED BOUNDING BOX, locate and read the WHITE PAPER TAG attached to or near that wire reel.
-
-=== READING INSTRUCTIONS ===
-1. Find the RED BOUNDING BOX with its position label (e.g., "01")
-2. Look inside or immediately adjacent to that box for a WHITE PAPER TAG
-3. Read the BLACK BOLD TEXT printed on the tag - this is the wire category code
-
-=== WHITE PAPER TAG IDENTIFICATION ===
-- WHITE rectangular paper tag, typically letter-size (11" x 8.5"), attached directly to the wire reel. Contrast may vary — tags can be dirty, faded, partially obscured, or against lighter-colored reels. Do not skip a tag just because contrast is low.
-- BLACK BOLD TEXT - the primary category/wire code you need to read
-- May include a checkmark but not always present
-${filterInstruction}
-
-=== WIRE CODE PATTERNS ===
-Format: [TYPE][SIZE][COLOR][FOOTAGE] or [TYPE][SIZE]-[VENDOR]
-
-Types: ${REF_WIRE_TYPES.join(", ")}
-Sizes (AWG): ${WIRE_GAUGES.join(", ")}
-Colors: ${COLOR_CODES.map(c => c).join(", ")}
-
-Examples: THHN4BK1000, XHHW350WH2500, URD404040-ALU, 4TRIPLEX, THHN8GN5000-COP, TC441000
-
-=== CRITICAL RULES ===
-- Use ONLY the position from the RED LABEL - do not guess positions
-- Report partial reads if full text is unclear (e.g., "THHN4??1000")
-- wireDetails should be ALL CAPS, no spaces, no special characters except hyphen for vendor codes
-- If a tag exists but is unreadable, include the position with wireDetails as "UNREADABLE"
-- Return position values exactly as listed above with zero-padded two-digit format (e.g., "01", "02", "03")
-
-=== JSON RESPONSE FORMAT ===
-Return ONLY valid JSON. Include a "confidence" field (0-100) for each detected item indicating how confident you are in the wireDetails reading:
-{
-  "detected": [
-    {"position": "01", "wireDetails": "THHN1GN2500", "confidence": 95},
-    {"position": "02", "wireDetails": "URD404040-ALU", "confidence": 60}
-  ],
-  "notes": "Brief observation about tag visibility/readability for each position"
-}
-
-If no tags are readable: {"detected": [], "notes": "Describe what was visible in each bounding box"}`;
-  }, [aisle]);
-
-  const applyAiResultToPins = useCallback((resultText: string, pins: typeof localPins): { updatedPins: typeof localPins; filledCount: number; correctedCount: number; flaggedCount: number } => {
-    let filledCount = 0;
-    let correctedCount = 0;
-    let flaggedCount = 0;
-    try {
-      let jsonStr = resultText;
-      const jsonMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[1].trim();
-      } else {
-        const objMatch = resultText.match(/\{[\s\S]*\}/);
-        if (objMatch) jsonStr = objMatch[0];
-      }
-      const parsed = JSON.parse(jsonStr);
-      if (parsed.detected && Array.isArray(parsed.detected)) {
-        const updatedPins = pins.map((pin) => {
-          const match = parsed.detected.find((d: any) => {
-            const normPin = pin.label.trim().toUpperCase();
-            const normItem = String(d.position || "").trim().toUpperCase();
-            if (normPin === normItem) return true;
-            const pinNum = parseInt(normPin, 10);
-            const itemNum = parseInt(normItem, 10);
-            if (!isNaN(pinNum) && !isNaN(itemNum) && pinNum === itemNum) return true;
-            return normPin.startsWith(normItem) || normItem.startsWith(normPin);
-          });
-          if (match && match.wireDetails) {
-            filledCount++;
-            const details = String(match.wireDetails).toUpperCase().replace(/[^A-Z0-9\-]/g, "");
-            const knownVendors = [...VENDOR_CODES, "COR"];
-            const vendorMatch = details.match(/^(.+)-([A-Z]+)$/);
-            const hasVendor = vendorMatch && knownVendors.includes(vendorMatch[2]);
-            const rawWire = hasVendor ? vendorMatch[1] : details;
-            const correction = correctWireDetails(rawWire);
-            const aiConf = typeof match.confidence === "number" ? match.confidence : 100;
-            if (correction.wasModified) correctedCount++;
-            if (!correction.confident) flaggedCount++;
-            const parsedFootage = correction.parts.footage ? parseInt(correction.parts.footage) : undefined;
-            const derivedVendor = deriveVendorCode(correction.correctedDetails);
-            return {
-              ...pin,
-              wireDetails: correction.correctedDetails,
-              vendorCode: hasVendor ? vendorMatch[2] : (derivedVendor || pin.vendorCode),
-              footage: match.footage || parsedFootage || pin.footage,
-              aiConfidence: aiConf,
-              correctionConfident: correction.confident,
-            };
-          }
-          return pin;
-        });
-        return { updatedPins, filledCount, correctedCount, flaggedCount };
-      }
-    } catch {}
-    return { updatedPins: pins, filledCount: 0, correctedCount: 0, flaggedCount: 0 };
-  }, []);
-
-  const analyzePhoto = async () => {
-    await flushSavePins();
-    const photosWithPins: { photoIdx: number; photo: typeof uploadedPhotos[0]; pins: typeof localPins }[] = [];
-
-    for (let idx = 0; idx < uploadedPhotos.length; idx++) {
-      const photo = uploadedPhotos[idx];
-      if (!photo.dbId) continue;
-      try {
-        const res = await apiRequest("GET", `/api/photos/${photo.dbId}/pins`);
-        const dbPins: Pin[] = await res.json();
-        const draftPins = dbPins.filter(p => !p.entryId);
-        if (draftPins.length > 0) {
-          photosWithPins.push({
-            photoIdx: idx,
-            photo,
-            pins: draftPins.map(p => ({
-              id: `pin-${p.id}`,
-              x: p.xPercent,
-              y: p.yPercent,
-              label: p.label || "01",
-              reelCount: p.reelCount || 1,
-              wireDetails: p.wireDetails || undefined,
-              vendorCode: p.vendorCode || undefined,
-              footage: p.footage || undefined,
-            })),
-          });
-        }
-      } catch {}
-    }
-
-    if (photosWithPins.length === 0) {
-      toast({ title: "No photos have pins to analyze", variant: "destructive" });
-      return;
-    }
-
-    setAiLoading(true);
-    setAiResult("");
-    let totalFilled = 0;
-    let totalCorrected = 0;
-    let totalFlagged = 0;
-    let totalPins = 0;
-
-    try {
-      for (let i = 0; i < photosWithPins.length; i++) {
-        const { photoIdx, photo, pins } = photosWithPins[i];
-        const photoName = photo.filename || `Photo ${photoIdx + 1}`;
-        setAiProgressText(`Analyzing ${photoName} (${i + 1} of ${photosWithPins.length})...`);
-        setCurrentPhotoIdx(photoIdx);
-
-        const annotatedDataUrl = await renderAnnotatedImage(photo.url, pins);
-        if (!annotatedDataUrl) continue;
-
-        const pinPositions = pins.map((p) => p.label).sort();
-        let detailShotInfo: { isDetailShot: boolean; parentFilename?: string; parentSection?: string } | undefined;
-        if (photo.isDetailShot) {
-          const parentPhoto = photo.parentPhotoId ? uploadedPhotos.find(p => p.dbId === photo.parentPhotoId) : undefined;
-          detailShotInfo = {
-            isDetailShot: true,
-            parentFilename: parentPhoto?.filename,
-            parentSection: parentPhoto?.section,
-          };
-        }
-        const prompt = buildPrompt(pinPositions, photo.section || "", aiFilter, detailShotInfo);
-
-        const res = await apiRequest("POST", "/api/ai/analyze", {
-          imageDataUrl: annotatedDataUrl,
-          prompt,
-        });
-        const data = await res.json();
-        const resultText = data.result || "";
-
-        if (photoIdx === currentPhotoIdx || i === photosWithPins.length - 1) {
-          setAiResult(resultText);
-        }
-
-        const { updatedPins, filledCount, correctedCount, flaggedCount } = applyAiResultToPins(resultText, pins);
-        totalFilled += filledCount;
-        totalCorrected += correctedCount;
-        totalFlagged += flaggedCount;
-        totalPins += pins.length;
-
-        try {
-          await apiRequest("PUT", `/api/photos/${photo.dbId}/draft-pins`, {
-            pins: updatedPins.map(p => ({
-              xPercent: p.x,
-              yPercent: p.y,
-              label: p.label,
-              reelCount: p.reelCount,
-              wireDetails: p.wireDetails || null,
-              vendorCode: p.vendorCode || null,
-              footage: p.footage || null,
-            })),
-          });
-        } catch {}
-
-        if (photoIdx === currentPhotoIdx) {
-          setLocalPins(updatedPins);
-        }
-      }
-
-      const lastItem = photosWithPins[photosWithPins.length - 1];
-      setCurrentPhotoIdx(lastItem.photoIdx);
-      try {
-        const res = await apiRequest("GET", `/api/photos/${lastItem.photo.dbId}/pins`);
-        const dbPins: Pin[] = await res.json();
-        const draftPins = dbPins.filter(p => !p.entryId);
-        if (draftPins.length > 0) {
-          setLocalPins(draftPins.map(p => ({
-            id: `pin-${p.id}`,
-            x: p.xPercent,
-            y: p.yPercent,
-            label: p.label || "01",
-            reelCount: p.reelCount || 1,
-            wireDetails: p.wireDetails || undefined,
-            vendorCode: p.vendorCode || undefined,
-            footage: p.footage || undefined,
-          })));
-        }
-      } catch {}
-
-      let msg = `AI analyzed ${photosWithPins.length} photo${photosWithPins.length > 1 ? "s" : ""}: filled ${totalFilled} of ${totalPins} pins`;
-      if (totalCorrected > 0) msg += `, ${totalCorrected} auto-corrected`;
-      if (totalFlagged > 0) msg += `, ${totalFlagged} need review`;
-      toast({ title: msg });
-    } catch (err) {
-      toast({ title: "AI analysis failed", variant: "destructive" });
-    } finally {
-      setAiLoading(false);
-      setAiProgressText("");
-    }
-  };
-
-  const analyzeCurrentPhotoOnly = async () => {
-    await flushSavePins();
-    const photo = currentPhoto;
-    if (!photo || !photo.dbId) {
-      toast({ title: "No photo selected", variant: "destructive" });
-      return;
-    }
-    if (localPins.length === 0) {
-      toast({ title: "No pins on this photo to analyze", variant: "destructive" });
-      return;
-    }
-
-    setAiLoading(true);
-    setAiResult("");
-    setAiProgressText(`Analyzing ${photo.filename || "current photo"}...`);
-
-    try {
-      const annotatedDataUrl = await renderAnnotatedImage(photo.url, localPins);
-      if (!annotatedDataUrl) {
-        toast({ title: "Failed to render annotated image", variant: "destructive" });
-        return;
-      }
-
-      const pinPositions = localPins.map((p) => p.label).sort();
-      let detailShotInfo: { isDetailShot: boolean; parentFilename?: string; parentSection?: string } | undefined;
-      if (photo.isDetailShot) {
-        const parentPhoto = photo.parentPhotoId ? uploadedPhotos.find(p => p.dbId === photo.parentPhotoId) : undefined;
-        detailShotInfo = {
-          isDetailShot: true,
-          parentFilename: parentPhoto?.filename,
-          parentSection: parentPhoto?.section,
-        };
-      }
-      const prompt = buildPrompt(pinPositions, photo.section || "", aiFilter, detailShotInfo);
-
-      const res = await apiRequest("POST", "/api/ai/analyze", {
-        imageDataUrl: annotatedDataUrl,
-        prompt,
-      });
-      const data = await res.json();
-      const resultText = data.result || "";
-      setAiResult(resultText);
-
-      const { updatedPins, filledCount, correctedCount, flaggedCount } = applyAiResultToPins(resultText, localPins);
-
-      try {
-        await apiRequest("PUT", `/api/photos/${photo.dbId}/draft-pins`, {
-          pins: updatedPins.map(p => ({
-            xPercent: p.x,
-            yPercent: p.y,
-            label: p.label,
-            reelCount: p.reelCount,
-            wireDetails: p.wireDetails || null,
-            vendorCode: p.vendorCode || null,
-            footage: p.footage || null,
-          })),
-        });
-      } catch {}
-
-      setLocalPins(updatedPins);
-
-      let msg = `AI analyzed this photo: filled ${filledCount} of ${localPins.length} pins`;
-      if (correctedCount > 0) msg += `, ${correctedCount} auto-corrected`;
-      if (flaggedCount > 0) msg += `, ${flaggedCount} need review`;
-      toast({ title: msg });
-    } catch (err) {
-      toast({ title: "AI analysis failed", variant: "destructive" });
-    } finally {
-      setAiLoading(false);
-      setAiProgressText("");
-    }
-  };
 
   const resetView = () => {
     setScale(1);
@@ -1688,56 +1322,47 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             </div>
           )}
 
+          {uploadedPhotos.length > 1 && (
+            <div className="space-y-1">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" data-testid="text-nearby-photos-title">
+                Nearby Photos
+              </div>
+              <div className="flex gap-2 overflow-x-auto py-1 px-0.5">
+                {uploadedPhotos.map((photo, idx) => {
+                  const isCurrent = idx === currentPhotoIdx;
+                  const isNearby = Math.abs(idx - currentPhotoIdx) <= 3;
+                  if (!isNearby) return null;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`flex-shrink-0 rounded-md overflow-visible border-2 transition-colors ${
+                        isCurrent
+                          ? "border-primary ring-2 ring-primary/30"
+                          : "border-border/50 hover-elevate"
+                      }`}
+                      onClick={() => setCurrentPhotoIdx(idx)}
+                      title={`${photo.filename || `Photo ${idx + 1}`}${photo.section ? ` - Section ${photo.section}` : ""}`}
+                      data-testid={`nearby-photo-${idx}`}
+                    >
+                      <img
+                        src={photo.url}
+                        alt={photo.filename || `Photo ${idx + 1}`}
+                        className="w-16 h-12 object-cover rounded-[4px]"
+                        style={{ transform: photo.isDetailShot ? undefined : undefined }}
+                      />
+                      <div className="text-[10px] text-center truncate max-w-[64px] text-muted-foreground mt-0.5">
+                        {photo.section || `#${idx + 1}`}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {localPins.length > 0 && (
             <div className="space-y-3">
-              <Button
-                size="lg"
-                className="w-full bg-[hsl(18_85%_32%)] text-white border-2 border-[hsl(18_85%_26%)] text-base font-semibold tracking-wide"
-                onClick={analyzePhoto}
-                disabled={aiLoading}
-                data-testid="button-ai-assist"
-              >
-                {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Brain className="h-5 w-5" />}
-                {aiLoading && aiProgressText ? aiProgressText : "AI Assist - Read All Tags"}
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full border-2 border-[hsl(18_60%_40%/0.5)] text-[hsl(18_60%_40%)] dark:text-[hsl(25_60%_70%)] dark:border-[hsl(18_40%_50%/0.4)] text-base font-semibold tracking-wide"
-                onClick={analyzeCurrentPhotoOnly}
-                disabled={aiLoading}
-                data-testid="button-ai-assist-current"
-              >
-                {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Brain className="h-5 w-5" />}
-                AI Assist - Read Tags from This Photo Only
-              </Button>
-              <div className="flex items-center gap-2 flex-wrap bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_12%)] rounded-md px-3 py-2 border border-[hsl(18_60%_30%/0.2)]">
-                <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)] whitespace-nowrap">Filter:</label>
-                <input
-                  type="text"
-                  value={aiFilter}
-                  onChange={(e) => setAiFilter(e.target.value)}
-                  placeholder="e.g. THHN, 4/0, BK (optional)"
-                  className="flex-1 min-w-[120px] rounded-md border border-[hsl(18_40%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(18_85%_48%)] focus:border-transparent"
-                  data-testid="input-ai-filter"
-                />
-              </div>
-
-              {aiResult && (
-                <div className="text-xs text-[hsl(25_60%_70%)] p-2.5 rounded-md border border-[hsl(18_60%_30%/0.2)] bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_11%)]" data-testid="text-ai-result">
-                  <span className="font-semibold text-[hsl(18_80%_55%)]">AI Notes:</span> {(() => {
-                    try {
-                      let jsonStr = aiResult;
-                      const jsonMatch = aiResult.match(/```(?:json)?\s*([\s\S]*?)```/);
-                      if (jsonMatch) jsonStr = jsonMatch[1].trim();
-                      else { const objMatch = aiResult.match(/\{[\s\S]*\}/); if (objMatch) jsonStr = objMatch[0]; }
-                      const parsed = JSON.parse(jsonStr);
-                      return parsed.notes || "Analysis complete.";
-                    } catch { return aiResult.substring(0, 200); }
-                  })()}
-                </div>
-              )}
-
               <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Position</div>
               <div className="overflow-x-auto">
                 <table className="pin-entry-table" data-testid="pin-entry-table">
@@ -1757,17 +1382,58 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                         <td>
                           <span className="pin-position-cell">{pin.label}</span>
                         </td>
-                        <td>
+                        <td className="relative">
                           <input
                             type="text"
-                            className={`input-caps${(pin.aiConfidence != null && pin.aiConfidence < 85) || pin.correctionConfident === false ? " low-confidence" : ""}`}
+                            className="input-caps"
                             value={pin.wireDetails || ""}
-                            onChange={(e) => updatePinField(pin.id, "wireDetails", e.target.value.toUpperCase())}
+                            onChange={(e) => {
+                              const val = e.target.value.toUpperCase();
+                              updatePinField(pin.id, "wireDetails", val);
+                              const matches = lookupCategory(val);
+                              setSuggestions(matches);
+                              setActiveSuggestionPin(matches.length > 0 ? pin.id : null);
+                            }}
+                            onFocus={() => {
+                              if (pin.wireDetails) {
+                                const matches = lookupCategory(pin.wireDetails);
+                                setSuggestions(matches);
+                                setActiveSuggestionPin(matches.length > 0 ? pin.id : null);
+                              }
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => setActiveSuggestionPin(null), 200);
+                            }}
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="characters"
+                            placeholder="Type category..."
                             data-testid={`input-wire-details-${index}`}
                           />
+                          {activeSuggestionPin === pin.id && suggestions.length > 0 && (
+                            <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-lg" data-testid={`suggestions-${index}`}>
+                              {suggestions.map((s) => (
+                                <button
+                                  key={s.catalog}
+                                  type="button"
+                                  className="w-full text-left px-2 py-1.5 text-xs hover-elevate cursor-pointer border-b last:border-b-0 border-border/50"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    updatePinField(pin.id, "wireDetails", s.catalog);
+                                    if (s.vendor) updatePinField(pin.id, "vendorCode", s.vendor);
+                                    if (s.footage) updatePinField(pin.id, "footage", s.footage);
+                                    setActiveSuggestionPin(null);
+                                    setSuggestions([]);
+                                  }}
+                                  data-testid={`suggestion-${s.catalog}`}
+                                >
+                                  <span className="font-mono font-semibold">{s.catalog}</span>
+                                  <span className="text-muted-foreground ml-2">{s.description}</span>
+                                  {s.footage && <span className="text-muted-foreground ml-1">({s.footage}')</span>}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <select
@@ -1869,15 +1535,12 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                   variant="outline"
                   className="border-[hsl(18_40%_50%/0.5)] text-[hsl(18_60%_40%)] dark:text-[hsl(25_60%_70%)] dark:border-[hsl(18_40%_50%/0.4)]"
                   onClick={() => {
-                    setAiResult("");
                     setLocalPins((prev) => prev.map((p) => ({
                       ...p,
                       wireDetails: undefined,
                       vendorCode: undefined,
                       footage: undefined,
                       reelCount: 1,
-                      aiConfidence: undefined,
-                      correctionConfident: undefined,
                     })));
                   }}
                   disabled={createEntries.isPending}
