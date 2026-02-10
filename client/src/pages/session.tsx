@@ -1833,41 +1833,37 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 </table>
               </div>
 
-              {aiResult && (
-                <>
-                  {batchProgress && (
-                    <div className="space-y-2" data-testid="batch-progress">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Creating entries...</span>
-                        <span>{batchProgress.current} / {batchProgress.total}</span>
-                      </div>
-                      <Progress value={(batchProgress.current / batchProgress.total) * 100} />
-                      {batchProgress.errors.length > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-destructive">
-                          <AlertTriangle className="h-3 w-3" />
-                          Failed: {batchProgress.errors.join(", ")}
-                        </div>
-                      )}
+              {batchProgress && (
+                <div className="space-y-2" data-testid="batch-progress">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Creating entries...</span>
+                    <span>{batchProgress.current} / {batchProgress.total}</span>
+                  </div>
+                  <Progress value={(batchProgress.current / batchProgress.total) * 100} />
+                  {batchProgress.errors.length > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-destructive">
+                      <AlertTriangle className="h-3 w-3" />
+                      Failed: {batchProgress.errors.join(", ")}
                     </div>
                   )}
+                </div>
+              )}
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Button
-                      className="bg-[hsl(145_60%_28%)] text-white border-[hsl(145_60%_22%)]"
-                      onClick={() => createEntries.mutate()}
-                      disabled={createEntries.isPending || !aisle}
-                      data-testid="button-create-entries-from-pins"
-                    >
-                      {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                      Add Reel(s) from Image
-                    </Button>
-                  </div>
-                  {!aisle && (
-                    <p className="text-xs text-center text-muted-foreground" data-testid="text-create-entries-hint">
-                      Fill in Aisle above to enable this button
-                    </p>
-                  )}
-                </>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  className="bg-[hsl(145_60%_28%)] text-white border-[hsl(145_60%_22%)]"
+                  onClick={() => createEntries.mutate()}
+                  disabled={createEntries.isPending || !aisle}
+                  data-testid="button-create-entries-from-pins"
+                >
+                  {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Add Reel(s) from Image
+                </Button>
+              </div>
+              {!aisle && (
+                <p className="text-xs text-center text-muted-foreground" data-testid="text-create-entries-hint">
+                  Fill in Aisle above to enable this button
+                </p>
               )}
 
               <div className="flex items-center gap-2 flex-wrap">
