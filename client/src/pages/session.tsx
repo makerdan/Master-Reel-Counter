@@ -1406,7 +1406,17 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
 
           {localPins.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_12%)] rounded-md px-3 py-2.5 border border-[hsl(18_60%_30%/0.2)]">
+              <Button
+                size="lg"
+                className="w-full bg-[hsl(18_85%_32%)] text-white border-2 border-[hsl(18_85%_26%)] text-base font-semibold tracking-wide"
+                onClick={analyzePhoto}
+                disabled={aiLoading}
+                data-testid="button-ai-assist"
+              >
+                {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Brain className="h-5 w-5" />}
+                AI Assist - Read Tags
+              </Button>
+              <div className="flex items-center gap-2 flex-wrap bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_12%)] rounded-md px-3 py-2 border border-[hsl(18_60%_30%/0.2)]">
                 <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)] whitespace-nowrap">Filter:</label>
                 <input
                   type="text"
@@ -1416,15 +1426,6 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                   className="flex-1 min-w-[120px] rounded-md border border-[hsl(18_40%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(18_85%_48%)] focus:border-transparent"
                   data-testid="input-ai-filter"
                 />
-                <Button
-                  className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
-                  onClick={analyzePhoto}
-                  disabled={aiLoading}
-                  data-testid="button-ai-assist"
-                >
-                  {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                  AI Assist - Read Tags
-                </Button>
               </div>
 
               {aiResult && (
