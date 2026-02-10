@@ -1552,7 +1552,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               <Textarea
                 value={photoNotes}
                 onChange={(e) => handleNotesChange(e.target.value)}
-                placeholder="e.g. Reels obstructed by pallets, hard to read tags, section partially counted..."
+                placeholder=""
                 className="resize-none border-[hsl(18_40%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] text-sm min-h-[60px]"
                 rows={2}
                 data-testid="textarea-photo-notes"
