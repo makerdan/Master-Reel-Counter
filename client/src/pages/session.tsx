@@ -406,6 +406,8 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [isDetailShot, setIsDetailShot] = useState(false);
   const [parentPhotoId, setParentPhotoId] = useState<number | undefined>(undefined);
   const noteSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sectionSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aisleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clampPan = useCallback((px: number, py: number, s: number) => {
     const el = containerRef.current;
@@ -543,6 +545,14 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     if (noteSaveTimer.current) {
       clearTimeout(noteSaveTimer.current);
       noteSaveTimer.current = null;
+    }
+    if (sectionSaveTimer.current) {
+      clearTimeout(sectionSaveTimer.current);
+      sectionSaveTimer.current = null;
+    }
+    if (aisleSaveTimer.current) {
+      clearTimeout(aisleSaveTimer.current);
+      aisleSaveTimer.current = null;
     }
     if (currentPhoto) {
       setPhotoNotes(currentPhoto.notes || "");
@@ -1043,7 +1053,19 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
         <div>
           <Input
             value={aisle}
-            onChange={(e) => setAisle(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setAisle(val);
+              const photoDbId = currentPhoto?.dbId;
+              if (aisleSaveTimer.current) clearTimeout(aisleSaveTimer.current);
+              if (photoDbId) {
+                aisleSaveTimer.current = setTimeout(async () => {
+                  try {
+                    await apiRequest("PATCH", `/api/photos/${photoDbId}`, { aisle: val });
+                  } catch {}
+                }, 800);
+              }
+            }}
             placeholder="Aisle..."
             inputMode="numeric"
             className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
@@ -1119,9 +1141,19 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 <Input
                   value={currentPhoto?.section || ""}
                   onChange={(e) => {
+                    const val = e.target.value;
+                    const photoDbId = currentPhoto?.dbId;
                     setUploadedPhotos((prev) =>
-                      prev.map((p, i) => i === currentPhotoIdx ? { ...p, section: e.target.value } : p)
+                      prev.map((p, i) => i === currentPhotoIdx ? { ...p, section: val } : p)
                     );
+                    if (sectionSaveTimer.current) clearTimeout(sectionSaveTimer.current);
+                    if (photoDbId) {
+                      sectionSaveTimer.current = setTimeout(async () => {
+                        try {
+                          await apiRequest("PATCH", `/api/photos/${photoDbId}`, { section: val });
+                        } catch {}
+                      }, 800);
+                    }
                   }}
                   placeholder="Section..."
                   inputMode="numeric"
