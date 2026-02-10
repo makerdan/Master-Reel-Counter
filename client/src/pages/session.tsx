@@ -1229,6 +1229,32 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             </div>
           )}
 
+          {currentPhoto && (
+            <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 flex items-center justify-center gap-3" data-testid="bottom-photo-nav">
+              <Button
+                size="icon"
+                className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                disabled={currentPhotoIdx <= 0}
+                onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
+                data-testid="button-prev-photo-bottom"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <span className="text-sm mono text-[hsl(30_40%_85%)] min-w-[60px] text-center" data-testid="text-photo-counter-bottom">
+                {String(currentPhotoIdx + 1).padStart(2, "0")} / {String(uploadedPhotos.length).padStart(2, "0")}
+              </span>
+              <Button
+                size="icon"
+                className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
+                onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
+                data-testid="button-next-photo-bottom"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+
           {localPins.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 flex-wrap bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_12%)] rounded-md px-3 py-2.5 border border-[hsl(18_60%_30%/0.2)]">
