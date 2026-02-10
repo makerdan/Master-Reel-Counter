@@ -4,9 +4,11 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
-import { ObjectStorageService } from "./replit_integrations/object_storage";
+import { ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema } from "@shared/schema";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
+import multer from "multer";
+import { randomUUID } from "crypto";
 
 async function verifySessionOwnership(sessionId: number, userId: string) {
   const session = await storage.getSession(sessionId);
@@ -37,6 +39,50 @@ export async function registerRoutes(
   registerObjectStorageRoutes(app);
 
   const objectStorageService = new ObjectStorageService();
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+  app.post("/api/uploads/direct", isAuthenticated, upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file provided" });
+      }
+
+      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+      if (!privateDir) {
+        return res.status(500).json({ error: "Object storage not configured" });
+      }
+
+      const objectId = randomUUID();
+      const fullPath = `${privateDir}/uploads/${objectId}`;
+      const pathParts = fullPath.startsWith("/") ? fullPath.slice(1).split("/") : fullPath.split("/");
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join("/");
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype || "application/octet-stream",
+        metadata: {
+          originalName: req.file.originalname,
+        },
+      });
+
+      const objectPath = `/objects/${objectName}`;
+
+      res.json({
+        objectPath,
+        metadata: {
+          name: req.file.originalname,
+          size: req.file.size,
+          contentType: req.file.mimetype,
+        },
+      });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
 
   // Sessions CRUD
   app.get("/api/sessions", isAuthenticated, async (req: any, res) => {
