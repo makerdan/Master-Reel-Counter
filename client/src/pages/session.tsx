@@ -391,6 +391,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   }>({ isDragging: false, pinId: null, startX: 0, startY: 0, moved: false });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState("");
+  const [aiProgressText, setAiProgressText] = useState("");
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
 
   const [scale, setScale] = useState(1);
@@ -905,8 +906,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
   const [aiFilter, setAiFilter] = useState("");
 
-  const renderAnnotatedImage = useCallback(async (): Promise<string | null> => {
-    if (!currentPhoto) return null;
+  const renderAnnotatedImage = useCallback(async (photoUrl: string, pins: typeof localPins): Promise<string | null> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -920,7 +920,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         const boxSize = Math.max(60, Math.min(img.naturalWidth, img.naturalHeight) * 0.06);
         const lineWidth = Math.max(3, boxSize * 0.06);
         const fontSize = Math.max(16, boxSize * 0.45);
-        for (const pin of localPins) {
+        for (const pin of pins) {
           const cx = (pin.x / 100) * img.naturalWidth;
           const cy = (pin.y / 100) * img.naturalHeight;
           ctx.strokeStyle = "rgba(255, 0, 0, 0.9)";
@@ -939,34 +939,19 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         resolve(canvas.toDataURL("image/jpeg", 0.85));
       };
       img.onerror = () => resolve(null);
-      img.src = currentPhoto.url;
+      img.src = photoUrl;
     });
-  }, [currentPhoto, localPins]);
+  }, []);
 
-  const analyzePhoto = async () => {
-    if (!currentPhoto || localPins.length === 0) {
-      toast({ title: "Add pins to mark reel locations before running AI Assist", variant: "destructive" });
-      return;
+  const buildPrompt = useCallback((pinPositions: string[], photoSection: string, filter: string) => {
+    let filterInstruction = "";
+    if (filter.trim()) {
+      filterInstruction = `\nFILTER: Only include tags containing or similar to "${filter.trim()}" (allow up to 3 character differences for OCR errors).`;
     }
-    setAiLoading(true);
-    setAiResult("");
-    try {
-      const annotatedDataUrl = await renderAnnotatedImage();
-      if (!annotatedDataUrl) {
-        toast({ title: "Failed to render annotated image for AI analysis", variant: "destructive" });
-        setAiLoading(false);
-        return;
-      }
-      const pinPositions = localPins.map((p) => p.label).sort();
-      let filterInstruction = "";
-      if (aiFilter.trim()) {
-        filterInstruction = `\nFILTER: Only include tags containing or similar to "${aiFilter.trim()}" (allow up to 3 character differences for OCR errors).`;
-      }
-      const section = currentPhoto?.section || "";
-      const prompt = `You are a wire inventory tag reader analyzing a warehouse section photo.
+    return `You are a wire inventory tag reader analyzing a warehouse section photo.
 
 === ANNOTATED IMAGE ===
-This photo shows wire reels in Aisle ${aisle}, Section ${section}.
+This photo shows wire reels in Aisle ${aisle}, Section ${photoSection}.
 RED BOUNDING BOXES mark user-selected reel locations. Each box has a RED LABEL showing its position code (e.g., "01", "02").
 Positions to analyze: ${pinPositions.join(", ")}
 
@@ -1013,75 +998,181 @@ Return ONLY valid JSON. Include a "confidence" field (0-100) for each detected i
 }
 
 If no tags are readable: {"detected": [], "notes": "Describe what was visible in each bounding box"}`;
+  }, [aisle]);
 
-      const res = await apiRequest("POST", "/api/ai/analyze", {
-        imageDataUrl: annotatedDataUrl,
-        prompt,
-      });
-      const data = await res.json();
-      const resultText = data.result || "";
-      setAiResult(resultText);
-
-      try {
-        let jsonStr = resultText;
-        const jsonMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch) {
-          jsonStr = jsonMatch[1].trim();
-        } else {
-          const objMatch = resultText.match(/\{[\s\S]*\}/);
-          if (objMatch) jsonStr = objMatch[0];
-        }
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.detected && Array.isArray(parsed.detected)) {
-          let filledCount = 0;
-          let correctedCount = 0;
-          let flaggedCount = 0;
-          setLocalPins((prev) =>
-            prev.map((pin) => {
-              const match = parsed.detected.find((d: any) => {
-                const normPin = pin.label.trim().toUpperCase();
-                const normItem = String(d.position || "").trim().toUpperCase();
-                if (normPin === normItem) return true;
-                const pinNum = parseInt(normPin, 10);
-                const itemNum = parseInt(normItem, 10);
-                if (!isNaN(pinNum) && !isNaN(itemNum) && pinNum === itemNum) return true;
-                return normPin.startsWith(normItem) || normItem.startsWith(normPin);
-              });
-              if (match && match.wireDetails) {
-                filledCount++;
-                const details = String(match.wireDetails).toUpperCase().replace(/[^A-Z0-9/\-]/g, "");
-                const knownVendors = [...VENDOR_CODES, "COR"];
-                const vendorMatch = details.match(/^(.+)-([A-Z]+)$/);
-                const hasVendor = vendorMatch && knownVendors.includes(vendorMatch[2]);
-                const rawWire = hasVendor ? vendorMatch[1] : details;
-                const correction = correctWireDetails(rawWire);
-                const aiConf = typeof match.confidence === "number" ? match.confidence : 100;
-                if (correction.wasModified) correctedCount++;
-                if (!correction.confident) flaggedCount++;
-                return {
-                  ...pin,
-                  wireDetails: correction.correctedDetails,
-                  vendorCode: hasVendor ? vendorMatch[2] : pin.vendorCode,
-                  footage: match.footage || pin.footage,
-                  aiConfidence: aiConf,
-                  correctionConfident: correction.confident,
-                };
-              }
-              return pin;
-            })
-          );
-          let msg = `AI filled ${filledCount} of ${localPins.length} pins`;
-          if (correctedCount > 0) msg += `, ${correctedCount} auto-corrected`;
-          if (flaggedCount > 0) msg += `, ${flaggedCount} need review`;
-          toast({ title: msg });
-        }
-      } catch {
-        // JSON parse failed, raw result already shown
+  const applyAiResultToPins = useCallback((resultText: string, pins: typeof localPins): { updatedPins: typeof localPins; filledCount: number; correctedCount: number; flaggedCount: number } => {
+    let filledCount = 0;
+    let correctedCount = 0;
+    let flaggedCount = 0;
+    try {
+      let jsonStr = resultText;
+      const jsonMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1].trim();
+      } else {
+        const objMatch = resultText.match(/\{[\s\S]*\}/);
+        if (objMatch) jsonStr = objMatch[0];
       }
-    } catch {
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.detected && Array.isArray(parsed.detected)) {
+        const updatedPins = pins.map((pin) => {
+          const match = parsed.detected.find((d: any) => {
+            const normPin = pin.label.trim().toUpperCase();
+            const normItem = String(d.position || "").trim().toUpperCase();
+            if (normPin === normItem) return true;
+            const pinNum = parseInt(normPin, 10);
+            const itemNum = parseInt(normItem, 10);
+            if (!isNaN(pinNum) && !isNaN(itemNum) && pinNum === itemNum) return true;
+            return normPin.startsWith(normItem) || normItem.startsWith(normPin);
+          });
+          if (match && match.wireDetails) {
+            filledCount++;
+            const details = String(match.wireDetails).toUpperCase().replace(/[^A-Z0-9/\-]/g, "");
+            const knownVendors = [...VENDOR_CODES, "COR"];
+            const vendorMatch = details.match(/^(.+)-([A-Z]+)$/);
+            const hasVendor = vendorMatch && knownVendors.includes(vendorMatch[2]);
+            const rawWire = hasVendor ? vendorMatch[1] : details;
+            const correction = correctWireDetails(rawWire);
+            const aiConf = typeof match.confidence === "number" ? match.confidence : 100;
+            if (correction.wasModified) correctedCount++;
+            if (!correction.confident) flaggedCount++;
+            return {
+              ...pin,
+              wireDetails: correction.correctedDetails,
+              vendorCode: hasVendor ? vendorMatch[2] : pin.vendorCode,
+              footage: match.footage || pin.footage,
+              aiConfidence: aiConf,
+              correctionConfident: correction.confident,
+            };
+          }
+          return pin;
+        });
+        return { updatedPins, filledCount, correctedCount, flaggedCount };
+      }
+    } catch {}
+    return { updatedPins: pins, filledCount: 0, correctedCount: 0, flaggedCount: 0 };
+  }, []);
+
+  const analyzePhoto = async () => {
+    await flushSavePins();
+    const photosWithPins: { photoIdx: number; photo: typeof uploadedPhotos[0]; pins: typeof localPins }[] = [];
+
+    for (let idx = 0; idx < uploadedPhotos.length; idx++) {
+      const photo = uploadedPhotos[idx];
+      if (!photo.dbId) continue;
+      try {
+        const res = await apiRequest("GET", `/api/photos/${photo.dbId}/pins`);
+        const dbPins: Pin[] = await res.json();
+        const draftPins = dbPins.filter(p => !p.entryId);
+        if (draftPins.length > 0) {
+          photosWithPins.push({
+            photoIdx: idx,
+            photo,
+            pins: draftPins.map(p => ({
+              id: `pin-${p.id}`,
+              x: p.xPercent,
+              y: p.yPercent,
+              label: p.label || "01",
+              reelCount: p.reelCount || 1,
+              wireDetails: p.wireDetails || undefined,
+              vendorCode: p.vendorCode || undefined,
+              footage: p.footage || undefined,
+            })),
+          });
+        }
+      } catch {}
+    }
+
+    if (photosWithPins.length === 0) {
+      toast({ title: "No photos have pins to analyze", variant: "destructive" });
+      return;
+    }
+
+    setAiLoading(true);
+    setAiResult("");
+    let totalFilled = 0;
+    let totalCorrected = 0;
+    let totalFlagged = 0;
+    let totalPins = 0;
+
+    try {
+      for (let i = 0; i < photosWithPins.length; i++) {
+        const { photoIdx, photo, pins } = photosWithPins[i];
+        const photoName = photo.filename || `Photo ${photoIdx + 1}`;
+        setAiProgressText(`Analyzing ${photoName} (${i + 1} of ${photosWithPins.length})...`);
+        setCurrentPhotoIdx(photoIdx);
+
+        const annotatedDataUrl = await renderAnnotatedImage(photo.url, pins);
+        if (!annotatedDataUrl) continue;
+
+        const pinPositions = pins.map((p) => p.label).sort();
+        const prompt = buildPrompt(pinPositions, photo.section || "", aiFilter);
+
+        const res = await apiRequest("POST", "/api/ai/analyze", {
+          imageDataUrl: annotatedDataUrl,
+          prompt,
+        });
+        const data = await res.json();
+        const resultText = data.result || "";
+
+        if (photoIdx === currentPhotoIdx || i === photosWithPins.length - 1) {
+          setAiResult(resultText);
+        }
+
+        const { updatedPins, filledCount, correctedCount, flaggedCount } = applyAiResultToPins(resultText, pins);
+        totalFilled += filledCount;
+        totalCorrected += correctedCount;
+        totalFlagged += flaggedCount;
+        totalPins += pins.length;
+
+        try {
+          await apiRequest("PUT", `/api/photos/${photo.dbId}/draft-pins`, {
+            pins: updatedPins.map(p => ({
+              xPercent: p.x,
+              yPercent: p.y,
+              label: p.label,
+              reelCount: p.reelCount,
+              wireDetails: p.wireDetails || null,
+              vendorCode: p.vendorCode || null,
+              footage: p.footage || null,
+            })),
+          });
+        } catch {}
+
+        if (photoIdx === currentPhotoIdx) {
+          setLocalPins(updatedPins);
+        }
+      }
+
+      const lastItem = photosWithPins[photosWithPins.length - 1];
+      setCurrentPhotoIdx(lastItem.photoIdx);
+      try {
+        const res = await apiRequest("GET", `/api/photos/${lastItem.photo.dbId}/pins`);
+        const dbPins: Pin[] = await res.json();
+        const draftPins = dbPins.filter(p => !p.entryId);
+        if (draftPins.length > 0) {
+          setLocalPins(draftPins.map(p => ({
+            id: `pin-${p.id}`,
+            x: p.xPercent,
+            y: p.yPercent,
+            label: p.label || "01",
+            reelCount: p.reelCount || 1,
+            wireDetails: p.wireDetails || undefined,
+            vendorCode: p.vendorCode || undefined,
+            footage: p.footage || undefined,
+          })));
+        }
+      } catch {}
+
+      let msg = `AI analyzed ${photosWithPins.length} photo${photosWithPins.length > 1 ? "s" : ""}: filled ${totalFilled} of ${totalPins} pins`;
+      if (totalCorrected > 0) msg += `, ${totalCorrected} auto-corrected`;
+      if (totalFlagged > 0) msg += `, ${totalFlagged} need review`;
+      toast({ title: msg });
+    } catch (err) {
       toast({ title: "AI analysis failed", variant: "destructive" });
     } finally {
       setAiLoading(false);
+      setAiProgressText("");
     }
   };
 
@@ -1458,7 +1549,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 data-testid="button-ai-assist"
               >
                 {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Brain className="h-5 w-5" />}
-                AI Assist - Read Tags
+                {aiLoading && aiProgressText ? aiProgressText : "AI Assist - Read All Tags"}
               </Button>
               <div className="flex items-center gap-2 flex-wrap bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_12%)] rounded-md px-3 py-2 border border-[hsl(18_60%_30%/0.2)]">
                 <label className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)] whitespace-nowrap">Filter:</label>
