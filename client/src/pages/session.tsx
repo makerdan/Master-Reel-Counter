@@ -2234,13 +2234,13 @@ function EntryTable({
           <table className="entries-table" data-testid="entries-table">
             <thead>
               <tr>
-                <th style={{ width: 40 }}>#</th>
-                <th>Aisle</th>
-                <th>Section</th>
-                <th>Reel Tag</th>
-                <th>Footage</th>
-                <th>Manufacturer</th>
-                <th style={{ width: 60 }}>Actions</th>
+                <th style={{ width: 50, textAlign: "center" }}>Reel #:</th>
+                <th style={{ textAlign: "center" }}>Aisle:</th>
+                <th style={{ textAlign: "center" }}>Section:</th>
+                <th>Category:</th>
+                <th style={{ textAlign: "center" }}>Footage:</th>
+                <th style={{ textAlign: "center" }}>Vendor Code:</th>
+                <th style={{ width: 70, textAlign: "center" }}>Actions:</th>
               </tr>
             </thead>
             <tbody>
@@ -2248,6 +2248,7 @@ function EntryTable({
                 const sectionEntries = grouped[sectionKey];
                 const isExpanded = expandedSections[sectionKey] ?? false;
                 const sectionFootage = sectionEntries.reduce((s, e) => s + (e.footage || 0), 0);
+                const [aisleLabel, sectionLabel] = sectionKey.split("-");
                 return (
                   <Fragment key={sectionKey}>
                     <tr
@@ -2258,21 +2259,21 @@ function EntryTable({
                       <td colSpan={7}>
                         <div className="flex items-center gap-2">
                           <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
-                          <span className="font-semibold">{sectionKey}</span>
-                          <span className="text-muted-foreground">({sectionEntries.length} entries, {sectionFootage.toLocaleString()} ft)</span>
+                          <span className="font-semibold">Aisle {aisleLabel} - Section {sectionLabel}</span>
+                          <span className="text-muted-foreground">({sectionEntries.length} {sectionEntries.length === 1 ? "entry" : "entries"}, {sectionFootage.toLocaleString()} ft. total)</span>
                         </div>
                       </td>
                     </tr>
                     {isExpanded && sectionEntries.map((entry, idx) => (
                       <tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
-                        <td className="mono text-muted-foreground">{idx + 1}</td>
-                        <td>{entry.aisle}</td>
-                        <td>{entry.section}</td>
+                        <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{String(idx + 1).padStart(2, "0")}</td>
+                        <td style={{ textAlign: "center" }}>{entry.aisle}</td>
+                        <td style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono">{entry.reelTag || "-"}</td>
-                        <td className="mono">{entry.footage?.toLocaleString() || "-"}</td>
-                        <td>{entry.manufacturer || "-"}</td>
-                        <td>
-                          <div className="flex items-center gap-1">
+                        <td className="mono" style={{ textAlign: "center" }}>{entry.footage ? `${entry.footage.toLocaleString()} ft.` : "-"}</td>
+                        <td style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               size="icon"
                               variant="ghost"
@@ -2315,8 +2316,8 @@ function EntryTable({
                 <td colSpan={4} className="font-semibold">
                   Total: {entries.length} entries
                 </td>
-                <td className="font-semibold mono" data-testid="text-total-footage">
-                  {totalFootage.toLocaleString()} ft
+                <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage">
+                  {totalFootage.toLocaleString()} ft.
                 </td>
                 <td colSpan={2} />
               </tr>
