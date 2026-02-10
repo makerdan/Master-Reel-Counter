@@ -319,9 +319,14 @@ export function correctWireDetails(rawDetails: string): CorrectionResult {
   }
 
   const detectedType = (typeResult?.corrected || typeResult?.original || "").toUpperCase();
-  const skipColor = detectedType === "TC";
+  const NO_COLOR_TYPES = ["TC", "RX", "URD", "SER", "TRIPLEX", "UF", "ALF", "LT", "LTNM", "BARE"];
+  const ONLY_BK_TYPES = ["SEOOW"];
+  const skipColor = NO_COLOR_TYPES.includes(detectedType);
 
-  const colorResult = !skipColor ? matchColor(remaining) : null;
+  let colorResult = !skipColor ? matchColor(remaining) : null;
+  if (colorResult && ONLY_BK_TYPES.includes(detectedType) && colorResult.corrected !== "BK" && colorResult.original !== "BK") {
+    colorResult = null;
+  }
   if (colorResult) {
     parts.color = {
       original: colorResult.original,
