@@ -82,9 +82,13 @@ export async function registerRoutes(
     try {
       const session = await verifySessionOwnership(parseInt(req.params.id), req.user.claims.sub);
       if (!session) return res.status(404).json({ message: "Session not found" });
-      const updated = await storage.updateSession(session.id, req.body);
+      const data: any = { ...req.body };
+      if (data.completedAt) data.completedAt = new Date(data.completedAt);
+      else if (data.completedAt === null) data.completedAt = null;
+      const updated = await storage.updateSession(session.id, data);
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Failed to update session:", error?.message || error);
       res.status(500).json({ message: "Failed to update session" });
     }
   });
