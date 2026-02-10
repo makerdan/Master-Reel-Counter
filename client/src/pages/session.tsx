@@ -1541,7 +1541,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             <div className="space-y-3 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_11%)] rounded-md p-3 border border-[hsl(18_60%_30%/0.2)]">
               <div className="flex items-center gap-2 flex-wrap">
                 <StickyNote className="h-4 w-4 text-[hsl(18_70%_50%)]" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)]">Photo Notes</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)]">Photo Notes:</span>
                 {isDetailShot && (
                   <Badge className="bg-[hsl(200_70%_30%)] text-white text-[10px] px-1.5 py-0 no-default-hover-elevate no-default-active-elevate" data-testid="badge-detail-shot">
                     <Focus className="h-3 w-3 mr-1" />
