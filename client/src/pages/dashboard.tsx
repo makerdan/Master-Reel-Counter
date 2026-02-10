@@ -302,43 +302,58 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleStatus.mutate({
-                            id: session.id,
-                            status: session.status === "active" ? "completed" : "active",
-                          });
-                        }}
-                        data-testid={`button-toggle-status-${session.id}`}
-                      >
-                        {session.status === "active" ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : (
-                          <RotateCcw className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={(e) => openEditDialog(session, e)}
-                        data-testid={`button-edit-session-${session.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={(e) => e.stopPropagation()}
-                            data-testid={`button-delete-session-${session.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleStatus.mutate({
+                                id: session.id,
+                                status: session.status === "active" ? "completed" : "active",
+                              });
+                            }}
+                            data-testid={`button-toggle-status-${session.id}`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {session.status === "active" ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : (
+                              <RotateCcw className="h-4 w-4" />
+                            )}
                           </Button>
-                        </AlertDialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>{session.status === "active" ? "Mark Session Complete" : "Reopen This Session"}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => openEditDialog(session, e)}
+                            data-testid={`button-edit-session-${session.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit Session Name</TooltipContent>
+                      </Tooltip>
+                      <AlertDialog>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={`button-delete-session-${session.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete This Session</TooltipContent>
+                        </Tooltip>
                         <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Session?</AlertDialogTitle>
