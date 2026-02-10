@@ -39,6 +39,9 @@ export const photos = pgTable("photos", {
   rotation: integer("rotation").default(0),
   aisle: text("aisle"),
   section: text("section"),
+  notes: text("notes"),
+  isDetailShot: boolean("is_detail_shot").default(false),
+  parentPhotoId: integer("parent_photo_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

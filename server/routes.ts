@@ -144,11 +144,14 @@ export async function registerRoutes(
       if (!photo) return res.status(404).json({ message: "Photo not found" });
       const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
       if (!session) return res.status(404).json({ message: "Photo not found" });
-      const { aisle, section, rotation } = req.body;
+      const { aisle, section, rotation, notes, isDetailShot, parentPhotoId } = req.body;
       const safeUpdate: Record<string, any> = {};
       if (aisle !== undefined) safeUpdate.aisle = aisle;
       if (section !== undefined) safeUpdate.section = section;
       if (rotation !== undefined) safeUpdate.rotation = rotation;
+      if (notes !== undefined) safeUpdate.notes = notes;
+      if (isDetailShot !== undefined) safeUpdate.isDetailShot = isDetailShot;
+      if (parentPhotoId !== undefined) safeUpdate.parentPhotoId = parentPhotoId;
       if (Object.keys(safeUpdate).length === 0) return res.status(400).json({ message: "No valid fields to update" });
       const updated = await storage.updatePhoto(photo.id, safeUpdate);
       res.json(updated);

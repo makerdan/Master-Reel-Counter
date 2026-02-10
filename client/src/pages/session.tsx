@@ -4,7 +4,7 @@ import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Brain, Cable,
-  Save, X, Loader2, RotateCcw, AlertTriangle, Move,
+  Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -350,7 +350,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; dbId?: number; filename?: string; timestamp?: string }>>([]);
+  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [localPins, _setLocalPins] = useState<LocalPin[]>([]);
   const localPinsRef = useRef<LocalPin[]>([]);
@@ -386,6 +386,11 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const [photoNotes, setPhotoNotes] = useState("");
+  const [isDetailShot, setIsDetailShot] = useState(false);
+  const [parentPhotoId, setParentPhotoId] = useState<number | undefined>(undefined);
+  const noteSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clampPan = useCallback((px: number, py: number, s: number) => {
     const el = containerRef.current;
@@ -429,6 +434,9 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           dbId: p.id,
           filename,
           timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : undefined,
+          notes: p.notes || "",
+          isDetailShot: p.isDetailShot || false,
+          parentPhotoId: p.parentPhotoId || undefined,
         };
       }));
       const firstAisle = photos.find(p => p.aisle)?.aisle;
@@ -515,6 +523,60 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
   }, [localPins, currentPhoto?.dbId, pinsLoaded]);
+
+  useEffect(() => {
+    if (noteSaveTimer.current) {
+      clearTimeout(noteSaveTimer.current);
+      noteSaveTimer.current = null;
+    }
+    if (currentPhoto) {
+      setPhotoNotes(currentPhoto.notes || "");
+      setIsDetailShot(currentPhoto.isDetailShot || false);
+      setParentPhotoId(currentPhoto.parentPhotoId);
+    }
+  }, [currentPhotoIdx, currentPhoto?.dbId]);
+
+  const savePhotoMeta = useCallback(async (notes: string, detail: boolean, parentId: number | undefined) => {
+    if (!currentPhoto?.dbId) return;
+    try {
+      await apiRequest("PATCH", `/api/photos/${currentPhoto.dbId}`, {
+        notes: notes || null,
+        isDetailShot: detail,
+        parentPhotoId: parentId || null,
+      });
+      setUploadedPhotos((prev) =>
+        prev.map((p, i) =>
+          i === currentPhotoIdx ? { ...p, notes, isDetailShot: detail, parentPhotoId: parentId } : p
+        )
+      );
+    } catch {}
+  }, [currentPhoto?.dbId, currentPhotoIdx]);
+
+  const handleNotesChange = useCallback((val: string) => {
+    setPhotoNotes(val);
+    if (noteSaveTimer.current) clearTimeout(noteSaveTimer.current);
+    noteSaveTimer.current = setTimeout(() => {
+      savePhotoMeta(val, isDetailShot, parentPhotoId);
+    }, 1200);
+  }, [savePhotoMeta, isDetailShot, parentPhotoId]);
+
+  const handleDetailShotToggle = useCallback((checked: boolean) => {
+    setIsDetailShot(checked);
+    if (!checked) {
+      setParentPhotoId(undefined);
+      savePhotoMeta(photoNotes, checked, undefined);
+    } else {
+      savePhotoMeta(photoNotes, checked, parentPhotoId);
+    }
+  }, [savePhotoMeta, photoNotes, parentPhotoId]);
+
+  const handleParentPhotoChange = useCallback((val: string) => {
+    const id = val ? parseInt(val) : undefined;
+    setParentPhotoId(id);
+    savePhotoMeta(photoNotes, isDetailShot, id);
+  }, [savePhotoMeta, photoNotes, isDetailShot]);
+
+  const parentPhotoOptions = uploadedPhotos.filter((p, i) => i !== currentPhotoIdx && p.dbId && !p.isDetailShot);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -1057,6 +1119,16 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               <div className="flex items-center justify-center gap-3 text-xs mono text-[hsl(25_40%_60%)]" data-testid="text-photo-info">
                 {currentPhoto.filename && <span className="truncate max-w-[200px]" title={currentPhoto.filename}>{currentPhoto.filename}</span>}
                 {currentPhoto.timestamp && <span className="whitespace-nowrap">{currentPhoto.timestamp}</span>}
+                {currentPhoto.isDetailShot && (
+                  <span className="inline-flex items-center gap-1 text-[hsl(200_70%_55%)]" title="Detail Shot">
+                    <Focus className="h-3 w-3" />
+                  </span>
+                )}
+                {currentPhoto.notes && (
+                  <span className="inline-flex items-center gap-1 text-[hsl(18_70%_55%)]" title={currentPhoto.notes}>
+                    <StickyNote className="h-3 w-3" />
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -1073,16 +1145,19 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             >
               <div className="photo-scroll-strip left" onWheel={(e) => e.stopPropagation()} />
               <div className="photo-scroll-strip right" onWheel={(e) => e.stopPropagation()} />
+              <div
+                className="relative w-full"
+                style={{
+                  transform: `scale(${scale}) translate(${panX}px, ${panY}px) rotate(${rotation}deg)`,
+                  transformOrigin: "center center",
+                }}
+              >
               <img
                 src={currentPhoto.url}
                 alt="Section photo"
                 draggable={false}
                 className="w-full select-none"
-                style={{
-                  display: "block",
-                  transform: `scale(${scale}) translate(${panX}px, ${panY}px) rotate(${rotation}deg)`,
-                  transformOrigin: "center center",
-                }}
+                style={{ display: "block" }}
               />
               {localPins.map((pin) => (
                 <div
@@ -1153,6 +1228,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                   </div>
                 </div>
               ))}
+              </div>
               <div className="photo-overlay-controls right-strip">
                 <button
                   className="photo-overlay-btn"
@@ -1221,6 +1297,56 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
+            </div>
+          )}
+
+          {currentPhoto && (
+            <div className="space-y-3 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_11%)] rounded-md p-3 border border-[hsl(18_60%_30%/0.2)]">
+              <div className="flex items-center gap-2 flex-wrap">
+                <StickyNote className="h-4 w-4 text-[hsl(18_70%_50%)]" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)]">Photo Notes</span>
+                {isDetailShot && (
+                  <Badge className="bg-[hsl(200_70%_30%)] text-white text-[10px] px-1.5 py-0 no-default-hover-elevate no-default-active-elevate" data-testid="badge-detail-shot">
+                    <Focus className="h-3 w-3 mr-1" />
+                    Detail Shot
+                  </Badge>
+                )}
+              </div>
+              <Textarea
+                value={photoNotes}
+                onChange={(e) => handleNotesChange(e.target.value)}
+                placeholder="e.g. Reels obstructed by pallets, hard to read tags, section partially counted..."
+                className="resize-none border-[hsl(18_40%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] text-sm min-h-[60px]"
+                rows={2}
+                data-testid="textarea-photo-notes"
+              />
+              <div className="flex items-center gap-4 flex-wrap">
+                <label className="flex items-center gap-2 cursor-pointer" data-testid="toggle-detail-shot">
+                  <Checkbox
+                    checked={isDetailShot}
+                    onCheckedChange={(checked) => handleDetailShotToggle(!!checked)}
+                  />
+                  <span className="text-xs text-[hsl(25_50%_65%)]">This is a detail/close-up shot</span>
+                </label>
+                {isDetailShot && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs text-[hsl(25_50%_65%)] whitespace-nowrap">Linked to:</label>
+                    <select
+                      value={parentPhotoId ?? ""}
+                      onChange={(e) => handleParentPhotoChange(e.target.value)}
+                      className="rounded-md border border-[hsl(18_40%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] px-2 py-1 text-xs min-w-[120px] focus:outline-none focus:ring-2 focus:ring-[hsl(18_85%_48%)]"
+                      data-testid="select-parent-photo"
+                    >
+                      <option value="">-- Select parent photo --</option>
+                      {parentPhotoOptions.map((p) => (
+                        <option key={p.dbId} value={p.dbId}>
+                          {p.filename || `Photo ${uploadedPhotos.indexOf(p) + 1}`} {p.section ? `(${p.section})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
