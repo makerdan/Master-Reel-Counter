@@ -48,6 +48,8 @@ export default function Dashboard() {
 
   const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
+    enabled: !!user,
+    placeholderData: [],
   });
 
   const createSession = useMutation({
