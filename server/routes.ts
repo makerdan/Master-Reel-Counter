@@ -403,21 +403,34 @@ export async function registerRoutes(
       const generatedAt = new Date().toISOString();
       const photoStats = await storage.getSessionPhotoStats([session.id]);
       const pt = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
-      const rowsHtml = sessionEntries.map((e: any, i: number) => `
+      const sessionPhotos = await storage.getSessionPhotos(session.id);
+      const photoMap = new Map(sessionPhotos.map(p => [p.id, p]));
+      const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const rowsHtml = sessionEntries.map((e: any, i: number) => {
+        const photo = e.photoId ? photoMap.get(e.photoId) : null;
+        const parentPhoto = photo?.parentPhotoId ? photoMap.get(photo.parentPhotoId) : null;
+        return `
         <tr>
-          <td>${i + 1}</td><td>${e.aisle || ""}</td><td>${e.section || ""}</td><td>${e.position || ""}</td>
-          <td>${e.palletId || ""}</td><td>${e.reelTag || ""}</td><td>${e.wireType || ""}</td>
-          <td>${e.gauge || ""}</td><td>${e.footage || ""}</td><td>${e.color || ""}</td>
-          <td>${e.manufacturer || ""}</td><td>${e.notes || ""}</td>
-        </tr>`).join("");
+          <td>${i + 1}</td><td>${esc(e.aisle || "")}</td><td>${esc(e.section || "")}</td><td>${esc(e.position || "")}</td>
+          <td>${esc(e.palletId || "")}</td><td>${esc(e.reelTag || "")}</td><td>${esc(e.wireType || "")}</td>
+          <td>${esc(e.gauge || "")}</td><td>${e.footage || ""}</td><td>${esc(e.color || "")}</td>
+          <td>${esc(e.manufacturer || "")}</td><td>${esc(e.notes || "")}</td>
+          <td>${esc(photo?.originalFilename || "")}</td>
+          <td>${esc(photo?.notes || "")}${photo?.isDetailShot ? ' <span class="detail">[Detail]</span>' : ""}</td>
+        </tr>`;
+      }).join("");
       const html = `<!DOCTYPE html><html><head><title>${session.name} - Audit Report</title>
         <style>
           body{font-family:Arial,sans-serif;padding:24px;color:#333}
           table{border-collapse:collapse;width:100%;margin-top:16px}
           th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:11px}
           th{background:#f5f0eb;font-weight:600}
+          .detail{color:#ea580c;font-weight:600;font-size:10px}
           h1{font-size:20px;margin:0}
           .meta{font-size:12px;color:#666;margin-top:4px}
+          .photo-summary{margin-top:24px}
+          .photo-summary h2{font-size:14px;margin:0 0 8px}
+          .photo-summary table{font-size:10px}
           .audit{margin-top:24px;padding-top:12px;border-top:2px solid #ea580c;font-size:10px;color:#666}
           .audit strong{color:#333}
           .stamp{display:inline-block;border:2px solid #ea580c;padding:4px 12px;border-radius:4px;font-size:10px;font-weight:600;color:#ea580c;margin-top:8px}
@@ -433,10 +446,27 @@ export async function registerRoutes(
           <thead><tr>
             <th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th>
             <th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Color</th>
-            <th>Manufacturer</th><th>Notes</th>
+            <th>Manufacturer</th><th>Notes</th><th>Photo</th><th>Photo Notes</th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
+        ${sessionPhotos.filter(p => p.notes || p.isDetailShot).length > 0 ? `
+        <div class="photo-summary">
+          <h2>Photo Annotations</h2>
+          <table>
+            <thead><tr><th>Photo</th><th>Section</th><th>Type</th><th>Parent Photo</th><th>Notes</th></tr></thead>
+            <tbody>${sessionPhotos.filter(p => p.notes || p.isDetailShot).map(p => {
+              const parent = p.parentPhotoId ? photoMap.get(p.parentPhotoId) : null;
+              return `<tr>
+                <td>${esc(p.originalFilename || p.filename)}</td>
+                <td>${esc(p.section || "")}</td>
+                <td>${p.isDetailShot ? '<span class="detail">Detail Shot</span>' : "Overview"}</td>
+                <td>${parent ? esc(parent.originalFilename || parent.filename) : ""}</td>
+                <td>${esc(p.notes || "")}</td>
+              </tr>`;
+            }).join("")}</tbody>
+          </table>
+        </div>` : ""}
         <div class="audit">
           <strong>Audit Trail</strong><br>
           Report generated: ${generatedAt}<br>

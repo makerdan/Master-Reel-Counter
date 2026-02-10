@@ -166,20 +166,35 @@ function SessionWorkspace({
   });
 
 
-  const exportCsv = () => {
-    const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Color", "Manufacturer", "Notes"];
-    const rows = entries.map((e, i) => [
-      i + 1, e.aisle, e.section, e.position || "", e.palletId || "", e.reelTag || "",
-      e.wireType || "", e.gauge || "", e.footage || "", e.color || "", e.manufacturer || "", e.notes || "",
-    ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.map((v) => `"${v}"`).join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${session.name.replace(/\s+/g, "_")}_entries.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportCsv = async () => {
+    try {
+      const res = await apiRequest("GET", `/api/sessions/${sessionId}/export`);
+      const data = await res.json();
+      const exportEntries = data.entries || entries;
+      const exportPhotos = data.photos || [];
+      const photoMap = new Map(exportPhotos.map((p: any) => [p.id, p]));
+      const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Color", "Manufacturer", "Notes", "Photo", "Photo Notes", "Detail Shot", "Parent Photo"];
+      const rows = exportEntries.map((e: any, i: number) => {
+        const photo = e.photoId ? photoMap.get(e.photoId) : null;
+        const parentPhoto = photo?.parentPhotoId ? photoMap.get(photo.parentPhotoId) : null;
+        return [
+          i + 1, e.aisle, e.section, e.position || "", e.palletId || "", e.reelTag || "",
+          e.wireType || "", e.gauge || "", e.footage || "", e.color || "", e.manufacturer || "", e.notes || "",
+          photo?.originalFilename || "", photo?.notes || "",
+          photo?.isDetailShot ? "Yes" : "", parentPhoto?.originalFilename || "",
+        ];
+      });
+      const csv = [headers.join(","), ...rows.map((r: any[]) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${session.name.replace(/\s+/g, "_")}_entries.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Failed to export CSV", variant: "destructive" });
+    }
   };
 
   const exportPdf = async () => {
@@ -1275,28 +1290,35 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
           )}
 
           {currentPhoto && (
-            <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 flex items-center justify-center gap-3" data-testid="bottom-photo-nav">
-              <Button
-                size="icon"
-                className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
-                disabled={currentPhotoIdx <= 0}
-                onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
-                data-testid="button-prev-photo-bottom"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <span className="text-sm mono text-[hsl(30_40%_85%)] min-w-[60px] text-center" data-testid="text-photo-counter-bottom">
-                {String(currentPhotoIdx + 1).padStart(2, "0")} / {String(uploadedPhotos.length).padStart(2, "0")}
-              </span>
-              <Button
-                size="icon"
-                className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
-                disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
-                data-testid="button-next-photo-bottom"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
+            <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 flex flex-col items-center gap-1" data-testid="bottom-photo-nav">
+              {currentPhoto.filename && (
+                <span className="text-xs mono text-[hsl(25_40%_60%)] truncate max-w-[260px]" title={currentPhoto.filename} data-testid="text-photo-name-bottom">
+                  {currentPhoto.filename}
+                </span>
+              )}
+              <div className="flex items-center gap-3">
+                <Button
+                  size="icon"
+                  className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                  disabled={currentPhotoIdx <= 0}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
+                  data-testid="button-prev-photo-bottom"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <span className="text-sm mono text-[hsl(30_40%_85%)] min-w-[60px] text-center" data-testid="text-photo-counter-bottom">
+                  {String(currentPhotoIdx + 1).padStart(2, "0")} / {String(uploadedPhotos.length).padStart(2, "0")}
+                </span>
+                <Button
+                  size="icon"
+                  className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                  disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
+                  data-testid="button-next-photo-bottom"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           )}
 
