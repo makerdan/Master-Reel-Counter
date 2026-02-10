@@ -1000,7 +1000,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             onChange={(e) => setAisle(e.target.value)}
             placeholder="Aisle..."
             inputMode="numeric"
-            className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "border-[hsl(145_55%_38%)]" : "border-[hsl(45_100%_45%)]"}`}
+            className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
             data-testid="input-photo-aisle"
           />
         </div>
@@ -1081,7 +1081,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                   }}
                   placeholder="Section..."
                   inputMode="numeric"
-                  className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "border-[hsl(145_55%_38%)]" : "border-[hsl(45_100%_45%)]"}`}
+                  className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
                   data-testid="input-photo-section"
                 />
               </div>

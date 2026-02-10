@@ -313,6 +313,27 @@
   }
 }
 
+@keyframes border-pulse {
+  0%, 100% {
+    border-color: hsl(45 100% 45%);
+    box-shadow: 0 0 4px 0 hsl(45 100% 45% / 0.3);
+  }
+  50% {
+    border-color: hsl(45 100% 60%);
+    box-shadow: 0 0 10px 2px hsl(45 100% 50% / 0.5);
+  }
+}
+
+.input-pulse-empty {
+  animation: border-pulse 2.5s ease-in-out infinite;
+}
+
+.input-filled {
+  animation: none;
+  border-color: hsl(145 55% 38%) !important;
+  box-shadow: none !important;
+}
+
 .photo-viewer-container {
   position: relative;
   overflow: hidden;
