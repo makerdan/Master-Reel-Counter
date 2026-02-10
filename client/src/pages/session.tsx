@@ -2234,12 +2234,12 @@ function EntryTable({
           <table className="entries-table" data-testid="entries-table">
             <thead>
               <tr>
-                <th style={{ width: 50, textAlign: "center" }}>Reel #:</th>
+                <th style={{ width: 65, textAlign: "center", whiteSpace: "nowrap" }}>Reel #:</th>
                 <th style={{ textAlign: "center" }}>Aisle:</th>
-                <th style={{ textAlign: "center" }}>Section:</th>
-                <th>Category:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
+                <th style={{ textAlign: "center" }}>Category:</th>
                 <th style={{ textAlign: "center" }}>Footage:</th>
-                <th style={{ textAlign: "center" }}>Vendor Code:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
                 <th style={{ width: 70, textAlign: "center" }}>Actions:</th>
               </tr>
             </thead>
