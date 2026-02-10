@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
-  ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
+  ArrowLeft, Camera, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Brain, Cable,
   Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus,
 } from "lucide-react";
@@ -16,7 +16,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -35,7 +34,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { correctWireDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, COLOR_CODES, VENDOR_CODES } from "@/lib/wireReference";
+import { correctWireDetails, vendorCodeFromDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, COLOR_CODES, VENDOR_CODES } from "@/lib/wireReference";
 import type { Session, Entry, Photo, Pin } from "@shared/schema";
 
 const WIRE_TYPES = ["THHN", "XHHW", "USE-2", "MC Cable", "NM-B", "SER", "UFB", "Bare", "Other"];
@@ -138,7 +137,6 @@ function SessionWorkspace({
 }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [mode, setMode] = useState<string>("photo");
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [editName, setEditName] = useState(session.name);
@@ -271,26 +269,7 @@ function SessionWorkspace({
       </header>
 
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
-        <Tabs value={mode} onValueChange={setMode}>
-          <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
-            <TabsTrigger value="photo" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode">
-              <Camera className="h-4 w-4 mr-1" />
-              Section Photo
-            </TabsTrigger>
-            <TabsTrigger value="single" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode">
-              <ListPlus className="h-4 w-4 mr-1" />
-              Single Entry
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="photo">
-            <PhotoMode sessionId={sessionId} photos={photos} />
-          </TabsContent>
-
-          <TabsContent value="single">
-            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} />
-          </TabsContent>
-        </Tabs>
+        <PhotoMode sessionId={sessionId} photos={photos} />
 
         <Separator />
 
@@ -299,7 +278,7 @@ function SessionWorkspace({
           loading={entriesLoading}
           totalFootage={totalFootage}
           sessionId={sessionId}
-          onEdit={(entry) => { setEditingEntry(entry); setMode("single"); }}
+          onEdit={(entry) => { setEditingEntry(entry); }}
         />
       </div>
 
@@ -838,7 +817,17 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
   const updatePinField = useCallback((pinId: string, field: keyof LocalPin, value: any) => {
     setLocalPins((prev) =>
-      prev.map((p) => p.id === pinId ? { ...p, [field]: value, ...(field === "wireDetails" ? { aiConfidence: undefined, correctionConfident: undefined } : {}) } : p)
+      prev.map((p) => {
+        if (p.id !== pinId) return p;
+        const updates: Partial<LocalPin> = { [field]: value };
+        if (field === "wireDetails") {
+          updates.aiConfidence = undefined;
+          updates.correctionConfident = undefined;
+          const autoVendor = vendorCodeFromDetails(String(value || ""));
+          if (autoVendor) updates.vendorCode = autoVendor;
+        }
+        return { ...p, ...updates };
+      })
     );
   }, []);
 
@@ -1076,10 +1065,11 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             if (correction.wasModified) correctedCount++;
             if (!correction.confident) flaggedCount++;
             const parsedFootage = correction.parts.footage ? parseInt(correction.parts.footage) : undefined;
+            const autoVendor = vendorCodeFromDetails(correction.correctedDetails);
             return {
               ...pin,
               wireDetails: correction.correctedDetails,
-              vendorCode: hasVendor ? vendorMatch[2] : pin.vendorCode,
+              vendorCode: hasVendor ? vendorMatch[2] : (autoVendor || pin.vendorCode),
               footage: match.footage || parsedFootage || pin.footage,
               aiConfidence: aiConf,
               correctionConfident: correction.confident,

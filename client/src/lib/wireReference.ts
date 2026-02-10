@@ -1,6 +1,6 @@
 export const WIRE_TYPES = [
   "THHN", "XHHW", "URD", "SER", "TC", "RX", "UF", "BARE",
-  "ALF", "LT", "LTNM", "MHF", "SEOOW", "SJEW", "SJEOO", "TRIPLEX",
+  "ALF", "SGF", "LT", "LTNM", "MHF", "SEOOW", "SJEW", "SJEOO", "TRIPLEX",
 ] as const;
 
 export const WIRE_GAUGES = [
@@ -24,7 +24,43 @@ export const WIRE_COLORS: Record<string, string> = {
 
 export const COLOR_CODES = Object.keys(WIRE_COLORS);
 
-export const VENDOR_CODES = ["ALU", "COP", "ALF"] as const;
+export const VENDOR_CODES = ["ALU", "COP", "ALF", "COR"] as const;
+
+const WIRE_TYPE_VENDOR_MAP: Record<string, string> = {
+  THHN: "COP",
+  TC: "COP",
+  RX: "COP",
+  UF: "COP",
+  BARE: "COP",
+  XHHW: "ALU",
+  URD: "ALU",
+  TRIPLEX: "ALU",
+  MHF: "ALU",
+  SEOOW: "COR",
+  SJEOO: "COR",
+  SJEW: "COR",
+  ALF: "ALF",
+  SGF: "ALF",
+  LT: "ALF",
+  LTNM: "ALF",
+};
+
+export function vendorCodeForWireType(wireType: string): string | undefined {
+  if (!wireType) return undefined;
+  const upper = wireType.toUpperCase();
+  return WIRE_TYPE_VENDOR_MAP[upper];
+}
+
+export function vendorCodeFromDetails(wireDetails: string): string | undefined {
+  if (!wireDetails) return undefined;
+  const upper = wireDetails.toUpperCase().replace(/[^A-Z0-9\-]/g, "");
+  for (const wt of Object.keys(WIRE_TYPE_VENDOR_MAP).sort((a, b) => b.length - a.length)) {
+    if (upper.startsWith(wt)) {
+      return WIRE_TYPE_VENDOR_MAP[wt];
+    }
+  }
+  return undefined;
+}
 
 export interface CatalogEntry {
   vendor: string;
