@@ -43,6 +43,24 @@ const GAUGES = ["14", "12", "10", "8", "6", "4", "3", "2", "1", "1/0", "2/0", "3
 const POSITIONS = ["Top", "Middle", "Bottom", "Floor"];
 const COLORS = ["Black", "White", "Red", "Blue", "Green", "Orange", "Yellow", "Brown", "Gray", "Purple", "Other"];
 
+const VENDOR_CODE_MAP: Record<string, string[]> = {
+  COP: ["THHN", "TC", "RX", "UF", "BARE"],
+  ALU: ["XHHW", "URD", "TRIPLEX", "MHF"],
+  COR: ["SEOOW", "SJEOO", "SJEW"],
+  ALF: ["ALF", "SGF", "LT", "LTNM"],
+};
+
+function deriveVendorCode(wireDetails: string): string | undefined {
+  if (!wireDetails) return undefined;
+  const upper = wireDetails.toUpperCase();
+  for (const [code, types] of Object.entries(VENDOR_CODE_MAP)) {
+    for (const t of types) {
+      if (upper.startsWith(t)) return code;
+    }
+  }
+  return undefined;
+}
+
 interface LocalPin {
   id: string;
   x: number;
@@ -838,7 +856,17 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
   const updatePinField = useCallback((pinId: string, field: keyof LocalPin, value: any) => {
     setLocalPins((prev) =>
-      prev.map((p) => p.id === pinId ? { ...p, [field]: value, ...(field === "wireDetails" ? { aiConfidence: undefined, correctionConfident: undefined } : {}) } : p)
+      prev.map((p) => {
+        if (p.id !== pinId) return p;
+        const updates: Partial<LocalPin> = { [field]: value };
+        if (field === "wireDetails") {
+          updates.aiConfidence = undefined;
+          updates.correctionConfident = undefined;
+          const derived = deriveVendorCode(String(value || ""));
+          if (derived) updates.vendorCode = derived;
+        }
+        return { ...p, ...updates };
+      })
     );
   }, []);
 
@@ -1076,10 +1104,11 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             if (correction.wasModified) correctedCount++;
             if (!correction.confident) flaggedCount++;
             const parsedFootage = correction.parts.footage ? parseInt(correction.parts.footage) : undefined;
+            const derivedVendor = deriveVendorCode(correction.correctedDetails);
             return {
               ...pin,
               wireDetails: correction.correctedDetails,
-              vendorCode: hasVendor ? vendorMatch[2] : pin.vendorCode,
+              vendorCode: hasVendor ? vendorMatch[2] : (derivedVendor || pin.vendorCode),
               footage: match.footage || parsedFootage || pin.footage,
               aiConfidence: aiConf,
               correctionConfident: correction.confident,
