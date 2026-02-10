@@ -68,7 +68,7 @@ export async function registerRoutes(
         },
       });
 
-      const objectPath = `/objects/${objectName}`;
+      const objectPath = `/objects/uploads/${objectId}`;
 
       res.json({
         objectPath,
@@ -460,10 +460,10 @@ export async function registerRoutes(
             <tbody>${sessionPhotos.filter(p => p.notes || p.isDetailShot).map(p => {
               const parent = p.parentPhotoId ? photoMap.get(p.parentPhotoId) : null;
               return `<tr>
-                <td>${esc(p.originalFilename || p.filename)}</td>
+                <td>${esc(p.originalFilename || "")}</td>
                 <td>${esc(p.section || "")}</td>
                 <td>${p.isDetailShot ? '<span class="detail">Detail Shot</span>' : "Overview"}</td>
-                <td>${parent ? esc(parent.originalFilename || parent.filename) : ""}</td>
+                <td>${parent ? esc(parent.originalFilename || "") : ""}</td>
                 <td>${esc(p.notes || "")}</td>
               </tr>`;
             }).join("")}</tbody>

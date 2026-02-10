@@ -194,10 +194,10 @@ export default function SettingsPage() {
                 <div className="flex gap-3">
                   <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium">AI Assist still works normally</p>
+                    <p className="text-sm font-medium">Manual entry and catalog autocomplete unaffected</p>
                     <p className="text-xs text-muted-foreground">
-                      AI image analysis reads directly from photos, not from stored entries, so it continues to work. 
-                      However, any AI-suggested values you save will be encoded before storage.
+                      Category autocomplete and catalog lookup work from a built-in reference, not from stored entries. 
+                      Any values you save will be encoded before storage.
                     </p>
                   </div>
                 </div>

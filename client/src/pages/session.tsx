@@ -947,7 +947,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       const totalCreated = localPins.reduce((sum, pin) => sum + pin.reelCount, 0);
       setLocalPins([]);
-      setAiResult("");
       setBatchProgress(null);
       toast({ title: `Created ${totalCreated} entries from ${localPins.length} pins` });
     },
@@ -1037,7 +1036,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                   disabled={currentPhotoIdx <= 0}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
                   data-testid="button-prev-photo"
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -1049,7 +1048,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                   disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
                   data-testid="button-next-photo"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -1251,7 +1250,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                   disabled={currentPhotoIdx <= 0}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); setAiResult(""); resetView(); }}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
                   data-testid="button-prev-photo-bottom"
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -1263,7 +1262,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                   disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); setAiResult(""); resetView(); }}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
                   data-testid="button-next-photo-bottom"
                 >
                   <ChevronRight className="h-5 w-5" />
