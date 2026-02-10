@@ -273,7 +273,11 @@ export function correctWireDetails(rawDetails: string): CorrectionResult {
     return { correctedDetails: rawDetails, wasModified: false, confident: false, parts: {} };
   }
 
-  const input = rawDetails.toUpperCase().replace(/[^A-Z0-9\-]/g, "");
+  let input = rawDetails.toUpperCase().replace(/[^A-Z0-9\-]/g, "");
+
+  if (input === "MHF" || input.startsWith("MHF") && input.length <= 4) {
+    input = "MHF40402041000";
+  }
 
   const catalogResult = matchCatalog(input);
   if (catalogResult) {
