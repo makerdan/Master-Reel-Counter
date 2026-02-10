@@ -273,7 +273,7 @@ export function correctWireDetails(rawDetails: string): CorrectionResult {
     return { correctedDetails: rawDetails, wasModified: false, confident: false, parts: {} };
   }
 
-  const input = rawDetails.toUpperCase().replace(/[^A-Z0-9/\-]/g, "");
+  const input = rawDetails.toUpperCase().replace(/[^A-Z0-9\-]/g, "");
 
   const catalogResult = matchCatalog(input);
   if (catalogResult) {

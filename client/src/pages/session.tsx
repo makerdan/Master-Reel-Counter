@@ -1066,7 +1066,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
           });
           if (match && match.wireDetails) {
             filledCount++;
-            const details = String(match.wireDetails).toUpperCase().replace(/[^A-Z0-9/\-]/g, "");
+            const details = String(match.wireDetails).toUpperCase().replace(/[^A-Z0-9\-]/g, "");
             const knownVendors = [...VENDOR_CODES, "COR"];
             const vendorMatch = details.match(/^(.+)-([A-Z]+)$/);
             const hasVendor = vendorMatch && knownVendors.includes(vendorMatch[2]);
@@ -1075,11 +1075,12 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
             const aiConf = typeof match.confidence === "number" ? match.confidence : 100;
             if (correction.wasModified) correctedCount++;
             if (!correction.confident) flaggedCount++;
+            const parsedFootage = correction.parts.footage ? parseInt(correction.parts.footage) : undefined;
             return {
               ...pin,
               wireDetails: correction.correctedDetails,
               vendorCode: hasVendor ? vendorMatch[2] : pin.vendorCode,
-              footage: match.footage || pin.footage,
+              footage: match.footage || parsedFootage || pin.footage,
               aiConfidence: aiConf,
               correctionConfident: correction.confident,
             };
