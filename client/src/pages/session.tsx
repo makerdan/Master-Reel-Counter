@@ -4,7 +4,7 @@ import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Brain, Cable,
-  Save, X, Loader2, CheckCircle2, RotateCcw, AlertTriangle, Move,
+  Save, X, Loader2, RotateCcw, AlertTriangle, Move,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -165,24 +165,6 @@ function SessionWorkspace({
     },
   });
 
-  const toggleStatus = useMutation({
-    mutationFn: async () => {
-      const newStatus = session.status === "active" ? "completed" : "active";
-      const body: any = { status: newStatus };
-      if (newStatus === "completed") body.completedAt = new Date().toISOString();
-      else body.completedAt = null;
-      const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, body);
-      return res.json();
-    },
-    onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
-      queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
-      toast({ title: session.status === "active" ? "Session completed" : "Session reopened" });
-    },
-    onError: () => {
-      toast({ title: "Failed to update status", variant: "destructive" });
-    },
-  });
 
   const exportCsv = () => {
     const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Color", "Manufacturer", "Notes"];
@@ -260,19 +242,6 @@ function SessionWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => toggleStatus.mutate()}
-              disabled={toggleStatus.isPending}
-              data-testid="button-toggle-session-status"
-            >
-              {session.status === "active" ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : (
-                <RotateCcw className="h-4 w-4" />
-              )}
-            </Button>
             <Button size="sm" variant="outline" onClick={exportCsv} data-testid="button-export-csv">
               <Download className="h-3 w-3" />
               CSV
