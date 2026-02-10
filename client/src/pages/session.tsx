@@ -461,7 +461,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           filename = `${base}_${String(count).padStart(2, "0")}${ext}`;
         }
         return {
-          url: p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/objects/${p.objectStorageKey}`,
+          url: p.objectStorageKey.startsWith("/uploads/") ? p.objectStorageKey : p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/uploads/${p.objectStorageKey}`,
           objectPath: p.objectStorageKey,
           section: p.section || "",
           aisle: p.aisle || "",
@@ -625,8 +625,12 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     if (!files.length) return;
 
     for (const file of files) {
-      const result = await uploadFile(file);
-      if (result) {
+      try {
+        const result = await uploadFile(file);
+        if (!result) {
+          toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
+          continue;
+        }
         const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
           objectStorageKey: result.objectPath,
           originalFilename: file.name,
@@ -635,7 +639,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           section: "",
         });
         const savedPhoto = await res.json();
-        const photoUrl = result.objectPath.startsWith("/objects/") ? result.objectPath : `/objects/${result.objectPath}`;
+        const photoUrl = result.objectPath;
         setUploadedPhotos((prev) => {
           const existingCount = prev.filter((p) => p.filename?.replace(/_\d+(?=\.\w+$)/, "") === file.name || p.filename === file.name).length;
           const dotIdx = file.name.lastIndexOf(".");
@@ -653,6 +657,9 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      } catch (err) {
+        console.error("Photo upload error:", err);
+        toast({ title: "Upload failed", description: `Error uploading ${file.name}: ${err instanceof Error ? err.message : "Unknown error"}`, variant: "destructive" });
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";

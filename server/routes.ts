@@ -4,11 +4,12 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
-import { ObjectStorageService, objectStorageClient } from "./replit_integrations/object_storage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema } from "@shared/schema";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
 import { randomUUID } from "crypto";
+import path from "path";
+import fs from "fs/promises";
 
 async function verifySessionOwnership(sessionId: number, userId: string) {
   const session = await storage.getSession(sessionId);
@@ -38,7 +39,8 @@ export async function registerRoutes(
   registerAuthRoutes(app);
   registerObjectStorageRoutes(app);
 
-  const objectStorageService = new ObjectStorageService();
+  const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
   app.post("/api/uploads/direct", isAuthenticated, upload.single("file"), async (req: any, res) => {
@@ -47,28 +49,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No file provided" });
       }
 
-      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
-      if (!privateDir) {
-        return res.status(500).json({ error: "Object storage not configured" });
-      }
+      await fs.mkdir(UPLOADS_DIR, { recursive: true });
 
-      const objectId = randomUUID();
-      const fullPath = `${privateDir}/uploads/${objectId}`;
-      const pathParts = fullPath.startsWith("/") ? fullPath.slice(1).split("/") : fullPath.split("/");
-      const bucketName = pathParts[0];
-      const objectName = pathParts.slice(1).join("/");
+      const ext = path.extname(req.file.originalname) || "";
+      const objectId = `${randomUUID()}${ext}`;
+      const filePath = path.join(UPLOADS_DIR, objectId);
 
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
+      await fs.writeFile(filePath, req.file.buffer);
 
-      await file.save(req.file.buffer, {
-        contentType: req.file.mimetype || "application/octet-stream",
-        metadata: {
-          originalName: req.file.originalname,
-        },
-      });
-
-      const objectPath = `/objects/uploads/${objectId}`;
+      const objectPath = `/uploads/${objectId}`;
+      console.log(`Upload success: file="${objectId}", size=${req.file.size}, type=${req.file.mimetype}`);
 
       res.json({
         objectPath,
@@ -78,9 +68,39 @@ export async function registerRoutes(
           contentType: req.file.mimetype,
         },
       });
-    } catch (error) {
-      console.error("Error uploading file:", error);
+    } catch (error: any) {
+      console.error("Error uploading file:", error?.message || error, error?.stack);
       res.status(500).json({ error: "Failed to upload file" });
+    }
+  });
+
+  app.get("/uploads/:filename", isAuthenticated, async (req: any, res) => {
+    try {
+      const filename = req.params.filename;
+      if (filename.includes("..") || filename.includes("/")) {
+        return res.status(400).json({ error: "Invalid filename" });
+      }
+      const filePath = path.join(UPLOADS_DIR, filename);
+      try {
+        await fs.access(filePath);
+      } catch {
+        return res.status(404).json({ error: "File not found" });
+      }
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+        ".gif": "image/gif", ".webp": "image/webp", ".heic": "image/heic",
+        ".heif": "image/heif", ".bmp": "image/bmp", ".tiff": "image/tiff",
+      };
+      res.set({
+        "Content-Type": mimeTypes[ext] || "application/octet-stream",
+        "Cache-Control": "private, max-age=86400",
+      });
+      const { createReadStream } = await import("fs");
+      createReadStream(filePath).pipe(res);
+    } catch (error) {
+      console.error("Error serving file:", error);
+      res.status(500).json({ error: "Failed to serve file" });
     }
   });
 
@@ -219,12 +239,12 @@ export async function registerRoutes(
       const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
       if (!session) return res.status(404).json({ message: "Photo not found" });
       try {
-        const objectFile = await objectStorageService.getObjectEntityFile(
-          photo.objectStorageKey.startsWith("/objects/") ? photo.objectStorageKey : `/objects/${photo.objectStorageKey}`
-        );
-        await objectFile.delete();
+        const key = photo.objectStorageKey;
+        const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+        const filePath = path.join(UPLOADS_DIR, filename);
+        await fs.unlink(filePath);
       } catch (err) {
-        console.warn("Could not delete object storage file:", err);
+        console.warn("Could not delete uploaded file:", err);
       }
       await storage.deletePhoto(photo.id);
       res.json({ success: true });
