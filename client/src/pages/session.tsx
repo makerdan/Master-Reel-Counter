@@ -2194,6 +2194,8 @@ function EntryTable({
     },
   });
 
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
   if (loading) {
     return <Skeleton className="h-48 w-full" />;
   }
@@ -2217,7 +2219,6 @@ function EntryTable({
   }, {});
 
   const sectionKeys = Object.keys(grouped).sort();
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   const toggleSection = (key: string) => {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
