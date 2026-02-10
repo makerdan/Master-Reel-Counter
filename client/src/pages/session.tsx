@@ -1029,12 +1029,10 @@ For each RED BOUNDING BOX, locate and read the WHITE PAPER TAG attached to or ne
 1. Find the RED BOUNDING BOX with its position label (e.g., "01")
 2. Look inside or immediately adjacent to that box for a WHITE PAPER TAG
 3. Read the BLACK BOLD TEXT printed on the tag - this is the wire category code
-4. Extract footage if visible (numeric value, typically 500-5000)
 
 === WHITE PAPER TAG IDENTIFICATION ===
-- Bright WHITE rectangular background (high contrast against dark wire spools)
+- WHITE rectangular paper tag, typically letter-size (11" x 8.5"), attached directly to the wire reel. Contrast may vary — tags can be dirty, faded, partially obscured, or against lighter-colored reels. Do not skip a tag just because contrast is low.
 - BLACK BOLD TEXT - the primary category/wire code you need to read
-- Size: approximately 2-4 inches, attached directly to wire reel
 - May include a checkmark but not always present
 ${filterInstruction}
 
@@ -1045,7 +1043,7 @@ Types: ${REF_WIRE_TYPES.join(", ")}
 Sizes (AWG): ${WIRE_GAUGES.join(", ")}
 Colors: ${COLOR_CODES.map(c => c).join(", ")}
 
-Examples: THHN4BK1000, XHHW350WH2500, URD404040-ALU, 4TRIPLEX, THHN12GNWH500
+Examples: THHN4BK1000, XHHW350WH2500, URD404040-ALU, 4TRIPLEX, THHN8GN5000-COP
 
 === CRITICAL RULES ===
 - Use ONLY the position from the RED LABEL - do not guess positions
@@ -1058,8 +1056,8 @@ Examples: THHN4BK1000, XHHW350WH2500, URD404040-ALU, 4TRIPLEX, THHN12GNWH500
 Return ONLY valid JSON. Include a "confidence" field (0-100) for each detected item indicating how confident you are in the wireDetails reading:
 {
   "detected": [
-    {"position": "01", "wireDetails": "THHN1GN2500", "footage": 2500, "confidence": 95},
-    {"position": "02", "wireDetails": "URD404040-ALU", "footage": null, "confidence": 60}
+    {"position": "01", "wireDetails": "THHN1GN2500", "confidence": 95},
+    {"position": "02", "wireDetails": "URD404040-ALU", "confidence": 60}
   ],
   "notes": "Brief observation about tag visibility/readability for each position"
 }
