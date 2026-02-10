@@ -4,6 +4,9 @@
 A full-stack warehouse wire reel counting application built with React, Express, PostgreSQL, and Replit integrations. Tracks wire reels across pallet sections with photo annotation, AI-powered tag reading, and PDF/CSV export capabilities.
 
 ## Recent Changes
+- 2026-02-10: Per-photo notes — textarea to document issues (obstructed reels, hard-to-read tags) with auto-save
+- 2026-02-10: Detail shot linking — mark photos as close-up detail shots, link to parent overview photo
+- 2026-02-10: Pin drift fix — wrapped image + pins in shared transform container so pins stay locked during zoom/pan/rotate
 - 2026-02-09: AI Assist wire reference correction - fuzzy matches AI output against accepted wire types/gauges/colors, auto-corrects close matches, amber highlights uncertain values
 - 2026-02-09: Session times now derived from first/last photo timestamps (not session creation time) for auditable time tracking
 - 2026-02-08: Initial full build - schema, storage, routes, all frontend pages
