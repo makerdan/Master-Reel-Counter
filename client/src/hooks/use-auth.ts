@@ -27,13 +27,13 @@ export function useAuth() {
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 30,
   });
 
   const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: () => {
-      queryClient.setQueryData(["/api/auth/user"], null);
+    mutationFn: async () => {
+      queryClient.clear();
+      await logout();
     },
   });
 
