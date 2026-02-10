@@ -365,7 +365,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number }>>([]);
+  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [localPins, _setLocalPins] = useState<LocalPin[]>([]);
   const localPinsRef = useRef<LocalPin[]>([]);
@@ -449,6 +449,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           url: p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/objects/${p.objectStorageKey}`,
           objectPath: p.objectStorageKey,
           section: p.section || "",
+          aisle: p.aisle || "",
           dbId: p.id,
           filename,
           timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : undefined,
@@ -846,7 +847,14 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
   const createEntries = useMutation({
     mutationFn: async () => {
-      const section = currentPhoto?.section || "";
+      const isDetail = currentPhoto?.isDetailShot || false;
+      const parentPhoto = isDetail && currentPhoto?.parentPhotoId
+        ? uploadedPhotos.find(p => p.dbId === currentPhoto.parentPhotoId)
+        : undefined;
+      const entryAisle = aisle || (isDetail && parentPhoto?.aisle ? parentPhoto.aisle : "") || "";
+      const entrySection = currentPhoto?.section || parentPhoto?.section || "";
+      const entryPhotoId = isDetail && parentPhoto?.dbId ? parentPhoto.dbId : currentPhoto?.dbId;
+      const pinPhotoId = currentPhoto?.dbId;
       const errors: string[] = [];
       const totalEntries = localPins.reduce((sum, pin) => sum + pin.reelCount, 0);
       let completed = 0;
@@ -857,22 +865,26 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           const entryIds: number[] = [];
           for (let r = 0; r < pin.reelCount; r++) {
             const reelLabel = pin.wireDetails || (pin.reelCount > 1 ? `Pin ${pin.label} (${r + 1}/${pin.reelCount})` : `Pin ${pin.label}`);
+            const noteParts: string[] = [];
+            if (pin.reelCount > 1) noteParts.push(`Reel ${r + 1} of ${pin.reelCount} at pin ${pin.label}`);
+            if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
             const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
-              aisle,
-              section,
+              aisle: entryAisle,
+              section: entrySection,
               position: "Floor",
               reelTag: reelLabel,
               manufacturer: pin.vendorCode || undefined,
               footage: pin.footage || undefined,
-              notes: pin.reelCount > 1 ? `Reel ${r + 1} of ${pin.reelCount} at pin ${pin.label}` : undefined,
+              photoId: entryPhotoId || undefined,
+              notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
             });
             const entry = await res.json();
             entryIds.push(entry.id);
             completed++;
             setBatchProgress({ current: completed, total: totalEntries, errors });
           }
-          if (currentPhoto?.dbId) {
-            await apiRequest("POST", `/api/photos/${currentPhoto.dbId}/pins`, {
+          if (pinPhotoId) {
+            await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
               xPercent: pin.x,
               yPercent: pin.y,
               label: pin.label,
@@ -943,17 +955,25 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     });
   }, []);
 
-  const buildPrompt = useCallback((pinPositions: string[], photoSection: string, filter: string) => {
+  const buildPrompt = useCallback((pinPositions: string[], photoSection: string, filter: string, detailShotInfo?: { isDetailShot: boolean; parentFilename?: string; parentSection?: string }) => {
     let filterInstruction = "";
     if (filter.trim()) {
       filterInstruction = `\nFILTER: Only include tags containing or similar to "${filter.trim()}" (allow up to 3 character differences for OCR errors).`;
+    }
+    let detailContext = "";
+    if (detailShotInfo?.isDetailShot) {
+      detailContext = `\n\n=== DETAIL SHOT CONTEXT ===
+This is a CLOSE-UP / DETAIL photo taken to get a better view of specific wire reel tag(s).
+${detailShotInfo.parentFilename ? `Parent overview photo: ${detailShotInfo.parentFilename} (Section ${detailShotInfo.parentSection || "unknown"})` : ""}
+Because this is a close-up, the tag text should be larger and more readable than in an overview shot.
+Focus on reading the tag text as accurately as possible — this photo was taken specifically because the tag was hard to read in the wider shot.`;
     }
     return `You are a wire inventory tag reader analyzing a warehouse section photo.
 
 === ANNOTATED IMAGE ===
 This photo shows wire reels in Aisle ${aisle}, Section ${photoSection}.
 RED BOUNDING BOXES mark user-selected reel locations. Each box has a RED LABEL showing its position code (e.g., "01", "02").
-Positions to analyze: ${pinPositions.join(", ")}
+Positions to analyze: ${pinPositions.join(", ")}${detailContext}
 
 === YOUR TASK ===
 For each RED BOUNDING BOX, locate and read the WHITE PAPER TAG attached to or near that wire reel.
@@ -1106,7 +1126,16 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
         if (!annotatedDataUrl) continue;
 
         const pinPositions = pins.map((p) => p.label).sort();
-        const prompt = buildPrompt(pinPositions, photo.section || "", aiFilter);
+        let detailShotInfo: { isDetailShot: boolean; parentFilename?: string; parentSection?: string } | undefined;
+        if (photo.isDetailShot) {
+          const parentPhoto = photo.parentPhotoId ? uploadedPhotos.find(p => p.dbId === photo.parentPhotoId) : undefined;
+          detailShotInfo = {
+            isDetailShot: true,
+            parentFilename: parentPhoto?.filename,
+            parentSection: parentPhoto?.section,
+          };
+        }
+        const prompt = buildPrompt(pinPositions, photo.section || "", aiFilter, detailShotInfo);
 
         const res = await apiRequest("POST", "/api/ai/analyze", {
           imageDataUrl: annotatedDataUrl,
