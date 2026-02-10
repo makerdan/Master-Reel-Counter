@@ -37,6 +37,7 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "ALU", catalog: "4TRIPLEX500", description: "#4 TRIPLEX PERIWINKLE COIL" },
   { vendor: "ALU", catalog: "6TRIPLEX500", description: "6 TRIPLEX VOLUTA XLP 500'" },
   { vendor: "ALU", catalog: "MHF40402041000", description: "4/0-4/0-2/0-4 MOBILE HOME FEEDER ALU 1000'" },
+  { vendor: "ALU", catalog: "SER101000", description: "SER 1/0 ALU 1000'" },
   { vendor: "ALU", catalog: "SER13WG1000", description: "SER 1-1-1-3 ALU 1000'" },
   { vendor: "ALU", catalog: "SER20WG1000", description: "SER 2/0-2/0-2/0-1 ALU 1000'" },
   { vendor: "ALU", catalog: "SER22241000", description: "SER 2-2-2-4 ALU 1000'" },
