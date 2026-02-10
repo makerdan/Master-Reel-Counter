@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -12,8 +11,6 @@ import Dashboard from "@/pages/dashboard";
 import SessionPage from "@/pages/session";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
-
-queryClient.clear();
 
 function AuthRouter() {
   const { user, isLoading } = useAuth();
