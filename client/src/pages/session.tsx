@@ -1868,7 +1868,7 @@ If no tags are readable: {"detected": [], "notes": "Describe what was visible in
                 <Button
                   variant="outline"
                   className="border-[hsl(18_40%_50%/0.5)] text-[hsl(18_60%_40%)] dark:text-[hsl(25_60%_70%)] dark:border-[hsl(18_40%_50%/0.4)]"
-                  onClick={() => { setAiResult(""); setLocalPins([]); }}
+                  onClick={() => { setAiResult(""); }}
                   disabled={createEntries.isPending}
                   data-testid="button-clear-pins"
                 >
