@@ -361,11 +361,11 @@ function matchCatalog(input: string): { entry: CatalogEntry; confident: boolean 
     }
   }
 
-  const maxDist = input.length <= 8 ? 1 : 2;
+  const maxDist = input.length >= 10 ? 2 : 1;
   let bestEntry: CatalogEntry | null = null;
   let bestDist = Infinity;
   for (const entry of CATALOG) {
-    if (Math.abs(entry.catalog.length - input.length) > maxDist) continue;
+    if (Math.abs(entry.catalog.length - input.length) > 1) continue;
     const dist = levenshtein(input, entry.catalog);
     if (dist < bestDist) {
       bestDist = dist;
@@ -390,24 +390,10 @@ function matchWireType(s: string): { original: string; corrected: string | null;
   }
 
   for (const wt of [...WIRE_TYPES].sort((a, b) => b.length - a.length)) {
-    const candidate = s.slice(0, wt.length + 1);
-    if (candidate.length >= wt.length - 1) {
-      const sub = s.slice(0, wt.length);
+    const sub = s.slice(0, wt.length);
+    if (sub.length >= wt.length) {
       const dist = levenshtein(sub, wt);
-      if (dist === 1) {
-        return { original: sub, corrected: wt, confident: true };
-      }
-      if (dist === 2 && wt.length >= 3) {
-        return { original: sub, corrected: wt, confident: false };
-      }
-    }
-  }
-
-  for (const wt of WIRE_TYPES) {
-    if (wt.length + 1 <= s.length) {
-      const sub = s.slice(0, wt.length + 1);
-      const dist = levenshtein(sub, wt);
-      if (dist <= 1) {
+      if (dist === 1 && wt.length >= 3) {
         return { original: sub, corrected: wt, confident: true };
       }
     }
@@ -448,18 +434,6 @@ function matchColor(s: string): { original: string; corrected: string | null; co
   for (const c of COLOR_CODES) {
     if (s.startsWith(c)) {
       return { original: c, corrected: c, confident: true };
-    }
-  }
-
-  if (s.length >= 2) {
-    const twoChar = s.slice(0, 2);
-    const result = fuzzyMatch(twoChar, COLOR_CODES, 1);
-    if (result.match) {
-      return {
-        original: twoChar,
-        corrected: result.match,
-        confident: result.distance === 0,
-      };
     }
   }
 

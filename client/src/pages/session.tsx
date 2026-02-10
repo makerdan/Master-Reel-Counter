@@ -724,10 +724,29 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     }
   }, [isPanning, handleMouseMove, handleMouseUp]);
 
-  const handleWheel = (e: React.WheelEvent) => {
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const panXRef = useRef(panX);
+  panXRef.current = panX;
+  const panYRef = useRef(panY);
+  panYRef.current = panY;
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    setScale((s) => Math.min(5, Math.max(1, s + (e.deltaY < 0 ? 0.2 : -0.2))));
-  };
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cursorX = (e.clientX - rect.left) / rect.width - 0.5;
+    const cursorY = (e.clientY - rect.top) / rect.height - 0.5;
+    const oldScale = scaleRef.current;
+    const newScale = Math.min(5, Math.max(1, oldScale + (e.deltaY < 0 ? 0.2 : -0.2)));
+    if (newScale === oldScale) return;
+    const adjX = panXRef.current + cursorX * (1 / newScale - 1 / oldScale) * rect.width;
+    const adjY = panYRef.current + cursorY * (1 / newScale - 1 / oldScale) * rect.height;
+    const clamped = clampPan(adjX, adjY, newScale);
+    setScale(newScale);
+    setPanX(clamped.x);
+    setPanY(clamped.y);
+  }, [clampPan]);
 
   const screenToImagePercent = useCallback((clientX: number, clientY: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
