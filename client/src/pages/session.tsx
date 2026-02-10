@@ -886,7 +886,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     setLocalPins((prev) =>
       prev.map((p) =>
         p.id === pinId
-          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, aiConfidence: undefined, correctionConfident: undefined }
+          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, reelCount: 1, aiConfidence: undefined, correctionConfident: undefined }
           : p
       )
     );
