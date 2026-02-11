@@ -633,7 +633,7 @@ export async function registerRoutes(
         <tr>
           <td>${i + 1}</td><td>${esc(e.aisle || "")}</td><td>${esc(e.section || "")}</td><td>${esc(e.position || "")}</td>
           <td>${esc(e.palletId || "")}</td><td>${esc(e.reelTag || "")}</td><td>${esc(e.wireType || "")}</td>
-          <td>${esc(e.gauge || "")}</td><td>${e.footage || ""}</td><td>${esc(e.color || "")}</td>
+          <td>${esc(e.gauge || "")}</td><td>${e.footage || ""}</td><td>${e.reelCount || 1}</td><td>${esc(e.color || "")}</td>
           <td>${esc(e.manufacturer || "")}</td><td>${esc(e.notes || "")}</td>
           <td>${esc(photo?.originalFilename || "")}</td>
           <td>${esc(photo?.notes || "")}${photo?.isDetailShot ? ' <span class="detail">[Detail]</span>' : ""}</td>
@@ -665,7 +665,7 @@ export async function registerRoutes(
         <table>
           <thead><tr>
             <th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th>
-            <th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Color</th>
+            <th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Reel Count</th><th>Color</th>
             <th>Manufacturer</th><th>Notes</th><th>Photo</th><th>Photo Notes</th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
@@ -819,8 +819,9 @@ export async function registerRoutes(
       res.json({
         session: { id: session.id, name: session.name, location: session.location, status: session.status, firstPhotoAt: ps.firstPhotoAt, lastPhotoAt: ps.lastPhotoAt },
         entries: sessionEntries.map(e => ({
-          id: e.id, section: e.section, aisle: e.aisle, palletId: e.palletId,
+          id: e.id, section: e.section, aisle: e.aisle, position: e.position, palletId: e.palletId,
           wireType: e.wireType, gauge: e.gauge, color: e.color, footage: e.footage,
+          reelCount: e.reelCount || 1,
           reelTag: e.reelTag, manufacturer: e.manufacturer, notes: e.notes, createdAt: e.createdAt,
         })),
         photos: sessionPhotos.map(p => ({ id: p.id, section: p.section, aisle: p.aisle })),

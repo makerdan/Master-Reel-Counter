@@ -247,13 +247,14 @@ function SessionWorkspace({
       const exportEntries = data.entries || entries;
       const exportPhotos = data.photos || [];
       const photoMap = new Map(exportPhotos.map((p: any) => [p.id, p]));
-      const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Color", "Manufacturer", "Notes", "Photo", "Photo Notes", "Detail Shot", "Parent Photo"];
+      const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Reel Count", "Color", "Manufacturer", "Notes", "Photo", "Photo Notes", "Detail Shot", "Parent Photo"];
       const rows = exportEntries.map((e: any, i: number) => {
         const photo = e.photoId ? photoMap.get(e.photoId) : null;
         const parentPhoto = photo?.parentPhotoId ? photoMap.get(photo.parentPhotoId) : null;
         return [
           i + 1, e.aisle, e.section, e.position || "", e.palletId || "", e.reelTag || "",
-          e.wireType || "", e.gauge || "", e.footage || "", e.color || "", e.manufacturer || "", e.notes || "",
+          e.wireType || "", e.gauge || "", e.footage || "", e.reelCount || 1,
+          e.color || "", e.manufacturer || "", e.notes || "",
           photo?.originalFilename || "", photo?.notes || "",
           photo?.isDetailShot ? "Yes" : "", parentPhoto?.originalFilename || "",
         ];
@@ -284,11 +285,14 @@ function SessionWorkspace({
     } catch {
       const w = window.open("", "_blank");
       if (!w) return;
+      const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const rowsHtml = entries.map((e, i) => `
         <tr>
-          <td>${i + 1}</td><td>${e.aisle}</td><td>${e.section}</td><td>${e.position || ""}</td>
-          <td>${e.reelTag || ""}</td><td>${e.wireType || ""}</td><td>${e.gauge || ""}</td>
-          <td>${e.footage || ""}</td><td>${e.color || ""}</td>
+          <td>${i + 1}</td><td>${esc(e.aisle)}</td><td>${esc(e.section)}</td><td>${esc(e.position || "")}</td>
+          <td>${esc(e.palletId || "")}</td><td>${esc(e.reelTag || "")}</td><td>${esc(e.wireType || "")}</td>
+          <td>${esc(e.gauge || "")}</td><td>${e.footage || ""}</td>
+          <td>${e.reelCount || 1}</td><td>${esc(e.color || "")}</td><td>${esc(e.manufacturer || "")}</td>
+          <td>${esc(e.notes || "")}</td>
         </tr>
       `).join("");
       w.document.write(`<!DOCTYPE html><html><head><title>${session.name} - Report</title>
@@ -297,7 +301,7 @@ function SessionWorkspace({
         h1{font-size:18px}h2{font-size:14px;color:#666;margin-top:4px}.audit{margin-top:20px;font-size:10px;color:#999;border-top:1px solid #ddd;padding-top:8px}</style></head><body>
         <h1>Master Reel Counter - ${session.name}</h1>
         <h2>Location: ${session.location || "N/A"} | Entries: ${entries.length} | Total Footage: ${totalFootage.toLocaleString()} ft</h2>
-        <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Color</th></tr></thead>
+        <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Reel Count</th><th>Color</th><th>Manufacturer</th><th>Notes</th></tr></thead>
         <tbody>${rowsHtml}</tbody></table>
         <div class="audit">Generated: ${new Date().toISOString()} | First photo: ${session.firstPhotoAt ? new Date(session.firstPhotoAt).toISOString() : "N/A"} | Last photo: ${session.lastPhotoAt ? new Date(session.lastPhotoAt).toISOString() : "N/A"}</div>
         <script>setTimeout(()=>window.print(),500)</script></body></html>`);
