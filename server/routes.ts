@@ -7,6 +7,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { insertSessionSchema, insertEntrySchema, insertPinSchema } from "@shared/schema";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
+import PDFDocument from "pdfkit";
 import { randomUUID, randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
@@ -625,86 +626,187 @@ export async function registerRoutes(
       const pt = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       const photoMap = new Map(sessionPhotos.map(p => [p.id, p]));
-      const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const rowsHtml = sessionEntries.map((e: any, i: number) => {
+
+      const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 36 });
+      const filename = `${session.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_report.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      doc.pipe(res);
+
+      const accentHex = "#ea580c";
+      const headerBg = "#f5f0eb";
+      const borderColor = "#cccccc";
+
+      doc.fontSize(18).fillColor(accentHex).text("Master Reel Counter", 36, 36);
+      doc.fontSize(14).fillColor("#333333").text(session.name, 36, 58);
+      doc.fontSize(9).fillColor("#666666");
+      doc.text(`Location: ${session.location || "N/A"}  |  Status: ${session.status}  |  Entries: ${sessionEntries.length}  |  Total Footage: ${totalFootage.toLocaleString()} ft`, 36, 78);
+      if (pt.firstPhotoAt) {
+        doc.text(`Session time: ${new Date(pt.firstPhotoAt).toLocaleString()} to ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toLocaleString() : "ongoing"}`, 36, 92);
+      }
+
+      const columns = [
+        { header: "#", width: 22 },
+        { header: "Aisle", width: 42 },
+        { header: "Section", width: 50 },
+        { header: "Position", width: 48 },
+        { header: "Pallet ID", width: 58 },
+        { header: "Reel Tag", width: 62 },
+        { header: "Wire Type", width: 58 },
+        { header: "Gauge", width: 40 },
+        { header: "Footage", width: 46 },
+        { header: "Qty", width: 26 },
+        { header: "Color", width: 42 },
+        { header: "Manufacturer", width: 68 },
+        { header: "Notes", width: 90 },
+        { header: "Photo", width: 76 },
+      ];
+      const tableLeft = 36;
+      const tableTop = pt.firstPhotoAt ? 112 : 100;
+      const rowHeight = 16;
+      const headerHeight = 18;
+      const pageWidth = doc.page.width - 72;
+      const totalColWidth = columns.reduce((s, c) => s + c.width, 0);
+      const scaleFactor = pageWidth / totalColWidth;
+      const scaledColumns = columns.map(c => ({ ...c, width: Math.floor(c.width * scaleFactor) }));
+
+      const drawTableHeader = (y: number) => {
+        doc.rect(tableLeft, y, pageWidth, headerHeight).fill(headerBg);
+        doc.fontSize(7).fillColor("#333333");
+        let x = tableLeft;
+        for (const col of scaledColumns) {
+          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false });
+          x += col.width;
+        }
+        doc.rect(tableLeft, y, pageWidth, headerHeight).stroke(borderColor);
+        return y + headerHeight;
+      };
+
+      const drawRow = (y: number, values: string[], isAlt: boolean) => {
+        if (isAlt) {
+          doc.rect(tableLeft, y, pageWidth, rowHeight).fill("#fafaf8");
+        }
+        doc.fontSize(6.5).fillColor("#333333");
+        let x = tableLeft;
+        for (let i = 0; i < scaledColumns.length; i++) {
+          const val = values[i] || "";
+          doc.text(val, x + 3, y + 4, { width: scaledColumns[i].width - 6, lineBreak: false });
+          x += scaledColumns[i].width;
+        }
+        doc.rect(tableLeft, y, pageWidth, rowHeight).stroke(borderColor);
+        return y + rowHeight;
+      };
+
+      let currentY = drawTableHeader(tableTop);
+      const maxY = doc.page.height - 80;
+
+      for (let i = 0; i < sessionEntries.length; i++) {
+        if (currentY + rowHeight > maxY) {
+          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+          currentY = drawTableHeader(36);
+        }
+        const e: any = sessionEntries[i];
         const photo = e.photoId ? photoMap.get(e.photoId) : null;
-        const parentPhoto = photo?.parentPhotoId ? photoMap.get(photo.parentPhotoId) : null;
-        return `
-        <tr>
-          <td>${i + 1}</td><td>${esc(e.aisle || "")}</td><td>${esc(e.section || "")}</td><td>${esc(e.position || "")}</td>
-          <td>${esc(e.palletId || "")}</td><td>${esc(e.reelTag || "")}</td><td>${esc(e.wireType || "")}</td>
-          <td>${esc(e.gauge || "")}</td><td>${e.footage || ""}</td><td>${e.reelCount || 1}</td><td>${esc(e.color || "")}</td>
-          <td>${esc(e.manufacturer || "")}</td><td>${esc(e.notes || "")}</td>
-          <td>${esc(photo?.originalFilename || "")}</td>
-          <td>${esc(photo?.notes || "")}${photo?.isDetailShot ? ' <span class="detail">[Detail]</span>' : ""}</td>
-        </tr>`;
-      }).join("");
-      const html = `<!DOCTYPE html><html><head><title>${session.name} - Audit Report</title>
-        <style>
-          body{font-family:Arial,sans-serif;padding:24px;color:#333}
-          table{border-collapse:collapse;width:100%;margin-top:16px}
-          th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:11px}
-          th{background:#f5f0eb;font-weight:600}
-          .detail{color:#ea580c;font-weight:600;font-size:10px}
-          h1{font-size:20px;margin:0}
-          .meta{font-size:12px;color:#666;margin-top:4px}
-          .photo-summary{margin-top:24px}
-          .photo-summary h2{font-size:14px;margin:0 0 8px}
-          .photo-summary table{font-size:10px}
-          .audit{margin-top:24px;padding-top:12px;border-top:2px solid #ea580c;font-size:10px;color:#666}
-          .audit strong{color:#333}
-          .stamp{display:inline-block;border:2px solid #ea580c;padding:4px 12px;border-radius:4px;font-size:10px;font-weight:600;color:#ea580c;margin-top:8px}
-        </style>
-      </head><body>
-        <h1>Master Reel Counter - ${session.name}</h1>
-        <div class="meta">
-          Location: ${session.location || "N/A"}<br>
-          Status: ${session.status} | Entries: ${sessionEntries.length} | Total Footage: ${totalFootage.toLocaleString()} ft<br>
-          ${pt.firstPhotoAt ? `Session time: ${new Date(pt.firstPhotoAt).toISOString()} to ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toISOString() : "ongoing"}` : "No photos uploaded"}
-        </div>
-        <table>
-          <thead><tr>
-            <th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th>
-            <th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Reel Count</th><th>Color</th>
-            <th>Manufacturer</th><th>Notes</th><th>Photo</th><th>Photo Notes</th>
-          </tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-        ${sessionPhotos.filter(p => p.notes || p.isDetailShot).length > 0 ? `
-        <div class="photo-summary">
-          <h2>Photo Annotations</h2>
-          <table>
-            <thead><tr><th>Photo</th><th>Section</th><th>Type</th><th>Parent Photo</th><th>Notes</th></tr></thead>
-            <tbody>${sessionPhotos.filter(p => p.notes || p.isDetailShot).map(p => {
-              const parent = p.parentPhotoId ? photoMap.get(p.parentPhotoId) : null;
-              return `<tr>
-                <td>${esc(p.originalFilename || "")}</td>
-                <td>${esc(p.section || "")}</td>
-                <td>${p.isDetailShot ? '<span class="detail">Detail Shot</span>' : "Overview"}</td>
-                <td>${parent ? esc(parent.originalFilename || "") : ""}</td>
-                <td>${esc(p.notes || "")}</td>
-              </tr>`;
-            }).join("")}</tbody>
-          </table>
-        </div>` : ""}
-        <div class="audit">
-          <strong>Audit Trail</strong><br>
-          Report generated: ${generatedAt}<br>
-          First photo: ${pt.firstPhotoAt ? new Date(pt.firstPhotoAt).toISOString() : "N/A"}<br>
-          Last photo: ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toISOString() : "N/A"}<br>
-          ${session.completedAt ? `Completed: ${new Date(session.completedAt).toISOString()}<br>` : ""}
-          Entry count at generation: ${sessionEntries.length}<br>
-          Data encoding: ${key ? "Active (entries decrypted for export)" : "Off"}<br>
-          <div class="stamp">VERIFIED EXPORT - ${generatedAt}</div>
-        </div>
-        <script>setTimeout(()=>window.print(),500)</script>
-      </body></html>`;
-      res.setHeader("Content-Type", "text/html");
-      res.setHeader("Content-Disposition", `inline; filename="${session.name.replace(/\s+/g, "_")}_report.html"`);
-      res.send(html);
+        const values = [
+          String(i + 1),
+          e.aisle || "",
+          e.section || "",
+          e.position || "",
+          e.palletId || "",
+          e.reelTag || "",
+          e.wireType || "",
+          e.gauge || "",
+          e.footage ? String(e.footage) : "",
+          String(e.reelCount || 1),
+          e.color || "",
+          e.manufacturer || "",
+          e.notes || "",
+          photo?.originalFilename || "",
+        ];
+        currentY = drawRow(currentY, values, i % 2 === 1);
+      }
+
+      const annotatedPhotos = sessionPhotos.filter(p => p.notes || p.isDetailShot);
+      if (annotatedPhotos.length > 0) {
+        if (currentY + 60 > maxY) {
+          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+          currentY = 36;
+        }
+        currentY += 16;
+        doc.fontSize(11).fillColor("#333333").text("Photo Annotations", 36, currentY);
+        currentY += 18;
+
+        const photoCols = [
+          { header: "Photo", width: 160 },
+          { header: "Section", width: 80 },
+          { header: "Type", width: 80 },
+          { header: "Parent Photo", width: 160 },
+          { header: "Notes", width: 220 },
+        ];
+        const pTotalW = photoCols.reduce((s, c) => s + c.width, 0);
+        const pScale = pageWidth / pTotalW;
+        const pScaled = photoCols.map(c => ({ ...c, width: Math.floor(c.width * pScale) }));
+
+        doc.rect(tableLeft, currentY, pageWidth, headerHeight).fill(headerBg);
+        doc.fontSize(7).fillColor("#333333");
+        let px = tableLeft;
+        for (const col of pScaled) {
+          doc.text(col.header, px + 3, currentY + 4, { width: col.width - 6, lineBreak: false });
+          px += col.width;
+        }
+        doc.rect(tableLeft, currentY, pageWidth, headerHeight).stroke(borderColor);
+        currentY += headerHeight;
+
+        for (let i = 0; i < annotatedPhotos.length; i++) {
+          if (currentY + rowHeight > maxY) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+          }
+          const p = annotatedPhotos[i];
+          const parent = p.parentPhotoId ? photoMap.get(p.parentPhotoId) : null;
+          if (i % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill("#fafaf8");
+          doc.fontSize(6.5).fillColor("#333333");
+          px = tableLeft;
+          const pVals = [
+            p.originalFilename || "",
+            p.section || "",
+            p.isDetailShot ? "Detail Shot" : "Overview",
+            parent?.originalFilename || "",
+            p.notes || "",
+          ];
+          for (let j = 0; j < pScaled.length; j++) {
+            doc.text(pVals[j], px + 3, currentY + 4, { width: pScaled[j].width - 6, lineBreak: false });
+            px += pScaled[j].width;
+          }
+          doc.rect(tableLeft, currentY, pageWidth, rowHeight).stroke(borderColor);
+          currentY += rowHeight;
+        }
+      }
+
+      if (currentY + 70 > maxY) {
+        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+        currentY = 36;
+      }
+      currentY += 16;
+      doc.moveTo(36, currentY).lineTo(36 + pageWidth, currentY).strokeColor(accentHex).lineWidth(2).stroke();
+      currentY += 8;
+      doc.fontSize(8).fillColor("#333333").text("Audit Trail", 36, currentY, { underline: true });
+      currentY += 14;
+      doc.fontSize(7).fillColor("#666666");
+      doc.text(`Report generated: ${generatedAt}`, 36, currentY); currentY += 11;
+      doc.text(`First photo: ${pt.firstPhotoAt ? new Date(pt.firstPhotoAt).toLocaleString() : "N/A"}`, 36, currentY); currentY += 11;
+      doc.text(`Last photo: ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toLocaleString() : "N/A"}`, 36, currentY); currentY += 11;
+      if (session.completedAt) { doc.text(`Completed: ${new Date(session.completedAt).toLocaleString()}`, 36, currentY); currentY += 11; }
+      doc.text(`Entry count: ${sessionEntries.length}`, 36, currentY); currentY += 11;
+      doc.text(`Data encoding: ${key ? "Active (entries decrypted for export)" : "Off"}`, 36, currentY); currentY += 16;
+
+      doc.rect(36, currentY, 200, 20).strokeColor(accentHex).lineWidth(1.5).stroke();
+      doc.fontSize(7).fillColor(accentHex).text(`VERIFIED EXPORT - ${generatedAt}`, 42, currentY + 6);
+
+      doc.end();
     } catch (error) {
       console.error("Error generating PDF:", error);
-      res.status(500).json({ message: "Failed to generate report" });
+      if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
     }
   });
 

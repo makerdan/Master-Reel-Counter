@@ -274,12 +274,13 @@ function SessionWorkspace({
 
   const exportPdf = async () => {
     try {
-      const res = await apiRequest("GET", `/api/sessions/${sessionId}/export/pdf`);
+      const res = await fetch(`/api/sessions/${sessionId}/export/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("PDF export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${session.name.replace(/\s+/g, "_")}_report.html`;
+      a.download = `${session.name.replace(/\s+/g, "_")}_report.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
