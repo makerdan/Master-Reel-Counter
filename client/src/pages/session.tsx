@@ -1031,40 +1031,37 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       const entryPhotoId = isDetail && parentPhoto?.dbId ? parentPhoto.dbId : currentPhoto?.dbId;
       const pinPhotoId = currentPhoto?.dbId;
       const errors: string[] = [];
-      const totalEntries = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
+      const totalEntries = pinsToCommit.length;
       let completed = 0;
       setBatchProgress({ current: 0, total: totalEntries, errors: [] });
 
       for (const pin of pinsToCommit) {
         try {
-          const entryIds: number[] = [];
-          for (let r = 0; r < pin.reelCount; r++) {
-            const reelLabel = pin.wireDetails || (pin.reelCount > 1 ? `Pin ${pin.label} (${r + 1}/${pin.reelCount})` : `Pin ${pin.label}`);
-            const noteParts: string[] = [];
-            if (pin.reelCount > 1) noteParts.push(`Reel ${r + 1} of ${pin.reelCount} at pin ${pin.label}`);
-            if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
-            const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
-              aisle: entryAisle,
-              section: entrySection,
-              position: "Floor",
-              reelTag: reelLabel,
-              manufacturer: pin.vendorCode || undefined,
-              footage: pin.footage || undefined,
-              photoId: entryPhotoId || undefined,
-              notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
-            });
-            const entry = await res.json();
-            entryIds.push(entry.id);
-            completed++;
-            setBatchProgress({ current: completed, total: totalEntries, errors });
-          }
+          const reelLabel = pin.wireDetails || `Pin ${pin.label}`;
+          const totalFootage = pin.footage ? pin.footage * pin.reelCount : undefined;
+          const noteParts: string[] = [];
+          if (pin.reelCount > 1) noteParts.push(`${pin.reelCount} reels at pin ${pin.label} (${pin.footage ? pin.footage + "ft each" : ""})`);
+          if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
+          const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
+            aisle: entryAisle,
+            section: entrySection,
+            position: "Floor",
+            reelTag: reelLabel,
+            manufacturer: pin.vendorCode || undefined,
+            footage: totalFootage,
+            photoId: entryPhotoId || undefined,
+            notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
+          });
+          const entry = await res.json();
+          completed++;
+          setBatchProgress({ current: completed, total: totalEntries, errors });
           if (pinPhotoId) {
             const pinRes = await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
               xPercent: pin.x,
               yPercent: pin.y,
               label: pin.label,
               reelCount: pin.reelCount,
-              entryId: entryIds[0],
+              entryId: entry.id,
             });
             const savedPin = await pinRes.json();
             (pin as any)._dbPinId = savedPin.id;
