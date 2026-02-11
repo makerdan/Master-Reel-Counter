@@ -726,60 +726,183 @@ export async function registerRoutes(
         currentY = drawRow(currentY, values, i % 2 === 1);
       }
 
-      const annotatedPhotos = sessionPhotos.filter(p => p.notes || p.isDetailShot);
-      if (annotatedPhotos.length > 0) {
-        if (currentY + 60 > maxY) {
-          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-          currentY = 36;
+      // --- Section-by-Section Pages with Photos and Pins ---
+      const sectionGroups = new Map<string, { aisle: string; section: string; photos: typeof sessionPhotos; entries: typeof sessionEntries }>();
+      for (const p of sessionPhotos) {
+        const sKey = `${p.aisle || ""}|||${p.section || ""}`;
+        if (!sectionGroups.has(sKey)) {
+          sectionGroups.set(sKey, { aisle: p.aisle || "", section: p.section || "", photos: [], entries: [] });
         }
-        currentY += 16;
-        doc.fontSize(11).fillColor("#333333").text("Photo Annotations", 36, currentY);
-        currentY += 18;
+        sectionGroups.get(sKey)!.photos.push(p);
+      }
+      for (const e of sessionEntries as any[]) {
+        const sKey = `${e.aisle || ""}|||${e.section || ""}`;
+        if (!sectionGroups.has(sKey)) {
+          sectionGroups.set(sKey, { aisle: e.aisle || "", section: e.section || "", photos: [], entries: [] });
+        }
+        sectionGroups.get(sKey)!.entries.push(e);
+      }
 
-        const photoCols = [
-          { header: "Photo", width: 160 },
-          { header: "Section", width: 80 },
-          { header: "Type", width: 80 },
-          { header: "Parent Photo", width: 160 },
-          { header: "Notes", width: 220 },
-        ];
-        const pTotalW = photoCols.reduce((s, c) => s + c.width, 0);
-        const pScale = pageWidth / pTotalW;
-        const pScaled = photoCols.map(c => ({ ...c, width: Math.floor(c.width * pScale) }));
+      const allPinsMap = new Map<number, any[]>();
+      for (const p of sessionPhotos) {
+        const photoPins = await storage.getPhotoPins(p.id);
+        const committed = photoPins.filter((pin: any) => pin.entryId != null);
+        if (committed.length > 0) allPinsMap.set(p.id, committed);
+      }
 
-        doc.rect(tableLeft, currentY, pageWidth, headerHeight).fill(headerBg);
+      const sortedSections = Array.from(sectionGroups.entries())
+        .map(([, data]) => data)
+        .sort((a, b) => {
+          if (a.aisle < b.aisle) return -1;
+          if (a.aisle > b.aisle) return 1;
+          const aN = parseInt(a.section) || 0;
+          const bN = parseInt(b.section) || 0;
+          return aN - bN;
+        });
+
+      const secEntryCols = [
+        { header: "#", width: 22 },
+        { header: "Reel Tag", width: 90 },
+        { header: "Footage", width: 55 },
+        { header: "Qty", width: 30 },
+        { header: "Manufacturer", width: 80 },
+        { header: "Position", width: 60 },
+        { header: "Notes", width: 160 },
+      ];
+      const secTotalW = secEntryCols.reduce((s, c) => s + c.width, 0);
+      const secScale = pageWidth / secTotalW;
+      const secScaled = secEntryCols.map(c => ({ ...c, width: Math.floor(c.width * secScale) }));
+
+      const drawSecEntryHeader = (y: number) => {
+        doc.rect(tableLeft, y, pageWidth, headerHeight).fill(headerBg);
         doc.fontSize(7).fillColor("#333333");
-        let px = tableLeft;
-        for (const col of pScaled) {
-          doc.text(col.header, px + 3, currentY + 4, { width: col.width - 6, lineBreak: false });
-          px += col.width;
+        let x = tableLeft;
+        for (const col of secScaled) {
+          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false });
+          x += col.width;
         }
-        doc.rect(tableLeft, currentY, pageWidth, headerHeight).stroke(borderColor);
-        currentY += headerHeight;
+        doc.rect(tableLeft, y, pageWidth, headerHeight).stroke(borderColor);
+        return y + headerHeight;
+      };
 
-        for (let i = 0; i < annotatedPhotos.length; i++) {
-          if (currentY + rowHeight > maxY) {
+      for (const sec of sortedSections) {
+        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+        currentY = 36;
+
+        doc.rect(tableLeft, currentY, pageWidth, 24).fill("#e8e0d8");
+        doc.fontSize(12).fillColor(accentHex).text(
+          `Aisle ${sec.aisle || "—"}  /  Section ${sec.section || "—"}`,
+          tableLeft + 8, currentY + 5, { width: pageWidth - 100, lineBreak: false }
+        );
+        const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+        const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+        doc.fontSize(8).fillColor("#666666").text(
+          `${sec.entries.length} entries  |  ${secReels} reels  |  ${secFootage.toLocaleString()} ft`,
+          tableLeft + pageWidth - 250, currentY + 7, { width: 240, align: "right", lineBreak: false }
+        );
+        doc.rect(tableLeft, currentY, pageWidth, 24).stroke(borderColor);
+        currentY += 32;
+
+        for (const photo of sec.photos) {
+          const photoKey = photo.objectStorageKey;
+          const photoFilename = photoKey.replace("/uploads/", "");
+          const photoPath = path.join(UPLOADS_DIR, photoFilename);
+          try {
+            await fs.access(photoPath);
+            const imgBuffer = await fs.readFile(photoPath);
+
+            const maxImgW = pageWidth;
+            const maxImgH = 280;
+            let imgW = maxImgW;
+            let imgH = maxImgH;
+
+            try {
+              const img = doc.openImage(imgBuffer);
+              const aspect = img.width / img.height;
+              if (aspect > maxImgW / maxImgH) {
+                imgW = maxImgW;
+                imgH = maxImgW / aspect;
+              } else {
+                imgH = maxImgH;
+                imgW = maxImgH * aspect;
+              }
+            } catch {
+              imgW = maxImgW;
+              imgH = maxImgH;
+            }
+
+            if (currentY + imgH + 20 > maxY) {
+              doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+              currentY = 36;
+            }
+
+            const imgX = tableLeft + (pageWidth - imgW) / 2;
+            doc.image(imgBuffer, imgX, currentY, { width: imgW, height: imgH });
+
+            const photoPins = allPinsMap.get(photo.id) || [];
+            for (const pin of photoPins) {
+              const pinX = imgX + (pin.xPercent / 100) * imgW;
+              const pinY = currentY + (pin.yPercent / 100) * imgH;
+              doc.circle(pinX, pinY, 6).fill(accentHex);
+              doc.circle(pinX, pinY, 6).strokeColor("#ffffff").lineWidth(1.5).stroke();
+              if (pin.label) {
+                doc.fontSize(5).fillColor("#ffffff").text(pin.label, pinX - 5, pinY - 3, { width: 10, align: "center", lineBreak: false });
+              }
+            }
+
+            doc.rect(imgX, currentY, imgW, imgH).strokeColor(borderColor).lineWidth(0.5).stroke();
+            currentY += imgH + 4;
+
+            doc.fontSize(6).fillColor("#999999").text(
+              photo.originalFilename || photoFilename,
+              tableLeft, currentY, { width: pageWidth, align: "center" }
+            );
+            currentY += 12;
+          } catch {
+            if (currentY + 20 > maxY) {
+              doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+              currentY = 36;
+            }
+            doc.fontSize(7).fillColor("#999999").text(`[Photo unavailable: ${photo.originalFilename || photoFilename}]`, tableLeft, currentY);
+            currentY += 14;
+          }
+        }
+
+        if (sec.entries.length > 0) {
+          if (currentY + headerHeight + rowHeight > maxY) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = 36;
           }
-          const p = annotatedPhotos[i];
-          const parent = p.parentPhotoId ? photoMap.get(p.parentPhotoId) : null;
-          if (i % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill("#fafaf8");
-          doc.fontSize(6.5).fillColor("#333333");
-          px = tableLeft;
-          const pVals = [
-            p.originalFilename || "",
-            p.section || "",
-            p.isDetailShot ? "Detail Shot" : "Overview",
-            parent?.originalFilename || "",
-            p.notes || "",
-          ];
-          for (let j = 0; j < pScaled.length; j++) {
-            doc.text(pVals[j], px + 3, currentY + 4, { width: pScaled[j].width - 6, lineBreak: false });
-            px += pScaled[j].width;
+          currentY += 4;
+          doc.fontSize(9).fillColor("#333333").text("Reels Found", tableLeft, currentY);
+          currentY += 14;
+          currentY = drawSecEntryHeader(currentY);
+
+          for (let i = 0; i < sec.entries.length; i++) {
+            if (currentY + rowHeight > maxY) {
+              doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+              currentY = drawSecEntryHeader(36);
+            }
+            const e: any = sec.entries[i];
+            if (i % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill("#fafaf8");
+            doc.fontSize(6.5).fillColor("#333333");
+            let x = tableLeft;
+            const vals = [
+              String(i + 1),
+              e.reelTag || "",
+              e.footage ? `${e.footage.toLocaleString()} ft` : "",
+              String(e.reelCount || 1),
+              e.manufacturer || "",
+              e.position || "",
+              e.notes || "",
+            ];
+            for (let j = 0; j < secScaled.length; j++) {
+              doc.text(vals[j], x + 3, currentY + 4, { width: secScaled[j].width - 6, lineBreak: false });
+              x += secScaled[j].width;
+            }
+            doc.rect(tableLeft, currentY, pageWidth, rowHeight).stroke(borderColor);
+            currentY += rowHeight;
           }
-          doc.rect(tableLeft, currentY, pageWidth, rowHeight).stroke(borderColor);
-          currentY += rowHeight;
         }
       }
 
