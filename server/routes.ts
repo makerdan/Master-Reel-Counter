@@ -7,14 +7,25 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { insertSessionSchema, insertEntrySchema, insertPinSchema } from "@shared/schema";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
 
-async function verifySessionOwnership(sessionId: number, userId: string) {
+async function verifySessionAccess(sessionId: number, userId: string): Promise<{ session: any; role: "owner" | "editor" | "viewer" } | null> {
   const session = await storage.getSession(sessionId);
-  if (!session || session.userId !== userId) return null;
-  return session;
+  if (!session) return null;
+  if (session.userId === userId) return { session, role: "owner" };
+  const collab = await storage.getCollaborator(sessionId, userId);
+  if (collab) return { session, role: collab.role as "editor" | "viewer" };
+  return null;
+}
+
+function canEdit(role: string): boolean {
+  return role === "owner" || role === "editor";
+}
+
+function isOwner(role: string): boolean {
+  return role === "owner";
 }
 
 async function getEncryptionKey(userId: string): Promise<Buffer | null> {
@@ -138,13 +149,36 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sessions/shared", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sharedSessions = await storage.getSharedSessions(userId);
+      const sessionIds = sharedSessions.map(s => s.id);
+      const [stats, photoStats] = await Promise.all([
+        storage.getSessionStats(sessionIds),
+        storage.getSessionPhotoStats(sessionIds),
+      ]);
+      const result = sharedSessions.map(s => {
+        const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0, sectionCount: 0 };
+        const ps = photoStats.get(s.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
+        return { ...s, ...st, ...ps };
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching shared sessions:", error);
+      res.status(500).json({ message: "Failed to fetch shared sessions" });
+    }
+  });
+
   app.get("/api/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const session = await verifySessionOwnership(parseInt(req.params.id), req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Session not found" });
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const { session, role } = access;
       const photoStats = await storage.getSessionPhotoStats([session.id]);
       const ps = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
-      res.json({ ...session, ...ps });
+      const collaborators = await storage.getSessionCollaborators(session.id);
+      res.json({ ...session, ...ps, role, collaboratorCount: collaborators.length });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch session" });
     }
@@ -152,12 +186,13 @@ export async function registerRoutes(
 
   app.patch("/api/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const session = await verifySessionOwnership(parseInt(req.params.id), req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Session not found" });
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can edit session details" });
       const data: any = { ...req.body };
       if (data.completedAt) data.completedAt = new Date(data.completedAt);
       else if (data.completedAt === null) data.completedAt = null;
-      const updated = await storage.updateSession(session.id, data);
+      const updated = await storage.updateSession(access.session.id, data);
       res.json(updated);
     } catch (error: any) {
       console.error("Failed to update session:", error?.message || error);
@@ -167,21 +202,22 @@ export async function registerRoutes(
 
   app.delete("/api/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const session = await verifySessionOwnership(parseInt(req.params.id), req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Session not found" });
-      await storage.deleteSession(session.id);
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can delete sessions" });
+      await storage.deleteSession(access.session.id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete session" });
     }
   });
 
-  // Photos - all operations verify session ownership
+  // Photos - all operations verify session access
   app.get("/api/sessions/:sessionId/photos", isAuthenticated, async (req: any, res) => {
     try {
-      const session = await verifySessionOwnership(parseInt(req.params.sessionId), req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Session not found" });
-      const photos = await storage.getSessionPhotos(session.id);
+      const access = await verifySessionAccess(parseInt(req.params.sessionId), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const photos = await storage.getSessionPhotos(access.session.id);
       res.json(photos);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch photos" });
@@ -191,18 +227,19 @@ export async function registerRoutes(
   app.post("/api/sessions/:sessionId/photos", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const session = await verifySessionOwnership(parseInt(req.params.sessionId), userId);
-      if (!session) return res.status(404).json({ message: "Session not found" });
+      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add photos" });
       const displayName = req.user.claims.first_name
         ? `${req.user.claims.first_name} ${req.user.claims.last_name || ""}`.trim()
         : req.user.claims.email || userId;
       const photo = await storage.createPhoto({
         ...req.body,
-        sessionId: session.id,
+        sessionId: access.session.id,
         userId,
         uploadedBy: displayName,
       });
-      console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${session.id}, at=${photo.createdAt.toISOString()}`);
+      console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${access.session.id}, at=${photo.createdAt.toISOString()}`);
       res.json(photo);
     } catch (error) {
       console.error("Error creating photo:", error);
@@ -214,8 +251,9 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.id));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit photos" });
       const { aisle, section, rotation, notes, isDetailShot, parentPhotoId } = req.body;
       const safeUpdate: Record<string, any> = {};
       if (aisle !== undefined) safeUpdate.aisle = aisle;
@@ -236,8 +274,9 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.id));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete photos" });
       try {
         const key = photo.objectStorageKey;
         const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
@@ -253,15 +292,15 @@ export async function registerRoutes(
     }
   });
 
-  // Entries CRUD - all operations verify session ownership + encoding
+  // Entries CRUD - all operations verify session access + encoding
   app.get("/api/sessions/:sessionId/entries", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const session = await verifySessionOwnership(parseInt(req.params.sessionId), userId);
-      if (!session) return res.status(404).json({ message: "Session not found" });
-      const rawEntries = await storage.getSessionEntries(session.id);
-      const key = await getEncryptionKey(userId);
-      const result = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
+      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const rawEntries = await storage.getSessionEntries(access.session.id);
+      const encKey = isOwner(access.role) ? await getEncryptionKey(userId) : await getEncryptionKey(access.session.userId);
+      const result = encKey ? rawEntries.map(e => decryptEntry(e, encKey) as any) : rawEntries;
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch entries" });
@@ -271,15 +310,16 @@ export async function registerRoutes(
   app.post("/api/sessions/:sessionId/entries", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const session = await verifySessionOwnership(parseInt(req.params.sessionId), userId);
-      if (!session) return res.status(404).json({ message: "Session not found" });
-      let entryData = { ...req.body, sessionId: session.id, userId };
-      const key = await getEncryptionKey(userId);
-      if (key) entryData = encryptEntry(entryData, key) as any;
+      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add entries" });
+      let entryData = { ...req.body, sessionId: access.session.id, userId };
+      const encKey = await getEncryptionKey(access.session.userId);
+      if (encKey) entryData = encryptEntry(entryData, encKey) as any;
       const data = insertEntrySchema.parse(entryData);
       const entry = await storage.createEntry(data);
-      await storage.updateSession(session.id, {});
-      const result = key ? decryptEntry(entry, key) : entry;
+      await storage.updateSession(access.session.id, {});
+      const result = encKey ? decryptEntry(entry, encKey) : entry;
       res.json(result);
     } catch (error) {
       console.error("Error creating entry:", error);
@@ -292,13 +332,14 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const entry = await storage.getEntry(parseInt(req.params.id));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const session = await verifySessionOwnership(entry.sessionId, userId);
-      if (!session) return res.status(404).json({ message: "Entry not found" });
-      const key = await getEncryptionKey(userId);
+      const access = await verifySessionAccess(entry.sessionId, userId);
+      if (!access) return res.status(404).json({ message: "Entry not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
+      const encKey = await getEncryptionKey(access.session.userId);
       let updateData = req.body;
-      if (key) updateData = encryptEntry(updateData, key) as any;
+      if (encKey) updateData = encryptEntry(updateData, encKey) as any;
       const updated = await storage.updateEntry(entry.id, updateData);
-      const result = key && updated ? decryptEntry(updated, key) : updated;
+      const result = encKey && updated ? decryptEntry(updated, encKey) : updated;
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to update entry" });
@@ -309,8 +350,9 @@ export async function registerRoutes(
     try {
       const entry = await storage.getEntry(parseInt(req.params.id));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const session = await verifySessionOwnership(entry.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Entry not found" });
+      const access = await verifySessionAccess(entry.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Entry not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete entries" });
       await storage.deleteEntry(entry.id);
       res.json({ success: true });
     } catch (error) {
@@ -318,13 +360,13 @@ export async function registerRoutes(
     }
   });
 
-  // Pins - verify ownership through photo -> session chain
+  // Pins - verify access through photo -> session chain
   app.get("/api/photos/:photoId/pins", isAuthenticated, async (req: any, res) => {
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Photo not found" });
       const pins = await storage.getPhotoPins(photo.id);
       res.json(pins);
     } catch (error) {
@@ -336,8 +378,9 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add pins" });
       const data = insertPinSchema.parse({ ...req.body, photoId: photo.id });
       const pin = await storage.createPin(data);
       res.json(pin);
@@ -353,8 +396,9 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Pin not found" });
-      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Pin not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Pin not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       const updated = await storage.updatePin(pin.id, req.body);
       res.json(updated);
     } catch (error) {
@@ -368,8 +412,9 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Pin not found" });
-      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Pin not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Pin not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       await storage.deletePin(pin.id);
       res.json({ success: true });
     } catch (error) {
@@ -381,8 +426,9 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       const { pins: pinData } = req.body;
       if (!Array.isArray(pinData)) return res.status(400).json({ message: "pins must be an array" });
       const existing = await storage.getPhotoPins(photo.id);
@@ -419,8 +465,9 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
-      if (!session) return res.status(404).json({ message: "Pin not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Pin not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       await storage.deletePin(pin.id);
       res.json({ success: true });
     } catch (error) {
@@ -429,11 +476,146 @@ export async function registerRoutes(
     }
   });
 
+  // Collaborators
+  app.get("/api/sessions/:id/collaborators", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const collaborators = await storage.getSessionCollaborators(access.session.id);
+      res.json({ collaborators, owner: { userId: access.session.userId } });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch collaborators" });
+    }
+  });
+
+  app.post("/api/sessions/:id/collaborators", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can add collaborators" });
+      const { username, role = "editor" } = req.body;
+      if (!username) return res.status(400).json({ message: "Username is required" });
+      if (username === req.user.claims.username) return res.status(400).json({ message: "You cannot add yourself as a collaborator" });
+      const existing = await storage.getSessionCollaborators(access.session.id);
+      if (existing.find(c => c.username === username)) {
+        return res.status(400).json({ message: "This user is already a collaborator" });
+      }
+      const collaborator = await storage.addCollaborator({
+        sessionId: access.session.id,
+        userId: username,
+        username,
+        role,
+      });
+      res.json(collaborator);
+    } catch (error) {
+      console.error("Error adding collaborator:", error);
+      res.status(500).json({ message: "Failed to add collaborator" });
+    }
+  });
+
+  app.delete("/api/sessions/:id/collaborators/:collabId", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can remove collaborators" });
+      await storage.removeCollaborator(parseInt(req.params.collabId));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove collaborator" });
+    }
+  });
+
+  app.post("/api/sessions/:id/leave", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessionId = parseInt(req.params.id);
+      await storage.removeCollaboratorBySessionAndUser(sessionId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to leave session" });
+    }
+  });
+
+  // Invite links
+  app.get("/api/sessions/:id/invite-links", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can manage invite links" });
+      const links = await storage.getSessionInviteLinks(access.session.id);
+      res.json(links);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invite links" });
+    }
+  });
+
+  app.post("/api/sessions/:id/invite-links", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can create invite links" });
+      const token = randomBytes(24).toString("hex");
+      const link = await storage.createInviteLink({
+        sessionId: access.session.id,
+        token,
+        createdBy: req.user.claims.sub,
+        isActive: true,
+        expiresAt: null,
+      });
+      res.json(link);
+    } catch (error) {
+      console.error("Error creating invite link:", error);
+      res.status(500).json({ message: "Failed to create invite link" });
+    }
+  });
+
+  app.delete("/api/invite-links/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const link = await storage.getInviteLinkById(parseInt(req.params.id));
+      if (!link) return res.status(404).json({ message: "Invite link not found" });
+      const access = await verifySessionAccess(link.sessionId, req.user.claims.sub);
+      if (!access || !isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can revoke invite links" });
+      await storage.revokeInviteLink(link.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to revoke invite link" });
+    }
+  });
+
+  // Join via invite token
+  app.post("/api/join/:token", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const username = req.user.claims.username || req.user.claims.first_name || userId;
+      const link = await storage.getInviteLinkByToken(req.params.token);
+      if (!link || !link.isActive) return res.status(404).json({ message: "Invalid or expired invite link" });
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+        return res.status(410).json({ message: "This invite link has expired" });
+      }
+      const session = await storage.getSession(link.sessionId);
+      if (!session) return res.status(404).json({ message: "Session no longer exists" });
+      if (session.userId === userId) return res.json({ session, message: "You own this session", alreadyMember: true });
+      const existing = await storage.getCollaborator(link.sessionId, userId);
+      if (existing) return res.json({ session, message: "You are already a collaborator", alreadyMember: true });
+      await storage.addCollaborator({
+        sessionId: link.sessionId,
+        userId,
+        username,
+        role: "editor",
+      });
+      res.json({ session, message: "Successfully joined session", alreadyMember: false });
+    } catch (error) {
+      console.error("Error joining session:", error);
+      res.status(500).json({ message: "Failed to join session" });
+    }
+  });
+
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const session = await verifySessionOwnership(parseInt(req.params.id), userId);
-      if (!session) return res.status(404).json({ message: "Session not found" });
+      const access = await verifySessionAccess(parseInt(req.params.id), userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
       const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
@@ -530,8 +712,9 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/export", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const session = await verifySessionOwnership(parseInt(req.params.id), userId);
-      if (!session) return res.status(404).json({ message: "Session not found" });
+      const access = await verifySessionAccess(parseInt(req.params.id), userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
       const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;

@@ -4,6 +4,12 @@
 A full-stack warehouse wire reel counting application built with React, Express, PostgreSQL, and Replit integrations. Tracks wire reels across pallet sections with photo annotation, manual category entry with catalog autocomplete, and PDF/CSV export capabilities.
 
 ## Recent Changes
+- 2026-02-11: Collaborative session sharing — team members can work together with role-based permissions (owner/editor/viewer)
+- 2026-02-11: Three invite methods — invite by username, shareable link (token-based), or email (mailto: with auto-generated invite link)
+- 2026-02-11: Shared sessions dashboard — "Shared with me" section shows sessions from other users with role badges
+- 2026-02-11: Team management dialog — owners can view/add/remove collaborators and manage invite links
+- 2026-02-11: Join page — /join/:token route for accepting invite links with success/error states
+- 2026-02-11: Authorization refactor — verifySessionAccess replaces verifySessionOwnership for role-based route protection
 - 2026-02-10: Removed AI Assist (OpenAI Vision) — replaced with manual category entry using catalog autocomplete
 - 2026-02-10: Added category autocomplete — type a catalog code, get dropdown suggestions, auto-fills vendor code, footage, wire type, and wire size
 - 2026-02-10: Added nearby photos viewer — horizontal thumbnail strip showing ±3 adjacent photos for viewing other angles of same rack area
@@ -28,8 +34,9 @@ A full-stack warehouse wire reel counting application built with React, Express,
 - **Encryption**: AES-256-GCM with PBKDF2-derived KEK from SESSION_SECRET, random DEK per user (key-wrapping pattern)
 
 ### Key Pages
-- `/` - Landing (unauthenticated) or Dashboard (authenticated)
-- `/session/:id` - Session workspace with photo mode and single entry mode
+- `/` - Landing (unauthenticated) or Dashboard (authenticated, includes "Shared with me" section)
+- `/session/:id` - Session workspace with photo mode, single entry mode, and team management (owner only)
+- `/join/:token` - Accept invite link and join a shared session
 - `/settings` - User settings with data encoding toggle and limitations
 
 ### Data Flow
@@ -42,15 +49,28 @@ A full-stack warehouse wire reel counting application built with React, Express,
 7. Settings: toggle data encoding on/off (encrypts/decrypts all existing entries)
 
 ### API Routes
-- `GET/POST /api/sessions` - Session CRUD
+- `GET/POST /api/sessions` - Session CRUD (returns role + collaboratorCount)
+- `GET /api/sessions/shared` - Get sessions shared with current user
 - `GET/POST /api/sessions/:id/entries` - Entry CRUD (auto-encrypt/decrypt when encoding enabled)
 - `GET/POST /api/sessions/:id/photos` - Photo CRUD
 - `POST /api/photos/:id/pins` - Pin CRUD
 - `PATCH/DELETE /api/entries/:id`, `/api/photos/:id`, `/api/pins/:id`
+- `GET/POST /api/sessions/:id/collaborators` - Team member management (owner only for POST)
+- `DELETE /api/sessions/:id/collaborators/:collabId` - Remove collaborator (owner only)
+- `GET/POST /api/sessions/:id/invite-links` - Invite link management (owner only)
+- `DELETE /api/invite-links/:id` - Revoke invite link (owner only)
+- `POST /api/join/:token` - Accept invite link and join session
 - `GET /api/sessions/:id/export` - Full session export (decrypted)
 - `GET /api/external/sessions/:id` - External API for Power Apps (limited fields, may be encrypted)
 - `GET /api/settings` - User settings
 - `POST /api/settings/encoding` - Toggle data encoding
+
+### Collaboration
+- Database tables: session_collaborators (userId, role, username), session_invite_links (token, isActive, expiresAt)
+- Roles: owner (full control), editor (add/edit data), viewer (read-only)
+- Authorization: verifySessionAccess checks ownership + collaborator table, returns { session, role }
+- Invite methods: by username (direct add), share link (token-based URL), email (mailto: with generated link)
+- Cascade delete: deleting a session removes all collaborators and invite links
 
 ### Encoding Details
 - Encoded fields: reelTag, wireType, gauge, color, manufacturer, notes, palletId, position

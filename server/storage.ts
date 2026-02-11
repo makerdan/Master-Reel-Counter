@@ -6,6 +6,8 @@ import {
   entries,
   pins,
   userSettings,
+  sessionCollaborators,
+  sessionInviteLinks,
   type InsertSession,
   type Session,
   type InsertPhoto,
@@ -15,6 +17,10 @@ import {
   type InsertPin,
   type Pin,
   type UserSettings,
+  type InsertCollaborator,
+  type Collaborator,
+  type InsertInviteLink,
+  type InviteLink,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -48,6 +54,19 @@ export interface IStorage {
   bulkUpdateEntries(entriesToUpdate: { id: number; data: Partial<Entry> }[]): Promise<void>;
   getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number; sectionCount: number }>>;
   getSessionPhotoStats(sessionIds: number[]): Promise<Map<number, { photoCount: number; firstPhotoAt: Date | null; lastPhotoAt: Date | null }>>;
+
+  addCollaborator(data: InsertCollaborator): Promise<Collaborator>;
+  getSessionCollaborators(sessionId: number): Promise<Collaborator[]>;
+  getCollaborator(sessionId: number, userId: string): Promise<Collaborator | undefined>;
+  removeCollaborator(id: number): Promise<void>;
+  removeCollaboratorBySessionAndUser(sessionId: number, userId: string): Promise<void>;
+  getSharedSessions(userId: string): Promise<(Session & { role: string; ownerUsername?: string })[]>;
+
+  createInviteLink(data: InsertInviteLink): Promise<InviteLink>;
+  getInviteLinkById(id: number): Promise<InviteLink | undefined>;
+  getInviteLinkByToken(token: string): Promise<InviteLink | undefined>;
+  getSessionInviteLinks(sessionId: number): Promise<InviteLink[]>;
+  revokeInviteLink(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -83,6 +102,8 @@ export class DatabaseStorage implements IStorage {
     }
     await db.delete(entries).where(eq(entries.sessionId, id));
     await db.delete(photos).where(eq(photos.sessionId, id));
+    await db.delete(sessionCollaborators).where(eq(sessionCollaborators.sessionId, id));
+    await db.delete(sessionInviteLinks).where(eq(sessionInviteLinks.sessionId, id));
     await db.delete(countingSessions).where(eq(countingSessions.id, id));
   }
 
@@ -243,6 +264,73 @@ export class DatabaseStorage implements IStorage {
       });
     }
     return result;
+  }
+
+  async addCollaborator(data: InsertCollaborator): Promise<Collaborator> {
+    const [result] = await db.insert(sessionCollaborators).values(data).returning();
+    return result;
+  }
+
+  async getSessionCollaborators(sessionId: number): Promise<Collaborator[]> {
+    return db.select().from(sessionCollaborators)
+      .where(eq(sessionCollaborators.sessionId, sessionId))
+      .orderBy(desc(sessionCollaborators.addedAt));
+  }
+
+  async getCollaborator(sessionId: number, userId: string): Promise<Collaborator | undefined> {
+    const [result] = await db.select().from(sessionCollaborators)
+      .where(and(eq(sessionCollaborators.sessionId, sessionId), eq(sessionCollaborators.userId, userId)));
+    return result;
+  }
+
+  async removeCollaborator(id: number): Promise<void> {
+    await db.delete(sessionCollaborators).where(eq(sessionCollaborators.id, id));
+  }
+
+  async removeCollaboratorBySessionAndUser(sessionId: number, userId: string): Promise<void> {
+    await db.delete(sessionCollaborators)
+      .where(and(eq(sessionCollaborators.sessionId, sessionId), eq(sessionCollaborators.userId, userId)));
+  }
+
+  async getSharedSessions(userId: string): Promise<(Session & { role: string; ownerUsername?: string })[]> {
+    const collabs = await db.select().from(sessionCollaborators)
+      .where(eq(sessionCollaborators.userId, userId));
+    if (collabs.length === 0) return [];
+    const sessionIds = collabs.map(c => c.sessionId);
+    const sessions = await db.select().from(countingSessions)
+      .where(inArray(countingSessions.id, sessionIds))
+      .orderBy(desc(countingSessions.lastUpdatedAt));
+    const roleMap = new Map(collabs.map(c => [c.sessionId, c.role]));
+    return sessions.map(s => ({ ...s, role: roleMap.get(s.id) || "editor" }));
+  }
+
+  async createInviteLink(data: InsertInviteLink): Promise<InviteLink> {
+    const [result] = await db.insert(sessionInviteLinks).values(data).returning();
+    return result;
+  }
+
+  async getInviteLinkById(id: number): Promise<InviteLink | undefined> {
+    const [result] = await db.select().from(sessionInviteLinks)
+      .where(eq(sessionInviteLinks.id, id));
+    return result;
+  }
+
+  async getInviteLinkByToken(token: string): Promise<InviteLink | undefined> {
+    const [result] = await db.select().from(sessionInviteLinks)
+      .where(eq(sessionInviteLinks.token, token));
+    return result;
+  }
+
+  async getSessionInviteLinks(sessionId: number): Promise<InviteLink[]> {
+    return db.select().from(sessionInviteLinks)
+      .where(eq(sessionInviteLinks.sessionId, sessionId))
+      .orderBy(desc(sessionInviteLinks.createdAt));
+  }
+
+  async revokeInviteLink(id: number): Promise<void> {
+    await db.update(sessionInviteLinks)
+      .set({ isActive: false })
+      .where(eq(sessionInviteLinks.id, id));
   }
 }
 

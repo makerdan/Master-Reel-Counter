@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings,
-  Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers,
+  Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,11 @@ type SessionWithStats = Session & {
   lastPhotoAt: string | null;
 };
 
+type SharedSessionWithStats = SessionWithStats & {
+  role: string;
+  ownerUsername?: string;
+};
+
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
@@ -48,6 +53,12 @@ export default function Dashboard() {
 
   const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
+    enabled: !!user,
+    placeholderData: [],
+  });
+
+  const { data: sharedSessions } = useQuery<SharedSessionWithStats[]>({
+    queryKey: ["/api/sessions/shared"],
     enabled: !!user,
     placeholderData: [],
   });
@@ -381,6 +392,94 @@ export default function Dashboard() {
               </Card>
             ))}
           </div>
+        )}
+
+        {sharedSessions && sharedSessions.length > 0 && (
+          <>
+            <div className="flex items-center gap-2 mt-8 mb-4">
+              <Users className="h-5 w-5 text-muted-foreground" />
+              <h2 className="text-xl font-bold" data-testid="text-shared-sessions-title">
+                Shared with me
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {sharedSessions.map((session) => (
+                <Card
+                  key={session.id}
+                  className="hover-elevate cursor-pointer border border-primary"
+                  data-testid={`card-shared-session-${session.id}`}
+                  onClick={() => setLocation(`/session/${session.id}`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-sm truncate" data-testid={`text-shared-session-name-${session.id}`}>
+                            {session.name}
+                          </h3>
+                          <Badge
+                            variant={session.status === "active" ? "default" : "secondary"}
+                            className="no-default-hover-elevate no-default-active-elevate"
+                            data-testid={`badge-shared-session-status-${session.id}`}
+                          >
+                            {session.status}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className="no-default-hover-elevate no-default-active-elevate"
+                            data-testid={`badge-shared-session-role-${session.id}`}
+                          >
+                            {session.role}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+                          <span className="flex items-center gap-1" data-testid={`text-shared-session-owner-${session.id}`}>
+                            <Users className="h-3 w-3" />
+                            {session.ownerUsername || session.userId}
+                          </span>
+                          {session.location && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {session.location}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1" data-testid={`text-shared-session-time-${session.id}`}>
+                            <Clock className="h-3 w-3" />
+                            {session.firstPhotoAt
+                              ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
+                              : "No photos yet"}
+                          </span>
+                          <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-photos-${session.id}`}>
+                            <Camera className="h-3 w-3" />
+                            {session.photoCount} photos
+                          </span>
+                          {session.sectionCount > 0 && (
+                            <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-sections-${session.id}`}>
+                              <Layers className="h-3 w-3" />
+                              {session.sectionCount} sections
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-entries-${session.id}`}>
+                            <Hash className="h-3 w-3" />
+                            {session.entryCount} reels
+                          </span>
+                          {session.totalFootage > 0 && (
+                            <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-footage-${session.id}`}>
+                              <Ruler className="h-3 w-3" />
+                              {session.totalFootage.toLocaleString()} ft
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </>
         )}
       </main>
 
