@@ -58,6 +58,7 @@ export const entries = pgTable("entries", {
   wireType: text("wire_type"),
   gauge: text("gauge"),
   footage: integer("footage"),
+  reelCount: integer("reel_count").default(1),
   color: text("color"),
   manufacturer: text("manufacturer"),
   notes: text("notes"),

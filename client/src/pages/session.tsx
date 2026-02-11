@@ -81,7 +81,7 @@ interface LocalPin {
 function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pinX: number; pinY: number; label: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const DISPLAY_SIZE = 300;
-  const CROP_FRACTION = 0.22 * 1.15;
+  const CROP_FRACTION = 0.22 * 1.15 * 0.75;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1046,7 +1046,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           const reelLabel = pin.wireDetails || `Pin ${pin.label}`;
           const totalFootage = pin.footage ? pin.footage * pin.reelCount : undefined;
           const noteParts: string[] = [];
-          if (pin.reelCount > 1) noteParts.push(`${pin.reelCount} reels at pin ${pin.label} (${pin.footage ? pin.footage + "ft each" : ""})`);
           if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
           const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
             aisle: entryAisle,
@@ -1055,6 +1054,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             reelTag: reelLabel,
             manufacturer: pin.vendorCode || undefined,
             footage: totalFootage,
+            reelCount: pin.reelCount,
             photoId: entryPhotoId || undefined,
             notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
           });
@@ -1883,11 +1883,11 @@ function SingleEntryMode({
     reelTag: editingEntry?.reelTag || "",
     wireType: editingEntry?.wireType || "",
     gauge: editingEntry?.gauge || "",
-    footage: editingEntry?.footage?.toString() || "",
+    footage: editingEntry ? (editingEntry.footage && editingEntry.reelCount && editingEntry.reelCount > 1 ? Math.round(editingEntry.footage / editingEntry.reelCount).toString() : editingEntry.footage?.toString() || "") : "",
     color: editingEntry?.color || "",
     manufacturer: editingEntry?.manufacturer || "",
     notes: editingEntry?.notes || "",
-    reelCount: "1",
+    reelCount: editingEntry?.reelCount?.toString() || "1",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -1901,11 +1901,11 @@ function SingleEntryMode({
         reelTag: editingEntry.reelTag || "",
         wireType: editingEntry.wireType || "",
         gauge: editingEntry.gauge || "",
-        footage: editingEntry.footage?.toString() || "",
+        footage: editingEntry.footage && editingEntry.reelCount && editingEntry.reelCount > 1 ? Math.round(editingEntry.footage / editingEntry.reelCount).toString() : editingEntry.footage?.toString() || "",
         color: editingEntry.color || "",
         manufacturer: editingEntry.manufacturer || "",
         notes: editingEntry.notes || "",
-        reelCount: "1",
+        reelCount: editingEntry.reelCount?.toString() || "1",
       });
       setErrors({});
       setTouched({});
@@ -1946,11 +1946,10 @@ function SingleEntryMode({
         wireType: form.wireType || null,
         gauge: form.gauge || null,
         footage: totalFootage,
+        reelCount,
         color: form.color && form.color !== "__none__" ? form.color : null,
         manufacturer: form.manufacturer || null,
-        notes: reelCount > 1
-          ? [form.notes, `${reelCount} reels (${perReelFootage || 0}ft each)`].filter(Boolean).join(" | ")
-          : form.notes || null,
+        notes: form.notes || null,
       };
 
       if (editingEntry) {
@@ -2161,20 +2160,11 @@ function EntryTable({
     },
   });
 
-  const parseReelInfo = (entry: Entry) => {
+  const getReelInfo = (entry: Entry) => {
     const totalFootage = entry.footage || 0;
-    const notes = entry.notes || "";
-    const newFormat = notes.match(/(\d+)\s*reels?\s*(?:at pin \S+\s*)?\((\d+)ft each\)/);
-    if (newFormat) {
-      const reelCount = parseInt(newFormat[1]);
-      const perReel = parseInt(newFormat[2]);
-      return { reelCount, perReel, totalFootage };
-    }
-    const legacyFormat = notes.match(/Reel \d+ of (\d+)/);
-    if (legacyFormat) {
-      return { reelCount: 1, perReel: totalFootage, totalFootage, isLegacySplit: true };
-    }
-    return { reelCount: 1, perReel: totalFootage, totalFootage };
+    const reelCount = entry.reelCount || 1;
+    const perReel = reelCount > 0 ? Math.round(totalFootage / reelCount) : totalFootage;
+    return { reelCount, perReel, totalFootage };
   };
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -2250,7 +2240,7 @@ function EntryTable({
                       </td>
                     </tr>
                     {isExpanded && sectionEntries.map((entry, idx) => {
-                      const info = parseReelInfo(entry);
+                      const info = getReelInfo(entry);
                       return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
                         <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{String(idx + 1).padStart(2, "0")}</td>
                         <td style={{ textAlign: "center" }}>{entry.aisle}</td>
