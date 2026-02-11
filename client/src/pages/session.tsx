@@ -1345,7 +1345,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                     >
                       &times;
                     </button>
-                    <div className="pin-label">{pin.label}</div>
+                    <div className="pin-label">P{pin.label}</div>
                     {pin.reelCount >= 2 && (
                       <div className="pin-reel-badge" data-testid={`badge-reel-count-${pin.id}`}>
                         X{pin.reelCount}
