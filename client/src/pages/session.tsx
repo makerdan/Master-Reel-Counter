@@ -72,13 +72,10 @@ interface LocalPin {
   footage?: number;
 }
 
-function ReelCropPreview({ photoUrl, pinX, pinY, label, imageDisplayWidth }: { photoUrl: string; pinX: number; pinY: number; label: string; imageDisplayWidth?: number }) {
+function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pinX: number; pinY: number; label: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const PIN_OUTER_W = 62;
-  const PIN_OUTER_H = 52;
-  const ENLARGE = 1.15;
-  const displayW = Math.round(PIN_OUTER_W * ENLARGE);
-  const displayH = Math.round(PIN_OUTER_H * ENLARGE);
+  const DISPLAY_SIZE = 300;
+  const CROP_FRACTION = 0.22 * 1.15;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -88,23 +85,21 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, imageDisplayWidth }: { p
     img.onload = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const dispW = imageDisplayWidth || 400;
-      const scaleRatio = img.width / dispW;
-      const cropW = PIN_OUTER_W * ENLARGE * scaleRatio;
-      const cropH = PIN_OUTER_H * ENLARGE * scaleRatio;
+      const cropW = img.width * CROP_FRACTION;
+      const cropH = img.height * CROP_FRACTION;
       const cx = (pinX / 100) * img.width;
       const cy = (pinY / 100) * img.height;
       let sx = cx - cropW / 2;
       let sy = cy - cropH / 2;
       sx = Math.max(0, Math.min(sx, img.width - cropW));
       sy = Math.max(0, Math.min(sy, img.height - cropH));
-      canvas.width = displayW * 2;
-      canvas.height = displayH * 2;
+      canvas.width = DISPLAY_SIZE * 2;
+      canvas.height = DISPLAY_SIZE * 2;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY, imageDisplayWidth]);
+  }, [photoUrl, pinX, pinY]);
 
   return (
     <div className="space-y-1" data-testid="reel-crop-preview">
@@ -116,7 +111,7 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, imageDisplayWidth }: { p
         <canvas
           ref={canvasRef}
           className="block"
-          style={{ width: displayW, height: displayH }}
+          style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE }}
           data-testid="reel-crop-canvas"
         />
       </div>
@@ -472,20 +467,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const photoImgRef = useRef<HTMLImageElement>(null);
-  const [imageDisplayWidth, setImageDisplayWidth] = useState(400);
-
-  useEffect(() => {
-    const img = photoImgRef.current;
-    if (!img) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setImageDisplayWidth(entry.contentRect.width);
-      }
-    });
-    ro.observe(img);
-    return () => ro.disconnect();
-  }, [currentPhotoIdx]);
-
   const [photoNotes, setPhotoNotes] = useState("");
   const [isDetailShot, setIsDetailShot] = useState(false);
   const [parentPhotoId, setParentPhotoId] = useState<number | undefined>(undefined);
@@ -1249,9 +1230,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 draggable={false}
                 className="w-full select-none"
                 style={{ display: "block" }}
-                onLoad={() => {
-                  if (photoImgRef.current) setImageDisplayWidth(photoImgRef.current.clientWidth);
-                }}
+                onLoad={() => {}}
               />
               {localPins.map((pin) => (
                 <div
@@ -1525,7 +1504,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                       pinX={selectedPin.x}
                       pinY={selectedPin.y}
                       label={selectedPin.label}
-                      imageDisplayWidth={imageDisplayWidth}
                     />
                   </div>
                 );
