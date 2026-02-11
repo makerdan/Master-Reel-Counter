@@ -435,7 +435,7 @@
   pointer-events: auto;
   z-index: 5;
   background: rgba(120, 120, 120, 0.55);
-  border: 2px solid rgba(234, 88, 12, 0.8);
+  border: 2px solid rgba(234, 88, 12, 1);
   min-width: 54px;
   min-height: 46px;
   padding: 3px 4px;
@@ -456,6 +456,7 @@
   white-space: nowrap;
   pointer-events: auto;
   margin-bottom: -1px;
+  opacity: 0.75;
 }
 .pin-marker.committed .pin-label {
   background: rgba(80, 80, 80, 0.75);
