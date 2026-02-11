@@ -5,7 +5,7 @@ import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Cable,
   Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  Users, Copy, Link, Mail, UserPlus, UserMinus,
+  Users, Copy, Link, Mail, UserPlus, UserMinus, ImagePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2169,6 +2169,10 @@ function SingleEntryMode({
   onDoneEditing: () => void;
 }) {
   const { toast } = useToast();
+  const { uploadFile, isUploading } = useUpload();
+  const singleFileRef = useRef<HTMLInputElement>(null);
+  const singleCameraRef = useRef<HTMLInputElement>(null);
+  const [capturedPhoto, setCapturedPhoto] = useState<{ url: string; objectPath: string; photoId: number } | null>(null);
   const [keepLocation, setKeepLocation] = useState(false);
   const [form, setForm] = useState({
     aisle: editingEntry?.aisle || "",
@@ -2201,10 +2205,38 @@ function SingleEntryMode({
         notes: editingEntry.notes || "",
         reelCount: editingEntry.reelCount?.toString() || "1",
       });
+      setCapturedPhoto(null);
       setErrors({});
       setTouched({});
     }
   }, [editingEntry]);
+
+  const handleSinglePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const result = await uploadFile(file);
+      if (!result) {
+        toast({ title: "Upload failed", variant: "destructive" });
+        return;
+      }
+      const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
+        objectStorageKey: result.objectPath,
+        originalFilename: file.name,
+        mimeType: file.type,
+        aisle: form.aisle,
+        section: form.section,
+      });
+      const savedPhoto = await res.json();
+      setCapturedPhoto({ url: result.objectPath, objectPath: result.objectPath, photoId: savedPhoto.id });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+      toast({ title: "Photo captured" });
+    } catch {
+      toast({ title: "Photo upload failed", variant: "destructive" });
+    }
+    if (singleFileRef.current) singleFileRef.current.value = "";
+    if (singleCameraRef.current) singleCameraRef.current.value = "";
+  };
 
   const update = (field: string, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
@@ -2232,7 +2264,7 @@ function SingleEntryMode({
       const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
       const perReelFootage = form.footage ? parseInt(form.footage) : null;
       const totalFootage = perReelFootage ? perReelFootage * reelCount : null;
-      const body = {
+      const body: Record<string, unknown> = {
         aisle: form.aisle,
         section: form.section,
         position: form.position || null,
@@ -2245,6 +2277,7 @@ function SingleEntryMode({
         manufacturer: form.manufacturer || null,
         notes: form.notes || null,
       };
+      if (!editingEntry && capturedPhoto) body.photoId = capturedPhoto.photoId;
 
       if (editingEntry) {
         await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
@@ -2266,6 +2299,7 @@ function SingleEntryMode({
           position: "", reelTag: "", wireType: "", gauge: "",
           footage: "", color: "", manufacturer: "", notes: "", reelCount: "1",
         });
+        setCapturedPhoto(null);
         setErrors({});
         setTouched({});
       }
@@ -2277,7 +2311,11 @@ function SingleEntryMode({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) saveEntry.mutate();
+    if (!validate()) {
+      toast({ title: "Missing required fields", description: "Aisle and Section are required", variant: "destructive" });
+      return;
+    }
+    saveEntry.mutate();
   };
 
   return (
@@ -2399,6 +2437,41 @@ function SingleEntryMode({
         <Label className="text-xs underline">Notes:</Label>
         <Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Notes..." rows={2} data-testid="input-notes" />
       </div>
+
+      {!editingEntry && (
+        <div className="space-y-2">
+          <Label className="text-xs underline">Photo (optional):</Label>
+          <input ref={singleFileRef} type="file" accept="image/*" className="hidden" onChange={handleSinglePhoto} data-testid="input-single-file" />
+          <input ref={singleCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleSinglePhoto} data-testid="input-single-camera" />
+          {capturedPhoto ? (
+            <div className="relative rounded-md overflow-hidden border border-border/50">
+              <img src={capturedPhoto.objectPath.startsWith("/uploads/") ? capturedPhoto.objectPath : `/uploads/${capturedPhoto.objectPath}`} alt="Captured" className="w-full max-h-48 object-cover" data-testid="img-captured-photo" />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="absolute top-1 right-1 bg-black/50 text-white"
+                onClick={() => setCapturedPhoto(null)}
+                data-testid="button-remove-photo"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload">
+                <ImagePlus className="h-4 w-4" />
+                Upload Photo
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera">
+                <Camera className="h-4 w-4" />
+                Take Photo
+              </Button>
+              {isUploading && <Loader2 className="h-4 w-4 animate-spin self-center" />}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         {!editingEntry && (
