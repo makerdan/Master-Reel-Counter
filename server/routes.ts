@@ -813,9 +813,31 @@ export async function registerRoutes(
         }
       }
 
-      const sortedCategories = Array.from(categoryMap.entries())
-        .map(([groupKey, data]) => ({ category: groupKey.split("|||")[0], ...data }))
-        .sort((a, b) => b.totalFootage - a.totalFootage);
+      const reelSizeOrder = [500, 1000, 2000, 2500, 5000];
+      const extractReelSize = (cat: string): number => {
+        const match = cat.match(/(\d+)$/);
+        if (!match) return 999999;
+        const num = parseInt(match[1]);
+        const idx = reelSizeOrder.indexOf(num);
+        return idx >= 0 ? idx : reelSizeOrder.length;
+      };
+      const extractWireType = (cat: string): string => {
+        return cat.replace(/\d+$/, "");
+      };
+
+      const allCategories = Array.from(categoryMap.entries())
+        .map(([groupKey, data]) => {
+          const category = groupKey.split("|||")[0];
+          return { category, wireTypeGroup: extractWireType(category), reelSizeIdx: extractReelSize(category), ...data };
+        });
+
+      allCategories.sort((a, b) => {
+        if (a.wireTypeGroup < b.wireTypeGroup) return -1;
+        if (a.wireTypeGroup > b.wireTypeGroup) return 1;
+        return a.reelSizeIdx - b.reelSizeIdx;
+      });
+
+      const sortedCategories = allCategories;
 
       const sumCols = [
         { header: "Category", width: 140 },
@@ -842,14 +864,31 @@ export async function registerRoutes(
 
       currentY = drawSumHeader(currentY);
 
+      let lastWireTypeGroup = "";
+      let altIdx = 0;
       for (let i = 0; i < sortedCategories.length; i++) {
         const rowH = 16;
+        const cat = sortedCategories[i];
+
+        if (cat.wireTypeGroup !== lastWireTypeGroup) {
+          const groupH = 18;
+          if (currentY + groupH + rowH > maxY) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = drawSumHeader(36);
+          }
+          doc.rect(tableLeft, currentY, pageWidth, groupH).fill("#e8e0d8");
+          doc.fontSize(7.5).fillColor(accentHex).text(cat.wireTypeGroup || "Other", tableLeft + 6, currentY + 5, { width: pageWidth - 12, lineBreak: false });
+          doc.rect(tableLeft, currentY, pageWidth, groupH).stroke(borderColor);
+          currentY += groupH;
+          lastWireTypeGroup = cat.wireTypeGroup;
+          altIdx = 0;
+        }
+
         if (currentY + rowH > maxY) {
           doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
           currentY = drawSumHeader(36);
         }
-        const cat = sortedCategories[i];
-        if (i % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowH).fill("#fafaf8");
+        if (altIdx % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowH).fill("#fafaf8");
         doc.fontSize(6.5).fillColor("#333333");
         let x = tableLeft;
         const vals = [
@@ -865,6 +904,7 @@ export async function registerRoutes(
         }
         doc.rect(tableLeft, currentY, pageWidth, rowH).stroke(borderColor);
         currentY += rowH;
+        altIdx++;
       }
 
       currentY += 6;
