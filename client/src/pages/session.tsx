@@ -2161,6 +2161,22 @@ function EntryTable({
     },
   });
 
+  const parseReelInfo = (entry: Entry) => {
+    const totalFootage = entry.footage || 0;
+    const notes = entry.notes || "";
+    const newFormat = notes.match(/(\d+)\s*reels?\s*(?:at pin \S+\s*)?\((\d+)ft each\)/);
+    if (newFormat) {
+      const reelCount = parseInt(newFormat[1]);
+      const perReel = parseInt(newFormat[2]);
+      return { reelCount, perReel, totalFootage };
+    }
+    const legacyFormat = notes.match(/Reel \d+ of (\d+)/);
+    if (legacyFormat) {
+      return { reelCount: 1, perReel: totalFootage, totalFootage, isLegacySplit: true };
+    }
+    return { reelCount: 1, perReel: totalFootage, totalFootage };
+  };
+
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   if (loading) {
@@ -2201,11 +2217,13 @@ function EntryTable({
           <table className="entries-table" data-testid="entries-table">
             <thead>
               <tr>
-                <th style={{ width: 65, textAlign: "center", whiteSpace: "nowrap" }}>Reel #:</th>
+                <th style={{ width: 65, textAlign: "center", whiteSpace: "nowrap" }}>Pos #:</th>
                 <th style={{ textAlign: "center" }}>Aisle:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
                 <th style={{ textAlign: "center" }}>Category:</th>
-                <th style={{ textAlign: "center" }}>Footage:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Reels:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ft/Reel:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Total Ft:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
                 <th style={{ width: 70, textAlign: "center" }}>Actions:</th>
               </tr>
@@ -2223,7 +2241,7 @@ function EntryTable({
                       onClick={() => toggleSection(sectionKey)}
                       data-testid={`section-toggle-${sectionKey}`}
                     >
-                      <td colSpan={7}>
+                      <td colSpan={9}>
                         <div className="flex items-center gap-2">
                           <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
                           <span className="font-semibold">Aisle {aisleLabel} - Section {sectionLabel}</span>
@@ -2231,13 +2249,16 @@ function EntryTable({
                         </div>
                       </td>
                     </tr>
-                    {isExpanded && sectionEntries.map((entry, idx) => (
-                      <tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
+                    {isExpanded && sectionEntries.map((entry, idx) => {
+                      const info = parseReelInfo(entry);
+                      return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
                         <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{String(idx + 1).padStart(2, "0")}</td>
                         <td style={{ textAlign: "center" }}>{entry.aisle}</td>
                         <td style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono">{entry.reelTag || "-"}</td>
-                        <td className="mono" style={{ textAlign: "center" }}>{entry.footage ? `${entry.footage.toLocaleString()} ft.` : "-"}</td>
+                        <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
+                        <td className="mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
+                        <td className="mono" style={{ textAlign: "center" }}>{info.totalFootage ? `${info.totalFootage.toLocaleString()}'` : "-"}</td>
                         <td style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td style={{ textAlign: "center" }}>
                           <div className="flex items-center justify-center gap-1">
@@ -2273,18 +2294,19 @@ function EntryTable({
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </Fragment>
                 );
               })}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={4} className="font-semibold">
+                <td colSpan={6} className="font-semibold">
                   Total: {entries.length} entries
                 </td>
                 <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage">
-                  {totalFootage.toLocaleString()} ft.
+                  {totalFootage.toLocaleString()}'
                 </td>
                 <td colSpan={2} />
               </tr>
