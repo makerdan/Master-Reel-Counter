@@ -72,8 +72,13 @@ interface LocalPin {
   footage?: number;
 }
 
-function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pinX: number; pinY: number; label: string }) {
+function ReelCropPreview({ photoUrl, pinX, pinY, label, imageDisplayWidth }: { photoUrl: string; pinX: number; pinY: number; label: string; imageDisplayWidth?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const PIN_OUTER_W = 62;
+  const PIN_OUTER_H = 52;
+  const ENLARGE = 1.15;
+  const displayW = Math.round(PIN_OUTER_W * ENLARGE);
+  const displayH = Math.round(PIN_OUTER_H * ENLARGE);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -83,22 +88,23 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pi
     img.onload = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const cropSize = Math.min(img.width, img.height) * 0.22;
+      const dispW = imageDisplayWidth || 400;
+      const scaleRatio = img.width / dispW;
+      const cropW = PIN_OUTER_W * ENLARGE * scaleRatio;
+      const cropH = PIN_OUTER_H * ENLARGE * scaleRatio;
       const cx = (pinX / 100) * img.width;
       const cy = (pinY / 100) * img.height;
-      const halfCrop = cropSize / 2;
-      let sx = cx - halfCrop;
-      let sy = cy - halfCrop;
-      sx = Math.max(0, Math.min(sx, img.width - cropSize));
-      sy = Math.max(0, Math.min(sy, img.height - cropSize));
-      const displaySize = 300;
-      canvas.width = displaySize;
-      canvas.height = displaySize;
-      ctx.clearRect(0, 0, displaySize, displaySize);
-      ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, displaySize, displaySize);
+      let sx = cx - cropW / 2;
+      let sy = cy - cropH / 2;
+      sx = Math.max(0, Math.min(sx, img.width - cropW));
+      sy = Math.max(0, Math.min(sy, img.height - cropH));
+      canvas.width = displayW * 2;
+      canvas.height = displayH * 2;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY]);
+  }, [photoUrl, pinX, pinY, imageDisplayWidth]);
 
   return (
     <div className="space-y-1" data-testid="reel-crop-preview">
@@ -110,7 +116,7 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pi
         <canvas
           ref={canvasRef}
           className="block"
-          style={{ width: 300, height: 300 }}
+          style={{ width: displayW, height: displayH }}
           data-testid="reel-crop-canvas"
         />
       </div>
@@ -465,6 +471,20 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const photoImgRef = useRef<HTMLImageElement>(null);
+  const [imageDisplayWidth, setImageDisplayWidth] = useState(400);
+
+  useEffect(() => {
+    const img = photoImgRef.current;
+    if (!img) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setImageDisplayWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(img);
+    return () => ro.disconnect();
+  }, [currentPhotoIdx]);
 
   const [photoNotes, setPhotoNotes] = useState("");
   const [isDetailShot, setIsDetailShot] = useState(false);
@@ -1223,11 +1243,15 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 }}
               >
               <img
+                ref={photoImgRef}
                 src={currentPhoto.url}
                 alt="Section photo"
                 draggable={false}
                 className="w-full select-none"
                 style={{ display: "block" }}
+                onLoad={() => {
+                  if (photoImgRef.current) setImageDisplayWidth(photoImgRef.current.clientWidth);
+                }}
               />
               {localPins.map((pin) => (
                 <div
@@ -1489,21 +1513,23 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             </div>
           )}
 
-          {localPins.length > 0 && selectedPinId && currentPhoto && (() => {
-            const selectedPin = localPins.find(p => p.id === selectedPinId);
-            if (!selectedPin) return null;
-            return (
-              <ReelCropPreview
-                photoUrl={currentPhoto.url}
-                pinX={selectedPin.x}
-                pinY={selectedPin.y}
-                label={selectedPin.label}
-              />
-            );
-          })()}
-
           {localPins.length > 0 && (
             <div className="space-y-3">
+              {selectedPinId && currentPhoto && (() => {
+                const selectedPin = localPins.find(p => p.id === selectedPinId);
+                if (!selectedPin) return null;
+                return (
+                  <div className="sticky top-[53px] z-[999] bg-background py-1">
+                    <ReelCropPreview
+                      photoUrl={currentPhoto.url}
+                      pinX={selectedPin.x}
+                      pinY={selectedPin.y}
+                      label={selectedPin.label}
+                      imageDisplayWidth={imageDisplayWidth}
+                    />
+                  </div>
+                );
+              })()}
               <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Position</div>
               <div className="overflow-x-auto">
                 <table className="pin-entry-table" data-testid="pin-entry-table">
