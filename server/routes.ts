@@ -413,6 +413,22 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/pins/:pinId", isAuthenticated, async (req: any, res) => {
+    try {
+      const pin = await storage.getPin(parseInt(req.params.pinId));
+      if (!pin) return res.status(404).json({ message: "Pin not found" });
+      const photo = await storage.getPhoto(pin.photoId);
+      if (!photo) return res.status(404).json({ message: "Photo not found" });
+      const session = await verifySessionOwnership(photo.sessionId, req.user.claims.sub);
+      if (!session) return res.status(404).json({ message: "Pin not found" });
+      await storage.deletePin(pin.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting pin:", error);
+      res.status(500).json({ message: "Failed to delete pin" });
+    }
+  });
+
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

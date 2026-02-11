@@ -432,13 +432,21 @@
 .pin-marker.committed {
   opacity: 0.35;
   cursor: default;
-  pointer-events: none;
+  pointer-events: auto;
   z-index: 5;
   background: rgba(120, 120, 120, 0.7);
   border-color: rgba(100, 100, 100, 0.5);
 }
+.pin-marker.committed:hover {
+  opacity: 0.55;
+  transform: translate(-50%, -50%) scale(1);
+}
 .pin-marker.committed .pin-label {
   background: rgba(80, 80, 80, 0.6);
+  pointer-events: none;
+}
+.pin-marker.committed .pin-delete-btn {
+  pointer-events: auto;
 }
 .pin-marker.dragging {
   cursor: grabbing;

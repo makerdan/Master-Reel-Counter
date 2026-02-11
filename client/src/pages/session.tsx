@@ -439,7 +439,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     });
   }, []);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
-  const [committedPins, setCommittedPins] = useState<Array<{ id: string; x: number; y: number; label: string; reelCount: number }>>([]);
+  const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number }>>([]);
   const [pinsLoaded, setPinsLoaded] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipAutoSave = useRef(false);
@@ -455,6 +455,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
   const [activeSuggestionPin, setActiveSuggestionPin] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
 
   const [scale, setScale] = useState(1);
   const [panX, setPanX] = useState(0);
@@ -561,6 +562,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         const committed = dbPins.filter(p => !!p.entryId);
         setCommittedPins(committed.map(p => ({
           id: `committed-${p.id}`,
+          dbId: p.id,
           x: p.xPercent,
           y: p.yPercent,
           label: p.label || "01",
@@ -939,6 +941,32 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     });
   }, []);
 
+  const deleteCommittedPin = useCallback(async (pin: { id: string; dbId?: number }) => {
+    if (pin.dbId) {
+      try {
+        await apiRequest("DELETE", `/api/pins/${pin.dbId}`);
+      } catch {
+        toast({ title: "Failed to delete pin", variant: "destructive" });
+        return;
+      }
+    }
+    setCommittedPins(prev => prev.filter(p => p.id !== pin.id));
+  }, [toast]);
+
+  const applyAutoFill = useCallback((pinId: string) => {
+    const pin = localPinsRef.current.find(p => p.id === pinId);
+    if (!pin?.wireDetails) return;
+    const normalized = pin.wireDetails.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const matches = lookupCategory(pin.wireDetails);
+    if (matches.length === 0) return;
+    const exactMatch = matches.find(m => m.catalog === normalized);
+    const match = exactMatch || (matches.length === 1 ? matches[0] : null);
+    if (!match) return;
+    updatePinField(pinId, "wireDetails", match.catalog);
+    if (!pin.vendorCode && match.vendor) updatePinField(pinId, "vendorCode", match.vendor);
+    if (!pin.footage && match.footage) updatePinField(pinId, "footage", match.footage);
+  }, [updatePinField]);
+
   const clearRow = useCallback((pinId: string) => {
     setLocalPins((prev) =>
       prev.map((p) =>
@@ -951,6 +979,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 
   const createEntries = useMutation({
     mutationFn: async () => {
+      const pinsToCommit = [...localPinsRef.current];
       const isDetail = currentPhoto?.isDetailShot || false;
       const parentPhoto = isDetail && currentPhoto?.parentPhotoId
         ? uploadedPhotos.find(p => p.dbId === currentPhoto.parentPhotoId)
@@ -960,11 +989,11 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       const entryPhotoId = isDetail && parentPhoto?.dbId ? parentPhoto.dbId : currentPhoto?.dbId;
       const pinPhotoId = currentPhoto?.dbId;
       const errors: string[] = [];
-      const totalEntries = localPins.reduce((sum, pin) => sum + pin.reelCount, 0);
+      const totalEntries = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
       let completed = 0;
       setBatchProgress({ current: 0, total: totalEntries, errors: [] });
 
-      for (const pin of localPins) {
+      for (const pin of pinsToCommit) {
         try {
           const entryIds: number[] = [];
           for (let r = 0; r < pin.reelCount; r++) {
@@ -988,13 +1017,15 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             setBatchProgress({ current: completed, total: totalEntries, errors });
           }
           if (pinPhotoId) {
-            await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
+            const pinRes = await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
               xPercent: pin.x,
               yPercent: pin.y,
               label: pin.label,
               reelCount: pin.reelCount,
               entryId: entryIds[0],
             });
+            const savedPin = await pinRes.json();
+            (pin as any)._dbPinId = savedPin.id;
           }
         } catch {
           errors.push(`Pin ${pin.label}`);
@@ -1004,14 +1035,16 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       if (errors.length > 0) {
         throw new Error(`Failed to create entries for: ${errors.join(", ")}`);
       }
+      return pinsToCommit;
     },
-    onSuccess: () => {
+    onSuccess: (pinsToCommit) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
-      const totalCreated = localPins.reduce((sum, pin) => sum + pin.reelCount, 0);
+      const totalCreated = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
       setCommittedPins(prev => [
         ...prev,
-        ...localPins.map(p => ({
+        ...pinsToCommit.map(p => ({
           id: `committed-${p.id}-${Date.now()}`,
+          dbId: (p as any)._dbPinId as number | undefined,
           x: p.x,
           y: p.y,
           label: p.label,
@@ -1021,7 +1054,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       setLocalPins([]);
       setSelectedPinId(null);
       setBatchProgress(null);
-      toast({ title: `Created ${totalCreated} entries from ${localPins.length} pins` });
+      toast({ title: `Created ${totalCreated} entries from ${pinsToCommit.length} pins` });
     },
     onError: (error: Error) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
@@ -1272,7 +1305,20 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                   data-testid={`pin-committed-${pin.id}`}
                 >
-                  <div className="pin-label">{pin.label}</div>
+                  <div className="pin-top-row">
+                    <button
+                      className="pin-delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteCommittedPin(pin);
+                      }}
+                      title="Delete committed pin"
+                      data-testid={`button-delete-committed-${pin.id}`}
+                    >
+                      &times;
+                    </button>
+                    <div className="pin-label">{pin.label}</div>
+                  </div>
                 </div>
               ))}
               </div>
@@ -1492,10 +1538,12 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                               updatePinField(pin.id, "wireDetails", val);
                               const matches = lookupCategory(val);
                               setSuggestions(matches);
+                              setSuggestionIndex(-1);
                               setActiveSuggestionPin(matches.length > 0 ? pin.id : null);
                             }}
                             onFocus={() => {
                               setSelectedPinId(pin.id);
+                              setSuggestionIndex(-1);
                               if (pin.wireDetails) {
                                 const matches = lookupCategory(pin.wireDetails);
                                 setSuggestions(matches);
@@ -1503,7 +1551,35 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                               }
                             }}
                             onBlur={() => {
-                              setTimeout(() => setActiveSuggestionPin(null), 200);
+                              setTimeout(() => {
+                                setActiveSuggestionPin(null);
+                                setSuggestionIndex(-1);
+                              }, 200);
+                              applyAutoFill(pin.id);
+                            }}
+                            onKeyDown={(e) => {
+                              if (activeSuggestionPin === pin.id && suggestions.length > 0) {
+                                if (e.key === "ArrowDown") {
+                                  e.preventDefault();
+                                  setSuggestionIndex(prev => Math.min(prev + 1, suggestions.length - 1));
+                                } else if (e.key === "ArrowUp") {
+                                  e.preventDefault();
+                                  setSuggestionIndex(prev => Math.max(prev - 1, -1));
+                                } else if (e.key === "Enter" && suggestionIndex >= 0) {
+                                  e.preventDefault();
+                                  const s = suggestions[suggestionIndex];
+                                  updatePinField(pin.id, "wireDetails", s.catalog);
+                                  if (s.vendor) updatePinField(pin.id, "vendorCode", s.vendor);
+                                  if (s.footage) updatePinField(pin.id, "footage", s.footage);
+                                  setActiveSuggestionPin(null);
+                                  setSuggestions([]);
+                                  setSuggestionIndex(-1);
+                                } else if (e.key === "Escape") {
+                                  setActiveSuggestionPin(null);
+                                  setSuggestions([]);
+                                  setSuggestionIndex(-1);
+                                }
+                              }
                             }}
                             autoComplete="off"
                             autoCorrect="off"
@@ -1513,11 +1589,11 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                           />
                           {activeSuggestionPin === pin.id && suggestions.length > 0 && (
                             <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-lg" data-testid={`suggestions-${index}`}>
-                              {suggestions.map((s) => (
+                              {suggestions.map((s, si) => (
                                 <button
                                   key={s.catalog}
                                   type="button"
-                                  className="w-full text-left px-2 py-1.5 text-xs hover-elevate cursor-pointer border-b last:border-b-0 border-border/50"
+                                  className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer border-b last:border-b-0 border-border/50 ${si === suggestionIndex ? "bg-accent text-accent-foreground" : "hover-elevate"}`}
                                   onMouseDown={(e) => {
                                     e.preventDefault();
                                     updatePinField(pin.id, "wireDetails", s.catalog);
@@ -1525,6 +1601,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                                     if (s.footage) updatePinField(pin.id, "footage", s.footage);
                                     setActiveSuggestionPin(null);
                                     setSuggestions([]);
+                                    setSuggestionIndex(-1);
                                   }}
                                   data-testid={`suggestion-${s.catalog}`}
                                 >
