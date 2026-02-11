@@ -249,7 +249,7 @@ export default function Dashboard() {
             {sessions.map((session) => (
               <Card
                 key={session.id}
-                className="hover-elevate cursor-pointer border border-black dark:border-white"
+                className="hover-elevate cursor-pointer border border-primary"
                 data-testid={`card-session-${session.id}`}
                 onClick={() => setLocation(`/session/${session.id}`)}
               >
