@@ -1431,7 +1431,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
               }
             }}
             placeholder="Aisle..."
-            inputMode="numeric"
             className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
             data-testid="input-photo-aisle"
           />
@@ -1520,7 +1519,6 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                     }
                   }}
                   placeholder="Section..."
-                  inputMode="numeric"
                   className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
                   data-testid="input-photo-section"
                 />
@@ -2291,7 +2289,6 @@ function SingleEntryMode({
             value={form.aisle}
             onChange={(e) => update("aisle", e.target.value)}
             onBlur={() => markTouched("aisle")}
-            inputMode="numeric"
             placeholder="Aisle"
             className={touched.aisle && errors.aisle ? "border-destructive" : ""}
             data-testid="input-aisle"
@@ -2306,7 +2303,6 @@ function SingleEntryMode({
             value={form.section}
             onChange={(e) => update("section", e.target.value)}
             onBlur={() => markTouched("section")}
-            inputMode="numeric"
             placeholder="Section"
             className={touched.section && errors.section ? "border-destructive" : ""}
             data-testid="input-section"
