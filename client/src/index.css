@@ -434,12 +434,12 @@
   cursor: default;
   pointer-events: auto;
   z-index: 5;
-  background: rgba(120, 120, 120, 0.3);
+  background: transparent;
   border: 2px solid rgba(234, 88, 12, 1);
-  min-width: 54px;
-  min-height: 46px;
-  padding: 3px 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  min-width: 62px;
+  min-height: 53px;
+  padding: 0;
+  box-shadow: none;
 }
 .pin-marker.committed:hover {
   opacity: 1;
@@ -456,14 +456,16 @@
   white-space: nowrap;
   pointer-events: auto;
   margin-bottom: -1px;
-  opacity: 0.75;
+  opacity: 1;
 }
 .pin-marker.committed .pin-label {
-  background: rgba(80, 80, 80, 0.75);
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   pointer-events: none;
   font-size: 10px;
   padding: 1px 3px;
   border-radius: 3px 3px 0 0;
+  color: white;
 }
 .pin-marker.committed .pin-delete-btn {
   pointer-events: auto;
@@ -471,6 +473,18 @@
   height: 14px;
   font-size: 10px;
   border-radius: 3px 3px 0 0;
+  opacity: 1;
+}
+.pin-marker.committed .pin-reel-badge {
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 3px;
+  border-radius: 3px 3px 0 0;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', monospace;
 }
 .pin-marker.dragging {
   cursor: grabbing;

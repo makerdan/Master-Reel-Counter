@@ -4,7 +4,7 @@ import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Cable,
-  Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus,
+  Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -430,6 +430,13 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const [aisle, setAisle] = useState("");
   const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+  const [viewingNearbyIdx, setViewingNearbyIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (viewingNearbyIdx !== null && viewingNearbyIdx >= uploadedPhotos.length) {
+      setViewingNearbyIdx(null);
+    }
+  }, [uploadedPhotos.length, viewingNearbyIdx]);
   const [localPins, _setLocalPins] = useState<LocalPin[]>([]);
   const localPinsRef = useRef<LocalPin[]>([]);
   const setLocalPins = useCallback((updater: LocalPin[] | ((prev: LocalPin[]) => LocalPin[])) => {
@@ -495,6 +502,8 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   }, [scale, panX, panY, clampPan]);
 
   const currentPhoto = uploadedPhotos[currentPhotoIdx];
+  const displayedPhotoIdx = viewingNearbyIdx !== null ? viewingNearbyIdx : currentPhotoIdx;
+  const displayedPhoto = uploadedPhotos[displayedPhotoIdx];
 
   useEffect(() => {
     if (photos.length > 0 && uploadedPhotos.length === 0) {
@@ -1143,7 +1152,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                   disabled={currentPhotoIdx <= 0}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
                   data-testid="button-prev-photo"
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -1155,7 +1164,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                   disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
                   data-testid="button-next-photo"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -1204,6 +1213,22 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             )}
           </div>
 
+          {viewingNearbyIdx !== null && viewingNearbyIdx !== currentPhotoIdx && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(18_85%_40%/0.15)] border border-[hsl(18_85%_40%/0.3)] rounded-md text-xs text-[hsl(30_40%_85%)]" data-testid="nearby-viewing-banner">
+              <Eye className="h-3 w-3 flex-shrink-0" />
+              <span>Viewing nearby photo {viewingNearbyIdx + 1} — pin table still shows photo {currentPhotoIdx + 1}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto text-xs"
+                onClick={() => setViewingNearbyIdx(null)}
+                data-testid="button-return-to-current"
+              >
+                Return
+              </Button>
+            </div>
+          )}
+
           {currentPhoto && (
             <div
               ref={containerRef}
@@ -1225,7 +1250,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
               >
               <img
                 ref={photoImgRef}
-                src={currentPhoto.url}
+                src={displayedPhoto?.url || currentPhoto.url}
                 alt="Section photo"
                 draggable={false}
                 className="w-full select-none"
@@ -1321,6 +1346,11 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                       &times;
                     </button>
                     <div className="pin-label">{pin.label}</div>
+                    {pin.reelCount >= 2 && (
+                      <div className="pin-reel-badge" data-testid={`badge-reel-count-${pin.id}`}>
+                        X{pin.reelCount}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1382,7 +1412,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                   disabled={currentPhotoIdx <= 0}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
                   data-testid="button-prev-photo-bottom"
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -1394,7 +1424,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                   disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
+                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
                   data-testid="button-next-photo-bottom"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -1461,6 +1491,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
               <div className="flex gap-2 overflow-x-auto py-1 px-0.5">
                 {uploadedPhotos.map((photo, idx) => {
                   const isCurrent = idx === currentPhotoIdx;
+                  const isViewing = idx === displayedPhotoIdx;
                   const isNearby = Math.abs(idx - currentPhotoIdx) <= 3;
                   if (!isNearby) return null;
                   return (
@@ -1468,11 +1499,20 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                       key={idx}
                       type="button"
                       className={`flex-shrink-0 rounded-md overflow-visible border-2 transition-colors ${
-                        isCurrent
+                        isViewing
                           ? "border-primary ring-2 ring-primary/30"
-                          : "border-border/50 hover-elevate"
+                          : isCurrent
+                            ? "border-[hsl(18_85%_40%)] ring-1 ring-[hsl(18_85%_40%/0.3)]"
+                            : "border-border/50 hover-elevate"
                       }`}
-                      onClick={() => setCurrentPhotoIdx(idx)}
+                      onClick={() => {
+                        if (idx === currentPhotoIdx) {
+                          setViewingNearbyIdx(null);
+                        } else {
+                          setViewingNearbyIdx(idx);
+                        }
+                        resetView();
+                      }}
                       title={`${photo.filename || `Photo ${idx + 1}`}${photo.section ? ` - Section ${photo.section}` : ""}`}
                       data-testid={`nearby-photo-${idx}`}
                     >
