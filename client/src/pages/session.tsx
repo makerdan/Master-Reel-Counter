@@ -72,6 +72,52 @@ interface LocalPin {
   footage?: number;
 }
 
+function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pinX: number; pinY: number; label: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const cropSize = Math.min(img.width, img.height) * 0.22;
+      const cx = (pinX / 100) * img.width;
+      const cy = (pinY / 100) * img.height;
+      const halfCrop = cropSize / 2;
+      let sx = cx - halfCrop;
+      let sy = cy - halfCrop;
+      sx = Math.max(0, Math.min(sx, img.width - cropSize));
+      sy = Math.max(0, Math.min(sy, img.height - cropSize));
+      const displaySize = 300;
+      canvas.width = displaySize;
+      canvas.height = displaySize;
+      ctx.clearRect(0, 0, displaySize, displaySize);
+      ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, displaySize, displaySize);
+    };
+    img.src = photoUrl;
+  }, [photoUrl, pinX, pinY]);
+
+  return (
+    <div className="space-y-1" data-testid="reel-crop-preview">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+        <Focus className="h-3 w-3" />
+        Reel Preview — {label}
+      </div>
+      <div className="rounded-md border border-border/50 overflow-hidden bg-black inline-block">
+        <canvas
+          ref={canvasRef}
+          className="block"
+          style={{ width: 300, height: 300 }}
+          data-testid="reel-crop-canvas"
+        />
+      </div>
+    </div>
+  );
+}
+
 function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoAt: string | Date | null) {
   if (!firstPhotoAt) return "No photos yet";
   const fmt = (d: string | Date) => new Date(d).toLocaleString(undefined, {
@@ -1367,6 +1413,19 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
             </div>
           )}
 
+          {localPins.length > 0 && selectedPinId && currentPhoto && (() => {
+            const selectedPin = localPins.find(p => p.id === selectedPinId);
+            if (!selectedPin) return null;
+            return (
+              <ReelCropPreview
+                photoUrl={currentPhoto.url}
+                pinX={selectedPin.x}
+                pinY={selectedPin.y}
+                label={selectedPin.label}
+              />
+            );
+          })()}
+
           {localPins.length > 0 && (
             <div className="space-y-3">
               <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Position</div>
@@ -1384,7 +1443,12 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   </thead>
                   <tbody>
                     {localPins.map((pin, index) => (
-                      <tr key={pin.id} data-testid={`pin-entry-row-${index}`}>
+                      <tr
+                        key={pin.id}
+                        data-testid={`pin-entry-row-${index}`}
+                        className={selectedPinId === pin.id ? "ring-1 ring-primary/40" : ""}
+                        onClick={() => setSelectedPinId(pin.id)}
+                      >
                         <td>
                           <span className="pin-position-cell">{pin.label}</span>
                         </td>
@@ -1401,6 +1465,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                               setActiveSuggestionPin(matches.length > 0 ? pin.id : null);
                             }}
                             onFocus={() => {
+                              setSelectedPinId(pin.id);
                               if (pin.wireDetails) {
                                 const matches = lookupCategory(pin.wireDetails);
                                 setSuggestions(matches);
