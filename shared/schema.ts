@@ -79,6 +79,25 @@ export const pins = pgTable("pins", {
   footage: integer("footage"),
 });
 
+export const sessionCollaborators = pgTable("session_collaborators", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  username: text("username"),
+  role: text("role").notNull().default("editor"),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+});
+
+export const sessionInviteLinks = pgTable("session_invite_links", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  token: varchar("token").notNull().unique(),
+  createdBy: varchar("created_by").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+});
+
 export const userSettings = pgTable("user_settings", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().unique(),
@@ -110,6 +129,16 @@ export const insertPinSchema = createInsertSchema(pins).omit({
   id: true,
 });
 
+export const insertCollaboratorSchema = createInsertSchema(sessionCollaborators).omit({
+  id: true,
+  addedAt: true,
+});
+
+export const insertInviteLinkSchema = createInsertSchema(sessionInviteLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof countingSessions.$inferSelect;
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
@@ -118,5 +147,9 @@ export type InsertEntry = z.infer<typeof insertEntrySchema>;
 export type Entry = typeof entries.$inferSelect;
 export type InsertPin = z.infer<typeof insertPinSchema>;
 export type Pin = typeof pins.$inferSelect;
+export type InsertCollaborator = z.infer<typeof insertCollaboratorSchema>;
+export type Collaborator = typeof sessionCollaborators.$inferSelect;
+export type InsertInviteLink = z.infer<typeof insertInviteLinkSchema>;
+export type InviteLink = typeof sessionInviteLinks.$inferSelect;
 
 export type UserSettings = typeof userSettings.$inferSelect;
