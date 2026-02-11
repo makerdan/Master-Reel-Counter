@@ -44,7 +44,7 @@ import type { Session, Entry, Photo, Pin, Collaborator, InviteLink } from "@shar
 
 const WIRE_TYPES = [...REF_WIRE_TYPES];
 const GAUGES = [...WIRE_GAUGES];
-const POSITIONS = ["900", "800", "700", "600", "500", "400"];
+const POSITIONS = ["On Floor", "In Front Of", "900", "800", "700", "600", "500", "400", "__none__"];
 const COLOR_OPTIONS = [
   { value: "__none__", label: "-- None --" },
   ...Object.entries(WIRE_COLORS).map(([code, name]) => ({
@@ -2267,7 +2267,7 @@ function SingleEntryMode({
       const body: Record<string, unknown> = {
         aisle: form.aisle,
         section: form.section,
-        position: form.position || null,
+        position: form.position && form.position !== "__none__" ? form.position : null,
         reelTag: form.reelTag.toUpperCase() || null,
         wireType: form.wireType || null,
         gauge: form.gauge || null,
@@ -2354,7 +2354,7 @@ function SingleEntryMode({
           <Select value={form.position} onValueChange={(v) => update("position", v)}>
             <SelectTrigger data-testid="select-position"><SelectValue placeholder="Position" /></SelectTrigger>
             <SelectContent>
-              {POSITIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              {POSITIONS.map((p) => <SelectItem key={p} value={p}>{p === "__none__" ? "-- None --" : p}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
