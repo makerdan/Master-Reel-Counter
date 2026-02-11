@@ -437,6 +437,37 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
       setViewingNearbyIdx(null);
     }
   }, [uploadedPhotos.length, viewingNearbyIdx]);
+
+  useEffect(() => {
+    if (viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx) {
+      setNearbyCommittedPins([]);
+      return;
+    }
+    const nearbyPhoto = uploadedPhotos[viewingNearbyIdx];
+    if (!nearbyPhoto?.dbId) {
+      setNearbyCommittedPins([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiRequest("GET", `/api/photos/${nearbyPhoto.dbId}/pins`);
+        const dbPins: Pin[] = await res.json();
+        if (cancelled) return;
+        const committed = dbPins.filter(p => !!p.entryId);
+        setNearbyCommittedPins(committed.map(p => ({
+          id: `nearby-committed-${p.id}`,
+          x: p.xPercent,
+          y: p.yPercent,
+          label: p.label || "01",
+          reelCount: p.reelCount || 1,
+        })));
+      } catch {
+        if (!cancelled) setNearbyCommittedPins([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [viewingNearbyIdx, currentPhotoIdx, uploadedPhotos]);
   const [localPins, _setLocalPins] = useState<LocalPin[]>([]);
   const localPinsRef = useRef<LocalPin[]>([]);
   const setLocalPins = useCallback((updater: LocalPin[] | ((prev: LocalPin[]) => LocalPin[])) => {
@@ -448,6 +479,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   }, []);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number }>>([]);
+  const [nearbyCommittedPins, setNearbyCommittedPins] = useState<Array<{ id: string; x: number; y: number; label: string; reelCount: number }>>([]);
   const [pinsLoaded, setPinsLoaded] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipAutoSave = useRef(false);
@@ -1257,103 +1289,127 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                 style={{ display: "block" }}
                 onLoad={() => {}}
               />
-              {localPins.map((pin) => (
-                <div
-                  key={pin.id}
-                  className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""}`}
-                  style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
-                  data-pin-id={pin.id}
-                  onMouseDown={(e) => {
-                    if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
-                    startPinDrag(e, pin.id);
-                  }}
-                  onTouchStart={(e) => {
-                    if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
-                    startPinDrag(e, pin.id);
-                  }}
-                  onClick={(e) => { e.stopPropagation(); setSelectedPinId(pin.id); }}
-                  data-testid={`pin-${pin.id}`}
-                >
-                  <div className="pin-top-row">
-                    <button
-                      className="pin-delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocalPins((prev) => prev.filter((p) => p.id !== pin.id));
-                      }}
-                      title="Delete pin"
-                      data-testid={`button-delete-pin-${pin.id}`}
-                    >
-                      &times;
-                    </button>
+              {viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx ? (
+                <>
+                  {localPins.map((pin) => (
                     <div
-                      className="pin-label"
-                      onClick={(e) => { e.stopPropagation(); openRelabel(pin.id); }}
-                      title="Click to rename"
-                      data-testid={`label-pin-${pin.id}`}
-                    >
-                      {pin.label}
-                    </div>
-                  </div>
-                  <div className="pin-bottom-row">
-                    <button
-                      className="pin-count-btn minus"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocalPins((prev) =>
-                          prev.map((p) => p.id === pin.id ? { ...p, reelCount: Math.max(1, p.reelCount - 1) } : p)
-                        );
+                      key={pin.id}
+                      className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""}`}
+                      style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                      data-pin-id={pin.id}
+                      onMouseDown={(e) => {
+                        if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
+                        startPinDrag(e, pin.id);
                       }}
-                      title="Decrease count"
-                      data-testid={`button-minus-pin-${pin.id}`}
-                    >
-                      &minus;
-                    </button>
-                    <span className="pin-reel-count" data-testid={`count-pin-${pin.id}`}>{pin.reelCount}</span>
-                    <button
-                      className="pin-count-btn plus"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocalPins((prev) =>
-                          prev.map((p) => p.id === pin.id ? { ...p, reelCount: Math.min(99, p.reelCount + 1) } : p)
-                        );
+                      onTouchStart={(e) => {
+                        if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
+                        startPinDrag(e, pin.id);
                       }}
-                      title="Increase count"
-                      data-testid={`button-plus-pin-${pin.id}`}
+                      onClick={(e) => { e.stopPropagation(); setSelectedPinId(pin.id); }}
+                      data-testid={`pin-${pin.id}`}
                     >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {committedPins.map((pin) => (
-                <div
-                  key={pin.id}
-                  className="pin-marker committed"
-                  style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
-                  data-testid={`pin-committed-${pin.id}`}
-                >
-                  <div className="pin-committed-topbar">
-                    <button
-                      className="pin-delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteCommittedPin(pin);
-                      }}
-                      title="Delete committed pin"
-                      data-testid={`button-delete-committed-${pin.id}`}
-                    >
-                      &times;
-                    </button>
-                    <div className="pin-label">P{pin.label}</div>
-                    {pin.reelCount >= 2 && (
-                      <div className="pin-reel-badge" data-testid={`badge-reel-count-${pin.id}`}>
-                        X{pin.reelCount}
+                      <div className="pin-top-row">
+                        <button
+                          className="pin-delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocalPins((prev) => prev.filter((p) => p.id !== pin.id));
+                          }}
+                          title="Delete pin"
+                          data-testid={`button-delete-pin-${pin.id}`}
+                        >
+                          &times;
+                        </button>
+                        <div
+                          className="pin-label"
+                          onClick={(e) => { e.stopPropagation(); openRelabel(pin.id); }}
+                          title="Click to rename"
+                          data-testid={`label-pin-${pin.id}`}
+                        >
+                          {pin.label}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                      <div className="pin-bottom-row">
+                        <button
+                          className="pin-count-btn minus"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocalPins((prev) =>
+                              prev.map((p) => p.id === pin.id ? { ...p, reelCount: Math.max(1, p.reelCount - 1) } : p)
+                            );
+                          }}
+                          title="Decrease count"
+                          data-testid={`button-minus-pin-${pin.id}`}
+                        >
+                          &minus;
+                        </button>
+                        <span className="pin-reel-count" data-testid={`count-pin-${pin.id}`}>{pin.reelCount}</span>
+                        <button
+                          className="pin-count-btn plus"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocalPins((prev) =>
+                              prev.map((p) => p.id === pin.id ? { ...p, reelCount: Math.min(99, p.reelCount + 1) } : p)
+                            );
+                          }}
+                          title="Increase count"
+                          data-testid={`button-plus-pin-${pin.id}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {committedPins.map((pin) => (
+                    <div
+                      key={pin.id}
+                      className="pin-marker committed"
+                      style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                      data-testid={`pin-committed-${pin.id}`}
+                    >
+                      <div className="pin-committed-topbar">
+                        <button
+                          className="pin-delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteCommittedPin(pin);
+                          }}
+                          title="Delete committed pin"
+                          data-testid={`button-delete-committed-${pin.id}`}
+                        >
+                          &times;
+                        </button>
+                        <div className="pin-label">P{pin.label}</div>
+                        {pin.reelCount >= 2 && (
+                          <div className="pin-reel-badge" data-testid={`badge-reel-count-${pin.id}`}>
+                            X{pin.reelCount}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {nearbyCommittedPins.map((pin) => (
+                    <div
+                      key={pin.id}
+                      className="pin-marker committed"
+                      style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                      data-testid={`pin-nearby-committed-${pin.id}`}
+                    >
+                      <div className="pin-committed-topbar">
+                        <div className="pin-label">P{pin.label}</div>
+                        {pin.reelCount >= 2 && (
+                          <div className="pin-reel-badge">
+                            X{pin.reelCount}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
               </div>
               <div className="photo-overlay-controls right-strip">
                 <button
