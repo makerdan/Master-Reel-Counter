@@ -439,6 +439,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     });
   }, []);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [committedPins, setCommittedPins] = useState<Array<{ id: string; x: number; y: number; label: string; reelCount: number }>>([]);
   const [pinsLoaded, setPinsLoaded] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipAutoSave = useRef(false);
@@ -557,6 +558,14 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
         const res = await apiRequest("GET", `/api/photos/${currentPhoto.dbId}/pins`);
         const dbPins: Pin[] = await res.json();
         const draftPins = dbPins.filter(p => !p.entryId);
+        const committed = dbPins.filter(p => !!p.entryId);
+        setCommittedPins(committed.map(p => ({
+          id: `committed-${p.id}`,
+          x: p.xPercent,
+          y: p.yPercent,
+          label: p.label || "01",
+          reelCount: p.reelCount || 1,
+        })));
         if (draftPins.length > 0) {
           setLocalPins(draftPins.map(p => ({
             id: `pin-${p.id}`,
@@ -999,7 +1008,18 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       const totalCreated = localPins.reduce((sum, pin) => sum + pin.reelCount, 0);
+      setCommittedPins(prev => [
+        ...prev,
+        ...localPins.map(p => ({
+          id: `committed-${p.id}-${Date.now()}`,
+          x: p.x,
+          y: p.y,
+          label: p.label,
+          reelCount: p.reelCount,
+        })),
+      ]);
       setLocalPins([]);
+      setSelectedPinId(null);
       setBatchProgress(null);
       toast({ title: `Created ${totalCreated} entries from ${localPins.length} pins` });
     },
@@ -1243,6 +1263,16 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                       +
                     </button>
                   </div>
+                </div>
+              ))}
+              {committedPins.map((pin) => (
+                <div
+                  key={pin.id}
+                  className="pin-marker committed"
+                  style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                  data-testid={`pin-committed-${pin.id}`}
+                >
+                  <div className="pin-label">{pin.label}</div>
                 </div>
               ))}
               </div>

@@ -429,6 +429,17 @@
   opacity: 0.95;
   box-shadow: 0 0 0 3px hsl(var(--ring)), 0 3px 8px rgba(0,0,0,0.4);
 }
+.pin-marker.committed {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+  z-index: 5;
+  background: rgba(120, 120, 120, 0.7);
+  border-color: rgba(100, 100, 100, 0.5);
+}
+.pin-marker.committed .pin-label {
+  background: rgba(80, 80, 80, 0.6);
+}
 .pin-marker.dragging {
   cursor: grabbing;
   transform: translate(-50%, -50%) scale(1.12);
