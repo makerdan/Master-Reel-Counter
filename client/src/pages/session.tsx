@@ -35,13 +35,19 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { correctWireDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, COLOR_CODES, VENDOR_CODES, lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { correctWireDetails, WIRE_TYPES as REF_WIRE_TYPES, WIRE_GAUGES, WIRE_COLORS, COLOR_CODES, VENDOR_CODES, lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/wireReference";
 import type { Session, Entry, Photo, Pin } from "@shared/schema";
 
-const WIRE_TYPES = ["THHN", "XHHW", "USE-2", "MC Cable", "NM-B", "SER", "UFB", "Bare", "Other"];
-const GAUGES = ["14", "12", "10", "8", "6", "4", "3", "2", "1", "1/0", "2/0", "3/0", "4/0", "250", "300", "350", "500", "750"];
-const POSITIONS = ["Top", "Middle", "Bottom", "Floor"];
-const COLORS = ["Black", "White", "Red", "Blue", "Green", "Orange", "Yellow", "Brown", "Gray", "Purple", "Other"];
+const WIRE_TYPES = [...REF_WIRE_TYPES];
+const GAUGES = [...WIRE_GAUGES];
+const POSITIONS = ["900", "800", "700", "600", "500", "400"];
+const COLOR_OPTIONS = [
+  { value: "__none__", label: "-- None --" },
+  ...Object.entries(WIRE_COLORS).map(([code, name]) => ({
+    value: name,
+    label: `(${code})  ${name}`,
+  })),
+];
 
 const VENDOR_CODE_MAP: Record<string, string[]> = {
   COP: ["THHN", "TC", "RX", "UF", "BARE"],
@@ -1874,7 +1880,6 @@ function SingleEntryMode({
     aisle: editingEntry?.aisle || "",
     section: editingEntry?.section || "",
     position: editingEntry?.position || "",
-    palletId: editingEntry?.palletId || "",
     reelTag: editingEntry?.reelTag || "",
     wireType: editingEntry?.wireType || "",
     gauge: editingEntry?.gauge || "",
@@ -1882,6 +1887,7 @@ function SingleEntryMode({
     color: editingEntry?.color || "",
     manufacturer: editingEntry?.manufacturer || "",
     notes: editingEntry?.notes || "",
+    reelCount: "1",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -1892,7 +1898,6 @@ function SingleEntryMode({
         aisle: editingEntry.aisle || "",
         section: editingEntry.section || "",
         position: editingEntry.position || "",
-        palletId: editingEntry.palletId || "",
         reelTag: editingEntry.reelTag || "",
         wireType: editingEntry.wireType || "",
         gauge: editingEntry.gauge || "",
@@ -1900,6 +1905,7 @@ function SingleEntryMode({
         color: editingEntry.color || "",
         manufacturer: editingEntry.manufacturer || "",
         notes: editingEntry.notes || "",
+        reelCount: "1",
       });
       setErrors({});
       setTouched({});
@@ -1929,18 +1935,22 @@ function SingleEntryMode({
 
   const saveEntry = useMutation({
     mutationFn: async () => {
+      const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
+      const perReelFootage = form.footage ? parseInt(form.footage) : null;
+      const totalFootage = perReelFootage ? perReelFootage * reelCount : null;
       const body = {
         aisle: form.aisle,
         section: form.section,
         position: form.position || null,
-        palletId: form.palletId.toUpperCase() || null,
         reelTag: form.reelTag.toUpperCase() || null,
         wireType: form.wireType || null,
         gauge: form.gauge || null,
-        footage: form.footage ? parseInt(form.footage) : null,
-        color: form.color || null,
+        footage: totalFootage,
+        color: form.color && form.color !== "__none__" ? form.color : null,
         manufacturer: form.manufacturer || null,
-        notes: form.notes || null,
+        notes: reelCount > 1
+          ? [form.notes, `${reelCount} reels (${perReelFootage || 0}ft each)`].filter(Boolean).join(" | ")
+          : form.notes || null,
       };
 
       if (editingEntry) {
@@ -1960,8 +1970,8 @@ function SingleEntryMode({
         setForm({
           aisle: keepLocation ? savedAisle : "",
           section: keepLocation ? savedSection : "",
-          position: "", palletId: "", reelTag: "", wireType: "", gauge: "",
-          footage: "", color: "", manufacturer: "", notes: "",
+          position: "", reelTag: "", wireType: "", gauge: "",
+          footage: "", color: "", manufacturer: "", notes: "", reelCount: "1",
         });
         setErrors({});
         setTouched({});
@@ -1981,7 +1991,7 @@ function SingleEntryMode({
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Aisle <span className="text-destructive">*</span></Label>
+          <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
           <Input
             value={form.aisle}
             onChange={(e) => update("aisle", e.target.value)}
@@ -1996,7 +2006,7 @@ function SingleEntryMode({
           )}
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Section <span className="text-destructive">*</span></Label>
+          <Label className="text-xs underline">Section: <span className="text-destructive">*</span></Label>
           <Input
             value={form.section}
             onChange={(e) => update("section", e.target.value)}
@@ -2011,7 +2021,7 @@ function SingleEntryMode({
           )}
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Position</Label>
+          <Label className="text-xs underline">Position:</Label>
           <Select value={form.position} onValueChange={(v) => update("position", v)}>
             <SelectTrigger data-testid="select-position"><SelectValue placeholder="Position" /></SelectTrigger>
             <SelectContent>
@@ -2023,18 +2033,26 @@ function SingleEntryMode({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Pallet ID</Label>
-          <Input value={form.palletId} onChange={(e) => update("palletId", e.target.value.toUpperCase())} placeholder="Pallet ID" data-testid="input-pallet-id" />
+          <Label className="text-xs underline">Category:</Label>
+          <Input value={form.reelTag} onChange={(e) => update("reelTag", e.target.value.toUpperCase())} placeholder="Category" data-testid="input-reel-tag" />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Reel Tag</Label>
-          <Input value={form.reelTag} onChange={(e) => update("reelTag", e.target.value.toUpperCase())} placeholder="Reel Tag" data-testid="input-reel-tag" />
+          <Label className="text-xs underline">Number of Reels:</Label>
+          <Input
+            type="number"
+            value={form.reelCount}
+            onChange={(e) => update("reelCount", e.target.value)}
+            min={1}
+            inputMode="numeric"
+            placeholder="1"
+            data-testid="input-reel-count"
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Wire Type</Label>
+          <Label className="text-xs underline">Wire Type:</Label>
           <Select value={form.wireType} onValueChange={(v) => update("wireType", v)}>
             <SelectTrigger data-testid="select-wire-type"><SelectValue placeholder="Type" /></SelectTrigger>
             <SelectContent>
@@ -2043,16 +2061,16 @@ function SingleEntryMode({
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Gauge</Label>
+          <Label className="text-xs underline">Wire Size:</Label>
           <Select value={form.gauge} onValueChange={(v) => update("gauge", v)}>
-            <SelectTrigger data-testid="select-gauge"><SelectValue placeholder="Gauge" /></SelectTrigger>
+            <SelectTrigger data-testid="select-gauge"><SelectValue placeholder="Size" /></SelectTrigger>
             <SelectContent>
               {GAUGES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Footage</Label>
+          <Label className="text-xs underline">Footage:</Label>
           <Input
             type="number"
             value={form.footage}
@@ -2070,22 +2088,24 @@ function SingleEntryMode({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Color</Label>
+          <Label className="text-xs underline">Color:</Label>
           <Select value={form.color} onValueChange={(v) => update("color", v)}>
             <SelectTrigger data-testid="select-color"><SelectValue placeholder="Color" /></SelectTrigger>
             <SelectContent>
-              {COLORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {COLOR_OPTIONS.map((c) => (
+                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Manufacturer</Label>
-          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value)} placeholder="Manufacturer" data-testid="input-manufacturer" />
+          <Label className="text-xs underline">Vendor Code:</Label>
+          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value)} placeholder="Vendor Code" data-testid="input-manufacturer" />
         </div>
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">Notes</Label>
+        <Label className="text-xs underline">Notes:</Label>
         <Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Notes..." rows={2} data-testid="input-notes" />
       </div>
 
