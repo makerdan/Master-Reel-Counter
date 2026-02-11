@@ -1305,7 +1305,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                   style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                   data-testid={`pin-committed-${pin.id}`}
                 >
-                  <div className="pin-top-row">
+                  <div className="pin-committed-topbar">
                     <button
                       className="pin-delete-btn"
                       onClick={(e) => {
