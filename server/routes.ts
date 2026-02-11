@@ -783,11 +783,108 @@ export async function registerRoutes(
         }
       }
 
+      // --- Summary Totals Page ---
+      doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+      currentY = 36;
+
+      doc.fontSize(18).fillColor(accentHex).text("Summary Totals", 36, currentY);
+      currentY += 24;
+      doc.fontSize(9).fillColor("#666666").text(`${session.name}  |  ${session.location || "N/A"}  |  ${sessionEntries.length} entries  |  ${totalFootage.toLocaleString()} ft total`, 36, currentY);
+      currentY += 20;
+
+      const categoryMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
+      for (const e of sessionEntries as any[]) {
+        const cat = e.reelTag || e.wireType || "Uncategorized";
+        const vendor = e.manufacturer || "";
+        const groupKey = `${cat}|||${vendor}`;
+        const existing = categoryMap.get(groupKey);
+        const loc = [e.aisle, e.section, e.position].filter(Boolean).join("-");
+        if (existing) {
+          existing.totalFootage += (e.footage || 0);
+          existing.reelCount += (e.reelCount || 1);
+          if (loc) existing.locations.push(loc);
+        } else {
+          categoryMap.set(groupKey, {
+            vendorCode: vendor,
+            totalFootage: e.footage || 0,
+            reelCount: e.reelCount || 1,
+            locations: loc ? [loc] : [],
+          });
+        }
+      }
+
+      const sortedCategories = Array.from(categoryMap.entries())
+        .map(([groupKey, data]) => ({ category: groupKey.split("|||")[0], ...data }))
+        .sort((a, b) => b.totalFootage - a.totalFootage);
+
+      const sumCols = [
+        { header: "Category", width: 140 },
+        { header: "Vendor Code", width: 100 },
+        { header: "Reels", width: 40 },
+        { header: "Total Footage", width: 80 },
+        { header: "Location References", width: 340 },
+      ];
+      const sumTotalW = sumCols.reduce((s, c) => s + c.width, 0);
+      const sumScale = pageWidth / sumTotalW;
+      const sumScaled = sumCols.map(c => ({ ...c, width: Math.floor(c.width * sumScale) }));
+
+      const drawSumHeader = (y: number) => {
+        doc.rect(tableLeft, y, pageWidth, headerHeight).fill(headerBg);
+        doc.fontSize(7.5).fillColor("#333333");
+        let x = tableLeft;
+        for (const col of sumScaled) {
+          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false });
+          x += col.width;
+        }
+        doc.rect(tableLeft, y, pageWidth, headerHeight).stroke(borderColor);
+        return y + headerHeight;
+      };
+
+      currentY = drawSumHeader(currentY);
+
+      for (let i = 0; i < sortedCategories.length; i++) {
+        const rowH = 16;
+        if (currentY + rowH > maxY) {
+          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+          currentY = drawSumHeader(36);
+        }
+        const cat = sortedCategories[i];
+        if (i % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowH).fill("#fafaf8");
+        doc.fontSize(6.5).fillColor("#333333");
+        let x = tableLeft;
+        const vals = [
+          cat.category,
+          cat.vendorCode,
+          String(cat.reelCount),
+          `${cat.totalFootage.toLocaleString()} ft`,
+          cat.locations.join(", "),
+        ];
+        for (let j = 0; j < sumScaled.length; j++) {
+          doc.text(vals[j], x + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false });
+          x += sumScaled[j].width;
+        }
+        doc.rect(tableLeft, currentY, pageWidth, rowH).stroke(borderColor);
+        currentY += rowH;
+      }
+
+      currentY += 6;
+      doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill(headerBg);
+      doc.fontSize(7).fillColor("#333333");
+      let tx = tableLeft;
+      const totalVals = ["GRAND TOTAL", "", String(sortedCategories.reduce((s, c) => s + c.reelCount, 0)), `${totalFootage.toLocaleString()} ft`, `${sortedCategories.length} categories`];
+      for (let j = 0; j < sumScaled.length; j++) {
+        doc.text(totalVals[j], tx + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false });
+        tx += sumScaled[j].width;
+      }
+      doc.rect(tableLeft, currentY, pageWidth, rowHeight).stroke(borderColor);
+      currentY += rowHeight;
+
+      // --- Audit Trail ---
+      currentY += 20;
       if (currentY + 70 > maxY) {
         doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
         currentY = 36;
       }
-      currentY += 16;
       doc.moveTo(36, currentY).lineTo(36 + pageWidth, currentY).strokeColor(accentHex).lineWidth(2).stroke();
       currentY += 8;
       doc.fontSize(8).fillColor("#333333").text("Audit Trail", 36, currentY, { underline: true });
