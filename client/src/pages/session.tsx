@@ -867,7 +867,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
         const dotIdx = filename.lastIndexOf(".");
         const base = dotIdx > 0 ? filename.substring(0, dotIdx) : filename;
         const ext = dotIdx > 0 ? filename.substring(dotIdx) : "";
-        filename = `${base}_${String(count).padStart(2, "0")}${ext}`;
+        filename = `${base}_${String(count).padStart(4, "0")}${ext}`;
       }
       return {
         url: p.objectStorageKey.startsWith("/uploads/") ? p.objectStorageKey : p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/uploads/${p.objectStorageKey}`,
@@ -1079,11 +1079,12 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
           const dotIdx = file.name.lastIndexOf(".");
           const base = dotIdx > 0 ? file.name.substring(0, dotIdx) : file.name;
           const ext = dotIdx > 0 ? file.name.substring(dotIdx) : "";
-          const numberedName = `${base}_${String(existingCount + prev.length + 1).padStart(2, "0")}${ext}`;
+          const numberedName = `${base}_${String(existingCount + prev.length + 1).padStart(4, "0")}${ext}`;
           return [...prev, {
             url: photoUrl,
             objectPath: result.objectPath,
             section: "",
+            aisle: aisle || "",
             dbId: savedPhoto.id,
             filename: numberedName,
             timestamp: new Date().toLocaleString(),
@@ -1126,9 +1127,10 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
 
     if (x < 0 || x > 100 || y < 0 || y > 100) return;
 
-    const existingNumbers = localPins
-      .map((p) => parseInt(p.label, 10))
-      .filter((n) => !isNaN(n));
+    const existingNumbers = [
+      ...localPins.map((p) => parseInt(p.label, 10)),
+      ...committedPins.map((p) => parseInt(p.label, 10)),
+    ].filter((n) => !isNaN(n));
     let nextNumber = 1;
     while (existingNumbers.includes(nextNumber)) {
       nextNumber++;
