@@ -2932,6 +2932,13 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                     className="w-full rounded-md object-cover max-h-48"
                     data-testid={`img-mobile-photo-${photo.id}`}
                   />
+                  {(photo.aisle || (photo.section && photo.section !== "000")) && (
+                    <p className="text-xs text-muted-foreground">
+                      {photo.aisle && <span>Aisle {photo.aisle}</span>}
+                      {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
+                      {photo.section && photo.section !== "000" && <span>Section {photo.section}</span>}
+                    </p>
+                  )}
                   <div className="space-y-1">
                     <Label className="text-xs underline">Notes:</Label>
                     <Textarea
