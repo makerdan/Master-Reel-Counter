@@ -325,6 +325,7 @@ function SessionWorkspace({
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditSessionOpen(true); }}>
+              <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
               <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTime(session.firstPhotoAt, session.lastPhotoAt)}</span>
             </div>
           </div>
@@ -335,7 +336,7 @@ function SessionWorkspace({
                 Team
               </Button>
             )}
-            <Button size="sm" variant={captureMode ? "default" : "outline"} onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
+            <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
               {captureMode ? <ListPlus className="h-3 w-3 mr-1" /> : <Camera className="h-3 w-3 mr-1" />}
               {captureMode ? "Full Mode" : "Mobile Flow"}
             </Button>
@@ -2097,6 +2098,9 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                         alt={photo.filename || `Photo ${idx + 1}`}
                         className="w-16 h-12 object-cover rounded-[4px]"
                       />
+                      <div className="text-[10px] text-center truncate max-w-[64px] text-muted-foreground mt-0.5">
+                        {photo.section || `#${idx + 1}`}
+                      </div>
                     </button>
                   );
                 })}
