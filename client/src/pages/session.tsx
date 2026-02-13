@@ -1793,7 +1793,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   {currentPhoto.filename}
                 </span>
               )}
-              <div className="flex items-center gap-3 w-full">
+              <div className="flex items-center w-full">
+                <div className="flex-1" />
                 <div className="flex items-center gap-3">
                   <Button
                     size="icon"
@@ -1804,9 +1805,29 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
-                  <span className="text-sm mono text-[hsl(30_40%_85%)] min-w-[60px] text-center" data-testid="text-photo-counter-bottom">
-                    {String(currentPhotoIdx + 1).padStart(2, "0")} / {String(uploadedPhotos.length).padStart(2, "0")}
-                  </span>
+                  <div className="flex items-center gap-1 text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter-bottom">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      className="w-8 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
+                      value={String(currentPhotoIdx + 1).padStart(2, "0")}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val) && val >= 1 && val <= uploadedPhotos.length) {
+                          flushSavePins().then(() => {
+                            skipAutoSave.current = true;
+                            setLocalPins([]);
+                            setViewingNearbyIdx(null);
+                            setCurrentPhotoIdx(val - 1);
+                            resetView();
+                          });
+                        }
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      data-testid="input-photo-number"
+                    />
+                    <span>/ {String(uploadedPhotos.length).padStart(2, "0")}</span>
+                  </div>
                   <Button
                     size="icon"
                     className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
@@ -1817,7 +1838,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                     <ChevronRight className="h-5 w-5" />
                   </Button>
                 </div>
-                <div className="ml-auto flex items-center">
+                <div className="flex-1 flex justify-end">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
