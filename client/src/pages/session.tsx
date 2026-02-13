@@ -222,6 +222,7 @@ function SessionWorkspace({
   const [editLocation, setEditLocation] = useState(session.location || "");
 
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
+  const [mobileFlowKey, setMobileFlowKey] = useState(0);
 
   const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
 
@@ -324,29 +325,7 @@ function SessionWorkspace({
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditSessionOpen(true); }}>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
-                <Badge
-                  variant={session.status === "active" ? "default" : "secondary"}
-                  className="no-default-hover-elevate no-default-active-elevate"
-                  data-testid="badge-session-status"
-                >
-                  {session.status}
-                </Badge>
-                {(session as any).role && (session as any).role !== "owner" && (
-                  <Badge
-                    variant="outline"
-                    className="no-default-hover-elevate no-default-active-elevate"
-                    data-testid="badge-user-role"
-                  >
-                    {(session as any).role === "editor" ? "Editor" : "Viewer"}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="mono" data-testid="text-entry-count">{entries.length} entries</span>
-                <span className="mono" data-testid="text-session-time">{formatSessionTime(session.firstPhotoAt, session.lastPhotoAt)}</span>
-              </div>
+              <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTime(session.firstPhotoAt, session.lastPhotoAt)}</span>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -356,9 +335,9 @@ function SessionWorkspace({
                 Team
               </Button>
             )}
-            <Button size="sm" variant={captureMode ? "default" : "outline"} onClick={() => setCaptureMode(!captureMode)} data-testid="button-toggle-mobile">
+            <Button size="sm" variant={captureMode ? "default" : "outline"} onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
               {captureMode ? <ListPlus className="h-3 w-3 mr-1" /> : <Camera className="h-3 w-3 mr-1" />}
-              {captureMode ? "Full Mode" : "Capture"}
+              {captureMode ? "Full Mode" : "Mobile Flow"}
             </Button>
             <Button size="sm" variant="outline" onClick={exportCsv} data-testid="button-export-csv">
               <Download className="h-3 w-3" />
@@ -375,7 +354,7 @@ function SessionWorkspace({
 
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
         {captureMode ? (
-          <MobileCaptureView sessionId={sessionId} photos={photos} />
+          <MobileCaptureView key={mobileFlowKey} sessionId={sessionId} photos={photos} />
         ) : (
           <>
             <Tabs value={mode} onValueChange={setMode}>
@@ -2117,11 +2096,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                         src={photo.url}
                         alt={photo.filename || `Photo ${idx + 1}`}
                         className="w-16 h-12 object-cover rounded-[4px]"
-                        style={{ transform: photo.isDetailShot ? undefined : undefined }}
                       />
-                      <div className="text-[10px] text-center truncate max-w-[64px] text-muted-foreground mt-0.5">
-                        {photo.section || `#${idx + 1}`}
-                      </div>
                     </button>
                   );
                 })}
@@ -2822,10 +2797,6 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         section: p.section || "",
       }));
       setRecentPhotos(mapped);
-      const firstAisle = photos.find(p => p.aisle)?.aisle;
-      if (firstAisle && !aisle) setAisle(firstAisle);
-      const firstSection = photos.find(p => p.section)?.section;
-      if (firstSection && !section) setSection(firstSection);
     }
   }, [photos]);
 
