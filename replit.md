@@ -4,6 +4,9 @@
 A full-stack warehouse wire reel counting application built with React, Express, PostgreSQL, and Replit integrations. Tracks wire reels across pallet sections with photo annotation, manual category entry with catalog autocomplete, and PDF/CSV export capabilities.
 
 ## Recent Changes
+- 2026-02-13: Pin size controls — plus/minus buttons in photo overlay toolbar scale pin markers from 0.5x to 3x via CSS --pin-scale variable, ideal for close-up shots
+- 2026-02-13: Centered photo navigation — top and bottom nav bars center prev/next buttons with typeable photo number input for direct jump
+- 2026-02-13: Photo deletion — trash button in bottom nav bar with confirmation dialog, cascades pin removal
 - 2026-02-13: Single Entry photo-to-pin-mode — photos captured in Single Entry mode now switch to Section Photo mode's full pin-placing interface (zoom/pan/rotate, pin placement, category autocomplete) for that photo
 - 2026-02-11: Collaborative session sharing — team members can work together with role-based permissions (owner/editor/viewer)
 - 2026-02-11: Three invite methods — invite by username, shareable link (token-based), or email (mailto: with auto-generated invite link)
