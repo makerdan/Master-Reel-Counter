@@ -2320,6 +2320,41 @@ function SingleEntryMode({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      {!editingEntry && (
+        <div className="space-y-2">
+          <Label className="text-xs underline">Photo (optional):</Label>
+          <input ref={singleFileRef} type="file" accept="image/*" className="hidden" onChange={handleSinglePhoto} data-testid="input-single-file" />
+          <input ref={singleCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleSinglePhoto} data-testid="input-single-camera" />
+          {capturedPhoto ? (
+            <div className="relative rounded-md overflow-hidden border border-border/50">
+              <img src={capturedPhoto.objectPath.startsWith("/uploads/") ? capturedPhoto.objectPath : `/uploads/${capturedPhoto.objectPath}`} alt="Captured" className="w-full max-h-48 object-cover" data-testid="img-captured-photo" />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="absolute top-1 right-1 bg-black/50 text-white"
+                onClick={() => setCapturedPhoto(null)}
+                data-testid="button-remove-photo"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload">
+                <ImagePlus className="h-4 w-4" />
+                Upload Photo
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera">
+                <Camera className="h-4 w-4" />
+                Take Photo
+              </Button>
+              {isUploading && <Loader2 className="h-4 w-4 animate-spin self-center" />}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="space-y-1">
           <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
@@ -2444,41 +2479,6 @@ function SingleEntryMode({
         <Label className="text-xs underline">Notes:</Label>
         <Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Notes..." rows={2} data-testid="input-notes" />
       </div>
-
-      {!editingEntry && (
-        <div className="space-y-2">
-          <Label className="text-xs underline">Photo (optional):</Label>
-          <input ref={singleFileRef} type="file" accept="image/*" className="hidden" onChange={handleSinglePhoto} data-testid="input-single-file" />
-          <input ref={singleCameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleSinglePhoto} data-testid="input-single-camera" />
-          {capturedPhoto ? (
-            <div className="relative rounded-md overflow-hidden border border-border/50">
-              <img src={capturedPhoto.objectPath.startsWith("/uploads/") ? capturedPhoto.objectPath : `/uploads/${capturedPhoto.objectPath}`} alt="Captured" className="w-full max-h-48 object-cover" data-testid="img-captured-photo" />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="absolute top-1 right-1 bg-black/50 text-white"
-                onClick={() => setCapturedPhoto(null)}
-                data-testid="button-remove-photo"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload">
-                <ImagePlus className="h-4 w-4" />
-                Upload Photo
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera">
-                <Camera className="h-4 w-4" />
-                Take Photo
-              </Button>
-              {isUploading && <Loader2 className="h-4 w-4 animate-spin self-center" />}
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         {!editingEntry && (
