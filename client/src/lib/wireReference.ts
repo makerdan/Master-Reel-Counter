@@ -37,6 +37,7 @@ export interface ParsedCatalogEntry extends CatalogEntry {
   wireSize?: string;
   color?: string;
   footage?: number;
+  conductors?: string;
 }
 
 export function parseCatalogEntry(entry: CatalogEntry): ParsedCatalogEntry {
@@ -82,7 +83,30 @@ export function parseCatalogEntry(entry: CatalogEntry): ParsedCatalogEntry {
     footage = parseInt(footageMatch[1]);
   }
 
-  return { ...entry, wireType, wireSize, color, footage };
+  let conductors: string | undefined;
+  if (desc.toUpperCase().includes("TRIPLEX")) {
+    conductors = "3";
+  } else if (desc.toUpperCase().includes("QUADRUPLEX") || desc.toUpperCase().includes("QUADPLEX")) {
+    conductors = "4";
+  } else if (desc.toUpperCase().includes("DUPLEX")) {
+    conductors = "2";
+  } else {
+    const multiConductorMatch = desc.match(/(\d+(?:\/\d+)?(?:-\d+(?:\/\d+)?){1,})/);
+    if (multiConductorMatch) {
+      const parts = multiConductorMatch[1].split("-");
+      if (parts.length >= 2) {
+        conductors = parts.length.toString();
+      }
+    } else {
+      const slashNotation = entry.catalog.match(/(\d+)\/(\d+)/);
+      const descSlash = desc.match(/(\d+)\/(\d)\s/);
+      if (descSlash && !desc.match(/\d+\/0/)) {
+        conductors = descSlash[2];
+      }
+    }
+  }
+
+  return { ...entry, wireType, wireSize, color, footage, conductors };
 }
 
 export const CATALOG: CatalogEntry[] = [

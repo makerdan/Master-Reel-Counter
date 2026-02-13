@@ -61,7 +61,7 @@ export function isEncrypted(value: string | null | undefined): boolean {
 }
 
 const ENCODABLE_ENTRY_FIELDS = [
-  "reelTag", "wireType", "gauge", "color", "manufacturer", "notes", "palletId", "position",
+  "reelTag", "wireType", "gauge", "color", "manufacturer", "notes", "palletId", "position", "conductors",
 ] as const;
 
 export function encryptEntry(entry: Record<string, any>, key: Buffer): Record<string, any> {

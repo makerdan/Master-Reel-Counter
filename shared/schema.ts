@@ -62,6 +62,7 @@ export const entries = pgTable("entries", {
   color: text("color"),
   manufacturer: text("manufacturer"),
   notes: text("notes"),
+  conductors: text("conductors"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -25,7 +25,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter,
 } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -221,6 +221,8 @@ function SessionWorkspace({
   const [editName, setEditName] = useState(session.name);
   const [editLocation, setEditLocation] = useState(session.location || "");
 
+  const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
+
   const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
 
   const updateSession = useMutation({
@@ -250,14 +252,14 @@ function SessionWorkspace({
       const exportEntries = data.entries || entries;
       const exportPhotos = data.photos || [];
       const photoMap = new Map(exportPhotos.map((p: any) => [p.id, p]));
-      const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Reel Count", "Color", "Manufacturer", "Notes", "Photo", "Photo Notes", "Detail Shot", "Parent Photo"];
+      const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Reel Count", "Conductors", "Color", "Manufacturer", "Notes", "Photo", "Photo Notes", "Detail Shot", "Parent Photo"];
       const rows = exportEntries.map((e: any, i: number) => {
         const photo = e.photoId ? photoMap.get(e.photoId) : null;
         const parentPhoto = photo?.parentPhotoId ? photoMap.get(photo.parentPhotoId) : null;
         return [
           i + 1, e.aisle, e.section, e.position || "", e.palletId || "", e.reelTag || "",
           e.wireType || "", e.gauge || "", e.footage || "", e.reelCount || 1,
-          e.color || "", e.manufacturer || "", e.notes || "",
+          e.conductors || "", e.color || "", e.manufacturer || "", e.notes || "",
           photo?.originalFilename || "", photo?.notes || "",
           photo?.isDetailShot ? "Yes" : "", parentPhoto?.originalFilename || "",
         ];
@@ -295,7 +297,7 @@ function SessionWorkspace({
           <td>${i + 1}</td><td>${esc(e.aisle)}</td><td>${esc(e.section)}</td><td>${esc(e.position || "")}</td>
           <td>${esc(e.palletId || "")}</td><td>${esc(e.reelTag || "")}</td><td>${esc(e.wireType || "")}</td>
           <td>${esc(e.gauge || "")}</td><td>${e.footage || ""}</td>
-          <td>${e.reelCount || 1}</td><td>${esc(e.color || "")}</td><td>${esc(e.manufacturer || "")}</td>
+          <td>${e.reelCount || 1}</td><td>${esc(e.conductors || "")}</td><td>${esc(e.color || "")}</td><td>${esc(e.manufacturer || "")}</td>
           <td>${esc(e.notes || "")}</td>
         </tr>
       `).join("");
@@ -305,7 +307,7 @@ function SessionWorkspace({
         h1{font-size:18px}h2{font-size:14px;color:#666;margin-top:4px}.audit{margin-top:20px;font-size:10px;color:#999;border-top:1px solid #ddd;padding-top:8px}</style></head><body>
         <h1>Master Reel Counter - ${session.name}</h1>
         <h2>Location: ${session.location || "N/A"} | Entries: ${entries.length} | Total Footage: ${totalFootage.toLocaleString()} ft</h2>
-        <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Reel Count</th><th>Color</th><th>Manufacturer</th><th>Notes</th></tr></thead>
+        <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Reel Count</th><th>Conductors</th><th>Color</th><th>Manufacturer</th><th>Notes</th></tr></thead>
         <tbody>${rowsHtml}</tbody></table>
         <div class="audit">Generated: ${new Date().toISOString()} | First photo: ${session.firstPhotoAt ? new Date(session.firstPhotoAt).toISOString() : "N/A"} | Last photo: ${session.lastPhotoAt ? new Date(session.lastPhotoAt).toISOString() : "N/A"}</div>
         <script>setTimeout(()=>window.print(),500)</script></body></html>`);
@@ -354,6 +356,10 @@ function SessionWorkspace({
                 Team
               </Button>
             )}
+            <Button size="sm" variant={captureMode ? "default" : "outline"} onClick={() => setCaptureMode(!captureMode)} data-testid="button-toggle-mobile">
+              {captureMode ? <ListPlus className="h-3 w-3 mr-1" /> : <Camera className="h-3 w-3 mr-1" />}
+              {captureMode ? "Full Mode" : "Capture"}
+            </Button>
             <Button size="sm" variant="outline" onClick={exportCsv} data-testid="button-export-csv">
               <Download className="h-3 w-3" />
               CSV
@@ -368,36 +374,42 @@ function SessionWorkspace({
       </header>
 
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
-        <Tabs value={mode} onValueChange={setMode}>
-          <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
-            <TabsTrigger value="photo" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode">
-              <Camera className="h-4 w-4 mr-1" />
-              Section Photo
-            </TabsTrigger>
-            <TabsTrigger value="single" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode">
-              <ListPlus className="h-4 w-4 mr-1" />
-              Single Entry
-            </TabsTrigger>
-          </TabsList>
+        {captureMode ? (
+          <MobileCaptureView sessionId={sessionId} photos={photos} />
+        ) : (
+          <>
+            <Tabs value={mode} onValueChange={setMode}>
+              <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
+                <TabsTrigger value="photo" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode">
+                  <Camera className="h-4 w-4 mr-1" />
+                  Section Photo
+                </TabsTrigger>
+                <TabsTrigger value="single" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode">
+                  <ListPlus className="h-4 w-4 mr-1" />
+                  Single Entry
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="photo">
-            <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} />
-          </TabsContent>
+              <TabsContent value="photo">
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} />
+              </TabsContent>
 
-          <TabsContent value="single">
-            <SingleEntryMode
-              sessionId={sessionId}
-              editingEntry={editingEntry}
-              onDoneEditing={() => setEditingEntry(null)}
-              onSwitchToPhoto={(photoId: number, aisleVal: string, sectionVal: string) => {
-                setNavigateToPhotoId(photoId);
-                setNavigateAisle(aisleVal);
-                setNavigateSection(sectionVal);
-                setMode("photo");
-              }}
-            />
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="single">
+                <SingleEntryMode
+                  sessionId={sessionId}
+                  editingEntry={editingEntry}
+                  onDoneEditing={() => setEditingEntry(null)}
+                  onSwitchToPhoto={(photoId: number, aisleVal: string, sectionVal: string) => {
+                    setNavigateToPhotoId(photoId);
+                    setNavigateAisle(aisleVal);
+                    setNavigateSection(sectionVal);
+                    setMode("photo");
+                  }}
+                />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
 
         <Separator />
 
@@ -407,6 +419,7 @@ function SessionWorkspace({
           totalFootage={totalFootage}
           sessionId={sessionId}
           onEdit={(entry) => { setEditingEntry(entry); setMode("single"); }}
+          photos={photos}
         />
       </div>
 
@@ -416,6 +429,16 @@ function SessionWorkspace({
             <DialogHeader>
               <DialogTitle>Edit Entry #{editingEntry.id}</DialogTitle>
             </DialogHeader>
+            {editingEntry.photoId && (() => {
+              const photo = photos.find(p => p.id === editingEntry.photoId);
+              if (!photo) return null;
+              const imgSrc = photo.objectStorageKey.startsWith("/uploads/") ? photo.objectStorageKey : `/uploads/${photo.objectStorageKey}`;
+              return (
+                <div className="rounded-md overflow-hidden border border-border/50 mb-2">
+                  <img src={imgSrc} alt="Entry photo" className="w-full max-h-48 object-cover" data-testid="img-edit-entry-photo" />
+                </div>
+              );
+            })()}
             <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} />
           </DialogContent>
         </Dialog>
@@ -2337,6 +2360,7 @@ function SingleEntryMode({
     manufacturer: editingEntry?.manufacturer || "",
     notes: editingEntry?.notes || "",
     reelCount: editingEntry?.reelCount?.toString() || "1",
+    conductors: editingEntry?.conductors || "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -2355,12 +2379,25 @@ function SingleEntryMode({
         manufacturer: editingEntry.manufacturer || "",
         notes: editingEntry.notes || "",
         reelCount: editingEntry.reelCount?.toString() || "1",
+        conductors: editingEntry.conductors || "",
       });
       setCapturedPhoto(null);
       setErrors({});
       setTouched({});
     }
   }, [editingEntry]);
+
+  useEffect(() => {
+    if (form.reelTag && form.reelTag.length >= 2) {
+      const matches = lookupCategory(form.reelTag);
+      const normalized = form.reelTag.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const exact = matches.find(m => m.catalog === normalized);
+      const match = exact || (matches.length === 1 ? matches[0] : null);
+      if (match && match.conductors && !form.conductors) {
+        setForm(f => ({ ...f, conductors: match.conductors || "" }));
+      }
+    }
+  }, [form.reelTag]);
 
   const handleSinglePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2435,6 +2472,7 @@ function SingleEntryMode({
         color: form.color && form.color !== "__none__" ? form.color : null,
         manufacturer: form.manufacturer || null,
         notes: form.notes || null,
+        conductors: form.conductors || null,
       };
       if (!editingEntry && capturedPhoto) body.photoId = capturedPhoto.photoId;
 
@@ -2456,7 +2494,7 @@ function SingleEntryMode({
           aisle: keepLocation ? savedAisle : "",
           section: keepLocation ? savedSection : "",
           position: "", reelTag: "", wireType: "", gauge: "",
-          footage: "", color: "", manufacturer: "", notes: "", reelCount: "1",
+          footage: "", color: "", manufacturer: "", notes: "", reelCount: "1", conductors: "",
         });
         setCapturedPhoto(null);
         setErrors({});
@@ -2580,6 +2618,19 @@ function SingleEntryMode({
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs underline">Conductors:</Label>
+          <Input
+            value={form.conductors}
+            onChange={(e) => update("conductors", e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="# conductors"
+            inputMode="numeric"
+            data-testid="input-conductors"
+          />
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="space-y-1">
           <Label className="text-xs underline">Wire Type:</Label>
@@ -2677,16 +2728,204 @@ function SingleEntryMode({
   );
 }
 
+function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: Photo[] }) {
+  const { toast } = useToast();
+  const { uploadFile, isUploading } = useUpload();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [aisle, setAisle] = useState("");
+  const [section, setSection] = useState("");
+  const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string }>>([]);
+  const [savingNotes, setSavingNotes] = useState<Record<number, boolean>>({});
+  const notesTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  const isReceiving = aisle.trim().toLowerCase() === "receiving";
+
+  useEffect(() => {
+    if (photos.length > 0) {
+      const mapped = photos.map(p => ({
+        id: p.id,
+        objectPath: p.objectStorageKey,
+        notes: p.notes || "",
+        aisle: p.aisle || "",
+        section: p.section || "",
+      }));
+      setRecentPhotos(mapped);
+      const firstAisle = photos.find(p => p.aisle)?.aisle;
+      if (firstAisle && !aisle) setAisle(firstAisle);
+      const firstSection = photos.find(p => p.section)?.section;
+      if (firstSection && !section) setSection(firstSection);
+    }
+  }, [photos]);
+
+  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const result = await uploadFile(file);
+        if (!result) {
+          toast({ title: "Upload failed", variant: "destructive" });
+          continue;
+        }
+        const sectionValue = isReceiving && !section.trim() ? "000" : section;
+        const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
+          objectStorageKey: result.objectPath,
+          originalFilename: file.name,
+          mimeType: file.type,
+          aisle: aisle,
+          section: sectionValue,
+        });
+        const savedPhoto = await res.json();
+        setRecentPhotos(prev => [...prev, {
+          id: savedPhoto.id,
+          objectPath: result.objectPath,
+          notes: "",
+          aisle: aisle,
+          section: sectionValue,
+        }]);
+        toast({ title: `Photo ${i + 1} captured` });
+      } catch {
+        toast({ title: "Photo upload failed", variant: "destructive" });
+      }
+    }
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const updatePhotoNotes = useCallback((photoId: number, notes: string) => {
+    setRecentPhotos(prev => prev.map(p => p.id === photoId ? { ...p, notes } : p));
+    if (notesTimerRef.current[photoId]) clearTimeout(notesTimerRef.current[photoId]);
+    notesTimerRef.current[photoId] = setTimeout(async () => {
+      setSavingNotes(prev => ({ ...prev, [photoId]: true }));
+      try {
+        await apiRequest("PATCH", `/api/photos/${photoId}`, { notes });
+      } catch {}
+      setSavingNotes(prev => ({ ...prev, [photoId]: false }));
+    }, 800);
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
+              <Input
+                value={aisle}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val.toLowerCase() === "rec") {
+                    setAisle("Receiving");
+                  } else {
+                    setAisle(val);
+                  }
+                }}
+                placeholder="Aisle"
+                data-testid="input-mobile-aisle"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs underline">Section:{!isReceiving && <span className="text-destructive"> *</span>}</Label>
+              <Input
+                value={section}
+                onChange={(e) => setSection(e.target.value)}
+                placeholder={isReceiving ? "Optional" : "Section"}
+                data-testid="input-mobile-section"
+              />
+            </div>
+          </div>
+
+          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
+
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              size="lg"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={isUploading || !aisle.trim()}
+              data-testid="button-mobile-camera"
+            >
+              {isUploading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Camera className="h-5 w-5 mr-2" />}
+              Take Photo
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading || !aisle.trim()}
+              data-testid="button-mobile-upload"
+            >
+              <ImagePlus className="h-5 w-5" />
+            </Button>
+          </div>
+          {!aisle.trim() && (
+            <p className="text-xs text-muted-foreground">Enter an aisle before capturing photos.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {recentPhotos.length > 0 && (
+        <Card>
+          <CardHeader className="p-3">
+            <CardTitle className="text-sm" data-testid="text-mobile-photo-count">{recentPhotos.length} Photos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0 space-y-3">
+            {[...recentPhotos].reverse().map((photo) => {
+              const imgSrc = photo.objectPath.startsWith("/uploads/") ? photo.objectPath : `/uploads/${photo.objectPath}`;
+              return (
+                <div key={photo.id} className="space-y-2 border-b border-border/50 pb-3 last:border-0 last:pb-0" data-testid={`mobile-photo-${photo.id}`}>
+                  <img
+                    src={imgSrc}
+                    alt={`Photo ${photo.id}`}
+                    className="w-full rounded-md object-cover max-h-48"
+                    data-testid={`img-mobile-photo-${photo.id}`}
+                  />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {photo.aisle && <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{photo.aisle}</Badge>}
+                    {photo.section && photo.section !== "000" && <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{photo.section}</Badge>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs underline">Notes:</Label>
+                    <Textarea
+                      value={photo.notes}
+                      onChange={(e) => updatePhotoNotes(photo.id, e.target.value)}
+                      placeholder="Photo notes..."
+                      rows={2}
+                      data-testid={`input-mobile-notes-${photo.id}`}
+                    />
+                    {savingNotes[photo.id] && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function EntryTable({
-  entries, loading, totalFootage, sessionId, onEdit,
+  entries, loading, totalFootage, sessionId, onEdit, photos,
 }: {
   entries: Entry[];
   loading: boolean;
   totalFootage: number;
   sessionId: number;
   onEdit: (entry: Entry) => void;
+  photos: Photo[];
 }) {
   const { toast } = useToast();
+  const photoMap = new Map(photos.map(p => [p.id, p]));
 
   const deleteEntry = useMutation({
     mutationFn: async (id: number) => {
@@ -2753,6 +2992,7 @@ function EntryTable({
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ft/Reel:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Total Ft:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
+                <th style={{ width: 50, textAlign: "center" }}>Photo:</th>
                 <th style={{ width: 70, textAlign: "center" }}>Actions:</th>
               </tr>
             </thead>
@@ -2769,10 +3009,10 @@ function EntryTable({
                       onClick={() => toggleSection(sectionKey)}
                       data-testid={`section-toggle-${sectionKey}`}
                     >
-                      <td colSpan={9}>
+                      <td colSpan={10}>
                         <div className="flex items-center gap-2">
                           <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
-                          <span className="font-semibold">Aisle {aisleLabel} - Section {sectionLabel}</span>
+                          <span className="font-semibold">{aisleLabel.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${aisleLabel}`} - {aisleLabel.toLowerCase() === "receiving" && sectionLabel === "000" ? "Section Unknown" : `Section ${sectionLabel}`}</span>
                           <span className="text-muted-foreground">({sectionEntries.length} {sectionEntries.length === 1 ? "entry" : "entries"}, {sectionFootage.toLocaleString()} ft. total)</span>
                         </div>
                       </td>
@@ -2788,6 +3028,30 @@ function EntryTable({
                         <td className="mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.totalFootage ? `${info.totalFootage.toLocaleString()}'` : "-"}</td>
                         <td style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
+                        <td style={{ textAlign: "center" }}>
+                          {entry.photoId && photoMap.get(entry.photoId) ? (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button size="icon" variant="ghost" data-testid={`button-view-photo-${entry.id}`}>
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>Photo - {photoMap.get(entry.photoId)?.originalFilename || "Photo"}</DialogTitle>
+                                </DialogHeader>
+                                <img
+                                  src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
+                                  alt="Entry photo"
+                                  className="w-full rounded-md"
+                                  data-testid={`img-entry-photo-${entry.id}`}
+                                />
+                              </DialogContent>
+                            </Dialog>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
                         <td style={{ textAlign: "center" }}>
                           <div className="flex items-center justify-center gap-1">
                             <Button
@@ -2836,7 +3100,7 @@ function EntryTable({
                 <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage">
                   {totalFootage.toLocaleString()}'
                 </td>
-                <td colSpan={2} />
+                <td colSpan={3} />
               </tr>
             </tfoot>
           </table>
