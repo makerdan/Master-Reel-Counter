@@ -376,6 +376,7 @@
   transform: translateY(-50%);
 }
 .photo-overlay-btn {
+  position: relative;
   width: 36px;
   height: 36px;
   border-radius: 6px;
@@ -399,6 +400,12 @@
   background: rgba(234, 88, 12, 1);
 }
 
+.photo-overlay-divider {
+  width: 24px;
+  height: 1px;
+  background: rgba(255,255,255,0.2);
+  margin: 2px 0;
+}
 .pin-marker {
   position: absolute;
   display: flex;
@@ -407,7 +414,7 @@
   gap: 2px;
   min-width: 54px;
   padding: 3px 4px;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(var(--pin-scale, 1));
   cursor: grab;
   pointer-events: auto;
   transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
@@ -420,12 +427,12 @@
   box-shadow: 0 2px 6px rgba(0,0,0,0.35);
 }
 .pin-marker:hover {
-  transform: translate(-50%, -50%) scale(1.08);
+  transform: translate(-50%, -50%) scale(calc(var(--pin-scale, 1) * 1.08));
   opacity: 0.9;
   box-shadow: 0 3px 8px rgba(0,0,0,0.4);
 }
 .pin-marker.selected {
-  transform: translate(-50%, -50%) scale(1.08);
+  transform: translate(-50%, -50%) scale(calc(var(--pin-scale, 1) * 1.08));
   opacity: 0.95;
   box-shadow: 0 0 0 3px hsl(var(--ring)), 0 3px 8px rgba(0,0,0,0.4);
 }
@@ -440,10 +447,11 @@
   min-height: 61px;
   padding: 0;
   box-shadow: none;
+  transform: translate(-50%, -50%) scale(var(--pin-scale, 1));
 }
 .pin-marker.committed:hover {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translate(-50%, -50%) scale(var(--pin-scale, 1));
 }
 .pin-marker.committed .pin-committed-topbar {
   position: absolute;
@@ -488,7 +496,7 @@
 }
 .pin-marker.dragging {
   cursor: grabbing;
-  transform: translate(-50%, -50%) scale(1.12);
+  transform: translate(-50%, -50%) scale(calc(var(--pin-scale, 1) * 1.12));
   z-index: 100;
   opacity: 0.95;
 }

@@ -5,7 +5,7 @@ import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Cable,
   Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  Users, Copy, Link, Mail, UserPlus, UserMinus, ImagePlus,
+  Users, Copy, Link, Mail, UserPlus, UserMinus, ImagePlus, Crosshair,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -817,6 +817,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
   const [panY, setPanY] = useState(0);
   const [rotation, setRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
+  const [pinScale, setPinScale] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1509,7 +1510,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
       {uploadedPhotos.length > 0 && (
         <>
           <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 space-y-1">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center w-full">
+              <div className="flex-1" />
               <div className="flex items-center gap-2">
                 <Button
                   size="icon"
@@ -1520,9 +1522,29 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
-                <span className="text-sm mono text-[hsl(30_40%_85%)] min-w-[60px] text-center" data-testid="text-photo-counter">
-                  {String(currentPhotoIdx + 1).padStart(2, "0")} / {String(uploadedPhotos.length).padStart(2, "0")}
-                </span>
+                <div className="flex items-center gap-1 text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="w-8 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
+                    value={String(currentPhotoIdx + 1).padStart(2, "0")}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val) && val >= 1 && val <= uploadedPhotos.length) {
+                        flushSavePins().then(() => {
+                          skipAutoSave.current = true;
+                          setLocalPins([]);
+                          setViewingNearbyIdx(null);
+                          setCurrentPhotoIdx(val - 1);
+                          resetView();
+                        });
+                      }
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    data-testid="input-photo-number-top"
+                  />
+                  <span>/ {String(uploadedPhotos.length).padStart(2, "0")}</span>
+                </div>
                 <Button
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
@@ -1533,7 +1555,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   <ChevronRight className="h-5 w-5" />
                 </Button>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex-1 flex justify-end gap-2">
                 <Input
                   value={currentPhoto?.section || ""}
                   onChange={(e) => {
@@ -1608,6 +1630,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 style={{
                   transform: `scale(${scale}) translate(${panX}px, ${panY}px) rotate(${rotation}deg)`,
                   transformOrigin: "center center",
+                  ["--pin-scale" as string]: pinScale,
                 }}
               >
               <img
@@ -1781,6 +1804,25 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   data-testid="button-rotate-ccw"
                 >
                   <RotateCcw className="h-4 w-4" />
+                </button>
+                <div className="photo-overlay-divider" />
+                <button
+                  className="photo-overlay-btn"
+                  onClick={(e) => { e.stopPropagation(); setPinScale((s) => Math.min(3, +(s + 0.25).toFixed(2))); }}
+                  title="Increase pin size"
+                  data-testid="button-pin-size-up"
+                >
+                  <Crosshair className="h-4 w-4" />
+                  <Plus className="h-2.5 w-2.5 absolute bottom-0.5 right-0.5" />
+                </button>
+                <button
+                  className="photo-overlay-btn"
+                  onClick={(e) => { e.stopPropagation(); setPinScale((s) => Math.max(0.5, +(s - 0.25).toFixed(2))); }}
+                  title="Decrease pin size"
+                  data-testid="button-pin-size-down"
+                >
+                  <Crosshair className="h-4 w-4" />
+                  <span className="absolute bottom-0 right-0.5 text-[8px] font-bold leading-none">-</span>
                 </button>
               </div>
             </div>
