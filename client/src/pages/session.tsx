@@ -1131,6 +1131,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     const rawX = (e.clientX - rect.left) / rect.width;
     const rawY = (e.clientY - rect.top) / rect.height;
 
+    if (rawX < 0.048 || rawX > 0.952) return;
+
     const cx = 0.5, cy = 0.5;
     let relX = rawX - cx;
     let relY = rawY - cy;
