@@ -1214,15 +1214,13 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
   const panYRef = useRef(panY);
   panYRef.current = panY;
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
+  const zoomAtPoint = useCallback((clientX: number, clientY: number, newScale: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const cursorX = (e.clientX - rect.left) / rect.width - 0.5;
-    const cursorY = (e.clientY - rect.top) / rect.height - 0.5;
     const oldScale = scaleRef.current;
-    const newScale = Math.min(5, Math.max(1, oldScale + (e.deltaY < 0 ? 0.2 : -0.2)));
     if (newScale === oldScale) return;
+    const cursorX = (clientX - rect.left) / rect.width - 0.5;
+    const cursorY = (clientY - rect.top) / rect.height - 0.5;
     const adjX = panXRef.current + cursorX * (1 / newScale - 1 / oldScale) * rect.width;
     const adjY = panYRef.current + cursorY * (1 / newScale - 1 / oldScale) * rect.height;
     const clamped = clampPan(adjX, adjY, newScale);
@@ -1230,6 +1228,47 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     setPanX(clamped.x);
     setPanY(clamped.y);
   }, [clampPan]);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const oldScale = scaleRef.current;
+    const newScale = Math.min(5, Math.max(1, oldScale + (e.deltaY < 0 ? 0.2 : -0.2)));
+    zoomAtPoint(e.clientX, e.clientY, newScale);
+  }, [zoomAtPoint]);
+
+  const pinchRef = useRef<{ dist: number; midX: number; midY: number; scale: number } | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[1].clientX - e.touches[0].clientX;
+      const dy = e.touches[1].clientY - e.touches[0].clientY;
+      pinchRef.current = {
+        dist: Math.hypot(dx, dy),
+        midX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        scale: scaleRef.current,
+      };
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dx = e.touches[1].clientX - e.touches[0].clientX;
+      const dy = e.touches[1].clientY - e.touches[0].clientY;
+      const dist = Math.hypot(dx, dy);
+      const ratio = dist / pinchRef.current.dist;
+      const newScale = Math.min(5, Math.max(1, pinchRef.current.scale * ratio));
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      zoomAtPoint(midX, midY, newScale);
+    }
+  }, [zoomAtPoint]);
+
+  const handleTouchEnd = useCallback(() => {
+    pinchRef.current = null;
+  }, []);
 
   const screenToImagePercent = useCallback((clientX: number, clientY: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -1648,6 +1687,9 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
               onWheel={handleWheel}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
               data-testid="photo-viewer"
             >
               <div className="photo-scroll-strip left" onWheel={(e) => e.stopPropagation()} />
