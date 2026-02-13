@@ -1817,7 +1817,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                     <ChevronRight className="h-5 w-5" />
                   </Button>
                 </div>
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -1826,7 +1826,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                       className="text-red-400"
                       data-testid="button-delete-photo"
                     >
-                      <Trash2 className="h-8 w-8" />
+                      <Trash2 className="h-10 w-10" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
