@@ -1821,12 +1821,12 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
-                      size="icon"
+                      size="lg"
                       variant="ghost"
-                      className="text-red-400"
+                      className="text-red-400 px-2"
                       data-testid="button-delete-photo"
                     >
-                      <Trash2 className="h-10 w-10" />
+                      <Trash2 className="h-8 w-8" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
