@@ -1815,6 +1815,54 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 >
                   <ChevronRight className="h-5 w-5" />
                 </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-red-400"
+                      data-testid="button-delete-photo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Photo?</AlertDialogTitle>
+                      <AlertDialogDescription>This photo and all its pins will be permanently removed.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={async () => {
+                          const photoDbId = currentPhoto?.dbId;
+                          if (!photoDbId) return;
+                          try {
+                            await apiRequest("DELETE", `/api/photos/${photoDbId}`);
+                            setUploadedPhotos(prev => {
+                              const filtered = prev.filter((_, i) => i !== currentPhotoIdx);
+                              const newIdx = Math.min(currentPhotoIdx, Math.max(0, filtered.length - 1));
+                              setCurrentPhotoIdx(newIdx);
+                              return filtered;
+                            });
+                            setLocalPins([]);
+                            localPinsRef.current = [];
+                            setViewingNearbyIdx(null);
+                            resetView();
+                            queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+                            toast({ title: "Photo deleted" });
+                          } catch {
+                            toast({ title: "Failed to delete photo", variant: "destructive" });
+                          }
+                        }}
+                        data-testid="button-confirm-delete-photo"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           )}
