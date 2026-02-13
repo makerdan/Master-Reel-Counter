@@ -1418,7 +1418,8 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
           <Input
             value={aisle}
             onChange={(e) => {
-              const val = e.target.value;
+              let val = e.target.value;
+              if (val.toLowerCase() === "rec") val = "Receiving";
               setAisle(val);
               const photoDbId = currentPhoto?.dbId;
               if (aisleSaveTimer.current) clearTimeout(aisleSaveTimer.current);
@@ -2249,10 +2250,12 @@ function SingleEntryMode({
     setTouched((t) => ({ ...t, [field]: true }));
   };
 
+  const isReceiving = form.aisle.trim().toLowerCase() === "receiving";
+
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!form.aisle.trim()) newErrors.aisle = "Aisle is required";
-    if (!form.section.trim()) newErrors.section = "Section is required";
+    if (!isReceiving && !form.section.trim()) newErrors.section = "Section is required";
     if (form.footage && (isNaN(parseInt(form.footage)) || parseInt(form.footage) < 1)) newErrors.footage = "Must be a positive number";
     setErrors(newErrors);
     setTouched({ aisle: true, section: true, footage: true });
@@ -2264,9 +2267,10 @@ function SingleEntryMode({
       const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
       const perReelFootage = form.footage ? parseInt(form.footage) : null;
       const totalFootage = perReelFootage ? perReelFootage * reelCount : null;
+      const sectionValue = isReceiving && !form.section.trim() ? "000" : form.section;
       const body: Record<string, unknown> = {
         aisle: form.aisle,
-        section: form.section,
+        section: sectionValue,
         position: form.position && form.position !== "__none__" ? form.position : null,
         reelTag: form.reelTag.toUpperCase() || null,
         wireType: form.wireType || null,
@@ -2360,7 +2364,14 @@ function SingleEntryMode({
           <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
           <Input
             value={form.aisle}
-            onChange={(e) => update("aisle", e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val.toLowerCase() === "rec") {
+                update("aisle", "Receiving");
+              } else {
+                update("aisle", val);
+              }
+            }}
             onBlur={() => markTouched("aisle")}
             placeholder="Aisle"
             className={touched.aisle && errors.aisle ? "border-destructive" : ""}
