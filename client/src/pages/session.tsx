@@ -129,18 +129,19 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pi
   );
 }
 
-function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoAt: string | Date | null) {
+function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoAt: string | Date | null, elapsedOnly = false) {
   if (!firstPhotoAt) return "No photos yet";
   const fmt = (d: string | Date) => new Date(d).toLocaleString(undefined, {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
   if (!lastPhotoAt || new Date(firstPhotoAt).getTime() === new Date(lastPhotoAt).getTime()) {
-    return fmt(firstPhotoAt);
+    return elapsedOnly ? "0m" : fmt(firstPhotoAt);
   }
   const diff = new Date(lastPhotoAt).getTime() - new Date(firstPhotoAt).getTime();
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
   const elapsed = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  if (elapsedOnly) return elapsed;
   return `${fmt(firstPhotoAt)} - ${fmt(lastPhotoAt)} (${elapsed})`;
 }
 
@@ -326,7 +327,7 @@ function SessionWorkspace({
             </Button>
             <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditSessionOpen(true); }}>
               <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
-              <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTime(session.firstPhotoAt, session.lastPhotoAt)}</span>
+              <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTime(session.firstPhotoAt, session.lastPhotoAt, captureMode)}</span>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -2931,10 +2932,6 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                     className="w-full rounded-md object-cover max-h-48"
                     data-testid={`img-mobile-photo-${photo.id}`}
                   />
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {photo.aisle && <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{photo.aisle}</Badge>}
-                    {photo.section && photo.section !== "000" && <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{photo.section}</Badge>}
-                  </div>
                   <div className="space-y-1">
                     <Label className="text-xs underline">Notes:</Label>
                     <Textarea
