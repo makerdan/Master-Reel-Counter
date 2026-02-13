@@ -144,6 +144,17 @@ export default function Dashboard() {
     });
   };
 
+  const formatElapsedMinutes = (first: string | null, last: string | null) => {
+    if (!first || !last) return null;
+    const diff = new Date(last).getTime() - new Date(first).getTime();
+    if (diff <= 0) return null;
+    const totalMinutes = Math.round(diff / 60000);
+    if (totalMinutes < 60) return `${totalMinutes}m`;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
@@ -291,6 +302,10 @@ export default function Dashboard() {
                           {session.firstPhotoAt
                             ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
                             : "No photos yet"}
+                          {(() => {
+                            const elapsed = formatElapsedMinutes(session.firstPhotoAt, session.lastPhotoAt);
+                            return elapsed ? <Badge variant="secondary" className="ml-1 no-default-hover-elevate no-default-active-elevate text-[10px] px-1.5 py-0" data-testid={`badge-session-elapsed-${session.id}`}>{elapsed}</Badge> : null;
+                          })()}
                         </span>
                         <span className="flex items-center gap-1 mono" data-testid={`text-session-photos-${session.id}`}>
                           <Camera className="h-3 w-3" />
@@ -448,6 +463,10 @@ export default function Dashboard() {
                             {session.firstPhotoAt
                               ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
                               : "No photos yet"}
+                            {(() => {
+                              const elapsed = formatElapsedMinutes(session.firstPhotoAt, session.lastPhotoAt);
+                              return elapsed ? <Badge variant="secondary" className="ml-1 no-default-hover-elevate no-default-active-elevate text-[10px] px-1.5 py-0" data-testid={`badge-shared-session-elapsed-${session.id}`}>{elapsed}</Badge> : null;
+                            })()}
                           </span>
                           <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-photos-${session.id}`}>
                             <Camera className="h-3 w-3" />

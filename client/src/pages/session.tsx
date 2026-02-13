@@ -1541,8 +1541,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 <Button
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
-                  disabled={currentPhotoIdx <= 0}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
+                  disabled={uploadedPhotos.length <= 1}
+                  onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i - 1 + uploadedPhotos.length) % uploadedPhotos.length); resetView(); }}
                   data-testid="button-prev-photo"
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -1573,8 +1573,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 <Button
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
-                  disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
+                  disabled={uploadedPhotos.length <= 1}
+                  onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i + 1) % uploadedPhotos.length); resetView(); }}
                   data-testid="button-next-photo"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -1866,8 +1866,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   <Button
                     size="icon"
                     className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
-                    disabled={currentPhotoIdx <= 0}
-                    onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
+                    disabled={uploadedPhotos.length <= 1}
+                    onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i - 1 + uploadedPhotos.length) % uploadedPhotos.length); resetView(); }}
                     data-testid="button-prev-photo-bottom"
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1898,8 +1898,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   <Button
                     size="icon"
                     className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
-                    disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                    onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
+                    disabled={uploadedPhotos.length <= 1}
+                    onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i + 1) % uploadedPhotos.length); resetView(); }}
                     data-testid="button-next-photo-bottom"
                   >
                     <ChevronRight className="h-5 w-5" />
