@@ -2786,8 +2786,9 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
   const [section, setSection] = useState("");
-  const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string }>>([]);
+  const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
   const [savingNotes, setSavingNotes] = useState<Record<number, boolean>>({});
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const notesTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
@@ -2800,6 +2801,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         notes: p.notes || "",
         aisle: p.aisle || "",
         section: p.section || "",
+        isDetailShot: p.isDetailShot || false,
       }));
       setRecentPhotos(mapped);
     }
@@ -2831,6 +2833,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
           notes: "",
           aisle: aisle,
           section: sectionValue,
+          isDetailShot: false,
         }]);
         toast({ title: `Photo ${i + 1} captured` });
       } catch {
@@ -2841,6 +2844,29 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
+
+  const toggleDetailShot = useCallback(async (photoId: number, isDetail: boolean) => {
+    setRecentPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isDetailShot: isDetail } : p));
+    try {
+      await apiRequest("PATCH", `/api/photos/${photoId}`, { isDetailShot: isDetail });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+    } catch {
+      setRecentPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isDetailShot: !isDetail } : p));
+    }
+  }, [sessionId]);
+
+  const deletePhoto = useCallback(async (photoId: number) => {
+    try {
+      await apiRequest("DELETE", `/api/photos/${photoId}`);
+      setRecentPhotos(prev => prev.filter(p => p.id !== photoId));
+      setConfirmDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+      toast({ title: "Photo deleted" });
+    } catch {
+      toast({ title: "Failed to delete photo", variant: "destructive" });
+      setConfirmDeleteId(null);
+    }
+  }, [sessionId, toast]);
 
   const updatePhotoNotes = useCallback((photoId: number, notes: string) => {
     setRecentPhotos(prev => prev.map(p => p.id === photoId ? { ...p, notes } : p));
@@ -2932,13 +2958,38 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                     className="w-full rounded-md object-cover max-h-48"
                     data-testid={`img-mobile-photo-${photo.id}`}
                   />
-                  {(photo.aisle || (photo.section && photo.section !== "000")) && (
-                    <p className="text-xs text-muted-foreground">
-                      {photo.aisle && <span>Aisle {photo.aisle}</span>}
-                      {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
-                      {photo.section && photo.section !== "000" && <span>Section {photo.section}</span>}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    {(photo.aisle || (photo.section && photo.section !== "000")) ? (
+                      <p className="text-xs text-muted-foreground">
+                        {photo.aisle && <span>Aisle {photo.aisle}</span>}
+                        {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
+                        {photo.section && photo.section !== "000" && <span>Section {photo.section}</span>}
+                      </p>
+                    ) : <div />}
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 cursor-pointer" data-testid={`checkbox-detail-${photo.id}`}>
+                        <Checkbox
+                          checked={photo.isDetailShot}
+                          onCheckedChange={(checked) => toggleDetailShot(photo.id, !!checked)}
+                        />
+                        <span className="text-xs text-muted-foreground">Detail shot</span>
+                      </label>
+                      {confirmDeleteId === photo.id ? (
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="destructive" onClick={() => deletePhoto(photo.id)} data-testid={`button-confirm-delete-${photo.id}`}>
+                            Delete
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)} data-testid={`button-cancel-delete-${photo.id}`}>
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button size="icon" variant="ghost" onClick={() => setConfirmDeleteId(photo.id)} data-testid={`button-delete-photo-${photo.id}`}>
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                   <div className="space-y-1">
                     <Label className="text-xs underline">Notes:</Label>
                     <Textarea
