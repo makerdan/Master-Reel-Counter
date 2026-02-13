@@ -1859,7 +1859,7 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
                             : "border-border/50 hover-elevate"
                       }`}
                       onClick={() => {
-                        if (idx === currentPhotoIdx) {
+                        if (idx === currentPhotoIdx || idx === viewingNearbyIdx) {
                           setViewingNearbyIdx(null);
                         } else {
                           setViewingNearbyIdx(idx);
