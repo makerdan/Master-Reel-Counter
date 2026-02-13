@@ -215,6 +215,7 @@ function SessionWorkspace({
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+  const [navigateToPhotoId, setNavigateToPhotoId] = useState<number | null>(null);
   const [editName, setEditName] = useState(session.name);
   const [editLocation, setEditLocation] = useState(session.location || "");
 
@@ -378,11 +379,19 @@ function SessionWorkspace({
           </TabsList>
 
           <TabsContent value="photo">
-            <PhotoMode sessionId={sessionId} photos={photos} />
+            <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} onNavigated={() => setNavigateToPhotoId(null)} />
           </TabsContent>
 
           <TabsContent value="single">
-            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} />
+            <SingleEntryMode
+              sessionId={sessionId}
+              editingEntry={editingEntry}
+              onDoneEditing={() => setEditingEntry(null)}
+              onSwitchToPhoto={(photoId: number) => {
+                setNavigateToPhotoId(photoId);
+                setMode("photo");
+              }}
+            />
           </TabsContent>
         </Tabs>
 
@@ -724,7 +733,7 @@ function TeamDialog({
   );
 }
 
-function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }) {
+function PhotoMode({ sessionId, photos, navigateToPhotoId, onNavigated }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; onNavigated?: () => void }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -840,35 +849,50 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
   const displayedPhoto = uploadedPhotos[displayedPhotoIdx];
 
   useEffect(() => {
-    if (photos.length > 0 && uploadedPhotos.length === 0) {
-      const nameCounts: Record<string, number> = {};
-      setUploadedPhotos(photos.map((p) => {
-        let filename = p.originalFilename || undefined;
-        if (filename) {
-          const count = (nameCounts[filename] || 0) + 1;
-          nameCounts[filename] = count;
-          const dotIdx = filename.lastIndexOf(".");
-          const base = dotIdx > 0 ? filename.substring(0, dotIdx) : filename;
-          const ext = dotIdx > 0 ? filename.substring(dotIdx) : "";
-          filename = `${base}_${String(count).padStart(2, "0")}${ext}`;
-        }
-        return {
-          url: p.objectStorageKey.startsWith("/uploads/") ? p.objectStorageKey : p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/uploads/${p.objectStorageKey}`,
-          objectPath: p.objectStorageKey,
-          section: p.section || "",
-          aisle: p.aisle || "",
-          dbId: p.id,
-          filename,
-          timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : undefined,
-          notes: p.notes || "",
-          isDetailShot: p.isDetailShot || false,
-          parentPhotoId: p.parentPhotoId || undefined,
-        };
-      }));
-      const firstAisle = photos.find(p => p.aisle)?.aisle;
-      if (firstAisle && !aisle) setAisle(firstAisle);
+    if (photos.length === 0) return;
+    const shouldFullSync = uploadedPhotos.length === 0;
+    const needsNavTarget = navigateToPhotoId && !uploadedPhotos.some(p => p.dbId === navigateToPhotoId) && photos.some(p => p.id === navigateToPhotoId);
+    if (!shouldFullSync && !needsNavTarget) return;
+    const nameCounts: Record<string, number> = {};
+    const mapped = photos.map((p) => {
+      let filename = p.originalFilename || undefined;
+      if (filename) {
+        const count = (nameCounts[filename] || 0) + 1;
+        nameCounts[filename] = count;
+        const dotIdx = filename.lastIndexOf(".");
+        const base = dotIdx > 0 ? filename.substring(0, dotIdx) : filename;
+        const ext = dotIdx > 0 ? filename.substring(dotIdx) : "";
+        filename = `${base}_${String(count).padStart(2, "0")}${ext}`;
+      }
+      return {
+        url: p.objectStorageKey.startsWith("/uploads/") ? p.objectStorageKey : p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/uploads/${p.objectStorageKey}`,
+        objectPath: p.objectStorageKey,
+        section: p.section || "",
+        aisle: p.aisle || "",
+        dbId: p.id,
+        filename,
+        timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : undefined,
+        notes: p.notes || "",
+        isDetailShot: p.isDetailShot || false,
+        parentPhotoId: p.parentPhotoId || undefined,
+      };
+    });
+    setUploadedPhotos(mapped);
+    const firstAisle = photos.find(p => p.aisle)?.aisle;
+    if (firstAisle && !aisle) setAisle(firstAisle);
+  }, [photos, navigateToPhotoId]);
+
+  useEffect(() => {
+    if (!navigateToPhotoId) return;
+    const idx = uploadedPhotos.findIndex(p => p.dbId === navigateToPhotoId);
+    if (idx >= 0) {
+      setCurrentPhotoIdx(idx);
+      setViewingNearbyIdx(null);
+      const photoAisle = uploadedPhotos[idx].aisle;
+      if (photoAisle) setAisle(photoAisle);
+      onNavigated?.();
     }
-  }, [photos]);
+  }, [navigateToPhotoId, uploadedPhotos]);
 
   const flushSavePins = useCallback(async () => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -2163,11 +2187,12 @@ function PhotoMode({ sessionId, photos }: { sessionId: number; photos: Photo[] }
 }
 
 function SingleEntryMode({
-  sessionId, editingEntry, onDoneEditing,
+  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto,
 }: {
   sessionId: number;
   editingEntry: Entry | null;
   onDoneEditing: () => void;
+  onSwitchToPhoto?: (photoId: number) => void;
 }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -2229,9 +2254,14 @@ function SingleEntryMode({
         section: form.section,
       });
       const savedPhoto = await res.json();
-      setCapturedPhoto({ url: result.objectPath, objectPath: result.objectPath, photoId: savedPhoto.id });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
-      toast({ title: "Photo captured" });
+      await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+      if (onSwitchToPhoto) {
+        toast({ title: "Photo captured — switching to pin mode" });
+        onSwitchToPhoto(savedPhoto.id);
+      } else {
+        setCapturedPhoto({ url: result.objectPath, objectPath: result.objectPath, photoId: savedPhoto.id });
+        toast({ title: "Photo captured" });
+      }
     } catch {
       toast({ title: "Photo upload failed", variant: "destructive" });
     }
