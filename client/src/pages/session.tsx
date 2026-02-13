@@ -1793,28 +1793,31 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   {currentPhoto.filename}
                 </span>
               )}
-              <div className="flex items-center gap-3">
-                <Button
-                  size="icon"
-                  className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
-                  disabled={currentPhotoIdx <= 0}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
-                  data-testid="button-prev-photo-bottom"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <span className="text-sm mono text-[hsl(30_40%_85%)] min-w-[60px] text-center" data-testid="text-photo-counter-bottom">
-                  {String(currentPhotoIdx + 1).padStart(2, "0")} / {String(uploadedPhotos.length).padStart(2, "0")}
-                </span>
-                <Button
-                  size="icon"
-                  className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
-                  disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
-                  onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
-                  data-testid="button-next-photo-bottom"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </Button>
+              <div className="flex items-center gap-3 w-full">
+                <div className="flex items-center gap-3">
+                  <Button
+                    size="icon"
+                    className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                    disabled={currentPhotoIdx <= 0}
+                    onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i - 1); resetView(); }}
+                    data-testid="button-prev-photo-bottom"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+                  <span className="text-sm mono text-[hsl(30_40%_85%)] min-w-[60px] text-center" data-testid="text-photo-counter-bottom">
+                    {String(currentPhotoIdx + 1).padStart(2, "0")} / {String(uploadedPhotos.length).padStart(2, "0")}
+                  </span>
+                  <Button
+                    size="icon"
+                    className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                    disabled={currentPhotoIdx >= uploadedPhotos.length - 1}
+                    onClick={async () => { await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => i + 1); resetView(); }}
+                    data-testid="button-next-photo-bottom"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                </div>
+                <div className="ml-auto">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -1823,7 +1826,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                       className="text-red-400"
                       data-testid="button-delete-photo"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-8 w-8" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -1863,6 +1866,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                </div>
               </div>
             </div>
           )}
