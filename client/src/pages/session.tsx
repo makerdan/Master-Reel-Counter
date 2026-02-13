@@ -2884,6 +2884,11 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
     <div className="space-y-4">
       <Card>
         <CardContent className="p-4 space-y-3">
+          {!aisle.trim() && (
+            <div className="rounded-md border border-[hsl(18_85%_40%/0.5)] bg-[hsl(18_85%_40%/0.08)] px-3 py-2 text-sm text-muted-foreground" data-testid="text-aisle-required">
+              Enter an aisle below to start capturing photos
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
@@ -2898,6 +2903,8 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                   }
                 }}
                 placeholder="Aisle"
+                className={!aisle.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
+                autoFocus={!aisle.trim()}
                 data-testid="input-mobile-aisle"
               />
             </div>
@@ -2936,9 +2943,6 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
               <ImagePlus className="h-5 w-5" />
             </Button>
           </div>
-          {!aisle.trim() && (
-            <p className="text-xs text-muted-foreground">Enter an aisle before capturing photos.</p>
-          )}
         </CardContent>
       </Card>
 
