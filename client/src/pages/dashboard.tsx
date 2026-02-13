@@ -304,7 +304,7 @@ export default function Dashboard() {
                             : "No photos yet"}
                           {(() => {
                             const elapsed = formatElapsedMinutes(session.firstPhotoAt, session.lastPhotoAt);
-                            return elapsed ? <Badge variant="secondary" className="ml-1 no-default-hover-elevate no-default-active-elevate text-[10px] px-1.5 py-0" data-testid={`badge-session-elapsed-${session.id}`}>{elapsed}</Badge> : null;
+                            return elapsed ? <span className="ml-1 mono" data-testid={`badge-session-elapsed-${session.id}`}>({elapsed})</span> : null;
                           })()}
                         </span>
                         <span className="flex items-center gap-1 mono" data-testid={`text-session-photos-${session.id}`}>
@@ -465,7 +465,7 @@ export default function Dashboard() {
                               : "No photos yet"}
                             {(() => {
                               const elapsed = formatElapsedMinutes(session.firstPhotoAt, session.lastPhotoAt);
-                              return elapsed ? <Badge variant="secondary" className="ml-1 no-default-hover-elevate no-default-active-elevate text-[10px] px-1.5 py-0" data-testid={`badge-shared-session-elapsed-${session.id}`}>{elapsed}</Badge> : null;
+                              return elapsed ? <span className="ml-1 mono" data-testid={`badge-shared-session-elapsed-${session.id}`}>({elapsed})</span> : null;
                             })()}
                           </span>
                           <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-photos-${session.id}`}>
