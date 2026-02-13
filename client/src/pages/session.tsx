@@ -2253,7 +2253,7 @@ function SingleEntryMode({
     const newErrors: Record<string, string> = {};
     if (!form.aisle.trim()) newErrors.aisle = "Aisle is required";
     if (!form.section.trim()) newErrors.section = "Section is required";
-    if (form.footage && isNaN(parseInt(form.footage))) newErrors.footage = "Must be a number";
+    if (form.footage && (isNaN(parseInt(form.footage)) || parseInt(form.footage) < 1)) newErrors.footage = "Must be a positive number";
     setErrors(newErrors);
     setTouched({ aisle: true, section: true, footage: true });
     return Object.keys(newErrors).length === 0;
@@ -2403,8 +2403,15 @@ function SingleEntryMode({
           <Input
             type="number"
             value={form.footage}
-            onChange={(e) => update("footage", e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^0-9]/g, "");
+              update("footage", v);
+            }}
             onBlur={() => markTouched("footage")}
+            onKeyDown={(e) => { if (e.key === "-" || e.key === "." || e.key === "e" || e.key === "+") e.preventDefault(); }}
+            min={1}
+            step={1}
+            inputMode="numeric"
             placeholder="Footage"
             className={touched.footage && errors.footage ? "border-destructive" : ""}
             data-testid="input-footage"
