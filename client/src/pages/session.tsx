@@ -50,7 +50,7 @@ const COLOR_OPTIONS = [
   ...Object.entries(WIRE_COLORS).map(([code, name]) => ({
     value: name,
     label: `(${code})  ${name}`,
-  })),
+  })).sort((a, b) => a.label.localeCompare(b.label)),
 ];
 
 const VENDOR_CODE_MAP: Record<string, string[]> = {
