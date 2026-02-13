@@ -1229,19 +1229,40 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     setPanY(clamped.y);
   }, [clampPan]);
 
-  const handleWheelNative = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const oldScale = scaleRef.current;
-    const newScale = Math.min(5, Math.max(1, oldScale + (e.deltaY < 0 ? 0.2 : -0.2)));
-    zoomAtPoint(e.clientX, e.clientY, newScale);
-  }, [zoomAtPoint]);
+  const zoomAtPointRef = useRef(zoomAtPoint);
+  zoomAtPointRef.current = zoomAtPoint;
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.addEventListener("wheel", handleWheelNative, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheelNative);
-  }, [handleWheelNative]);
+    const onWheel = (e: WheelEvent) => {
+      const el = containerRef.current;
+      if (!el) return;
+      if (!el.contains(e.target as Node)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const oldScale = scaleRef.current;
+      const delta = e.ctrlKey ? -e.deltaY * 0.01 : (e.deltaY < 0 ? 0.2 : -0.2);
+      const newScale = Math.min(5, Math.max(1, oldScale + delta));
+      zoomAtPointRef.current(e.clientX, e.clientY, newScale);
+    };
+
+    const onGestureStart = (e: Event) => {
+      const el = containerRef.current;
+      if (el && el.contains(e.target as Node)) e.preventDefault();
+    };
+    const onGestureChange = (e: Event) => {
+      const el = containerRef.current;
+      if (el && el.contains(e.target as Node)) e.preventDefault();
+    };
+
+    document.addEventListener("wheel", onWheel, { passive: false });
+    document.addEventListener("gesturestart", onGestureStart, { passive: false } as any);
+    document.addEventListener("gesturechange", onGestureChange, { passive: false } as any);
+    return () => {
+      document.removeEventListener("wheel", onWheel);
+      document.removeEventListener("gesturestart", onGestureStart);
+      document.removeEventListener("gesturechange", onGestureChange);
+    };
+  }, []);
 
   const pinchRef = useRef<{ dist: number; midX: number; midY: number; scale: number } | null>(null);
 
