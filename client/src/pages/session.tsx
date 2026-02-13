@@ -216,6 +216,8 @@ function SessionWorkspace({
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [navigateToPhotoId, setNavigateToPhotoId] = useState<number | null>(null);
+  const [navigateAisle, setNavigateAisle] = useState<string>("");
+  const [navigateSection, setNavigateSection] = useState<string>("");
   const [editName, setEditName] = useState(session.name);
   const [editLocation, setEditLocation] = useState(session.location || "");
 
@@ -379,7 +381,7 @@ function SessionWorkspace({
           </TabsList>
 
           <TabsContent value="photo">
-            <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} onNavigated={() => setNavigateToPhotoId(null)} />
+            <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} />
           </TabsContent>
 
           <TabsContent value="single">
@@ -387,8 +389,10 @@ function SessionWorkspace({
               sessionId={sessionId}
               editingEntry={editingEntry}
               onDoneEditing={() => setEditingEntry(null)}
-              onSwitchToPhoto={(photoId: number) => {
+              onSwitchToPhoto={(photoId: number, aisleVal: string, sectionVal: string) => {
                 setNavigateToPhotoId(photoId);
+                setNavigateAisle(aisleVal);
+                setNavigateSection(sectionVal);
                 setMode("photo");
               }}
             />
@@ -733,7 +737,7 @@ function TeamDialog({
   );
 }
 
-function PhotoMode({ sessionId, photos, navigateToPhotoId, onNavigated }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; onNavigated?: () => void }) {
+function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -878,8 +882,10 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, onNavigated }: { sess
       };
     });
     setUploadedPhotos(mapped);
-    const firstAisle = photos.find(p => p.aisle)?.aisle;
-    if (firstAisle && !aisle) setAisle(firstAisle);
+    if (!navigateToPhotoId) {
+      const firstAisle = photos.find(p => p.aisle)?.aisle;
+      if (firstAisle && !aisle) setAisle(firstAisle);
+    }
   }, [photos, navigateToPhotoId]);
 
   useEffect(() => {
@@ -888,8 +894,10 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, onNavigated }: { sess
     if (idx >= 0) {
       setCurrentPhotoIdx(idx);
       setViewingNearbyIdx(null);
-      const photoAisle = uploadedPhotos[idx].aisle;
-      if (photoAisle) setAisle(photoAisle);
+      setAisle(navigateAisle || "");
+      if (navigateSection) {
+        setUploadedPhotos(prev => prev.map((p, i) => i === idx ? { ...p, section: navigateSection } : p));
+      }
       onNavigated?.();
     }
   }, [navigateToPhotoId, uploadedPhotos]);
@@ -2192,7 +2200,7 @@ function SingleEntryMode({
   sessionId: number;
   editingEntry: Entry | null;
   onDoneEditing: () => void;
-  onSwitchToPhoto?: (photoId: number) => void;
+  onSwitchToPhoto?: (photoId: number, aisle: string, section: string) => void;
 }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -2257,7 +2265,7 @@ function SingleEntryMode({
       await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       if (onSwitchToPhoto) {
         toast({ title: "Photo captured — switching to pin mode" });
-        onSwitchToPhoto(savedPhoto.id);
+        onSwitchToPhoto(savedPhoto.id, form.aisle, form.section);
       } else {
         setCapturedPhoto({ url: result.objectPath, objectPath: result.objectPath, photoId: savedPhoto.id });
         toast({ title: "Photo captured" });
