@@ -1229,12 +1229,19 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     setPanY(clamped.y);
   }, [clampPan]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheelNative = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const oldScale = scaleRef.current;
     const newScale = Math.min(5, Math.max(1, oldScale + (e.deltaY < 0 ? 0.2 : -0.2)));
     zoomAtPoint(e.clientX, e.clientY, newScale);
   }, [zoomAtPoint]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener("wheel", handleWheelNative, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheelNative);
+  }, [handleWheelNative]);
 
   const pinchRef = useRef<{ dist: number; midX: number; midY: number; scale: number } | null>(null);
 
@@ -1686,7 +1693,6 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
               style={{ cursor: panMode ? "grab" : "crosshair" }}
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
-              onWheel={handleWheel}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
