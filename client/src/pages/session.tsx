@@ -2945,27 +2945,6 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
             </div>
           </div>
 
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                const active = document.activeElement;
-                if (active === aisleInputRef.current) {
-                  sectionInputRef.current?.focus();
-                } else if (active === sectionInputRef.current) {
-                  sectionInputRef.current?.blur();
-                } else {
-                  (isReceiving ? sectionInputRef : aisleInputRef).current?.focus();
-                }
-              }}
-              data-testid="button-next-field"
-            >
-              Next
-              <ChevronRight className="h-3 w-3 ml-1" />
-            </Button>
-          </div>
-
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
 
