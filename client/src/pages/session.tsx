@@ -2802,7 +2802,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
   const [savingNotes, setSavingNotes] = useState<Record<number, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
-  const [photoSort, setPhotoSort] = useState<"latest" | "aisle">("latest");
+  const [photoSort, setPhotoSort] = useState<"latest" | "aisle">("aisle");
   const notesTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
