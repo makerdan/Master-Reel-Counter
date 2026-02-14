@@ -2794,6 +2794,8 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   const { uploadFile, isUploading } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const aisleInputRef = useRef<HTMLInputElement>(null);
+  const sectionInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
   const [section, setSection] = useState("");
   const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
@@ -2905,6 +2907,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
             <div className="space-y-1">
               <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
               <Input
+                ref={aisleInputRef}
                 value={aisle}
                 onChange={(e) => setAisle(e.target.value)}
                 placeholder="Aisle"
@@ -2912,6 +2915,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                 autoFocus={!aisle.trim()}
                 disabled={isReceiving}
                 data-testid="input-mobile-aisle"
+                onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.focus(); } }}
               />
               <label className="flex items-center gap-1.5 cursor-pointer pt-1" data-testid="checkbox-receiving">
                 <Checkbox
@@ -2931,12 +2935,35 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
             <div className="space-y-1">
               <Label className="text-xs underline">Section:{!isReceiving && <span className="text-destructive"> *</span>}</Label>
               <Input
+                ref={sectionInputRef}
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
                 placeholder={isReceiving ? "Optional" : "Section"}
                 data-testid="input-mobile-section"
+                onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.blur(); } }}
               />
             </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const active = document.activeElement;
+                if (active === aisleInputRef.current) {
+                  sectionInputRef.current?.focus();
+                } else if (active === sectionInputRef.current) {
+                  sectionInputRef.current?.blur();
+                } else {
+                  (isReceiving ? sectionInputRef : aisleInputRef).current?.focus();
+                }
+              }}
+              data-testid="button-next-field"
+            >
+              Next
+              <ChevronRight className="h-3 w-3 ml-1" />
+            </Button>
           </div>
 
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
