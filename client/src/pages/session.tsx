@@ -2914,8 +2914,9 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                 className={!aisle.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
                 autoFocus={!aisle.trim()}
                 disabled={isReceiving}
+                enterKeyHint="next"
                 data-testid="input-mobile-aisle"
-                onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.focus(); } }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sectionInputRef.current?.focus(); } }}
               />
               <label className="flex items-center gap-1.5 cursor-pointer pt-1" data-testid="checkbox-receiving">
                 <Checkbox
@@ -2939,6 +2940,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
                 placeholder={isReceiving ? "Optional" : "Section"}
+                enterKeyHint="done"
                 data-testid="input-mobile-section"
                 onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.blur(); } }}
               />
