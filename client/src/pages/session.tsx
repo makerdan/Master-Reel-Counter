@@ -5,8 +5,11 @@ import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Cable,
   Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  Users, Copy, Link, Mail, UserPlus, UserMinus, ImagePlus, Crosshair,
+  Users, Copy, Link, Mail, UserPlus, UserMinus, ImagePlus, Crosshair, ArrowUpDown,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -341,14 +344,24 @@ function SessionWorkspace({
               {captureMode ? <ListPlus className="h-3 w-3 mr-1" /> : <Camera className="h-3 w-3 mr-1" />}
               {captureMode ? "Full Mode" : "Mobile Flow"}
             </Button>
-            <Button size="sm" variant="outline" onClick={exportCsv} data-testid="button-export-csv">
-              <Download className="h-3 w-3" />
-              CSV
-            </Button>
-            <Button size="sm" variant="outline" onClick={exportPdf} data-testid="button-export-pdf">
-              <FileText className="h-3 w-3" />
-              PDF
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" data-testid="button-export">
+                  <Download className="h-3 w-3" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportCsv} data-testid="button-export-csv">
+                  <Download className="h-4 w-4 mr-2" />
+                  CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf">
+                  <FileText className="h-4 w-4 mr-2" />
+                  PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ThemeToggle />
           </div>
         </div>
@@ -2789,6 +2802,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
   const [savingNotes, setSavingNotes] = useState<Record<number, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [photoSort, setPhotoSort] = useState<"latest" | "aisle">("latest");
   const notesTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
@@ -2894,19 +2908,27 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
               <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
               <Input
                 value={aisle}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val.toLowerCase() === "rec") {
-                    setAisle("Receiving");
-                  } else {
-                    setAisle(val);
-                  }
-                }}
+                onChange={(e) => setAisle(e.target.value)}
                 placeholder="Aisle"
                 className={!aisle.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
                 autoFocus={!aisle.trim()}
+                disabled={isReceiving}
                 data-testid="input-mobile-aisle"
               />
+              <label className="flex items-center gap-1.5 cursor-pointer pt-1" data-testid="checkbox-receiving">
+                <Checkbox
+                  checked={isReceiving}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setAisle("Receiving");
+                      setSection("");
+                    } else {
+                      setAisle("");
+                    }
+                  }}
+                />
+                <span className="text-xs text-muted-foreground">Receiving</span>
+              </label>
             </div>
             <div className="space-y-1">
               <Label className="text-xs underline">Section:{!isReceiving && <span className="text-destructive"> *</span>}</Label>
@@ -2948,11 +2970,37 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
 
       {recentPhotos.length > 0 && (
         <Card>
-          <CardHeader className="p-3">
+          <CardHeader className="p-3 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm" data-testid="text-mobile-photo-count">{recentPhotos.length} Photos</CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPhotoSort(s => s === "latest" ? "aisle" : "latest")}
+              data-testid="button-photo-sort"
+            >
+              <ArrowUpDown className="h-3 w-3 mr-1" />
+              {photoSort === "latest" ? "By Aisle" : "Latest"}
+            </Button>
           </CardHeader>
           <CardContent className="p-3 pt-0 space-y-3">
-            {[...recentPhotos].reverse().map((photo) => {
+            {(() => {
+              const sorted = [...recentPhotos];
+              if (photoSort === "latest") {
+                sorted.sort((a, b) => b.id - a.id);
+              } else {
+                sorted.sort((a, b) => {
+                  const aIsReceiving = a.aisle.toLowerCase() === "receiving";
+                  const bIsReceiving = b.aisle.toLowerCase() === "receiving";
+                  if (aIsReceiving && !bIsReceiving) return 1;
+                  if (!aIsReceiving && bIsReceiving) return -1;
+                  if (aIsReceiving && bIsReceiving) return b.id - a.id;
+                  const aisleCompare = a.aisle.localeCompare(b.aisle, undefined, { numeric: true });
+                  if (aisleCompare !== 0) return aisleCompare;
+                  return (a.section || "").localeCompare(b.section || "", undefined, { numeric: true });
+                });
+              }
+              return sorted;
+            })().map((photo) => {
               const imgSrc = photo.objectPath.startsWith("/uploads/") ? photo.objectPath : `/uploads/${photo.objectPath}`;
               return (
                 <div key={photo.id} className="space-y-2 border-b border-border/50 pb-3 last:border-0 last:pb-0" data-testid={`mobile-photo-${photo.id}`}>
@@ -2965,9 +3013,9 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                   <div className="flex items-center justify-between gap-2">
                     {(photo.aisle || (photo.section && photo.section !== "000")) ? (
                       <p className="text-xs text-muted-foreground">
-                        {photo.aisle && <span>Aisle {photo.aisle}</span>}
+                        {photo.aisle && <span>Aisle: {photo.aisle}</span>}
                         {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
-                        {photo.section && photo.section !== "000" && <span>Section {photo.section}</span>}
+                        {photo.section && photo.section !== "000" && <span>Section: {photo.section}</span>}
                       </p>
                     ) : <div />}
                     <div className="flex items-center gap-2">
