@@ -2966,101 +2966,122 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         </CardContent>
       </Card>
 
-      {recentPhotos.length > 0 && (
-        <Card>
-          <CardHeader className="p-3 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm" data-testid="text-mobile-photo-count">{recentPhotos.length} Photos</CardTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setPhotoSort(s => s === "latest" ? "aisle" : "latest")}
-              data-testid="button-photo-sort"
-            >
-              <ArrowUpDown className="h-3 w-3 mr-1" />
-              {photoSort === "latest" ? "By Aisle" : "Latest"}
-            </Button>
-          </CardHeader>
-          <CardContent className="p-3 pt-0 space-y-3">
-            {(() => {
-              const sorted = [...recentPhotos];
-              if (photoSort === "latest") {
-                sorted.sort((a, b) => b.id - a.id);
-              } else {
-                sorted.sort((a, b) => {
-                  const aIsReceiving = a.aisle.toLowerCase() === "receiving";
-                  const bIsReceiving = b.aisle.toLowerCase() === "receiving";
-                  if (aIsReceiving && !bIsReceiving) return 1;
-                  if (!aIsReceiving && bIsReceiving) return -1;
-                  if (aIsReceiving && bIsReceiving) return b.id - a.id;
-                  const aisleCompare = a.aisle.localeCompare(b.aisle, undefined, { numeric: true });
-                  if (aisleCompare !== 0) return aisleCompare;
-                  return (a.section || "").localeCompare(b.section || "", undefined, { numeric: true });
-                });
-              }
-              return sorted;
-            })().map((photo) => {
-              const imgSrc = photo.objectPath.startsWith("/uploads/") ? photo.objectPath : `/uploads/${photo.objectPath}`;
-              return (
-                <div key={photo.id} className="space-y-2 border-b border-border/50 pb-3 last:border-0 last:pb-0" data-testid={`mobile-photo-${photo.id}`}>
-                  <img
-                    src={imgSrc}
-                    alt={`Photo ${photo.id}`}
-                    className="w-full rounded-md object-cover max-h-48"
-                    data-testid={`img-mobile-photo-${photo.id}`}
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    {(photo.aisle || (photo.section && photo.section !== "000")) ? (
-                      <p className="text-xs text-muted-foreground">
-                        {photo.aisle && <span>Aisle: {photo.aisle}</span>}
-                        {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
-                        {photo.section && photo.section !== "000" && <span>Section: {photo.section}</span>}
-                      </p>
-                    ) : <div />}
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 cursor-pointer" data-testid={`checkbox-detail-${photo.id}`}>
-                        <Checkbox
-                          checked={photo.isDetailShot}
-                          onCheckedChange={(checked) => toggleDetailShot(photo.id, !!checked)}
-                        />
-                        <span className="text-xs text-muted-foreground">Detail shot</span>
-                      </label>
-                      {confirmDeleteId === photo.id ? (
-                        <div className="flex items-center gap-1">
-                          <Button size="sm" variant="destructive" onClick={() => deletePhoto(photo.id)} data-testid={`button-confirm-delete-${photo.id}`}>
-                            Delete
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)} data-testid={`button-cancel-delete-${photo.id}`}>
-                            Cancel
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button size="icon" variant="ghost" onClick={() => setConfirmDeleteId(photo.id)} data-testid={`button-delete-photo-${photo.id}`}>
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+      {recentPhotos.length > 0 && (() => {
+        const sorted = [...recentPhotos];
+        if (photoSort === "latest") {
+          sorted.sort((a, b) => b.id - a.id);
+        } else {
+          sorted.sort((a, b) => {
+            const aIsRec = a.aisle.toLowerCase() === "receiving";
+            const bIsRec = b.aisle.toLowerCase() === "receiving";
+            if (aIsRec && !bIsRec) return 1;
+            if (!aIsRec && bIsRec) return -1;
+            if (aIsRec && bIsRec) return b.id - a.id;
+            const aisleComp = a.aisle.localeCompare(b.aisle, undefined, { numeric: true });
+            if (aisleComp !== 0) return aisleComp;
+            return (a.section || "").localeCompare(b.section || "", undefined, { numeric: true });
+          });
+        }
+        const safeIndex = Math.min(currentPhotoIndex, sorted.length - 1);
+        const photo = sorted[safeIndex];
+        if (!photo) return null;
+        const imgSrc = photo.objectPath.startsWith("/uploads/") ? photo.objectPath : `/uploads/${photo.objectPath}`;
+        return (
+          <Card>
+            <CardHeader className="p-3 flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm" data-testid="text-mobile-photo-count">{safeIndex + 1} / {sorted.length}</CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setPhotoSort(s => s === "latest" ? "aisle" : "latest"); setCurrentPhotoIndex(0); }}
+                data-testid="button-photo-sort"
+              >
+                <ArrowUpDown className="h-3 w-3 mr-1" />
+                {photoSort === "latest" ? "By Aisle" : "Latest"}
+              </Button>
+            </CardHeader>
+            <CardContent className="p-3 pt-0 space-y-3">
+              <div className="space-y-2" data-testid={`mobile-photo-${photo.id}`}>
+                <img
+                  src={imgSrc}
+                  alt={`Photo ${photo.id}`}
+                  className="w-full rounded-md object-cover max-h-64"
+                  data-testid={`img-mobile-photo-${photo.id}`}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  {(photo.aisle || (photo.section && photo.section !== "000")) ? (
+                    <p className="text-xs text-muted-foreground">
+                      {photo.aisle && <span>Aisle: {photo.aisle}</span>}
+                      {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
+                      {photo.section && photo.section !== "000" && <span>Section: {photo.section}</span>}
+                    </p>
+                  ) : <div />}
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer" data-testid={`checkbox-detail-${photo.id}`}>
+                      <Checkbox
+                        checked={photo.isDetailShot}
+                        onCheckedChange={(checked) => toggleDetailShot(photo.id, !!checked)}
+                      />
+                      <span className="text-xs text-muted-foreground">Detail shot</span>
+                    </label>
+                    {confirmDeleteId === photo.id ? (
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="destructive" onClick={() => { deletePhoto(photo.id); setCurrentPhotoIndex(i => Math.max(0, Math.min(i, sorted.length - 2))); }} data-testid={`button-confirm-delete-${photo.id}`}>
+                          Delete
                         </Button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs underline">Notes:</Label>
-                    <Textarea
-                      value={photo.notes}
-                      onChange={(e) => updatePhotoNotes(photo.id, e.target.value)}
-                      placeholder="Photo notes..."
-                      rows={2}
-                      data-testid={`input-mobile-notes-${photo.id}`}
-                    />
-                    {savingNotes[photo.id] && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Loader2 className="h-3 w-3 animate-spin" /> Saving...
-                      </p>
+                        <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)} data-testid={`button-cancel-delete-${photo.id}`}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button size="icon" variant="ghost" onClick={() => setConfirmDeleteId(photo.id)} data-testid={`button-delete-photo-${photo.id}`}>
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+                <div className="space-y-1">
+                  <Label className="text-xs underline">Notes:</Label>
+                  <Textarea
+                    value={photo.notes}
+                    onChange={(e) => updatePhotoNotes(photo.id, e.target.value)}
+                    placeholder="Photo notes..."
+                    rows={2}
+                    data-testid={`input-mobile-notes-${photo.id}`}
+                  />
+                  {savingNotes[photo.id] && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPhotoIndex(i => i - 1)}
+                  disabled={safeIndex === 0}
+                  data-testid="button-photo-prev"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Prev
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPhotoIndex(i => i + 1)}
+                  disabled={safeIndex >= sorted.length - 1}
+                  data-testid="button-photo-next"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
