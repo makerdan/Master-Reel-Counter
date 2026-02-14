@@ -2997,15 +2997,26 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         return (
           <Card>
             <CardHeader className="p-3 flex flex-row items-center justify-between gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPhotoIndex(i => i - 1)}
+                disabled={safeIndex === 0}
+                data-testid="button-photo-prev-top"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Prev
+              </Button>
               <CardTitle className="text-sm" data-testid="text-mobile-photo-count">{safeIndex + 1} / {sorted.length}</CardTitle>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => { setPhotoSort(s => s === "latest" ? "aisle" : "latest"); setCurrentPhotoIndex(0); }}
-                data-testid="button-photo-sort"
+                onClick={() => setCurrentPhotoIndex(i => i + 1)}
+                disabled={safeIndex >= sorted.length - 1}
+                data-testid="button-photo-next-top"
               >
-                <ArrowUpDown className="h-3 w-3 mr-1" />
-                {photoSort === "latest" ? "By Aisle" : "Latest"}
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </CardHeader>
             <CardContent className="p-3 pt-0 space-y-3">
@@ -3074,6 +3085,15 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" />
                   Prev
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setPhotoSort(s => s === "latest" ? "aisle" : "latest"); setCurrentPhotoIndex(0); }}
+                  data-testid="button-photo-sort"
+                >
+                  <ArrowUpDown className="h-3 w-3 mr-1" />
+                  {photoSort === "latest" ? "By Aisle" : "Latest"}
                 </Button>
                 <Button
                   size="sm"
