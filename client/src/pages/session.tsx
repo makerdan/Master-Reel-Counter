@@ -336,18 +336,15 @@ function SessionWorkspace({
           <div className="flex items-center gap-1 shrink-0">
             {(session as any).role === "owner" && (
               <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team">
-                <Users className="h-3 w-3" />
                 Team
               </Button>
             )}
             <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
-              {captureMode ? <ListPlus className="h-3 w-3 mr-1" /> : <Camera className="h-3 w-3 mr-1" />}
               {captureMode ? "Full Mode" : "Mobile Flow"}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-export">
-                  <Download className="h-3 w-3" />
                   Export
                 </Button>
               </DropdownMenuTrigger>
