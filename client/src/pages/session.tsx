@@ -2813,9 +2813,18 @@ function SingleEntryMode({
   );
 }
 
+type UploadQueueItem = {
+  queueId: string;
+  file: File;
+  blobUrl: string;
+  aisle: string;
+  section: string;
+  status: "pending" | "uploading" | "failed";
+  retries: number;
+};
+
 function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: Photo[] }) {
   const { toast } = useToast();
-  const { uploadFile, isUploading } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const aisleInputRef = useRef<HTMLInputElement>(null);
@@ -2828,6 +2837,8 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   const [photoSort, setPhotoSort] = useState<"latest" | "aisle">("aisle");
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const notesTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+  const processingRef = useRef(false);
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
 
@@ -2845,43 +2856,88 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
     }
   }, [photos]);
 
-  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+  useEffect(() => {
+    if (processingRef.current) return;
+    const nextItem = uploadQueue.find(q => q.status === "pending");
+    if (!nextItem) return;
+    processingRef.current = true;
+    setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "uploading" as const } : q));
+
+    (async () => {
       try {
-        const result = await uploadFile(file);
-        if (!result) {
-          toast({ title: "Upload failed", variant: "destructive" });
-          continue;
-        }
-        const sectionValue = isReceiving && !section.trim() ? "000" : section;
+        const formData = new FormData();
+        formData.append("file", nextItem.file);
+        const uploadRes = await fetch("/api/uploads/direct", { method: "POST", body: formData, credentials: "include" });
+        if (!uploadRes.ok) throw new Error("Upload failed");
+        const uploadResult = await uploadRes.json();
+
         const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
-          objectStorageKey: result.objectPath,
-          originalFilename: file.name,
-          mimeType: file.type,
-          aisle: aisle,
-          section: sectionValue,
+          objectStorageKey: uploadResult.objectPath,
+          originalFilename: nextItem.file.name,
+          mimeType: nextItem.file.type,
+          aisle: nextItem.aisle,
+          section: nextItem.section,
         });
         const savedPhoto = await res.json();
+
         setRecentPhotos(prev => [...prev, {
           id: savedPhoto.id,
-          objectPath: result.objectPath,
+          objectPath: uploadResult.objectPath,
           notes: "",
-          aisle: aisle,
-          section: sectionValue,
+          aisle: nextItem.aisle,
+          section: nextItem.section,
           isDetailShot: false,
         }]);
-        toast({ title: `Photo ${i + 1} captured` });
+        URL.revokeObjectURL(nextItem.blobUrl);
+        setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       } catch {
-        toast({ title: "Photo upload failed", variant: "destructive" });
+        setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "failed" as const, retries: q.retries + 1 } : q));
+        toast({ title: "Photo upload failed — tap to retry", variant: "destructive" });
+      } finally {
+        processingRef.current = false;
       }
+    })();
+  }, [uploadQueue, sessionId, toast]);
+
+  const retryUpload = useCallback((queueId: string) => {
+    setUploadQueue(prev => prev.map(q => q.queueId === queueId ? { ...q, status: "pending" as const } : q));
+  }, []);
+
+  const dismissFailedUpload = useCallback((queueId: string) => {
+    setUploadQueue(prev => {
+      const item = prev.find(q => q.queueId === queueId);
+      if (item) URL.revokeObjectURL(item.blobUrl);
+      return prev.filter(q => q.queueId !== queueId);
+    });
+  }, []);
+
+  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const sectionValue = isReceiving && !section.trim() ? "000" : section;
+    const newItems: UploadQueueItem[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      newItems.push({
+        queueId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        blobUrl: URL.createObjectURL(file),
+        aisle,
+        section: sectionValue,
+        status: "pending",
+        retries: 0,
+      });
     }
-    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+    setUploadQueue(prev => [...prev, ...newItems]);
+    toast({ title: `${newItems.length} photo${newItems.length > 1 ? "s" : ""} queued` });
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
+
+  const isUploading = uploadQueue.some(q => q.status === "uploading");
+  const pendingCount = uploadQueue.filter(q => q.status === "pending" || q.status === "uploading").length;
+  const failedCount = uploadQueue.filter(q => q.status === "failed").length;
 
   const toggleDetailShot = useCallback(async (photoId: number, isDetail: boolean) => {
     setRecentPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isDetailShot: isDetail } : p));
@@ -2979,22 +3035,48 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
               className="flex-1"
               size="lg"
               onClick={() => cameraInputRef.current?.click()}
-              disabled={isUploading || !aisle.trim()}
+              disabled={!aisle.trim()}
               data-testid="button-mobile-camera"
             >
-              {isUploading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Camera className="h-5 w-5 mr-2" />}
+              <Camera className="h-5 w-5 mr-2" />
               Take Photo
             </Button>
             <Button
               variant="outline"
               size="lg"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || !aisle.trim()}
+              disabled={!aisle.trim()}
               data-testid="button-mobile-upload"
             >
               <ImagePlus className="h-5 w-5" />
             </Button>
           </div>
+          {(pendingCount > 0 || failedCount > 0) && (
+            <div className="space-y-2" data-testid="upload-queue-status">
+              {pendingCount > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Uploading {pendingCount} photo{pendingCount > 1 ? "s" : ""} in background...</span>
+                </div>
+              )}
+              {failedCount > 0 && (
+                <div className="space-y-1">
+                  {uploadQueue.filter(q => q.status === "failed").map(item => (
+                    <div key={item.queueId} className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2" data-testid={`upload-failed-${item.queueId}`}>
+                      <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+                      <span className="text-xs flex-1 truncate">{item.file.name} failed</span>
+                      <Button size="sm" variant="outline" onClick={() => retryUpload(item.queueId)} data-testid={`button-retry-${item.queueId}`}>
+                        <RotateCw className="h-3 w-3 mr-1" /> Retry
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => dismissFailedUpload(item.queueId)} data-testid={`button-dismiss-${item.queueId}`}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
