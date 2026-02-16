@@ -255,7 +255,7 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit photos" });
-      const { aisle, section, rotation, notes, isDetailShot, parentPhotoId } = req.body;
+      const { aisle, section, rotation, notes, isDetailShot, parentPhotoId, pinScale } = req.body;
       const safeUpdate: Record<string, any> = {};
       if (aisle !== undefined) safeUpdate.aisle = aisle;
       if (section !== undefined) safeUpdate.section = section;
@@ -263,6 +263,7 @@ export async function registerRoutes(
       if (notes !== undefined) safeUpdate.notes = notes;
       if (isDetailShot !== undefined) safeUpdate.isDetailShot = isDetailShot;
       if (parentPhotoId !== undefined) safeUpdate.parentPhotoId = parentPhotoId;
+      if (pinScale !== undefined) safeUpdate.pinScale = pinScale;
       if (Object.keys(safeUpdate).length === 0) return res.status(400).json({ message: "No valid fields to update" });
       const updated = await storage.updatePhoto(photo.id, safeUpdate);
       res.json(updated);
