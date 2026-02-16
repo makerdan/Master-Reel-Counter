@@ -757,7 +757,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number }>>([]);
+  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number; pinScale?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [viewingNearbyIdx, setViewingNearbyIdx] = useState<number | null>(null);
 
@@ -832,6 +832,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
   const [rotation, setRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
   const [pinScale, setPinScale] = useState(1);
+  const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -894,6 +895,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
         notes: p.notes || "",
         isDetailShot: p.isDetailShot || false,
         parentPhotoId: p.parentPhotoId || undefined,
+        pinScale: p.pinScale ?? 1,
       };
     });
     setUploadedPhotos(mapped);
@@ -981,6 +983,28 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     };
     loadPins();
   }, [currentPhoto?.dbId]);
+
+  useEffect(() => {
+    if (pinScaleSaveTimer.current) {
+      clearTimeout(pinScaleSaveTimer.current);
+      pinScaleSaveTimer.current = null;
+    }
+    setPinScale(displayedPhoto?.pinScale ?? 1);
+  }, [displayedPhoto?.dbId]);
+
+  const savePinScale = useCallback((newScale: number) => {
+    const clamped = Math.max(0.5, Math.min(3, newScale));
+    setPinScale(clamped);
+    const photoId = displayedPhoto?.dbId;
+    if (!photoId) return;
+    setUploadedPhotos(prev => prev.map(p => p.dbId === photoId ? { ...p, pinScale: clamped } : p));
+    if (pinScaleSaveTimer.current) clearTimeout(pinScaleSaveTimer.current);
+    pinScaleSaveTimer.current = setTimeout(async () => {
+      try {
+        await apiRequest("PATCH", `/api/photos/${photoId}`, { pinScale: clamped });
+      } catch {}
+    }, 500);
+  }, [displayedPhoto?.dbId]);
 
   useEffect(() => {
     if (!currentPhoto?.dbId || !pinsLoaded || skipAutoSave.current) return;
@@ -1895,7 +1919,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 <div className="photo-overlay-divider" />
                 <button
                   className="photo-overlay-btn"
-                  onClick={(e) => { e.stopPropagation(); setPinScale((s) => Math.min(3, +(s + 0.25).toFixed(2))); }}
+                  onClick={(e) => { e.stopPropagation(); savePinScale(Math.min(3, +(pinScale + 0.25).toFixed(2))); }}
                   title="Increase pin size"
                   data-testid="button-pin-size-up"
                 >
@@ -1904,7 +1928,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 </button>
                 <button
                   className="photo-overlay-btn"
-                  onClick={(e) => { e.stopPropagation(); setPinScale((s) => Math.max(0.5, +(s - 0.25).toFixed(2))); }}
+                  onClick={(e) => { e.stopPropagation(); savePinScale(Math.max(0.5, +(pinScale - 0.25).toFixed(2))); }}
                   title="Decrease pin size"
                   data-testid="button-pin-size-down"
                 >

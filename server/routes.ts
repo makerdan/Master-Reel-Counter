@@ -263,7 +263,7 @@ export async function registerRoutes(
       if (notes !== undefined) safeUpdate.notes = notes;
       if (isDetailShot !== undefined) safeUpdate.isDetailShot = isDetailShot;
       if (parentPhotoId !== undefined) safeUpdate.parentPhotoId = parentPhotoId;
-      if (pinScale !== undefined) safeUpdate.pinScale = pinScale;
+      if (pinScale !== undefined && typeof pinScale === "number" && !isNaN(pinScale)) safeUpdate.pinScale = Math.max(0.5, Math.min(3, pinScale));
       if (Object.keys(safeUpdate).length === 0) return res.status(400).json({ message: "No valid fields to update" });
       const updated = await storage.updatePhoto(photo.id, safeUpdate);
       res.json(updated);
