@@ -85,10 +85,10 @@ interface LocalPin {
   footage?: number;
 }
 
-function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pinX: number; pinY: number; label: string }) {
+function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoUrl: string; pinX: number; pinY: number; label: string; pinScale?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const DISPLAY_SIZE = 300;
-  const CROP_FRACTION = 0.22 * 1.15 * 0.75;
+  const BASE_CROP_FRACTION = 0.22 * 1.15 * 0.75;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,8 +98,9 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pi
     img.onload = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const cropW = img.width * CROP_FRACTION;
-      const cropH = img.height * CROP_FRACTION;
+      const scaledFraction = BASE_CROP_FRACTION * pinScale;
+      const cropW = img.width * scaledFraction;
+      const cropH = img.height * scaledFraction;
       const cx = (pinX / 100) * img.width;
       const cy = (pinY / 100) * img.height;
       let sx = cx - cropW / 2;
@@ -112,7 +113,7 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label }: { photoUrl: string; pi
       ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY]);
+  }, [photoUrl, pinX, pinY, pinScale]);
 
   return (
     <div className="space-y-1" data-testid="reel-crop-preview">
@@ -2157,6 +2158,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                       pinX={selectedPin.x}
                       pinY={selectedPin.y}
                       label={selectedPin.label}
+                      pinScale={pinScale}
                     />
                   </div>
                 );
