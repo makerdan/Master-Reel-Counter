@@ -98,9 +98,8 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoU
     img.onload = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const scaledFraction = BASE_CROP_FRACTION / pinScale;
-      const cropW = img.width * scaledFraction;
-      const cropH = img.height * scaledFraction;
+      const cropW = img.width * BASE_CROP_FRACTION;
+      const cropH = img.height * BASE_CROP_FRACTION;
       const cx = (pinX / 100) * img.width;
       const cy = (pinY / 100) * img.height;
       let sx = cx - cropW / 2;
@@ -113,7 +112,7 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoU
       ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY, pinScale]);
+  }, [photoUrl, pinX, pinY]);
 
   return (
     <div className="space-y-1" data-testid="reel-crop-preview">
