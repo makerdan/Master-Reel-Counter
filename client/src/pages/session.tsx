@@ -993,7 +993,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
   }, [displayedPhoto?.dbId]);
 
   const savePinScale = useCallback((newScale: number) => {
-    const clamped = Math.max(0.5, Math.min(3, newScale));
+    const clamped = Math.max(0.5, Math.min(5, newScale));
     setPinScale(clamped);
     const photoId = displayedPhoto?.dbId;
     if (!photoId) return;
@@ -1252,6 +1252,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
       const el = containerRef.current;
       if (!el) return;
       if (!el.contains(e.target as Node)) return;
+      const target = e.target as HTMLElement;
+      if (target.closest(".photo-scroll-strip") || target.closest(".photo-overlay-controls")) return;
       e.preventDefault();
       e.stopPropagation();
       const oldScale = scaleRef.current;
@@ -1919,7 +1921,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 <div className="photo-overlay-divider" />
                 <button
                   className="photo-overlay-btn"
-                  onClick={(e) => { e.stopPropagation(); savePinScale(Math.min(3, +(pinScale + 0.25).toFixed(2))); }}
+                  onClick={(e) => { e.stopPropagation(); savePinScale(Math.min(5, +(pinScale + 0.25).toFixed(2))); }}
                   title="Increase pin size"
                   data-testid="button-pin-size-up"
                 >
