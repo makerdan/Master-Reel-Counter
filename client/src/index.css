@@ -350,16 +350,17 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 4.8%;
   z-index: 15;
   cursor: default;
   touch-action: auto;
 }
 .photo-scroll-strip.left {
   left: 0;
+  width: 4.8%;
 }
 .photo-scroll-strip.right {
   right: 0;
+  width: 52px;
 }
 
 .photo-overlay-controls {
@@ -368,7 +369,7 @@
   flex-direction: column;
   gap: 4px;
   z-index: 20;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .photo-overlay-controls.right-strip {
   top: 50%;
@@ -376,6 +377,7 @@
   transform: translateY(-50%);
 }
 .photo-overlay-btn {
+  pointer-events: auto;
   position: relative;
   width: 36px;
   height: 36px;

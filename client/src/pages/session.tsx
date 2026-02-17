@@ -3017,7 +3017,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                 data-testid="input-mobile-aisle"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sectionInputRef.current?.focus(); } }}
               />
-              <label className="flex items-center gap-1.5 cursor-pointer pt-1" data-testid="checkbox-receiving">
+              <label className="flex items-center gap-2 cursor-pointer pt-1" data-testid="checkbox-receiving">
                 <Checkbox
                   checked={isReceiving}
                   onCheckedChange={(checked) => {
@@ -3028,8 +3028,9 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                       setAisle("");
                     }
                   }}
+                  className="h-8 w-8 [&_svg]:h-5 [&_svg]:w-5"
                 />
-                <span className="text-xs text-muted-foreground">Receiving</span>
+                <span className="text-sm text-muted-foreground">Receiving</span>
               </label>
             </div>
             <div className="space-y-1">
