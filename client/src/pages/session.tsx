@@ -3400,7 +3400,13 @@ function EntryTable({
             </thead>
             <tbody>
               {sectionKeys.map((sectionKey) => {
-                const sectionEntries = grouped[sectionKey];
+                const sectionEntries = [...grouped[sectionKey]].sort((a, b) => {
+                  const pinA = pinByEntryId.get(a.id);
+                  const pinB = pinByEntryId.get(b.id);
+                  const numA = pinA?.label ? parseInt(pinA.label, 10) : Infinity;
+                  const numB = pinB?.label ? parseInt(pinB.label, 10) : Infinity;
+                  return (isNaN(numA) ? Infinity : numA) - (isNaN(numB) ? Infinity : numB);
+                });
                 const isExpanded = expandedSections[sectionKey] ?? false;
                 const sectionFootage = sectionEntries.reduce((s, e) => s + (e.footage || 0), 0);
                 const [aisleLabel, sectionLabel] = sectionKey.split("-");
