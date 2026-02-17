@@ -98,7 +98,7 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoU
     img.onload = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const scaledFraction = BASE_CROP_FRACTION * pinScale;
+      const scaledFraction = BASE_CROP_FRACTION / pinScale;
       const cropW = img.width * scaledFraction;
       const cropH = img.height * scaledFraction;
       const cx = (pinX / 100) * img.width;
