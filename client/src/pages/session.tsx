@@ -2125,53 +2125,65 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
             </div>
           )}
 
-          {uploadedPhotos.length > 1 && (
-            <div className="space-y-1">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" data-testid="text-nearby-photos-title">
-                Nearby Photos
+          {uploadedPhotos.length > 1 && (() => {
+            const sortedByLocation = uploadedPhotos
+              .map((photo, origIdx) => ({ photo, origIdx }))
+              .sort((a, b) => {
+                const aisleA = (a.photo.aisle || "").toLowerCase();
+                const aisleB = (b.photo.aisle || "").toLowerCase();
+                if (aisleA !== aisleB) return aisleA.localeCompare(aisleB);
+                const secA = parseInt(a.photo.section || "0", 10) || 0;
+                const secB = parseInt(b.photo.section || "0", 10) || 0;
+                return secA - secB;
+              });
+            const sortedPos = sortedByLocation.findIndex(s => s.origIdx === currentPhotoIdx);
+            const nearbyItems = sortedByLocation.filter((_, si) => Math.abs(si - sortedPos) <= 3);
+            return (
+              <div className="space-y-1">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground" data-testid="text-nearby-photos-title">
+                  Nearby Photos
+                </div>
+                <div className="flex gap-2 overflow-x-auto py-1 px-0.5">
+                  {nearbyItems.map(({ photo, origIdx }) => {
+                    const isCurrent = origIdx === currentPhotoIdx;
+                    const isViewing = origIdx === displayedPhotoIdx;
+                    return (
+                      <button
+                        key={origIdx}
+                        type="button"
+                        className={`flex-shrink-0 rounded-md overflow-visible border-2 transition-colors ${
+                          isViewing
+                            ? "border-primary ring-2 ring-primary/30"
+                            : isCurrent
+                              ? "border-[hsl(18_85%_40%)] ring-1 ring-[hsl(18_85%_40%/0.3)]"
+                              : "border-border/50 hover-elevate"
+                        }`}
+                        onClick={() => {
+                          if (origIdx === currentPhotoIdx || origIdx === viewingNearbyIdx) {
+                            setViewingNearbyIdx(null);
+                          } else {
+                            setViewingNearbyIdx(origIdx);
+                          }
+                          resetView();
+                        }}
+                        title={`${photo.aisle ? `Aisle ${photo.aisle} - ` : ""}${photo.section ? `Section ${photo.section}` : photo.filename || `Photo ${origIdx + 1}`}`}
+                        data-testid={`nearby-photo-${origIdx}`}
+                      >
+                        <img
+                          src={photo.url}
+                          alt={photo.filename || `Photo ${origIdx + 1}`}
+                          className="w-16 h-12 object-cover rounded-[4px]"
+                        />
+                        <div className="text-[10px] text-center truncate max-w-[64px] text-muted-foreground mt-0.5">
+                          {photo.aisle && photo.section ? `${photo.aisle}-${photo.section}` : photo.section || `#${origIdx + 1}`}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex gap-2 overflow-x-auto py-1 px-0.5">
-                {uploadedPhotos.map((photo, idx) => {
-                  const isCurrent = idx === currentPhotoIdx;
-                  const isViewing = idx === displayedPhotoIdx;
-                  const isNearby = Math.abs(idx - currentPhotoIdx) <= 3;
-                  if (!isNearby) return null;
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      className={`flex-shrink-0 rounded-md overflow-visible border-2 transition-colors ${
-                        isViewing
-                          ? "border-primary ring-2 ring-primary/30"
-                          : isCurrent
-                            ? "border-[hsl(18_85%_40%)] ring-1 ring-[hsl(18_85%_40%/0.3)]"
-                            : "border-border/50 hover-elevate"
-                      }`}
-                      onClick={() => {
-                        if (idx === currentPhotoIdx || idx === viewingNearbyIdx) {
-                          setViewingNearbyIdx(null);
-                        } else {
-                          setViewingNearbyIdx(idx);
-                        }
-                        resetView();
-                      }}
-                      title={`${photo.filename || `Photo ${idx + 1}`}${photo.section ? ` - Section ${photo.section}` : ""}`}
-                      data-testid={`nearby-photo-${idx}`}
-                    >
-                      <img
-                        src={photo.url}
-                        alt={photo.filename || `Photo ${idx + 1}`}
-                        className="w-16 h-12 object-cover rounded-[4px]"
-                      />
-                      <div className="text-[10px] text-center truncate max-w-[64px] text-muted-foreground mt-0.5">
-                        {photo.section || `#${idx + 1}`}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {localPins.length > 0 && (
             <div className="space-y-3">
