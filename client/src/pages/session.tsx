@@ -3055,7 +3055,6 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                 onChange={(e) => setAisle(e.target.value)}
                 placeholder="Aisle"
                 className={!aisle.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
-                autoFocus={!aisle.trim()}
                 disabled={isReceiving}
                 enterKeyHint="next"
                 data-testid="input-mobile-aisle"
