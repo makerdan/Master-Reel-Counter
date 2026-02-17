@@ -134,7 +134,7 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, cropMode, onCropModeChan
             onClick={() => onCropModeChange("wide")}
             data-testid="button-crop-wide"
           >
-            Wide
+            Wide Shot
           </button>
         </div>
       </div>
