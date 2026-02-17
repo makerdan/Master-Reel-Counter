@@ -88,7 +88,7 @@ interface LocalPin {
 function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoUrl: string; pinX: number; pinY: number; label: string; pinScale?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const DISPLAY_SIZE = 160;
-  const BASE_CROP_FRACTION = 0.05;
+  const BASE_CROP_FRACTION = 0.07;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1468,7 +1468,11 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
 
   const createEntries = useMutation({
     mutationFn: async () => {
-      const pinsToCommit = [...localPinsRef.current];
+      const allPins = [...localPinsRef.current];
+      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0);
+      if (pinsToCommit.length === 0) {
+        return [];
+      }
       const isDetail = currentPhoto?.isDetailShot || false;
       const parentPhoto = isDetail && currentPhoto?.parentPhotoId
         ? uploadedPhotos.find(p => p.dbId === currentPhoto.parentPhotoId)
@@ -1524,8 +1528,13 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
       return pinsToCommit;
     },
     onSuccess: (pinsToCommit) => {
+      if (pinsToCommit.length === 0) {
+        toast({ title: "No pins have category details entered yet" });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       const totalCreated = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
+      const committedIds = new Set(pinsToCommit.map(p => p.id));
       setCommittedPins(prev => [
         ...prev,
         ...pinsToCommit.map(p => ({
@@ -1537,8 +1546,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
           reelCount: p.reelCount,
         })),
       ]);
-      setLocalPins([]);
-      setSelectedPinId(null);
+      setLocalPins(prev => prev.filter(p => !committedIds.has(p.id)));
+      setSelectedPinId(prev => prev && committedIds.has(prev) ? null : prev);
       setBatchProgress(null);
       toast({ title: `Created ${totalCreated} entries from ${pinsToCommit.length} pins` });
     },
