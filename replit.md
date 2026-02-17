@@ -4,6 +4,8 @@
 A full-stack warehouse wire reel counting application built with React, Express, PostgreSQL, and Replit integrations. Tracks wire reels across pallet sections with photo annotation, manual category entry with catalog autocomplete, and PDF/CSV export capabilities.
 
 ## Recent Changes
+- 2026-02-16: Background upload queue — Mobile Flow photos upload in the background while user captures the next photo; blob preview with status overlays (queued/uploading/failed), retry & dismiss on failure, cleanup on unmount
+- 2026-02-16: Per-photo pin scale — each photo independently stores its marker size (0.5-3x range) in the database with debounced save and server-side validation
 - 2026-02-13: Wrap-around photo navigation — prev/next buttons loop from first→last and last→first; disabled when only 0-1 photos
 - 2026-02-13: Dashboard elapsed time — each session card shows total elapsed minutes (e.g. "34m" or "1h 12m") badge derived from first-to-last photo timestamps
 - 2026-02-13: Mobile capture mode — simplified mobile view for quick photo capture with aisle/section/notes only, toggle button to switch between Capture and Full mode

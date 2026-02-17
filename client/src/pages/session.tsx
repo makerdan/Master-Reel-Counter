@@ -2839,6 +2839,8 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   const notesTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
   const processingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const blobUrlsRef = useRef<Set<string>>(new Set());
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
 
@@ -2880,6 +2882,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         });
         const savedPhoto = await res.json();
 
+        if (!mountedRef.current) return;
         setRecentPhotos(prev => [...prev, {
           id: savedPhoto.id,
           objectPath: uploadResult.objectPath,
@@ -2889,9 +2892,11 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
           isDetailShot: false,
         }]);
         URL.revokeObjectURL(nextItem.blobUrl);
+        blobUrlsRef.current.delete(nextItem.blobUrl);
         setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       } catch {
+        if (!mountedRef.current) return;
         setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "failed" as const, retries: q.retries + 1 } : q));
         toast({ title: "Photo upload failed — tap to retry", variant: "destructive" });
       } finally {
@@ -2907,7 +2912,10 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   const dismissFailedUpload = useCallback((queueId: string) => {
     setUploadQueue(prev => {
       const item = prev.find(q => q.queueId === queueId);
-      if (item) URL.revokeObjectURL(item.blobUrl);
+      if (item) {
+        URL.revokeObjectURL(item.blobUrl);
+        blobUrlsRef.current.delete(item.blobUrl);
+      }
       return prev.filter(q => q.queueId !== queueId);
     });
   }, []);
@@ -2919,10 +2927,12 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
     const newItems: UploadQueueItem[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const blobUrl = URL.createObjectURL(file);
+      blobUrlsRef.current.add(blobUrl);
       newItems.push({
         queueId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         file,
-        blobUrl: URL.createObjectURL(file),
+        blobUrl,
         aisle,
         section: sectionValue,
         status: "pending",
@@ -2934,6 +2944,15 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      blobUrlsRef.current.clear();
+    };
+  }, []);
 
   const isUploading = uploadQueue.some(q => q.status === "uploading");
   const pendingCount = uploadQueue.filter(q => q.status === "pending" || q.status === "uploading").length;
@@ -3080,8 +3099,9 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         </CardContent>
       </Card>
 
-      {recentPhotos.length > 0 && (() => {
-        const sorted = [...recentPhotos];
+      {(recentPhotos.length > 0 || uploadQueue.length > 0) && (() => {
+        type DisplayPhoto = { id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean; queueId?: string; queueStatus?: "pending" | "uploading" | "failed"; blobUrl?: string };
+        const sorted: DisplayPhoto[] = [...recentPhotos];
         if (photoSort === "latest") {
           sorted.sort((a, b) => b.id - a.id);
         } else {
@@ -3096,10 +3116,24 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
             return (a.section || "").localeCompare(b.section || "", undefined, { numeric: true });
           });
         }
+        uploadQueue.forEach(q => {
+          sorted.push({
+            id: -1,
+            objectPath: "",
+            notes: "",
+            aisle: q.aisle,
+            section: q.section,
+            isDetailShot: false,
+            queueId: q.queueId,
+            queueStatus: q.status,
+            blobUrl: q.blobUrl,
+          });
+        });
+        if (sorted.length === 0) return null;
         const safeIndex = Math.min(currentPhotoIndex, sorted.length - 1);
         const photo = sorted[safeIndex];
         if (!photo) return null;
-        const imgSrc = photo.objectPath.startsWith("/uploads/") ? photo.objectPath : `/uploads/${photo.objectPath}`;
+        const imgSrc = photo.blobUrl ? photo.blobUrl : (photo.objectPath.startsWith("/uploads/") ? photo.objectPath : `/uploads/${photo.objectPath}`);
         return (
           <Card>
             <CardHeader className="p-3 flex flex-row items-center justify-between gap-2">
@@ -3126,13 +3160,47 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
               </Button>
             </CardHeader>
             <CardContent className="p-3 pt-0 space-y-3">
-              <div className="space-y-2" data-testid={`mobile-photo-${photo.id}`}>
-                <img
-                  src={imgSrc}
-                  alt={`Photo ${photo.id}`}
-                  className="w-full rounded-md object-cover max-h-64"
-                  data-testid={`img-mobile-photo-${photo.id}`}
-                />
+              <div className="space-y-2" data-testid={`mobile-photo-${photo.queueId || photo.id}`}>
+                <div className="relative">
+                  <img
+                    src={imgSrc}
+                    alt={photo.queueId ? "Uploading..." : `Photo ${photo.id}`}
+                    className={`w-full rounded-md object-cover max-h-64 ${photo.queueStatus ? "opacity-60" : ""}`}
+                    data-testid={`img-mobile-photo-${photo.queueId || photo.id}`}
+                  />
+                  {photo.queueStatus && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md bg-background/40">
+                      {photo.queueStatus === "uploading" && (
+                        <>
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                          <span className="text-sm font-medium mt-2">Uploading...</span>
+                        </>
+                      )}
+                      {photo.queueStatus === "pending" && (
+                        <>
+                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground mt-2">Queued</span>
+                        </>
+                      )}
+                      {photo.queueStatus === "failed" && (
+                        <div className="flex flex-col items-center gap-2">
+                          <AlertTriangle className="h-8 w-8 text-destructive" />
+                          <span className="text-sm font-medium text-destructive">Upload failed</span>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => retryUpload(photo.queueId!)} data-testid={`button-retry-inline-${photo.queueId}`}>
+                              <RotateCw className="h-3 w-3 mr-1" /> Retry
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => dismissFailedUpload(photo.queueId!)} data-testid={`button-dismiss-inline-${photo.queueId}`}>
+                              <X className="h-3 w-3 mr-1" /> Dismiss
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {!photo.queueStatus && (
+                <>
                 <div className="flex items-center justify-between gap-2">
                   {(photo.aisle || (photo.section && photo.section !== "000")) ? (
                     <p className="text-xs text-muted-foreground">
@@ -3180,6 +3248,15 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                     </p>
                   )}
                 </div>
+                </>
+                )}
+                {photo.queueStatus && (photo.aisle || (photo.section && photo.section !== "000")) && (
+                  <p className="text-xs text-muted-foreground">
+                    {photo.aisle && <span>Aisle: {photo.aisle}</span>}
+                    {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
+                    {photo.section && photo.section !== "000" && <span>Section: {photo.section}</span>}
+                  </p>
+                )}
               </div>
               <div className="flex items-center justify-center gap-3 pt-1">
                 <Button
