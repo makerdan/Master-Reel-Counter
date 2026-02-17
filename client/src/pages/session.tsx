@@ -3324,6 +3324,11 @@ function EntryTable({
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
 
+  const { data: sessionPins = [] } = useQuery<Pin[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "pins"],
+  });
+  const pinByEntryId = new Map(sessionPins.filter(p => p.entryId).map(p => [p.entryId!, p]));
+
   const deleteEntry = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/entries/${id}`);
@@ -3381,7 +3386,7 @@ function EntryTable({
           <table className="entries-table" data-testid="entries-table">
             <thead>
               <tr>
-                <th style={{ width: 65, textAlign: "center", whiteSpace: "nowrap" }}>Pos #:</th>
+                <th style={{ width: 65, textAlign: "center", whiteSpace: "nowrap" }}>Pin #:</th>
                 <th style={{ textAlign: "center" }}>Aisle:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
                 <th style={{ textAlign: "center" }}>Category:</th>
@@ -3417,7 +3422,7 @@ function EntryTable({
                     {isExpanded && sectionEntries.map((entry, idx) => {
                       const info = getReelInfo(entry);
                       return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
-                        <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{String(idx + 1).padStart(2, "0")}</td>
+                        <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(2, "0")}</td>
                         <td style={{ textAlign: "center" }}>{entry.aisle}</td>
                         <td style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono">{entry.reelTag || "-"}</td>

@@ -45,6 +45,7 @@ export interface IStorage {
   createPin(pin: InsertPin): Promise<Pin>;
   getPin(id: number): Promise<Pin | undefined>;
   getPhotoPins(photoId: number): Promise<Pin[]>;
+  getSessionPins(sessionId: number): Promise<Pin[]>;
   updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined>;
   deletePin(id: number): Promise<void>;
 
@@ -176,6 +177,13 @@ export class DatabaseStorage implements IStorage {
 
   async getPhotoPins(photoId: number): Promise<Pin[]> {
     return db.select().from(pins).where(eq(pins.photoId, photoId));
+  }
+
+  async getSessionPins(sessionId: number): Promise<Pin[]> {
+    const sessionPhotos = await db.select({ id: photos.id }).from(photos).where(eq(photos.sessionId, sessionId));
+    if (sessionPhotos.length === 0) return [];
+    const photoIds = sessionPhotos.map(p => p.id);
+    return db.select().from(pins).where(inArray(pins.photoId, photoIds));
   }
 
   async updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined> {

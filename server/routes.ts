@@ -294,6 +294,18 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sessions/:sessionId/pins", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const sessionPins = await storage.getSessionPins(access.session.id);
+      res.json(sessionPins);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch pins" });
+    }
+  });
+
   // Entries CRUD - all operations verify session access + encoding
   app.get("/api/sessions/:sessionId/entries", isAuthenticated, async (req: any, res) => {
     try {
