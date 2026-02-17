@@ -87,7 +87,7 @@ interface LocalPin {
 
 function ReelCropPreview({ photoUrl, pinX, pinY, label, cropMode, onCropModeChange }: { photoUrl: string; pinX: number; pinY: number; label: string; cropMode: "closeup" | "wide"; onCropModeChange: (mode: "closeup" | "wide") => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const DISPLAY_SIZE = 160;
+  const DISPLAY_SIZE = 320;
   const fraction = cropMode === "closeup" ? 0.15 : 0.07;
 
   useEffect(() => {
