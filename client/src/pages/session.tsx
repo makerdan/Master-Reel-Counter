@@ -85,10 +85,10 @@ interface LocalPin {
   footage?: number;
 }
 
-function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoUrl: string; pinX: number; pinY: number; label: string; pinScale?: number }) {
+function ReelCropPreview({ photoUrl, pinX, pinY, label, cropMode, onCropModeChange }: { photoUrl: string; pinX: number; pinY: number; label: string; cropMode: "closeup" | "wide"; onCropModeChange: (mode: "closeup" | "wide") => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const DISPLAY_SIZE = 160;
-  const BASE_CROP_FRACTION = 0.15;
+  const fraction = cropMode === "closeup" ? 0.15 : 0.07;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,8 +98,8 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoU
     img.onload = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const cropW = img.width * BASE_CROP_FRACTION;
-      const cropH = img.height * BASE_CROP_FRACTION;
+      const cropW = img.width * fraction;
+      const cropH = img.height * fraction;
       const cx = (pinX / 100) * img.width;
       const cy = (pinY / 100) * img.height;
       let sx = cx - cropW / 2;
@@ -112,13 +112,31 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoU
       ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY]);
+  }, [photoUrl, pinX, pinY, fraction]);
 
   return (
     <div className="space-y-1" data-testid="reel-crop-preview">
-      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 flex-wrap">
         <Focus className="h-3 w-3" />
         Reel Preview — {label}
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            type="button"
+            className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors ${cropMode === "closeup" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover-elevate"}`}
+            onClick={() => onCropModeChange("closeup")}
+            data-testid="button-crop-closeup"
+          >
+            Close-up
+          </button>
+          <button
+            type="button"
+            className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors ${cropMode === "wide" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover-elevate"}`}
+            onClick={() => onCropModeChange("wide")}
+            data-testid="button-crop-wide"
+          >
+            Wide
+          </button>
+        </div>
       </div>
       <div className="rounded-md border border-border/50 overflow-hidden bg-black inline-block">
         <canvas
@@ -832,6 +850,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
   const [rotation, setRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
   const [pinScale, setPinScale] = useState(1);
+  const [cropMode, setCropMode] = useState<"closeup" | "wide">("closeup");
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -2166,7 +2185,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                       pinX={selectedPin.x}
                       pinY={selectedPin.y}
                       label={selectedPin.label}
-                      pinScale={pinScale}
+                      cropMode={cropMode}
+                      onCropModeChange={setCropMode}
                     />
                   </div>
                 );
