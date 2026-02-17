@@ -87,8 +87,8 @@ interface LocalPin {
 
 function ReelCropPreview({ photoUrl, pinX, pinY, label, pinScale = 1 }: { photoUrl: string; pinX: number; pinY: number; label: string; pinScale?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const DISPLAY_SIZE = 300;
-  const BASE_CROP_FRACTION = 0.22 * 1.15 * 0.75;
+  const DISPLAY_SIZE = 160;
+  const BASE_CROP_FRACTION = 0.10;
 
   useEffect(() => {
     const canvas = canvasRef.current;
