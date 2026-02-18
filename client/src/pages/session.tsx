@@ -3046,7 +3046,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
               Enter an aisle below to start capturing photos
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={(e) => e.preventDefault()} className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
               <Input
@@ -3056,6 +3056,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                 placeholder="Aisle"
                 className={!aisle.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
                 disabled={isReceiving}
+                tabIndex={1}
                 enterKeyHint="next"
                 data-testid="input-mobile-aisle"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sectionInputRef.current?.focus(); } }}
@@ -3083,12 +3084,13 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
                 placeholder={isReceiving ? "Optional" : "Section"}
+                tabIndex={2}
                 enterKeyHint="done"
                 data-testid="input-mobile-section"
                 onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.blur(); } }}
               />
             </div>
-          </div>
+          </form>
 
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
