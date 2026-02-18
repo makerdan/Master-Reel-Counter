@@ -2350,7 +2350,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                             <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-lg" data-testid={`suggestions-${index}`}>
                               {suggestions.map((s, si) => (
                                 <button
-                                  key={s.catalog}
+                                  key={`${s.vendor}-${s.catalog}`}
                                   type="button"
                                   className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer border-b last:border-b-0 border-border/50 ${si === suggestionIndex ? "bg-accent text-accent-foreground" : "hover-elevate"}`}
                                   onMouseDown={(e) => {

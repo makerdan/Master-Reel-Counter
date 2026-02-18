@@ -296,7 +296,7 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "COP", catalog: "THHN400BK1000", description: "THHN 400 BLACK CABLE 1000 FT" },
   { vendor: "COP", catalog: "THHN400BK2500", description: "THHN 400 STR BLACK 2500'" },
   { vendor: "COP", catalog: "THHN400BL2500", description: "THHN 400 STR BLUE 2500'" },
-  { vendor: "COP", catalog: "THHN400BR2500", description: "THHN 400 STR BROWN 2500'" },
+  { vendor: "COP", catalog: "THHN400BR2500", description: "COP THHN 400 STR BROWN 2500'" },
   { vendor: "COP", catalog: "THHN400R5000", description: "THHN 4/0 STR ORANGE 5000'" },
   { vendor: "COP", catalog: "THHN40BK1000", description: "THHN 4/0 STR BLACK 1000'" },
   { vendor: "COP", catalog: "THHN40BK5000", description: "THHN 4/0 STR BLACK 5000'" },
