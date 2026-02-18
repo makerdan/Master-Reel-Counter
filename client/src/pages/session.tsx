@@ -85,7 +85,7 @@ interface LocalPin {
   footage?: number;
 }
 
-function ReelCropPreview({ photoUrl, pinX, pinY, label, cropMode, onCropModeChange }: { photoUrl: string; pinX: number; pinY: number; label: string; cropMode: "closeup" | "wide"; onCropModeChange: (mode: "closeup" | "wide") => void }) {
+function ReelCropPreview({ photoUrl, pinX, pinY, label, cropMode, onCropModeChange, onClose }: { photoUrl: string; pinX: number; pinY: number; label: string; cropMode: "closeup" | "wide"; onCropModeChange: (mode: "closeup" | "wide") => void; onClose?: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const DISPLAY_SIZE = 320;
   const fraction = cropMode === "closeup" ? 0.15 : 0.07;
@@ -136,6 +136,16 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, cropMode, onCropModeChan
           >
             Wide Shot
           </button>
+          {onClose && (
+            <button
+              type="button"
+              className="ml-1 p-0.5 rounded text-muted-foreground hover-elevate"
+              onClick={onClose}
+              data-testid="button-close-preview"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
       <div className="rounded-md border border-border/50 overflow-hidden bg-black inline-block">
@@ -2201,6 +2211,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                       label={selectedPin.label}
                       cropMode={cropMode}
                       onCropModeChange={setCropMode}
+                      onClose={() => setSelectedPinId(null)}
                     />
                   </div>
                 );
