@@ -966,9 +966,18 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
         pinScale: p.pinScale ?? 1,
       };
     });
+    mapped.sort((a, b) => {
+      const aisleA = (a.aisle || "").toLowerCase();
+      const aisleB = (b.aisle || "").toLowerCase();
+      if (aisleA !== aisleB) return aisleA.localeCompare(aisleB);
+      const secA = parseInt(a.section || "0", 10) || 0;
+      const secB = parseInt(b.section || "0", 10) || 0;
+      if (secA !== secB) return secA - secB;
+      return (a.dbId || 0) - (b.dbId || 0);
+    });
     setUploadedPhotos(mapped);
     if (!navigateToPhotoId) {
-      const firstAisle = photos.find(p => p.aisle)?.aisle;
+      const firstAisle = mapped.find(p => p.aisle)?.aisle;
       if (firstAisle && !aisle) setAisle(firstAisle);
     }
   }, [photos, navigateToPhotoId]);
