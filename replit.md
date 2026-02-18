@@ -4,6 +4,7 @@
 A full-stack warehouse wire reel counting application built with React, Express, PostgreSQL, and Replit integrations. Tracks wire reels across pallet sections with photo annotation, manual category entry with catalog autocomplete, and PDF/CSV export capabilities.
 
 ## Recent Changes
+- 2026-02-18: Incomplete pins tracking — orange badge indicators on photo nav bars and nearby thumbnails showing count of unsubmitted pins per photo; "Next incomplete" button navigates to next photo with pending pins; API endpoint `/api/sessions/:id/incomplete-pins` with 10s polling and cache invalidation on pin save/commit/photo delete
 - 2026-02-16: Background upload queue — Mobile Flow photos upload in the background while user captures the next photo; blob preview with status overlays (queued/uploading/failed), retry & dismiss on failure, cleanup on unmount
 - 2026-02-16: Per-photo pin scale — each photo independently stores its marker size (0.5-3x range) in the database with debounced save and server-side validation
 - 2026-02-13: Wrap-around photo navigation — prev/next buttons loop from first→last and last→first; disabled when only 0-1 photos

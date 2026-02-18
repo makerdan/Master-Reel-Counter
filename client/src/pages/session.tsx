@@ -5,7 +5,7 @@ import {
   ArrowLeft, Camera, ListPlus, Plus, Trash2, Pencil, Download, FileText,
   RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, ChevronDown, Cable,
   Save, X, Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  Users, Copy, Link, Mail, UserPlus, UserMinus, ImagePlus, Crosshair, ArrowUpDown,
+  Users, Copy, Link, Mail, UserPlus, UserMinus, ImagePlus, Crosshair, ArrowUpDown, AlertCircle,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -828,6 +828,21 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [viewingNearbyIdx, setViewingNearbyIdx] = useState<number | null>(null);
 
+  const { data: incompletePinsData } = useQuery<{ photoId: number; incompleteCount: number }[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"],
+    enabled: sessionId > 0,
+    refetchInterval: 10000,
+  });
+
+  const incompletePinsMap = new Map<number, number>();
+  if (incompletePinsData) {
+    for (const item of incompletePinsData) {
+      incompletePinsMap.set(item.photoId, item.incompleteCount);
+    }
+  }
+
+  const totalIncompletePins = incompletePinsData ? incompletePinsData.reduce((sum, item) => sum + item.incompleteCount, 0) : 0;
+
   useEffect(() => {
     if (viewingNearbyIdx !== null && viewingNearbyIdx >= uploadedPhotos.length) {
       setViewingNearbyIdx(null);
@@ -1099,6 +1114,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
             footage: p.footage || null,
           })),
         });
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       } catch {
       }
     }, 1000);
@@ -1608,6 +1624,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
         return;
       }
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       const totalCreated = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
       const committedIds = new Set(pinsToCommit.map(p => p.id));
       setCommittedPins(prev => [
@@ -1639,6 +1656,26 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     setPanX(0);
     setPanY(0);
   };
+
+  const navigateToNextIncomplete = async () => {
+    if (!incompletePinsData || incompletePinsData.length === 0) return;
+    const incompletePhotoIds = new Set(incompletePinsData.map(d => d.photoId));
+    for (let offset = 1; offset <= uploadedPhotos.length; offset++) {
+      const idx = (currentPhotoIdx + offset) % uploadedPhotos.length;
+      const photo = uploadedPhotos[idx];
+      if (photo?.dbId && incompletePhotoIds.has(photo.dbId)) {
+        await flushSavePins();
+        skipAutoSave.current = true;
+        setLocalPins([]);
+        setViewingNearbyIdx(null);
+        setCurrentPhotoIdx(idx);
+        resetView();
+        return;
+      }
+    }
+  };
+
+  const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
   return (
     <div className="space-y-4 rounded-md border-2 border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4">
@@ -1720,6 +1757,11 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
                 <div className="flex items-center gap-1 text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter">
+                  {currentPhotoIncompleteCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[hsl(30_90%_45%)] text-white text-[10px] font-bold px-1" data-testid="badge-current-incomplete-top">
+                      {currentPhotoIncompleteCount}
+                    </span>
+                  )}
                   <input
                     type="text"
                     inputMode="numeric"
@@ -1751,6 +1793,17 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                 >
                   <ChevronRight className="h-5 w-5" />
                 </Button>
+                {totalIncompletePins > 0 && (
+                  <Button
+                    size="sm"
+                    className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)] ml-1"
+                    onClick={navigateToNextIncomplete}
+                    data-testid="button-next-incomplete"
+                  >
+                    <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                    <span className="mono text-xs">{totalIncompletePins}</span>
+                  </Button>
+                )}
               </div>
               <div className="flex-1 flex justify-end gap-2">
                 <Input
@@ -2048,6 +2101,11 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
                   <div className="flex items-center gap-1 text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter-bottom">
+                    {currentPhotoIncompleteCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[hsl(30_90%_45%)] text-white text-[10px] font-bold px-1" data-testid="badge-current-incomplete-bottom">
+                        {currentPhotoIncompleteCount}
+                      </span>
+                    )}
                     <input
                       type="text"
                       inputMode="numeric"
@@ -2079,6 +2137,17 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   >
                     <ChevronRight className="h-5 w-5" />
                   </Button>
+                  {totalIncompletePins > 0 && (
+                    <Button
+                      size="sm"
+                      className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)] ml-1"
+                      onClick={navigateToNextIncomplete}
+                      data-testid="button-next-incomplete-bottom"
+                    >
+                      <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                      <span className="mono text-xs">{totalIncompletePins}</span>
+                    </Button>
+                  )}
                 </div>
                 <div className="flex-1 flex justify-end">
                 <AlertDialog>
@@ -2117,6 +2186,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                             resetView();
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
                             toast({ title: "Photo deleted" });
                           } catch {
                             toast({ title: "Failed to delete photo", variant: "destructive" });
@@ -2210,7 +2280,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                       <button
                         key={origIdx}
                         type="button"
-                        className={`flex-shrink-0 rounded-md overflow-visible border-2 transition-colors ${
+                        className={`relative flex-shrink-0 rounded-md overflow-visible border-2 transition-colors ${
                           isViewing
                             ? "border-primary ring-2 ring-primary/30"
                             : isCurrent
@@ -2225,9 +2295,14 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                           }
                           resetView();
                         }}
-                        title={`${photo.aisle ? `Aisle ${photo.aisle} - ` : ""}${photo.section ? `Section ${photo.section}` : photo.filename || `Photo ${origIdx + 1}`}`}
+                        title={`${photo.aisle ? `Aisle ${photo.aisle} - ` : ""}${photo.section ? `Section ${photo.section}` : photo.filename || `Photo ${origIdx + 1}`}${photo.dbId && incompletePinsMap.has(photo.dbId) ? ` (${incompletePinsMap.get(photo.dbId)} incomplete)` : ""}`}
                         data-testid={`nearby-photo-${origIdx}`}
                       >
+                        {photo.dbId && incompletePinsMap.has(photo.dbId) && (
+                          <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-[hsl(30_90%_45%)] text-white text-[9px] font-bold px-0.5 z-10" data-testid={`badge-nearby-incomplete-${origIdx}`}>
+                            {incompletePinsMap.get(photo.dbId)}
+                          </span>
+                        )}
                         <img
                           src={photo.url}
                           alt={photo.filename || `Photo ${origIdx + 1}`}

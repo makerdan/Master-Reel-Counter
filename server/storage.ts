@@ -49,6 +49,7 @@ export interface IStorage {
   updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined>;
   deletePin(id: number): Promise<void>;
 
+  getSessionIncompletePins(sessionId: number): Promise<{ photoId: number; incompleteCount: number }[]>;
   getUserSettings(userId: string): Promise<UserSettings | undefined>;
   upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings>;
   getAllUserEntries(userId: string): Promise<Entry[]>;
@@ -184,6 +185,27 @@ export class DatabaseStorage implements IStorage {
     if (sessionPhotos.length === 0) return [];
     const photoIds = sessionPhotos.map(p => p.id);
     return db.select().from(pins).where(inArray(pins.photoId, photoIds));
+  }
+
+  async getSessionIncompletePins(sessionId: number): Promise<{ photoId: number; incompleteCount: number }[]> {
+    const sessionPhotos = await db.select({ id: photos.id }).from(photos).where(eq(photos.sessionId, sessionId));
+    if (sessionPhotos.length === 0) return [];
+    const photoIds = sessionPhotos.map(p => p.id);
+    const results = await db
+      .select({
+        photoId: pins.photoId,
+        incompleteCount: count(),
+      })
+      .from(pins)
+      .where(
+        and(
+          inArray(pins.photoId, photoIds),
+          sql`(${pins.wireDetails} IS NULL OR ${pins.wireDetails} = '')`,
+          sql`${pins.entryId} IS NULL`
+        )
+      )
+      .groupBy(pins.photoId);
+    return results.map(r => ({ photoId: r.photoId, incompleteCount: Number(r.incompleteCount) }));
   }
 
   async updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined> {

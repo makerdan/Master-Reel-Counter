@@ -374,6 +374,18 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sessions/:id/incomplete-pins", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const result = await storage.getSessionIncompletePins(sessionId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch incomplete pins" });
+    }
+  });
+
   // Pins - verify access through photo -> session chain
   app.get("/api/photos/:photoId/pins", isAuthenticated, async (req: any, res) => {
     try {
