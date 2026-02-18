@@ -78,7 +78,7 @@ export function parseCatalogEntry(entry: CatalogEntry): ParsedCatalogEntry {
     }
   }
 
-  const footageMatch = desc.match(/(\d+)'?\s*$/);
+  const footageMatch = desc.match(/(\d+)(?:'|\s*[Ff][Tt]\.?)?\s*$/);
   if (footageMatch) {
     footage = parseInt(footageMatch[1]);
   }
