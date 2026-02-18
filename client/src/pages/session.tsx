@@ -278,6 +278,41 @@ function SessionWorkspace({
   });
 
 
+  const shareSession = () => {
+    const lines: string[] = [];
+    lines.push(`Session: ${session.name}`);
+    if (session.location) lines.push(`Location: ${session.location}`);
+    lines.push(`Entries: ${entries.length}`);
+    lines.push(`Total Footage: ${totalFootage.toLocaleString()} ft`);
+    lines.push(`Photos: ${photos.length}`);
+    if (session.firstPhotoAt) {
+      lines.push(`Time: ${formatSessionTime(session.firstPhotoAt, session.lastPhotoAt)}`);
+    }
+    lines.push("");
+
+    const grouped = new Map<string, Entry[]>();
+    for (const e of entries) {
+      const key = `${e.aisle} - ${e.section}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(e);
+    }
+
+    for (const [loc, group] of grouped) {
+      lines.push(`--- ${loc} ---`);
+      for (const e of group) {
+        const parts = [e.reelTag || "Unknown", e.wireType, e.gauge, e.footage ? `${e.footage}ft` : "", e.color, e.manufacturer].filter(Boolean);
+        lines.push(`  ${parts.join(" | ")}${e.reelCount && e.reelCount > 1 ? ` (x${e.reelCount})` : ""}`);
+      }
+      lines.push("");
+    }
+
+    lines.push(`Generated: ${new Date().toLocaleString()}`);
+
+    const subject = encodeURIComponent(`Wire Reel Count - ${session.name}`);
+    const body = encodeURIComponent(lines.join("\n"));
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_self");
+  };
+
   const exportCsv = async () => {
     try {
       const res = await apiRequest("GET", `/api/sessions/${sessionId}/export`);
@@ -384,6 +419,10 @@ function SessionWorkspace({
                 <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf">
                   <FileText className="h-4 w-4 mr-2" />
                   PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={shareSession} data-testid="button-share-session">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Share via Email
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
