@@ -1260,7 +1260,6 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
       reelCount: 1,
     };
     setLocalPins((prev) => [...prev, newPin]);
-    setSelectedPinId(newPin.id);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
