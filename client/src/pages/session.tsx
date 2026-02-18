@@ -1605,6 +1605,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
             }}
             placeholder="Aisle..."
             className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
+            enterKeyHint="next"
             data-testid="input-photo-aisle"
           />
         </div>
@@ -1714,6 +1715,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
                   }}
                   placeholder="Section..."
                   className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
+                  enterKeyHint="done"
                   data-testid="input-photo-section"
                 />
               </div>
@@ -2696,6 +2698,7 @@ function SingleEntryMode({
             }}
             onBlur={() => markTouched("aisle")}
             placeholder="Aisle"
+            enterKeyHint="next"
             className={touched.aisle && errors.aisle ? "border-destructive" : ""}
             data-testid="input-aisle"
           />
@@ -2710,6 +2713,7 @@ function SingleEntryMode({
             onChange={(e) => update("section", e.target.value)}
             onBlur={() => markTouched("section")}
             placeholder="Section"
+            enterKeyHint="next"
             className={touched.section && errors.section ? "border-destructive" : ""}
             data-testid="input-section"
           />
@@ -2731,7 +2735,7 @@ function SingleEntryMode({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs underline">Category:</Label>
-          <Input value={form.reelTag} onChange={(e) => update("reelTag", e.target.value.toUpperCase())} placeholder="Category" data-testid="input-reel-tag" />
+          <Input value={form.reelTag} onChange={(e) => update("reelTag", e.target.value.toUpperCase())} placeholder="Category" enterKeyHint="next" data-testid="input-reel-tag" />
         </div>
         <div className="space-y-1">
           <Label className="text-xs underline">Number of Reels:</Label>
@@ -2742,6 +2746,7 @@ function SingleEntryMode({
             min={1}
             inputMode="numeric"
             placeholder="1"
+            enterKeyHint="next"
             data-testid="input-reel-count"
           />
         </div>
@@ -2755,6 +2760,7 @@ function SingleEntryMode({
             onChange={(e) => update("conductors", e.target.value.replace(/[^0-9]/g, ""))}
             placeholder="# conductors"
             inputMode="numeric"
+            enterKeyHint="next"
             data-testid="input-conductors"
           />
         </div>
@@ -2794,6 +2800,7 @@ function SingleEntryMode({
             step={1}
             inputMode="numeric"
             placeholder="Footage"
+            enterKeyHint="next"
             className={touched.footage && errors.footage ? "border-destructive" : ""}
             data-testid="input-footage"
           />
@@ -2817,13 +2824,13 @@ function SingleEntryMode({
         </div>
         <div className="space-y-1">
           <Label className="text-xs underline">Vendor Code:</Label>
-          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value)} placeholder="Vendor Code" data-testid="input-manufacturer" />
+          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value)} placeholder="Vendor Code" enterKeyHint="next" data-testid="input-manufacturer" />
         </div>
       </div>
 
       <div className="space-y-1">
         <Label className="text-xs underline">Notes:</Label>
-        <Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Notes..." rows={2} data-testid="input-notes" />
+        <Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Notes..." rows={2} enterKeyHint="done" data-testid="input-notes" />
       </div>
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
