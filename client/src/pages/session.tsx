@@ -1011,6 +1011,13 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     }
   }, [navigateToPhotoId, uploadedPhotos]);
 
+  useEffect(() => {
+    const photo = uploadedPhotos[currentPhotoIdx];
+    if (photo) {
+      setAisle(photo.aisle || "");
+    }
+  }, [currentPhotoIdx, uploadedPhotos]);
+
   const flushSavePins = useCallback(async () => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     const photoDbId = uploadedPhotos[currentPhotoIdx]?.dbId;
@@ -1688,6 +1695,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
               let val = e.target.value;
               if (val.toLowerCase() === "rec") val = "Receiving";
               setAisle(val);
+              setUploadedPhotos(prev => prev.map((p, i) => i === currentPhotoIdx ? { ...p, aisle: val } : p));
               const photoDbId = currentPhoto?.dbId;
               if (aisleSaveTimer.current) clearTimeout(aisleSaveTimer.current);
               if (photoDbId) {
