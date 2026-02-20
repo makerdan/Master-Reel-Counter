@@ -750,7 +750,9 @@ export async function registerRoutes(
         doc.font('Helvetica-Bold').fontSize(7).fillColor("#333333");
         let x = tableLeft;
         for (const col of secScaled) {
-          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false, underline: true });
+          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false });
+          const tw = doc.widthOfString(col.header);
+          doc.save().moveTo(x + 3, y + 13).lineTo(x + 3 + tw, y + 13).lineWidth(0.4).strokeColor("#333333").stroke().restore();
           x += col.width;
         }
         doc.font('Helvetica');
@@ -1076,7 +1078,11 @@ export async function registerRoutes(
         doc.font('Helvetica-Bold').fontSize(7.5).fillColor("#333333");
         let x = tableLeft;
         for (const col of sumScaled) {
-          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false, underline: true, align: col.align });
+          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false, align: col.align });
+          const tw = doc.widthOfString(col.header);
+          let ulX = x + 3;
+          if (col.align === "center") ulX = x + 3 + (col.width - 6 - tw) / 2;
+          doc.save().moveTo(ulX, y + 13).lineTo(ulX + tw, y + 13).lineWidth(0.4).strokeColor("#333333").stroke().restore();
           x += col.width;
         }
         doc.font('Helvetica');
@@ -1158,16 +1164,19 @@ export async function registerRoutes(
       }
       doc.moveTo(36, currentY).lineTo(36 + pageWidth, currentY).strokeColor(accentHex).lineWidth(2).stroke();
       currentY += 8;
-      doc.font('Helvetica-Bold').fontSize(8).fillColor("#333333").text("Audit Trail:", 36, currentY, { underline: true });
+      doc.font('Helvetica-Bold').fontSize(8).fillColor("#333333");
+      doc.text("Audit Trail:", 36, currentY, { lineBreak: false });
+      const atLabelW = doc.widthOfString("Audit Trail:");
+      doc.save().moveTo(36, currentY + 9).lineTo(36 + atLabelW, currentY + 9).lineWidth(0.5).strokeColor("#333333").stroke().restore();
       doc.font('Helvetica');
       currentY += 14;
       const ctGeneratedAt = formatCT(new Date());
-      doc.fontSize(7).fillColor("#666666");
       const auditLabel = (label: string, value: string) => {
         doc.font('Helvetica').fontSize(7).fillColor("#666666");
         const labelW = doc.widthOfString(label);
-        doc.text(label, 36, currentY, { underline: true, lineBreak: false });
-        doc.text(` ${value}`, 36 + labelW, currentY, { underline: false, lineBreak: false });
+        doc.text(label, 36, currentY, { lineBreak: false });
+        doc.save().moveTo(36, currentY + 8).lineTo(36 + labelW, currentY + 8).lineWidth(0.4).strokeColor("#666666").stroke().restore();
+        doc.text(` ${value}`, 36 + labelW, currentY, { lineBreak: false });
         currentY += 11;
       };
       auditLabel("Report Generated:", ctGeneratedAt);
