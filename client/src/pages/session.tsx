@@ -1808,7 +1808,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
               </div>
               <div className="flex-1 flex justify-end gap-2">
                 <div>
-                  <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Section:</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Section:</label>
                   <Input
                     value={currentPhoto?.section || ""}
                     onChange={(e) => {
