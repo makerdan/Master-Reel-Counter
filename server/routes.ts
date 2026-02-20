@@ -8,6 +8,7 @@ import { insertSessionSchema, insertEntrySchema, insertPinSchema } from "@shared
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
 import PDFDocument from "pdfkit";
+import sharp from "sharp";
 import { randomUUID, randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
@@ -838,9 +839,13 @@ export async function registerRoutes(
           const photoPath = path.join(UPLOADS_DIR, photoFilename);
           try {
             await fs.access(photoPath);
-            const imgBuffer = await fs.readFile(photoPath);
-            const img = doc.openImage(imgBuffer);
-            return { photo, buffer: imgBuffer, imgW: img.width, imgH: img.height, origW: img.width, origH: img.height };
+            const rawBuffer = await fs.readFile(photoPath);
+            const orientedBuffer = await sharp(rawBuffer).rotate().toBuffer();
+            const metadata = await sharp(orientedBuffer).metadata();
+            const imgW = metadata.width || 1;
+            const imgH = metadata.height || 1;
+            const img = doc.openImage(orientedBuffer);
+            return { photo, buffer: orientedBuffer, imgW: img.width, imgH: img.height, origW: imgW, origH: imgH };
           } catch {
             return null;
           }
