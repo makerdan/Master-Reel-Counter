@@ -2623,7 +2623,7 @@ function SingleEntryMode({
     reelTag: editingEntry?.reelTag || "",
     wireType: editingEntry?.wireType || "",
     gauge: editingEntry?.gauge || "",
-    footage: editingEntry ? (editingEntry.footage && editingEntry.reelCount && editingEntry.reelCount > 1 ? Math.round(editingEntry.footage / editingEntry.reelCount).toString() : editingEntry.footage?.toString() || "") : "",
+    footage: editingEntry?.footage?.toString() || "",
     color: editingEntry?.color || "",
     manufacturer: editingEntry?.manufacturer || "",
     notes: editingEntry?.notes || "",
@@ -2632,6 +2632,9 @@ function SingleEntryMode({
   });
   const [onFloor, setOnFloor] = useState(editingEntry?.notes?.includes("On Floor") || false);
   const [inFrontOf, setInFrontOf] = useState(editingEntry?.notes?.includes("In Front Of") || false);
+  const [receivingChecked, setReceivingChecked] = useState(editingEntry?.aisle?.toLowerCase() === "receiving" || false);
+  const [footageOverride, setFootageOverride] = useState(!!editingEntry);
+  const lastMatchedCatalog = useRef<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -2653,23 +2656,56 @@ function SingleEntryMode({
       });
       setOnFloor(editingEntry.notes?.includes("On Floor") || false);
       setInFrontOf(editingEntry.notes?.includes("In Front Of") || false);
+      setReceivingChecked(editingEntry.aisle?.toLowerCase() === "receiving" || false);
+      setFootageOverride(true);
+      lastMatchedCatalog.current = editingEntry.reelTag?.toUpperCase().replace(/[^A-Z0-9]/g, "") || null;
       setCapturedPhoto(null);
       setErrors({});
       setTouched({});
     }
   }, [editingEntry]);
 
+  const getCatalogMatch = (reelTag: string): ParsedCatalogEntry | null => {
+    if (!reelTag || reelTag.length < 2) return null;
+    const matches = lookupCategory(reelTag);
+    const normalized = reelTag.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const exact = matches.find(m => m.catalog === normalized);
+    return exact || (matches.length === 1 ? matches[0] : null);
+  };
+
   useEffect(() => {
-    if (form.reelTag && form.reelTag.length >= 2) {
-      const matches = lookupCategory(form.reelTag);
-      const normalized = form.reelTag.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      const exact = matches.find(m => m.catalog === normalized);
-      const match = exact || (matches.length === 1 ? matches[0] : null);
-      if (match && match.conductors && !form.conductors) {
+    const match = getCatalogMatch(form.reelTag);
+    if (match) {
+      if (match.conductors && !form.conductors) {
         setForm(f => ({ ...f, conductors: match.conductors || "" }));
+      }
+      if (match.footage) {
+        const matchCatalog = match.catalog;
+        if (matchCatalog !== lastMatchedCatalog.current) {
+          lastMatchedCatalog.current = matchCatalog;
+          setFootageOverride(false);
+          const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
+          setForm(f => ({ ...f, footage: (match.footage! * reelCount).toString() }));
+        }
+      } else {
+        lastMatchedCatalog.current = match.catalog;
+      }
+    } else {
+      if (lastMatchedCatalog.current !== null) {
+        lastMatchedCatalog.current = null;
       }
     }
   }, [form.reelTag]);
+
+  useEffect(() => {
+    if (!footageOverride) {
+      const match = getCatalogMatch(form.reelTag);
+      if (match?.footage) {
+        const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
+        setForm(f => ({ ...f, footage: (match.footage! * reelCount).toString() }));
+      }
+    }
+  }, [form.reelCount, footageOverride]);
 
   const handleSinglePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2777,6 +2813,9 @@ function SingleEntryMode({
         });
         setOnFloor(false);
         setInFrontOf(false);
+        setReceivingChecked(false);
+        setFootageOverride(false);
+        lastMatchedCatalog.current = null;
         setCapturedPhoto(null);
         setErrors({});
         setTouched({});
@@ -2873,7 +2912,25 @@ function SingleEntryMode({
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox
+            checked={receivingChecked}
+            onCheckedChange={(c) => {
+              const checked = !!c;
+              setReceivingChecked(checked);
+              if (checked) {
+                update("aisle", "Receiving");
+                update("section", "000");
+              } else {
+                update("aisle", "");
+                update("section", "");
+              }
+            }}
+            data-testid="checkbox-receiving"
+          />
+          Receiving
+        </label>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <Checkbox
             checked={onFloor}
@@ -2932,6 +2989,7 @@ function SingleEntryMode({
             value={form.footage}
             onChange={(e) => {
               const v = e.target.value.replace(/[^0-9]/g, "");
+              setFootageOverride(true);
               update("footage", v);
             }}
             onBlur={() => markTouched("footage")}
@@ -2939,7 +2997,7 @@ function SingleEntryMode({
             min={1}
             step={1}
             inputMode="numeric"
-            placeholder="Footage"
+            placeholder="Auto or enter manually"
             enterKeyHint="next"
             className={touched.footage && errors.footage ? "border-destructive" : ""}
             data-testid="input-footage"
