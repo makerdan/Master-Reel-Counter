@@ -849,10 +849,9 @@ export async function registerRoutes(
         const renderPhoto = (pl: PhotoLayout, x: number, y: number, maxW: number, maxH: number) => {
           const aspect = pl.origW / pl.origH;
           let w: number, h: number;
-          if (aspect > maxW / maxH) {
-            w = maxW;
-            h = maxW / aspect;
-          } else {
+          w = maxW;
+          h = maxW / aspect;
+          if (h > maxH) {
             h = maxH;
             w = maxH * aspect;
           }
@@ -873,7 +872,7 @@ export async function registerRoutes(
           if (maxH < 60) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = 36;
-            maxH = maxY - currentY - 60;
+            maxH = Math.min(photoMaxH, maxY - currentY - 60);
           }
           const pl = await loadPhoto(photo);
           const photoFilename = photo.objectStorageKey.replace("/uploads/", "");
@@ -892,6 +891,7 @@ export async function registerRoutes(
           if (currentY + fitH + 16 > maxY) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = 36;
+            maxH = Math.min(photoMaxH, maxY - currentY - 60);
           }
 
           const { renderedH } = renderPhoto(pl, tableLeft, currentY, maxW, maxH);
@@ -940,8 +940,9 @@ export async function registerRoutes(
           currentY += 12;
         };
 
+        const photoMaxH = 350;
         for (const photo of fullPhotos) {
-          await renderPhotoWithCaption(photo, pageWidth, maxY - currentY - 60);
+          await renderPhotoWithCaption(photo, pageWidth, Math.min(photoMaxH, maxY - currentY - 60));
         }
 
         if (detailPhotos.length > 0) {
@@ -957,7 +958,7 @@ export async function registerRoutes(
             if (pair.length === 2) {
               await renderPhotoPair(pair, pageWidth, 250);
             } else {
-              await renderPhotoWithCaption(pair[0], pageWidth, maxY - currentY - 60);
+              await renderPhotoWithCaption(pair[0], pageWidth, Math.min(photoMaxH, maxY - currentY - 60));
             }
           }
         }
