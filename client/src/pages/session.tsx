@@ -2675,11 +2675,20 @@ function SingleEntryMode({
     return exact || (matches.length === 1 ? matches[0] : null);
   };
 
+  const getUniqueVendor = (catalog: string): string | null => {
+    const vendors = new Set(PARSED_CATALOG.filter(e => e.catalog === catalog).map(e => e.vendor));
+    return vendors.size === 1 ? [...vendors][0] : null;
+  };
+
   useEffect(() => {
     const match = getCatalogMatch(form.reelTag);
     if (match) {
       if (match.conductors && !form.conductors) {
         setForm(f => ({ ...f, conductors: match.conductors || "" }));
+      }
+      const uniqueVendor = getUniqueVendor(match.catalog);
+      if (uniqueVendor && !form.manufacturer) {
+        setForm(f => ({ ...f, manufacturer: uniqueVendor }));
       }
       if (match.footage) {
         const matchCatalog = match.catalog;
@@ -2756,10 +2765,11 @@ function SingleEntryMode({
     const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
     lastMatchedCatalog.current = match.catalog;
     setFootageOverride(false);
+    const uniqueVendor = getUniqueVendor(match.catalog);
     setForm(f => ({
       ...f,
       reelTag: match.catalog,
-      manufacturer: f.manufacturer || match.vendor || "",
+      manufacturer: f.manufacturer || (uniqueVendor ?? ""),
       footage: match.footage ? (match.footage * reelCount).toString() : f.footage,
       conductors: f.conductors || match.conductors || "",
     }));
@@ -3031,7 +3041,7 @@ function SingleEntryMode({
         </div>
         <div className="space-y-1">
           <Label className="text-xs underline">Vendor Code:</Label>
-          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value)} placeholder="Vendor Code" enterKeyHint="next" data-testid="input-manufacturer" />
+          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value.toUpperCase())} placeholder="Vendor Code" enterKeyHint="next" data-testid="input-manufacturer" />
         </div>
       </div>
 
