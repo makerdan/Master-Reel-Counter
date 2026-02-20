@@ -956,17 +956,8 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     const shouldFullSync = uploadedPhotos.length === 0;
     const needsNavTarget = navigateToPhotoId && !uploadedPhotos.some(p => p.dbId === navigateToPhotoId) && photos.some(p => p.id === navigateToPhotoId);
     if (!shouldFullSync && !needsNavTarget) return;
-    const nameCounts: Record<string, number> = {};
     const mapped = photos.map((p) => {
-      let filename = p.originalFilename || undefined;
-      if (filename) {
-        const count = (nameCounts[filename] || 0) + 1;
-        nameCounts[filename] = count;
-        const dotIdx = filename.lastIndexOf(".");
-        const base = dotIdx > 0 ? filename.substring(0, dotIdx) : filename;
-        const ext = dotIdx > 0 ? filename.substring(dotIdx) : "";
-        filename = `${base}_${String(count).padStart(4, "0")}${ext}`;
-      }
+      const filename = p.originalFilename || `Photo_${p.id}`;
       return {
         url: p.objectStorageKey.startsWith("/uploads/") ? p.objectStorageKey : p.objectStorageKey.startsWith("/objects/") ? p.objectStorageKey : `/uploads/${p.objectStorageKey}`,
         objectPath: p.objectStorageKey,

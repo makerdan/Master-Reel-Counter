@@ -241,7 +241,11 @@ export async function registerRoutes(
         userId,
         uploadedBy: displayName,
       });
-      console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${access.session.id}, at=${photo.createdAt.toISOString()}`);
+      const ext = (req.body.originalFilename || "photo.jpg").match(/\.[^.]+$/)?.[0] || ".jpg";
+      const uniqueFilename = `S${access.session.id}_P${String(photo.id).padStart(4, "0")}${ext}`;
+      await storage.updatePhoto(photo.id, { originalFilename: uniqueFilename });
+      photo.originalFilename = uniqueFilename;
+      console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${access.session.id}, filename="${uniqueFilename}", at=${photo.createdAt.toISOString()}`);
       res.json(photo);
     } catch (error) {
       console.error("Error creating photo:", error);
