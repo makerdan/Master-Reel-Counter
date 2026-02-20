@@ -1681,7 +1681,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
     <div className="space-y-4 rounded-md border-2 border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4">
       <div className="flex items-end gap-2 flex-wrap">
         <div>
-          <label className="block text-xs font-semibold text-[hsl(25_40%_45%)] dark:text-[hsl(25_40%_60%)] mb-1">Aisle:</label>
+          <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Aisle:</label>
           <Input
             value={aisle}
             onChange={(e) => {
@@ -1808,7 +1808,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
               </div>
               <div className="flex-1 flex justify-end gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-[hsl(25_40%_45%)] dark:text-[hsl(25_40%_60%)] mb-1">Section:</label>
+                  <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Section:</label>
                   <Input
                     value={currentPhoto?.section || ""}
                     onChange={(e) => {
