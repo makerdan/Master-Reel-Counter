@@ -764,51 +764,79 @@ export async function registerRoutes(
         return y + headerHeight;
       };
 
-      const drawCommittedPin = (pin: any, imgX: number, imgY: number, imgW: number, imgH: number, imgOrigW: number, pinScale: number) => {
+      const drawCommittedPin = (pin: any, imgX: number, imgY: number, imgW: number, imgH: number, _imgOrigW: number, pinScale: number) => {
         const pinCenterX = imgX + (pin.xPercent / 100) * imgW;
         const pinCenterY = imgY + (pin.yPercent / 100) * imgH;
-        const baseW = 82;
-        const baseH = 61;
-        const cssToImgRatio = imgW / imgOrigW;
-        const pw = baseW * cssToImgRatio * pinScale;
-        const ph = baseH * cssToImgRatio * pinScale;
+
+        const refDisplayW = 375;
+        const sf = (imgW / refDisplayW) * pinScale;
+
+        const pw = 82 * sf;
+        const ph = 61 * sf;
+        const borderW = Math.max(0.5, 2 * sf);
+        const cornerR = Math.max(1, 5 * sf);
         const px = pinCenterX - pw / 2;
         const py = pinCenterY - ph / 2;
 
         doc.save();
-        doc.rect(px, py, pw, ph)
+        doc.roundedRect(px, py, pw, ph, cornerR)
           .strokeColor(accentHex)
-          .lineWidth(1.5)
+          .lineWidth(borderW)
           .stroke();
 
         if (pin.label) {
-          const labelFontSize = Math.max(4, 7 * cssToImgRatio * pinScale);
+          const labelFontSize = Math.max(4, 10 * sf);
+          const labelPadX = Math.max(1, 3 * sf);
+          const labelPadY = Math.max(0.5, 1 * sf);
+          const tabCornerR = Math.max(0.5, 3 * sf);
+
           const labelText = `P${pin.label}`;
-          const labelPadX = 2 * cssToImgRatio * pinScale;
-          const labelH = labelFontSize + 3 * cssToImgRatio * pinScale;
-          const labelW = labelText.length * labelFontSize * 0.65 + labelPadX * 2;
-          let tabX = pinCenterX - labelW / 2;
+          doc.font('Helvetica-Bold').fontSize(labelFontSize);
+          const labelTextW = doc.widthOfString(labelText);
+          const labelW = labelTextW + labelPadX * 2;
+          const labelH = labelFontSize + labelPadY * 2;
+
           const reelCount = pin.reelCount || 1;
           let badgeW = 0;
+          let badgeText = "";
           if (reelCount >= 2) {
-            const badgeText = `X${reelCount}`;
-            badgeW = badgeText.length * labelFontSize * 0.65 + labelPadX * 2;
+            badgeText = `X${reelCount}`;
+            const badgeTextW = doc.widthOfString(badgeText);
+            badgeW = badgeTextW + labelPadX * 2;
           }
-          const totalTopW = labelW + badgeW;
-          tabX = pinCenterX - totalTopW / 2;
+          const totalTopW = labelW + (badgeW > 0 ? badgeW + sf : 0);
+          const tabX = pinCenterX - totalTopW / 2;
+          const tabY = py - labelH + borderW / 2;
 
-          const tabY = py - labelH;
-          doc.rect(tabX, tabY, labelW, labelH).fill(accentHex);
-          doc.font('Helvetica-Bold').fontSize(labelFontSize).fillColor("#ffffff")
-            .text(labelText, tabX, tabY + 1, { width: labelW, align: "center", lineBreak: false });
+          doc.save();
+          doc.moveTo(tabX + tabCornerR, tabY)
+            .lineTo(tabX + labelW - tabCornerR, tabY)
+            .quadraticCurveTo(tabX + labelW, tabY, tabX + labelW, tabY + tabCornerR)
+            .lineTo(tabX + labelW, tabY + labelH)
+            .lineTo(tabX, tabY + labelH)
+            .lineTo(tabX, tabY + tabCornerR)
+            .quadraticCurveTo(tabX, tabY, tabX + tabCornerR, tabY)
+            .fill(accentHex);
+          doc.fillColor("#ffffff").fontSize(labelFontSize)
+            .text(labelText, tabX + labelPadX, tabY + labelPadY, { lineBreak: false });
 
           if (reelCount >= 2) {
-            const badgeText = `X${reelCount}`;
-            const badgeX = tabX + labelW;
-            doc.rect(badgeX, tabY, badgeW, labelH).fill(accentHex);
-            doc.font('Helvetica-Bold').fontSize(labelFontSize).fillColor("#ffffff")
-              .text(badgeText, badgeX, tabY + 1, { width: badgeW, align: "center", lineBreak: false });
+            const gapBetween = sf;
+            const badgeX = tabX + labelW + gapBetween;
+            doc.save();
+            doc.moveTo(badgeX + tabCornerR, tabY)
+              .lineTo(badgeX + badgeW - tabCornerR, tabY)
+              .quadraticCurveTo(badgeX + badgeW, tabY, badgeX + badgeW, tabY + tabCornerR)
+              .lineTo(badgeX + badgeW, tabY + labelH)
+              .lineTo(badgeX, tabY + labelH)
+              .lineTo(badgeX, tabY + tabCornerR)
+              .quadraticCurveTo(badgeX, tabY, badgeX + tabCornerR, tabY)
+              .fill(accentHex);
+            doc.fillColor("#ffffff").fontSize(labelFontSize)
+              .text(badgeText, badgeX + labelPadX, tabY + labelPadY, { lineBreak: false });
+            doc.restore();
           }
+          doc.restore();
           doc.font('Helvetica');
         }
         doc.restore();
