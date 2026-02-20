@@ -736,28 +736,31 @@ export async function registerRoutes(
         });
 
       const secEntryCols = [
-        { header: "Vendor:", width: 90 },
-        { header: "Category:", width: 130 },
-        { header: "# of Reels:", width: 55 },
-        { header: "Total Footage:", width: 75 },
-        { header: "Notes:", width: 150 },
+        { header: "Vendor:", width: 70 },
+        { header: "Category:", width: 110 },
+        { header: "# of Reels:", width: 45 },
+        { header: "Total Footage:", width: 65 },
+        { header: "Notes:", width: 110 },
       ];
-      const secTotalW = secEntryCols.reduce((s, c) => s + c.width, 0);
-      const secScale = pageWidth / secTotalW;
-      const secScaled = secEntryCols.map(c => ({ ...c, width: Math.floor(c.width * secScale) }));
 
-      const drawSecEntryHeader = (y: number) => {
-        doc.rect(tableLeft, y, pageWidth, headerHeight).fill(headerBg);
-        doc.font('Helvetica-Bold').fontSize(7).fillColor("#333333");
-        let x = tableLeft;
-        for (const col of secScaled) {
-          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false });
+      const scaleSecCols = (tblW: number) => {
+        const secTotalW = secEntryCols.reduce((s, c) => s + c.width, 0);
+        const secScale = tblW / secTotalW;
+        return secEntryCols.map(c => ({ ...c, width: Math.floor(c.width * secScale) }));
+      };
+
+      const drawSecEntryHeader = (y: number, tblX: number, tblW: number, cols: { header: string; width: number }[]) => {
+        doc.rect(tblX, y, tblW, headerHeight).fill(headerBg);
+        doc.font('Helvetica-Bold').fontSize(6.5).fillColor("#333333");
+        let x = tblX;
+        for (const col of cols) {
+          doc.text(col.header, x + 2, y + 4, { width: col.width - 4, lineBreak: false });
           const tw = doc.widthOfString(col.header);
-          doc.save().moveTo(x + 3, y + 13).lineTo(x + 3 + tw, y + 13).lineWidth(0.4).strokeColor("#333333").stroke().restore();
+          doc.save().moveTo(x + 2, y + 13).lineTo(x + 2 + tw, y + 13).lineWidth(0.4).strokeColor("#333333").stroke().restore();
           x += col.width;
         }
         doc.font('Helvetica');
-        doc.rect(tableLeft, y, pageWidth, headerHeight).stroke(borderColor);
+        doc.rect(tblX, y, tblW, headerHeight).stroke(borderColor);
         return y + headerHeight;
       };
 
@@ -811,197 +814,170 @@ export async function registerRoutes(
         doc.restore();
       };
 
-      for (const sec of sortedSections) {
-        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-        currentY = 36;
+      type PhotoLayout = { photo: any; buffer: Buffer; imgW: number; imgH: number; origW: number; origH: number };
+      const loadPhoto = async (photo: any): Promise<PhotoLayout | null> => {
+        const photoKey = photo.objectStorageKey;
+        const photoFilename = photoKey.replace("/uploads/", "");
+        const photoPath = path.join(UPLOADS_DIR, photoFilename);
+        try {
+          await fs.access(photoPath);
+          const rawBuffer = await fs.readFile(photoPath);
+          const orientedBuffer = await sharp(rawBuffer).rotate().toBuffer();
+          const metadata = await sharp(orientedBuffer).metadata();
+          const imgW = metadata.width || 1;
+          const imgH = metadata.height || 1;
+          const img = doc.openImage(orientedBuffer);
+          return { photo, buffer: orientedBuffer, imgW: img.width, imgH: img.height, origW: imgW, origH: imgH };
+        } catch {
+          return null;
+        }
+      };
 
-        doc.rect(tableLeft, currentY, pageWidth, 24).fill("#e8e0d8");
-        doc.fontSize(12).fillColor(accentHex).text(
-          `Aisle ${sec.aisle || "—"}  /  Section ${sec.section || "—"}`,
-          tableLeft + 8, currentY + 5, { width: pageWidth - 100, lineBreak: false }
-        );
+      const renderPhoto = (pl: PhotoLayout, x: number, y: number, maxW: number, maxH: number) => {
+        const aspect = pl.origW / pl.origH;
+        let w: number, h: number;
+        w = maxW;
+        h = maxW / aspect;
+        if (h > maxH) {
+          h = maxH;
+          w = maxH * aspect;
+        }
+        const imgX = x;
+        doc.image(pl.buffer, imgX, y, { width: w, height: h });
+
+        const photoPins = allPinsMap.get(pl.photo.id) || [];
+        const pinScale = pl.photo.pinScale || 1;
+        for (const pin of photoPins) {
+          drawCommittedPin(pin, imgX, y, w, h, pl.origW, pinScale);
+        }
+
+        doc.rect(imgX, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
+        return { renderedW: w, renderedH: h, imgX };
+      };
+
+      for (const sec of sortedSections) {
+        const allPhotos = sec.photos || [];
         const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
         const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
-        doc.fontSize(8).fillColor("#666666").text(
-          `${sec.entries.length} entries  |  ${secReels} reels  |  ${secFootage.toLocaleString()} ft`,
-          tableLeft + pageWidth - 250, currentY + 7, { width: 240, align: "right", lineBreak: false }
-        );
-        doc.rect(tableLeft, currentY, pageWidth, 24).stroke(borderColor);
-        currentY += 32;
 
-        const fullPhotos = sec.photos.filter((p: any) => !p.isDetailShot);
-        const detailPhotos = sec.photos.filter((p: any) => p.isDetailShot);
-
-        type PhotoLayout = { photo: any; buffer: Buffer; imgW: number; imgH: number; origW: number; origH: number };
-        const loadPhoto = async (photo: any): Promise<PhotoLayout | null> => {
-          const photoKey = photo.objectStorageKey;
-          const photoFilename = photoKey.replace("/uploads/", "");
-          const photoPath = path.join(UPLOADS_DIR, photoFilename);
-          try {
-            await fs.access(photoPath);
-            const rawBuffer = await fs.readFile(photoPath);
-            const orientedBuffer = await sharp(rawBuffer).rotate().toBuffer();
-            const metadata = await sharp(orientedBuffer).metadata();
-            const imgW = metadata.width || 1;
-            const imgH = metadata.height || 1;
-            const img = doc.openImage(orientedBuffer);
-            return { photo, buffer: orientedBuffer, imgW: img.width, imgH: img.height, origW: imgW, origH: imgH };
-          } catch {
-            return null;
-          }
-        };
-
-        const renderPhoto = (pl: PhotoLayout, x: number, y: number, maxW: number, maxH: number) => {
-          const aspect = pl.origW / pl.origH;
-          let w: number, h: number;
-          w = maxW;
-          h = maxW / aspect;
-          if (h > maxH) {
-            h = maxH;
-            w = maxH * aspect;
-          }
-          const imgX = x + (maxW - w) / 2;
-          doc.image(pl.buffer, imgX, y, { width: w, height: h });
-
-          const photoPins = allPinsMap.get(pl.photo.id) || [];
-          const pinScale = pl.photo.pinScale || 1;
-          for (const pin of photoPins) {
-            drawCommittedPin(pin, imgX, y, w, h, pl.origW, pinScale);
-          }
-
-          doc.rect(imgX, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
-          return { renderedW: w, renderedH: h, imgX };
-        };
-
-        const renderPhotoWithCaption = async (photo: any, maxW: number, maxH: number) => {
-          if (maxH < 60) {
-            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-            currentY = 36;
-            maxH = Math.min(photoMaxH, maxY - currentY - 60);
-          }
+        const loadedPhotos: PhotoLayout[] = [];
+        for (const photo of allPhotos) {
           const pl = await loadPhoto(photo);
-          const photoFilename = photo.objectStorageKey.replace("/uploads/", "");
-          if (!pl) {
-            if (currentY + 20 > maxY) {
-              doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-              currentY = 36;
-            }
-            doc.fontSize(7).fillColor("#999999").text(`[Photo unavailable: ${photo.originalFilename || photoFilename}]`, tableLeft, currentY);
-            currentY += 14;
-            return;
-          }
-
-          const aspect = pl.origW / pl.origH;
-          const fitH = Math.min(maxH, maxW / aspect);
-          if (currentY + fitH + 16 > maxY) {
-            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-            currentY = 36;
-            maxH = Math.min(photoMaxH, maxY - currentY - 60);
-          }
-
-          const { renderedH } = renderPhoto(pl, tableLeft, currentY, maxW, maxH);
-          currentY += renderedH + 4;
-          doc.fontSize(6).fillColor("#999999").text(
-            photo.originalFilename || photoFilename,
-            tableLeft, currentY, { width: pageWidth, align: "center" }
-          );
-          currentY += 12;
-        };
-
-        const renderPhotoPair = async (photos: any[], maxW: number, maxH: number) => {
-          const loaded: (PhotoLayout | null)[] = [];
-          for (const p of photos) {
-            loaded.push(await loadPhoto(p));
-          }
-          const valid = loaded.filter(Boolean) as PhotoLayout[];
-          if (valid.length === 0) return;
-
-          const gap = 8;
-          const halfW = (maxW - gap) / 2;
-
-          let tallestH = 0;
-          for (const pl of valid) {
-            const aspect = pl.origW / pl.origH;
-            const h = Math.min(maxH, halfW / aspect);
-            if (h > tallestH) tallestH = h;
-          }
-
-          if (currentY + tallestH + 16 > maxY) {
-            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-            currentY = 36;
-          }
-
-          for (let idx = 0; idx < valid.length; idx++) {
-            const xOffset = tableLeft + idx * (halfW + gap);
-            renderPhoto(valid[idx], xOffset, currentY, halfW, maxH);
-          }
-          currentY += tallestH + 4;
-
-          const captions = valid.map(pl => pl.photo.originalFilename || pl.photo.objectStorageKey.replace("/uploads/", ""));
-          doc.fontSize(6).fillColor("#999999").text(
-            captions.join("     "),
-            tableLeft, currentY, { width: pageWidth, align: "center" }
-          );
-          currentY += 12;
-        };
-
-        const photoMaxH = 350;
-        for (const photo of fullPhotos) {
-          await renderPhotoWithCaption(photo, pageWidth, Math.min(photoMaxH, maxY - currentY - 60));
+          if (pl) loadedPhotos.push(pl);
         }
 
-        if (detailPhotos.length > 0) {
-          const pairs: any[][] = [];
-          for (let i = 0; i < detailPhotos.length; i += 2) {
-            if (i + 1 < detailPhotos.length) {
-              pairs.push([detailPhotos[i], detailPhotos[i + 1]]);
-            } else {
-              pairs.push([detailPhotos[i]]);
-            }
-          }
-          for (const pair of pairs) {
-            if (pair.length === 2) {
-              await renderPhotoPair(pair, pageWidth, 250);
-            } else {
-              await renderPhotoWithCaption(pair[0], pageWidth, Math.min(photoMaxH, maxY - currentY - 60));
-            }
-          }
-        }
+        for (let pi = 0; pi < Math.max(loadedPhotos.length, 1); pi++) {
+          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+          currentY = 36;
 
-        if (sec.entries.length > 0) {
-          const minTableSpace = headerHeight + rowHeight + 18;
-          if (currentY + minTableSpace > maxY) {
-            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-            currentY = 36;
+          doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
+          doc.fontSize(11).fillColor(accentHex).text(
+            `Aisle ${sec.aisle || "—"}  /  Section ${sec.section || "—"}`,
+            tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
+          );
+          doc.fontSize(7).fillColor("#666666").text(
+            `${sec.entries.length} entries  |  ${secReels} reels  |  ${secFootage.toLocaleString()} ft`,
+            tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
+          );
+          doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
+          if (loadedPhotos.length > 1) {
+            doc.fontSize(6).fillColor("#999999").text(
+              `Photo ${pi + 1} of ${loadedPhotos.length}`,
+              tableLeft + pageWidth - 220, currentY + 14, { width: 210, align: "right", lineBreak: false }
+            );
           }
-          currentY += 4;
-          doc.fontSize(9).fillColor("#333333").text("Reels Found", tableLeft, currentY);
-          currentY += 14;
-          currentY = drawSecEntryHeader(currentY);
+          currentY += 28;
 
-          for (let i = 0; i < sec.entries.length; i++) {
-            if (currentY + rowHeight > maxY) {
-              doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-              currentY = drawSecEntryHeader(36);
+          const contentTop = currentY;
+          const contentH = maxY - contentTop;
+          const gap = 12;
+
+          const pl = loadedPhotos[pi] || null;
+
+          if (pl) {
+            const photoAspect = pl.origW / pl.origH;
+            let photoW: number, photoH: number;
+            const maxPhotoW = pageWidth * 0.45;
+            photoW = maxPhotoW;
+            photoH = maxPhotoW / photoAspect;
+            if (photoH > contentH) {
+              photoH = contentH;
+              photoW = contentH * photoAspect;
+              if (photoW > maxPhotoW) {
+                photoW = maxPhotoW;
+                photoH = maxPhotoW / photoAspect;
+              }
             }
-            const e: any = sec.entries[i];
-            if (i % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill("#fafaf8");
-            doc.font('Helvetica-Bold').fontSize(6.5).fillColor("#333333");
-            let x = tableLeft;
-            const vals = [
-              e.manufacturer || "",
-              e.reelTag || "",
-              String(e.reelCount || 1),
-              e.footage ? `${e.footage.toLocaleString()} ft` : "",
-              e.notes || "",
-            ];
-            for (let j = 0; j < secScaled.length; j++) {
-              doc.text(vals[j], x + 3, currentY + 4, { width: secScaled[j].width - 6, lineBreak: false });
-              x += secScaled[j].width;
+
+            renderPhoto(pl, tableLeft, contentTop, photoW, contentH);
+
+            const tblX = tableLeft + photoW + gap;
+            const tblW = pageWidth - photoW - gap;
+
+            if (sec.entries.length > 0) {
+              const secScaled = scaleSecCols(tblW);
+              let tblY = contentTop;
+              tblY = drawSecEntryHeader(tblY, tblX, tblW, secScaled);
+
+              const entryRowH = 14;
+              for (let i = 0; i < sec.entries.length; i++) {
+                if (tblY + entryRowH > maxY) {
+                  break;
+                }
+                const e: any = sec.entries[i];
+                if (i % 2 === 1) doc.rect(tblX, tblY, tblW, entryRowH).fill("#fafaf8");
+                doc.font('Helvetica-Bold').fontSize(5.5).fillColor("#333333");
+                let x = tblX;
+                const vals = [
+                  e.manufacturer || "",
+                  e.reelTag || "",
+                  String(e.reelCount || 1),
+                  e.footage ? `${e.footage.toLocaleString()} ft` : "",
+                  e.notes || "",
+                ];
+                for (let j = 0; j < secScaled.length; j++) {
+                  doc.text(vals[j], x + 2, tblY + 3, { width: secScaled[j].width - 4, lineBreak: false });
+                  x += secScaled[j].width;
+                }
+                doc.font('Helvetica');
+                doc.rect(tblX, tblY, tblW, entryRowH).stroke(borderColor);
+                tblY += entryRowH;
+              }
+            } else {
+              doc.fontSize(7).fillColor("#999999").text("No entries for this section", tblX + 4, contentTop + 4);
             }
-            doc.font('Helvetica');
-            doc.rect(tableLeft, currentY, pageWidth, rowHeight).stroke(borderColor);
-            currentY += rowHeight;
+          } else if (sec.entries.length > 0) {
+            const secScaled = scaleSecCols(pageWidth);
+            let tblY = contentTop;
+            doc.fontSize(7).fillColor("#999999").text("[No photos available]", tableLeft, tblY);
+            tblY += 14;
+            tblY = drawSecEntryHeader(tblY, tableLeft, pageWidth, secScaled);
+
+            for (let i = 0; i < sec.entries.length; i++) {
+              if (tblY + rowHeight > maxY) {
+                doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+                tblY = drawSecEntryHeader(36, tableLeft, pageWidth, secScaled);
+              }
+              const e: any = sec.entries[i];
+              if (i % 2 === 1) doc.rect(tableLeft, tblY, pageWidth, rowHeight).fill("#fafaf8");
+              doc.font('Helvetica-Bold').fontSize(6.5).fillColor("#333333");
+              let x = tableLeft;
+              const vals = [
+                e.manufacturer || "",
+                e.reelTag || "",
+                String(e.reelCount || 1),
+                e.footage ? `${e.footage.toLocaleString()} ft` : "",
+                e.notes || "",
+              ];
+              for (let j = 0; j < secScaled.length; j++) {
+                doc.text(vals[j], x + 2, tblY + 4, { width: secScaled[j].width - 4, lineBreak: false });
+                x += secScaled[j].width;
+              }
+              doc.font('Helvetica');
+              doc.rect(tableLeft, tblY, pageWidth, rowHeight).stroke(borderColor);
+              tblY += rowHeight;
+            }
+            currentY = tblY;
           }
         }
       }
