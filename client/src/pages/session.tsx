@@ -2635,6 +2635,8 @@ function SingleEntryMode({
   const [receivingChecked, setReceivingChecked] = useState(editingEntry?.aisle?.toLowerCase() === "receiving" || false);
   const [footageOverride, setFootageOverride] = useState(!!editingEntry);
   const lastMatchedCatalog = useRef<string | null>(null);
+  const [categorySuggestions, setCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -2748,6 +2750,21 @@ function SingleEntryMode({
 
   const markTouched = (field: string) => {
     setTouched((t) => ({ ...t, [field]: true }));
+  };
+
+  const applyCatalogMatch = (match: ParsedCatalogEntry) => {
+    const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
+    lastMatchedCatalog.current = match.catalog;
+    setFootageOverride(false);
+    setForm(f => ({
+      ...f,
+      reelTag: match.catalog,
+      manufacturer: f.manufacturer || match.vendor || "",
+      footage: match.footage ? (match.footage * reelCount).toString() : f.footage,
+      conductors: f.conductors || match.conductors || "",
+    }));
+    setCategorySuggestions([]);
+    setShowCategorySuggestions(false);
   };
 
   const toggleNoteTag = (tag: string, checked: boolean) => {
@@ -2958,9 +2975,59 @@ function SingleEntryMode({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
+        <div className="space-y-1 relative">
           <Label className="text-xs underline">Category:</Label>
-          <Input value={form.reelTag} onChange={(e) => update("reelTag", e.target.value.toUpperCase())} placeholder="Category" enterKeyHint="next" data-testid="input-reel-tag" />
+          <Input
+            value={form.reelTag}
+            onChange={(e) => {
+              const val = e.target.value.toUpperCase();
+              update("reelTag", val);
+              if (val.length >= 2) {
+                const matches = lookupCategory(val);
+                setCategorySuggestions(matches);
+                setShowCategorySuggestions(matches.length > 0);
+              } else {
+                setCategorySuggestions([]);
+                setShowCategorySuggestions(false);
+              }
+            }}
+            onFocus={() => {
+              if (form.reelTag && form.reelTag.length >= 2) {
+                const matches = lookupCategory(form.reelTag);
+                setCategorySuggestions(matches);
+                setShowCategorySuggestions(matches.length > 0);
+              }
+            }}
+            onBlur={() => {
+              setTimeout(() => setShowCategorySuggestions(false), 200);
+              const match = getCatalogMatch(form.reelTag);
+              if (match) applyCatalogMatch(match);
+            }}
+            placeholder="Category"
+            enterKeyHint="next"
+            autoComplete="off"
+            data-testid="input-reel-tag"
+          />
+          {showCategorySuggestions && categorySuggestions.length > 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="category-suggestions">
+              {categorySuggestions.map((s) => (
+                <button
+                  key={s.catalog}
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    applyCatalogMatch(s);
+                  }}
+                  data-testid={`suggestion-${s.catalog}`}
+                >
+                  <span className="font-mono font-semibold">{s.catalog}</span>
+                  <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
+                  {s.footage && <span className="text-orange-500 ml-1 text-xs">({s.footage}ft)</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="space-y-1">
           <Label className="text-xs underline">Vendor Code:</Label>
