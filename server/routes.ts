@@ -768,7 +768,7 @@ export async function registerRoutes(
         const pinCenterX = imgX + (pin.xPercent / 100) * imgW;
         const pinCenterY = imgY + (pin.yPercent / 100) * imgH;
 
-        const refDisplayW = 375;
+        const refDisplayW = 900;
         const sf = (imgW / refDisplayW) * pinScale;
 
         const pw = 82 * sf;
@@ -883,6 +883,53 @@ export async function registerRoutes(
         return { renderedW: w, renderedH: h, imgX };
       };
 
+      const drawSectionHeader = (aisle: string, section: string, entryCount: number, reelCount: number, footage: number, photoLabel?: string) => {
+        doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
+        doc.fontSize(11).fillColor(accentHex).text(
+          `Aisle ${aisle || "—"}  /  Section ${section || "—"}`,
+          tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
+        );
+        doc.fontSize(7).fillColor("#666666").text(
+          `${entryCount} entries  |  ${reelCount} reels  |  ${footage.toLocaleString()} ft`,
+          tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
+        );
+        doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
+        if (photoLabel) {
+          doc.fontSize(6).fillColor("#999999").text(
+            photoLabel,
+            tableLeft + pageWidth - 220, currentY + 14, { width: 210, align: "right", lineBreak: false }
+          );
+        }
+        currentY += 28;
+      };
+
+      const drawEntriesTable = (entries: any[], tblX: number, tblW: number, startY: number, fontSize: number, rH: number) => {
+        const secScaled = scaleSecCols(tblW);
+        let tblY = drawSecEntryHeader(startY, tblX, tblW, secScaled);
+        for (let i = 0; i < entries.length; i++) {
+          if (tblY + rH > maxY) break;
+          const e: any = entries[i];
+          if (i % 2 === 1) doc.rect(tblX, tblY, tblW, rH).fill("#fafaf8");
+          doc.font('Helvetica-Bold').fontSize(fontSize).fillColor("#333333");
+          let x = tblX;
+          const vals = [
+            e.manufacturer || "",
+            e.reelTag || "",
+            String(e.reelCount || 1),
+            e.footage ? `${e.footage.toLocaleString()} ft` : "",
+            e.notes || "",
+          ];
+          for (let j = 0; j < secScaled.length; j++) {
+            doc.text(vals[j], x + 2, tblY + 3, { width: secScaled[j].width - 4, lineBreak: false });
+            x += secScaled[j].width;
+          }
+          doc.font('Helvetica');
+          doc.rect(tblX, tblY, tblW, rH).stroke(borderColor);
+          tblY += rH;
+        }
+        return tblY;
+      };
+
       for (const sec of sortedSections) {
         const allPhotos = sec.photos || [];
         const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
@@ -894,118 +941,51 @@ export async function registerRoutes(
           if (pl) loadedPhotos.push(pl);
         }
 
-        for (let pi = 0; pi < Math.max(loadedPhotos.length, 1); pi++) {
+        if (loadedPhotos.length === 0) {
+          if (sec.entries.length === 0) continue;
           doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
           currentY = 36;
+          drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage);
+          drawEntriesTable(sec.entries, tableLeft, pageWidth, currentY, 6.5, rowHeight);
+          continue;
+        }
 
-          doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
-          doc.fontSize(11).fillColor(accentHex).text(
-            `Aisle ${sec.aisle || "—"}  /  Section ${sec.section || "—"}`,
-            tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
-          );
-          doc.fontSize(7).fillColor("#666666").text(
-            `${sec.entries.length} entries  |  ${secReels} reels  |  ${secFootage.toLocaleString()} ft`,
-            tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
-          );
-          doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
-          if (loadedPhotos.length > 1) {
-            doc.fontSize(6).fillColor("#999999").text(
-              `Photo ${pi + 1} of ${loadedPhotos.length}`,
-              tableLeft + pageWidth - 220, currentY + 14, { width: 210, align: "right", lineBreak: false }
-            );
-          }
-          currentY += 28;
+        for (let pi = 0; pi < loadedPhotos.length; pi++) {
+          const pl = loadedPhotos[pi];
+          const photoPinEntryIds = new Set((allPinsMap.get(pl.photo.id) || []).map((p: any) => p.entryId));
+          const photoEntries = sec.entries.filter((e: any) => photoPinEntryIds.has(e.id));
+          const entriesToShow = photoEntries.length > 0 ? photoEntries : (pi === 0 ? sec.entries : []);
+
+          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+          currentY = 36;
+          const photoLabel = loadedPhotos.length > 1 ? `Photo ${pi + 1} of ${loadedPhotos.length}` : undefined;
+          drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
 
           const contentTop = currentY;
           const contentH = maxY - contentTop;
           const gap = 12;
 
-          const pl = loadedPhotos[pi] || null;
-
-          if (pl) {
-            const photoAspect = pl.origW / pl.origH;
-            let photoW: number, photoH: number;
-            const maxPhotoW = pageWidth * 0.45;
-            photoW = maxPhotoW;
-            photoH = maxPhotoW / photoAspect;
-            if (photoH > contentH) {
-              photoH = contentH;
-              photoW = contentH * photoAspect;
-              if (photoW > maxPhotoW) {
-                photoW = maxPhotoW;
-                photoH = maxPhotoW / photoAspect;
-              }
+          const photoAspect = pl.origW / pl.origH;
+          let photoW: number, photoH: number;
+          const maxPhotoW = pageWidth * 0.45;
+          photoW = maxPhotoW;
+          photoH = maxPhotoW / photoAspect;
+          if (photoH > contentH) {
+            photoH = contentH;
+            photoW = contentH * photoAspect;
+            if (photoW > maxPhotoW) {
+              photoW = maxPhotoW;
+              photoH = maxPhotoW / photoAspect;
             }
+          }
 
-            renderPhoto(pl, tableLeft, contentTop, photoW, contentH);
+          renderPhoto(pl, tableLeft, contentTop, photoW, contentH);
 
-            const tblX = tableLeft + photoW + gap;
-            const tblW = pageWidth - photoW - gap;
+          const tblX = tableLeft + photoW + gap;
+          const tblW = pageWidth - photoW - gap;
 
-            if (sec.entries.length > 0) {
-              const secScaled = scaleSecCols(tblW);
-              let tblY = contentTop;
-              tblY = drawSecEntryHeader(tblY, tblX, tblW, secScaled);
-
-              const entryRowH = 14;
-              for (let i = 0; i < sec.entries.length; i++) {
-                if (tblY + entryRowH > maxY) {
-                  break;
-                }
-                const e: any = sec.entries[i];
-                if (i % 2 === 1) doc.rect(tblX, tblY, tblW, entryRowH).fill("#fafaf8");
-                doc.font('Helvetica-Bold').fontSize(5.5).fillColor("#333333");
-                let x = tblX;
-                const vals = [
-                  e.manufacturer || "",
-                  e.reelTag || "",
-                  String(e.reelCount || 1),
-                  e.footage ? `${e.footage.toLocaleString()} ft` : "",
-                  e.notes || "",
-                ];
-                for (let j = 0; j < secScaled.length; j++) {
-                  doc.text(vals[j], x + 2, tblY + 3, { width: secScaled[j].width - 4, lineBreak: false });
-                  x += secScaled[j].width;
-                }
-                doc.font('Helvetica');
-                doc.rect(tblX, tblY, tblW, entryRowH).stroke(borderColor);
-                tblY += entryRowH;
-              }
-            } else {
-              doc.fontSize(7).fillColor("#999999").text("No entries for this section", tblX + 4, contentTop + 4);
-            }
-          } else if (sec.entries.length > 0) {
-            const secScaled = scaleSecCols(pageWidth);
-            let tblY = contentTop;
-            doc.fontSize(7).fillColor("#999999").text("[No photos available]", tableLeft, tblY);
-            tblY += 14;
-            tblY = drawSecEntryHeader(tblY, tableLeft, pageWidth, secScaled);
-
-            for (let i = 0; i < sec.entries.length; i++) {
-              if (tblY + rowHeight > maxY) {
-                doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-                tblY = drawSecEntryHeader(36, tableLeft, pageWidth, secScaled);
-              }
-              const e: any = sec.entries[i];
-              if (i % 2 === 1) doc.rect(tableLeft, tblY, pageWidth, rowHeight).fill("#fafaf8");
-              doc.font('Helvetica-Bold').fontSize(6.5).fillColor("#333333");
-              let x = tableLeft;
-              const vals = [
-                e.manufacturer || "",
-                e.reelTag || "",
-                String(e.reelCount || 1),
-                e.footage ? `${e.footage.toLocaleString()} ft` : "",
-                e.notes || "",
-              ];
-              for (let j = 0; j < secScaled.length; j++) {
-                doc.text(vals[j], x + 2, tblY + 4, { width: secScaled[j].width - 4, lineBreak: false });
-                x += secScaled[j].width;
-              }
-              doc.font('Helvetica');
-              doc.rect(tableLeft, tblY, pageWidth, rowHeight).stroke(borderColor);
-              tblY += rowHeight;
-            }
-            currentY = tblY;
+          if (entriesToShow.length > 0) {
+            drawEntriesTable(entriesToShow, tblX, tblW, contentTop, 5.5, 14);
           }
         }
       }
