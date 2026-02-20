@@ -670,88 +670,35 @@ export async function registerRoutes(
         doc.text(`Session time: ${new Date(pt.firstPhotoAt).toLocaleString()} to ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toLocaleString() : "ongoing"}`, 36, 92);
       }
 
-      const columns = [
-        { header: "#", width: 22 },
-        { header: "Aisle", width: 42 },
-        { header: "Section", width: 50 },
-        { header: "Position", width: 48 },
-        { header: "Pallet ID", width: 58 },
-        { header: "Reel Tag", width: 62 },
-        { header: "Wire Type", width: 58 },
-        { header: "Gauge", width: 40 },
-        { header: "Footage", width: 46 },
-        { header: "Qty", width: 26 },
-        { header: "Cond.", width: 30 },
-        { header: "Color", width: 38 },
-        { header: "Manufacturer", width: 68 },
-        { header: "Notes", width: 90 },
-        { header: "Photo", width: 76 },
-      ];
       const tableLeft = 36;
-      const tableTop = pt.firstPhotoAt ? 112 : 100;
+      const pageWidth = doc.page.width - 72;
       const rowHeight = 16;
       const headerHeight = 18;
-      const pageWidth = doc.page.width - 72;
-      const totalColWidth = columns.reduce((s, c) => s + c.width, 0);
-      const scaleFactor = pageWidth / totalColWidth;
-      const scaledColumns = columns.map(c => ({ ...c, width: Math.floor(c.width * scaleFactor) }));
-
-      const drawTableHeader = (y: number) => {
-        doc.rect(tableLeft, y, pageWidth, headerHeight).fill(headerBg);
-        doc.fontSize(7).fillColor("#333333");
-        let x = tableLeft;
-        for (const col of scaledColumns) {
-          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false });
-          x += col.width;
-        }
-        doc.rect(tableLeft, y, pageWidth, headerHeight).stroke(borderColor);
-        return y + headerHeight;
-      };
-
-      const drawRow = (y: number, values: string[], isAlt: boolean) => {
-        if (isAlt) {
-          doc.rect(tableLeft, y, pageWidth, rowHeight).fill("#fafaf8");
-        }
-        doc.fontSize(6.5).fillColor("#333333");
-        let x = tableLeft;
-        for (let i = 0; i < scaledColumns.length; i++) {
-          const val = values[i] || "";
-          doc.text(val, x + 3, y + 4, { width: scaledColumns[i].width - 6, lineBreak: false });
-          x += scaledColumns[i].width;
-        }
-        doc.rect(tableLeft, y, pageWidth, rowHeight).stroke(borderColor);
-        return y + rowHeight;
-      };
-
-      let currentY = drawTableHeader(tableTop);
+      let currentY = pt.firstPhotoAt ? 112 : 100;
       const maxY = doc.page.height - 80;
 
-      for (let i = 0; i < sessionEntries.length; i++) {
-        if (currentY + rowHeight > maxY) {
-          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-          currentY = drawTableHeader(36);
-        }
-        const e: any = sessionEntries[i];
-        const photo = e.photoId ? photoMap.get(e.photoId) : null;
-        const values = [
-          String(i + 1),
-          e.aisle || "",
-          e.section || "",
-          e.position || "",
-          e.palletId || "",
-          e.reelTag || "",
-          e.wireType || "",
-          e.gauge || "",
-          e.footage ? String(e.footage) : "",
-          String(e.reelCount || 1),
-          e.conductors || "",
-          e.color || "",
-          e.manufacturer || "",
-          e.notes || "",
-          photo?.originalFilename || "",
-        ];
-        currentY = drawRow(currentY, values, i % 2 === 1);
-      }
+      const formatCT = (d: Date): string => {
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Chicago',
+          month: '2-digit', day: '2-digit', year: 'numeric',
+          hour: 'numeric', minute: '2-digit', second: '2-digit',
+          hour12: false,
+        }).formatToParts(d);
+        const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+        let hour = get('hour');
+        if (hour.startsWith('0') && hour.length > 1) hour = hour.slice(1);
+        if (hour === '24') hour = '0';
+        return `${get('month')}-${get('day')}-${get('year')} at ${hour}:${get('minute')}:${get('second')} CT`;
+      };
+
+      const formatElapsed = (startMs: number, endMs: number): string => {
+        const diffMs = Math.abs(endMs - startMs);
+        const totalMin = Math.floor(diffMs / 60000);
+        if (totalMin < 60) return `${totalMin}m`;
+        const h = Math.floor(totalMin / 60);
+        const m = totalMin % 60;
+        return m > 0 ? `${h}h ${m}m` : `${h}h`;
+      };
 
       // --- Section-by-Section Pages with Photos and Pins ---
       const sectionGroups = new Map<string, { aisle: string; section: string; photos: typeof sessionPhotos; entries: typeof sessionEntries }>();
@@ -788,13 +735,11 @@ export async function registerRoutes(
         });
 
       const secEntryCols = [
-        { header: "#", width: 22 },
-        { header: "Reel Tag", width: 90 },
-        { header: "Footage", width: 55 },
-        { header: "Qty", width: 30 },
-        { header: "Manufacturer", width: 80 },
-        { header: "Position", width: 60 },
-        { header: "Notes", width: 160 },
+        { header: "Vendor:", width: 90 },
+        { header: "Category:", width: 130 },
+        { header: "# of Reels:", width: 55 },
+        { header: "Total Footage:", width: 75 },
+        { header: "Notes:", width: 150 },
       ];
       const secTotalW = secEntryCols.reduce((s, c) => s + c.width, 0);
       const secScale = pageWidth / secTotalW;
@@ -802,14 +747,65 @@ export async function registerRoutes(
 
       const drawSecEntryHeader = (y: number) => {
         doc.rect(tableLeft, y, pageWidth, headerHeight).fill(headerBg);
-        doc.fontSize(7).fillColor("#333333");
+        doc.font('Helvetica-Bold').fontSize(7).fillColor("#333333");
         let x = tableLeft;
         for (const col of secScaled) {
-          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false });
+          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false, underline: true });
           x += col.width;
         }
+        doc.font('Helvetica');
         doc.rect(tableLeft, y, pageWidth, headerHeight).stroke(borderColor);
         return y + headerHeight;
+      };
+
+      const drawCommittedPin = (pin: any, imgX: number, imgY: number, imgW: number, imgH: number, imgOrigW: number, pinScale: number) => {
+        const pinCenterX = imgX + (pin.xPercent / 100) * imgW;
+        const pinCenterY = imgY + (pin.yPercent / 100) * imgH;
+        const baseW = 82;
+        const baseH = 61;
+        const cssToImgRatio = imgW / imgOrigW;
+        const pw = baseW * cssToImgRatio * pinScale;
+        const ph = baseH * cssToImgRatio * pinScale;
+        const px = pinCenterX - pw / 2;
+        const py = pinCenterY - ph / 2;
+
+        doc.save();
+        doc.rect(px, py, pw, ph)
+          .strokeColor(accentHex)
+          .lineWidth(1.5)
+          .stroke();
+
+        if (pin.label) {
+          const labelFontSize = Math.max(4, 7 * cssToImgRatio * pinScale);
+          const labelText = `P${pin.label}`;
+          const labelPadX = 2 * cssToImgRatio * pinScale;
+          const labelH = labelFontSize + 3 * cssToImgRatio * pinScale;
+          const labelW = labelText.length * labelFontSize * 0.65 + labelPadX * 2;
+          let tabX = pinCenterX - labelW / 2;
+          const reelCount = pin.reelCount || 1;
+          let badgeW = 0;
+          if (reelCount >= 2) {
+            const badgeText = `X${reelCount}`;
+            badgeW = badgeText.length * labelFontSize * 0.65 + labelPadX * 2;
+          }
+          const totalTopW = labelW + badgeW;
+          tabX = pinCenterX - totalTopW / 2;
+
+          const tabY = py - labelH;
+          doc.rect(tabX, tabY, labelW, labelH).fill(accentHex);
+          doc.font('Helvetica-Bold').fontSize(labelFontSize).fillColor("#ffffff")
+            .text(labelText, tabX, tabY + 1, { width: labelW, align: "center", lineBreak: false });
+
+          if (reelCount >= 2) {
+            const badgeText = `X${reelCount}`;
+            const badgeX = tabX + labelW;
+            doc.rect(badgeX, tabY, badgeW, labelH).fill(accentHex);
+            doc.font('Helvetica-Bold').fontSize(labelFontSize).fillColor("#ffffff")
+              .text(badgeText, badgeX, tabY + 1, { width: badgeW, align: "center", lineBreak: false });
+          }
+          doc.font('Helvetica');
+        }
+        doc.restore();
       };
 
       for (const sec of sortedSections) {
@@ -830,73 +826,143 @@ export async function registerRoutes(
         doc.rect(tableLeft, currentY, pageWidth, 24).stroke(borderColor);
         currentY += 32;
 
-        for (const photo of sec.photos) {
+        const fullPhotos = sec.photos.filter((p: any) => !p.isDetailShot);
+        const detailPhotos = sec.photos.filter((p: any) => p.isDetailShot);
+
+        type PhotoLayout = { photo: any; buffer: Buffer; imgW: number; imgH: number; origW: number; origH: number };
+        const loadPhoto = async (photo: any): Promise<PhotoLayout | null> => {
           const photoKey = photo.objectStorageKey;
           const photoFilename = photoKey.replace("/uploads/", "");
           const photoPath = path.join(UPLOADS_DIR, photoFilename);
           try {
             await fs.access(photoPath);
             const imgBuffer = await fs.readFile(photoPath);
-
-            const maxImgW = pageWidth;
-            const maxImgH = 280;
-            let imgW = maxImgW;
-            let imgH = maxImgH;
-
-            try {
-              const img = doc.openImage(imgBuffer);
-              const aspect = img.width / img.height;
-              if (aspect > maxImgW / maxImgH) {
-                imgW = maxImgW;
-                imgH = maxImgW / aspect;
-              } else {
-                imgH = maxImgH;
-                imgW = maxImgH * aspect;
-              }
-            } catch {
-              imgW = maxImgW;
-              imgH = maxImgH;
-            }
-
-            if (currentY + imgH + 20 > maxY) {
-              doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-              currentY = 36;
-            }
-
-            const imgX = tableLeft + (pageWidth - imgW) / 2;
-            doc.image(imgBuffer, imgX, currentY, { width: imgW, height: imgH });
-
-            const photoPins = allPinsMap.get(photo.id) || [];
-            for (const pin of photoPins) {
-              const pinX = imgX + (pin.xPercent / 100) * imgW;
-              const pinY = currentY + (pin.yPercent / 100) * imgH;
-              doc.circle(pinX, pinY, 6).fill(accentHex);
-              doc.circle(pinX, pinY, 6).strokeColor("#ffffff").lineWidth(1.5).stroke();
-              if (pin.label) {
-                doc.fontSize(5).fillColor("#ffffff").text(pin.label, pinX - 5, pinY - 3, { width: 10, align: "center", lineBreak: false });
-              }
-            }
-
-            doc.rect(imgX, currentY, imgW, imgH).strokeColor(borderColor).lineWidth(0.5).stroke();
-            currentY += imgH + 4;
-
-            doc.fontSize(6).fillColor("#999999").text(
-              photo.originalFilename || photoFilename,
-              tableLeft, currentY, { width: pageWidth, align: "center" }
-            );
-            currentY += 12;
+            const img = doc.openImage(imgBuffer);
+            return { photo, buffer: imgBuffer, imgW: img.width, imgH: img.height, origW: img.width, origH: img.height };
           } catch {
+            return null;
+          }
+        };
+
+        const renderPhoto = (pl: PhotoLayout, x: number, y: number, maxW: number, maxH: number) => {
+          const aspect = pl.origW / pl.origH;
+          let w: number, h: number;
+          if (aspect > maxW / maxH) {
+            w = maxW;
+            h = maxW / aspect;
+          } else {
+            h = maxH;
+            w = maxH * aspect;
+          }
+          const imgX = x + (maxW - w) / 2;
+          doc.image(pl.buffer, imgX, y, { width: w, height: h });
+
+          const photoPins = allPinsMap.get(pl.photo.id) || [];
+          const pinScale = pl.photo.pinScale || 1;
+          for (const pin of photoPins) {
+            drawCommittedPin(pin, imgX, y, w, h, pl.origW, pinScale);
+          }
+
+          doc.rect(imgX, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
+          return { renderedW: w, renderedH: h, imgX };
+        };
+
+        const renderPhotoWithCaption = async (photo: any, maxW: number, maxH: number) => {
+          if (maxH < 60) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+            maxH = maxY - currentY - 60;
+          }
+          const pl = await loadPhoto(photo);
+          const photoFilename = photo.objectStorageKey.replace("/uploads/", "");
+          if (!pl) {
             if (currentY + 20 > maxY) {
               doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
               currentY = 36;
             }
             doc.fontSize(7).fillColor("#999999").text(`[Photo unavailable: ${photo.originalFilename || photoFilename}]`, tableLeft, currentY);
             currentY += 14;
+            return;
+          }
+
+          const aspect = pl.origW / pl.origH;
+          const fitH = Math.min(maxH, maxW / aspect);
+          if (currentY + fitH + 16 > maxY) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+          }
+
+          const { renderedH } = renderPhoto(pl, tableLeft, currentY, maxW, maxH);
+          currentY += renderedH + 4;
+          doc.fontSize(6).fillColor("#999999").text(
+            photo.originalFilename || photoFilename,
+            tableLeft, currentY, { width: pageWidth, align: "center" }
+          );
+          currentY += 12;
+        };
+
+        const renderPhotoPair = async (photos: any[], maxW: number, maxH: number) => {
+          const loaded: (PhotoLayout | null)[] = [];
+          for (const p of photos) {
+            loaded.push(await loadPhoto(p));
+          }
+          const valid = loaded.filter(Boolean) as PhotoLayout[];
+          if (valid.length === 0) return;
+
+          const gap = 8;
+          const halfW = (maxW - gap) / 2;
+
+          let tallestH = 0;
+          for (const pl of valid) {
+            const aspect = pl.origW / pl.origH;
+            const h = Math.min(maxH, halfW / aspect);
+            if (h > tallestH) tallestH = h;
+          }
+
+          if (currentY + tallestH + 16 > maxY) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+          }
+
+          for (let idx = 0; idx < valid.length; idx++) {
+            const xOffset = tableLeft + idx * (halfW + gap);
+            renderPhoto(valid[idx], xOffset, currentY, halfW, maxH);
+          }
+          currentY += tallestH + 4;
+
+          const captions = valid.map(pl => pl.photo.originalFilename || pl.photo.objectStorageKey.replace("/uploads/", ""));
+          doc.fontSize(6).fillColor("#999999").text(
+            captions.join("     "),
+            tableLeft, currentY, { width: pageWidth, align: "center" }
+          );
+          currentY += 12;
+        };
+
+        for (const photo of fullPhotos) {
+          await renderPhotoWithCaption(photo, pageWidth, maxY - currentY - 60);
+        }
+
+        if (detailPhotos.length > 0) {
+          const pairs: any[][] = [];
+          for (let i = 0; i < detailPhotos.length; i += 2) {
+            if (i + 1 < detailPhotos.length) {
+              pairs.push([detailPhotos[i], detailPhotos[i + 1]]);
+            } else {
+              pairs.push([detailPhotos[i]]);
+            }
+          }
+          for (const pair of pairs) {
+            if (pair.length === 2) {
+              await renderPhotoPair(pair, pageWidth, 250);
+            } else {
+              await renderPhotoWithCaption(pair[0], pageWidth, maxY - currentY - 60);
+            }
           }
         }
 
         if (sec.entries.length > 0) {
-          if (currentY + headerHeight + rowHeight > maxY) {
+          const minTableSpace = headerHeight + rowHeight + 18;
+          if (currentY + minTableSpace > maxY) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = 36;
           }
@@ -912,21 +978,20 @@ export async function registerRoutes(
             }
             const e: any = sec.entries[i];
             if (i % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill("#fafaf8");
-            doc.fontSize(6.5).fillColor("#333333");
+            doc.font('Helvetica-Bold').fontSize(6.5).fillColor("#333333");
             let x = tableLeft;
             const vals = [
-              String(i + 1),
-              e.reelTag || "",
-              e.footage ? `${e.footage.toLocaleString()} ft` : "",
-              String(e.reelCount || 1),
               e.manufacturer || "",
-              e.position || "",
+              e.reelTag || "",
+              String(e.reelCount || 1),
+              e.footage ? `${e.footage.toLocaleString()} ft` : "",
               e.notes || "",
             ];
             for (let j = 0; j < secScaled.length; j++) {
               doc.text(vals[j], x + 3, currentY + 4, { width: secScaled[j].width - 6, lineBreak: false });
               x += secScaled[j].width;
             }
+            doc.font('Helvetica');
             doc.rect(tableLeft, currentY, pageWidth, rowHeight).stroke(borderColor);
             currentY += rowHeight;
           }
@@ -989,25 +1054,32 @@ export async function registerRoutes(
 
       const sortedCategories = allCategories;
 
+      const groupReelCounts = new Map<string, number>();
+      for (const cat of sortedCategories) {
+        const g = cat.wireTypeGroup;
+        groupReelCounts.set(g, (groupReelCounts.get(g) || 0) + cat.reelCount);
+      }
+
       const sumCols = [
-        { header: "Category", width: 140 },
-        { header: "Vendor Code", width: 100 },
-        { header: "Reels", width: 40 },
-        { header: "Total Footage", width: 80 },
-        { header: "Location References", width: 340 },
+        { header: "Category:", width: 140, align: "left" as const },
+        { header: "Vendor Code:", width: 100, align: "center" as const },
+        { header: "# of Reels:", width: 50, align: "center" as const },
+        { header: "Total Footage:", width: 80, align: "center" as const },
+        { header: "Reel Location(s):", width: 330, align: "left" as const },
       ];
       const sumTotalW = sumCols.reduce((s, c) => s + c.width, 0);
-      const sumScale = pageWidth / sumTotalW;
-      const sumScaled = sumCols.map(c => ({ ...c, width: Math.floor(c.width * sumScale) }));
+      const sumScaleF = pageWidth / sumTotalW;
+      const sumScaled = sumCols.map(c => ({ ...c, width: Math.floor(c.width * sumScaleF) }));
 
       const drawSumHeader = (y: number) => {
         doc.rect(tableLeft, y, pageWidth, headerHeight).fill(headerBg);
-        doc.fontSize(7.5).fillColor("#333333");
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor("#333333");
         let x = tableLeft;
         for (const col of sumScaled) {
-          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false });
+          doc.text(col.header, x + 3, y + 4, { width: col.width - 6, lineBreak: false, underline: true, align: col.align });
           x += col.width;
         }
+        doc.font('Helvetica');
         doc.rect(tableLeft, y, pageWidth, headerHeight).stroke(borderColor);
         return y + headerHeight;
       };
@@ -1027,7 +1099,13 @@ export async function registerRoutes(
             currentY = drawSumHeader(36);
           }
           doc.rect(tableLeft, currentY, pageWidth, groupH).fill("#e8e0d8");
-          doc.fontSize(7.5).fillColor(accentHex).text(cat.wireTypeGroup || "Other", tableLeft + 6, currentY + 5, { width: pageWidth - 12, lineBreak: false });
+          doc.font('Helvetica-Bold').fontSize(7.5).fillColor(accentHex).text(cat.wireTypeGroup || "Other", tableLeft + 6, currentY + 5, { width: pageWidth - 160, lineBreak: false });
+          const groupCount = groupReelCounts.get(cat.wireTypeGroup) || 0;
+          doc.fontSize(7.5).fillColor(accentHex).text(
+            `${groupCount} reels`,
+            tableLeft + pageWidth - 150, currentY + 5, { width: 140, align: "right", lineBreak: false }
+          );
+          doc.font('Helvetica');
           doc.rect(tableLeft, currentY, pageWidth, groupH).stroke(borderColor);
           currentY += groupH;
           lastWireTypeGroup = cat.wireTypeGroup;
@@ -1042,14 +1120,15 @@ export async function registerRoutes(
         doc.fontSize(6.5).fillColor("#333333");
         let x = tableLeft;
         const vals = [
-          cat.category,
+          `    ${cat.category}`,
           cat.vendorCode,
           String(cat.reelCount),
           `${cat.totalFootage.toLocaleString()} ft`,
           cat.locations.join(", "),
         ];
+        const aligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
         for (let j = 0; j < sumScaled.length; j++) {
-          doc.text(vals[j], x + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false });
+          doc.text(vals[j], x + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false, align: aligns[j] });
           x += sumScaled[j].width;
         }
         doc.rect(tableLeft, currentY, pageWidth, rowH).stroke(borderColor);
@@ -1059,36 +1138,52 @@ export async function registerRoutes(
 
       currentY += 6;
       doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill(headerBg);
-      doc.fontSize(7).fillColor("#333333");
+      doc.font('Helvetica-Bold').fontSize(7).fillColor("#333333");
       let tx = tableLeft;
       const totalVals = ["GRAND TOTAL", "", String(sortedCategories.reduce((s, c) => s + c.reelCount, 0)), `${totalFootage.toLocaleString()} ft`, `${sortedCategories.length} categories`];
+      const totalAligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
       for (let j = 0; j < sumScaled.length; j++) {
-        doc.text(totalVals[j], tx + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false });
+        doc.text(totalVals[j], tx + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false, align: totalAligns[j] });
         tx += sumScaled[j].width;
       }
-      doc.rect(tableLeft, currentY, pageWidth, rowHeight).stroke(borderColor);
+      doc.font('Helvetica');
+      doc.rect(tableLeft, currentY, pageWidth, rowHeight).strokeColor("#000000").lineWidth(1.5).stroke();
       currentY += rowHeight;
 
       // --- Audit Trail ---
       currentY += 20;
-      if (currentY + 70 > maxY) {
+      if (currentY + 90 > maxY) {
         doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
         currentY = 36;
       }
       doc.moveTo(36, currentY).lineTo(36 + pageWidth, currentY).strokeColor(accentHex).lineWidth(2).stroke();
       currentY += 8;
-      doc.fontSize(8).fillColor("#333333").text("Audit Trail", 36, currentY, { underline: true });
+      doc.font('Helvetica-Bold').fontSize(8).fillColor("#333333").text("Audit Trail:", 36, currentY, { underline: true });
+      doc.font('Helvetica');
       currentY += 14;
+      const ctGeneratedAt = formatCT(new Date());
       doc.fontSize(7).fillColor("#666666");
-      doc.text(`Report generated: ${generatedAt}`, 36, currentY); currentY += 11;
-      doc.text(`First photo: ${pt.firstPhotoAt ? new Date(pt.firstPhotoAt).toLocaleString() : "N/A"}`, 36, currentY); currentY += 11;
-      doc.text(`Last photo: ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toLocaleString() : "N/A"}`, 36, currentY); currentY += 11;
-      if (session.completedAt) { doc.text(`Completed: ${new Date(session.completedAt).toLocaleString()}`, 36, currentY); currentY += 11; }
-      doc.text(`Entry count: ${sessionEntries.length}`, 36, currentY); currentY += 11;
-      doc.text(`Data encoding: ${key ? "Active (entries decrypted for export)" : "Off"}`, 36, currentY); currentY += 16;
+      const auditLabel = (label: string, value: string) => {
+        doc.font('Helvetica').fontSize(7).fillColor("#666666");
+        doc.text(label, 36, currentY, { underline: true, continued: true, lineBreak: false });
+        doc.text(` ${value}`, { underline: false, lineBreak: false });
+        currentY += 11;
+      };
+      auditLabel("Report Generated:", ctGeneratedAt);
+      auditLabel("Starting Photo:", pt.firstPhotoAt ? formatCT(new Date(pt.firstPhotoAt)) : "N/A");
+      auditLabel("Ending Photo:", pt.lastPhotoAt ? formatCT(new Date(pt.lastPhotoAt)) : "N/A");
+      if (pt.firstPhotoAt && pt.lastPhotoAt) {
+        auditLabel("Elapsed Time:", formatElapsed(new Date(pt.firstPhotoAt).getTime(), new Date(pt.lastPhotoAt).getTime()));
+      } else {
+        auditLabel("Elapsed Time:", "N/A");
+      }
+      if (session.completedAt) { auditLabel("Completed:", formatCT(new Date(session.completedAt))); }
+      auditLabel("Entry Count:", String(sessionEntries.length));
+      auditLabel("Data Encoding:", key ? "Active (entries decrypted for export)" : "Off");
+      currentY += 5;
 
-      doc.rect(36, currentY, 200, 20).strokeColor(accentHex).lineWidth(1.5).stroke();
-      doc.fontSize(7).fillColor(accentHex).text(`VERIFIED EXPORT - ${generatedAt}`, 42, currentY + 6);
+      doc.rect(36, currentY, 260, 20).strokeColor(accentHex).lineWidth(1.5).stroke();
+      doc.fontSize(7).fillColor(accentHex).text(`VERIFIED EXPORT - ${ctGeneratedAt}`, 42, currentY + 6);
 
       doc.end();
     } catch (error) {
