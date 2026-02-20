@@ -861,14 +861,20 @@ export async function registerRoutes(
         }
       };
 
-      const renderPhoto = (pl: PhotoLayout, x: number, y: number, maxW: number, maxH: number) => {
+      const renderPhoto = (pl: PhotoLayout, x: number, y: number, maxW: number, maxH: number, photoEntries?: any[]) => {
+        const captionH = 12;
+        const availH = maxH - captionH;
         const aspect = pl.origW / pl.origH;
         let w: number, h: number;
         w = maxW;
         h = maxW / aspect;
-        if (h > maxH) {
-          h = maxH;
-          w = maxH * aspect;
+        if (h > availH) {
+          h = availH;
+          w = availH * aspect;
+          if (w > maxW) {
+            w = maxW;
+            h = maxW / aspect;
+          }
         }
         const imgX = x;
         doc.image(pl.buffer, imgX, y, { width: w, height: h });
@@ -880,7 +886,15 @@ export async function registerRoutes(
         }
 
         doc.rect(imgX, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
-        return { renderedW: w, renderedH: h, imgX };
+
+        const photoName = pl.photo.originalFilename || `Photo ${pl.photo.id}`;
+        const reelTotal = photoEntries
+          ? photoEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0)
+          : photoPins.reduce((s: number, p: any) => s + (p.reelCount || 1), 0);
+        doc.font('Helvetica').fontSize(6).fillColor("#666666")
+          .text(`${photoName}  |  ${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`, imgX, y + h + 2, { width: w, align: "center", lineBreak: false });
+
+        return { renderedW: w, renderedH: h + captionH, imgX };
       };
 
       const drawSectionHeader = (aisle: string, section: string, entryCount: number, reelCount: number, footage: number, photoLabel?: string) => {
@@ -979,7 +993,7 @@ export async function registerRoutes(
             }
           }
 
-          renderPhoto(pl, tableLeft, contentTop, photoW, contentH);
+          renderPhoto(pl, tableLeft, contentTop, photoW, contentH, entriesToShow);
 
           const tblX = tableLeft + photoW + gap;
           const tblW = pageWidth - photoW - gap;
