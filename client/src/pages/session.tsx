@@ -2630,6 +2630,8 @@ function SingleEntryMode({
     reelCount: editingEntry?.reelCount?.toString() || "1",
     conductors: editingEntry?.conductors || "",
   });
+  const [onFloor, setOnFloor] = useState(editingEntry?.notes?.includes("On Floor") || false);
+  const [inFrontOf, setInFrontOf] = useState(editingEntry?.notes?.includes("In Front Of") || false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -2649,6 +2651,8 @@ function SingleEntryMode({
         reelCount: editingEntry.reelCount?.toString() || "1",
         conductors: editingEntry.conductors || "",
       });
+      setOnFloor(editingEntry.notes?.includes("On Floor") || false);
+      setInFrontOf(editingEntry.notes?.includes("In Front Of") || false);
       setCapturedPhoto(null);
       setErrors({});
       setTouched({});
@@ -2710,6 +2714,14 @@ function SingleEntryMode({
     setTouched((t) => ({ ...t, [field]: true }));
   };
 
+  const toggleNoteTag = (tag: string, checked: boolean) => {
+    setForm((f) => {
+      const parts = f.notes.split("; ").filter(p => p.trim() && p.trim() !== tag);
+      if (checked) parts.unshift(tag);
+      return { ...f, notes: parts.join("; ") };
+    });
+  };
+
   const isReceiving = form.aisle.trim().toLowerCase() === "receiving";
 
   const validate = (): boolean => {
@@ -2725,8 +2737,7 @@ function SingleEntryMode({
   const saveEntry = useMutation({
     mutationFn: async () => {
       const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
-      const perReelFootage = form.footage ? parseInt(form.footage) : null;
-      const totalFootage = perReelFootage ? perReelFootage * reelCount : null;
+      const totalFootage = form.footage ? parseInt(form.footage) : null;
       const sectionValue = isReceiving && !form.section.trim() ? "000" : form.section;
       const body: Record<string, unknown> = {
         aisle: form.aisle,
@@ -2764,6 +2775,8 @@ function SingleEntryMode({
           position: "", reelTag: "", wireType: "", gauge: "",
           footage: "", color: "", manufacturer: "", notes: "", reelCount: "1", conductors: "",
         });
+        setOnFloor(false);
+        setInFrontOf(false);
         setCapturedPhoto(null);
         setErrors({});
         setTouched({});
@@ -2805,22 +2818,22 @@ function SingleEntryMode({
               </Button>
             </div>
           ) : (
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload">
-                <ImagePlus className="h-4 w-4" />
+            <div className="flex gap-3">
+              <Button type="button" size="lg" className="flex-1 bg-[hsl(18_85%_48%)] hover:bg-[hsl(18_85%_40%)] text-white font-semibold text-base py-3" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload">
+                <ImagePlus className="h-5 w-5 mr-2" />
                 Upload Photo
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera">
-                <Camera className="h-4 w-4" />
+              <Button type="button" size="lg" className="flex-1 bg-[hsl(18_85%_48%)] hover:bg-[hsl(18_85%_40%)] text-white font-semibold text-base py-3" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera">
+                <Camera className="h-5 w-5 mr-2" />
                 Take Photo
               </Button>
-              {isUploading && <Loader2 className="h-4 w-4 animate-spin self-center" />}
+              {isUploading && <Loader2 className="h-5 w-5 animate-spin self-center" />}
             </div>
           )}
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs underline">Aisle: <span className="text-destructive">*</span></Label>
           <Input
@@ -2858,15 +2871,33 @@ function SingleEntryMode({
             <p className="text-xs text-destructive" data-testid="error-section">{errors.section}</p>
           )}
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs underline">Position:</Label>
-          <Select value={form.position} onValueChange={(v) => update("position", v)}>
-            <SelectTrigger data-testid="select-position"><SelectValue placeholder="Position" /></SelectTrigger>
-            <SelectContent>
-              {POSITIONS.map((p) => <SelectItem key={p} value={p}>{p === "__none__" ? "-- None --" : p}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+      </div>
+
+      <div className="flex gap-4">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox
+            checked={onFloor}
+            onCheckedChange={(c) => {
+              const checked = !!c;
+              setOnFloor(checked);
+              toggleNoteTag("On Floor", checked);
+            }}
+            data-testid="checkbox-on-floor"
+          />
+          On Floor
+        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox
+            checked={inFrontOf}
+            onCheckedChange={(c) => {
+              const checked = !!c;
+              setInFrontOf(checked);
+              toggleNoteTag("In Front Of", checked);
+            }}
+            data-testid="checkbox-in-front-of"
+          />
+          In Front Of
+        </label>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -2874,6 +2905,13 @@ function SingleEntryMode({
           <Label className="text-xs underline">Category:</Label>
           <Input value={form.reelTag} onChange={(e) => update("reelTag", e.target.value.toUpperCase())} placeholder="Category" enterKeyHint="next" data-testid="input-reel-tag" />
         </div>
+        <div className="space-y-1">
+          <Label className="text-xs underline">Vendor Code:</Label>
+          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value)} placeholder="Vendor Code" enterKeyHint="next" data-testid="input-manufacturer" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label className="text-xs underline">Number of Reels:</Label>
           <Input
@@ -2887,43 +2925,8 @@ function SingleEntryMode({
             data-testid="input-reel-count"
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs underline">Conductors:</Label>
-          <Input
-            value={form.conductors}
-            onChange={(e) => update("conductors", e.target.value.replace(/[^0-9]/g, ""))}
-            placeholder="# conductors"
-            inputMode="numeric"
-            enterKeyHint="next"
-            data-testid="input-conductors"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs underline">Wire Type:</Label>
-          <Select value={form.wireType} onValueChange={(v) => update("wireType", v)}>
-            <SelectTrigger data-testid="select-wire-type"><SelectValue placeholder="Type" /></SelectTrigger>
-            <SelectContent>
-              {WIRE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs underline">Wire Size:</Label>
-          <Select value={form.gauge} onValueChange={(v) => update("gauge", v)}>
-            <SelectTrigger data-testid="select-gauge"><SelectValue placeholder="Size" /></SelectTrigger>
-            <SelectContent>
-              {GAUGES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs underline">Footage:</Label>
+          <Label className="text-xs underline">Total Footage:</Label>
           <Input
             type="number"
             value={form.footage}
@@ -2944,24 +2947,6 @@ function SingleEntryMode({
           {touched.footage && errors.footage && (
             <p className="text-xs text-destructive" data-testid="error-footage">{errors.footage}</p>
           )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs underline">Color:</Label>
-          <Select value={form.color} onValueChange={(v) => update("color", v)}>
-            <SelectTrigger data-testid="select-color"><SelectValue placeholder="Color" /></SelectTrigger>
-            <SelectContent>
-              {COLOR_OPTIONS.map((c) => (
-                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs underline">Vendor Code:</Label>
-          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value)} placeholder="Vendor Code" enterKeyHint="next" data-testid="input-manufacturer" />
         </div>
       </div>
 
