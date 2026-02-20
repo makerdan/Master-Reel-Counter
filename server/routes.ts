@@ -1165,8 +1165,9 @@ export async function registerRoutes(
       doc.fontSize(7).fillColor("#666666");
       const auditLabel = (label: string, value: string) => {
         doc.font('Helvetica').fontSize(7).fillColor("#666666");
-        doc.text(label, 36, currentY, { underline: true, continued: true, lineBreak: false });
-        doc.text(` ${value}`, { underline: false, lineBreak: false });
+        const labelW = doc.widthOfString(label);
+        doc.text(label, 36, currentY, { underline: true, lineBreak: false });
+        doc.text(` ${value}`, 36 + labelW, currentY, { underline: false, lineBreak: false });
         currentY += 11;
       };
       auditLabel("Report Generated:", ctGeneratedAt);
