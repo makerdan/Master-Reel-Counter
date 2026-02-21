@@ -3106,6 +3106,39 @@ function SingleEntryMode({
               Cancel
             </Button>
           )}
+          {!editingEntry && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setForm(f => ({
+                  aisle: keepLocation ? f.aisle : "",
+                  section: keepLocation ? f.section : "",
+                  position: "",
+                  reelTag: "",
+                  wireType: "",
+                  gauge: "",
+                  footage: "",
+                  color: "",
+                  manufacturer: "",
+                  notes: "",
+                  reelCount: "1",
+                  conductors: "",
+                }));
+                setOnFloor(false);
+                setInFrontOf(false);
+                setReceivingChecked(false);
+                setFootageOverride(false);
+                lastMatchedCatalog.current = null;
+                setCapturedPhoto(null);
+                setErrors({});
+                setTouched({});
+              }}
+              data-testid="button-clear-form"
+            >
+              Clear
+            </Button>
+          )}
           <Button
             type="submit"
             disabled={saveEntry.isPending}
