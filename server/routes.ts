@@ -670,16 +670,34 @@ export async function registerRoutes(
       doc.fontSize(18).fillColor(accentHex).text("Master Reel Counter", 36, 36);
       doc.fontSize(14).fillColor("#333333").text(session.name, 36, 58);
       doc.fontSize(9).fillColor("#666666");
-      doc.text(`Location: ${session.location || "N/A"}  |  Status: ${session.status}  |  Entries: ${sessionEntries.length}  |  Total Footage: ${totalFootage.toLocaleString()} ft`, 36, 78);
+      let infoY = 78;
+      doc.text(`Location: ${session.location || "N/A"}`, 36, infoY);
+      infoY += 12;
+      doc.text(`Status: ${session.status}`, 36, infoY);
+      infoY += 12;
+      doc.text(`Entries: ${sessionEntries.length}`, 36, infoY);
+      infoY += 12;
+      doc.text(`Total Footage: ${totalFootage.toLocaleString()} ft`, 36, infoY);
+      infoY += 12;
       if (pt.firstPhotoAt) {
-        doc.text(`Session time: ${new Date(pt.firstPhotoAt).toLocaleString()} to ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toLocaleString() : "ongoing"}`, 36, 92);
+        doc.text(`Session time: ${new Date(pt.firstPhotoAt).toLocaleString()} to ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toLocaleString() : "ongoing"}`, 36, infoY);
+        infoY += 12;
+        if (pt.lastPhotoAt) {
+          const diffMs = Math.abs(new Date(pt.lastPhotoAt).getTime() - new Date(pt.firstPhotoAt).getTime());
+          const totalMin = Math.floor(diffMs / 60000);
+          let elapsedStr: string;
+          if (totalMin < 60) { elapsedStr = `${totalMin}m`; }
+          else { const h = Math.floor(totalMin / 60); const m = totalMin % 60; elapsedStr = m > 0 ? `${h}h ${m}m` : `${h}h`; }
+          doc.text(`Elapsed time: ${elapsedStr}`, 36, infoY);
+          infoY += 12;
+        }
       }
 
       const tableLeft = 36;
       const pageWidth = doc.page.width - 72;
       const rowHeight = 16;
       const headerHeight = 18;
-      let currentY = pt.firstPhotoAt ? 112 : 100;
+      let currentY = infoY + 4;
       const maxY = doc.page.height - 80;
 
       const formatCT = (d: Date): string => {
@@ -959,52 +977,70 @@ export async function registerRoutes(
           if (pl) loadedPhotos.push(pl);
         }
 
-        if (loadedPhotos.length === 0) {
-          if (sec.entries.length === 0) continue;
-          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-          currentY = 36;
-          drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage);
-          drawEntriesTable(sec.entries, tableLeft, pageWidth, currentY, 6.5, rowHeight);
-          continue;
+        if (loadedPhotos.length === 0 && sec.entries.length === 0) continue;
+
+        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+        currentY = 36;
+        const photoLabel = loadedPhotos.length > 0 ? `${loadedPhotos.length} photo${loadedPhotos.length !== 1 ? "s" : ""}` : undefined;
+        drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
+
+        if (sec.entries.length > 0) {
+          const afterTable = drawEntriesTable(sec.entries, tableLeft, pageWidth, currentY, 6.5, rowHeight);
+          currentY = afterTable + 8;
         }
 
-        for (let pi = 0; pi < loadedPhotos.length; pi++) {
-          const pl = loadedPhotos[pi];
-          const photoPinEntryIds = new Set((allPinsMap.get(pl.photo.id) || []).map((p: any) => p.entryId));
-          const photoEntries = sec.entries.filter((e: any) => photoPinEntryIds.has(e.id));
-          const entriesToShow = photoEntries.length > 0 ? photoEntries : (pi === 0 ? sec.entries : []);
+        if (loadedPhotos.length > 0) {
+          const gap = 10;
 
-          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-          currentY = 36;
-          const photoLabel = loadedPhotos.length > 1 ? `Photo ${pi + 1} of ${loadedPhotos.length}` : undefined;
-          drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
+          const renderPhotosInGrid = (photos: PhotoLayout[], startIdx: number) => {
+            let idx = startIdx;
+            while (idx < photos.length) {
+              const remaining = photos.length - idx;
 
-          const contentTop = currentY;
-          const contentH = maxY - contentTop;
-          const gap = 12;
+              if (remaining === 1) {
+                const pl = photos[idx];
+                const availH = maxY - currentY;
+                if (availH < 80) {
+                  doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+                  currentY = 36;
+                }
+                const maxW = pageWidth * 0.65;
+                const maxH = maxY - currentY;
+                const result = renderPhoto(pl, tableLeft, currentY, maxW, maxH, sec.entries);
+                currentY += result.renderedH + gap;
+                idx++;
+              } else {
+                const availH = maxY - currentY;
+                if (availH < 80) {
+                  doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+                  currentY = 36;
+                }
 
-          const photoAspect = pl.origW / pl.origH;
-          let photoW: number, photoH: number;
-          const maxPhotoW = pageWidth * 0.45;
-          photoW = maxPhotoW;
-          photoH = maxPhotoW / photoAspect;
-          if (photoH > contentH) {
-            photoH = contentH;
-            photoW = contentH * photoAspect;
-            if (photoW > maxPhotoW) {
-              photoW = maxPhotoW;
-              photoH = maxPhotoW / photoAspect;
+                const cellW = (pageWidth - gap) / 2;
+                const cellH = Math.min((maxY - currentY), (doc.page.height - 72) * 0.45);
+                if (cellH < 60) {
+                  doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+                  currentY = 36;
+                }
+                const actualCellH = Math.min((maxY - currentY), (doc.page.height - 72) * 0.45);
+
+                const photosInRow = Math.min(2, remaining);
+                let maxRowH = 0;
+
+                for (let c = 0; c < photosInRow; c++) {
+                  const pl = photos[idx + c];
+                  const x = tableLeft + c * (cellW + gap);
+                  const result = renderPhoto(pl, x, currentY, cellW, actualCellH, sec.entries);
+                  if (result.renderedH > maxRowH) maxRowH = result.renderedH;
+                }
+
+                currentY += maxRowH + gap;
+                idx += photosInRow;
+              }
             }
-          }
+          };
 
-          renderPhoto(pl, tableLeft, contentTop, photoW, contentH, entriesToShow);
-
-          const tblX = tableLeft + photoW + gap;
-          const tblW = pageWidth - photoW - gap;
-
-          if (entriesToShow.length > 0) {
-            drawEntriesTable(entriesToShow, tblX, tblW, contentTop, 5.5, 14);
-          }
+          renderPhotosInGrid(loadedPhotos, 0);
         }
       }
 
