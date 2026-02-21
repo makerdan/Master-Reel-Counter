@@ -1032,11 +1032,21 @@ export async function registerRoutes(
           if (hasPhotos) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = 36;
-            const unmatchedLabel = `${unmatchedEntries.length} entr${unmatchedEntries.length !== 1 ? "ies" : "y"} (no photo)`;
-            const unmatchedReels = unmatchedEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
-            const unmatchedFootage = unmatchedEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
-            drawSectionHeader(sec.aisle, sec.section, unmatchedEntries.length, unmatchedReels, unmatchedFootage, unmatchedLabel);
           }
+          const unmatchedReels = unmatchedEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+          const unmatchedFootage = unmatchedEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+          const aisleDisplay = sec.aisle.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${sec.aisle || "—"}`;
+          doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
+          doc.fontSize(11).fillColor(accentHex).text(
+            `Entries Without Photos — ${aisleDisplay} / Section ${sec.section || "—"}`,
+            tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
+          );
+          doc.fontSize(7).fillColor("#666666").text(
+            `${unmatchedEntries.length} entries  |  ${unmatchedReels} reels  |  ${unmatchedFootage.toLocaleString()} ft`,
+            tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
+          );
+          doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
+          currentY += 26;
           const afterTable = drawEntriesTable(unmatchedEntries, tableLeft, pageWidth, currentY, 6.5, rowHeight);
           currentY = afterTable + 8;
         }
