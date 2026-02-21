@@ -991,56 +991,51 @@ export async function registerRoutes(
 
         if (loadedPhotos.length > 0) {
           const gap = 10;
+          const minPhotoH = 120;
 
-          const renderPhotosInGrid = (photos: PhotoLayout[], startIdx: number) => {
-            let idx = startIdx;
-            while (idx < photos.length) {
-              const remaining = photos.length - idx;
-
-              if (remaining === 1) {
-                const pl = photos[idx];
-                const availH = maxY - currentY;
-                if (availH < 80) {
-                  doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-                  currentY = 36;
-                }
-                const maxW = pageWidth * 0.65;
-                const maxH = maxY - currentY;
-                const result = renderPhoto(pl, tableLeft, currentY, maxW, maxH, sec.entries);
-                currentY += result.renderedH + gap;
-                idx++;
-              } else {
-                const availH = maxY - currentY;
-                if (availH < 80) {
-                  doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-                  currentY = 36;
-                }
-
-                const cellW = (pageWidth - gap) / 2;
-                const cellH = Math.min((maxY - currentY), (doc.page.height - 72) * 0.45);
-                if (cellH < 60) {
-                  doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-                  currentY = 36;
-                }
-                const actualCellH = Math.min((maxY - currentY), (doc.page.height - 72) * 0.45);
-
-                const photosInRow = Math.min(2, remaining);
-                let maxRowH = 0;
-
-                for (let c = 0; c < photosInRow; c++) {
-                  const pl = photos[idx + c];
-                  const x = tableLeft + c * (cellW + gap);
-                  const result = renderPhoto(pl, x, currentY, cellW, actualCellH, sec.entries);
-                  if (result.renderedH > maxRowH) maxRowH = result.renderedH;
-                }
-
-                currentY += maxRowH + gap;
-                idx += photosInRow;
-              }
+          const ensureSpace = (needed: number) => {
+            if (currentY + needed > maxY) {
+              doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+              currentY = 36;
+              drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, `${loadedPhotos.length} photo${loadedPhotos.length !== 1 ? "s" : ""} (cont.)`);
             }
           };
 
-          renderPhotosInGrid(loadedPhotos, 0);
+          let idx = 0;
+          while (idx < loadedPhotos.length) {
+            const remaining = loadedPhotos.length - idx;
+
+            if (remaining === 1) {
+              ensureSpace(minPhotoH);
+              const pl = loadedPhotos[idx];
+              const maxW = pageWidth * 0.6;
+              const availH = maxY - currentY;
+              const aspect = pl.origW / pl.origH;
+              let w = maxW;
+              let h = maxW / aspect;
+              if (h > availH - 14) { h = availH - 14; w = h * aspect; if (w > maxW) { w = maxW; h = maxW / aspect; } }
+              const centeredX = tableLeft + (pageWidth - w) / 2;
+              const result = renderPhoto(pl, centeredX, currentY, w, availH, sec.entries);
+              currentY += result.renderedH + gap;
+              idx++;
+            } else {
+              ensureSpace(minPhotoH);
+              const cellW = (pageWidth - gap) / 2;
+              const availH = maxY - currentY;
+              const photosInRow = Math.min(2, remaining);
+              let maxRowH = 0;
+
+              for (let c = 0; c < photosInRow; c++) {
+                const pl = loadedPhotos[idx + c];
+                const x = tableLeft + c * (cellW + gap);
+                const result = renderPhoto(pl, x, currentY, cellW, availH, sec.entries);
+                if (result.renderedH > maxRowH) maxRowH = result.renderedH;
+              }
+
+              currentY += maxRowH + gap;
+              idx += photosInRow;
+            }
+          }
         }
       }
 
