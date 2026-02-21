@@ -1566,7 +1566,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
       const parentPhoto = isDetail && currentPhoto?.parentPhotoId
         ? uploadedPhotos.find(p => p.dbId === currentPhoto.parentPhotoId)
         : undefined;
-      const entryAisle = aisle || (isDetail && parentPhoto?.aisle ? parentPhoto.aisle : "") || "";
+      const entryAisle = isDetail && parentPhoto?.aisle ? parentPhoto.aisle : (currentPhoto?.aisle || aisle || "");
       const entrySection = currentPhoto?.section || parentPhoto?.section || "";
       const entryPhotoId = isDetail && parentPhoto?.dbId ? parentPhoto.dbId : currentPhoto?.dbId;
       const pinPhotoId = currentPhoto?.dbId;
@@ -1584,7 +1584,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
           const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
             aisle: entryAisle,
             section: entrySection,
-            position: "Floor",
+            position: "",
             reelTag: reelLabel,
             manufacturer: pin.vendorCode || undefined,
             footage: totalFootage,
