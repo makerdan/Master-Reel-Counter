@@ -1026,6 +1026,11 @@ export async function registerRoutes(
           const pinEntryIds = new Set(photoPins.map((p: any) => p.entryId).filter(Boolean));
           const photoEntries = sec.entries.filter((e: any) => pinEntryIds.has(e.id));
           if (photoEntries.length > 0) {
+            const pinLabelForEntry = (e: any) => {
+              const pin = photoPins.find((p: any) => p.entryId === e.id);
+              return pin?.label ?? 999;
+            };
+            photoEntries.sort((a: any, b: any) => pinLabelForEntry(a) - pinLabelForEntry(b));
             photosWithEntries.push({ pl, entries: photoEntries });
             photoEntries.forEach((e: any) => matchedEntryIds.add(e.id));
           } else {
@@ -1177,7 +1182,17 @@ export async function registerRoutes(
           return { category, wireTypeGroup: extractWireType(category), reelSizeIdx: extractReelSize(category), ...data };
         });
 
+      const wireTypePriority = (wireType: string, vendor: string): number => {
+        const wt = wireType.toUpperCase().trim();
+        const v = vendor.toUpperCase().trim();
+        if (wt === "THHN" && v === "COP") return 0;
+        if (wt === "XHHW" && v === "ALU") return 1;
+        return 2;
+      };
       allCategories.sort((a, b) => {
+        const pa = wireTypePriority(a.wireTypeGroup, a.vendorCode);
+        const pb = wireTypePriority(b.wireTypeGroup, b.vendorCode);
+        if (pa !== pb) return pa - pb;
         if (a.wireTypeGroup < b.wireTypeGroup) return -1;
         if (a.wireTypeGroup > b.wireTypeGroup) return 1;
         return a.reelSizeIdx - b.reelSizeIdx;
