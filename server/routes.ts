@@ -1127,13 +1127,24 @@ export async function registerRoutes(
       doc.fontSize(9).fillColor("#666666").text(`${session.name}  |  ${session.location || "N/A"}  |  ${sessionEntries.length} entries  |  ${totalFootage.toLocaleString()} ft total`, 36, currentY);
       currentY += 20;
 
+      const entryPinLabelMap = new Map<number, string>();
+      for (const [, pins] of allPinsMap) {
+        for (const pin of pins) {
+          if (pin.entryId && pin.label) {
+            entryPinLabelMap.set(pin.entryId, `P${String(pin.label).padStart(2, "0")}`);
+          }
+        }
+      }
+
       const categoryMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
       for (const e of sessionEntries as any[]) {
         const cat = e.reelTag || e.wireType || "Uncategorized";
         const vendor = e.manufacturer || "";
         const groupKey = `${cat}|||${vendor}`;
         const existing = categoryMap.get(groupKey);
-        const loc = [e.aisle, e.section, e.position].filter(Boolean).join("-");
+        const pinLabel = entryPinLabelMap.get(e.id);
+        const locParts = [e.aisle, e.section, pinLabel].filter(Boolean);
+        const loc = locParts.join("-");
         if (existing) {
           existing.totalFootage += (e.footage || 0);
           existing.reelCount += (e.reelCount || 1);
