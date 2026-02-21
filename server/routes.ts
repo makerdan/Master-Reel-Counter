@@ -953,25 +953,33 @@ export async function registerRoutes(
         currentY += 28;
       };
 
-      const drawEntriesTable = (entries: any[], tblX: number, tblW: number, startY: number, fontSize: number, rH: number) => {
-        const secScaled = scaleSecCols(tblW);
-        let tblY = drawSecEntryHeader(startY, tblX, tblW, secScaled);
+      const drawEntriesTable = (entries: any[], tblX: number, tblW: number, startY: number, fontSize: number, rH: number, pinMap?: Map<number, string>) => {
+        const pinColW = pinMap ? 30 : 0;
+        const dataW = tblW - pinColW;
+        const secScaled = scaleSecCols(dataW);
+        const allCols = pinMap
+          ? [{ header: "Pin:", width: pinColW }, ...secScaled]
+          : secScaled;
+        let tblY = drawSecEntryHeader(startY, tblX, tblW, allCols);
         for (let i = 0; i < entries.length; i++) {
           if (tblY + rH > maxY) break;
           const e: any = entries[i];
           if (i % 2 === 1) doc.rect(tblX, tblY, tblW, rH).fill("#fafaf8");
           doc.font('Helvetica-Bold').fontSize(fontSize).fillColor("#333333");
           let x = tblX;
-          const vals = [
+          const baseVals = [
             e.manufacturer || "",
             e.reelTag || "",
             String(e.reelCount || 1),
             e.footage ? `${e.footage.toLocaleString()} ft` : "",
             e.notes || "",
           ];
-          for (let j = 0; j < secScaled.length; j++) {
-            doc.text(vals[j], x + 2, tblY + 3, { width: secScaled[j].width - 4, lineBreak: false });
-            x += secScaled[j].width;
+          const vals = pinMap
+            ? [pinMap.get(e.id) || "", ...baseVals]
+            : baseVals;
+          for (let j = 0; j < allCols.length; j++) {
+            doc.text(vals[j], x + 2, tblY + 3, { width: allCols[j].width - 4, lineBreak: false });
+            x += allCols[j].width;
           }
           doc.font('Helvetica');
           doc.rect(tblX, tblY, tblW, rH).stroke(borderColor);
@@ -1061,7 +1069,14 @@ export async function registerRoutes(
           const tblW = pageWidth - photoW - gap;
           let tblEndY = currentY;
           if (photoEntries.length > 0) {
-            tblEndY = drawEntriesTable(photoEntries, tblX, tblW, currentY, 5.5, 14);
+            const photoPins = allPinsMap.get(pl.photo.id) || [];
+            const entryPinMap = new Map<number, string>();
+            for (const pin of photoPins) {
+              if (pin.entryId && pin.label) {
+                entryPinMap.set(pin.entryId, `P${String(pin.label).padStart(2, "0")}`);
+              }
+            }
+            tblEndY = drawEntriesTable(photoEntries, tblX, tblW, currentY, 5.5, 14, entryPinMap.size > 0 ? entryPinMap : undefined);
           }
 
           const photoEndY = currentY + result.renderedH;
