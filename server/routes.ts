@@ -271,6 +271,20 @@ export async function registerRoutes(
       if (pinScale !== undefined && typeof pinScale === "number" && !isNaN(pinScale)) safeUpdate.pinScale = Math.max(0.5, Math.min(5, pinScale));
       if (Object.keys(safeUpdate).length === 0) return res.status(400).json({ message: "No valid fields to update" });
       const updated = await storage.updatePhoto(photo.id, safeUpdate);
+
+      if (safeUpdate.section !== undefined || safeUpdate.aisle !== undefined) {
+        const pins = await storage.getPhotoPins(photo.id);
+        const committedPins = pins.filter(p => p.entryId);
+        const entryUpdate: Record<string, any> = {};
+        if (safeUpdate.section !== undefined) entryUpdate.section = safeUpdate.section;
+        if (safeUpdate.aisle !== undefined) entryUpdate.aisle = safeUpdate.aisle;
+        for (const pin of committedPins) {
+          if (pin.entryId) {
+            await storage.updateEntry(pin.entryId, entryUpdate);
+          }
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update photo" });
