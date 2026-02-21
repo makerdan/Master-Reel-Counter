@@ -1183,9 +1183,25 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
 
   const parentPhotoOptions = uploadedPhotos.filter((p, i) => i !== currentPhotoIdx && p.dbId && !p.isDetailShot);
 
+  const getNextReceivingSection = useCallback(() => {
+    const isRec = aisle.trim().toLowerCase() === "receiving";
+    if (!isRec) return "000";
+    const allReceivingPhotos = [
+      ...photos.filter(p => (p.aisle || "").toLowerCase() === "receiving"),
+      ...uploadedPhotos.filter(p => (p.aisle || "").toLowerCase() === "receiving" && !photos.some(pp => pp.id === p.dbId)),
+    ];
+    const existingSections = allReceivingPhotos
+      .map(p => parseInt(p.section || "0", 10))
+      .filter(n => !isNaN(n));
+    const maxSection = existingSections.length > 0 ? Math.max(...existingSections) : 0;
+    return String(maxSection + 1).padStart(3, "0");
+  }, [aisle, photos, uploadedPhotos]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    const isRec = aisle.trim().toLowerCase() === "receiving";
+    let nextRecNum = isRec ? parseInt(getNextReceivingSection(), 10) : 0;
 
     for (const file of files) {
       try {
@@ -1194,12 +1210,17 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
           toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
           continue;
         }
+        let sectionVal = "";
+        if (isRec) {
+          sectionVal = String(nextRecNum).padStart(3, "0");
+          nextRecNum++;
+        }
         const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
           objectStorageKey: result.objectPath,
           originalFilename: file.name,
           mimeType: file.type,
           aisle,
-          section: "",
+          section: sectionVal,
         });
         const savedPhoto = await res.json();
         const photoUrl = result.objectPath;
@@ -1212,7 +1233,7 @@ function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, naviga
           return [...prev, {
             url: photoUrl,
             objectPath: result.objectPath,
-            section: "",
+            section: sectionVal,
             aisle: aisle || "",
             dbId: savedPhoto.id,
             filename: numberedName,
@@ -3260,15 +3281,37 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
     });
   }, []);
 
+  const getNextReceivingSection = useCallback(() => {
+    const allReceivingPhotos = [
+      ...photos.filter(p => (p.aisle || "").toLowerCase() === "receiving"),
+      ...recentPhotos.filter(p => p.aisle.toLowerCase() === "receiving" && !photos.some(pp => pp.id === p.id)),
+    ];
+    const pendingReceivingSections = uploadQueue
+      .filter(q => q.aisle.toLowerCase() === "receiving" && q.status !== "failed")
+      .map(q => parseInt(q.section, 10))
+      .filter(n => !isNaN(n));
+    const existingSections = allReceivingPhotos
+      .map(p => parseInt(p.section || "0", 10))
+      .filter(n => !isNaN(n));
+    const allSections = [...existingSections, ...pendingReceivingSections];
+    const maxSection = allSections.length > 0 ? Math.max(...allSections) : 0;
+    return String(maxSection + 1).padStart(3, "0");
+  }, [photos, recentPhotos, uploadQueue]);
+
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const sectionValue = isReceiving && !section.trim() ? "000" : section;
     const newItems: UploadQueueItem[] = [];
+    let nextReceivingNum = isReceiving ? parseInt(getNextReceivingSection(), 10) : 0;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const blobUrl = URL.createObjectURL(file);
       blobUrlsRef.current.add(blobUrl);
+      let sectionValue = section;
+      if (isReceiving && !section.trim()) {
+        sectionValue = String(nextReceivingNum).padStart(3, "0");
+        nextReceivingNum++;
+      }
       newItems.push({
         queueId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         file,

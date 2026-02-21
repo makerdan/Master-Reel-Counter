@@ -1013,12 +1013,18 @@ export async function registerRoutes(
 
         const unmatchedEntries = sec.entries.filter((e: any) => !matchedEntryIds.has(e.id));
 
-        if (unmatchedEntries.length > 0 && photosWithEntries.length === 0 && photosWithoutEntries.length === 0) {
+        if (unmatchedEntries.length > 0) {
+          const hasPhotos = photosWithEntries.length > 0 || photosWithoutEntries.length > 0;
+          if (hasPhotos) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+            const unmatchedLabel = `${unmatchedEntries.length} entr${unmatchedEntries.length !== 1 ? "ies" : "y"} (no photo)`;
+            const unmatchedReels = unmatchedEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+            const unmatchedFootage = unmatchedEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+            drawSectionHeader(sec.aisle, sec.section, unmatchedEntries.length, unmatchedReels, unmatchedFootage, unmatchedLabel);
+          }
           const afterTable = drawEntriesTable(unmatchedEntries, tableLeft, pageWidth, currentY, 6.5, rowHeight);
           currentY = afterTable + 8;
-        } else if (unmatchedEntries.length > 0) {
-          const afterTable = drawEntriesTable(unmatchedEntries, tableLeft, pageWidth, currentY, 6.5, rowHeight);
-          currentY = afterTable + 12;
         }
 
         for (const { pl, entries: photoEntries } of photosWithEntries) {
