@@ -205,8 +205,8 @@ function EntryTable({
                                           style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
                                           data-testid={`pin-highlight-${entry.id}`}
                                         >
-                                          <div className="w-12 h-12 rounded-full border-[3px] border-orange-500/70 animate-pulse" />
-                                          <div className="absolute inset-0 w-12 h-12 rounded-full border border-white/40" />
+                                          <div className="w-24 h-24 rounded-full border-4 border-orange-500 animate-pulse" />
+                                          <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-white/70" />
                                         </div>
                                       );
                                     })()}
