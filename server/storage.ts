@@ -425,14 +425,57 @@ export class DatabaseStorage implements IStorage {
 
   async searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<number[]> {
     const pattern = `%${query}%`;
+
+    const monthNames: Record<string, number> = {
+      january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+      july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+      jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+    };
+
+    let dateMonth: number | null = null;
+    let dateYear: number | null = null;
+
+    const lowerQuery = query.trim().toLowerCase();
+    const mmyyyySlash = lowerQuery.match(/^(\d{1,2})\/(\d{4})$/);
+    const mmyyyyDash = lowerQuery.match(/^(\d{1,2})-(\d{4})$/);
+    if (mmyyyySlash) {
+      dateMonth = parseInt(mmyyyySlash[1]);
+      dateYear = parseInt(mmyyyySlash[2]);
+    } else if (mmyyyyDash) {
+      dateMonth = parseInt(mmyyyyDash[1]);
+      dateYear = parseInt(mmyyyyDash[2]);
+    } else {
+      const parts = lowerQuery.split(/[\s,/\-]+/);
+      for (const part of parts) {
+        if (monthNames[part] !== undefined) dateMonth = monthNames[part];
+        else if (/^\d{4}$/.test(part)) dateYear = parseInt(part);
+      }
+    }
+
+    const textConditions = [
+      ilike(countingSessions.name, pattern),
+      ilike(sql`COALESCE(${countingSessions.location}, '')`, pattern),
+    ];
+
+    if (dateMonth && dateYear) {
+      textConditions.push(
+        sql`EXTRACT(MONTH FROM ${countingSessions.startedAt}) = ${dateMonth} AND EXTRACT(YEAR FROM ${countingSessions.startedAt}) = ${dateYear}`
+      );
+    } else if (dateMonth) {
+      textConditions.push(
+        sql`EXTRACT(MONTH FROM ${countingSessions.startedAt}) = ${dateMonth}`
+      );
+    } else if (dateYear) {
+      textConditions.push(
+        sql`EXTRACT(YEAR FROM ${countingSessions.startedAt}) = ${dateYear}`
+      );
+    }
+
     const sessionResults = await db.select({ id: countingSessions.id })
       .from(countingSessions)
       .where(and(
         eq(countingSessions.userId, userId),
-        or(
-          ilike(countingSessions.name, pattern),
-          ilike(sql`COALESCE(${countingSessions.location}, '')`, pattern),
-        )
+        or(...textConditions),
       ));
     const matchedIds = new Set(sessionResults.map(r => r.id));
 
