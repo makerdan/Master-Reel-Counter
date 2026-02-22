@@ -238,6 +238,23 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/sessions/:id/lock", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can lock/unlock sessions" });
+      if (typeof req.body?.locked !== "boolean") return res.status(400).json({ message: "locked must be a boolean" });
+      const { locked } = req.body;
+      const updated = await storage.updateSession(access.session.id, { isLocked: !!locked });
+      await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, locked ? "locked_session" : "unlocked_session", "session", access.session.id);
+      broadcastToSession(access.session.id, { type: "session_lock", locked: !!locked });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to toggle session lock:", error?.message || error);
+      res.status(500).json({ message: "Failed to toggle session lock" });
+    }
+  });
+
   app.delete("/api/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
       const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);

@@ -6,6 +6,7 @@ import {
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
   FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
   Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
+  Lock, Unlock,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -299,6 +300,21 @@ export default function Dashboard() {
     },
   });
 
+  const toggleLock = useMutation({
+    mutationFn: async ({ id, locked }: { id: number; locked: boolean }) => {
+      const res = await apiRequest("POST", `/api/sessions/${id}/lock`, { locked });
+      return res.json();
+    },
+    onSuccess: async (_data, variables) => {
+      await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/shared-sessions"] });
+      toast({ title: variables.locked ? "Session locked" : "Session unlocked" });
+    },
+    onError: () => {
+      toast({ title: "Failed to toggle lock", variant: "destructive" });
+    },
+  });
+
   const createFolder = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/folders", { name: newFolderName });
@@ -541,6 +557,14 @@ export default function Dashboard() {
                 >
                   {session.status}
                 </Badge>
+                {session.isLocked && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Lock className="h-3.5 w-3.5 text-amber-500" data-testid={`icon-locked-${session.id}`} />
+                    </TooltipTrigger>
+                    <TooltipContent>Session is locked</TooltipContent>
+                  </Tooltip>
+                )}
                 {isShared && (session as SharedSessionWithStats).role && (
                   <Badge
                     variant="outline"
@@ -692,6 +716,19 @@ export default function Dashboard() {
                         </DropdownMenuItem>
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleLock.mutate({ id: session.id, locked: !session.isLocked });
+                      }}
+                      data-testid={`menu-lock-session-${session.id}`}
+                    >
+                      {session.isLocked ? (
+                        <><Unlock className="h-4 w-4 mr-2" /> Unlock Session</>
+                      ) : (
+                        <><Lock className="h-4 w-4 mr-2" /> Lock Session</>
+                      )}
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"

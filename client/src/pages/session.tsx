@@ -153,7 +153,7 @@ function SessionWorkspace({
 
   const toggleLock = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, { isLocked: !isLocked });
+      const res = await apiRequest("POST", `/api/sessions/${sessionId}/lock`, { locked: !isLocked });
       return res.json();
     },
     onSuccess: () => {
