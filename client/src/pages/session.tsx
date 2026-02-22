@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
@@ -9,6 +9,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,10 +80,10 @@ export default function SessionPage() {
             <p className="text-sm font-medium mb-1">Failed to load session</p>
             <p className="text-xs text-muted-foreground mb-4">There was a problem connecting to the server.</p>
             <div className="flex gap-2 justify-center">
-              <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-error-back">
+              <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-error-back" title="Back to dashboard">
                 Back to Dashboard
               </Button>
-              <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] })} data-testid="button-retry-session">
+              <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] })} data-testid="button-retry-session" title="Retry loading session">
                 Retry
               </Button>
             </div>
@@ -98,7 +99,7 @@ export default function SessionPage() {
         <Card className="w-full max-w-sm">
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">Session not found</p>
-            <Button variant="outline" className="mt-4" onClick={() => setLocation("/")}>
+            <Button variant="outline" className="mt-4" onClick={() => setLocation("/")} title="Back to dashboard">
               Back to Dashboard
             </Button>
           </CardContent>
@@ -207,13 +208,23 @@ function SessionWorkspace({
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
       queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
-      setEditSessionOpen(false);
-      toast({ title: "Session updated" });
     },
     onError: () => {
       toast({ title: "Failed to update session", variant: "destructive" });
     },
   });
+
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (!editSessionOpen) return;
+    if (!editName.trim()) return;
+    if (editName === session.name && (editLocation || "") === (session.location || "")) return;
+    clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      updateSession.mutate({ name: editName, location: editLocation });
+    }, 1000);
+    return () => clearTimeout(autoSaveTimerRef.current);
+  }, [editName, editLocation, editSessionOpen]);
 
 
   const shareSession = () => {
@@ -326,9 +337,14 @@ function SessionWorkspace({
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-4 py-2">
           <div className="flex items-center gap-2 min-w-0">
-            <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Back to dashboard</TooltipContent>
+            </Tooltip>
             <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditSessionOpen(true); }}>
               <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
               <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTime(session.firstPhotoAt, session.lastPhotoAt, captureMode)}</span>
@@ -348,21 +364,36 @@ function SessionWorkspace({
               </span>
             )}
             {isOwner && (
-              <Button size="icon" variant="ghost" onClick={() => toggleLock.mutate()} disabled={toggleLock.isPending} data-testid="button-toggle-lock" title={isLocked ? "Unlock session" : "Lock session"}>
-                {isLocked ? <Lock className="h-4 w-4 text-amber-500" /> : <Unlock className="h-4 w-4" />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" onClick={() => toggleLock.mutate()} disabled={toggleLock.isPending} data-testid="button-toggle-lock">
+                    {isLocked ? <Lock className="h-4 w-4 text-amber-500" /> : <Unlock className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isLocked ? "Unlock session" : "Lock session"}</TooltipContent>
+              </Tooltip>
             )}
             {!isOwner && isLocked && (
               <span className="flex items-center gap-1 text-xs text-amber-500" title="Session is locked">
                 <Lock className="h-3 w-3" />
               </span>
             )}
-            <Button size="icon" variant="ghost" onClick={undo} disabled={!canUndo} data-testid="button-undo" className="h-8 w-8">
-              <Undo2 className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={redo} disabled={!canRedo} data-testid="button-redo" className="h-8 w-8">
-              <Redo2 className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="ghost" onClick={undo} disabled={!canUndo} data-testid="button-undo" className="h-8 w-8">
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Undo</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="ghost" onClick={redo} disabled={!canRedo} data-testid="button-redo" className="h-8 w-8">
+                  <Redo2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Redo</TooltipContent>
+            </Tooltip>
             {onlineUsers.length > 0 && (
               <div className="flex items-center gap-0.5 mr-1" data-testid="online-users">
                 {onlineUsers.slice(0, 3).map((u, i) => (
@@ -382,22 +413,32 @@ function SessionWorkspace({
               </div>
             )}
             {isOwner && (
-              <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team">
+              <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team" title="Manage team">
                 Team
               </Button>
             )}
-            <Button size="icon" variant={showComments ? "default" : "ghost"} onClick={() => { setShowComments(!showComments); setShowActivity(false); }} data-testid="button-toggle-comments">
-              <MessageSquare className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant={showActivity ? "default" : "ghost"} onClick={() => { setShowActivity(!showActivity); setShowComments(false); }} data-testid="button-toggle-activity">
-              <History className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant={showComments ? "default" : "ghost"} onClick={() => { setShowComments(!showComments); setShowActivity(false); }} data-testid="button-toggle-comments">
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Comments</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant={showActivity ? "default" : "ghost"} onClick={() => { setShowActivity(!showActivity); setShowComments(false); }} data-testid="button-toggle-activity">
+                  <History className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Activity log</TooltipContent>
+            </Tooltip>
+            <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" title={captureMode ? "Switch to full mode" : "Switch to mobile capture mode"}>
               {captureMode ? "Full Mode" : "Mobile Flow"}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" data-testid="button-export">
+                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data">
                   Export
                 </Button>
               </DropdownMenuTrigger>
@@ -518,18 +559,17 @@ function SessionWorkspace({
         </Dialog>
       )}
 
-      <Dialog open={editSessionOpen} onOpenChange={setEditSessionOpen}>
+      <Dialog open={editSessionOpen} onOpenChange={(open) => {
+        if (!open && editName.trim() && (editName !== session.name || (editLocation || "") !== (session.location || ""))) {
+          updateSession.mutate({ name: editName, location: editLocation });
+        }
+        setEditSessionOpen(open);
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Session</DialogTitle>
           </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (editName.trim()) updateSession.mutate({ name: editName, location: editLocation });
-            }}
-            className="space-y-4"
-          >
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-session-name">Session Name</Label>
               <Input
@@ -548,15 +588,8 @@ function SessionWorkspace({
                 data-testid="input-edit-session-location"
               />
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={!editName.trim() || updateSession.isPending}
-              data-testid="button-save-session-edit"
-            >
-              {updateSession.isPending ? "Saving..." : "Save Changes"}
-            </Button>
-          </form>
+            <p className="text-xs text-muted-foreground text-center">Changes are saved automatically</p>
+          </div>
         </DialogContent>
       </Dialog>
 

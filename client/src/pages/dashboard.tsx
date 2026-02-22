@@ -277,13 +277,23 @@ export default function Dashboard() {
     },
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
-      setEditingSession(null);
-      toast({ title: "Session updated" });
     },
     onError: () => {
       toast({ title: "Failed to update session", variant: "destructive" });
     },
   });
+
+  const sessionAutoSaveRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (!editingSession) return;
+    if (!editName.trim()) return;
+    if (editName === editingSession.name && (editLocation || "") === (editingSession.location || "")) return;
+    clearTimeout(sessionAutoSaveRef.current);
+    sessionAutoSaveRef.current = setTimeout(() => {
+      updateSession.mutate({ id: editingSession.id, name: editName, location: editLocation });
+    }, 1000);
+    return () => clearTimeout(sessionAutoSaveRef.current);
+  }, [editName, editLocation, editingSession]);
 
   const toggleStatus = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
@@ -339,13 +349,23 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       invalidateAll();
-      setRenamingFolder(null);
-      toast({ title: "Folder renamed" });
     },
     onError: () => {
       toast({ title: "Failed to rename folder", variant: "destructive" });
     },
   });
+
+  const folderAutoSaveRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (!renamingFolder) return;
+    if (!renameFolderName.trim()) return;
+    if (renameFolderName === renamingFolder.name) return;
+    clearTimeout(folderAutoSaveRef.current);
+    folderAutoSaveRef.current = setTimeout(() => {
+      renameFolder.mutate({ id: renamingFolder.id, name: renameFolderName });
+    }, 1000);
+    return () => clearTimeout(folderAutoSaveRef.current);
+  }, [renameFolderName, renamingFolder]);
 
   const deleteFolder = useMutation({
     mutationFn: async (id: number) => {
@@ -659,6 +679,7 @@ export default function Dashboard() {
                       variant="ghost"
                       onClick={(e) => e.stopPropagation()}
                       data-testid={`button-session-menu-${session.id}`}
+                      title="Session menu"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
@@ -785,7 +806,7 @@ export default function Dashboard() {
       >
         <div className="flex items-center gap-2 group" data-testid={`folder-header-${folder.id}`}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1 px-2" data-testid={`button-toggle-folder-${folder.id}`}>
+            <Button variant="ghost" size="sm" className="gap-1 px-2" data-testid={`button-toggle-folder-${folder.id}`} title="Toggle folder">
               <ChevronDown className={`h-4 w-4 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
               {isCollapsed ? <Folder className="h-4 w-4 text-primary" /> : <FolderOpen className="h-4 w-4 text-primary" />}
               <span className="font-semibold text-sm">{folder.name}</span>
@@ -801,6 +822,7 @@ export default function Dashboard() {
                 variant="ghost"
                 className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                 data-testid={`button-folder-menu-${folder.id}`}
+                title="Folder options"
               >
                 <MoreVertical className="h-3 w-3" />
               </Button>
@@ -907,7 +929,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" data-testid="button-sort-sessions">
+                <Button variant="outline" size="sm" data-testid="button-sort-sessions" title="Sort sessions">
                   <ArrowUpDown className="h-4 w-4 mr-1" />
                   {sortField === "date" ? "Date" : sortField === "name" ? "Name" : sortField === "entries" ? "Reels" : "Footage"}
                   {sortDirection === "desc" ? <ArrowDown className="h-3 w-3 ml-1" /> : <ArrowUp className="h-3 w-3 ml-1" />}
@@ -942,7 +964,7 @@ export default function Dashboard() {
             </DropdownMenu>
             <Dialog open={newFolderDialogOpen} onOpenChange={setNewFolderDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" data-testid="button-new-folder">
+                <Button variant="outline" size="sm" data-testid="button-new-folder" title="Create a new folder">
                   <FolderPlus className="h-4 w-4" />
                   New Folder
                 </Button>
@@ -981,7 +1003,7 @@ export default function Dashboard() {
             </Dialog>
             <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
               <DialogTrigger asChild>
-                <Button data-testid="button-new-session">
+                <Button data-testid="button-new-session" title="Create a new counting session">
                   <Plus className="h-4 w-4" />
                   New Session
                 </Button>
@@ -1050,15 +1072,20 @@ export default function Dashboard() {
               data-testid="input-search-sessions"
             />
             {searchQuery && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                onClick={() => { setSearchQuery(""); setShowRecentSearches(false); }}
-                data-testid="button-clear-search"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    onClick={() => { setSearchQuery(""); setShowRecentSearches(false); }}
+                    data-testid="button-clear-search"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear search</TooltipContent>
+              </Tooltip>
             )}
             {showRecentSearches && recentSearches.length > 0 && !searchQuery && (
               <div
@@ -1103,6 +1130,7 @@ export default function Dashboard() {
                       className="h-7 w-7 shrink-0 mr-1"
                       onClick={(e) => { e.stopPropagation(); removeRecentSearch(term); }}
                       data-testid={`button-remove-recent-${term}`}
+                      title="Remove"
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -1137,6 +1165,7 @@ export default function Dashboard() {
                   className="w-full justify-start gap-2 border-primary/40 hover:bg-primary/5"
                   onClick={() => setLocation(`/session/${lastSession.id}`)}
                   data-testid="button-continue-last-session"
+                  title="Continue your last session"
                 >
                   <ChevronRight className="h-4 w-4 text-primary" />
                   <span className="text-sm">Continue: <strong>{lastSession.name}</strong></span>
@@ -1159,7 +1188,7 @@ export default function Dashboard() {
               <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-destructive" />
               <p className="text-sm font-medium mb-1">Unable to load sessions</p>
               <p className="text-xs text-muted-foreground mb-4">There was a problem connecting to the server. Please try again.</p>
-              <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/sessions"] })} data-testid="button-retry-sessions">
+              <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/sessions"] })} data-testid="button-retry-sessions" title="Retry loading sessions">
                 <RotateCcw className="h-3 w-3 mr-1" /> Retry
               </Button>
             </CardContent>
@@ -1231,20 +1260,17 @@ export default function Dashboard() {
         )}
       </main>
 
-      <Dialog open={!!editingSession} onOpenChange={(o) => { if (!o) setEditingSession(null); }}>
+      <Dialog open={!!editingSession} onOpenChange={(o) => {
+        if (!o && editingSession && editName.trim() && (editName !== editingSession.name || (editLocation || "") !== (editingSession.location || ""))) {
+          updateSession.mutate({ id: editingSession.id, name: editName, location: editLocation });
+        }
+        if (!o) setEditingSession(null);
+      }}>
         <DialogContent onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle>Edit Session</DialogTitle>
           </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (editingSession && editName.trim()) {
-                updateSession.mutate({ id: editingSession.id, name: editName, location: editLocation });
-              }
-            }}
-            className="space-y-4"
-          >
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="edit-session-name">Session Name</Label>
               <Input
@@ -1263,32 +1289,22 @@ export default function Dashboard() {
                 data-testid="input-edit-session-location"
               />
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={!editName.trim() || updateSession.isPending}
-              data-testid="button-save-session-edit"
-            >
-              {updateSession.isPending ? "Saving..." : "Save Changes"}
-            </Button>
-          </form>
+            <p className="text-xs text-muted-foreground text-center">Changes are saved automatically</p>
+          </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!renamingFolder} onOpenChange={(o) => { if (!o) setRenamingFolder(null); }}>
+      <Dialog open={!!renamingFolder} onOpenChange={(o) => {
+        if (!o && renamingFolder && renameFolderName.trim() && renameFolderName !== renamingFolder.name) {
+          renameFolder.mutate({ id: renamingFolder.id, name: renameFolderName });
+        }
+        if (!o) setRenamingFolder(null);
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename Folder</DialogTitle>
           </DialogHeader>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (renamingFolder && renameFolderName.trim()) {
-                renameFolder.mutate({ id: renamingFolder.id, name: renameFolderName });
-              }
-            }}
-            className="space-y-4"
-          >
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="rename-folder-name">Folder Name</Label>
               <Input
@@ -1298,15 +1314,8 @@ export default function Dashboard() {
                 data-testid="input-rename-folder"
               />
             </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={!renameFolderName.trim() || renameFolder.isPending}
-              data-testid="button-save-folder-rename"
-            >
-              {renameFolder.isPending ? "Saving..." : "Save"}
-            </Button>
-          </form>
+            <p className="text-xs text-muted-foreground text-center">Changes are saved automatically</p>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1436,6 +1445,7 @@ export default function Dashboard() {
             variant="outline"
             onClick={() => setSelectedSessions(new Set())}
             data-testid="button-bulk-clear"
+            title="Clear selection"
           >
             <X className="h-3 w-3 mr-1" /> Clear
           </Button>
@@ -1444,6 +1454,7 @@ export default function Dashboard() {
             variant="outline"
             onClick={() => setBulkMoveOpen(true)}
             data-testid="button-bulk-move"
+            title="Move to folder"
           >
             <FolderInput className="h-3 w-3 mr-1" /> Move
           </Button>
@@ -1453,6 +1464,7 @@ export default function Dashboard() {
             onClick={() => bulkUpdateStatus.mutate({ ids: Array.from(selectedSessions), status: "completed" })}
             disabled={bulkUpdateStatus.isPending}
             data-testid="button-bulk-complete"
+            title="Mark as complete"
           >
             <CheckCircle2 className="h-3 w-3 mr-1" /> Complete
           </Button>
@@ -1462,12 +1474,13 @@ export default function Dashboard() {
             onClick={() => bulkUpdateStatus.mutate({ ids: Array.from(selectedSessions), status: "active" })}
             disabled={bulkUpdateStatus.isPending}
             data-testid="button-bulk-reopen"
+            title="Reopen sessions"
           >
             <RotateCcw className="h-3 w-3 mr-1" /> Reopen
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="destructive" data-testid="button-bulk-delete">
+              <Button size="sm" variant="destructive" data-testid="button-bulk-delete" title="Delete selected sessions">
                 <Trash2 className="h-3 w-3 mr-1" /> Delete
               </Button>
             </AlertDialogTrigger>
