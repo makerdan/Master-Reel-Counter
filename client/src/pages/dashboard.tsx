@@ -5,7 +5,7 @@ import {
   Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings, BarChart3,
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
   FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
-  Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown,
+  Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -134,8 +134,9 @@ export default function Dashboard() {
   const [selectedSessions, setSelectedSessions] = useState<Set<number>>(new Set());
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: number; name: string; sessionCount: number } | null>(null);
+  const [deleteSessionTarget, setDeleteSessionTarget] = useState<{ id: number; name: string } | null>(null);
 
-  const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
+  const { data: sessions, isLoading, isError: sessionsError } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
     enabled: !!user,
     placeholderData: [],
@@ -696,9 +697,7 @@ export default function Dashboard() {
                       className="text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm(`Delete "${session.name}" and all its data?`)) {
-                          deleteSession.mutate(session.id);
-                        }
+                        setDeleteSessionTarget({ id: session.id, name: session.name });
                       }}
                       data-testid={`menu-delete-session-${session.id}`}
                     >
@@ -1097,6 +1096,17 @@ export default function Dashboard() {
               <Skeleton key={i} className="h-24 w-full rounded-xl" />
             ))}
           </div>
+        ) : sessionsError ? (
+          <Card className="border border-destructive/30">
+            <CardContent className="py-12 text-center">
+              <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-destructive" />
+              <p className="text-sm font-medium mb-1">Unable to load sessions</p>
+              <p className="text-xs text-muted-foreground mb-4">There was a problem connecting to the server. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/sessions"] })} data-testid="button-retry-sessions">
+                <RotateCcw className="h-3 w-3 mr-1" /> Retry
+              </Button>
+            </CardContent>
+          </Card>
         ) : !filteredSessions.length && !isSearching && !(userFolders || []).length ? (
           <Card className="border border-border">
             <CardContent className="py-12 text-center">
@@ -1312,6 +1322,29 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteSessionTarget} onOpenChange={(o) => { if (!o) setDeleteSessionTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteSessionTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this session and all its entries, photos, and pins. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-session">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteSessionTarget) deleteSession.mutate(deleteSessionTarget.id);
+                setDeleteSessionTarget(null);
+              }}
+              data-testid="button-confirm-delete-session"
+            >
+              Delete Session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteFolderTarget} onOpenChange={(o) => { if (!o) setDeleteFolderTarget(null); }}>
         <AlertDialogContent>

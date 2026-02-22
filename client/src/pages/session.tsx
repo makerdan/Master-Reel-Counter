@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History, MessageSquare,
-  Lock, Unlock, Check, Loader2,
+  Lock, Unlock, Check, Loader2, AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -45,7 +45,7 @@ export default function SessionPage() {
     }
   }, [sessionId]);
 
-  const { data: session, isLoading: sessionLoading } = useQuery<Session & { firstPhotoAt: string | null; lastPhotoAt: string | null; role: "owner" | "editor" | "viewer"; collaboratorCount: number }>({
+  const { data: session, isLoading: sessionLoading, isError: sessionError } = useQuery<Session & { firstPhotoAt: string | null; lastPhotoAt: string | null; role: "owner" | "editor" | "viewer"; collaboratorCount: number }>({
     queryKey: ["/api/sessions", sessionId.toString()],
     enabled: sessionId > 0,
   });
@@ -69,10 +69,32 @@ export default function SessionPage() {
     );
   }
 
+  if (sessionError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm border border-destructive/30">
+          <CardContent className="p-6 text-center">
+            <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-destructive" />
+            <p className="text-sm font-medium mb-1">Failed to load session</p>
+            <p className="text-xs text-muted-foreground mb-4">There was a problem connecting to the server.</p>
+            <div className="flex gap-2 justify-center">
+              <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-error-back">
+                Back to Dashboard
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] })} data-testid="button-retry-session">
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!session) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">Session not found</p>
             <Button variant="outline" className="mt-4" onClick={() => setLocation("/")}>

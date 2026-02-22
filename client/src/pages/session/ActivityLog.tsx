@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Clock, FileText, Camera, MapPin, MessageSquare, User } from "lucide-react";
+import { Clock, FileText, Camera, MapPin, MessageSquare, User, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ActivityLogEntry {
@@ -43,7 +43,7 @@ function formatTimeAgo(dateStr: string): string {
 }
 
 export default function ActivityLog({ sessionId }: { sessionId: number }) {
-  const { data: logs = [], isLoading } = useQuery<ActivityLogEntry[]>({
+  const { data: logs = [], isLoading, isError: logsError } = useQuery<ActivityLogEntry[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "activity"],
     refetchInterval: 30000,
   });
@@ -52,6 +52,15 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
     return (
       <div className="space-y-2 p-2">
         {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+      </div>
+    );
+  }
+
+  if (logsError) {
+    return (
+      <div className="p-4 text-center">
+        <AlertTriangle className="h-6 w-6 mx-auto mb-2 text-destructive" />
+        <p className="text-xs text-muted-foreground">Failed to load activity log</p>
       </div>
     );
   }

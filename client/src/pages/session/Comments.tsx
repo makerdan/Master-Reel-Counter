@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Send, Trash2, Pencil, Reply, X, MessageSquare } from "lucide-react";
+import { Send, Trash2, Pencil, Reply, X, MessageSquare, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,7 +54,7 @@ export default function Comments({
   const [editText, setEditText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: allComments = [], isLoading } = useQuery<CommentData[]>({
+  const { data: allComments = [], isLoading, isError: commentsError } = useQuery<CommentData[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "comments"],
     refetchInterval: 15000,
   });
@@ -191,6 +191,15 @@ export default function Comments({
     return (
       <div className="space-y-2 p-2">
         {[1, 2].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+      </div>
+    );
+  }
+
+  if (commentsError) {
+    return (
+      <div className="p-4 text-center">
+        <AlertTriangle className="h-6 w-6 mx-auto mb-2 text-destructive" />
+        <p className="text-xs text-muted-foreground">Failed to load comments</p>
       </div>
     );
   }

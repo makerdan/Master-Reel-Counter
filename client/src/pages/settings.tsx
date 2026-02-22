@@ -57,7 +57,7 @@ export default function SettingsPage() {
     },
   });
 
-  const { data: settings, isLoading } = useQuery<UserSettingsResponse>({
+  const { data: settings, isLoading, isError: settingsError } = useQuery<UserSettingsResponse>({
     queryKey: ["/api/settings"],
   });
 
@@ -145,7 +145,12 @@ export default function SettingsPage() {
               and secured by the server. The data is automatically decrypted when you view it in the app.
             </p>
 
-            {isLoading ? (
+            {settingsError ? (
+              <div className="flex items-center gap-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+                <p className="text-sm">Failed to load encoding settings. Please try refreshing the page.</p>
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading settings...

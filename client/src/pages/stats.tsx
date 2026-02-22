@@ -21,7 +21,7 @@ interface UserStats {
 
 export default function StatsPage() {
   const [, setLocation] = useLocation();
-  const { data: stats, isLoading } = useQuery<UserStats>({
+  const { data: stats, isLoading, isError } = useQuery<UserStats>({
     queryKey: ["/api/stats"],
   });
 
@@ -37,10 +37,42 @@ export default function StatsPage() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+          <div className="flex items-center justify-between gap-2 px-4 py-2">
+            <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back-stats-error">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-sm font-semibold">Summary Stats</h1>
+            <ThemeToggle />
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm border border-destructive/30">
+            <CardContent className="py-8 text-center">
+              <BarChart3 className="h-10 w-10 mx-auto mb-3 text-destructive" />
+              <p className="text-sm font-medium mb-1">Unable to load stats</p>
+              <p className="text-xs text-muted-foreground mb-4">There was a problem fetching your statistics.</p>
+              <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-back-to-dashboard">
+                <ArrowLeft className="h-3 w-3 mr-1" /> Back to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (!stats) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Unable to load stats</p>
+      <div className="min-h-screen bg-background p-4 space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
+        </div>
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
