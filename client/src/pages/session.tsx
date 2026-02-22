@@ -546,8 +546,8 @@ function SessionWorkspace({
 
       {editingEntry && (
         <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) setEditingEntry(null); }}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
+            <DialogHeader className="p-4 pb-2 shrink-0">
               <DialogTitle>Edit Entry #{editingEntry.id}</DialogTitle>
             </DialogHeader>
             {editingEntry.photoId && (() => {
@@ -556,7 +556,10 @@ function SessionWorkspace({
               const imgSrc = photo.objectStorageKey.startsWith("/uploads/") ? photo.objectStorageKey : `/uploads/${photo.objectStorageKey}`;
               const pin = pinByEntryId.get(editingEntry.id);
               return (
-                <div className="border border-border/50 mb-2 max-h-[40vh] overflow-y-auto rounded-md">
+                <div
+                  className="border border-border/50 mx-4 mb-2 max-h-[40vh] overflow-y-auto rounded-md shrink-0"
+                  style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+                >
                   <div className="relative inline-block w-full">
                     <img src={imgSrc} alt="Entry photo" className="w-full" style={{ display: "block" }} data-testid="img-edit-entry-photo" />
                     {pin && (
@@ -576,7 +579,9 @@ function SessionWorkspace({
                 </div>
               );
             })()}
-            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} onUndoableSave={pushUndo} canEdit={canEditSession} />
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
+              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} onUndoableSave={pushUndo} canEdit={canEditSession} />
+            </div>
           </DialogContent>
         </Dialog>
       )}
