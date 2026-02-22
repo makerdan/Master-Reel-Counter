@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History, MessageSquare,
-  Lock, Unlock, Check, Loader2, AlertTriangle,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -30,6 +30,7 @@ import SingleEntryMode from "./session/SingleEntryMode";
 import MobileCaptureView from "./session/MobileCaptureView";
 import ActivityLog from "./session/ActivityLog";
 import Comments from "./session/Comments";
+import FlaggedReels from "./session/FlaggedReels";
 import { buildExportFilename, formatSessionTime } from "./session/utils";
 import { useUndoRedo } from "@/hooks/use-undo";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
@@ -506,6 +507,10 @@ function SessionWorkspace({
                   <ListPlus className="h-4 w-4 mr-1" />
                   Single Entry
                 </TabsTrigger>
+                <TabsTrigger value="flagged" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode">
+                  <Flag className="h-4 w-4 mr-1" />
+                  Flagged
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="photo">
@@ -525,6 +530,13 @@ function SessionWorkspace({
                   }}
                   onUndoableSave={pushUndo}
                   canEdit={canEditSession}
+                />
+              </TabsContent>
+
+              <TabsContent value="flagged">
+                <FlaggedReels
+                  sessionId={sessionId}
+                  onBack={() => setMode("photo")}
                 />
               </TabsContent>
             </Tabs>

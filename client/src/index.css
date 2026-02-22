@@ -443,6 +443,12 @@
   opacity: 0.95;
   box-shadow: 0 0 0 3px hsl(var(--ring)), 0 3px 8px rgba(0,0,0,0.4);
 }
+.pin-marker.flagged {
+  box-shadow: 0 0 0 3px hsl(45 90% 45%), 0 3px 8px rgba(0,0,0,0.4);
+}
+.pin-marker.flagged.selected {
+  box-shadow: 0 0 0 3px hsl(45 90% 45%), 0 0 0 5px hsl(var(--ring)), 0 3px 8px rgba(0,0,0,0.4);
+}
 .pin-marker.committed {
   opacity: 1;
   cursor: default;
@@ -703,6 +709,53 @@
   background: hsl(var(--destructive));
   color: white;
   border-color: hsl(var(--destructive));
+}
+.flag-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: hsl(25 12% 18%);
+  border: 1px solid hsl(18 40% 50% / 0.3);
+  color: hsl(18 30% 60%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 4px;
+  transition: all 0.15s;
+}
+.flag-btn:hover {
+  background: hsl(45 90% 45%);
+  color: white;
+  border-color: hsl(45 90% 45%);
+}
+.flag-btn.flagged {
+  background: hsl(45 90% 45%);
+  color: white;
+  border-color: hsl(45 80% 35%);
+}
+:root:not(.dark) .flag-btn {
+  background: hsl(25 15% 90%);
+  border-color: hsl(18 30% 70%);
+  color: hsl(18 20% 50%);
+}
+:root:not(.dark) .flag-btn:hover {
+  background: hsl(45 90% 50%);
+  color: white;
+  border-color: hsl(45 90% 45%);
+}
+:root:not(.dark) .flag-btn.flagged {
+  background: hsl(45 90% 50%);
+  color: white;
+  border-color: hsl(45 80% 40%);
+}
+.pin-entry-table tr.flagged-row {
+  background-color: hsl(45 90% 45% / 0.12) !important;
+  border-left: 3px solid hsl(45 90% 45%);
+}
+:root:not(.dark) .pin-entry-table tr.flagged-row {
+  background-color: hsl(45 90% 50% / 0.08) !important;
+  border-left: 3px solid hsl(45 90% 50%);
 }
 
 @media (max-width: 640px) {

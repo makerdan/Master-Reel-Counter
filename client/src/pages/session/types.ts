@@ -11,6 +11,7 @@ export interface LocalPin {
   wireDetails?: string;
   vendorCode?: string;
   footage?: number;
+  flagged?: boolean;
 }
 
 export interface SessionWithRole extends Session {

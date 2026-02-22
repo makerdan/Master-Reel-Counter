@@ -699,6 +699,50 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sessions/:id/flagged-pins", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const flaggedPins = await storage.getSessionFlaggedPins(sessionId);
+      const sessionPhotos = await storage.getSessionPhotos(sessionId);
+      const photoMap = new Map(sessionPhotos.map(p => [p.id, p]));
+      const enriched = flaggedPins.map(pin => {
+        const photo = photoMap.get(pin.photoId);
+        let photoUrl: string | null = null;
+        if (photo?.objectStorageKey) {
+          const key = photo.objectStorageKey;
+          photoUrl = key.startsWith("/uploads/") ? key : key.startsWith("/objects/") ? key : `/uploads/${key}`;
+        }
+        return {
+          ...pin,
+          photoUrl,
+          photoFilename: photo?.originalFilename || null,
+        };
+      });
+      res.json(enriched);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch flagged pins" });
+    }
+  });
+
+  app.patch("/api/pins/:pinId/flag", isAuthenticated, async (req: any, res) => {
+    try {
+      const pin = await storage.getPin(parseInt(req.params.pinId));
+      if (!pin) return res.status(404).json({ message: "Pin not found" });
+      const photo = await storage.getPhoto(pin.photoId);
+      if (!photo) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Pin not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to flag pins" });
+      const { flagged } = req.body;
+      const updated = await storage.updatePin(pin.id, { flagged: !!flagged });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update pin flag" });
+    }
+  });
+
   // Pins - verify access through photo -> session chain
   app.get("/api/photos/:photoId/pins", isAuthenticated, async (req: any, res) => {
     try {
@@ -793,6 +837,7 @@ export async function registerRoutes(
           wireDetails: p.wireDetails || null,
           vendorCode: p.vendorCode || null,
           footage: p.footage || null,
+          flagged: p.flagged || false,
         });
         saved.push(pin);
       }

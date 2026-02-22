@@ -39,6 +39,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **API:** RESTful API for session, entry, photo, pin, collaborator, and settings management.
 - **Real-time Communication:** WebSockets for real-time synchronization of session changes, comments, and activity logs.
 - **Data Encoding:** AES-256-GCM encryption for specific entry fields, with key wrapping and user-specific keys.
+- **Flagged Reels Workflow:** Pins can be flagged for re-shoot/review. Dedicated "Flagged" tab shows all flagged pins with photo previews, location indicators, and resolve functionality. Flag state persists through draft-pin auto-save and committed pin creation.
 
 ## External Dependencies
 - **Replit Auth:** For user authentication (OpenID Connect).

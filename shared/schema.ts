@@ -91,6 +91,7 @@ export const pins = pgTable("pins", {
   wireDetails: text("wire_details"),
   vendorCode: text("vendor_code"),
   footage: integer("footage"),
+  flagged: boolean("flagged").default(false),
 });
 
 export const sessionCollaborators = pgTable("session_collaborators", {

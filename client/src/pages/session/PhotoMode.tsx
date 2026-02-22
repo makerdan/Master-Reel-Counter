@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  AlertCircle,
+  AlertCircle, Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -258,6 +258,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           wireDetails: p.wireDetails || null,
           vendorCode: p.vendorCode || null,
           footage: p.footage || null,
+          flagged: p.flagged || false,
         })),
       });
     } catch {
@@ -295,6 +296,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             wireDetails: p.wireDetails || undefined,
             vendorCode: p.vendorCode || undefined,
             footage: p.footage || undefined,
+            flagged: p.flagged || false,
           })));
         } else {
           setLocalPins([]);
@@ -344,6 +346,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             wireDetails: p.wireDetails || null,
             vendorCode: p.vendorCode || null,
             footage: p.footage || null,
+            flagged: p.flagged || false,
           })),
         });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
@@ -857,6 +860,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               label: pin.label,
               reelCount: pin.reelCount,
               entryId: entry.id,
+              flagged: pin.flagged || false,
             });
             const savedPin = await pinRes.json();
             (pin as any)._dbPinId = savedPin.id;
@@ -1175,7 +1179,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {localPins.map((pin) => (
                     <div
                       key={pin.id}
-                      className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""}`}
+                      className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""} ${pin.flagged ? "flagged" : ""}`}
                       style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                       data-pin-id={pin.id}
                       onMouseDown={(e) => {
@@ -1636,7 +1640,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       <tr
                         key={pin.id}
                         data-testid={`pin-entry-row-${index}`}
-                        className={selectedPinId === pin.id ? "ring-1 ring-primary/40" : ""}
+                        className={`${selectedPinId === pin.id ? "ring-1 ring-primary/40" : ""} ${pin.flagged ? "flagged-row" : ""}`}
                         onClick={() => setSelectedPinId(pin.id)}
                       >
                         <td>
@@ -1786,6 +1790,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             data-testid={`button-clear-row-${index}`}
                           >
                             &#10005;
+                          </button>
+                          <button
+                            type="button"
+                            className={`flag-btn ${pin.flagged ? "flagged" : ""}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updatePinField(pin.id, "flagged", !pin.flagged);
+                            }}
+                            title={pin.flagged ? "Remove re-shoot flag" : "Flag for re-shoot"}
+                            data-testid={`button-flag-${index}`}
+                          >
+                            <Flag className="h-3.5 w-3.5" />
                           </button>
                         </td>
                       </tr>

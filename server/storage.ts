@@ -59,6 +59,7 @@ export interface IStorage {
   deletePin(id: number): Promise<void>;
 
   getSessionIncompletePins(sessionId: number): Promise<{ photoId: number; incompleteCount: number }[]>;
+  getSessionFlaggedPins(sessionId: number): Promise<Pin[]>;
   getUserSettings(userId: string): Promise<UserSettings | undefined>;
   upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings>;
   getAllUserEntries(userId: string): Promise<Entry[]>;
@@ -251,6 +252,18 @@ export class DatabaseStorage implements IStorage {
       )
       .groupBy(pins.photoId);
     return results.map(r => ({ photoId: r.photoId, incompleteCount: Number(r.incompleteCount) }));
+  }
+
+  async getSessionFlaggedPins(sessionId: number): Promise<Pin[]> {
+    const sessionPhotos = await db.select({ id: photos.id }).from(photos).where(eq(photos.sessionId, sessionId));
+    if (sessionPhotos.length === 0) return [];
+    const photoIds = sessionPhotos.map(p => p.id);
+    return db.select().from(pins).where(
+      and(
+        inArray(pins.photoId, photoIds),
+        eq(pins.flagged, true)
+      )
+    );
   }
 
   async updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined> {
