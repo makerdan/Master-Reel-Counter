@@ -512,7 +512,7 @@ export default function Dashboard() {
 
   const renderFolderSection = (folder: FolderType) => {
     const folderSessions = folderedSessions.get(folder.id) || [];
-    const isCollapsed = !openFolders.has(folder.id);
+    const isCollapsed = isSearching ? false : !openFolders.has(folder.id);
 
     if (isSearching && folderSessions.length === 0) return null;
 
