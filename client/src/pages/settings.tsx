@@ -112,7 +112,7 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-3xl mx-auto px-4 py-6 pb-[50vh] space-y-6">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
           <p className="text-sm text-muted-foreground mt-1">

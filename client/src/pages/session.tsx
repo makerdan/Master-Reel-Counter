@@ -485,7 +485,7 @@ function SessionWorkspace({
         </div>
       )}
 
-      <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
+      <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 pb-[50vh] space-y-4">
         {captureMode ? (
           <MobileCaptureView key={mobileFlowKey} sessionId={sessionId} photos={photos} />
         ) : (

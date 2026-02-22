@@ -96,7 +96,7 @@ export default function StatsPage() {
         </div>
       </header>
 
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-4 space-y-6">
+      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-4 pb-[50vh] space-y-6">
         {hasNoData ? (
           <Card>
             <CardContent className="py-12 text-center">
