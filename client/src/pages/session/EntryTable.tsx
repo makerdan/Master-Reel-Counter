@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, useRef, useCallback, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -205,7 +205,10 @@ function EntryTable({
                                           style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
                                           data-testid={`pin-highlight-${entry.id}`}
                                           ref={(el) => {
-                                            if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+                                            if (el && !el.dataset.scrolled) {
+                                              el.dataset.scrolled = "1";
+                                              setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+                                            }
                                           }}
                                         >
                                           <div className="w-24 h-24 rounded-full animate-pulse opacity-100" style={{ border: "12px solid #f97316" }} />
