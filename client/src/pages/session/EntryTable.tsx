@@ -192,7 +192,8 @@ function EntryTable({
                                     <img
                                       src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
                                       alt="Entry photo"
-                                      className="w-full h-auto max-h-[75vh] object-contain rounded-md"
+                                      className="w-full rounded-md"
+                                      style={{ display: "block" }}
                                       data-testid={`img-entry-photo-${entry.id}`}
                                     />
                                     {(() => {
@@ -204,8 +205,8 @@ function EntryTable({
                                           style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
                                           data-testid={`pin-highlight-${entry.id}`}
                                         >
-                                          <div className="w-10 h-10 rounded-full border-[3px] border-orange-500/80 animate-pulse" />
-                                          <div className="absolute inset-0 w-10 h-10 rounded-full border-2 border-white/50" />
+                                          <div className="w-12 h-12 rounded-full border-[3px] border-orange-500/70 animate-pulse" />
+                                          <div className="absolute inset-0 w-12 h-12 rounded-full border border-white/40" />
                                         </div>
                                       );
                                     })()}
