@@ -1,0 +1,627 @@
+import { useState } from "react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, MessageSquare, History, Users, Share2, AlertCircle, StickyNote, Focus, ArrowUpDown, ImagePlus, Check, X, Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  Accordion, AccordionItem, AccordionTrigger, AccordionContent,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+function HelpBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded bg-[hsl(18_85%_40%/0.15)] border border-[hsl(18_85%_40%/0.3)] text-[hsl(18_70%_45%)] dark:text-[hsl(25_70%_65%)] px-1.5 py-0.5 text-[11px] font-mono font-medium">
+      {children}
+    </span>
+  );
+}
+
+function HelpKey({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] font-mono font-medium text-muted-foreground">
+      {children}
+    </kbd>
+  );
+}
+
+function HelpIcon({ icon: Icon, className }: { icon: React.ElementType; className?: string }) {
+  return <Icon className={`h-3.5 w-3.5 shrink-0 ${className || "text-[hsl(18_70%_50%)]"}`} />;
+}
+
+function FeatureRow({ icon, label, description }: { icon: React.ReactNode; label: string; description: string }) {
+  return (
+    <div className="flex items-start gap-2.5 py-1.5">
+      <div className="mt-0.5">{icon}</div>
+      <div>
+        <span className="text-xs font-semibold text-foreground">{label}</span>
+        <p className="text-[11px] text-muted-foreground leading-relaxed">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function FullModeHelp() {
+  return (
+    <Accordion type="multiple" className="w-full">
+      <AccordionItem value="overview">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Overview</span>
+        </AccordionTrigger>
+        <AccordionContent className="text-xs text-muted-foreground leading-relaxed space-y-2 pb-4">
+          <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
+          <p>Full Mode provides the complete desktop and tablet workflow with three main tabs: <HelpBadge>Section Photo</HelpBadge>, <HelpBadge>Single Entry</HelpBadge>, and <HelpBadge>Flagged</HelpBadge>. Below all tabs is the <HelpBadge>Table View</HelpBadge> showing all committed entries.</p>
+          <p>Switch to <HelpBadge>Mobile Flow</HelpBadge> using the button in the top-right header for a streamlined phone-friendly capture experience.</p>
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="header">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Header</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <FeatureRow
+            icon={<HelpIcon icon={ChevronLeft} />}
+            label="Back Arrow"
+            description="Returns to the dashboard where all sessions and folders are listed."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Session Name & Time"
+            description="Tap the session name to edit the name and location. Changes auto-save after closing the dialog."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Lock} />}
+            label="Lock / Unlock"
+            description="Session owners can lock a session to prevent all edits. Collaborators see a lock icon when a session is locked. Useful for finalizing counts."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Undo2} />}
+            label="Undo / Redo"
+            description="Reverts or re-applies recent entry and pin modifications. Tracks create, edit, and delete actions within the current session."
+          />
+          <FeatureRow
+            icon={<Users className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" />}
+            label="Online Users"
+            description="Shows avatars with green dots for collaborators currently viewing this session. Up to 3 avatars display, with a +N overflow count."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Users} />}
+            label="Team Button"
+            description="Opens the Team dialog (owner only). Invite collaborators by username, shareable link, or email. Set roles (editor/viewer), transfer ownership, and track invite link usage with join counts and 7-day auto-expiry."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={MessageSquare} />}
+            label="Comments"
+            description="Toggle the threaded comments panel. All collaborators can post and reply to comments on the session."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={History} />}
+            label="Activity Log"
+            description="Toggle the activity log showing a timestamped feed of all session changes — entries created, photos uploaded, collaborators joining, etc."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Download} />}
+            label="Export"
+            description="Export session data as CSV (spreadsheet), PDF (formatted report), or share via email. The export includes all entries grouped by aisle/section."
+          />
+          <div className="flex items-start gap-2.5 py-1.5">
+            <div className="mt-0.5"><span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-[hsl(18_70%_50%)]" /></div>
+            <div>
+              <span className="text-xs font-semibold text-foreground">Dark / Light Mode</span>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">Toggle between dark and light themes using the sun/moon icon in the header.</p>
+            </div>
+          </div>
+          <FeatureRow
+            icon={<span className="text-[11px] font-mono font-bold text-green-500">&#10003;</span>}
+            label="Auto-Save Indicator"
+            description='Shows "Saving..." with a spinner during save operations, then "Saved" with a checkmark when complete. All changes auto-save — no manual save button needed.'
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="photo-mode">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Camera className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Section Photo Tab</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">The primary workflow. Upload photos of pallet sections, place pins on each reel, then fill in wire details below.</p>
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Uploading Photos</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Upload Photos / Take Photo"
+            description="Upload one or more images from your gallery, or open the camera to take a photo directly. Photos are stored in the cloud and tagged with the current aisle."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Aisle & Section Fields"
+            description='Set the aisle and section for the current photo. Type "rec" as a shortcut to auto-fill "Receiving". These values auto-save with a short delay.'
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Navigation</p>
+          <FeatureRow
+            icon={<HelpIcon icon={ChevronLeft} />}
+            label="Previous / Next Photo"
+            description="Navigate between uploaded photos. The counter shows your current position (e.g. 03 / 12). You can also type a photo number directly into the counter to jump."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={AlertCircle} />}
+            label="Next Reel Button"
+            description="Appears when there are pins without wire details filled in. Jumps to the next photo with incomplete pins and scrolls to the entry table so you can start filling in details immediately. The orange badge shows the total count of incomplete pins."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Viewer Controls</p>
+          <FeatureRow
+            icon={<HelpIcon icon={ZoomIn} />}
+            label="Zoom In / Out"
+            description="Zoom the photo up to 5x for close inspection. Use the + and - buttons on the right side overlay strip."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Move} />}
+            label="Pan Mode"
+            description="Toggle pan mode to drag the photo around when zoomed in, instead of placing new pins. The button highlights when active."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={RotateCw} />}
+            label="Rotate"
+            description="Rotate the photo 90° clockwise or counter-clockwise if it was taken at an angle."
+          />
+          <FeatureRow
+            icon={<span className="inline-block w-3.5 h-3.5 border-2 border-[hsl(18_70%_50%)] rounded-sm" />}
+            label="Pin Size Adjust"
+            description="Increase or decrease the size of pin markers on the photo. Useful for dense photos with many closely-spaced reels. The pin scale is saved per-photo."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Placing & Managing Pins</p>
+          <FeatureRow
+            icon={<MapPin className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" />}
+            label="Place a Pin"
+            description="Tap/click anywhere on the photo to place a pin. Each pin marks a reel position and is auto-labeled with a sequential number. Pins appear as interactive markers with a label, reel count, and delete button."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-bold text-[hsl(18_70%_50%)]">A1</span>}
+            label="Rename Pin"
+            description="Tap the pin label to rename it with a custom shelf/spot code (e.g. 9001). Useful for matching physical location tags."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-bold text-[hsl(18_70%_50%)]">+/-</span>}
+            label="Reel Count Buttons"
+            description="Each pin has + and - buttons to adjust the reel count (1–99) directly on the photo. This count carries through to the entry table below."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Move} />}
+            label="Drag Pins"
+            description="Press and drag any pin to reposition it on the photo. Works with both mouse and touch."
+          />
+          <FeatureRow
+            icon={<X className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" />}
+            label="Delete Pin"
+            description='Tap the "×" button on a pin to remove it. This only deletes the draft pin; committed entries are managed in the Table View.'
+          />
+          <div className="flex items-start gap-2.5 py-1.5">
+            <div className="mt-0.5"><span className="inline-block w-3 h-3 rounded-full border-2 border-muted-foreground opacity-60" /></div>
+            <div>
+              <span className="text-xs font-semibold text-foreground">Committed Pins</span>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">Pins that have been saved as entries appear with a "P" prefix and a muted style. They can still be deleted to remove the entry.</p>
+            </div>
+          </div>
+          <FeatureRow
+            icon={<span className="inline-block w-3 h-3 rounded border border-[hsl(18_70%_50%)]" />}
+            label="Draft Pins Auto-Save"
+            description="Draft pins (positions and details) are automatically saved to the server in the background. If you navigate away and come back, your pins are restored."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Reel Crop Preview</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Focus} />}
+            label="Pin Selection Preview"
+            description="Tap a pin or its row in the entry table to see a zoomed crop of the area around that pin. Toggle between close-up and wide crop modes for different detail levels. This sticks to the top of the screen as you scroll."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Entry Details Table</p>
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
+            label="Category Input (Wire Details)"
+            description="Type a wire category and the system searches ~180 catalog entries. Use arrow keys to navigate suggestions and Enter to select. Selecting a category auto-fills the vendor code and footage fields."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">VND</span>}
+            label="Vendor Code"
+            description="Select the vendor code from the dropdown (COP, ALU, COR, ALF). Auto-filled when selecting a catalog entry."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
+            label="Footage"
+            description="Enter the total footage for this reel position. Auto-calculated from catalog data when a category is selected."
+          />
+          <FeatureRow
+            icon={<span className="text-[11px] font-bold text-[hsl(18_70%_50%)]">&#8595;</span>}
+            label="Copy Down"
+            description="Copies the current row's category, vendor code, and footage to the next row. Great for sections with identical reels."
+          />
+          <FeatureRow
+            icon={<X className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" />}
+            label="Clear Row"
+            description="Clears all fields in a single row back to empty, keeping the pin position."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Flag} className="text-yellow-500" />}
+            label="Flag for Re-shoot"
+            description="Marks a pin as needing a re-shoot or additional info. Flagged pins appear in the Flagged tab and have a yellow highlight."
+          />
+          <FeatureRow
+            icon={<Plus className="h-3.5 w-3.5 shrink-0 text-green-500" />}
+            label="Add Reel(s) from Image"
+            description="Commits all pins on the current photo as entries. Requires an aisle to be set. Shows a progress bar for batch creation. After committing, pins become read-only committed markers."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Notes & Detail Shots</p>
+          <FeatureRow
+            icon={<HelpIcon icon={StickyNote} />}
+            label="Photo Notes"
+            description="Add free-text notes to any photo. Notes auto-save with a short delay and appear as a sticky-note icon in the photo info bar."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Focus} />}
+            label="Detail / Close-up Shot"
+            description='Check the "This is a detail/close-up shot" box to mark a photo as a detail shot. You can then link it to a parent photo, creating a parent→detail relationship visible in exports.'
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Nearby Photos</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Eye} />}
+            label="Nearby Photo Strip"
+            description="Shows a horizontal strip of photos sorted by aisle/section location, centered on the current photo. Tap a thumbnail to preview that photo's image and committed pins without leaving your current pin context. An orange badge shows the incomplete pin count for each nearby photo."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="single-entry">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Pencil className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Single Entry Tab</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">For manual entry without photos. Also used as the editing form when you tap "Edit" on an existing entry.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Entry Form"
+            description="Fill in aisle, section, pallet position, reel tag, wire type, gauge, footage, reel count, conductors, color, manufacturer, and notes. All fields have appropriate input types and validation."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
+            label="Catalog Autocomplete"
+            description="The category field searches the same ~180 wire catalog entries. Selecting a match auto-fills related fields."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Flag} className="text-yellow-500" />}
+            label="Flag Toggle"
+            description="When editing an entry that has a linked pin, a flag toggle appears. Use it to flag or unflag the reel for re-shoot directly from the edit form."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Jump to Photo"
+            description="When editing a photo-linked entry, a button appears to jump directly to that photo in the Section Photo tab with the correct aisle and section pre-set."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="flagged">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Flag className="h-4 w-4 text-yellow-500" /> Flagged Tab</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Dedicated view for all reels that have been flagged for re-shoot or additional information.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Eye} />}
+            label="Photo Preview"
+            description="Each flagged reel shows a thumbnail of its photo with an orange pulsing ring highlighting the pin location. Tap the thumbnail for a full-size preview with the same highlighting."
+          />
+          <FeatureRow
+            icon={<MapPin className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" />}
+            label="Location Info"
+            description="Each card shows the aisle and section where the reel is located, along with the pin label and wire details."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Check} />}
+            label="Resolve"
+            description='Tap "Resolve" to unflag a reel once the re-shoot or additional info has been captured. The reel disappears from the flagged list.'
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Share2} />}
+            label="Shareable Link"
+            description="Copy a direct link to the Flagged tab to share with team members. The link opens the session directly to this view."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="table-view">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Table View</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={ChevronLeft} />}
+            label="Collapsible Sections"
+            description="Entries are grouped by aisle-section. Tap a section header to expand or collapse it. The header shows the entry count for that section."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Eye} />}
+            label="Photo Viewer"
+            description="Tap the eye icon on any entry to view its linked photo. The photo opens with an orange pulsing ring highlighting the exact pin location, auto-scrolled to center."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Edit Entry"
+            description="Tap the pencil icon to open the entry in an edit dialog with the linked photo and pin highlight visible above the form."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Delete Entry"
+            description="Tap the trash icon to delete an entry. A confirmation dialog appears. Deleted entries can be restored with Undo."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={AlertCircle} />}
+            label="Validation Warnings"
+            description="Entries missing a reel tag or footage show a yellow warning badge on the section header. This helps catch incomplete data before exporting."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
+            label="Total Footage"
+            description="The Table View header shows the total footage across all entries for quick reference."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="collaboration">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Users className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Collaboration</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Work together with your team in real-time on counting sessions.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Users} />}
+            label="Three Invite Methods"
+            description="Invite by username (search and add directly), shareable link (anyone with the link can join), or email invitation. Each method is accessible from the Team dialog."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-bold text-[hsl(18_70%_50%)]">R</span>}
+            label="Role-Based Permissions"
+            description="Editors can add, edit, and delete entries and photos. Viewers can only view data. The owner can toggle roles and transfer ownership."
+          />
+          <FeatureRow
+            icon={<span className="inline-block w-2 h-2 rounded-full bg-green-500" />}
+            label="Real-Time Presence"
+            description="See who's online with green dot indicators. Changes sync via WebSocket in real-time — when a collaborator adds an entry or uploads a photo, you see it immediately."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Share2} />}
+            label="Invite Link Tracking"
+            description="Shareable invite links show how many people have used them and auto-expire after 7 days for security."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Lock} />}
+            label="Session Locking"
+            description="The owner can lock a session to freeze all edits. Collaborators see a lock banner and cannot make changes until the owner unlocks."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="export">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Download className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Export & Sharing</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <FeatureRow
+            icon={<HelpIcon icon={FileText} />}
+            label="CSV Export"
+            description="Downloads all entries as a CSV spreadsheet. Includes columns for aisle, section, position, pallet ID, reel tag, wire type, gauge, footage, reel count, conductors, color, manufacturer, notes, photo filename, photo notes, detail shot status, and parent photo."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={FileText} />}
+            label="PDF Export"
+            description="Generates a formatted PDF report of the session, suitable for printing or sharing with warehouse managers."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Mail} />}
+            label="Share via Email"
+            description="Opens your email client with a pre-composed message containing the session link for quick sharing."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="tips">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Tips & Efficiency</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-2 pb-4 text-[11px] text-muted-foreground leading-relaxed">
+          <p><span className="font-semibold text-foreground">Rapid Data Entry:</span> Type a few letters of a wire category and use <HelpKey>Arrow Down</HelpKey> + <HelpKey>Enter</HelpKey> to select. The cursor auto-advances to the next row.</p>
+          <p><span className="font-semibold text-foreground">Copy Down:</span> When multiple reels are the same type, fill one row then tap <HelpBadge>&#8595;</HelpBadge> to copy the data down to the next row repeatedly.</p>
+          <p><span className="font-semibold text-foreground">Next Reel Navigation:</span> After placing all your pins, use the orange "Next Reel" button to jump through photos that still need details. The entry table auto-scrolls into view.</p>
+          <p><span className="font-semibold text-foreground">Receiving Mode:</span> Type "rec" in the aisle field to auto-fill "Receiving". In Mobile Flow, the Receiving checkbox auto-increments section numbers.</p>
+          <p><span className="font-semibold text-foreground">Pin Scale:</span> For photos with many small reels close together, decrease the pin size using the size controls on the right overlay strip. Pin scale is remembered per-photo.</p>
+          <p><span className="font-semibold text-foreground">Nearby Photos:</span> Use the photo strip below the viewer to preview adjacent sections without losing your pin work on the current photo.</p>
+          <p><span className="font-semibold text-foreground">Flagging Workflow:</span> When you can't read a tag, flag the reel and continue. Later, share the Flagged tab link with someone who can re-photograph those specific reels.</p>
+          <p><span className="font-semibold text-foreground">Undo Safety Net:</span> All entry creates, edits, and deletes can be undone. The undo/redo buttons in the header track your action history for the current session.</p>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  );
+}
+
+function MobileFlowHelp() {
+  return (
+    <Accordion type="multiple" className="w-full">
+      <AccordionItem value="overview">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Mobile Flow Overview</span>
+        </AccordionTrigger>
+        <AccordionContent className="text-xs text-muted-foreground leading-relaxed space-y-2 pb-4">
+          <p>Mobile Flow is a streamlined capture mode designed for walking through the warehouse with a phone. Focus on quickly taking photos with location tags — wire details can be entered later in Full Mode.</p>
+          <p>Switch back to <HelpBadge>Full Mode</HelpBadge> at any time using the button in the top-right header to annotate photos with pins and enter reel details.</p>
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="capture">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Camera className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Capturing Photos</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Aisle & Section"
+            description="Enter the aisle and section before taking photos. Aisle is required. These values tag every photo you capture until you change them. The aisle field highlights orange when empty as a reminder."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Take Photo"
+            description="Opens the device camera to capture a photo. The photo is tagged with the current aisle and section, then queued for upload."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ImagePlus} />}
+            label="Upload from Gallery"
+            description="Select one or more existing photos from your gallery. Supports multi-select for batch uploading."
+          />
+          <div className="flex items-start gap-2.5 py-1.5">
+            <div className="mt-0.5"><Check className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" /></div>
+            <div>
+              <span className="text-xs font-semibold text-foreground">Receiving Checkbox</span>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">Check "Receiving" to auto-set the aisle to "Receiving" and auto-increment the section number (001, 002, 003...) with each new photo. Section becomes optional.</p>
+            </div>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="upload-queue">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><ArrowUpDown className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Upload Queue & Offline</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Photos upload in the background so you can keep capturing without waiting.</p>
+          <FeatureRow
+            icon={<span className="inline-flex items-center gap-1"><span className="animate-spin text-[11px]">&#9696;</span></span>}
+            label="Background Upload"
+            description="Photos are queued and uploaded one at a time in the background. A counter shows how many are pending. You can keep taking photos while uploads proceed."
+          />
+          <FeatureRow
+            icon={<span className="text-xs text-destructive font-bold">!</span>}
+            label="Failed Uploads"
+            description='If an upload fails (network issue), it shows with a red warning. Tap "Retry" to re-attempt or "Dismiss" to discard. Failed uploads stay in the queue until resolved.'
+          />
+          <FeatureRow
+            icon={<span className="text-xs text-yellow-500 font-bold">&#9888;</span>}
+            label="Offline Mode"
+            description="When your device goes offline, a yellow banner appears. Photos are saved to your device's local storage (IndexedDB) and will automatically upload when connectivity returns. No data is lost."
+          />
+          <FeatureRow
+            icon={<span className="text-[11px] font-mono font-bold text-[hsl(18_70%_50%)]">DB</span>}
+            label="IndexedDB Persistence"
+            description="Even if you close the app or your phone restarts while offline, queued photos are preserved in IndexedDB and restored when you reopen the session."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="review">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Photo Review</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Review and manage photos after capture, right from the Mobile Flow.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={ChevronLeft} />}
+            label="Photo Navigation"
+            description='Swipe through photos with Prev/Next buttons. The counter shows your position (e.g. "3 / 12"). Navigation buttons appear both above and below the photo.'
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ArrowUpDown} />}
+            label="Sort Toggle"
+            description='Switch between "By Aisle" (grouped by location) and "Latest" (most recent first) sorting for the photo carousel.'
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={StickyNote} />}
+            label="Photo Notes"
+            description="Add notes to any photo. Notes auto-save after a brief delay. A saving indicator appears while syncing."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Focus} />}
+            label="Detail Shot Toggle"
+            description="Mark any photo as a detail/close-up shot with the checkbox. Useful for tagging zoomed-in photos of specific reel labels."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Delete Photo"
+            description='Tap the trash icon, then confirm with the "Delete" button. A cancel option is always available before the photo is permanently removed.'
+          />
+          <div className="flex items-start gap-2.5 py-1.5">
+            <div className="mt-0.5"><MapPin className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" /></div>
+            <div>
+              <span className="text-xs font-semibold text-foreground">Location Labels</span>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">Each photo displays its aisle and section tag below the image. Receiving photos with auto-incremented sections show the padded number (e.g. "Section: 003").</p>
+            </div>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="tips">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Mobile Tips</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-2 pb-4 text-[11px] text-muted-foreground leading-relaxed">
+          <p><span className="font-semibold text-foreground">Speed Workflow:</span> Set your aisle and section, then rapidly tap "Take Photo" to capture multiple angles. The upload queue handles everything in the background.</p>
+          <p><span className="font-semibold text-foreground">Receiving Mode:</span> Check the Receiving box for dock areas. Sections auto-number so you never have to type them — just keep snapping photos.</p>
+          <p><span className="font-semibold text-foreground">Offline Resilience:</span> Head into low-signal warehouse areas with confidence. Photos queue locally and sync when you get back to connectivity.</p>
+          <p><span className="font-semibold text-foreground">Batch Capture:</span> Use the gallery upload button to select multiple photos at once from your camera roll — all will be tagged with the current aisle/section.</p>
+          <p><span className="font-semibold text-foreground">Review Later:</span> Mobile Flow is optimized for capturing. Switch to Full Mode on a tablet or desktop to add pins, wire details, and finalize entries.</p>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  );
+}
+
+export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SheetTrigger asChild>
+            <Button size="icon" variant="ghost" data-testid="button-help-menu">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Help</TooltipContent>
+      </Tooltip>
+      <SheetContent side="left" className="w-[380px] sm:w-[420px] p-0 flex flex-col">
+        <SheetHeader className="p-4 pb-2 border-b shrink-0">
+          <SheetTitle className="flex items-center gap-2 text-base">
+            <HelpCircle className="h-5 w-5 text-[hsl(18_70%_50%)]" />
+            {mode === "mobile" ? "Mobile Flow Help" : "Help Guide"}
+          </SheetTitle>
+          <SheetDescription className="text-xs">
+            {mode === "mobile"
+              ? "Quick reference for the mobile capture workflow."
+              : "Comprehensive guide to every feature and workflow."}
+          </SheetDescription>
+        </SheetHeader>
+        <ScrollArea className="flex-1 px-4">
+          {mode === "mobile" ? <MobileFlowHelp /> : <FullModeHelp />}
+          <div className="h-8" />
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
+  );
+}

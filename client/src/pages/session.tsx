@@ -31,6 +31,7 @@ import MobileCaptureView from "./session/MobileCaptureView";
 import ActivityLog from "./session/ActivityLog";
 import Comments from "./session/Comments";
 import FlaggedReels from "./session/FlaggedReels";
+import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename, formatSessionTime } from "./session/utils";
 import { useUndoRedo } from "@/hooks/use-undo";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
@@ -362,6 +363,7 @@ function SessionWorkspace({
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-4 py-2">
           <div className="flex items-center gap-2 min-w-0">
+            <HelpMenu mode={captureMode ? "mobile" : "full"} />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back">
