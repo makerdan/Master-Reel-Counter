@@ -20,6 +20,8 @@ interface FlaggedPin {
   flagged: boolean;
   photoUrl?: string;
   photoFilename?: string;
+  photoAisle?: string | null;
+  photoSection?: string | null;
 }
 
 interface FlaggedReelsProps {
@@ -151,6 +153,14 @@ export default function FlaggedReels({ sessionId, onBack }: FlaggedReelsProps) {
                       </Badge>
                     )}
                   </div>
+
+                  {(pin.photoAisle || pin.photoSection) && (
+                    <div className="flex gap-2 text-xs text-muted-foreground mb-0.5" data-testid={`text-location-${pin.id}`}>
+                      {pin.photoAisle && <span>Aisle {pin.photoAisle}</span>}
+                      {pin.photoAisle && pin.photoSection && <span>&middot;</span>}
+                      {pin.photoSection && <span>Section {pin.photoSection}</span>}
+                    </div>
+                  )}
 
                   <div className="flex gap-3 text-xs text-muted-foreground font-mono">
                     {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}

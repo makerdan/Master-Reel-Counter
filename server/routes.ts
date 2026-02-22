@@ -718,6 +718,8 @@ export async function registerRoutes(
           ...pin,
           photoUrl,
           photoFilename: photo?.originalFilename || null,
+          photoAisle: photo?.aisle || null,
+          photoSection: photo?.section || null,
         };
       });
       res.json(enriched);
