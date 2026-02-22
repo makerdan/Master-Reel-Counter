@@ -65,7 +65,7 @@ export default function Dashboard() {
   const [newFolderName, setNewFolderName] = useState("");
   const [renamingFolder, setRenamingFolder] = useState<FolderType | null>(null);
   const [renameFolderName, setRenameFolderName] = useState("");
-  const [collapsedFolders, setCollapsedFolders] = useState<Set<number>>(new Set());
+  const [openFolders, setOpenFolders] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInside, setSearchInside] = useState(false);
   const [moveSessionTarget, setMoveSessionTarget] = useState<SessionWithStats | null>(null);
@@ -293,7 +293,7 @@ export default function Dashboard() {
   };
 
   const toggleFolderCollapse = (folderId: number) => {
-    setCollapsedFolders(prev => {
+    setOpenFolders(prev => {
       const next = new Set(prev);
       if (next.has(folderId)) next.delete(folderId);
       else next.add(folderId);
@@ -512,7 +512,7 @@ export default function Dashboard() {
 
   const renderFolderSection = (folder: FolderType) => {
     const folderSessions = folderedSessions.get(folder.id) || [];
-    const isCollapsed = collapsedFolders.has(folder.id);
+    const isCollapsed = !openFolders.has(folder.id);
 
     if (isSearching && folderSessions.length === 0) return null;
 
