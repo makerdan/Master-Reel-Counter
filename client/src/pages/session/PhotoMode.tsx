@@ -1690,7 +1690,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                 <button
                                   key={`${s.vendor}-${s.catalog}`}
                                   type="button"
-                                  className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer border-b last:border-b-0 border-border/50 ${si === suggestionIndex ? "bg-accent text-accent-foreground" : "hover-elevate"}`}
+                                  className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer border-b last:border-b-0 border-border/50 ${si === suggestionIndex ? "bg-primary text-primary-foreground font-medium" : "hover-elevate"}`}
                                   onMouseDown={(e) => {
                                     e.preventDefault();
                                     updatePinField(pin.id, "wireDetails", s.catalog);
