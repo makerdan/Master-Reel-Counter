@@ -5,7 +5,7 @@ import {
   Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings,
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
   FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
-  Search, ChevronDown, X,
+  Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,11 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInside, setSearchInside] = useState(false);
   const [showRecentSearches, setShowRecentSearches] = useState(false);
+
+  type SortField = "date" | "name" | "entries" | "footage";
+  type SortDirection = "asc" | "desc";
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const recentDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -125,6 +130,8 @@ export default function Dashboard() {
   const [moveSessionTarget, setMoveSessionTarget] = useState<SessionWithStats | null>(null);
   const [createFolderForSession, setCreateFolderForSession] = useState<SessionWithStats | null>(null);
   const [inlineFolderName, setInlineFolderName] = useState("");
+  const [selectedSessions, setSelectedSessions] = useState<Set<number>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
 
   const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
@@ -176,11 +183,32 @@ export default function Dashboard() {
     return sessions.filter(s => ownedMatchSet.has(s.id));
   }, [sessions, isSearching, ownedMatchSet]);
 
+  const sortSessions = useCallback((list: SessionWithStats[]) => {
+    return [...list].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "date":
+          cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+          break;
+        case "name":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case "entries":
+          cmp = a.entryCount - b.entryCount;
+          break;
+        case "footage":
+          cmp = a.totalFootage - b.totalFootage;
+          break;
+      }
+      return sortDirection === "desc" ? -cmp : cmp;
+    });
+  }, [sortField, sortDirection]);
+
   const filteredSharedSessions = useMemo(() => {
     if (!sharedSessions) return [];
-    if (!isSearching) return sharedSessions;
-    return sharedSessions.filter(s => sharedMatchSet.has(s.id));
-  }, [sharedSessions, isSearching, sharedMatchSet]);
+    const filtered = isSearching ? sharedSessions.filter(s => sharedMatchSet.has(s.id)) : sharedSessions;
+    return sortSessions(filtered as SessionWithStats[]) as SharedSessionWithStats[];
+  }, [sharedSessions, isSearching, sharedMatchSet, sortSessions]);
 
   const folderedSessions = useMemo(() => {
     const map = new Map<number | null, SessionWithStats[]>();
@@ -193,8 +221,11 @@ export default function Dashboard() {
       if (!map.has(key)) map.set(null, [...(map.get(null) || []), session]);
       else map.get(key)!.push(session);
     }
+    for (const [key, list] of map.entries()) {
+      map.set(key, sortSessions(list));
+    }
     return map;
-  }, [filteredSessions, userFolders]);
+  }, [filteredSessions, userFolders, sortSessions]);
 
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
@@ -356,6 +387,62 @@ export default function Dashboard() {
     },
   });
 
+  const bulkUpdateStatus = useMutation({
+    mutationFn: async ({ ids, status }: { ids: number[]; status: string }) => {
+      const res = await apiRequest("POST", "/api/sessions/bulk/status", { ids, status });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      invalidateAll();
+      setSelectedSessions(new Set());
+      toast({ title: `${data.updated.length} session(s) updated` });
+    },
+    onError: () => {
+      toast({ title: "Failed to update sessions", variant: "destructive" });
+    },
+  });
+
+  const bulkMove = useMutation({
+    mutationFn: async ({ ids, folderId }: { ids: number[]; folderId: number | null }) => {
+      const res = await apiRequest("POST", "/api/sessions/bulk/move", { ids, folderId });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      invalidateAll();
+      setSelectedSessions(new Set());
+      setBulkMoveOpen(false);
+      toast({ title: `${data.moved.length} session(s) moved` });
+    },
+    onError: () => {
+      toast({ title: "Failed to move sessions", variant: "destructive" });
+    },
+  });
+
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const res = await apiRequest("POST", "/api/sessions/bulk/delete", { ids });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      invalidateAll();
+      setSelectedSessions(new Set());
+      toast({ title: `${data.deleted.length} session(s) deleted` });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete sessions", variant: "destructive" });
+    },
+  });
+
+  const toggleSessionSelection = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedSessions(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const openEditDialog = (session: SessionWithStats, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingSession(session);
@@ -407,15 +494,25 @@ export default function Dashboard() {
   const renderSessionCard = (session: SessionWithStats, isShared = false) => {
     const prefix = isShared ? "shared-" : "";
     const sessionReasons = isSearching ? (matchReasons[session.id] || []) : [];
+    const isSelected = selectedSessions.has(session.id);
     return (
       <Card
         key={session.id}
-        className="hover-elevate cursor-pointer border border-primary"
+        className={`hover-elevate cursor-pointer border ${isSelected ? "border-primary ring-2 ring-primary/30" : "border-primary"}`}
         data-testid={`card-${prefix}session-${session.id}`}
         onClick={() => setLocation(`/session/${session.id}`)}
       >
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2">
+            {!isShared && (
+              <div className="pt-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => toggleSessionSelection(session.id, { stopPropagation: () => {} } as React.MouseEvent)}
+                  data-testid={`checkbox-select-session-${session.id}`}
+                />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-sm truncate" data-testid={`text-${prefix}session-name-${session.id}`}>
@@ -725,6 +822,41 @@ export default function Dashboard() {
             Counting Sessions
           </h1>
           <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-sort-sessions">
+                  <ArrowUpDown className="h-4 w-4 mr-1" />
+                  {sortField === "date" ? "Date" : sortField === "name" ? "Name" : sortField === "entries" ? "Reels" : "Footage"}
+                  {sortDirection === "desc" ? <ArrowDown className="h-3 w-3 ml-1" /> : <ArrowUp className="h-3 w-3 ml-1" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {([
+                  { field: "date" as SortField, label: "Date" },
+                  { field: "name" as SortField, label: "Name" },
+                  { field: "entries" as SortField, label: "Reels" },
+                  { field: "footage" as SortField, label: "Footage" },
+                ]).map(({ field, label }) => (
+                  <DropdownMenuItem
+                    key={field}
+                    onClick={() => {
+                      if (sortField === field) {
+                        setSortDirection(d => d === "desc" ? "asc" : "desc");
+                      } else {
+                        setSortField(field);
+                        setSortDirection(field === "name" ? "asc" : "desc");
+                      }
+                    }}
+                    data-testid={`menu-sort-${field}`}
+                  >
+                    <span className="flex-1">{label}</span>
+                    {sortField === field && (
+                      sortDirection === "desc" ? <ArrowDown className="h-3 w-3 ml-2" /> : <ArrowUp className="h-3 w-3 ml-2" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Dialog open={newFolderDialogOpen} onOpenChange={setNewFolderDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" data-testid="button-new-folder">
@@ -909,6 +1041,29 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {(() => {
+          try {
+            const lastId = localStorage.getItem("reel-counter-last-session");
+            if (!lastId || !sessions?.length) return null;
+            const lastSession = sessions.find(s => s.id === parseInt(lastId));
+            if (!lastSession || lastSession.status === "completed") return null;
+            return (
+              <div className="mb-4">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 border-primary/40 hover:bg-primary/5"
+                  onClick={() => setLocation(`/session/${lastSession.id}`)}
+                  data-testid="button-continue-last-session"
+                >
+                  <ChevronRight className="h-4 w-4 text-primary" />
+                  <span className="text-sm">Continue: <strong>{lastSession.name}</strong></span>
+                  {lastSession.location && <span className="text-xs text-muted-foreground">({lastSession.location})</span>}
+                </Button>
+              </div>
+            );
+          } catch { return null; }
+        })()}
+
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -1089,6 +1244,101 @@ export default function Dashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={bulkMoveOpen} onOpenChange={setBulkMoveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move {selectedSessions.size} Session(s)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => bulkMove.mutate({ ids: Array.from(selectedSessions), folderId: null })}
+              disabled={bulkMove.isPending}
+              data-testid="button-bulk-move-unfiled"
+            >
+              <Cable className="h-4 w-4 mr-2" /> Unfiled
+            </Button>
+            {(userFolders || []).map(folder => (
+              <Button
+                key={folder.id}
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => bulkMove.mutate({ ids: Array.from(selectedSessions), folderId: folder.id })}
+                disabled={bulkMove.isPending}
+                data-testid={`button-bulk-move-folder-${folder.id}`}
+              >
+                <Folder className="h-4 w-4 mr-2" /> {folder.name}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {selectedSessions.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-background border border-primary rounded-lg shadow-lg px-4 py-3 flex items-center gap-3" data-testid="bulk-action-bar">
+          <span className="text-sm font-medium">{selectedSessions.size} selected</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSelectedSessions(new Set())}
+            data-testid="button-bulk-clear"
+          >
+            <X className="h-3 w-3 mr-1" /> Clear
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setBulkMoveOpen(true)}
+            data-testid="button-bulk-move"
+          >
+            <FolderInput className="h-3 w-3 mr-1" /> Move
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => bulkUpdateStatus.mutate({ ids: Array.from(selectedSessions), status: "completed" })}
+            disabled={bulkUpdateStatus.isPending}
+            data-testid="button-bulk-complete"
+          >
+            <CheckCircle2 className="h-3 w-3 mr-1" /> Complete
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => bulkUpdateStatus.mutate({ ids: Array.from(selectedSessions), status: "active" })}
+            disabled={bulkUpdateStatus.isPending}
+            data-testid="button-bulk-reopen"
+          >
+            <RotateCcw className="h-3 w-3 mr-1" /> Reopen
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="destructive" data-testid="button-bulk-delete">
+                <Trash2 className="h-3 w-3 mr-1" /> Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {selectedSessions.size} session(s)?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete the selected sessions and all their data. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => bulkDelete.mutate(Array.from(selectedSessions))}
+                  data-testid="button-confirm-bulk-delete"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
     </div>
   );
 }

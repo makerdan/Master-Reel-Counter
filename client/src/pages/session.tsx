@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
-  ArrowLeft, Camera, ListPlus, Download, FileText, Mail,
+  ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -27,12 +27,19 @@ import EntryTable from "./session/EntryTable";
 import SingleEntryMode from "./session/SingleEntryMode";
 import MobileCaptureView from "./session/MobileCaptureView";
 import { buildExportFilename, formatSessionTime } from "./session/utils";
+import { useUndoRedo } from "@/hooks/use-undo";
 
 export default function SessionPage() {
   const [, params] = useRoute("/session/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const sessionId = params?.id ? parseInt(params.id) : 0;
+
+  useEffect(() => {
+    if (sessionId > 0) {
+      try { localStorage.setItem("reel-counter-last-session", String(sessionId)); } catch {}
+    }
+  }, [sessionId]);
 
   const { data: session, isLoading: sessionLoading } = useQuery<Session & { firstPhotoAt: string | null; lastPhotoAt: string | null; role: "owner" | "editor" | "viewer"; collaboratorCount: number }>({
     queryKey: ["/api/sessions", sessionId.toString()],
@@ -107,6 +114,19 @@ function SessionWorkspace({
 
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
   const [mobileFlowKey, setMobileFlowKey] = useState(0);
+
+  const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) { redo(); } else { undo(); }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undo, redo]);
 
   const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
 
@@ -249,6 +269,12 @@ function SessionWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <Button size="icon" variant="ghost" onClick={undo} disabled={!canUndo} data-testid="button-undo" className="h-8 w-8">
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={redo} disabled={!canRedo} data-testid="button-redo" className="h-8 w-8">
+              <Redo2 className="h-4 w-4" />
+            </Button>
             {(session as any).role === "owner" && (
               <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team">
                 Team
@@ -315,6 +341,7 @@ function SessionWorkspace({
                     setNavigateSection(sectionVal);
                     setMode("photo");
                   }}
+                  onUndoableSave={pushUndo}
                 />
               </TabsContent>
             </Tabs>
@@ -329,6 +356,7 @@ function SessionWorkspace({
           onEdit={(entry) => { setEditingEntry(entry); setMode("single"); }}
           sessionId={sessionId}
           totalFootage={totalFootage}
+          onUndoableDelete={pushUndo}
         />
       </div>
 
@@ -348,7 +376,7 @@ function SessionWorkspace({
                 </div>
               );
             })()}
-            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} />
+            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} onUndoableSave={pushUndo} />
           </DialogContent>
         </Dialog>
       )}

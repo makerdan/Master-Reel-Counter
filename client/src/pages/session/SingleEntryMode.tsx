@@ -13,12 +13,13 @@ import { lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/w
 import type { Entry } from "@shared/schema";
 
 export default function SingleEntryMode({
-  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto,
+  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave,
 }: {
   sessionId: number;
   editingEntry: Entry | null;
   onDoneEditing: () => void;
   onSwitchToPhoto?: (photoId: number, aisle: string, section: string) => void;
+  onUndoableSave?: (action: any) => void;
 }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -228,14 +229,26 @@ export default function SingleEntryMode({
       };
       if (!editingEntry && capturedPhoto) body.photoId = capturedPhoto.photoId;
 
+      let result;
       if (editingEntry) {
-        await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
+        const res = await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
+        result = { type: "update" as const, body, previousData: editingEntry };
       } else {
-        await apiRequest("POST", `/api/sessions/${sessionId}/entries`, body);
+        const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, body);
+        const created = await res.json();
+        result = { type: "create" as const, body, id: created.id };
       }
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      if (onUndoableSave && result) {
+        if (result.type === "create") {
+          onUndoableSave({ type: "create-entry", sessionId, entityId: result.id, data: result.body });
+        } else if (result.type === "update" && editingEntry) {
+          onUndoableSave({ type: "update-entry", sessionId, entityId: editingEntry.id, data: result.body, previousData: result.previousData });
+        }
+      }
       toast({ title: editingEntry ? "Entry updated" : "Entry saved" });
       if (editingEntry) {
         onDoneEditing();

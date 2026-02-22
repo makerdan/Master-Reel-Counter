@@ -18,13 +18,14 @@ import { useToast } from "@/hooks/use-toast";
 import type { Entry, Photo, Pin } from "@shared/schema";
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete,
 }: {
   entries: Entry[];
   photos: Photo[];
   onEdit: (entry: Entry) => void;
   sessionId: number;
   totalFootage: number;
+  onUndoableDelete?: (action: any) => void;
 }) {
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
@@ -35,11 +36,22 @@ function EntryTable({
   const pinByEntryId = new Map(sessionPins.filter(p => p.entryId).map(p => [p.entryId!, p]));
 
   const deleteEntry = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async ({ id, entry }: { id: number; entry: Entry }) => {
       await apiRequest("DELETE", `/api/entries/${id}`);
+      return entry;
     },
-    onSuccess: () => {
+    onSuccess: (entry) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      if (onUndoableDelete) {
+        const { id, ...rest } = entry;
+        onUndoableDelete({
+          type: "delete-entry",
+          sessionId,
+          entityId: id,
+          data: rest,
+          previousData: rest,
+        });
+      }
       toast({ title: "Entry deleted" });
     },
   });
@@ -188,7 +200,7 @@ function EntryTable({
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteEntry.mutate(entry.id)}>Delete</AlertDialogAction>
+                                  <AlertDialogAction onClick={() => deleteEntry.mutate({ id: entry.id, entry })}>Delete</AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>

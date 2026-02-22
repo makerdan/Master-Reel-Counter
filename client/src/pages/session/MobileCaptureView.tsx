@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { saveToQueue, removeFromQueue, getQueuedPhotos, type QueuedPhoto } from "@/lib/offlineQueue";
 import type { Photo } from "@shared/schema";
 
 type UploadQueueItem = {
@@ -41,8 +42,42 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
   const blobUrlsRef = useRef<Set<string>>(new Set());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
+
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getQueuedPhotos(sessionId).then(items => {
+      if (cancelled || items.length === 0) return;
+      const restored: UploadQueueItem[] = items.map(item => ({
+        queueId: item.id,
+        file: new File([item.blob], `restored-${item.id}.jpg`, { type: "image/jpeg" }),
+        blobUrl: URL.createObjectURL(item.blob),
+        aisle: item.aisle,
+        section: item.section,
+        status: "pending" as const,
+        retries: 0,
+      }));
+      for (const r of restored) blobUrlsRef.current.add(r.blobUrl);
+      setUploadQueue(prev => {
+        const existingIds = new Set(prev.map(q => q.queueId));
+        return [...prev, ...restored.filter(r => !existingIds.has(r.queueId))];
+      });
+    });
+    return () => { cancelled = true; };
+  }, [sessionId]);
 
   useEffect(() => {
     if (photos.length > 0) {
@@ -59,7 +94,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
   }, [photos]);
 
   useEffect(() => {
-    if (processingRef.current) return;
+    if (processingRef.current || !isOnline) return;
     const nextItem = uploadQueue.find(q => q.status === "pending");
     if (!nextItem) return;
     processingRef.current = true;
@@ -94,6 +129,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         URL.revokeObjectURL(nextItem.blobUrl);
         blobUrlsRef.current.delete(nextItem.blobUrl);
         setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
+        removeFromQueue(nextItem.queueId).catch(() => {});
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       } catch {
         if (!mountedRef.current) return;
@@ -103,7 +139,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         processingRef.current = false;
       }
     })();
-  }, [uploadQueue, sessionId, toast]);
+  }, [uploadQueue, sessionId, toast, isOnline]);
 
   const retryUpload = useCallback((queueId: string) => {
     setUploadQueue(prev => prev.map(q => q.queueId === queueId ? { ...q, status: "pending" as const } : q));
@@ -118,6 +154,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
       }
       return prev.filter(q => q.queueId !== queueId);
     });
+    removeFromQueue(queueId).catch(() => {});
   }, []);
 
   const getNextReceivingSection = useCallback(() => {
@@ -162,6 +199,18 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
       });
     }
     setUploadQueue(prev => [...prev, ...newItems]);
+    for (const item of newItems) {
+      saveToQueue({
+        id: item.queueId,
+        sessionId,
+        blob: item.file,
+        aisle: item.aisle,
+        section: item.section,
+        notes: "",
+        isReceiving: item.aisle.toLowerCase() === "receiving",
+        createdAt: Date.now(),
+      }).catch(() => {});
+    }
     toast({ title: `${newItems.length} photo${newItems.length > 1 ? "s" : ""} queued` });
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -217,6 +266,12 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
 
   return (
     <div className="space-y-4">
+      {!isOnline && (
+        <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-2 text-sm flex items-center gap-2" data-testid="text-offline-banner">
+          <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
+          <span>You're offline. Photos will be saved and uploaded when you reconnect.</span>
+        </div>
+      )}
       <Card>
         <CardContent className="p-4 space-y-3">
           {!aisle.trim() && (

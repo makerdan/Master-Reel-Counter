@@ -218,6 +218,78 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/sessions/bulk/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { ids, status } = req.body;
+      if (!Array.isArray(ids) || !ids.length || !["active", "completed"].includes(status)) {
+        return res.status(400).json({ message: "Invalid request" });
+      }
+      const results = [];
+      for (const id of ids) {
+        const access = await verifySessionAccess(id, userId);
+        if (access && isOwner(access.role)) {
+          const data: any = { status };
+          if (status === "completed") data.completedAt = new Date();
+          else data.completedAt = null;
+          await storage.updateSession(id, data);
+          results.push(id);
+        }
+      }
+      res.json({ updated: results });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update sessions" });
+    }
+  });
+
+  app.post("/api/sessions/bulk/move", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { ids, folderId } = req.body;
+      if (!Array.isArray(ids) || !ids.length) {
+        return res.status(400).json({ message: "Invalid request" });
+      }
+      if (folderId !== null && folderId !== undefined) {
+        const folder = await storage.getFolder(folderId);
+        if (!folder || folder.userId !== userId) {
+          return res.status(404).json({ message: "Folder not found" });
+        }
+      }
+      const results = [];
+      for (const id of ids) {
+        const access = await verifySessionAccess(id, userId);
+        if (access && isOwner(access.role)) {
+          await storage.updateSession(id, { folderId: folderId ?? null });
+          results.push(id);
+        }
+      }
+      res.json({ moved: results });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to move sessions" });
+    }
+  });
+
+  app.post("/api/sessions/bulk/delete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || !ids.length) {
+        return res.status(400).json({ message: "Invalid request" });
+      }
+      const results = [];
+      for (const id of ids) {
+        const access = await verifySessionAccess(id, userId);
+        if (access && isOwner(access.role)) {
+          await storage.deleteSession(id);
+          results.push(id);
+        }
+      }
+      res.json({ deleted: results });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete sessions" });
+    }
+  });
+
   // Folders
   app.get("/api/folders", isAuthenticated, async (req: any, res) => {
     try {
