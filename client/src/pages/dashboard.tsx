@@ -69,6 +69,8 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInside, setSearchInside] = useState(false);
   const [moveSessionTarget, setMoveSessionTarget] = useState<SessionWithStats | null>(null);
+  const [createFolderForSession, setCreateFolderForSession] = useState<SessionWithStats | null>(null);
+  const [inlineFolderName, setInlineFolderName] = useState("");
 
   const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
@@ -251,6 +253,24 @@ export default function Dashboard() {
     },
   });
 
+  const createFolderAndMove = useMutation({
+    mutationFn: async ({ sessionId, folderName }: { sessionId: number; folderName: string }) => {
+      const folderRes = await apiRequest("POST", "/api/folders", { name: folderName });
+      const folder = await folderRes.json();
+      await apiRequest("POST", `/api/sessions/${sessionId}/move`, { folderId: folder.id });
+      return folder;
+    },
+    onSuccess: () => {
+      invalidateAll();
+      setCreateFolderForSession(null);
+      setInlineFolderName("");
+      toast({ title: "Folder created and session moved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create folder", variant: "destructive" });
+    },
+  });
+
   const duplicateSession = useMutation({
     mutationFn: async (id: number) => {
       const res = await apiRequest("POST", `/api/sessions/${id}/duplicate`, {});
@@ -412,9 +432,9 @@ export default function Dashboard() {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={(e) => openEditDialog(session, e)}
-                      data-testid={`menu-edit-session-${session.id}`}
+                      data-testid={`menu-rename-session-${session.id}`}
                     >
-                      <Pencil className="h-4 w-4 mr-2" /> Edit
+                      <Pencil className="h-4 w-4 mr-2" /> Rename Session
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={(e) => {
@@ -425,38 +445,47 @@ export default function Dashboard() {
                     >
                       <Copy className="h-4 w-4 mr-2" /> Duplicate
                     </DropdownMenuItem>
-                    {(userFolders && userFolders.length > 0) && (
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger data-testid={`menu-move-session-${session.id}`}>
-                          <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          {session.folderId && (
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                moveSession.mutate({ id: session.id, folderId: null });
-                              }}
-                              data-testid={`menu-move-unfiled-${session.id}`}
-                            >
-                              <X className="h-4 w-4 mr-2" /> Remove from folder
-                            </DropdownMenuItem>
-                          )}
-                          {userFolders.filter(f => f.id !== session.folderId).map(folder => (
-                            <DropdownMenuItem
-                              key={folder.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                moveSession.mutate({ id: session.id, folderId: folder.id });
-                              }}
-                              data-testid={`menu-move-to-folder-${folder.id}-${session.id}`}
-                            >
-                              <Folder className="h-4 w-4 mr-2" /> {folder.name}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    )}
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger data-testid={`menu-move-session-${session.id}`}>
+                        <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        {session.folderId && (
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveSession.mutate({ id: session.id, folderId: null });
+                            }}
+                            data-testid={`menu-move-unfiled-${session.id}`}
+                          >
+                            <X className="h-4 w-4 mr-2" /> Remove from folder
+                          </DropdownMenuItem>
+                        )}
+                        {(userFolders || []).filter(f => f.id !== session.folderId).map(folder => (
+                          <DropdownMenuItem
+                            key={folder.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveSession.mutate({ id: session.id, folderId: folder.id });
+                            }}
+                            data-testid={`menu-move-to-folder-${folder.id}-${session.id}`}
+                          >
+                            <Folder className="h-4 w-4 mr-2" /> {folder.name}
+                          </DropdownMenuItem>
+                        ))}
+                        {(userFolders || []).filter(f => f.id !== session.folderId).length > 0 && <DropdownMenuSeparator />}
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCreateFolderForSession(session);
+                            setInlineFolderName("");
+                          }}
+                          data-testid={`menu-create-folder-${session.id}`}
+                        >
+                          <FolderPlus className="h-4 w-4 mr-2" /> Create New Folder
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
@@ -504,59 +533,41 @@ export default function Dashboard() {
               </Badge>
             </Button>
           </CollapsibleTrigger>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => {
-                    setRenamingFolder(folder);
-                    setRenameFolderName(folder.name);
-                  }}
-                  data-testid={`button-rename-folder-${folder.id}`}
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Rename folder</TooltipContent>
-            </Tooltip>
-            <AlertDialog>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      data-testid={`button-delete-folder-${folder.id}`}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </AlertDialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Delete folder</TooltipContent>
-              </Tooltip>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Folder?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will delete the folder "{folder.name}". Sessions inside will be moved to unfiled.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel data-testid="button-cancel-delete-folder">Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => deleteFolder.mutate(folder.id)}
-                    data-testid="button-confirm-delete-folder"
-                  >
-                    Delete Folder
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                data-testid={`button-folder-menu-${folder.id}`}
+              >
+                <MoreVertical className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onClick={() => {
+                  setRenamingFolder(folder);
+                  setRenameFolderName(folder.name);
+                }}
+                data-testid={`menu-rename-folder-${folder.id}`}
+              >
+                <Pencil className="h-4 w-4 mr-2" /> Rename Folder
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => {
+                  if (confirm(`Delete folder "${folder.name}"? Sessions inside will be moved to unfiled.`)) {
+                    deleteFolder.mutate(folder.id);
+                  }
+                }}
+                data-testid={`menu-delete-folder-${folder.id}`}
+              >
+                <Trash2 className="h-4 w-4 mr-2" /> Delete Folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <CollapsibleContent>
           <div className="space-y-2 ml-4 mt-1 border-l-2 border-primary/20 pl-3">
@@ -879,6 +890,45 @@ export default function Dashboard() {
               data-testid="button-save-folder-rename"
             >
               {renameFolder.isPending ? "Saving..." : "Save"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!createFolderForSession} onOpenChange={(o) => { if (!o) { setCreateFolderForSession(null); setInlineFolderName(""); } }}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Create New Folder</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Create a folder and move "{createFolderForSession?.name}" into it.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (createFolderForSession && inlineFolderName.trim()) {
+                createFolderAndMove.mutate({ sessionId: createFolderForSession.id, folderName: inlineFolderName });
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="inline-folder-name">Folder Name</Label>
+              <Input
+                id="inline-folder-name"
+                value={inlineFolderName}
+                onChange={(e) => setInlineFolderName(e.target.value)}
+                placeholder="e.g., Building A Counts"
+                data-testid="input-inline-folder-name"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!inlineFolderName.trim() || createFolderAndMove.isPending}
+              data-testid="button-create-folder-and-move"
+            >
+              {createFolderAndMove.isPending ? "Creating..." : "Create & Move"}
             </Button>
           </form>
         </DialogContent>
