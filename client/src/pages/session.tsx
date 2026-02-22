@@ -22,7 +22,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Session, Entry, Photo } from "@shared/schema";
+import type { Session, Entry, Photo, Pin } from "@shared/schema";
 import PhotoMode from "./session/PhotoMode";
 import TeamDialog from "./session/TeamDialog";
 import EntryTable from "./session/EntryTable";
@@ -148,6 +148,12 @@ function SessionWorkspace({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
+
+  const { data: sessionPins = [] } = useQuery<Pin[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "pins"],
+    enabled: sessionId > 0,
+  });
+  const pinByEntryId = new Map(sessionPins.filter(p => p.entryId).map(p => [p.entryId!, p]));
 
   const isLocked = !!(session as any).isLocked;
   const isOwner = (session as any).role === "owner";
@@ -548,9 +554,25 @@ function SessionWorkspace({
               const photo = photos.find(p => p.id === editingEntry.photoId);
               if (!photo) return null;
               const imgSrc = photo.objectStorageKey.startsWith("/uploads/") ? photo.objectStorageKey : `/uploads/${photo.objectStorageKey}`;
+              const pin = pinByEntryId.get(editingEntry.id);
               return (
-                <div className="rounded-md overflow-hidden border border-border/50 mb-2">
-                  <img src={imgSrc} alt="Entry photo" className="w-full max-h-48 object-cover" data-testid="img-edit-entry-photo" />
+                <div className="border border-border/50 mb-2 max-h-[40vh] overflow-y-auto rounded-md">
+                  <div className="relative inline-block w-full">
+                    <img src={imgSrc} alt="Entry photo" className="w-full" style={{ display: "block" }} data-testid="img-edit-entry-photo" />
+                    {pin && (
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
+                        data-testid={`pin-highlight-edit-${editingEntry.id}`}
+                        ref={(el) => {
+                          if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+                        }}
+                      >
+                        <div className="w-24 h-24 rounded-full animate-pulse opacity-100" style={{ border: "12px solid #f97316" }} />
+                        <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-white opacity-100" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })()}
