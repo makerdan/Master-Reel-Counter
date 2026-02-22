@@ -133,6 +133,7 @@ export default function Dashboard() {
   const [inlineFolderName, setInlineFolderName] = useState("");
   const [selectedSessions, setSelectedSessions] = useState<Set<number>>(new Set());
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: number; name: string; sessionCount: number } | null>(null);
 
   const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
@@ -762,9 +763,8 @@ export default function Dashboard() {
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => {
-                  if (confirm(`Delete folder "${folder.name}"? Sessions inside will be moved to unfiled.`)) {
-                    deleteFolder.mutate(folder.id);
-                  }
+                  const folderSessions = folderedSessions.get(folder.id) || [];
+                  setDeleteFolderTarget({ id: folder.id, name: folder.name, sessionCount: folderSessions.length });
                 }}
                 data-testid={`menu-delete-folder-${folder.id}`}
               >
@@ -1312,6 +1312,31 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteFolderTarget} onOpenChange={(o) => { if (!o) setDeleteFolderTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete folder "{deleteFolderTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteFolderTarget?.sessionCount
+                ? `This folder contains ${deleteFolderTarget.sessionCount} session${deleteFolderTarget.sessionCount !== 1 ? "s" : ""}. The sessions will not be deleted — they will be moved to unfiled.`
+                : "This empty folder will be permanently removed."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-folder">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteFolderTarget) deleteFolder.mutate(deleteFolderTarget.id);
+                setDeleteFolderTarget(null);
+              }}
+              data-testid="button-confirm-delete-folder"
+            >
+              Delete Folder
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {selectedSessions.size > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-background border border-primary rounded-lg shadow-lg px-4 py-3 flex items-center gap-3" data-testid="bulk-action-bar">
