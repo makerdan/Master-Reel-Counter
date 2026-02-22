@@ -671,8 +671,31 @@ export async function registerRoutes(
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       const photoMap = new Map(sessionPhotos.map(p => [p.id, p]));
 
+      const formatExportTime = (d: Date) => {
+        let h = d.getHours();
+        const m = d.getMinutes();
+        const ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12 || 12;
+        return `${h}'${String(m).padStart(2, "0")}${ampm}`;
+      };
+      const formatExportDate = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const buildExportFilename = (ext: string) => {
+        const safeName = session.name.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, " ").trim();
+        const first = pt.firstPhotoAt ? new Date(pt.firstPhotoAt) : null;
+        const last = pt.lastPhotoAt ? new Date(pt.lastPhotoAt) : null;
+        if (!first) return `${safeName.replace(/ /g, "_")}.${ext}`;
+        const d1 = formatExportDate(first);
+        const t1 = formatExportTime(first);
+        if (!last || first.getTime() === last.getTime()) return `${safeName}_${d1}_${t1}.${ext}`;
+        const d2 = formatExportDate(last);
+        const t2 = formatExportTime(last);
+        if (d1 === d2) return `${safeName}_${d1}_${t1}-${t2}.${ext}`;
+        return `${safeName}_${d1}_${t1}-${d2}_${t2}.${ext}`;
+      };
+
       const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 36 });
-      const filename = `${session.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_report.pdf`;
+      const filename = buildExportFilename("pdf");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       doc.pipe(res);

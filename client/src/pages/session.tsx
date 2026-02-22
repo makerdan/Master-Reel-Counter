@@ -160,6 +160,29 @@ function ReelCropPreview({ photoUrl, pinX, pinY, label, cropMode, onCropModeChan
   );
 }
 
+function buildExportFilename(session: { name: string; firstPhotoAt?: string | null; lastPhotoAt?: string | null }, ext: string): string {
+  const safeName = session.name.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, " ").trim();
+  const fmtTime = (d: Date) => {
+    let h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h}'${String(m).padStart(2, "0")}${ampm}`;
+  };
+  const fmtDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const first = session.firstPhotoAt ? new Date(session.firstPhotoAt) : null;
+  const last = session.lastPhotoAt ? new Date(session.lastPhotoAt) : null;
+  if (!first) return `${safeName.replace(/ /g, "_")}.${ext}`;
+  const d1 = fmtDate(first);
+  const t1 = fmtTime(first);
+  if (!last || first.getTime() === last.getTime()) return `${safeName}_${d1}_${t1}.${ext}`;
+  const d2 = fmtDate(last);
+  const t2 = fmtTime(last);
+  if (d1 === d2) return `${safeName}_${d1}_${t1}-${t2}.${ext}`;
+  return `${safeName}_${d1}_${t1}-${d2}_${t2}.${ext}`;
+}
+
 function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoAt: string | Date | null, elapsedOnly = false) {
   if (!firstPhotoAt) return "No photos yet";
   const fmt = (d: string | Date) => new Date(d).toLocaleString(undefined, {
@@ -337,7 +360,7 @@ function SessionWorkspace({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${session.name.replace(/\s+/g, "_")}_entries.csv`;
+      a.download = buildExportFilename(session, "csv");
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -353,7 +376,7 @@ function SessionWorkspace({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${session.name.replace(/\s+/g, "_")}_report.pdf`;
+      a.download = buildExportFilename(session, "pdf");
       a.click();
       URL.revokeObjectURL(url);
     } catch {
