@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings,
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
+  FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
+  Search, ChevronDown, X,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -20,11 +23,19 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub,
+  DropdownMenuSubContent, DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Session } from "@shared/schema";
+import type { Session, Folder as FolderType } from "@shared/schema";
 
 type SessionWithStats = Session & {
   entryCount: number;
@@ -50,6 +61,14 @@ export default function Dashboard() {
   const [editingSession, setEditingSession] = useState<SessionWithStats | null>(null);
   const [editName, setEditName] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [renamingFolder, setRenamingFolder] = useState<FolderType | null>(null);
+  const [renameFolderName, setRenameFolderName] = useState("");
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInside, setSearchInside] = useState(false);
+  const [moveSessionTarget, setMoveSessionTarget] = useState<SessionWithStats | null>(null);
 
   const { data: sessions, isLoading } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
@@ -63,6 +82,52 @@ export default function Dashboard() {
     placeholderData: [],
   });
 
+  const { data: userFolders } = useQuery<FolderType[]>({
+    queryKey: ["/api/folders"],
+    enabled: !!user,
+    placeholderData: [],
+  });
+
+  const { data: searchResults } = useQuery<number[]>({
+    queryKey: ["/api/search/sessions", searchQuery, searchInside],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/search/sessions?q=${encodeURIComponent(searchQuery)}&inside=${searchInside}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user && searchQuery.trim().length > 0,
+    placeholderData: [],
+  });
+
+  const isSearching = searchQuery.trim().length > 0;
+  const searchMatchSet = useMemo(() => new Set(searchResults || []), [searchResults]);
+
+  const filteredSessions = useMemo(() => {
+    if (!sessions) return [];
+    if (!isSearching) return sessions;
+    return sessions.filter(s => searchMatchSet.has(s.id));
+  }, [sessions, isSearching, searchMatchSet]);
+
+  const folderedSessions = useMemo(() => {
+    const map = new Map<number | null, SessionWithStats[]>();
+    map.set(null, []);
+    for (const folder of (userFolders || [])) {
+      map.set(folder.id, []);
+    }
+    for (const session of filteredSessions) {
+      const key = session.folderId ?? null;
+      if (!map.has(key)) map.set(null, [...(map.get(null) || []), session]);
+      else map.get(key)!.push(session);
+    }
+    return map;
+  }, [filteredSessions, userFolders]);
+
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
+  }, []);
+
   const createSession = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/sessions", {
@@ -72,7 +137,7 @@ export default function Dashboard() {
       return res.json();
     },
     onSuccess: (session: Session) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      invalidateAll();
       setNewDialogOpen(false);
       setSessionName("");
       setSessionLocation("");
@@ -88,7 +153,7 @@ export default function Dashboard() {
       await apiRequest("DELETE", `/api/sessions/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      invalidateAll();
       toast({ title: "Session deleted" });
     },
     onError: () => {
@@ -127,11 +192,93 @@ export default function Dashboard() {
     },
   });
 
+  const createFolder = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/folders", { name: newFolderName });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      setNewFolderDialogOpen(false);
+      setNewFolderName("");
+      toast({ title: "Folder created" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create folder", variant: "destructive" });
+    },
+  });
+
+  const renameFolder = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const res = await apiRequest("PATCH", `/api/folders/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      setRenamingFolder(null);
+      toast({ title: "Folder renamed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to rename folder", variant: "destructive" });
+    },
+  });
+
+  const deleteFolder = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/folders/${id}`);
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Folder deleted (sessions moved to unfiled)" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete folder", variant: "destructive" });
+    },
+  });
+
+  const moveSession = useMutation({
+    mutationFn: async ({ id, folderId }: { id: number; folderId: number | null }) => {
+      const res = await apiRequest("POST", `/api/sessions/${id}/move`, { folderId });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      setMoveSessionTarget(null);
+      toast({ title: "Session moved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to move session", variant: "destructive" });
+    },
+  });
+
+  const duplicateSession = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/sessions/${id}/duplicate`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Session duplicated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to duplicate session", variant: "destructive" });
+    },
+  });
+
   const openEditDialog = (session: SessionWithStats, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingSession(session);
     setEditName(session.name);
     setEditLocation(session.location || "");
+  };
+
+  const toggleFolderCollapse = (folderId: number) => {
+    setCollapsedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
+      return next;
+    });
   };
 
   const formatDate = (date: string | Date | null) => {
@@ -154,6 +301,277 @@ export default function Dashboard() {
     const mins = totalMinutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
+
+  const renderSessionCard = (session: SessionWithStats, isShared = false) => {
+    const prefix = isShared ? "shared-" : "";
+    return (
+      <Card
+        key={session.id}
+        className="hover-elevate cursor-pointer border border-primary"
+        data-testid={`card-${prefix}session-${session.id}`}
+        onClick={() => setLocation(`/session/${session.id}`)}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-sm truncate" data-testid={`text-${prefix}session-name-${session.id}`}>
+                  {session.name}
+                </h3>
+                <Badge
+                  variant={session.status === "active" ? "default" : "secondary"}
+                  className="no-default-hover-elevate no-default-active-elevate"
+                  data-testid={`badge-${prefix}session-status-${session.id}`}
+                >
+                  {session.status}
+                </Badge>
+                {isShared && (session as SharedSessionWithStats).role && (
+                  <Badge
+                    variant="outline"
+                    className="no-default-hover-elevate no-default-active-elevate"
+                    data-testid={`badge-shared-session-role-${session.id}`}
+                  >
+                    {(session as SharedSessionWithStats).role}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+                {isShared && (session as SharedSessionWithStats).ownerUsername && (
+                  <span className="flex items-center gap-1" data-testid={`text-shared-session-owner-${session.id}`}>
+                    <Users className="h-3 w-3" />
+                    {(session as SharedSessionWithStats).ownerUsername}
+                  </span>
+                )}
+                {session.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {session.location}
+                  </span>
+                )}
+                <span className="flex items-center gap-1" data-testid={`text-${prefix}session-time-${session.id}`}>
+                  <Clock className="h-3 w-3" />
+                  {session.firstPhotoAt
+                    ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
+                    : "No photos yet"}
+                  {(() => {
+                    const elapsed = formatElapsedMinutes(session.firstPhotoAt, session.lastPhotoAt);
+                    return elapsed ? <span className="ml-1 mono" data-testid={`badge-${prefix}session-elapsed-${session.id}`}>({elapsed})</span> : null;
+                  })()}
+                </span>
+                <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-photos-${session.id}`}>
+                  <Camera className="h-3 w-3" />
+                  {session.photoCount} photos
+                </span>
+                {session.sectionCount > 0 && (
+                  <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-sections-${session.id}`}>
+                    <Layers className="h-3 w-3" />
+                    {session.sectionCount} sections
+                  </span>
+                )}
+                <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-entries-${session.id}`}>
+                  <Hash className="h-3 w-3" />
+                  {session.entryCount} reels
+                </span>
+                {session.totalFootage > 0 && (
+                  <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-footage-${session.id}`}>
+                    <Ruler className="h-3 w-3" />
+                    {session.totalFootage.toLocaleString()} ft
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {!isShared && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={(e) => e.stopPropagation()}
+                      data-testid={`button-session-menu-${session.id}`}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleStatus.mutate({
+                          id: session.id,
+                          status: session.status === "active" ? "completed" : "active",
+                        });
+                      }}
+                      data-testid={`menu-toggle-status-${session.id}`}
+                    >
+                      {session.status === "active" ? (
+                        <><CheckCircle2 className="h-4 w-4 mr-2" /> Mark Complete</>
+                      ) : (
+                        <><RotateCcw className="h-4 w-4 mr-2" /> Reopen</>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => openEditDialog(session, e)}
+                      data-testid={`menu-edit-session-${session.id}`}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicateSession.mutate(session.id);
+                      }}
+                      data-testid={`menu-duplicate-session-${session.id}`}
+                    >
+                      <Copy className="h-4 w-4 mr-2" /> Duplicate
+                    </DropdownMenuItem>
+                    {(userFolders && userFolders.length > 0) && (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger data-testid={`menu-move-session-${session.id}`}>
+                          <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          {session.folderId && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveSession.mutate({ id: session.id, folderId: null });
+                              }}
+                              data-testid={`menu-move-unfiled-${session.id}`}
+                            >
+                              <X className="h-4 w-4 mr-2" /> Remove from folder
+                            </DropdownMenuItem>
+                          )}
+                          {userFolders.filter(f => f.id !== session.folderId).map(folder => (
+                            <DropdownMenuItem
+                              key={folder.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveSession.mutate({ id: session.id, folderId: folder.id });
+                              }}
+                              data-testid={`menu-move-to-folder-${folder.id}-${session.id}`}
+                            >
+                              <Folder className="h-4 w-4 mr-2" /> {folder.name}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete "${session.name}" and all its data?`)) {
+                          deleteSession.mutate(session.id);
+                        }
+                      }}
+                      data-testid={`menu-delete-session-${session.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderFolderSection = (folder: FolderType) => {
+    const folderSessions = folderedSessions.get(folder.id) || [];
+    const isCollapsed = collapsedFolders.has(folder.id);
+
+    if (isSearching && folderSessions.length === 0) return null;
+
+    return (
+      <Collapsible
+        key={folder.id}
+        open={!isCollapsed}
+        onOpenChange={() => toggleFolderCollapse(folder.id)}
+      >
+        <div className="flex items-center gap-2 group" data-testid={`folder-header-${folder.id}`}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-1 px-2" data-testid={`button-toggle-folder-${folder.id}`}>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+              {isCollapsed ? <Folder className="h-4 w-4 text-primary" /> : <FolderOpen className="h-4 w-4 text-primary" />}
+              <span className="font-semibold text-sm">{folder.name}</span>
+              <Badge variant="secondary" className="ml-1 no-default-hover-elevate no-default-active-elevate text-xs">
+                {folderSessions.length}
+              </Badge>
+            </Button>
+          </CollapsibleTrigger>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    setRenamingFolder(folder);
+                    setRenameFolderName(folder.name);
+                  }}
+                  data-testid={`button-rename-folder-${folder.id}`}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Rename folder</TooltipContent>
+            </Tooltip>
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      data-testid={`button-delete-folder-${folder.id}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Delete folder</TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Folder?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will delete the folder "{folder.name}". Sessions inside will be moved to unfiled.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-delete-folder">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteFolder.mutate(folder.id)}
+                    data-testid="button-confirm-delete-folder"
+                  >
+                    Delete Folder
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+        <CollapsibleContent>
+          <div className="space-y-2 ml-4 mt-1 border-l-2 border-primary/20 pl-3">
+            {folderSessions.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2 pl-2">No sessions in this folder</p>
+            ) : (
+              folderSessions.map(session => renderSessionCard(session))
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
+
+  const unfiledSessions = folderedSessions.get(null) || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -198,59 +616,135 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
+        <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
           <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">
             Counting Sessions
           </h1>
-          <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-new-session">
-                <Plus className="h-4 w-4" />
-                New Session
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New Counting Session</DialogTitle>
-              </DialogHeader>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (sessionName.trim()) createSession.mutate();
-                }}
-                className="space-y-4"
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="session-name">Session Name</Label>
-                  <Input
-                    id="session-name"
-                    value={sessionName}
-                    onChange={(e) => setSessionName(e.target.value)}
-                    placeholder="e.g., Warehouse A - Bay 3"
-                    data-testid="input-session-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="session-location">Location (optional)</Label>
-                  <Input
-                    id="session-location"
-                    value={sessionLocation}
-                    onChange={(e) => setSessionLocation(e.target.value)}
-                    placeholder="e.g., Building 2, Dock 5"
-                    data-testid="input-session-location"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={!sessionName.trim() || createSession.isPending}
-                  data-testid="button-create-session"
-                >
-                  {createSession.isPending ? "Creating..." : "Create Session"}
+          <div className="flex items-center gap-2">
+            <Dialog open={newFolderDialogOpen} onOpenChange={setNewFolderDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-new-folder">
+                  <FolderPlus className="h-4 w-4" />
+                  New Folder
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Folder</DialogTitle>
+                </DialogHeader>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (newFolderName.trim()) createFolder.mutate();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="folder-name">Folder Name</Label>
+                    <Input
+                      id="folder-name"
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      placeholder="e.g., Building A Counts"
+                      data-testid="input-folder-name"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={!newFolderName.trim() || createFolder.isPending}
+                    data-testid="button-create-folder"
+                  >
+                    {createFolder.isPending ? "Creating..." : "Create Folder"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-new-session">
+                  <Plus className="h-4 w-4" />
+                  New Session
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Counting Session</DialogTitle>
+                </DialogHeader>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (sessionName.trim()) createSession.mutate();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="session-name">Session Name</Label>
+                    <Input
+                      id="session-name"
+                      value={sessionName}
+                      onChange={(e) => setSessionName(e.target.value)}
+                      placeholder="e.g., Warehouse A - Bay 3"
+                      data-testid="input-session-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="session-location">Location (optional)</Label>
+                    <Input
+                      id="session-location"
+                      value={sessionLocation}
+                      onChange={(e) => setSessionLocation(e.target.value)}
+                      placeholder="e.g., Building 2, Dock 5"
+                      data-testid="input-session-location"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={!sessionName.trim() || createSession.isPending}
+                    data-testid="button-create-session"
+                  >
+                    {createSession.isPending ? "Creating..." : "Create Session"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <div className="mb-4 space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search sessions..."
+              className="pl-9 pr-9"
+              data-testid="input-search-sessions"
+            />
+            {searchQuery && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchQuery("")}
+                data-testid="button-clear-search"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="search-inside"
+              checked={searchInside}
+              onCheckedChange={(checked) => setSearchInside(checked === true)}
+              data-testid="checkbox-search-inside"
+            />
+            <label htmlFor="search-inside" className="text-xs text-muted-foreground cursor-pointer">
+              Search inside sessions (entries, categories, notes)
+            </label>
+          </div>
         </div>
 
         {isLoading ? (
@@ -259,157 +753,44 @@ export default function Dashboard() {
               <Skeleton key={i} className="h-24 w-full rounded-xl" />
             ))}
           </div>
-        ) : !sessions?.length ? (
+        ) : !filteredSessions.length && !isSearching ? (
           <Card>
             <CardContent className="py-12 text-center">
               <Cable className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
               <p className="text-muted-foreground text-sm">No sessions yet. Create one to start counting reels.</p>
             </CardContent>
           </Card>
+        ) : isSearching && !filteredSessions.length ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-muted-foreground text-sm">No sessions match "{searchQuery}"</p>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="space-y-3">
-            {sessions.map((session) => (
-              <Card
-                key={session.id}
-                className="hover-elevate cursor-pointer border border-primary"
-                data-testid={`card-session-${session.id}`}
-                onClick={() => setLocation(`/session/${session.id}`)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-sm truncate" data-testid={`text-session-name-${session.id}`}>
-                          {session.name}
-                        </h3>
-                        <Badge
-                          variant={session.status === "active" ? "default" : "secondary"}
-                          className="no-default-hover-elevate no-default-active-elevate"
-                          data-testid={`badge-session-status-${session.id}`}
-                        >
-                          {session.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
-                        {session.location && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {session.location}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1" data-testid={`text-session-time-${session.id}`}>
-                          <Clock className="h-3 w-3" />
-                          {session.firstPhotoAt
-                            ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
-                            : "No photos yet"}
-                          {(() => {
-                            const elapsed = formatElapsedMinutes(session.firstPhotoAt, session.lastPhotoAt);
-                            return elapsed ? <span className="ml-1 mono" data-testid={`badge-session-elapsed-${session.id}`}>({elapsed})</span> : null;
-                          })()}
-                        </span>
-                        <span className="flex items-center gap-1 mono" data-testid={`text-session-photos-${session.id}`}>
-                          <Camera className="h-3 w-3" />
-                          {session.photoCount} photos
-                        </span>
-                        {session.sectionCount > 0 && (
-                          <span className="flex items-center gap-1 mono" data-testid={`text-session-sections-${session.id}`}>
-                            <Layers className="h-3 w-3" />
-                            {session.sectionCount} sections
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1 mono" data-testid={`text-session-entries-${session.id}`}>
-                          <Hash className="h-3 w-3" />
-                          {session.entryCount} reels
-                        </span>
-                        {session.totalFootage > 0 && (
-                          <span className="flex items-center gap-1 mono" data-testid={`text-session-footage-${session.id}`}>
-                            <Ruler className="h-3 w-3" />
-                            {session.totalFootage.toLocaleString()} ft
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleStatus.mutate({
-                                id: session.id,
-                                status: session.status === "active" ? "completed" : "active",
-                              });
-                            }}
-                            data-testid={`button-toggle-status-${session.id}`}
-                          >
-                            {session.status === "active" ? (
-                              <CheckCircle2 className="h-4 w-4" />
-                            ) : (
-                              <RotateCcw className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{session.status === "active" ? "Mark Session Complete" : "Reopen This Session"}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={(e) => openEditDialog(session, e)}
-                            data-testid={`button-edit-session-${session.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit Session Name</TooltipContent>
-                      </Tooltip>
-                      <AlertDialog>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={(e) => e.stopPropagation()}
-                                data-testid={`button-delete-session-${session.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                          </TooltipTrigger>
-                          <TooltipContent>Delete This Session</TooltipContent>
-                        </Tooltip>
-                        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Session?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete "{session.name}" and all its entries, photos, and pins.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => deleteSession.mutate(session.id)}
-                              data-testid="button-confirm-delete"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
+          <div className="space-y-4">
+            {(userFolders || []).map(folder => renderFolderSection(folder))}
+
+            {unfiledSessions.length > 0 && (
+              <div>
+                {(userFolders || []).length > 0 && (
+                  <div className="flex items-center gap-2 mb-2" data-testid="unfiled-header">
+                    <Cable className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm text-muted-foreground">Unfiled</span>
+                    <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
+                      {unfiledSessions.length}
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                )}
+                <div className="space-y-2">
+                  {unfiledSessions.map(session => renderSessionCard(session))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {sharedSessions && sharedSessions.length > 0 && (
+        {sharedSessions && sharedSessions.length > 0 && !isSearching && (
           <>
             <div className="flex items-center gap-2 mt-8 mb-4">
               <Users className="h-5 w-5 text-muted-foreground" />
@@ -418,85 +799,7 @@ export default function Dashboard() {
               </h2>
             </div>
             <div className="space-y-3">
-              {sharedSessions.map((session) => (
-                <Card
-                  key={session.id}
-                  className="hover-elevate cursor-pointer border border-primary"
-                  data-testid={`card-shared-session-${session.id}`}
-                  onClick={() => setLocation(`/session/${session.id}`)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-sm truncate" data-testid={`text-shared-session-name-${session.id}`}>
-                            {session.name}
-                          </h3>
-                          <Badge
-                            variant={session.status === "active" ? "default" : "secondary"}
-                            className="no-default-hover-elevate no-default-active-elevate"
-                            data-testid={`badge-shared-session-status-${session.id}`}
-                          >
-                            {session.status}
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className="no-default-hover-elevate no-default-active-elevate"
-                            data-testid={`badge-shared-session-role-${session.id}`}
-                          >
-                            {session.role}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
-                          <span className="flex items-center gap-1" data-testid={`text-shared-session-owner-${session.id}`}>
-                            <Users className="h-3 w-3" />
-                            {session.ownerUsername || session.userId}
-                          </span>
-                          {session.location && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {session.location}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1" data-testid={`text-shared-session-time-${session.id}`}>
-                            <Clock className="h-3 w-3" />
-                            {session.firstPhotoAt
-                              ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
-                              : "No photos yet"}
-                            {(() => {
-                              const elapsed = formatElapsedMinutes(session.firstPhotoAt, session.lastPhotoAt);
-                              return elapsed ? <span className="ml-1 mono" data-testid={`badge-shared-session-elapsed-${session.id}`}>({elapsed})</span> : null;
-                            })()}
-                          </span>
-                          <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-photos-${session.id}`}>
-                            <Camera className="h-3 w-3" />
-                            {session.photoCount} photos
-                          </span>
-                          {session.sectionCount > 0 && (
-                            <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-sections-${session.id}`}>
-                              <Layers className="h-3 w-3" />
-                              {session.sectionCount} sections
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-entries-${session.id}`}>
-                            <Hash className="h-3 w-3" />
-                            {session.entryCount} reels
-                          </span>
-                          {session.totalFootage > 0 && (
-                            <span className="flex items-center gap-1 mono" data-testid={`text-shared-session-footage-${session.id}`}>
-                              <Ruler className="h-3 w-3" />
-                              {session.totalFootage.toLocaleString()} ft
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {sharedSessions.map((session) => renderSessionCard(session as any, true))}
             </div>
           </>
         )}
@@ -541,6 +844,41 @@ export default function Dashboard() {
               data-testid="button-save-session-edit"
             >
               {updateSession.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!renamingFolder} onOpenChange={(o) => { if (!o) setRenamingFolder(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (renamingFolder && renameFolderName.trim()) {
+                renameFolder.mutate({ id: renamingFolder.id, name: renameFolderName });
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="rename-folder-name">Folder Name</Label>
+              <Input
+                id="rename-folder-name"
+                value={renameFolderName}
+                onChange={(e) => setRenameFolderName(e.target.value)}
+                data-testid="input-rename-folder"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!renameFolderName.trim() || renameFolder.isPending}
+              data-testid="button-save-folder-rename"
+            >
+              {renameFolder.isPending ? "Saving..." : "Save"}
             </Button>
           </form>
         </DialogContent>

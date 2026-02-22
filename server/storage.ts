@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, inArray, sql, count, sum, min, max } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, sql, count, sum, min, max, ilike, or } from "drizzle-orm";
 import {
   countingSessions,
   photos,
@@ -8,6 +8,7 @@ import {
   userSettings,
   sessionCollaborators,
   sessionInviteLinks,
+  folders,
   type InsertSession,
   type Session,
   type InsertPhoto,
@@ -21,6 +22,8 @@ import {
   type Collaborator,
   type InsertInviteLink,
   type InviteLink,
+  type InsertFolder,
+  type Folder,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -69,6 +72,14 @@ export interface IStorage {
   getInviteLinkByToken(token: string): Promise<InviteLink | undefined>;
   getSessionInviteLinks(sessionId: number): Promise<InviteLink[]>;
   revokeInviteLink(id: number): Promise<void>;
+
+  createFolder(folder: InsertFolder): Promise<Folder>;
+  getUserFolders(userId: string): Promise<Folder[]>;
+  getFolder(id: number): Promise<Folder | undefined>;
+  updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined>;
+  deleteFolder(id: number): Promise<void>;
+  duplicateSession(sessionId: number, userId: string, targetFolderId: number | null): Promise<Session>;
+  searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<number[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -361,6 +372,97 @@ export class DatabaseStorage implements IStorage {
     await db.update(sessionInviteLinks)
       .set({ isActive: false })
       .where(eq(sessionInviteLinks.id, id));
+  }
+
+  async createFolder(folder: InsertFolder): Promise<Folder> {
+    const [result] = await db.insert(folders).values(folder).returning();
+    return result;
+  }
+
+  async getUserFolders(userId: string): Promise<Folder[]> {
+    return db.select().from(folders)
+      .where(eq(folders.userId, userId))
+      .orderBy(asc(folders.sortOrder), asc(folders.createdAt));
+  }
+
+  async getFolder(id: number): Promise<Folder | undefined> {
+    const [result] = await db.select().from(folders).where(eq(folders.id, id));
+    return result;
+  }
+
+  async updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined> {
+    const [result] = await db.update(folders)
+      .set(data)
+      .where(eq(folders.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteFolder(id: number): Promise<void> {
+    await db.update(countingSessions)
+      .set({ folderId: null })
+      .where(eq(countingSessions.folderId, id));
+    await db.delete(folders).where(eq(folders.id, id));
+  }
+
+  async duplicateSession(sessionId: number, userId: string, targetFolderId: number | null): Promise<Session> {
+    const original = await this.getSession(sessionId);
+    if (!original) throw new Error("Session not found");
+    const [newSession] = await db.insert(countingSessions).values({
+      userId,
+      folderId: targetFolderId,
+      name: `${original.name} (Copy)`,
+      location: original.location,
+      status: "active",
+    }).returning();
+    const originalEntries = await this.getSessionEntries(sessionId);
+    for (const entry of originalEntries) {
+      const { id, sessionId: _, createdAt, updatedAt, ...rest } = entry;
+      await db.insert(entries).values({ ...rest, sessionId: newSession.id });
+    }
+    return newSession;
+  }
+
+  async searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<number[]> {
+    const pattern = `%${query}%`;
+    const sessionResults = await db.select({ id: countingSessions.id })
+      .from(countingSessions)
+      .where(and(
+        eq(countingSessions.userId, userId),
+        or(
+          ilike(countingSessions.name, pattern),
+          ilike(sql`COALESCE(${countingSessions.location}, '')`, pattern),
+        )
+      ));
+    const matchedIds = new Set(sessionResults.map(r => r.id));
+
+    if (searchInside) {
+      const userSessions = await db.select({ id: countingSessions.id })
+        .from(countingSessions)
+        .where(eq(countingSessions.userId, userId));
+      const allSessionIds = userSessions.map(s => s.id);
+      if (allSessionIds.length > 0) {
+        const entryMatches = await db.select({ sessionId: entries.sessionId })
+          .from(entries)
+          .where(and(
+            inArray(entries.sessionId, allSessionIds),
+            or(
+              ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
+              ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
+              ilike(sql`COALESCE(${entries.manufacturer}, '')`, pattern),
+              ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
+              ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
+              ilike(sql`COALESCE(${entries.section}, '')`, pattern),
+            )
+          ))
+          .groupBy(entries.sessionId);
+        for (const m of entryMatches) {
+          matchedIds.add(m.sessionId);
+        }
+      }
+    }
+
+    return Array.from(matchedIds);
   }
 }
 

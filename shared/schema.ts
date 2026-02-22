@@ -13,9 +13,18 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const folders = pgTable("folders", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const countingSessions = pgTable("counting_sessions", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull(),
+  folderId: integer("folder_id").references(() => folders.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   location: text("location"),
   status: text("status").notNull().default("active"),
@@ -109,6 +118,11 @@ export const userSettings = pgTable("user_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const insertFolderSchema = createInsertSchema(folders).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertSessionSchema = createInsertSchema(countingSessions).omit({
   id: true,
   startedAt: true,
@@ -141,6 +155,8 @@ export const insertInviteLinkSchema = createInsertSchema(sessionInviteLinks).omi
   createdAt: true,
 });
 
+export type InsertFolder = z.infer<typeof insertFolderSchema>;
+export type Folder = typeof folders.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Session = typeof countingSessions.$inferSelect;
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;

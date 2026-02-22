@@ -143,6 +143,10 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const data = insertSessionSchema.parse({ ...req.body, userId });
+      if (data.folderId) {
+        const folder = await storage.getFolder(data.folderId);
+        if (!folder || folder.userId !== userId) return res.status(400).json({ message: "Invalid folder" });
+      }
       const session = await storage.createSession(data);
       res.json(session);
     } catch (error) {
@@ -211,6 +215,125 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete session" });
+    }
+  });
+
+  // Folders
+  app.get("/api/folders", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const userFolders = await storage.getUserFolders(userId);
+      res.json(userFolders);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get folders" });
+    }
+  });
+
+  app.post("/api/folders", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name } = req.body;
+      if (!name || typeof name !== "string") return res.status(400).json({ message: "Name is required" });
+      const existing = await storage.getUserFolders(userId);
+      const maxOrder = existing.reduce((m, f) => Math.max(m, f.sortOrder), -1);
+      const folder = await storage.createFolder({ userId, name, sortOrder: maxOrder + 1 });
+      res.json(folder);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create folder" });
+    }
+  });
+
+  app.patch("/api/folders/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const folder = await storage.getFolder(parseInt(req.params.id));
+      if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
+      const { name, sortOrder } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      const updated = await storage.updateFolder(folder.id, updates);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update folder" });
+    }
+  });
+
+  app.delete("/api/folders/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const folder = await storage.getFolder(parseInt(req.params.id));
+      if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
+      await storage.deleteFolder(folder.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete folder" });
+    }
+  });
+
+  app.post("/api/folders/reorder", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { folderIds } = req.body;
+      if (!Array.isArray(folderIds)) return res.status(400).json({ message: "folderIds array required" });
+      const userFolders = await storage.getUserFolders(userId);
+      const ownedIds = new Set(userFolders.map(f => f.id));
+      for (let i = 0; i < folderIds.length; i++) {
+        if (!ownedIds.has(folderIds[i])) continue;
+        await storage.updateFolder(folderIds[i], { sortOrder: i });
+      }
+      const updated = await storage.getUserFolders(userId);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reorder folders" });
+    }
+  });
+
+  app.post("/api/sessions/:id/move", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const session = await storage.getSession(parseInt(req.params.id));
+      if (!session || session.userId !== userId) return res.status(404).json({ message: "Session not found" });
+      const { folderId } = req.body;
+      if (folderId !== null && folderId !== undefined) {
+        const folder = await storage.getFolder(folderId);
+        if (!folder || folder.userId !== userId) return res.status(400).json({ message: "Folder not found" });
+      }
+      const updated = await storage.updateSession(session.id, { folderId: folderId ?? null });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to move session" });
+    }
+  });
+
+  app.post("/api/sessions/:id/duplicate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const access = await verifySessionAccess(parseInt(req.params.id), userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const { folderId } = req.body || {};
+      const targetFolderId = folderId ?? access.session.folderId ?? null;
+      if (targetFolderId) {
+        const folder = await storage.getFolder(targetFolderId);
+        if (!folder || folder.userId !== userId) return res.status(400).json({ message: "Invalid folder" });
+      }
+      const newSession = await storage.duplicateSession(access.session.id, userId, targetFolderId);
+      res.json(newSession);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to duplicate session" });
+    }
+  });
+
+  app.get("/api/search/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const query = String(req.query.q || "");
+      const searchInside = req.query.inside === "true";
+      if (!query.trim()) return res.json([]);
+      const matchedIds = await storage.searchUserSessions(userId, query, searchInside);
+      res.json(matchedIds);
+    } catch (error) {
+      res.status(500).json({ message: "Search failed" });
     }
   });
 
