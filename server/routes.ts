@@ -1638,7 +1638,9 @@ export async function registerRoutes(
         ];
         const aligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
         for (let j = 0; j < sumScaled.length; j++) {
+          if (j === 3) doc.font('Helvetica-Bold');
           doc.text(vals[j], x + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false, align: aligns[j] });
+          if (j === 3) doc.font('Helvetica');
           x += sumScaled[j].width;
         }
         doc.rect(tableLeft, currentY, pageWidth, rowH).stroke(borderColor);
