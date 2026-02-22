@@ -394,14 +394,14 @@ export default function Dashboard() {
   };
 
   const reasonLabels: Record<string, string> = {
-    name: "Name",
-    location: "Location",
-    status: "Status",
-    date: "Date",
-    footage: "Footage",
-    reels: "Reels",
-    collaborator: "Collaborator",
-    entries: "Entries",
+    name: "Matched Name",
+    location: "Matched Location",
+    status: "Matched Status",
+    date: "Matched Date",
+    footage: "Matched Footage",
+    reels: "Matched Reels",
+    collaborator: "Matched Collaborator",
+    entries: "Matched Entry Content",
   };
 
   const renderSessionCard = (session: SessionWithStats, isShared = false) => {
@@ -440,8 +440,8 @@ export default function Dashboard() {
                 {sessionReasons.length > 0 && sessionReasons.map(reason => (
                   <Badge
                     key={reason}
-                    variant="secondary"
-                    className="no-default-hover-elevate no-default-active-elevate"
+                    variant="outline"
+                    className="no-default-hover-elevate no-default-active-elevate border-primary/40 text-primary bg-primary/5"
                     data-testid={`badge-match-reason-${reason}-${session.id}`}
                   >
                     {reasonLabels[reason] || reason}
@@ -922,7 +922,7 @@ export default function Dashboard() {
               <p className="text-muted-foreground text-sm">No sessions yet. Create one to start counting reels.</p>
             </CardContent>
           </Card>
-        ) : isSearching && !filteredSessions.length ? (
+        ) : isSearching && !filteredSessions.length && !filteredSharedSessions.length ? (
           <Card>
             <CardContent className="py-8 text-center">
               <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
@@ -931,6 +931,11 @@ export default function Dashboard() {
           </Card>
         ) : (
           <div className="space-y-4">
+            {isSearching && (
+              <p className="text-sm text-muted-foreground" data-testid="text-search-result-count">
+                Found {filteredSessions.length + filteredSharedSessions.length} result{filteredSessions.length + filteredSharedSessions.length !== 1 ? "s" : ""} matching "{searchQuery}":
+              </p>
+            )}
             {(userFolders || []).map(folder => renderFolderSection(folder))}
 
             {unfiledSessions.length > 0 && (
