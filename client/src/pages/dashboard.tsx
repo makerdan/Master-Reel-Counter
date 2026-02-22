@@ -1097,13 +1097,23 @@ export default function Dashboard() {
               <Skeleton key={i} className="h-24 w-full rounded-xl" />
             ))}
           </div>
-        ) : !filteredSessions.length && !isSearching ? (
+        ) : !filteredSessions.length && !isSearching && !(userFolders || []).length ? (
           <Card className="border border-border">
             <CardContent className="py-12 text-center">
               <Cable className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
               <p className="text-muted-foreground text-sm">No sessions yet. Create one to start counting reels.</p>
             </CardContent>
           </Card>
+        ) : !filteredSessions.length && !isSearching && (userFolders || []).length > 0 ? (
+          <div className="space-y-4">
+            {(userFolders || []).map(folder => renderFolderSection(folder))}
+            <Card className="border border-border">
+              <CardContent className="py-8 text-center">
+                <Cable className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-muted-foreground text-sm">No sessions yet. Create one to start counting reels.</p>
+              </CardContent>
+            </Card>
+          </div>
         ) : isSearching && !filteredSessions.length && !filteredSharedSessions.length ? (
           <Card className="border border-border">
             <CardContent className="py-8 text-center">
