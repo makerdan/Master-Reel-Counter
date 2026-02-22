@@ -1671,6 +1671,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                   setActiveSuggestionPin(null);
                                   setSuggestions([]);
                                   setSuggestionIndex(-1);
+                                  const nextInput = document.querySelector(`[data-testid="input-wire-details-${index + 1}"]`) as HTMLInputElement | null;
+                                  if (nextInput) setTimeout(() => nextInput.focus(), 0);
                                 } else if (e.key === "Escape") {
                                   setActiveSuggestionPin(null);
                                   setSuggestions([]);
@@ -1699,6 +1701,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                     setActiveSuggestionPin(null);
                                     setSuggestions([]);
                                     setSuggestionIndex(-1);
+                                    const nextInput = document.querySelector(`[data-testid="input-wire-details-${index + 1}"]`) as HTMLInputElement | null;
+                                    if (nextInput) setTimeout(() => nextInput.focus(), 0);
                                   }}
                                   data-testid={`suggestion-${s.catalog}`}
                                 >
