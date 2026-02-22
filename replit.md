@@ -26,7 +26,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
     - Background photo uploads and an offline photo queue with IndexedDB persistence for seamless operation in varying network conditions.
     - Per-photo pin scaling and notes.
     - Nearby photo viewer for contextual information.
-- **Collaboration:** Supports collaborative sessions with role-based permissions (owner, editor, viewer) and multiple invitation methods (username, shareable link, email). Real-time updates for collaborative sessions via WebSocket.
+- **Collaboration:** Supports collaborative sessions with role-based permissions (owner, editor, viewer) and multiple invitation methods (username, shareable link, email). Real-time updates for collaborative sessions via WebSocket. Online presence tracking with green dot indicators. Role management (editor/viewer toggle), ownership transfer with confirmation dialog, invite link usage tracking (join count), and 7-day auto-expiry on invite links.
 - **Data Export:** Capabilities to export session data as PDF or CSV.
 - **Undo/Redo:** Implemented for entry and pin modifications.
 - **Summary Statistics:** Dashboard to display key metrics and activity logs.
