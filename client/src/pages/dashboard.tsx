@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -68,6 +68,60 @@ export default function Dashboard() {
   const [openFolders, setOpenFolders] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInside, setSearchInside] = useState(false);
+  const [showRecentSearches, setShowRecentSearches] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const recentDropdownRef = useRef<HTMLDivElement>(null);
+
+  const RECENT_SEARCHES_KEY = "reel-counter-recent-searches";
+  const MAX_RECENT = 8;
+
+  const getRecentSearches = useCallback((): string[] => {
+    try {
+      const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  }, []);
+
+  const [recentSearches, setRecentSearches] = useState<string[]>(getRecentSearches);
+
+  const addRecentSearch = useCallback((query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    setRecentSearches(prev => {
+      const filtered = prev.filter(s => s !== trimmed);
+      const updated = [trimmed, ...filtered].slice(0, MAX_RECENT);
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const removeRecentSearch = useCallback((query: string) => {
+    setRecentSearches(prev => {
+      const updated = prev.filter(s => s !== query);
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const clearRecentSearches = useCallback(() => {
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+    setRecentSearches([]);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        recentDropdownRef.current &&
+        !recentDropdownRef.current.contains(e.target as Node) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(e.target as Node)
+      ) {
+        setShowRecentSearches(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
   const [moveSessionTarget, setMoveSessionTarget] = useState<SessionWithStats | null>(null);
   const [createFolderForSession, setCreateFolderForSession] = useState<SessionWithStats | null>(null);
   const [inlineFolderName, setInlineFolderName] = useState("");
@@ -90,26 +144,43 @@ export default function Dashboard() {
     placeholderData: [],
   });
 
-  const { data: searchResults } = useQuery<number[]>({
+  type SearchResult = { ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> };
+  const emptySearch: SearchResult = { ownedIds: [], sharedIds: [], reasons: {} };
+
+  const { data: searchResults } = useQuery<SearchResult>({
     queryKey: ["/api/search/sessions", searchQuery, searchInside],
     queryFn: async () => {
-      if (!searchQuery.trim()) return [];
+      if (!searchQuery.trim()) return emptySearch;
       const res = await fetch(`/api/search/sessions?q=${encodeURIComponent(searchQuery)}&inside=${searchInside}`);
-      if (!res.ok) return [];
+      if (!res.ok) return emptySearch;
       return res.json();
     },
     enabled: !!user && searchQuery.trim().length > 0,
-    placeholderData: [],
+    placeholderData: emptySearch,
   });
 
+  useEffect(() => {
+    if (searchQuery.trim() && searchResults && (searchResults.ownedIds.length > 0 || searchResults.sharedIds.length > 0)) {
+      addRecentSearch(searchQuery);
+    }
+  }, [searchResults]);
+
   const isSearching = searchQuery.trim().length > 0;
-  const searchMatchSet = useMemo(() => new Set(searchResults || []), [searchResults]);
+  const ownedMatchSet = useMemo(() => new Set(searchResults?.ownedIds || []), [searchResults]);
+  const sharedMatchSet = useMemo(() => new Set(searchResults?.sharedIds || []), [searchResults]);
+  const matchReasons = searchResults?.reasons || {};
 
   const filteredSessions = useMemo(() => {
     if (!sessions) return [];
     if (!isSearching) return sessions;
-    return sessions.filter(s => searchMatchSet.has(s.id));
-  }, [sessions, isSearching, searchMatchSet]);
+    return sessions.filter(s => ownedMatchSet.has(s.id));
+  }, [sessions, isSearching, ownedMatchSet]);
+
+  const filteredSharedSessions = useMemo(() => {
+    if (!sharedSessions) return [];
+    if (!isSearching) return sharedSessions;
+    return sharedSessions.filter(s => sharedMatchSet.has(s.id));
+  }, [sharedSessions, isSearching, sharedMatchSet]);
 
   const folderedSessions = useMemo(() => {
     const map = new Map<number | null, SessionWithStats[]>();
@@ -322,8 +393,20 @@ export default function Dashboard() {
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
+  const reasonLabels: Record<string, string> = {
+    name: "Name",
+    location: "Location",
+    status: "Status",
+    date: "Date",
+    footage: "Footage",
+    reels: "Reels",
+    collaborator: "Collaborator",
+    entries: "Entries",
+  };
+
   const renderSessionCard = (session: SessionWithStats, isShared = false) => {
     const prefix = isShared ? "shared-" : "";
+    const sessionReasons = isSearching ? (matchReasons[session.id] || []) : [];
     return (
       <Card
         key={session.id}
@@ -354,6 +437,16 @@ export default function Dashboard() {
                     {(session as SharedSessionWithStats).role}
                   </Badge>
                 )}
+                {sessionReasons.length > 0 && sessionReasons.map(reason => (
+                  <Badge
+                    key={reason}
+                    variant="secondary"
+                    className="no-default-hover-elevate no-default-active-elevate"
+                    data-testid={`badge-match-reason-${reason}-${session.id}`}
+                  >
+                    {reasonLabels[reason] || reason}
+                  </Badge>
+                ))}
               </div>
               <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
                 {isShared && (session as SharedSessionWithStats).ownerUsername && (
@@ -727,8 +820,16 @@ export default function Dashboard() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => { if (!searchQuery && recentSearches.length > 0) setShowRecentSearches(true); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && searchQuery.trim()) {
+                  addRecentSearch(searchQuery);
+                  setShowRecentSearches(false);
+                }
+              }}
               placeholder="Search sessions..."
               className="pl-9 pr-9"
               data-testid="input-search-sessions"
@@ -738,11 +839,61 @@ export default function Dashboard() {
                 size="icon"
                 variant="ghost"
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                onClick={() => setSearchQuery("")}
+                onClick={() => { setSearchQuery(""); setShowRecentSearches(false); }}
                 data-testid="button-clear-search"
               >
                 <X className="h-4 w-4" />
               </Button>
+            )}
+            {showRecentSearches && recentSearches.length > 0 && !searchQuery && (
+              <div
+                ref={recentDropdownRef}
+                className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border bg-popover shadow-md"
+                data-testid="dropdown-recent-searches"
+              >
+                <div className="flex items-center justify-between px-3 py-2 border-b">
+                  <span className="text-xs font-medium text-muted-foreground">Recent searches</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={clearRecentSearches}
+                    data-testid="button-clear-recent-searches"
+                  >
+                    Clear all
+                  </Button>
+                </div>
+                {recentSearches.map((term) => (
+                  <div
+                    key={term}
+                    className="flex items-center justify-between"
+                    data-testid={`item-recent-search-${term}`}
+                  >
+                    <Button
+                      variant="ghost"
+                      className="flex-1 justify-start gap-2 h-auto py-2 px-3 rounded-none text-sm font-normal"
+                      onClick={() => {
+                        setSearchQuery(term);
+                        setShowRecentSearches(false);
+                        addRecentSearch(term);
+                      }}
+                      data-testid={`button-select-recent-${term}`}
+                    >
+                      <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="truncate">{term}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 mr-1"
+                      onClick={(e) => { e.stopPropagation(); removeRecentSearch(term); }}
+                      data-testid={`button-remove-recent-${term}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -801,7 +952,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {sharedSessions && sharedSessions.length > 0 && !isSearching && (
+        {filteredSharedSessions.length > 0 && (
           <>
             <div className="flex items-center gap-2 mt-8 mb-4">
               <Users className="h-5 w-5 text-muted-foreground" />
@@ -810,7 +961,7 @@ export default function Dashboard() {
               </h2>
             </div>
             <div className="space-y-3">
-              {sharedSessions.map((session) => renderSessionCard(session as any, true))}
+              {filteredSharedSessions.map((session) => renderSessionCard(session as any, true))}
             </div>
           </>
         )}

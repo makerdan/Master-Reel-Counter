@@ -79,7 +79,7 @@ export interface IStorage {
   updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined>;
   deleteFolder(id: number): Promise<void>;
   duplicateSession(sessionId: number, userId: string, targetFolderId: number | null): Promise<Session>;
-  searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<number[]>;
+  searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -423,8 +423,18 @@ export class DatabaseStorage implements IStorage {
     return newSession;
   }
 
-  async searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<number[]> {
+  async searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{
+    ownedIds: number[];
+    sharedIds: number[];
+    reasons: Record<number, string[]>;
+  }> {
+    const lowerQuery = query.trim().toLowerCase();
     const pattern = `%${query}%`;
+    const reasons: Record<number, string[]> = {};
+    const addReason = (id: number, reason: string) => {
+      if (!reasons[id]) reasons[id] = [];
+      if (!reasons[id].includes(reason)) reasons[id].push(reason);
+    };
 
     const monthNames: Record<string, number> = {
       january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
@@ -434,16 +444,10 @@ export class DatabaseStorage implements IStorage {
 
     let dateMonth: number | null = null;
     let dateYear: number | null = null;
-
-    const lowerQuery = query.trim().toLowerCase();
-    const mmyyyySlash = lowerQuery.match(/^(\d{1,2})\/(\d{4})$/);
-    const mmyyyyDash = lowerQuery.match(/^(\d{1,2})-(\d{4})$/);
-    if (mmyyyySlash) {
-      dateMonth = parseInt(mmyyyySlash[1]);
-      dateYear = parseInt(mmyyyySlash[2]);
-    } else if (mmyyyyDash) {
-      dateMonth = parseInt(mmyyyyDash[1]);
-      dateYear = parseInt(mmyyyyDash[2]);
+    const mmyyyyMatch = lowerQuery.match(/^(\d{1,2})[\/\-](\d{4})$/);
+    if (mmyyyyMatch) {
+      dateMonth = parseInt(mmyyyyMatch[1]);
+      dateYear = parseInt(mmyyyyMatch[2]);
     } else {
       const parts = lowerQuery.split(/[\s,/\-]+/);
       for (const part of parts) {
@@ -452,43 +456,137 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const textConditions = [
-      ilike(countingSessions.name, pattern),
-      ilike(sql`COALESCE(${countingSessions.location}, '')`, pattern),
-    ];
-
-    if (dateMonth && dateYear) {
-      textConditions.push(
-        sql`EXTRACT(MONTH FROM ${countingSessions.startedAt}) = ${dateMonth} AND EXTRACT(YEAR FROM ${countingSessions.startedAt}) = ${dateYear}`
-      );
-    } else if (dateMonth) {
-      textConditions.push(
-        sql`EXTRACT(MONTH FROM ${countingSessions.startedAt}) = ${dateMonth}`
-      );
-    } else if (dateYear) {
-      textConditions.push(
-        sql`EXTRACT(YEAR FROM ${countingSessions.startedAt}) = ${dateYear}`
-      );
+    let statusMatch: string | null = null;
+    if (lowerQuery === "active" || lowerQuery === "completed") {
+      statusMatch = lowerQuery;
     }
 
-    const sessionResults = await db.select({ id: countingSessions.id })
-      .from(countingSessions)
-      .where(and(
-        eq(countingSessions.userId, userId),
-        or(...textConditions),
-      ));
-    const matchedIds = new Set(sessionResults.map(r => r.id));
+    let footageMin: number | null = null;
+    const footageMatch = lowerQuery.match(/^[>]?\s*(\d+)\+?\s*(ft|feet|footage)?$/);
+    if (footageMatch && parseInt(footageMatch[1]) >= 100) {
+      footageMin = parseInt(footageMatch[1]);
+    }
 
-    if (searchInside) {
-      const userSessions = await db.select({ id: countingSessions.id })
-        .from(countingSessions)
-        .where(eq(countingSessions.userId, userId));
-      const allSessionIds = userSessions.map(s => s.id);
-      if (allSessionIds.length > 0) {
+    let reelMin: number | null = null;
+    const reelMatch = lowerQuery.match(/^[>]?\s*(\d+)\+?\s*reels?$/);
+    if (reelMatch) {
+      reelMin = parseInt(reelMatch[1]);
+    }
+
+    const allUserSessions = await db.select().from(countingSessions)
+      .where(eq(countingSessions.userId, userId));
+    const allSessionIds = allUserSessions.map(s => s.id);
+    const ownedMatched = new Set<number>();
+
+    for (const s of allUserSessions) {
+      if (s.name.toLowerCase().includes(lowerQuery)) {
+        ownedMatched.add(s.id);
+        addReason(s.id, "name");
+      }
+      if (s.location && s.location.toLowerCase().includes(lowerQuery)) {
+        ownedMatched.add(s.id);
+        addReason(s.id, "location");
+      }
+      if (statusMatch && s.status === statusMatch) {
+        ownedMatched.add(s.id);
+        addReason(s.id, "status");
+      }
+      if (dateMonth || dateYear) {
+        const d = new Date(s.startedAt);
+        const mMatch = dateMonth ? d.getMonth() + 1 === dateMonth : true;
+        const yMatch = dateYear ? d.getFullYear() === dateYear : true;
+        if (mMatch && yMatch) {
+          ownedMatched.add(s.id);
+          addReason(s.id, "date");
+        }
+      }
+    }
+
+    if ((footageMin !== null || reelMin !== null) && allSessionIds.length > 0) {
+      const stats = await this.getSessionStats(allSessionIds);
+      for (const [sid, stat] of stats) {
+        if (footageMin !== null && stat.totalFootage >= footageMin) {
+          ownedMatched.add(sid);
+          addReason(sid, "footage");
+        }
+        if (reelMin !== null && stat.entryCount >= reelMin) {
+          ownedMatched.add(sid);
+          addReason(sid, "reels");
+        }
+      }
+    }
+
+    if (allSessionIds.length > 0) {
+      const collabMatches = await db.select({ sessionId: sessionCollaborators.sessionId })
+        .from(sessionCollaborators)
+        .where(and(
+          inArray(sessionCollaborators.sessionId, allSessionIds),
+          ilike(sql`COALESCE(${sessionCollaborators.username}, '')`, pattern),
+        ))
+        .groupBy(sessionCollaborators.sessionId);
+      for (const m of collabMatches) {
+        ownedMatched.add(m.sessionId);
+        addReason(m.sessionId, "collaborator");
+      }
+    }
+
+    if (searchInside && allSessionIds.length > 0) {
+      const entryMatches = await db.select({ sessionId: entries.sessionId })
+        .from(entries)
+        .where(and(
+          inArray(entries.sessionId, allSessionIds),
+          or(
+            ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
+            ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
+            ilike(sql`COALESCE(${entries.manufacturer}, '')`, pattern),
+            ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
+            ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
+            ilike(sql`COALESCE(${entries.section}, '')`, pattern),
+          )
+        ))
+        .groupBy(entries.sessionId);
+      for (const m of entryMatches) {
+        ownedMatched.add(m.sessionId);
+        addReason(m.sessionId, "entries");
+      }
+    }
+
+    const sharedMatched = new Set<number>();
+    const collabs = await db.select().from(sessionCollaborators)
+      .where(eq(sessionCollaborators.userId, userId));
+    if (collabs.length > 0) {
+      const sharedSessionIds = collabs.map(c => c.sessionId);
+      const sharedSessions = await db.select().from(countingSessions)
+        .where(inArray(countingSessions.id, sharedSessionIds));
+      for (const s of sharedSessions) {
+        if (s.name.toLowerCase().includes(lowerQuery)) {
+          sharedMatched.add(s.id);
+          addReason(s.id, "name");
+        }
+        if (s.location && s.location.toLowerCase().includes(lowerQuery)) {
+          sharedMatched.add(s.id);
+          addReason(s.id, "location");
+        }
+        if (statusMatch && s.status === statusMatch) {
+          sharedMatched.add(s.id);
+          addReason(s.id, "status");
+        }
+        if (dateMonth || dateYear) {
+          const d = new Date(s.startedAt);
+          const mMatch = dateMonth ? d.getMonth() + 1 === dateMonth : true;
+          const yMatch = dateYear ? d.getFullYear() === dateYear : true;
+          if (mMatch && yMatch) {
+            sharedMatched.add(s.id);
+            addReason(s.id, "date");
+          }
+        }
+      }
+
+      if (searchInside && sharedSessionIds.length > 0) {
         const entryMatches = await db.select({ sessionId: entries.sessionId })
           .from(entries)
           .where(and(
-            inArray(entries.sessionId, allSessionIds),
+            inArray(entries.sessionId, sharedSessionIds),
             or(
               ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
               ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
@@ -500,12 +598,17 @@ export class DatabaseStorage implements IStorage {
           ))
           .groupBy(entries.sessionId);
         for (const m of entryMatches) {
-          matchedIds.add(m.sessionId);
+          sharedMatched.add(m.sessionId);
+          addReason(m.sessionId, "entries");
         }
       }
     }
 
-    return Array.from(matchedIds);
+    return {
+      ownedIds: Array.from(ownedMatched),
+      sharedIds: Array.from(sharedMatched),
+      reasons,
+    };
   }
 }
 

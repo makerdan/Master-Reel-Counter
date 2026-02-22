@@ -329,9 +329,9 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const query = String(req.query.q || "");
       const searchInside = req.query.inside === "true";
-      if (!query.trim()) return res.json([]);
-      const matchedIds = await storage.searchUserSessions(userId, query, searchInside);
-      res.json(matchedIds);
+      if (!query.trim()) return res.json({ ownedIds: [], sharedIds: [], reasons: {} });
+      const result = await storage.searchUserSessions(userId, query, searchInside);
+      res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Search failed" });
     }
