@@ -253,8 +253,9 @@ export async function registerRoutes(
     try {
       const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Session not found" });
-      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can edit session details" });
       const data: any = { ...req.body };
+      const isLastPhotoIndexOnly = Object.keys(data).length === 1 && "lastPhotoIndex" in data;
+      if (!isLastPhotoIndexOnly && !isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can edit session details" });
       if (data.completedAt) data.completedAt = new Date(data.completedAt);
       else if (data.completedAt === null) data.completedAt = null;
       const updated = await storage.updateSession(access.session.id, data);

@@ -28,7 +28,7 @@ import ReelCropPreview from "./ReelCropPreview";
 import type { LocalPin } from "./types";
 import { deriveVendorCode } from "./utils";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0 }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +36,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [aisle, setAisle] = useState("");
   const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number; pinScale?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+  const initialRestoredRef = useRef(false);
+  const saveEnabledRef = useRef(false);
   const [viewingNearbyIdx, setViewingNearbyIdx] = useState<number | null>(null);
 
   const { data: incompletePinsData } = useQuery<{ photoId: number; incompleteCount: number }[]>({
@@ -192,9 +194,19 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       return (a.dbId || 0) - (b.dbId || 0);
     });
     setUploadedPhotos(mapped);
-    if (!navigateToPhotoId) {
+    if (!navigateToPhotoId && !initialRestoredRef.current && initialPhotoIndex > 0 && initialPhotoIndex < mapped.length) {
+      setCurrentPhotoIdx(initialPhotoIndex);
+      const photo = mapped[initialPhotoIndex];
+      if (photo?.aisle) setAisle(photo.aisle);
+      initialRestoredRef.current = true;
+      setTimeout(() => { saveEnabledRef.current = true; }, 3000);
+    } else if (!navigateToPhotoId) {
       const firstAisle = mapped.find(p => p.aisle)?.aisle;
       if (firstAisle && !aisle) setAisle(firstAisle);
+      if (!initialRestoredRef.current) {
+        initialRestoredRef.current = true;
+        setTimeout(() => { saveEnabledRef.current = true; }, 3000);
+      }
     }
   }, [photos, navigateToPhotoId]);
 
@@ -218,6 +230,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       setAisle(photo.aisle || "");
     }
   }, [currentPhotoIdx, uploadedPhotos]);
+
+  const photoIdxSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (!saveEnabledRef.current) return;
+    if (uploadedPhotos.length === 0) return;
+    const clampedIdx = Math.min(currentPhotoIdx, uploadedPhotos.length - 1);
+    clearTimeout(photoIdxSaveTimer.current);
+    photoIdxSaveTimer.current = setTimeout(() => {
+      apiRequest("PATCH", `/api/sessions/${sessionId}`, { lastPhotoIndex: clampedIdx }).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(photoIdxSaveTimer.current);
+  }, [currentPhotoIdx, sessionId, uploadedPhotos.length]);
 
   const flushSavePins = useCallback(async () => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);

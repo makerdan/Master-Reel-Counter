@@ -33,6 +33,7 @@ export const countingSessions = pgTable("counting_sessions", {
   startedAt: timestamp("started_at").defaultNow().notNull(),
   lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
+  lastPhotoIndex: integer("last_photo_index").default(0),
 });
 
 export const photos = pgTable("photos", {
