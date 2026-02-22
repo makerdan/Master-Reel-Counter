@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Settings, Shield, ShieldOff, AlertTriangle, Lock,
-  Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X,
+  Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -368,6 +368,28 @@ export default function SettingsPage() {
                 Sign Out
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Contact</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-2">
+              Questions, feedback, or issues? Reach out to the developer.
+            </p>
+            <a
+              href="mailto:makerdantheman@gmail.com"
+              className="text-sm font-medium text-primary hover:underline"
+              data-testid="link-contact-email"
+            >
+              makerdantheman@gmail.com
+            </a>
+            <p className="text-xs text-muted-foreground mt-1">Dan — Developer</p>
           </CardContent>
         </Card>
       </main>
