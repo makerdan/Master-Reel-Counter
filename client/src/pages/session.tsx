@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
-  ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2,
+  ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History, MessageSquare,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -26,8 +26,11 @@ import TeamDialog from "./session/TeamDialog";
 import EntryTable from "./session/EntryTable";
 import SingleEntryMode from "./session/SingleEntryMode";
 import MobileCaptureView from "./session/MobileCaptureView";
+import ActivityLog from "./session/ActivityLog";
+import Comments from "./session/Comments";
 import { buildExportFilename, formatSessionTime } from "./session/utils";
 import { useUndoRedo } from "@/hooks/use-undo";
+import { useSessionWebSocket } from "@/hooks/use-websocket";
 
 export default function SessionPage() {
   const [, params] = useRoute("/session/:id");
@@ -115,7 +118,12 @@ function SessionWorkspace({
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
   const [mobileFlowKey, setMobileFlowKey] = useState(0);
 
+  const [showActivity, setShowActivity] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
+
+  useSessionWebSocket(sessionId);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -280,6 +288,12 @@ function SessionWorkspace({
                 Team
               </Button>
             )}
+            <Button size="icon" variant={showComments ? "default" : "ghost"} onClick={() => { setShowComments(!showComments); setShowActivity(false); }} data-testid="button-toggle-comments">
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant={showActivity ? "default" : "ghost"} onClick={() => { setShowActivity(!showActivity); setShowComments(false); }} data-testid="button-toggle-activity">
+              <History className="h-4 w-4" />
+            </Button>
             <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
               {captureMode ? "Full Mode" : "Mobile Flow"}
             </Button>
@@ -308,6 +322,20 @@ function SessionWorkspace({
           </div>
         </div>
       </header>
+
+      {(showActivity || showComments) && (
+        <div className="border-b bg-card">
+          <div className="max-w-5xl mx-auto w-full px-4">
+            <div className="flex items-center gap-2 py-2 border-b border-border/50">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {showActivity ? "Activity Log" : "Comments"}
+              </h3>
+            </div>
+            {showActivity && <ActivityLog sessionId={sessionId} />}
+            {showComments && <Comments sessionId={sessionId} role={(session as any).role} />}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
         {captureMode ? (

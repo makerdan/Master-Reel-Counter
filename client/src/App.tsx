@@ -10,6 +10,7 @@ import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import SessionPage from "@/pages/session";
 import SettingsPage from "@/pages/settings";
+import StatsPage from "@/pages/stats";
 import JoinPage from "@/pages/join";
 import NotFound from "@/pages/not-found";
 
@@ -34,6 +35,9 @@ function AuthRouter() {
       </Route>
       <Route path="/settings">
         {user ? <SettingsPage /> : <Landing />}
+      </Route>
+      <Route path="/stats">
+        {user ? <StatsPage /> : <Landing />}
       </Route>
       <Route path="/join/:token">
         {user ? <JoinPage /> : <Landing />}

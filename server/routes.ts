@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
@@ -12,6 +13,26 @@ import sharp from "sharp";
 import { randomUUID, randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
+
+const sessionRooms = new Map<number, Set<WebSocket>>();
+
+function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSocket) {
+  const room = sessionRooms.get(sessionId);
+  if (!room) return;
+  const data = JSON.stringify(message);
+  for (const ws of room) {
+    if (ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
+    }
+  }
+}
+
+async function logActivity(sessionId: number, userId: string, username: string | undefined, action: string, entityType?: string, entityId?: number, details?: string) {
+  try {
+    await storage.createActivityLog({ sessionId, userId, username: username || null, action, entityType: entityType || null, entityId: entityId || null, details: details || null });
+    broadcastToSession(sessionId, { type: "activity", action, entityType, entityId, userId, username });
+  } catch {}
+}
 
 async function verifySessionAccess(sessionId: number, userId: string): Promise<{ session: any; role: "owner" | "editor" | "viewer" } | null> {
   const session = await storage.getSession(sessionId);
@@ -441,6 +462,8 @@ export async function registerRoutes(
       await storage.updatePhoto(photo.id, { originalFilename: uniqueFilename });
       photo.originalFilename = uniqueFilename;
       console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${access.session.id}, filename="${uniqueFilename}", at=${photo.createdAt.toISOString()}`);
+      logActivity(access.session.id, userId, displayName, "photo_uploaded", "photo", photo.id, uniqueFilename);
+      broadcastToSession(access.session.id, { type: "sync", entity: "photos", sessionId: access.session.id });
       res.json(photo);
     } catch (error) {
       console.error("Error creating photo:", error);
@@ -548,6 +571,9 @@ export async function registerRoutes(
       const entry = await storage.createEntry(data);
       await storage.updateSession(access.session.id, {});
       const result = encKey ? decryptEntry(entry, encKey) : entry;
+      const username = req.user.claims.first_name || req.user.claims.email || userId;
+      logActivity(access.session.id, userId, username, "entry_created", "entry", entry.id, result.reelTag || undefined);
+      broadcastToSession(access.session.id, { type: "sync", entity: "entries", sessionId: access.session.id });
       res.json(result);
     } catch (error) {
       console.error("Error creating entry:", error);
@@ -568,6 +594,9 @@ export async function registerRoutes(
       if (encKey) updateData = encryptEntry(updateData, encKey) as any;
       const updated = await storage.updateEntry(entry.id, updateData);
       const result = encKey && updated ? decryptEntry(updated, encKey) : updated;
+      const username = req.user.claims.first_name || req.user.claims.email || userId;
+      logActivity(entry.sessionId, userId, username, "entry_updated", "entry", entry.id);
+      broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to update entry" });
@@ -578,10 +607,14 @@ export async function registerRoutes(
     try {
       const entry = await storage.getEntry(parseInt(req.params.id));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const access = await verifySessionAccess(entry.sessionId, req.user.claims.sub);
+      const userId = req.user.claims.sub;
+      const access = await verifySessionAccess(entry.sessionId, userId);
       if (!access) return res.status(404).json({ message: "Entry not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete entries" });
       await storage.deleteEntry(entry.id);
+      const username = req.user.claims.first_name || req.user.claims.email || userId;
+      logActivity(entry.sessionId, userId, username, "entry_deleted", "entry", entry.id);
+      broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete entry" });
@@ -623,6 +656,7 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add pins" });
       const data = insertPinSchema.parse({ ...req.body, photoId: photo.id });
       const pin = await storage.createPin(data);
+      broadcastToSession(photo.sessionId, { type: "sync", entity: "pins", sessionId: photo.sessionId });
       res.json(pin);
     } catch (error) {
       console.error("Error creating pin:", error);
@@ -1685,6 +1719,135 @@ export async function registerRoutes(
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch session data" });
     }
+  });
+
+  // Stats
+  app.get("/api/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getUserStats(userId);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get stats" });
+    }
+  });
+
+  // Activity logs
+  app.get("/api/sessions/:id/activity", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const limit = parseInt(req.query.limit) || 50;
+      const offset = parseInt(req.query.offset) || 0;
+      const logs = await storage.getSessionActivityLogs(sessionId, limit, offset);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get activity logs" });
+    }
+  });
+
+  // Comments
+  app.get("/api/sessions/:id/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const allComments = await storage.getSessionComments(sessionId);
+      res.json(allComments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get comments" });
+    }
+  });
+
+  app.post("/api/sessions/:id/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "View-only access" });
+      const { text, entryId, photoId, parentCommentId } = req.body;
+      if (!text || !text.trim()) return res.status(400).json({ message: "Comment text required" });
+      const username = req.user.claims.first_name || req.user.claims.email || userId;
+      const comment = await storage.createComment({
+        sessionId, userId, username,
+        text: text.trim(),
+        entryId: entryId || null,
+        photoId: photoId || null,
+        parentCommentId: parentCommentId || null,
+      });
+      await logActivity(sessionId, userId, username, "comment_added", "comment", comment.id, text.trim().substring(0, 100));
+      broadcastToSession(sessionId, { type: "comment", action: "created", comment });
+      res.status(201).json(comment);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+
+  app.patch("/api/comments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const commentId = parseInt(req.params.id);
+      const comment = await storage.getComment(commentId);
+      if (!comment) return res.status(404).json({ message: "Comment not found" });
+      if (comment.userId !== userId) return res.status(403).json({ message: "Not authorized" });
+      const { text } = req.body;
+      if (!text || !text.trim()) return res.status(400).json({ message: "Comment text required" });
+      const updated = await storage.updateComment(commentId, { text: text.trim() });
+      broadcastToSession(comment.sessionId, { type: "comment", action: "updated", comment: updated });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update comment" });
+    }
+  });
+
+  app.delete("/api/comments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const commentId = parseInt(req.params.id);
+      const comment = await storage.getComment(commentId);
+      if (!comment) return res.status(404).json({ message: "Comment not found" });
+      const access = await verifySessionAccess(comment.sessionId, userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (comment.userId !== userId && !isOwner(access.role)) return res.status(403).json({ message: "Not authorized" });
+      await storage.deleteComment(commentId);
+      broadcastToSession(comment.sessionId, { type: "comment", action: "deleted", commentId });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete comment" });
+    }
+  });
+
+  // WebSocket
+  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+  wss.on("connection", (ws) => {
+    let joinedSessionId: number | null = null;
+
+    ws.on("message", (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (msg.type === "join" && typeof msg.sessionId === "number") {
+          if (joinedSessionId !== null) {
+            const prev = sessionRooms.get(joinedSessionId);
+            if (prev) { prev.delete(ws); if (prev.size === 0) sessionRooms.delete(joinedSessionId); }
+          }
+          joinedSessionId = msg.sessionId;
+          if (!sessionRooms.has(joinedSessionId)) sessionRooms.set(joinedSessionId, new Set());
+          sessionRooms.get(joinedSessionId)!.add(ws);
+          ws.send(JSON.stringify({ type: "joined", sessionId: joinedSessionId }));
+        }
+      } catch {}
+    });
+
+    ws.on("close", () => {
+      if (joinedSessionId !== null) {
+        const room = sessionRooms.get(joinedSessionId);
+        if (room) { room.delete(ws); if (room.size === 0) sessionRooms.delete(joinedSessionId); }
+      }
+    });
   });
 
   return httpServer;

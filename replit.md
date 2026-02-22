@@ -4,6 +4,10 @@
 A full-stack warehouse wire reel counting application built with React, Express, PostgreSQL, and Replit integrations. Tracks wire reels across pallet sections with photo annotation, manual category entry with catalog autocomplete, and PDF/CSV export capabilities.
 
 ## Recent Changes
+- 2026-02-22: Threaded comments — comments table with parentCommentId for replies; CRUD API routes; Comments component with reply/edit/delete; real-time updates via WebSocket
+- 2026-02-22: Activity logging — activity_logs table tracking entry/photo/pin create/update/delete; ActivityLog component with timestamped actions and icons; broadcasts to session room via WebSocket
+- 2026-02-22: Real-time WebSocket sync — session rooms with join/leave; broadcasts entry/photo/pin/comment changes; useSessionWebSocket hook auto-invalidates TanStack queries on sync messages
+- 2026-02-22: Summary statistics — /stats page with metric cards (sessions, entries, reels, footage, photos); top categories/manufacturers; weekly activity bar charts; accessible from dashboard via Stats icon button
 - 2026-02-22: Undo/Redo — useUndoRedo hook tracks create/update/delete for entries and pins; undo/redo buttons in session header; Ctrl+Z / Ctrl+Shift+Z keyboard shortcuts; max 20 actions in stack; integrated with EntryTable (delete) and SingleEntryMode (create/update)
 - 2026-02-22: Quick re-entry — session page saves last active session ID to localStorage; dashboard shows "Continue" button for last active (non-completed) session
 - 2026-02-22: Offline photo queue — IndexedDB persistence for upload queue; auto-resume on reconnect; offline indicator banner in MobileCaptureView; blob preview with status overlays

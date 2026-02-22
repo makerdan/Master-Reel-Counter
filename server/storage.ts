@@ -9,6 +9,8 @@ import {
   sessionCollaborators,
   sessionInviteLinks,
   folders,
+  activityLogs,
+  comments,
   type InsertSession,
   type Session,
   type InsertPhoto,
@@ -24,6 +26,10 @@ import {
   type InviteLink,
   type InsertFolder,
   type Folder,
+  type InsertActivityLog,
+  type ActivityLog,
+  type InsertComment,
+  type Comment,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -80,6 +86,28 @@ export interface IStorage {
   deleteFolder(id: number): Promise<void>;
   duplicateSession(sessionId: number, userId: string, targetFolderId: number | null): Promise<Session>;
   searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> }>;
+
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  getSessionActivityLogs(sessionId: number, limit?: number, offset?: number): Promise<ActivityLog[]>;
+
+  createComment(comment: InsertComment): Promise<Comment>;
+  getSessionComments(sessionId: number): Promise<Comment[]>;
+  getComment(id: number): Promise<Comment | undefined>;
+  updateComment(id: number, data: Partial<Comment>): Promise<Comment | undefined>;
+  deleteComment(id: number): Promise<void>;
+
+  getUserStats(userId: string): Promise<{
+    totalSessions: number;
+    activeSessions: number;
+    completedSessions: number;
+    totalEntries: number;
+    totalReels: number;
+    totalFootage: number;
+    totalPhotos: number;
+    topCategories: { category: string; count: number; footage: number }[];
+    topManufacturers: { manufacturer: string; count: number }[];
+    weeklyStats: { week: string; entries: number; footage: number }[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -608,6 +636,141 @@ export class DatabaseStorage implements IStorage {
       ownedIds: Array.from(ownedMatched),
       sharedIds: Array.from(sharedMatched),
       reasons,
+    };
+  }
+
+  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
+    const [result] = await db.insert(activityLogs).values(log).returning();
+    return result;
+  }
+
+  async getSessionActivityLogs(sessionId: number, limit = 50, offset = 0): Promise<ActivityLog[]> {
+    return db.select().from(activityLogs)
+      .where(eq(activityLogs.sessionId, sessionId))
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async createComment(comment: InsertComment): Promise<Comment> {
+    const [result] = await db.insert(comments).values(comment).returning();
+    return result;
+  }
+
+  async getSessionComments(sessionId: number): Promise<Comment[]> {
+    return db.select().from(comments)
+      .where(eq(comments.sessionId, sessionId))
+      .orderBy(asc(comments.createdAt));
+  }
+
+  async getComment(id: number): Promise<Comment | undefined> {
+    const [result] = await db.select().from(comments).where(eq(comments.id, id));
+    return result;
+  }
+
+  async updateComment(id: number, data: Partial<Comment>): Promise<Comment | undefined> {
+    const [result] = await db.update(comments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(comments.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteComment(id: number): Promise<void> {
+    await db.delete(comments).where(eq(comments.parentCommentId, id));
+    await db.delete(comments).where(eq(comments.id, id));
+  }
+
+  async getUserStats(userId: string): Promise<{
+    totalSessions: number;
+    activeSessions: number;
+    completedSessions: number;
+    totalEntries: number;
+    totalReels: number;
+    totalFootage: number;
+    totalPhotos: number;
+    topCategories: { category: string; count: number; footage: number }[];
+    topManufacturers: { manufacturer: string; count: number }[];
+    weeklyStats: { week: string; entries: number; footage: number }[];
+  }> {
+    const userSessions = await db.select({ id: countingSessions.id, status: countingSessions.status })
+      .from(countingSessions)
+      .where(eq(countingSessions.userId, userId));
+
+    const sessionIds = userSessions.map(s => s.id);
+    const totalSessions = userSessions.length;
+    const activeSessions = userSessions.filter(s => s.status === "active").length;
+    const completedSessions = userSessions.filter(s => s.status === "completed").length;
+
+    if (sessionIds.length === 0) {
+      return {
+        totalSessions: 0, activeSessions: 0, completedSessions: 0,
+        totalEntries: 0, totalReels: 0, totalFootage: 0, totalPhotos: 0,
+        topCategories: [], topManufacturers: [], weeklyStats: [],
+      };
+    }
+
+    const [entryStats] = await db.select({
+      totalEntries: count(),
+      totalReels: sum(entries.reelCount),
+      totalFootage: sum(entries.footage),
+    }).from(entries).where(inArray(entries.sessionId, sessionIds));
+
+    const [photoStats] = await db.select({
+      totalPhotos: count(),
+    }).from(photos).where(inArray(photos.sessionId, sessionIds));
+
+    const topCategoriesRaw = await db.select({
+      category: entries.reelTag,
+      count: count(),
+      footage: sum(entries.footage),
+    }).from(entries)
+      .where(and(inArray(entries.sessionId, sessionIds), sql`${entries.reelTag} IS NOT NULL AND ${entries.reelTag} != ''`))
+      .groupBy(entries.reelTag)
+      .orderBy(desc(count()))
+      .limit(10);
+
+    const topManufacturersRaw = await db.select({
+      manufacturer: entries.manufacturer,
+      count: count(),
+    }).from(entries)
+      .where(and(inArray(entries.sessionId, sessionIds), sql`${entries.manufacturer} IS NOT NULL AND ${entries.manufacturer} != ''`))
+      .groupBy(entries.manufacturer)
+      .orderBy(desc(count()))
+      .limit(10);
+
+    const weeklyStatsRaw = await db.select({
+      week: sql<string>`to_char(date_trunc('week', ${entries.createdAt}), 'YYYY-MM-DD')`,
+      entries: count(),
+      footage: sum(entries.footage),
+    }).from(entries)
+      .where(inArray(entries.sessionId, sessionIds))
+      .groupBy(sql`date_trunc('week', ${entries.createdAt})`)
+      .orderBy(sql`date_trunc('week', ${entries.createdAt})`)
+      .limit(12);
+
+    return {
+      totalSessions,
+      activeSessions,
+      completedSessions,
+      totalEntries: Number(entryStats.totalEntries) || 0,
+      totalReels: Number(entryStats.totalReels) || 0,
+      totalFootage: Number(entryStats.totalFootage) || 0,
+      totalPhotos: Number(photoStats.totalPhotos) || 0,
+      topCategories: topCategoriesRaw.map(c => ({
+        category: c.category!,
+        count: Number(c.count),
+        footage: Number(c.footage) || 0,
+      })),
+      topManufacturers: topManufacturersRaw.map(m => ({
+        manufacturer: m.manufacturer!,
+        count: Number(m.count),
+      })),
+      weeklyStats: weeklyStatsRaw.map(w => ({
+        week: w.week,
+        entries: Number(w.entries),
+        footage: Number(w.footage) || 0,
+      })),
     };
   }
 }
