@@ -1056,7 +1056,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     data-testid="button-next-incomplete"
                   >
                     <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                    <span className="mono text-xs">{totalIncompletePins}</span>
+                    <span className="text-xs font-semibold">Next Reel ({totalIncompletePins})</span>
                   </Button>
                 )}
               </div>
@@ -1401,7 +1401,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       data-testid="button-next-incomplete-bottom"
                     >
                       <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                      <span className="mono text-xs">{totalIncompletePins}</span>
+                      <span className="text-xs font-semibold">Next Reel ({totalIncompletePins})</span>
                     </Button>
                   )}
                 </div>
