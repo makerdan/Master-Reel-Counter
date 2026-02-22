@@ -179,7 +179,7 @@ function EntryTable({
                           {entry.photoId && photoMap.get(entry.photoId) ? (
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button size="icon" variant="ghost" data-testid={`button-view-photo-${entry.id}`}>
+                                <Button size="icon" variant="ghost" title="View Photo" data-testid={`button-view-photo-${entry.id}`}>
                                   <Eye className="h-3 w-3" />
                                 </Button>
                               </DialogTrigger>
@@ -231,6 +231,7 @@ function EntryTable({
                               variant="ghost"
                               onClick={() => onEdit(entry)}
                               disabled={!canEdit}
+                              title="Edit Entry"
                               data-testid={`button-edit-entry-${entry.id}`}
                             >
                               <Pencil className="h-3 w-3" />
@@ -241,6 +242,7 @@ function EntryTable({
                                   size="icon"
                                   variant="ghost"
                                   disabled={!canEdit}
+                                  title="Delete Entry"
                                   data-testid={`button-delete-entry-${entry.id}`}
                                 >
                                   <Trash2 className="h-3 w-3" />
