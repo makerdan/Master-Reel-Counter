@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  Crosshair, AlertCircle,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1299,8 +1299,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   title="Increase pin size"
                   data-testid="button-pin-size-up"
                 >
-                  <Crosshair className="h-4 w-4" />
-                  <Plus className="h-2.5 w-2.5 absolute bottom-0.5 right-0.5" />
+                  <span className="inline-block w-4 h-4 border-2 border-current rounded-sm" />
                 </button>
                 <button
                   className="photo-overlay-btn"
@@ -1308,8 +1307,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   title="Decrease pin size"
                   data-testid="button-pin-size-down"
                 >
-                  <Crosshair className="h-4 w-4" />
-                  <span className="absolute bottom-0 right-0.5 text-[8px] font-bold leading-none">-</span>
+                  <span className="inline-block w-2.5 h-2.5 border-2 border-current rounded-sm" />
                 </button>
               </div>
             </div>
