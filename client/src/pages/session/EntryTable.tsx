@@ -188,12 +188,28 @@ function EntryTable({
                                   <DialogTitle>Photo - {photoMap.get(entry.photoId)?.originalFilename || "Photo"}</DialogTitle>
                                 </DialogHeader>
                                 <div className="flex-1 min-h-0 overflow-auto px-4 pb-4">
-                                  <img
-                                    src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
-                                    alt="Entry photo"
-                                    className="w-full h-auto max-h-[75vh] object-contain rounded-md"
-                                    data-testid={`img-entry-photo-${entry.id}`}
-                                  />
+                                  <div className="relative inline-block w-full">
+                                    <img
+                                      src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
+                                      alt="Entry photo"
+                                      className="w-full h-auto max-h-[75vh] object-contain rounded-md"
+                                      data-testid={`img-entry-photo-${entry.id}`}
+                                    />
+                                    {(() => {
+                                      const pin = pinByEntryId.get(entry.id);
+                                      if (!pin) return null;
+                                      return (
+                                        <div
+                                          className="absolute pointer-events-none"
+                                          style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
+                                          data-testid={`pin-highlight-${entry.id}`}
+                                        >
+                                          <div className="w-10 h-10 rounded-full border-[3px] border-orange-500/80 animate-pulse" />
+                                          <div className="absolute inset-0 w-10 h-10 rounded-full border-2 border-white/50" />
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
                                 </div>
                               </DialogContent>
                             </Dialog>
