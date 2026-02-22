@@ -177,6 +177,11 @@
   }
 }
 
+[cmdk-item][data-selected="true"],
+[role="option"][data-highlighted] {
+  background-color: hsl(var(--accent) / 0.5) !important;
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.

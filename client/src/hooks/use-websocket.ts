@@ -3,7 +3,7 @@ import { queryClient } from "@/lib/queryClient";
 
 type MessageHandler = (msg: any) => void;
 
-export function useSessionWebSocket(sessionId: number | null, onMessage?: MessageHandler) {
+export function useSessionWebSocket(sessionId: number | null, onMessage?: MessageHandler, userInfo?: { userId: string; username: string }) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -15,7 +15,7 @@ export function useSessionWebSocket(sessionId: number | null, onMessage?: Messag
     wsRef.current = ws;
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "join", sessionId }));
+      ws.send(JSON.stringify({ type: "join", sessionId, userId: userInfo?.userId, username: userInfo?.username }));
     };
 
     ws.onmessage = (event) => {
@@ -46,7 +46,7 @@ export function useSessionWebSocket(sessionId: number | null, onMessage?: Messag
     ws.onerror = () => {
       ws.close();
     };
-  }, [sessionId, onMessage]);
+  }, [sessionId, onMessage, userInfo?.userId, userInfo?.username]);
 
   useEffect(() => {
     connect();

@@ -15,6 +15,7 @@ import path from "path";
 import fs from "fs/promises";
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
+const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null }>();
 
 function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSocket) {
   const room = sessionRooms.get(sessionId);
@@ -24,6 +25,28 @@ function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSock
     if (ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
       ws.send(data);
     }
+  }
+}
+
+function getOnlineUsers(sessionId: number): { userId: string; username: string }[] {
+  const users: { userId: string; username: string }[] = [];
+  const seen = new Set<string>();
+  for (const [ws, info] of wsUserMap) {
+    if (info.sessionId === sessionId && info.userId && ws.readyState === WebSocket.OPEN && !seen.has(info.userId)) {
+      seen.add(info.userId);
+      users.push({ userId: info.userId, username: info.username || info.userId });
+    }
+  }
+  return users;
+}
+
+function broadcastPresence(sessionId: number) {
+  const users = getOnlineUsers(sessionId);
+  const room = sessionRooms.get(sessionId);
+  if (!room) return;
+  const data = JSON.stringify({ type: "presence", users });
+  for (const ws of room) {
+    if (ws.readyState === WebSocket.OPEN) ws.send(data);
   }
 }
 
@@ -151,16 +174,18 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const sessions = await storage.getUserSessions(userId);
       const sessionIds = sessions.map(s => s.id);
-      const [stats, photoStats, thumbnails] = await Promise.all([
+      const [stats, photoStats, thumbnails, collabUsernames] = await Promise.all([
         storage.getSessionStats(sessionIds),
         storage.getSessionPhotoStats(sessionIds),
         storage.getSessionThumbnails(sessionIds),
+        storage.getSessionCollaboratorUsernames(sessionIds),
       ]);
       const sessionsWithStats = sessions.map(s => {
         const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0, sectionCount: 0 };
         const ps = photoStats.get(s.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
         const thumbnailKey = thumbnails.get(s.id) || null;
-        return { ...s, ...st, ...ps, thumbnailKey };
+        const collaboratorUsernames = collabUsernames.get(s.id) || [];
+        return { ...s, ...st, ...ps, thumbnailKey, collaboratorUsernames };
       });
       res.json(sessionsWithStats);
     } catch (error) {
@@ -190,16 +215,18 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const sharedSessions = await storage.getSharedSessions(userId);
       const sessionIds = sharedSessions.map(s => s.id);
-      const [stats, photoStats, thumbnails] = await Promise.all([
+      const [stats, photoStats, thumbnails, collabUsernames] = await Promise.all([
         storage.getSessionStats(sessionIds),
         storage.getSessionPhotoStats(sessionIds),
         storage.getSessionThumbnails(sessionIds),
+        storage.getSessionCollaboratorUsernames(sessionIds),
       ]);
       const result = sharedSessions.map(s => {
         const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0, sectionCount: 0 };
         const ps = photoStats.get(s.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
         const thumbnailKey = thumbnails.get(s.id) || null;
-        return { ...s, ...st, ...ps, thumbnailKey };
+        const collaboratorUsernames = collabUsernames.get(s.id) || [];
+        return { ...s, ...st, ...ps, thumbnailKey, collaboratorUsernames };
       });
       res.json(result);
     } catch (error) {
@@ -842,6 +869,42 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/sessions/:id/collaborators/:collabId", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can change roles" });
+      const { role } = req.body;
+      if (!role || !["editor", "viewer"].includes(role)) return res.status(400).json({ message: "Role must be editor or viewer" });
+      const updated = await storage.updateCollaboratorRole(parseInt(req.params.collabId), role);
+      if (!updated) return res.status(404).json({ message: "Collaborator not found" });
+      await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "changed_role", "collaborator", updated.id, `Changed to ${role}`);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update collaborator role" });
+    }
+  });
+
+  app.post("/api/sessions/:id/transfer-ownership", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can transfer ownership" });
+      const { collaboratorId } = req.body;
+      if (!collaboratorId) return res.status(400).json({ message: "collaboratorId is required" });
+      const collaborators = await storage.getSessionCollaborators(access.session.id);
+      const targetCollab = collaborators.find(c => c.id === collaboratorId);
+      if (!targetCollab) return res.status(404).json({ message: "Collaborator not found" });
+      await storage.transferSessionOwnership(access.session.id, targetCollab.userId, targetCollab.username || "");
+      await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "transferred_ownership", "session", access.session.id, `Transferred to ${targetCollab.username || targetCollab.userId}`);
+      broadcastToSession(access.session.id, { type: "ownership_transfer" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error transferring ownership:", error?.message || error);
+      res.status(500).json({ message: "Failed to transfer ownership" });
+    }
+  });
+
   app.post("/api/sessions/:id/leave", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -877,7 +940,7 @@ export async function registerRoutes(
         token,
         createdBy: req.user.claims.sub,
         isActive: true,
-        expiresAt: null,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
       res.json(link);
     } catch (error) {
@@ -920,6 +983,7 @@ export async function registerRoutes(
         username,
         role: "editor",
       });
+      await storage.incrementInviteLinkUsedCount(link.id);
       res.json({ session, message: "Successfully joined session", alreadyMember: false });
     } catch (error) {
       console.error("Error joining session:", error);
@@ -1880,32 +1944,52 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sessions/:id/online", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const users = getOnlineUsers(sessionId);
+      res.json(users);
+    } catch {
+      res.json([]);
+    }
+  });
+
   // WebSocket
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+
   wss.on("connection", (ws) => {
-    let joinedSessionId: number | null = null;
+    wsUserMap.set(ws, { sessionId: null, userId: null, username: null });
 
     ws.on("message", (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.type === "join" && typeof msg.sessionId === "number") {
-          if (joinedSessionId !== null) {
-            const prev = sessionRooms.get(joinedSessionId);
-            if (prev) { prev.delete(ws); if (prev.size === 0) sessionRooms.delete(joinedSessionId); }
+          const info = wsUserMap.get(ws)!;
+          const prevSessionId = info.sessionId;
+          if (prevSessionId !== null) {
+            const prev = sessionRooms.get(prevSessionId);
+            if (prev) { prev.delete(ws); if (prev.size === 0) sessionRooms.delete(prevSessionId); }
+            broadcastPresence(prevSessionId);
           }
-          joinedSessionId = msg.sessionId;
-          if (!sessionRooms.has(joinedSessionId)) sessionRooms.set(joinedSessionId, new Set());
-          sessionRooms.get(joinedSessionId)!.add(ws);
-          ws.send(JSON.stringify({ type: "joined", sessionId: joinedSessionId }));
+          info.sessionId = msg.sessionId;
+          info.userId = msg.userId || null;
+          info.username = msg.username || null;
+          if (!sessionRooms.has(msg.sessionId)) sessionRooms.set(msg.sessionId, new Set());
+          sessionRooms.get(msg.sessionId)!.add(ws);
+          ws.send(JSON.stringify({ type: "joined", sessionId: msg.sessionId }));
+          broadcastPresence(msg.sessionId);
         }
       } catch {}
     });
 
     ws.on("close", () => {
-      if (joinedSessionId !== null) {
-        const room = sessionRooms.get(joinedSessionId);
-        if (room) { room.delete(ws); if (room.size === 0) sessionRooms.delete(joinedSessionId); }
+      const info = wsUserMap.get(ws);
+      if (info?.sessionId !== null && info?.sessionId !== undefined) {
+        const room = sessionRooms.get(info.sessionId);
+        if (room) { room.delete(ws); if (room.size === 0) sessionRooms.delete(info.sessionId); }
+        broadcastPresence(info.sessionId);
       }
+      wsUserMap.delete(ws);
     });
   });
 

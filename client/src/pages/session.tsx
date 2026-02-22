@@ -32,6 +32,7 @@ import Comments from "./session/Comments";
 import { buildExportFilename, formatSessionTime } from "./session/utils";
 import { useUndoRedo } from "@/hooks/use-undo";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function SessionPage() {
   const [, params] = useRoute("/session/:id");
@@ -162,7 +163,14 @@ function SessionWorkspace({
     },
   });
 
-  useSessionWebSocket(sessionId);
+  const { user } = useAuth();
+  const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
+
+  useSessionWebSocket(sessionId, (msg) => {
+    if (msg.type === "presence") {
+      setOnlineUsers(msg.users || []);
+    }
+  }, user ? { userId: (user as any).id, username: (user as any).firstName || (user as any).id } : undefined);
 
   const isMutating = useIsMutating();
   useEffect(() => {
@@ -355,6 +363,24 @@ function SessionWorkspace({
             <Button size="icon" variant="ghost" onClick={redo} disabled={!canRedo} data-testid="button-redo" className="h-8 w-8">
               <Redo2 className="h-4 w-4" />
             </Button>
+            {onlineUsers.length > 0 && (
+              <div className="flex items-center gap-0.5 mr-1" data-testid="online-users">
+                {onlineUsers.slice(0, 3).map((u, i) => (
+                  <div
+                    key={u.userId}
+                    className="relative w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold uppercase border border-background"
+                    title={`${u.username} (online)`}
+                    data-testid={`avatar-online-${i}`}
+                  >
+                    {u.username.charAt(0)}
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border border-background" />
+                  </div>
+                ))}
+                {onlineUsers.length > 3 && (
+                  <span className="text-[10px] text-muted-foreground ml-0.5">+{onlineUsers.length - 3}</span>
+                )}
+              </div>
+            )}
             {isOwner && (
               <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team">
                 Team

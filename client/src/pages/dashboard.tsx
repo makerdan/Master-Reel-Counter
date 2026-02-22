@@ -46,6 +46,7 @@ type SessionWithStats = Session & {
   firstPhotoAt: string | null;
   lastPhotoAt: string | null;
   thumbnailKey: string | null;
+  collaboratorUsernames: string[];
 };
 
 type SharedSessionWithStats = SessionWithStats & {
@@ -629,6 +630,25 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
+              {(session as any).collaboratorUsernames?.length > 0 && (
+                <div className="flex items-center gap-1 mt-2" data-testid={`avatars-session-${session.id}`}>
+                  {(session as any).collaboratorUsernames.slice(0, 3).map((name: string, i: number) => (
+                    <div
+                      key={i}
+                      className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold uppercase border border-background"
+                      title={name}
+                      data-testid={`avatar-collaborator-${session.id}-${i}`}
+                    >
+                      {name.charAt(0)}
+                    </div>
+                  ))}
+                  {(session as any).collaboratorUsernames.length > 3 && (
+                    <span className="text-[10px] text-muted-foreground ml-0.5">
+                      +{(session as any).collaboratorUsernames.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {!isShared && (

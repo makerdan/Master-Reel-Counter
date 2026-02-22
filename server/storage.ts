@@ -66,12 +66,15 @@ export interface IStorage {
   getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number; sectionCount: number }>>;
   getSessionPhotoStats(sessionIds: number[]): Promise<Map<number, { photoCount: number; firstPhotoAt: Date | null; lastPhotoAt: Date | null }>>;
   getSessionThumbnails(sessionIds: number[]): Promise<Map<number, string>>;
+  getSessionCollaboratorUsernames(sessionIds: number[]): Promise<Map<number, string[]>>;
 
   addCollaborator(data: InsertCollaborator): Promise<Collaborator>;
   getSessionCollaborators(sessionId: number): Promise<Collaborator[]>;
   getCollaborator(sessionId: number, userId: string): Promise<Collaborator | undefined>;
   removeCollaborator(id: number): Promise<void>;
   removeCollaboratorBySessionAndUser(sessionId: number, userId: string): Promise<void>;
+  updateCollaboratorRole(id: number, role: string): Promise<Collaborator | undefined>;
+  transferSessionOwnership(sessionId: number, newOwnerId: string, newOwnerUsername: string): Promise<void>;
   getSharedSessions(userId: string): Promise<(Session & { role: string; ownerUsername?: string })[]>;
 
   createInviteLink(data: InsertInviteLink): Promise<InviteLink>;
@@ -79,6 +82,7 @@ export interface IStorage {
   getInviteLinkByToken(token: string): Promise<InviteLink | undefined>;
   getSessionInviteLinks(sessionId: number): Promise<InviteLink[]>;
   revokeInviteLink(id: number): Promise<void>;
+  incrementInviteLinkUsedCount(id: number): Promise<void>;
 
   createFolder(folder: InsertFolder): Promise<Folder>;
   getUserFolders(userId: string): Promise<Folder[]>;
@@ -354,6 +358,22 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getSessionCollaboratorUsernames(sessionIds: number[]): Promise<Map<number, string[]>> {
+    const result = new Map<number, string[]>();
+    if (sessionIds.length === 0) return result;
+    const rows = await db.select({
+      sessionId: sessionCollaborators.sessionId,
+      username: sessionCollaborators.username,
+    }).from(sessionCollaborators)
+      .where(inArray(sessionCollaborators.sessionId, sessionIds));
+    for (const row of rows) {
+      const existing = result.get(row.sessionId) || [];
+      existing.push(row.username || "?");
+      result.set(row.sessionId, existing);
+    }
+    return result;
+  }
+
   async addCollaborator(data: InsertCollaborator): Promise<Collaborator> {
     const [result] = await db.insert(sessionCollaborators).values(data).returning();
     return result;
@@ -378,6 +398,30 @@ export class DatabaseStorage implements IStorage {
   async removeCollaboratorBySessionAndUser(sessionId: number, userId: string): Promise<void> {
     await db.delete(sessionCollaborators)
       .where(and(eq(sessionCollaborators.sessionId, sessionId), eq(sessionCollaborators.userId, userId)));
+  }
+
+  async updateCollaboratorRole(id: number, role: string): Promise<Collaborator | undefined> {
+    const [result] = await db.update(sessionCollaborators)
+      .set({ role })
+      .where(eq(sessionCollaborators.id, id))
+      .returning();
+    return result;
+  }
+
+  async transferSessionOwnership(sessionId: number, newOwnerId: string, newOwnerUsername: string): Promise<void> {
+    const session = await this.getSession(sessionId);
+    if (!session) throw new Error("Session not found");
+    const oldOwnerId = session.userId;
+    await db.update(countingSessions)
+      .set({ userId: newOwnerId })
+      .where(eq(countingSessions.id, sessionId));
+    await this.removeCollaboratorBySessionAndUser(sessionId, newOwnerId);
+    await db.insert(sessionCollaborators).values({
+      sessionId,
+      userId: oldOwnerId,
+      username: null,
+      role: "editor",
+    });
   }
 
   async getSharedSessions(userId: string): Promise<(Session & { role: string; ownerUsername?: string })[]> {
@@ -418,6 +462,12 @@ export class DatabaseStorage implements IStorage {
   async revokeInviteLink(id: number): Promise<void> {
     await db.update(sessionInviteLinks)
       .set({ isActive: false })
+      .where(eq(sessionInviteLinks.id, id));
+  }
+
+  async incrementInviteLinkUsedCount(id: number): Promise<void> {
+    await db.update(sessionInviteLinks)
+      .set({ usedCount: sql`used_count + 1` })
       .where(eq(sessionInviteLinks.id, id));
   }
 

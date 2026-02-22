@@ -107,6 +107,7 @@ export const sessionInviteLinks = pgTable("session_invite_links", {
   token: varchar("token").notNull().unique(),
   createdBy: varchar("created_by").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  usedCount: integer("used_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at"),
 });
