@@ -1685,7 +1685,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             data-testid={`input-wire-details-${index}`}
                           />
                           {activeSuggestionPin === pin.id && suggestions.length > 0 && (
-                            <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-lg" data-testid={`suggestions-${index}`}>
+                            <div className={`absolute z-50 left-0 right-0 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-lg ${index === localPins.length - 1 ? "bottom-full mb-1" : "top-full mt-1"}`} data-testid={`suggestions-${index}`}>
                               {suggestions.map((s, si) => (
                                 <button
                                   key={`${s.vendor}-${s.catalog}`}
