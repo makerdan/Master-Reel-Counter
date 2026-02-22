@@ -1641,6 +1641,22 @@ export async function registerRoutes(
     }
   });
 
+  // Update user profile name
+  app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName } = req.body;
+      if (typeof firstName !== "string" || typeof lastName !== "string") {
+        return res.status(400).json({ message: "firstName and lastName are required strings" });
+      }
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const user = await authStorage.upsertUser({ id: userId, firstName: firstName.trim(), lastName: lastName.trim() });
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   // User Settings
   app.get("/api/settings", isAuthenticated, async (req: any, res) => {
     try {

@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Settings, Shield, ShieldOff, AlertTriangle, Lock,
-  Unlock, Loader2, Cable, LogOut, Info,
+  Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +31,31 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const [confirmDisableOpen, setConfirmDisableOpen] = useState(false);
   const [confirmEnableOpen, setConfirmEnableOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [firstName, setFirstName] = useState(user?.firstName || "");
+  const [lastName, setLastName] = useState(user?.lastName || "");
+
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || "");
+      setLastName(user.lastName || "");
+    }
+  }, [user]);
+
+  const updateName = useMutation({
+    mutationFn: async (data: { firstName: string; lastName: string }) => {
+      const res = await apiRequest("PATCH", "/api/user/profile", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setEditingName(false);
+      toast({ title: "Name updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update name", variant: "destructive" });
+    },
+  });
 
   const { data: settings, isLoading } = useQuery<UserSettingsResponse>({
     queryKey: ["/api/settings"],
@@ -258,12 +285,80 @@ export default function SettingsPage() {
               <CardTitle className="text-base">Account</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div>
-                <p className="text-sm font-medium" data-testid="text-settings-username">{user?.firstName} {user?.lastName}</p>
-                <p className="text-xs text-muted-foreground">Signed in via Replit</p>
+          <CardContent className="space-y-4">
+            {editingName ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="firstName" className="text-xs">First Name</Label>
+                    <Input
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="First name"
+                      data-testid="input-first-name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="lastName" className="text-xs">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Last name"
+                      data-testid="input-last-name"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => updateName.mutate({ firstName, lastName })}
+                    disabled={updateName.isPending || (!firstName.trim() && !lastName.trim())}
+                    data-testid="button-save-name"
+                  >
+                    {updateName.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Check className="h-3 w-3 mr-1" />
+                    )}
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setFirstName(user?.firstName || "");
+                      setLastName(user?.lastName || "");
+                      setEditingName(false);
+                    }}
+                    disabled={updateName.isPending}
+                    data-testid="button-cancel-name"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Cancel
+                  </Button>
+                </div>
               </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="text-sm font-medium" data-testid="text-settings-username">{user?.firstName} {user?.lastName}</p>
+                  <p className="text-xs text-muted-foreground">Signed in via Replit</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditingName(true)}
+                  data-testid="button-edit-name"
+                >
+                  <Pencil className="h-3 w-3 mr-1" />
+                  Edit Name
+                </Button>
+              </div>
+            )}
+            <Separator />
+            <div className="flex items-center justify-end">
               <Button
                 variant="outline"
                 onClick={() => logout()}
