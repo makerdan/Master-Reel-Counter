@@ -51,6 +51,13 @@ function isOwner(role: string): boolean {
   return role === "owner";
 }
 
+function checkLocked(session: any, role: string): string | null {
+  if (session.isLocked && !isOwner(role)) {
+    return "This session is locked";
+  }
+  return null;
+}
+
 async function getEncryptionKey(userId: string): Promise<Buffer | null> {
   const settings = await storage.getUserSettings(userId);
   if (!settings?.encodingEnabled || !settings.encryptionKey || !settings.encryptionSalt) return null;
@@ -144,14 +151,16 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const sessions = await storage.getUserSessions(userId);
       const sessionIds = sessions.map(s => s.id);
-      const [stats, photoStats] = await Promise.all([
+      const [stats, photoStats, thumbnails] = await Promise.all([
         storage.getSessionStats(sessionIds),
         storage.getSessionPhotoStats(sessionIds),
+        storage.getSessionThumbnails(sessionIds),
       ]);
       const sessionsWithStats = sessions.map(s => {
         const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0, sectionCount: 0 };
         const ps = photoStats.get(s.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
-        return { ...s, ...st, ...ps };
+        const thumbnailKey = thumbnails.get(s.id) || null;
+        return { ...s, ...st, ...ps, thumbnailKey };
       });
       res.json(sessionsWithStats);
     } catch (error) {
@@ -181,14 +190,16 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const sharedSessions = await storage.getSharedSessions(userId);
       const sessionIds = sharedSessions.map(s => s.id);
-      const [stats, photoStats] = await Promise.all([
+      const [stats, photoStats, thumbnails] = await Promise.all([
         storage.getSessionStats(sessionIds),
         storage.getSessionPhotoStats(sessionIds),
+        storage.getSessionThumbnails(sessionIds),
       ]);
       const result = sharedSessions.map(s => {
         const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0, sectionCount: 0 };
         const ps = photoStats.get(s.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
-        return { ...s, ...st, ...ps };
+        const thumbnailKey = thumbnails.get(s.id) || null;
+        return { ...s, ...st, ...ps, thumbnailKey };
       });
       res.json(result);
     } catch (error) {
@@ -448,6 +459,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.sessionId), userId);
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add photos" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
       const displayName = req.user.claims.first_name
         ? `${req.user.claims.first_name} ${req.user.claims.last_name || ""}`.trim()
         : req.user.claims.email || userId;
@@ -516,6 +529,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete photos" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
       try {
         const key = photo.objectStorageKey;
         const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
@@ -564,6 +579,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.sessionId), userId);
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add entries" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
       let entryData = { ...req.body, sessionId: access.session.id, userId };
       const encKey = await getEncryptionKey(access.session.userId);
       if (encKey) entryData = encryptEntry(entryData, encKey) as any;
@@ -589,6 +606,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(entry.sessionId, userId);
       if (!access) return res.status(404).json({ message: "Entry not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
       const encKey = await getEncryptionKey(access.session.userId);
       let updateData = req.body;
       if (encKey) updateData = encryptEntry(updateData, encKey) as any;
@@ -611,6 +630,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(entry.sessionId, userId);
       if (!access) return res.status(404).json({ message: "Entry not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete entries" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
       await storage.deleteEntry(entry.id);
       const username = req.user.claims.first_name || req.user.claims.email || userId;
       logActivity(entry.sessionId, userId, username, "entry_deleted", "entry", entry.id);
@@ -654,6 +675,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add pins" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
       const data = insertPinSchema.parse({ ...req.body, photoId: photo.id });
       const pin = await storage.createPin(data);
       broadcastToSession(photo.sessionId, { type: "sync", entity: "pins", sessionId: photo.sessionId });
@@ -689,6 +712,7 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
+      { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
       await storage.deletePin(pin.id);
       res.json({ success: true });
     } catch (error) {
@@ -703,6 +727,7 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
+      { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
       const { pins: pinData } = req.body;
       if (!Array.isArray(pinData)) return res.status(400).json({ message: "pins must be an array" });
       const existing = await storage.getPhotoPins(photo.id);
@@ -742,6 +767,7 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
+      { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
       await storage.deletePin(pin.id);
       res.json({ success: true });
     } catch (error) {

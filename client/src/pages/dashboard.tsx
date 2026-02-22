@@ -44,6 +44,7 @@ type SessionWithStats = Session & {
   photoCount: number;
   firstPhotoAt: string | null;
   lastPhotoAt: string | null;
+  thumbnailKey: string | null;
 };
 
 type SharedSessionWithStats = SessionWithStats & {
@@ -513,6 +514,19 @@ export default function Dashboard() {
                 />
               </div>
             )}
+            <div className="shrink-0" data-testid={`img-session-thumbnail-${session.id}`}>
+              {session.thumbnailKey ? (
+                <img
+                  src={session.thumbnailKey}
+                  alt=""
+                  className="w-12 h-12 rounded-md object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center">
+                  <Camera className="h-5 w-5 text-muted-foreground" />
+                </div>
+              )}
+            </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-semibold text-sm truncate" data-testid={`text-${prefix}session-name-${session.id}`}>
@@ -1084,14 +1098,14 @@ export default function Dashboard() {
             ))}
           </div>
         ) : !filteredSessions.length && !isSearching ? (
-          <Card>
+          <Card className="border border-border">
             <CardContent className="py-12 text-center">
               <Cable className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
               <p className="text-muted-foreground text-sm">No sessions yet. Create one to start counting reels.</p>
             </CardContent>
           </Card>
         ) : isSearching && !filteredSessions.length && !filteredSharedSessions.length ? (
-          <Card>
+          <Card className="border border-border">
             <CardContent className="py-8 text-center">
               <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
               <p className="text-muted-foreground text-sm">No sessions match "{searchQuery}"</p>

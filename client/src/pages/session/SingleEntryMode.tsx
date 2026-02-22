@@ -13,13 +13,14 @@ import { lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/w
 import type { Entry } from "@shared/schema";
 
 export default function SingleEntryMode({
-  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave,
+  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true,
 }: {
   sessionId: number;
   editingEntry: Entry | null;
   onDoneEditing: () => void;
   onSwitchToPhoto?: (photoId: number, aisle: string, section: string) => void;
   onUndoableSave?: (action: any) => void;
+  canEdit?: boolean;
 }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -565,7 +566,7 @@ export default function SingleEntryMode({
           )}
           <Button
             type="submit"
-            disabled={saveEntry.isPending}
+            disabled={saveEntry.isPending || !canEdit}
             data-testid="button-save-entry"
           >
             {saveEntry.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

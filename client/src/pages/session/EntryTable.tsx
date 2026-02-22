@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Pencil, Trash2, ChevronDown } from "lucide-react";
+import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Entry, Photo, Pin } from "@shared/schema";
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true,
 }: {
   entries: Entry[];
   photos: Photo[];
@@ -26,6 +26,7 @@ function EntryTable({
   sessionId: number;
   totalFootage: number;
   onUndoableDelete?: (action: any) => void;
+  canEdit?: boolean;
 }) {
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
@@ -92,7 +93,18 @@ function EntryTable({
   return (
     <Card>
       <CardHeader className="p-3">
-        <CardTitle className="text-sm" data-testid="text-entries-title">Table View - {entries.length} Entries</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-sm" data-testid="text-entries-title">Table View - {entries.length} Entries</CardTitle>
+          {(() => {
+            const warnings = entries.filter(e => !e.reelTag || !e.footage).length;
+            return warnings > 0 ? (
+              <span className="flex items-center gap-1 text-xs text-amber-500" data-testid="text-validation-warnings">
+                <AlertTriangle className="h-3 w-3" />
+                {warnings} warning{warnings !== 1 ? "s" : ""}
+              </span>
+            ) : null;
+          })()}
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
@@ -144,10 +156,24 @@ function EntryTable({
                         <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(2, "0")}</td>
                         <td style={{ textAlign: "center" }}>{entry.aisle}</td>
                         <td style={{ textAlign: "center" }}>{entry.section}</td>
-                        <td className="mono">{entry.reelTag || "-"}</td>
+                        <td className="mono">
+                          {entry.reelTag || "-"}
+                          {!entry.reelTag && (
+                            <span className="inline-flex items-center ml-1" title="No category">
+                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                            </span>
+                          )}
+                        </td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
-                        <td className="mono" style={{ textAlign: "center" }}>{info.totalFootage ? `${info.totalFootage.toLocaleString()}'` : "-"}</td>
+                        <td className="mono" style={{ textAlign: "center" }}>
+                          {info.totalFootage ? `${info.totalFootage.toLocaleString()}'` : "-"}
+                          {!info.totalFootage && (
+                            <span className="inline-flex items-center ml-1" title="Zero footage">
+                              <AlertTriangle className="h-3 w-3 text-amber-500" />
+                            </span>
+                          )}
+                        </td>
                         <td style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td style={{ textAlign: "center" }}>
                           {entry.photoId && photoMap.get(entry.photoId) ? (
@@ -179,6 +205,7 @@ function EntryTable({
                               size="icon"
                               variant="ghost"
                               onClick={() => onEdit(entry)}
+                              disabled={!canEdit}
                               data-testid={`button-edit-entry-${entry.id}`}
                             >
                               <Pencil className="h-3 w-3" />
@@ -188,6 +215,7 @@ function EntryTable({
                                 <Button
                                   size="icon"
                                   variant="ghost"
+                                  disabled={!canEdit}
                                   data-testid={`button-delete-entry-${entry.id}`}
                                 >
                                   <Trash2 className="h-3 w-3" />

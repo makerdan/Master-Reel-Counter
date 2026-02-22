@@ -65,6 +65,7 @@ export interface IStorage {
   bulkUpdateEntries(entriesToUpdate: { id: number; data: Partial<Entry> }[]): Promise<void>;
   getSessionStats(sessionIds: number[]): Promise<Map<number, { entryCount: number; totalFootage: number; sectionCount: number }>>;
   getSessionPhotoStats(sessionIds: number[]): Promise<Map<number, { photoCount: number; firstPhotoAt: Date | null; lastPhotoAt: Date | null }>>;
+  getSessionThumbnails(sessionIds: number[]): Promise<Map<number, string>>;
 
   addCollaborator(data: InsertCollaborator): Promise<Collaborator>;
   getSessionCollaborators(sessionId: number): Promise<Collaborator[]>;
@@ -331,6 +332,21 @@ export class DatabaseStorage implements IStorage {
         firstPhotoAt: row.firstPhotoAt ? new Date(row.firstPhotoAt) : null,
         lastPhotoAt: row.lastPhotoAt ? new Date(row.lastPhotoAt) : null,
       });
+    }
+    return result;
+  }
+
+  async getSessionThumbnails(sessionIds: number[]): Promise<Map<number, string>> {
+    const result = new Map<number, string>();
+    if (sessionIds.length === 0) return result;
+    const rows = await db.execute(sql`
+      SELECT DISTINCT ON (session_id) session_id, object_storage_key
+      FROM photos
+      WHERE session_id = ANY(${sessionIds})
+      ORDER BY session_id, id ASC
+    `);
+    for (const row of rows) {
+      result.set(row.session_id as number, row.object_storage_key as string);
     }
     return result;
   }

@@ -28,7 +28,7 @@ import ReelCropPreview from "./ReelCropPreview";
 import type { LocalPin } from "./types";
 import { deriveVendorCode } from "./utils";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -954,7 +954,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           <Button
             className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
+            disabled={isUploading || !canEdit}
             data-testid="button-upload-photos"
           >
             {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
@@ -963,7 +963,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           <Button
             className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
             onClick={() => cameraInputRef.current?.click()}
-            disabled={isUploading}
+            disabled={isUploading || !canEdit}
             data-testid="button-take-photo"
           >
             {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}

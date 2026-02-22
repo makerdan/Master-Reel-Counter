@@ -13,10 +13,10 @@
   --elevate-2: rgba(0,0,0, .08);
   --background: 40 15% 98%;
   --foreground: 25 10% 12%;
-  --border: 40 10% 90%;
+  --border: 25 12% 82%;
   --card: 40 15% 96%;
   --card-foreground: 25 10% 12%;
-  --card-border: 40 10% 88%;
+  --card-border: 25 12% 80%;
   --sidebar: 40 12% 94%;
   --sidebar-foreground: 25 10% 15%;
   --sidebar-border: 40 10% 86%;
@@ -754,6 +754,16 @@
     font-size: 8px;
     border-radius: 2px;
   }
+}
+
+:root:not(.dark) header.sticky {
+  border-bottom-color: hsl(25 12% 82%);
+}
+:root:not(.dark) .border-b {
+  border-bottom-color: hsl(25 12% 85%);
+}
+:root:not(.dark) [class*="bg-card"] {
+  border-color: hsl(25 12% 85%);
 }
 
 .entries-table {

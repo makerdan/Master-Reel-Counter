@@ -1,3 +1,4 @@
+export { sessions, users } from "./models/auth";
 import { sql } from "drizzle-orm";
 import {
   pgTable,
@@ -28,6 +29,7 @@ export const countingSessions = pgTable("counting_sessions", {
   name: text("name").notNull(),
   location: text("location"),
   status: text("status").notNull().default("active"),
+  isLocked: boolean("is_locked").default(false).notNull(),
   startedAt: timestamp("started_at").defaultNow().notNull(),
   lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),

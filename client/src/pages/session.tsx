@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History, MessageSquare,
+  Lock, Unlock, Check, Loader2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -120,10 +121,37 @@ function SessionWorkspace({
 
   const [showActivity, setShowActivity] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
 
+  const isLocked = !!(session as any).isLocked;
+  const isOwner = (session as any).role === "owner";
+  const canEditSession = !isLocked || isOwner;
+
+  const toggleLock = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, { isLocked: !isLocked });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      toast({ title: isLocked ? "Session unlocked" : "Session locked" });
+    },
+  });
+
   useSessionWebSocket(sessionId);
+
+  const isMutating = useIsMutating();
+  useEffect(() => {
+    if (isMutating > 0) {
+      setSaveStatus("saving");
+    } else if (saveStatus === "saving") {
+      setSaveStatus("saved");
+      const t = setTimeout(() => setSaveStatus("idle"), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [isMutating]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -277,13 +305,35 @@ function SessionWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {saveStatus === "saving" && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse" data-testid="text-save-status">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving...
+              </span>
+            )}
+            {saveStatus === "saved" && (
+              <span className="flex items-center gap-1 text-xs text-green-500" data-testid="text-save-status">
+                <Check className="h-3 w-3" />
+                Saved
+              </span>
+            )}
+            {isOwner && (
+              <Button size="icon" variant="ghost" onClick={() => toggleLock.mutate()} disabled={toggleLock.isPending} data-testid="button-toggle-lock" title={isLocked ? "Unlock session" : "Lock session"}>
+                {isLocked ? <Lock className="h-4 w-4 text-amber-500" /> : <Unlock className="h-4 w-4" />}
+              </Button>
+            )}
+            {!isOwner && isLocked && (
+              <span className="flex items-center gap-1 text-xs text-amber-500" title="Session is locked">
+                <Lock className="h-3 w-3" />
+              </span>
+            )}
             <Button size="icon" variant="ghost" onClick={undo} disabled={!canUndo} data-testid="button-undo" className="h-8 w-8">
               <Undo2 className="h-4 w-4" />
             </Button>
             <Button size="icon" variant="ghost" onClick={redo} disabled={!canRedo} data-testid="button-redo" className="h-8 w-8">
               <Redo2 className="h-4 w-4" />
             </Button>
-            {(session as any).role === "owner" && (
+            {isOwner && (
               <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team">
                 Team
               </Button>
@@ -337,6 +387,15 @@ function SessionWorkspace({
         </div>
       )}
 
+      {isLocked && !isOwner && (
+        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-center">
+          <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1">
+            <Lock className="h-3 w-3" />
+            This session is locked. Editing is disabled.
+          </span>
+        </div>
+      )}
+
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 space-y-4">
         {captureMode ? (
           <MobileCaptureView key={mobileFlowKey} sessionId={sessionId} photos={photos} />
@@ -355,7 +414,7 @@ function SessionWorkspace({
               </TabsList>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} />
               </TabsContent>
 
               <TabsContent value="single">
@@ -370,6 +429,7 @@ function SessionWorkspace({
                     setMode("photo");
                   }}
                   onUndoableSave={pushUndo}
+                  canEdit={canEditSession}
                 />
               </TabsContent>
             </Tabs>
@@ -385,6 +445,7 @@ function SessionWorkspace({
           sessionId={sessionId}
           totalFootage={totalFootage}
           onUndoableDelete={pushUndo}
+          canEdit={canEditSession}
         />
       </div>
 
@@ -404,7 +465,7 @@ function SessionWorkspace({
                 </div>
               );
             })()}
-            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} onUndoableSave={pushUndo} />
+            <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} onUndoableSave={pushUndo} canEdit={canEditSession} />
           </DialogContent>
         </Dialog>
       )}
