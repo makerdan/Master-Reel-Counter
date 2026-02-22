@@ -869,6 +869,22 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       if (errors.length > 0) {
         throw new Error(`Failed to create entries for: ${errors.join(", ")}`);
       }
+      const remainingDraftPins = allPins.filter(p => !p.wireDetails || p.wireDetails.trim().length === 0);
+      if (pinPhotoId) {
+        try {
+          await apiRequest("PUT", `/api/photos/${pinPhotoId}/draft-pins`, {
+            pins: remainingDraftPins.map(p => ({
+              xPercent: p.x,
+              yPercent: p.y,
+              label: p.label,
+              reelCount: p.reelCount,
+              wireDetails: null,
+              vendorCode: null,
+              footage: null,
+            })),
+          });
+        } catch {}
+      }
       return pinsToCommit;
     },
     onSuccess: (pinsToCommit) => {
@@ -876,6 +892,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         toast({ title: "No pins have category details entered yet" });
         return;
       }
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       const totalCreated = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
