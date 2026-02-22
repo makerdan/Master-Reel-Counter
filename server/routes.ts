@@ -726,6 +726,22 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/entries/:entryId/pin", isAuthenticated, async (req: any, res) => {
+    try {
+      const entryId = parseInt(req.params.entryId);
+      const entry = await storage.getEntry(entryId);
+      if (!entry) return res.status(404).json({ message: "Entry not found" });
+      const access = await verifySessionAccess(entry.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Entry not found" });
+      const sessionPins = await storage.getSessionPins(entry.sessionId);
+      const pin = sessionPins.find(p => p.entryId === entryId);
+      if (!pin) return res.status(404).json({ message: "No pin linked to this entry" });
+      res.json(pin);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch entry pin" });
+    }
+  });
+
   app.patch("/api/pins/:pinId/flag", isAuthenticated, async (req: any, res) => {
     try {
       const pin = await storage.getPin(parseInt(req.params.pinId));

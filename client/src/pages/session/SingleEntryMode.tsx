@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Camera, Save, X, Loader2, ImagePlus } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Camera, Save, X, Loader2, ImagePlus, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/wireReference";
-import type { Entry } from "@shared/schema";
+import type { Entry, Pin } from "@shared/schema";
 
 export default function SingleEntryMode({
   sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true,
@@ -51,6 +51,27 @@ export default function SingleEntryMode({
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const { data: linkedPin } = useQuery<Pin>({
+    queryKey: ["/api/entries", editingEntry?.id?.toString(), "pin"],
+    queryFn: async () => {
+      const res = await fetch(`/api/entries/${editingEntry!.id}/pin`, { credentials: "include" });
+      if (!res.ok) throw new Error("No pin");
+      return res.json();
+    },
+    enabled: !!editingEntry?.id,
+    retry: false,
+  });
+
+  const flagMutation = useMutation({
+    mutationFn: async ({ pinId, flagged }: { pinId: number; flagged: boolean }) => {
+      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/entries", editingEntry?.id?.toString(), "pin"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
+    },
+  });
 
   useEffect(() => {
     if (editingEntry) {
@@ -524,6 +545,20 @@ export default function SingleEntryMode({
             />
             Keep Location
           </label>
+        )}
+        {editingEntry && linkedPin && (
+          <Button
+            type="button"
+            variant={linkedPin.flagged ? "default" : "outline"}
+            size="sm"
+            className={linkedPin.flagged ? "bg-[hsl(45_90%_45%)] hover:bg-[hsl(45_90%_35%)] text-black" : ""}
+            disabled={flagMutation.isPending}
+            onClick={() => flagMutation.mutate({ pinId: linkedPin.id, flagged: !linkedPin.flagged })}
+            data-testid="button-toggle-flag-edit"
+          >
+            <Flag className="h-3.5 w-3.5 mr-1" />
+            {linkedPin.flagged ? "Flagged for Re-shoot" : "Flag for Re-shoot"}
+          </Button>
         )}
         <div className="flex items-center gap-2 ml-auto">
           {editingEntry && (
