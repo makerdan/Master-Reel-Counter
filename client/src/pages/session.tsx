@@ -568,7 +568,10 @@ function SessionWorkspace({
                         style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
                         data-testid={`pin-highlight-edit-${editingEntry.id}`}
                         ref={(el) => {
-                          if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+                          if (el && !(el as any).__scrolled) {
+                            (el as any).__scrolled = true;
+                            setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+                          }
                         }}
                       >
                         <div className="w-24 h-24 rounded-full animate-pulse opacity-100" style={{ border: "12px solid #f97316" }} />
