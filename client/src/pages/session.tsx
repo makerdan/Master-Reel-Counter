@@ -131,7 +131,15 @@ function SessionWorkspace({
 }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [mode, setMode] = useState<string>("photo");
+  const initialTab = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab && ["photo", "single", "flagged"].includes(tab)) return tab;
+    } catch {}
+    return "photo";
+  })();
+  const [mode, setMode] = useState<string>(initialTab);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
@@ -140,6 +148,16 @@ function SessionWorkspace({
   const [navigateSection, setNavigateSection] = useState<string>("");
   const [editName, setEditName] = useState(session.name);
   const [editLocation, setEditLocation] = useState(session.location || "");
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (mode === "photo") {
+      url.searchParams.delete("tab");
+    } else {
+      url.searchParams.set("tab", mode);
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, [mode]);
 
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
   const [mobileFlowKey, setMobileFlowKey] = useState(0);

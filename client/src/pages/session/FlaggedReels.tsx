@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, ChevronLeft, Loader2, MapPin, Eye, X, Check } from "lucide-react";
+import { Flag, ChevronLeft, Loader2, MapPin, Eye, X, Check, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface FlaggedPin {
   id: number;
@@ -27,7 +28,9 @@ interface FlaggedReelsProps {
 }
 
 export default function FlaggedReels({ sessionId, onBack }: FlaggedReelsProps) {
+  const { toast } = useToast();
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { data: flaggedPins = [], isLoading } = useQuery<FlaggedPin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"],
@@ -65,6 +68,26 @@ export default function FlaggedReels({ sessionId, onBack }: FlaggedReelsProps) {
           Flagged Reels
           <Badge variant="secondary" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
         </h2>
+        <div className="ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="button-share-flagged"
+            onClick={() => {
+              const url = `${window.location.origin}/session/${sessionId}?tab=flagged`;
+              navigator.clipboard.writeText(url).then(() => {
+                setCopied(true);
+                toast({ title: "Link copied", description: "Share this link with your team member." });
+                setTimeout(() => setCopied(false), 2000);
+              }).catch(() => {
+                toast({ title: "Copy failed", description: url, variant: "destructive" });
+              });
+            }}
+          >
+            {copied ? <Check className="h-3.5 w-3.5 mr-1" /> : <Share2 className="h-3.5 w-3.5 mr-1" />}
+            {copied ? "Copied" : "Share"}
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
