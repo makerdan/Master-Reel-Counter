@@ -120,13 +120,16 @@ export default function FlaggedReels({ sessionId, onBack }: FlaggedReelsProps) {
                       className="w-full h-full object-cover"
                     />
                     <div
-                      className="absolute w-3 h-3 rounded-full bg-yellow-500 border-2 border-white shadow"
+                      className="absolute pointer-events-none"
                       style={{
                         left: `${pin.xPercent}%`,
                         top: `${pin.yPercent}%`,
                         transform: "translate(-50%, -50%)",
                       }}
-                    />
+                    >
+                      <div className="w-8 h-8 rounded-full animate-pulse" style={{ border: "4px solid #f97316" }} />
+                      <div className="absolute inset-0 w-8 h-8 rounded-full border border-white" />
+                    </div>
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/30 transition-opacity">
                       <Eye className="h-4 w-4 text-white" />
                     </div>
@@ -203,14 +206,15 @@ export default function FlaggedReels({ sessionId, onBack }: FlaggedReelsProps) {
                 className="max-w-full max-h-[75vh] rounded-lg"
               />
               <div
-                className="absolute w-6 h-6 rounded-full bg-yellow-500 border-3 border-white shadow-lg flex items-center justify-center"
+                className="absolute pointer-events-none"
                 style={{
                   left: `${previewPin.xPercent}%`,
                   top: `${previewPin.yPercent}%`,
                   transform: "translate(-50%, -50%)",
                 }}
               >
-                <Flag className="h-3 w-3 text-white" />
+                <div className="w-24 h-24 rounded-full animate-pulse opacity-100" style={{ border: "12px solid #f97316" }} />
+                <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-white opacity-100" />
               </div>
             </div>
             <div className="mt-2 text-white text-sm text-center">
