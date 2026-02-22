@@ -204,6 +204,9 @@ function EntryTable({
                                           className="absolute pointer-events-none"
                                           style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
                                           data-testid={`pin-highlight-${entry.id}`}
+                                          ref={(el) => {
+                                            if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+                                          }}
                                         >
                                           <div className="w-24 h-24 rounded-full border-4 border-orange-500 animate-pulse opacity-100" />
                                           <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-white opacity-100" />
