@@ -183,16 +183,18 @@ function EntryTable({
                                   <Eye className="h-3 w-3" />
                                 </Button>
                               </DialogTrigger>
-                              <DialogContent className="max-w-2xl">
-                                <DialogHeader>
+                              <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+                                <DialogHeader className="p-4 pb-2 shrink-0">
                                   <DialogTitle>Photo - {photoMap.get(entry.photoId)?.originalFilename || "Photo"}</DialogTitle>
                                 </DialogHeader>
-                                <img
-                                  src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
-                                  alt="Entry photo"
-                                  className="w-full rounded-md"
-                                  data-testid={`img-entry-photo-${entry.id}`}
-                                />
+                                <div className="flex-1 min-h-0 overflow-auto px-4 pb-4">
+                                  <img
+                                    src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
+                                    alt="Entry photo"
+                                    className="w-full h-auto max-h-[75vh] object-contain rounded-md"
+                                    data-testid={`img-entry-photo-${entry.id}`}
+                                  />
+                                </div>
                               </DialogContent>
                             </Dialog>
                           ) : (
