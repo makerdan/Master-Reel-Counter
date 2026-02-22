@@ -128,6 +128,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [pinScale, setPinScale] = useState(1);
   const [cropMode, setCropMode] = useState<"closeup" | "wide">("closeup");
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pinTableRef = useRef<HTMLTableElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -944,6 +945,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         setViewingNearbyIdx(null);
         setCurrentPhotoIdx(idx);
         resetView();
+        setTimeout(() => {
+          pinTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 400);
         return;
       }
     }
@@ -1624,7 +1628,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               })()}
               <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Position</div>
               <div className="overflow-x-auto">
-                <table className="pin-entry-table" data-testid="pin-entry-table">
+                <table className="pin-entry-table" ref={pinTableRef} data-testid="pin-entry-table">
                   <thead>
                     <tr>
                       <th style={{ width: 70 }}>Reel #:</th>
