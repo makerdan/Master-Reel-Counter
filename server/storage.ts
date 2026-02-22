@@ -339,14 +339,17 @@ export class DatabaseStorage implements IStorage {
   async getSessionThumbnails(sessionIds: number[]): Promise<Map<number, string>> {
     const result = new Map<number, string>();
     if (sessionIds.length === 0) return result;
-    const rows = await db.execute(sql`
-      SELECT DISTINCT ON (session_id) session_id, object_storage_key
-      FROM photos
-      WHERE session_id = ANY(${sessionIds})
-      ORDER BY session_id, id ASC
-    `);
+    const rows = await db
+      .select({ sessionId: photos.sessionId, objectStorageKey: photos.objectStorageKey })
+      .from(photos)
+      .where(inArray(photos.sessionId, sessionIds))
+      .orderBy(asc(photos.sessionId), asc(photos.id));
+    const seen = new Set<number>();
     for (const row of rows) {
-      result.set(row.session_id as number, row.object_storage_key as string);
+      if (!seen.has(row.sessionId)) {
+        seen.add(row.sessionId);
+        result.set(row.sessionId, row.objectStorageKey);
+      }
     }
     return result;
   }
