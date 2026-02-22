@@ -946,7 +946,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         setCurrentPhotoIdx(idx);
         resetView();
         setTimeout(() => {
-          pinTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          pinTableRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
         }, 400);
         return;
       }
