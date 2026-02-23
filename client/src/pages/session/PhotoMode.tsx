@@ -129,7 +129,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [rotation, setRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
   const [pinScale, setPinScale] = useState(1);
-  const [cropMode, setCropMode] = useState<"closeup" | "wide">("closeup");
+  const [zoomLevel, setZoomLevel] = useState(0.15);
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinTableRef = useRef<HTMLTableElement>(null);
   const [isPanning, setIsPanning] = useState(false);
@@ -1622,8 +1622,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       pinX={selectedPin.x}
                       pinY={selectedPin.y}
                       label={selectedPin.label}
-                      cropMode={cropMode}
-                      onCropModeChange={setCropMode}
+                      zoomLevel={zoomLevel}
+                      onZoomChange={setZoomLevel}
                       onClose={() => setSelectedPinId(null)}
                     />
                   </div>

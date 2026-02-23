@@ -1,28 +1,35 @@
 import { useEffect, useRef } from "react";
-import { Focus, X } from "lucide-react";
+import { Focus, X, ZoomIn, ZoomOut } from "lucide-react";
 
 interface ReelCropPreviewProps {
   photoUrl: string;
   pinX: number;
   pinY: number;
   label: string;
-  cropMode: "closeup" | "wide";
-  onCropModeChange: (mode: "closeup" | "wide") => void;
+  zoomLevel: number;
+  onZoomChange: (level: number) => void;
   onClose?: () => void;
 }
+
+const ZOOM_MIN = 0.05;
+const ZOOM_MAX = 0.50;
+const ZOOM_STEP = 0.03;
+const PRESET_CLOSEUP = 0.15;
+const PRESET_WIDE = 0.40;
 
 export default function ReelCropPreview({
   photoUrl,
   pinX,
   pinY,
   label,
-  cropMode,
-  onCropModeChange,
+  zoomLevel,
+  onZoomChange,
   onClose,
 }: ReelCropPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const DISPLAY_SIZE = 320;
-  const fraction = cropMode === "closeup" ? 0.15 : 0.07;
+
+  const clamp = (v: number) => Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v)) * 100) / 100;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -32,8 +39,8 @@ export default function ReelCropPreview({
     img.onload = () => {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      const cropW = img.width * fraction;
-      const cropH = img.height * fraction;
+      const cropW = img.width * zoomLevel;
+      const cropH = img.height * zoomLevel;
       const cx = (pinX / 100) * img.width;
       const cy = (pinY / 100) * img.height;
       let sx = cx - cropW / 2;
@@ -46,7 +53,10 @@ export default function ReelCropPreview({
       ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY, fraction]);
+  }, [photoUrl, pinX, pinY, zoomLevel]);
+
+  const isCloseup = Math.abs(zoomLevel - PRESET_CLOSEUP) < 0.01;
+  const isWide = Math.abs(zoomLevel - PRESET_WIDE) < 0.01;
 
   return (
     <div className="space-y-1" data-testid="reel-crop-preview">
@@ -57,11 +67,11 @@ export default function ReelCropPreview({
           <button
             type="button"
             className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors ${
-              cropMode === "closeup"
+              isCloseup
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover-elevate"
             }`}
-            onClick={() => onCropModeChange("closeup")}
+            onClick={() => onZoomChange(PRESET_CLOSEUP)}
             data-testid="button-crop-closeup"
           >
             Close-up
@@ -69,14 +79,35 @@ export default function ReelCropPreview({
           <button
             type="button"
             className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors ${
-              cropMode === "wide"
+              isWide
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover-elevate"
             }`}
-            onClick={() => onCropModeChange("wide")}
+            onClick={() => onZoomChange(PRESET_WIDE)}
             data-testid="button-crop-wide"
           >
-            Wide Shot
+            Wide
+          </button>
+          <div className="w-px h-3.5 bg-border mx-0.5" />
+          <button
+            type="button"
+            className="p-0.5 rounded text-muted-foreground hover-elevate disabled:opacity-30 disabled:pointer-events-none"
+            onClick={() => onZoomChange(clamp(zoomLevel - ZOOM_STEP))}
+            disabled={zoomLevel <= ZOOM_MIN + 0.005}
+            data-testid="button-zoom-in"
+            title="Zoom in"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className="p-0.5 rounded text-muted-foreground hover-elevate disabled:opacity-30 disabled:pointer-events-none"
+            onClick={() => onZoomChange(clamp(zoomLevel + ZOOM_STEP))}
+            disabled={zoomLevel >= ZOOM_MAX - 0.005}
+            data-testid="button-zoom-out"
+            title="Zoom out"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
           </button>
           {onClose && (
             <button
