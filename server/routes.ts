@@ -1622,22 +1622,10 @@ export async function registerRoutes(
         const photosWithEntries: { pl: PhotoLayout; entries: any[] }[] = [];
         const photosWithoutEntries: PhotoLayout[] = [];
 
-        console.log(`[PDF-DEBUG] === Section aisle=${sec.aisle} section=${sec.section} ===`);
-        console.log(`[PDF-DEBUG] sec.entries: [${sec.entries.map((e:any) => `id=${e.id}(type=${typeof e.id})`)}]`);
-        console.log(`[PDF-DEBUG] sec.photos: [${sec.photos.map((p:any) => `id=${p.id}`)}]`);
-        console.log(`[PDF-DEBUG] loadedPhotos: [${loadedPhotos.map((pl:any) => `id=${pl.photo.id}`)}]`);
-        console.log(`[PDF-DEBUG] allPinsMap keys: [${[...allPinsMap.keys()]}]`);
-
         for (const pl of loadedPhotos) {
           const photoPins = allPinsMap.get(pl.photo.id) || [];
           const pinEntryIds = new Set(photoPins.map((p: any) => p.entryId).filter(Boolean));
           const photoEntries = sec.entries.filter((e: any) => pinEntryIds.has(e.id));
-          console.log(`[PDF-DEBUG] photo ${pl.photo.id}: pinEntryIds=[${[...pinEntryIds].map(id => `${id}(type=${typeof id})`)}], matchedEntries=[${photoEntries.map((e:any) => e.id)}]`);
-          if (photoEntries.length === 0 && pinEntryIds.size > 0) {
-            const samplePinId = [...pinEntryIds][0];
-            const sampleEntryId = sec.entries[0]?.id;
-            console.log(`[PDF-DEBUG] MISMATCH CHECK: pinEntryId=${samplePinId} (type=${typeof samplePinId}), entryId=${sampleEntryId} (type=${typeof sampleEntryId}), strictEqual=${samplePinId === sampleEntryId}, looseEqual=${samplePinId == sampleEntryId}`);
-          }
           if (photoEntries.length > 0) {
             const pinLabelForEntry = (e: any) => {
               const pin = photoPins.find((p: any) => p.entryId === e.id);
@@ -1652,7 +1640,6 @@ export async function registerRoutes(
         }
 
         const unmatchedEntries = sec.entries.filter((e: any) => !matchedEntryIds.has(e.id));
-        console.log(`[PDF-DEBUG] matchedEntryIds: [${[...matchedEntryIds]}], unmatchedEntries: [${unmatchedEntries.map((e:any) => e.id)}]`);
 
         if (unmatchedEntries.length > 0) {
           deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: unmatchedEntries });
