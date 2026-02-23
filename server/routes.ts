@@ -1626,6 +1626,9 @@ export async function registerRoutes(
           const photoPins = allPinsMap.get(pl.photo.id) || [];
           const pinEntryIds = new Set(photoPins.map((p: any) => p.entryId).filter(Boolean));
           const photoEntries = sec.entries.filter((e: any) => pinEntryIds.has(e.id));
+          if (sec.section === '28') {
+            console.log(`[PDF-DEBUG] sec28: photo ${pl.photo.id}, pins: [${[...pinEntryIds]}], sec.entries: [${sec.entries.map((e:any) => e.id)}], matched: [${photoEntries.map((e:any) => e.id)}]`);
+          }
           if (photoEntries.length > 0) {
             const pinLabelForEntry = (e: any) => {
               const pin = photoPins.find((p: any) => p.entryId === e.id);
