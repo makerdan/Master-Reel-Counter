@@ -33,6 +33,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     sectionAdvanceStep: number;
     largerTouchTargets: boolean;
     photoQuality: number;
+    useReceivingQuality: boolean;
+    receivingPhotoQuality: number;
   }>({
     queryKey: ["/api/settings"],
     select: (data: any) => ({
@@ -40,6 +42,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       sectionAdvanceStep: data?.sectionAdvanceStep ?? 1,
       largerTouchTargets: data?.largerTouchTargets ?? false,
       photoQuality: data?.photoQuality ?? 85,
+      useReceivingQuality: data?.useReceivingQuality ?? false,
+      receivingPhotoQuality: data?.receivingPhotoQuality ?? 50,
     }),
   });
 
@@ -133,7 +137,11 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
     (async () => {
       try {
-        const quality = (captureSettings?.photoQuality ?? 85) / 100;
+        const isReceiving = nextItem.aisle.toLowerCase() === "receiving";
+        const baseQuality = isReceiving && captureSettings?.useReceivingQuality
+          ? (captureSettings.receivingPhotoQuality ?? 50)
+          : (captureSettings?.photoQuality ?? 85);
+        const quality = baseQuality / 100;
         let fileToUpload: File | Blob = nextItem.file;
         if (quality < 1 && nextItem.file.type.startsWith("image/")) {
           try {
