@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, FileText, Camera, MapPin, MessageSquare, User, AlertTriangle } from "lucide-react";
+import { Clock, FileText, Camera, MapPin, MessageSquare, User, AlertTriangle, Copy, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ActivityLogEntry {
@@ -47,6 +49,7 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
     queryKey: ["/api/sessions", sessionId.toString(), "activity"],
     refetchInterval: 30000,
   });
+  const [copied, setCopied] = useState(false);
 
   if (isLoading) {
     return (
@@ -74,8 +77,36 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
     );
   }
 
+  const copyAll = () => {
+    const lines = logs.map((log) => {
+      const config = ACTION_CONFIG[log.action] || { label: log.action };
+      const date = new Date(log.createdAt);
+      const timestamp = date.toLocaleString(undefined, {
+        month: "short", day: "numeric", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+      const parts = [
+        log.username || "Unknown",
+        config.label,
+        log.details || "",
+        timestamp,
+      ];
+      return parts.filter(Boolean).join(" | ");
+    });
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   return (
-    <div className="space-y-0.5 max-h-[400px] overflow-y-auto" data-testid="activity-log-list">
+    <div>
+      <div className="flex justify-end px-2 py-1">
+        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1.5" onClick={copyAll} data-testid="button-copy-activity">
+          {copied ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy All</>}
+        </Button>
+      </div>
+      <div className="space-y-0.5 max-h-[400px] overflow-y-auto" data-testid="activity-log-list">
       {logs.map((log) => {
         const config = ACTION_CONFIG[log.action] || { icon: Clock, label: log.action, color: "text-muted-foreground" };
         const Icon = config.icon;
@@ -94,6 +125,7 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
