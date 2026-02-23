@@ -49,7 +49,7 @@ export function OverviewHelp() {
   return (
     <AccordionItem value="overview">
       <AccordionTrigger className="text-sm font-semibold py-3">
-        <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Overview</span>
+        <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Master Reel Counter — Overview</span>
       </AccordionTrigger>
       <AccordionContent className="text-xs text-muted-foreground leading-relaxed space-y-2 pb-4">
         <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>

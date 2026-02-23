@@ -990,7 +990,7 @@ export default function Dashboard() {
       <main className="max-w-5xl mx-auto px-4 py-6 pb-[50vh]">
         <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
           <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">
-            Counting Sessions
+            Sessions Dashboard
           </h1>
           <div className="flex items-center gap-2">
             <DropdownMenu>

@@ -16,6 +16,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
+import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -99,6 +100,7 @@ export default function SettingsPage() {
             <span className="font-semibold text-sm">Settings</span>
           </div>
           <div className="flex items-center gap-1">
+            <HelpMenu mode="dashboard" />
             <ThemeToggle />
             <Button
               size="sm"
