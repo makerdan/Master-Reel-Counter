@@ -564,17 +564,21 @@ function SessionWorkspace({
           </>
         )}
 
-        <Separator />
+        {mobileFlowDetailParentPhotoId == null && (
+          <>
+            <Separator />
 
-        <EntryTable
-          entries={entries}
-          photos={photos}
-          onEdit={(entry) => { setEditingEntry(entry); setMode("single"); }}
-          sessionId={sessionId}
-          totalFootage={totalFootage}
-          onUndoableDelete={pushUndo}
-          canEdit={canEditSession}
-        />
+            <EntryTable
+              entries={entries}
+              photos={photos}
+              onEdit={(entry) => { setEditingEntry(entry); setMode("single"); }}
+              sessionId={sessionId}
+              totalFootage={totalFootage}
+              onUndoableDelete={pushUndo}
+              canEdit={canEditSession}
+            />
+          </>
+        )}
       </div>
 
       {editingEntry && (
