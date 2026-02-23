@@ -145,6 +145,7 @@ function SessionWorkspace({
 }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const tz = useTimezone();
   const initialTab = (() => {
     try {
       const params = new URLSearchParams(window.location.search);
