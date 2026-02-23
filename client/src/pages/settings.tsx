@@ -41,6 +41,8 @@ interface UserSettingsResponse {
   companyLogoKey: string | null;
   exportFooterText: string | null;
   photoQuality: number;
+  useReceivingQuality: boolean;
+  receivingPhotoQuality: number;
   defaultAislePrefix: string | null;
   sectionAdvanceStep: number;
   defaultUnit: string;
@@ -320,7 +322,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between gap-4 mb-2">
                 <div>
                   <Label className="text-sm font-medium">Photo Quality</Label>
-                  <p className="text-xs text-muted-foreground">Higher quality means larger file sizes and slower uploads. Lower quality saves bandwidth.</p>
+                  <p className="text-xs text-muted-foreground">Lower quality saves bandwidth but may reduce zoom clarity on reel labels. Higher quality preserves detail for accurate reading.</p>
                 </div>
                 <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-photo-quality-value">{settings?.photoQuality ?? 85}%</span>
               </div>
@@ -351,6 +353,55 @@ export default function SettingsPage() {
                   );
                 })}
               </div>
+            </div>
+
+            <div className="border-t pt-3 mt-3">
+              <div className="flex items-center justify-between gap-4 mb-2">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium">Receiving Quality Override</Label>
+                  <p className="text-xs text-muted-foreground">Reels in Receiving are typically photographed up close, so high zoom clarity isn't needed. Enable this to automatically use a lower quality for Receiving photos, saving bandwidth and storage.</p>
+                </div>
+                <Switch
+                  checked={settings?.useReceivingQuality ?? false}
+                  onCheckedChange={(checked) => saveSetting("useReceivingQuality", checked)}
+                  data-testid="switch-receiving-quality"
+                />
+              </div>
+              {settings?.useReceivingQuality && (
+                <div className="pl-2 border-l-2 border-primary/20 ml-1 mt-2 space-y-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <Label className="text-xs text-muted-foreground">Receiving photo quality</Label>
+                    <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-receiving-quality-value">{settings?.receivingPhotoQuality ?? 50}%</span>
+                  </div>
+                  <Slider
+                    value={[settings?.receivingPhotoQuality ?? 50]}
+                    onValueCommit={(val) => saveSetting("receivingPhotoQuality", val[0])}
+                    min={30}
+                    max={100}
+                    step={5}
+                    className="w-full"
+                    data-testid="slider-receiving-quality"
+                  />
+                  <div className="relative w-full h-4 mt-0.5">
+                    {[30, 40, 50, 60, 70, 80, 90, 100].map((tick) => {
+                      const pct = ((tick - 30) / 70) * 100;
+                      const isSelected = (settings?.receivingPhotoQuality ?? 50) === tick;
+                      return (
+                        <div
+                          key={tick}
+                          className="absolute flex flex-col items-center"
+                          style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
+                        >
+                          <div className={`w-px h-1.5 ${isSelected ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                          <span className={`text-[9px] tabular-nums ${isSelected ? "text-primary font-semibold" : "text-muted-foreground/60"}`}>
+                            {tick}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

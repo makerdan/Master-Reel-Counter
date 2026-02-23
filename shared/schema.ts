@@ -126,6 +126,8 @@ export const userSettings = pgTable("user_settings", {
   companyLogoKey: text("company_logo_key"),
   exportFooterText: text("export_footer_text"),
   photoQuality: integer("photo_quality").notNull().default(85),
+  useReceivingQuality: boolean("use_receiving_quality").notNull().default(false),
+  receivingPhotoQuality: integer("receiving_photo_quality").notNull().default(50),
   defaultAislePrefix: text("default_aisle_prefix"),
   sectionAdvanceStep: integer("section_advance_step").notNull().default(1),
   defaultUnit: varchar("default_unit", { length: 10 }).notNull().default("feet"),

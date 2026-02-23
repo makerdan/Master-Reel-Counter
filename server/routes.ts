@@ -1850,6 +1850,8 @@ export async function registerRoutes(
         companyLogoKey: null,
         exportFooterText: null,
         photoQuality: 85,
+        useReceivingQuality: false,
+        receivingPhotoQuality: 50,
         defaultAislePrefix: null,
         sectionAdvanceStep: 1,
         defaultUnit: "feet",
@@ -1867,7 +1869,8 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const allowedFields = [
         "defaultExportFormat", "companyName", "companyLogoKey", "exportFooterText",
-        "photoQuality", "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
+        "photoQuality", "useReceivingQuality", "receivingPhotoQuality",
+        "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
         "defaultTheme", "thumbnailSize", "largerTouchTargets",
       ];
       const updates: Record<string, any> = {};
