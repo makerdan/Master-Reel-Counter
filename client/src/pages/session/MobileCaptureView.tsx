@@ -290,7 +290,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       {activeDetailParentId != null && (
         <div className="rounded-md border border-[hsl(200_70%_50%/0.5)] bg-[hsl(200_70%_50%/0.1)] px-3 py-2 text-sm flex items-center gap-2" data-testid="text-detail-shot-banner">
           <Camera className="h-4 w-4 text-[hsl(200_70%_50%)] shrink-0" />
-          <span>Detail shot mode — next photo will be linked to the flagged reel's original image.</span>
+          <span>Detail shot mode — this photo will be linked to the flagged reel's original image.</span>
         </div>
       )}
       <Card>
@@ -399,7 +399,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         </CardContent>
       </Card>
 
-      {(recentPhotos.length > 0 || uploadQueue.length > 0) && (() => {
+      {activeDetailParentId == null && (recentPhotos.length > 0 || uploadQueue.length > 0) && (() => {
         type DisplayPhoto = { id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean; queueId?: string; queueStatus?: "pending" | "uploading" | "failed"; blobUrl?: string };
         const sorted: DisplayPhoto[] = [...recentPhotos];
         if (photoSort === "latest") {
