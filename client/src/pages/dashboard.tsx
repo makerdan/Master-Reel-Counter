@@ -943,7 +943,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <HelpMenu mode="full" />
+            <HelpMenu mode="dashboard" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1224,6 +1224,7 @@ export default function Dashboard() {
             if (!lastId || !sessions?.length) return null;
             const lastSession = sessions.find(s => s.id === parseInt(lastId));
             if (!lastSession || lastSession.status === "completed") return null;
+            if (!lastSession.folderId) return null;
             return (
               <div className="mb-4 flex items-center gap-1">
                 <Button
