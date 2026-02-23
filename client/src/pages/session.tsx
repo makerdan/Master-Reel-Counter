@@ -206,6 +206,7 @@ function SessionWorkspace({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       toast({ title: isLocked ? "Session unlocked" : "Session locked" });
     },
   });

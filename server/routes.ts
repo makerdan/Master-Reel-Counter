@@ -704,13 +704,18 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      const allowedEntryFields = ['aisle', 'section', 'position', 'palletId', 'reelTag', 'wireType', 'gauge', 'footage', 'reelCount', 'color', 'manufacturer', 'notes', 'conductors', 'photoId'];
+      const safeBody: Record<string, any> = {};
+      for (const key of allowedEntryFields) {
+        if (req.body[key] !== undefined) safeBody[key] = req.body[key];
+      }
       const encKey = await getEncryptionKey(access.session.userId);
-      let updateData = req.body;
+      let updateData: any = safeBody;
       if (encKey) updateData = encryptEntry(updateData, encKey) as any;
       const updated = await storage.updateEntry(entry.id, updateData);
       const result = encKey && updated ? decryptEntry(updated, encKey) : updated;
 
-      if (req.body.section !== undefined || req.body.aisle !== undefined) {
+      if (safeBody.section !== undefined || safeBody.aisle !== undefined) {
         const allSessionPins = await storage.getSessionPins(entry.sessionId);
         const linkedPin = allSessionPins.find(p => p.entryId === entry.id);
         if (linkedPin) {
@@ -887,7 +892,12 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
-      const updated = await storage.updatePin(pin.id, req.body);
+      const allowedPinFields = ['xPercent', 'yPercent', 'label', 'reelCount', 'wireDetails', 'vendorCode', 'footage', 'entryId', 'flagged'];
+      const safeUpdate: Record<string, any> = {};
+      for (const key of allowedPinFields) {
+        if (req.body[key] !== undefined) safeUpdate[key] = req.body[key];
+      }
+      const updated = await storage.updatePin(pin.id, safeUpdate);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update pin" });

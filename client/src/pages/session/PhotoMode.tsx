@@ -143,6 +143,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const sectionSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aisleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const batchProgressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (noteSaveTimer.current) clearTimeout(noteSaveTimer.current);
+      if (aisleSaveTimer.current) clearTimeout(aisleSaveTimer.current);
+      if (sectionSaveTimer.current) clearTimeout(sectionSaveTimer.current);
+      if (pinScaleSaveTimer.current) clearTimeout(pinScaleSaveTimer.current);
+      if (batchProgressTimer.current) clearTimeout(batchProgressTimer.current);
+    };
+  }, []);
+
   const clampPan = useCallback((px: number, py: number, s: number) => {
     const el = containerRef.current;
     if (!el || s <= 1) return { x: 0, y: 0 };
@@ -791,7 +803,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       }
     }
     setCommittedPins(prev => prev.filter(p => p.id !== pin.id));
-  }, [toast]);
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+  }, [toast, sessionId]);
 
   const applyAutoFill = useCallback((pinId: string) => {
     const pin = localPinsRef.current.find(p => p.id === pinId);
@@ -924,7 +937,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     onError: (error: Error) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       toast({ title: error.message, variant: "destructive" });
-      setTimeout(() => setBatchProgress(null), 3000);
+      batchProgressTimer.current = setTimeout(() => setBatchProgress(null), 3000);
     },
   });
 
