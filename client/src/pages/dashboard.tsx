@@ -355,6 +355,20 @@ export default function Dashboard() {
     },
   });
 
+  const moveFolder = useMutation({
+    mutationFn: async ({ id, parentFolderId }: { id: number; parentFolderId: number | null }) => {
+      const res = await apiRequest("PATCH", `/api/folders/${id}`, { parentFolderId });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Folder moved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to move folder", variant: "destructive" });
+    },
+  });
+
   const folderAutoSaveRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     if (!renamingFolder) return;
@@ -483,8 +497,8 @@ export default function Dashboard() {
     });
   };
 
-  const openEditDialog = (session: SessionWithStats, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openEditDialog = (session: SessionWithStats, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setEditingSession(session);
     setEditName(session.name);
     setEditLocation(session.location || "");
@@ -801,7 +815,9 @@ export default function Dashboard() {
     );
   };
 
-  const renderFolderSection = (folder: FolderType) => {
+  const renderFolderSection = (folder: FolderType, visited = new Set<number>()) => {
+    if (visited.has(folder.id)) return null;
+    visited.add(folder.id);
     const folderSessions = folderedSessions.get(folder.id) || [];
     const isCollapsed = isSearching ? false : !openFolders.has(folder.id);
 
@@ -846,6 +862,44 @@ export default function Dashboard() {
               >
                 <Pencil className="h-4 w-4 mr-2" /> Rename Folder
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger data-testid={`menu-move-folder-${folder.id}`}>
+                  <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {folder.parentFolderId && (
+                    <DropdownMenuItem
+                      onClick={() => moveFolder.mutate({ id: folder.id, parentFolderId: null })}
+                      data-testid={`menu-folder-move-root-${folder.id}`}
+                    >
+                      <X className="h-4 w-4 mr-2" /> Move to Root
+                    </DropdownMenuItem>
+                  )}
+                  {(() => {
+                    const descendants = new Set<number>();
+                    const findDescendants = (parentId: number) => {
+                      for (const f of (userFolders || [])) {
+                        if (f.parentFolderId === parentId && !descendants.has(f.id)) {
+                          descendants.add(f.id);
+                          findDescendants(f.id);
+                        }
+                      }
+                    };
+                    findDescendants(folder.id);
+                    return (userFolders || [])
+                      .filter(f => f.id !== folder.id && f.id !== folder.parentFolderId && !descendants.has(f.id))
+                      .map(target => (
+                        <DropdownMenuItem
+                          key={target.id}
+                          onClick={() => moveFolder.mutate({ id: folder.id, parentFolderId: target.id })}
+                          data-testid={`menu-folder-move-to-${target.id}-${folder.id}`}
+                        >
+                          <Folder className="h-4 w-4 mr-2" /> {target.name}
+                        </DropdownMenuItem>
+                      ));
+                  })()}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive"
@@ -862,7 +916,8 @@ export default function Dashboard() {
         </div>
         <CollapsibleContent>
           <div className="space-y-2 ml-4 mt-1 border-l-2 border-primary/20 pl-3">
-            {folderSessions.length === 0 ? (
+            {(userFolders || []).filter(f => f.parentFolderId === folder.id).map(child => renderFolderSection(child, visited))}
+            {folderSessions.length === 0 && (userFolders || []).filter(f => f.parentFolderId === folder.id).length === 0 ? (
               <p className="text-xs text-muted-foreground py-2 pl-2">No sessions in this folder</p>
             ) : (
               folderSessions.map(session => renderSessionCard(session))
@@ -1168,10 +1223,10 @@ export default function Dashboard() {
             const lastSession = sessions.find(s => s.id === parseInt(lastId));
             if (!lastSession || lastSession.status === "completed") return null;
             return (
-              <div className="mb-4">
+              <div className="mb-4 flex items-center gap-1">
                 <Button
                   variant="outline"
-                  className="w-full justify-start gap-2 border-primary/40 hover:bg-primary/5"
+                  className="flex-1 justify-start gap-2 border-primary/40 hover:bg-primary/5"
                   onClick={() => setLocation(`/session/${lastSession.id}`)}
                   data-testid="button-continue-last-session"
                   title="Continue your last session"
@@ -1180,6 +1235,100 @@ export default function Dashboard() {
                   <span className="text-sm">Continue: <strong>{lastSession.name}</strong></span>
                   {lastSession.location && <span className="text-xs text-muted-foreground">({lastSession.location})</span>}
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="ghost" data-testid="button-continue-session-menu" title="Session menu">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        toggleStatus.mutate({
+                          id: lastSession.id,
+                          status: lastSession.status === "active" ? "completed" : "active",
+                        });
+                      }}
+                      data-testid="menu-continue-toggle-status"
+                    >
+                      {lastSession.status === "active" ? (
+                        <><CheckCircle2 className="h-4 w-4 mr-2" /> Mark Complete</>
+                      ) : (
+                        <><RotateCcw className="h-4 w-4 mr-2" /> Reopen</>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => openEditDialog(lastSession)}
+                      data-testid="menu-continue-rename-session"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" /> Rename Session
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => duplicateSession.mutate(lastSession.id)}
+                      data-testid="menu-continue-duplicate-session"
+                    >
+                      <Copy className="h-4 w-4 mr-2" /> Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger data-testid="menu-continue-move-session">
+                        <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        {lastSession.folderId && (
+                          <DropdownMenuItem
+                            onClick={() => moveSession.mutate({ id: lastSession.id, folderId: null })}
+                            data-testid="menu-continue-move-unfiled"
+                          >
+                            <X className="h-4 w-4 mr-2" /> Remove from folder
+                          </DropdownMenuItem>
+                        )}
+                        {(userFolders || []).filter(f => f.id !== lastSession.folderId).map(folder => (
+                          <DropdownMenuItem
+                            key={folder.id}
+                            onClick={() => moveSession.mutate({ id: lastSession.id, folderId: folder.id })}
+                            data-testid={`menu-continue-move-to-folder-${folder.id}`}
+                          >
+                            <Folder className="h-4 w-4 mr-2" /> {folder.name}
+                          </DropdownMenuItem>
+                        ))}
+                        {(userFolders || []).filter(f => f.id !== lastSession.folderId).length > 0 && <DropdownMenuSeparator />}
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setCreateFolderForSession(lastSession);
+                            setInlineFolderName("");
+                          }}
+                          data-testid="menu-continue-create-folder"
+                        >
+                          <FolderPlus className="h-4 w-4 mr-2" /> Create New Folder
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuItem
+                      onClick={() => toggleLock.mutate({ id: lastSession.id, locked: !lastSession.isLocked })}
+                      data-testid="menu-continue-lock-session"
+                    >
+                      {lastSession.isLocked ? (
+                        <><Unlock className="h-4 w-4 mr-2" /> Unlock Session</>
+                      ) : (
+                        <><Lock className="h-4 w-4 mr-2" /> Lock Session</>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setLocation(`/session/${lastSession.id}?activity=1`)}
+                      data-testid="menu-continue-activity-log"
+                    >
+                      <History className="h-4 w-4 mr-2" /> Activity Log
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => setDeleteSessionTarget({ id: lastSession.id, name: lastSession.name })}
+                      data-testid="menu-continue-delete-session"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             );
           } catch { return null; }
@@ -1211,7 +1360,7 @@ export default function Dashboard() {
           </Card>
         ) : !filteredSessions.length && !isSearching && (userFolders || []).length > 0 ? (
           <div className="space-y-4">
-            {(userFolders || []).map(folder => renderFolderSection(folder))}
+            {(userFolders || []).filter(f => !f.parentFolderId).map(folder => renderFolderSection(folder))}
             <Card className="border border-border">
               <CardContent className="py-8 text-center">
                 <Cable className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
@@ -1233,7 +1382,7 @@ export default function Dashboard() {
                 Found {filteredSessions.length + filteredSharedSessions.length} result{filteredSessions.length + filteredSharedSessions.length !== 1 ? "s" : ""} matching "{searchQuery}":
               </p>
             )}
-            {(userFolders || []).map(folder => renderFolderSection(folder))}
+            {(userFolders || []).filter(f => !f.parentFolderId).map(folder => renderFolderSection(folder))}
 
             {unfiledSessions.length > 0 && (
               <div>

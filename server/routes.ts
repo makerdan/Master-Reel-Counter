@@ -397,10 +397,30 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
-      const { name, sortOrder } = req.body;
+      const { name, sortOrder, parentFolderId } = req.body;
       const updates: any = {};
       if (name !== undefined) updates.name = name;
       if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      if (parentFolderId !== undefined) {
+        if (parentFolderId !== null) {
+          if (parentFolderId === folder.id) return res.status(400).json({ message: "Cannot move folder into itself" });
+          const parentFolder = await storage.getFolder(parentFolderId);
+          if (!parentFolder || parentFolder.userId !== userId) return res.status(400).json({ message: "Parent folder not found" });
+          const visited = new Set<number>([folder.id, parentFolder.id]);
+          let ancestor: typeof parentFolder | undefined = parentFolder;
+          let depth = 0;
+          while (ancestor && ancestor.parentFolderId && depth < 50) {
+            if (ancestor.parentFolderId === folder.id) return res.status(400).json({ message: "Cannot create circular folder nesting" });
+            if (visited.has(ancestor.parentFolderId)) return res.status(400).json({ message: "Corrupt folder chain detected" });
+            visited.add(ancestor.parentFolderId);
+            const next = await storage.getFolder(ancestor.parentFolderId);
+            if (!next || next.userId !== userId) return res.status(400).json({ message: "Invalid folder chain" });
+            ancestor = next;
+            depth++;
+          }
+        }
+        updates.parentFolderId = parentFolderId;
+      }
       const updated = await storage.updateFolder(folder.id, updates);
       res.json(updated);
     } catch (error) {
