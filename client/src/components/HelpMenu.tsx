@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, MessageSquare, History, Users, Share2, AlertCircle, StickyNote, Focus, ArrowUpDown, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, StickyNote, Focus, ArrowUpDown, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription,
@@ -299,11 +299,6 @@ export function SessionSections() {
             description="Opens the Team dialog (owner only). Invite collaborators by username, shareable link, or email. Set roles (editor/viewer), transfer ownership, and track invite link usage with join counts and 7-day auto-expiry."
           />
           <FeatureRow
-            icon={<HelpIcon icon={MessageSquare} />}
-            label="Comments"
-            description="Toggle the threaded comments panel. All collaborators can post and reply to comments on the session."
-          />
-          <FeatureRow
             icon={<HelpIcon icon={History} />}
             label="Activity Log"
             description="Toggle the activity log showing a timestamped feed of all session changes — entries created, photos uploaded, collaborators joining, etc."
@@ -480,7 +475,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={Focus} />}
             label="Detail / Close-up Shot"
-            description='Check the "This is a detail/close-up shot" box to mark a photo as a detail shot. You can then link it to a parent photo, creating a parent→detail relationship visible in exports.'
+            description='Check the "This is a detail/close-up shot" box to mark a photo as a detail shot. You can link it to a parent photo, creating a parent→detail relationship visible in exports. Detail shots can also be captured via the Re-shoot button in the Flagged tab.'
           />
 
           <Separator className="my-2" />
@@ -539,9 +534,19 @@ export function SessionSections() {
             description="Each card shows the aisle and section where the reel is located, along with the pin label and wire details."
           />
           <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Re-shoot"
+            description='Tap "Re-shoot" to enter detail-shot mode in Mobile Flow. The aisle and section are pre-filled from the original photo. After capturing, a review screen shows your photo with an editable notes field. Tap "Save & Done" to save or "Retake" to try again.'
+          />
+          <FeatureRow
             icon={<HelpIcon icon={Check} />}
-            label="Resolve"
-            description='Tap "Resolve" to unflag a reel once the re-shoot or additional info has been captured. The reel disappears from the flagged list.'
+            label="Un-Flag"
+            description='Tap "Un-Flag" to unflag a reel once the re-shoot or additional info has been captured. The reel disappears from the flagged list.'
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ChevronLeft} />}
+            label="Back to Flagged Reels"
+            description="While in detail-shot mode, tap this button to return to the Flagged tab without capturing a photo."
           />
           <FeatureRow
             icon={<HelpIcon icon={Share2} />}

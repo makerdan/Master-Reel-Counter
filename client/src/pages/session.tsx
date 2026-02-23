@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
-  ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History, MessageSquare,
+  ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History,
   Lock, Unlock, Check, Loader2, AlertTriangle, Flag,
 } from "lucide-react";
 import {
@@ -29,7 +29,6 @@ import EntryTable from "./session/EntryTable";
 import SingleEntryMode from "./session/SingleEntryMode";
 import MobileCaptureView from "./session/MobileCaptureView";
 import ActivityLog from "./session/ActivityLog";
-import Comments from "./session/Comments";
 import FlaggedReels from "./session/FlaggedReels";
 import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename, formatSessionTime } from "./session/utils";
@@ -169,7 +168,6 @@ function SessionWorkspace({
   const [showActivity, setShowActivity] = useState(() => {
     try { return new URLSearchParams(window.location.search).get("activity") === "1"; } catch { return false; }
   });
-  const [showComments, setShowComments] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
@@ -433,14 +431,6 @@ function SessionWorkspace({
                 Team
               </Button>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" variant={showComments ? "default" : "ghost"} onClick={() => { setShowComments(!showComments); setShowActivity(false); }} data-testid="button-toggle-comments">
-                  <MessageSquare className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Comments</TooltipContent>
-            </Tooltip>
             <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" title={captureMode ? "Switch to full mode" : "Switch to mobile capture mode"}>
               {captureMode ? "Full Mode" : "Mobile Flow"}
             </Button>
@@ -471,16 +461,15 @@ function SessionWorkspace({
         </div>
       </header>
 
-      {(showActivity || showComments) && (
+      {showActivity && (
         <div className="border-b bg-card">
           <div className="max-w-5xl mx-auto w-full px-4">
             <div className="flex items-center gap-2 py-2 border-b border-border/50">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {showActivity ? "Activity Log" : "Comments"}
+                Activity Log
               </h3>
             </div>
-            {showActivity && <ActivityLog sessionId={sessionId} />}
-            {showComments && <Comments sessionId={sessionId} role={(session as any).role} />}
+            <ActivityLog sessionId={sessionId} />
           </div>
         </div>
       )}

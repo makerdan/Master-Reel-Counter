@@ -835,7 +835,7 @@ export default function Dashboard() {
             <Button variant="ghost" size="sm" className="gap-1 px-2" data-testid={`button-toggle-folder-${folder.id}`} title="Toggle folder">
               <ChevronDown className={`h-4 w-4 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
               {isCollapsed ? <Folder className="h-4 w-4 text-primary" /> : <FolderOpen className="h-4 w-4 text-primary" />}
-              <span className="font-semibold text-sm">{folder.name}</span>
+              <span className="font-semibold text-base">{folder.name}</span>
               <Badge variant="secondary" className="ml-1 no-default-hover-elevate no-default-active-elevate text-xs">
                 {folderSessions.length}
               </Badge>
@@ -916,7 +916,7 @@ export default function Dashboard() {
           </DropdownMenu>
         </div>
         <CollapsibleContent>
-          <div className="space-y-2 ml-4 mt-1 border-l-2 border-primary/20 pl-3">
+          <div className="space-y-2 mt-1 border border-border/50 rounded-md p-3">
             {(userFolders || []).filter(f => f.parentFolderId === folder.id).map(child => renderFolderSection(child, visited))}
             {folderSessions.length === 0 && (userFolders || []).filter(f => f.parentFolderId === folder.id).length === 0 ? (
               <p className="text-xs text-muted-foreground py-2 pl-2">No sessions in this folder</p>
