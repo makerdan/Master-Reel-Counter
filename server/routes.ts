@@ -568,49 +568,47 @@ export async function registerRoutes(
       if (Object.keys(safeUpdate).length === 0) return res.status(400).json({ message: "No valid fields to update" });
       const updated = await storage.updatePhoto(photo.id, safeUpdate);
 
-      const cascadeLocationToDetailShots = async (parentId: number, locationUpdate: Record<string, any>, sessionId: number) => {
-        const sessionPhotos = await storage.getSessionPhotos(sessionId);
-        const detailShots = sessionPhotos.filter(p => p.parentPhotoId === parentId);
-        for (const ds of detailShots) {
-          await storage.updatePhoto(ds.id, locationUpdate);
-          const dsPins = await storage.getPhotoPins(ds.id);
-          const dsCommitted = dsPins.filter(p => p.entryId);
-          for (const dp of dsCommitted) {
-            if (dp.entryId) {
-              await storage.updateEntry(dp.entryId, locationUpdate);
+      if (safeUpdate.section !== undefined || safeUpdate.aisle !== undefined) {
+        const { db } = await import("./db");
+        await db.transaction(async () => {
+          const entryUpdate: Record<string, any> = {};
+          if (safeUpdate.section !== undefined) entryUpdate.section = safeUpdate.section;
+          if (safeUpdate.aisle !== undefined) entryUpdate.aisle = safeUpdate.aisle;
+
+          const photoPins = await storage.getPhotoPins(photo.id);
+          const committedPins = photoPins.filter(p => p.entryId);
+          for (const pin of committedPins) {
+            if (pin.entryId) {
+              await storage.updateEntry(pin.entryId, entryUpdate);
             }
           }
-        }
-      };
 
-      if (safeUpdate.section !== undefined || safeUpdate.aisle !== undefined) {
-        const pins = await storage.getPhotoPins(photo.id);
-        const committedPins = pins.filter(p => p.entryId);
-        const entryUpdate: Record<string, any> = {};
-        if (safeUpdate.section !== undefined) entryUpdate.section = safeUpdate.section;
-        if (safeUpdate.aisle !== undefined) entryUpdate.aisle = safeUpdate.aisle;
-        for (const pin of committedPins) {
-          if (pin.entryId) {
-            await storage.updateEntry(pin.entryId, entryUpdate);
+          const sessionPhotos = await storage.getSessionPhotos(photo.sessionId);
+          const detailShots = sessionPhotos.filter(p => p.parentPhotoId === photo.id);
+          for (const ds of detailShots) {
+            await storage.updatePhoto(ds.id, entryUpdate);
+            const dsPins = await storage.getPhotoPins(ds.id);
+            for (const dp of dsPins.filter(p => p.entryId)) {
+              if (dp.entryId) await storage.updateEntry(dp.entryId, entryUpdate);
+            }
           }
-        }
-        await cascadeLocationToDetailShots(photo.id, entryUpdate, photo.sessionId);
+        });
       }
 
       if (safeUpdate.parentPhotoId !== undefined && safeUpdate.parentPhotoId !== null) {
         const parentPhoto = await storage.getPhoto(safeUpdate.parentPhotoId);
         if (parentPhoto && (parentPhoto.aisle || parentPhoto.section)) {
-          const inheritUpdate: Record<string, any> = {};
-          if (parentPhoto.aisle) inheritUpdate.aisle = parentPhoto.aisle;
-          if (parentPhoto.section) inheritUpdate.section = parentPhoto.section;
-          await storage.updatePhoto(photo.id, inheritUpdate);
-          const dsPins = await storage.getPhotoPins(photo.id);
-          const dsCommitted = dsPins.filter(p => p.entryId);
-          for (const dp of dsCommitted) {
-            if (dp.entryId) {
-              await storage.updateEntry(dp.entryId, inheritUpdate);
+          const { db } = await import("./db");
+          await db.transaction(async () => {
+            const inheritUpdate: Record<string, any> = {};
+            if (parentPhoto.aisle) inheritUpdate.aisle = parentPhoto.aisle;
+            if (parentPhoto.section) inheritUpdate.section = parentPhoto.section;
+            await storage.updatePhoto(photo.id, inheritUpdate);
+            const dsPins = await storage.getPhotoPins(photo.id);
+            for (const dp of dsPins.filter(p => p.entryId)) {
+              if (dp.entryId) await storage.updateEntry(dp.entryId, inheritUpdate);
             }
-          }
+          });
         }
       }
 
@@ -716,27 +714,30 @@ export async function registerRoutes(
         const allSessionPins = await storage.getSessionPins(entry.sessionId);
         const linkedPin = allSessionPins.find(p => p.entryId === entry.id);
         if (linkedPin) {
-          const photoUpdate: Record<string, any> = {};
-          if (req.body.section !== undefined) photoUpdate.section = req.body.section;
-          if (req.body.aisle !== undefined) photoUpdate.aisle = req.body.aisle;
-          await storage.updatePhoto(linkedPin.photoId, photoUpdate);
-          const siblingPins = allSessionPins.filter(p => p.photoId === linkedPin.photoId && p.entryId && p.entryId !== entry.id);
-          for (const sp of siblingPins) {
-            if (sp.entryId) {
-              await storage.updateEntry(sp.entryId, photoUpdate);
-            }
-          }
-          const sessionPhotos = await storage.getSessionPhotos(entry.sessionId);
-          const detailShots = sessionPhotos.filter(p => p.parentPhotoId === linkedPin.photoId);
-          for (const ds of detailShots) {
-            await storage.updatePhoto(ds.id, photoUpdate);
-            const dsPins = allSessionPins.filter(p => p.photoId === ds.id && p.entryId);
-            for (const dp of dsPins) {
-              if (dp.entryId) {
-                await storage.updateEntry(dp.entryId, photoUpdate);
+          const { db } = await import("./db");
+          await db.transaction(async () => {
+            const photoUpdate: Record<string, any> = {};
+            if (req.body.section !== undefined) photoUpdate.section = req.body.section;
+            if (req.body.aisle !== undefined) photoUpdate.aisle = req.body.aisle;
+            await storage.updatePhoto(linkedPin.photoId, photoUpdate);
+            const siblingPins = allSessionPins.filter(p => p.photoId === linkedPin.photoId && p.entryId && p.entryId !== entry.id);
+            for (const sp of siblingPins) {
+              if (sp.entryId) {
+                await storage.updateEntry(sp.entryId, photoUpdate);
               }
             }
-          }
+            const sessionPhotos = await storage.getSessionPhotos(entry.sessionId);
+            const detailShots = sessionPhotos.filter(p => p.parentPhotoId === linkedPin.photoId);
+            for (const ds of detailShots) {
+              await storage.updatePhoto(ds.id, photoUpdate);
+              const dsPins = allSessionPins.filter(p => p.photoId === ds.id && p.entryId);
+              for (const dp of dsPins) {
+                if (dp.entryId) {
+                  await storage.updateEntry(dp.entryId, photoUpdate);
+                }
+              }
+            }
+          });
           broadcastToSession(entry.sessionId, { type: "sync", entity: "photos", sessionId: entry.sessionId });
         }
       }
@@ -2284,6 +2285,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const { enabled } = req.body;
+      const { db: txDb } = await import("./db");
 
       const currentSettings = await storage.getUserSettings(userId);
       const allEntries = await storage.getAllUserEntries(userId);
@@ -2306,40 +2308,44 @@ export async function registerRoutes(
             position: entry.position,
           }, dataKey),
         }));
-        if (entriesToUpdate.length > 0) {
-          await storage.bulkUpdateEntries(entriesToUpdate);
-        }
-        await storage.upsertUserSettings(userId, {
-          encodingEnabled: true,
-          encryptionKey: wrappedKey,
-          encryptionSalt: salt,
-        });
-        res.json({ success: true, encodingEnabled: true, entriesEncoded: entriesToUpdate.length });
-      } else {
-        if (currentSettings?.encodingEnabled && currentSettings.encryptionKey && currentSettings.encryptionSalt) {
-          const kek = deriveKEK(currentSettings.encryptionSalt);
-          const dataKey = unwrapKey(currentSettings.encryptionKey, kek);
-          const entriesToUpdate = allEntries.map(entry => ({
-            id: entry.id,
-            data: decryptEntry({
-              reelTag: entry.reelTag,
-              wireType: entry.wireType,
-              gauge: entry.gauge,
-              color: entry.color,
-              manufacturer: entry.manufacturer,
-              notes: entry.notes,
-              palletId: entry.palletId,
-              position: entry.position,
-            }, dataKey),
-          }));
+        await txDb.transaction(async () => {
           if (entriesToUpdate.length > 0) {
             await storage.bulkUpdateEntries(entriesToUpdate);
           }
-        }
-        await storage.upsertUserSettings(userId, {
-          encodingEnabled: false,
-          encryptionKey: null,
-          encryptionSalt: null,
+          await storage.upsertUserSettings(userId, {
+            encodingEnabled: true,
+            encryptionKey: wrappedKey,
+            encryptionSalt: salt,
+          });
+        });
+        res.json({ success: true, encodingEnabled: true, entriesEncoded: entriesToUpdate.length });
+      } else {
+        await txDb.transaction(async () => {
+          if (currentSettings?.encodingEnabled && currentSettings.encryptionKey && currentSettings.encryptionSalt) {
+            const kek = deriveKEK(currentSettings.encryptionSalt);
+            const dataKey = unwrapKey(currentSettings.encryptionKey, kek);
+            const entriesToUpdate = allEntries.map(entry => ({
+              id: entry.id,
+              data: decryptEntry({
+                reelTag: entry.reelTag,
+                wireType: entry.wireType,
+                gauge: entry.gauge,
+                color: entry.color,
+                manufacturer: entry.manufacturer,
+                notes: entry.notes,
+                palletId: entry.palletId,
+                position: entry.position,
+              }, dataKey),
+            }));
+            if (entriesToUpdate.length > 0) {
+              await storage.bulkUpdateEntries(entriesToUpdate);
+            }
+          }
+          await storage.upsertUserSettings(userId, {
+            encodingEnabled: false,
+            encryptionKey: null,
+            encryptionSalt: null,
+          });
         });
         res.json({ success: true, encodingEnabled: false, entriesDecoded: allEntries.length });
       }
@@ -2349,13 +2355,11 @@ export async function registerRoutes(
     }
   });
 
-  // External API for Power Apps - read-only, limited data exposure
-  app.get("/api/external/sessions/:id", async (req, res) => {
+  app.get("/api/external/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const session = await storage.getSession(parseInt(req.params.id));
-      if (!session) {
-        return res.status(404).json({ message: "Session not found" });
-      }
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const session = access.session;
       const sessionEntries = await storage.getSessionEntries(session.id);
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       const photoStats = await storage.getSessionPhotoStats([session.id]);
@@ -2478,6 +2482,8 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/online", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
       const users = getOnlineUsers(sessionId);
       res.json(users);
     } catch {
@@ -2491,10 +2497,17 @@ export async function registerRoutes(
   wss.on("connection", (ws) => {
     wsUserMap.set(ws, { sessionId: null, userId: null, username: null });
 
-    ws.on("message", (raw) => {
+    ws.on("message", async (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.type === "join" && typeof msg.sessionId === "number") {
+          if (msg.userId) {
+            const access = await verifySessionAccess(msg.sessionId, msg.userId);
+            if (!access) {
+              ws.send(JSON.stringify({ type: "error", message: "Access denied" }));
+              return;
+            }
+          }
           const info = wsUserMap.get(ws)!;
           const prevSessionId = info.sessionId;
           if (prevSessionId !== null) {

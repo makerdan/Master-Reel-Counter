@@ -35,10 +35,11 @@ The application is built with a React frontend, an Express.js backend, and Postg
 **System Design Choices:**
 - **Frontend Framework:** React + Vite with TanStack Query for data fetching and wouter for routing.
 - **Backend Framework:** Express.js.
-- **Database:** PostgreSQL managed with Drizzle ORM.
-- **API:** RESTful API for session, entry, photo, pin, collaborator, and settings management.
-- **Real-time Communication:** WebSockets for real-time synchronization of session changes, comments, and activity logs.
-- **Data Encoding:** AES-256-GCM encryption for specific entry fields, with key wrapping and user-specific keys.
+- **Database:** PostgreSQL managed with Drizzle ORM. Multi-step cascading operations (section/aisle sync, encryption toggle, session/photo/entry deletion) are wrapped in database transactions for atomicity.
+- **API:** RESTful API for session, entry, photo, pin, collaborator, and settings management. All routes require authentication via `isAuthenticated` middleware, and session-scoped routes verify access via `verifySessionAccess`.
+- **Real-time Communication:** WebSockets with session access verification on join. Only authenticated owners/collaborators can join a session's WebSocket room.
+- **Data Encoding:** AES-256-GCM encryption for specific entry fields, with key wrapping and user-specific keys. Encryption toggle is transactional — entries and settings update atomically.
+- **Cascade Deletion:** Session deletion cleans up all related data (photos, entries, pins, collaborators, invite links, activity logs, comments). Photo deletion clears child detail shot references and removes linked comments/entries/pins. Entry deletion unlinks associated pins and removes comments.
 - **Flagged Reels Workflow:** Pins can be flagged for re-shoot/review. Dedicated "Flagged" tab shows all flagged pins with photo previews, location indicators, and resolve functionality. Flag state persists through draft-pin auto-save and committed pin creation.
 - **User Settings:** Comprehensive settings stored in userSettings table with PATCH /api/settings endpoint. Settings include: Display (theme: light/dark/system, thumbnail size), Accessibility (larger touch targets, text size: small/default/large/extra-large with automatic disable during Mobile Flow), Data Entry (aisle prefix, section advance step, default unit), Photo Capture (quality compression 30-100% with Receiving quality override for close-up reel photos), Export (default format, company name, footer text), Data Encoding (AES-256-GCM toggle with collapsible limitations). Settings auto-save on change. Theme provider supports system/light/dark modes with DB-to-localStorage sync. TextSizeSyncer applies root font-size from settings; MobileCaptureView forces 16px default on mount.
 
