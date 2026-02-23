@@ -6,7 +6,7 @@ import {
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
   FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
   Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
-  Lock, Unlock,
+  Lock, Unlock, History,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -769,6 +769,15 @@ export default function Dashboard() {
                       ) : (
                         <><Lock className="h-4 w-4 mr-2" /> Lock Session</>
                       )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/session/${session.id}?activity=1`);
+                      }}
+                      data-testid={`menu-activity-log-${session.id}`}
+                    >
+                      <History className="h-4 w-4 mr-2" /> Activity Log
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

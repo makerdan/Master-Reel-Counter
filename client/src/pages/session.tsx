@@ -163,7 +163,9 @@ function SessionWorkspace({
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
   const [mobileFlowKey, setMobileFlowKey] = useState(0);
 
-  const [showActivity, setShowActivity] = useState(false);
+  const [showActivity, setShowActivity] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("activity") === "1"; } catch { return false; }
+  });
   const [showComments, setShowComments] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
@@ -435,14 +437,6 @@ function SessionWorkspace({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Comments</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" variant={showActivity ? "default" : "ghost"} onClick={() => { setShowActivity(!showActivity); setShowComments(false); }} data-testid="button-toggle-activity">
-                  <History className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Activity log</TooltipContent>
             </Tooltip>
             <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" title={captureMode ? "Switch to full mode" : "Switch to mobile capture mode"}>
               {captureMode ? "Full Mode" : "Mobile Flow"}
