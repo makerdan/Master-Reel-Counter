@@ -389,21 +389,6 @@ function SessionWorkspace({
                 Saved
               </span>
             )}
-            {isOwner && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button size="icon" variant="ghost" onClick={() => toggleLock.mutate()} disabled={toggleLock.isPending} data-testid="button-toggle-lock">
-                    {isLocked ? <Lock className="h-4 w-4 text-amber-500" /> : <Unlock className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{isLocked ? "Unlock session" : "Lock session"}</TooltipContent>
-              </Tooltip>
-            )}
-            {!isOwner && isLocked && (
-              <span className="flex items-center gap-1 text-xs text-amber-500" title="Session is locked">
-                <Lock className="h-3 w-3" />
-              </span>
-            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button size="icon" variant="ghost" onClick={undo} disabled={!canUndo} data-testid="button-undo" className="h-8 w-8">
