@@ -1384,6 +1384,80 @@ export async function registerRoutes(
         return { renderedW: w, renderedH: h + captionH, imgX };
       };
 
+      const renderCompactPhotoWithEntries = (pl: PhotoLayout, entries: any[], x: number, y: number, maxW: number, maxH: number) => {
+        const imgW = Math.min(maxW * 0.35, 200);
+        const captionH = 10;
+        const aspect = pl.origW / pl.origH;
+        let w = imgW;
+        let h = imgW / aspect;
+        const availImgH = maxH - captionH;
+        if (h > availImgH) {
+          h = availImgH;
+          w = availImgH * aspect;
+          if (w > imgW) { w = imgW; h = imgW / aspect; }
+        }
+
+        doc.image(pl.buffer, x, y, { width: w, height: h });
+        const photoPins = allPinsMap.get(pl.photo.id) || [];
+        const pinScale = pl.photo.pinScale || 1;
+        for (const pin of photoPins) {
+          drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale);
+        }
+        doc.rect(x, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
+
+        const photoName = pl.photo.originalFilename || `Photo ${pl.photo.id}`;
+        const reelTotal = entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+        doc.font('Helvetica').fontSize(5.5).fillColor("#666666")
+          .text(`${photoName}  |  ${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`, x, y + h + 1, { width: w, align: "center", lineBreak: false });
+
+        const listX = x + w + 8;
+        const listW = maxW - w - 8;
+        let listY = y;
+        const lineH = 9;
+        const bottomLimit = y + maxH;
+
+        for (const e of entries) {
+          const entryLines: { text: string; fontSize: number; color: string; font: string; indent: boolean }[] = [];
+          const pinLabel = photoPins.find((p: any) => p.entryId === e.id)?.label;
+          const header = pinLabel ? `P${String(pinLabel).padStart(2, "0")} — ${e.reelTag || e.wireType || "Entry"}` : (e.reelTag || e.wireType || "Entry");
+          entryLines.push({ text: header, fontSize: 6.5, color: accentHex, font: 'Helvetica-Bold', indent: false });
+
+          const details: string[] = [];
+          if (e.manufacturer) details.push(`Vendor: ${e.manufacturer}`);
+          if (e.reelCount && e.reelCount > 1) details.push(`Reels: ${e.reelCount}`);
+          if (e.footage) details.push(`Footage: ${e.footage.toLocaleString()} ft`);
+          if (e.gauge) details.push(`Gauge: ${e.gauge}`);
+          if (e.color) details.push(`Color: ${e.color}`);
+          if (e.conductors) details.push(`Conductors: ${e.conductors}`);
+
+          const line1 = details.slice(0, 3).join("  •  ");
+          const line2 = details.slice(3).join("  •  ");
+          if (line1) entryLines.push({ text: line1, fontSize: 5.5, color: "#333333", font: 'Helvetica', indent: true });
+          if (line2) entryLines.push({ text: line2, fontSize: 5.5, color: "#333333", font: 'Helvetica', indent: true });
+          if (e.notes) entryLines.push({ text: `Notes: ${e.notes}`, fontSize: 5, color: "#666666", font: 'Helvetica', indent: true });
+
+          const neededH = entryLines.length * (lineH - 1) + 4;
+          if (listY + neededH > bottomLimit) {
+            if (listY > y + 10) {
+              doc.font('Helvetica').fontSize(5).fillColor("#999999")
+                .text(`(${entries.indexOf(e) + 1}/${entries.length} continued in table below)`, listX, listY, { width: listW, lineBreak: false });
+              listY += lineH;
+            }
+            break;
+          }
+
+          for (const ln of entryLines) {
+            doc.font(ln.font).fontSize(ln.fontSize).fillColor(ln.color)
+              .text(ln.indent ? `  ${ln.text}` : ln.text, listX, listY, { width: listW, lineBreak: false });
+            listY += lineH - 1;
+          }
+          listY += 3;
+        }
+
+        const totalH = Math.max(h + captionH, listY - y);
+        return { renderedH: totalH };
+      };
+
       const drawSectionHeader = (aisle: string, section: string, entryCount: number, reelCount: number, footage: number, photoLabel?: string) => {
         doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
         doc.fontSize(11).fillColor(accentHex).text(
@@ -1515,7 +1589,67 @@ export async function registerRoutes(
           currentY = afterTable + 8;
         }
 
-        for (const { pl, entries: photoEntries } of photosWithEntries) {
+        const isReceivingSection = (sec.aisle || "").toLowerCase() === "receiving";
+
+        const compactPhotos: { pl: PhotoLayout; entries: any[] }[] = [];
+        const standardPhotos: { pl: PhotoLayout; entries: any[] }[] = [];
+        for (const item of photosWithEntries) {
+          const isCompact = isReceivingSection || item.pl.photo.isDetailShot;
+          if (isCompact) {
+            compactPhotos.push(item);
+          } else {
+            standardPhotos.push(item);
+          }
+        }
+
+        const compactWithoutEntries: PhotoLayout[] = [];
+        const standardWithoutEntries: PhotoLayout[] = [];
+        for (const pl of photosWithoutEntries) {
+          const isCompact = isReceivingSection || pl.photo.isDetailShot;
+          if (isCompact) {
+            compactWithoutEntries.push(pl);
+          } else {
+            standardWithoutEntries.push(pl);
+          }
+        }
+
+        if (compactPhotos.length > 0) {
+          const compactMinH = 80;
+          for (const { pl, entries: photoEntries } of compactPhotos) {
+            ensureSpace(compactMinH);
+            const availH = Math.min(maxY - currentY, 180);
+            const result = renderCompactPhotoWithEntries(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
+            currentY += result.renderedH + gap;
+          }
+        }
+
+        if (compactWithoutEntries.length > 0) {
+          let idx = 0;
+          while (idx < compactWithoutEntries.length) {
+            const remaining = compactWithoutEntries.length - idx;
+            const perRow = Math.min(4, remaining);
+            const cellW = (pageWidth - gap * (perRow - 1)) / perRow;
+            const rowAspects = [];
+            for (let c = 0; c < perRow; c++) {
+              const pl = compactWithoutEntries[idx + c];
+              rowAspects.push(pl.origW / pl.origH);
+            }
+            const estimatedH = Math.max(...rowAspects.map(a => cellW / a)) + 14;
+            ensureSpace(Math.min(estimatedH, 200));
+            const availH = maxY - currentY;
+            let maxRowH = 0;
+            for (let c = 0; c < perRow; c++) {
+              const pl = compactWithoutEntries[idx + c];
+              const x = tableLeft + c * (cellW + gap);
+              const result = renderPhoto(pl, x, currentY, cellW, availH);
+              if (result.renderedH > maxRowH) maxRowH = result.renderedH;
+            }
+            currentY += maxRowH + gap;
+            idx += perRow;
+          }
+        }
+
+        for (const { pl, entries: photoEntries } of standardPhotos) {
           ensureSpace(minPhotoH);
           const availH = maxY - currentY;
           const photoW = pageWidth * 0.45;
@@ -1539,14 +1673,14 @@ export async function registerRoutes(
           currentY = Math.max(photoEndY, tblEndY) + gap;
         }
 
-        if (photosWithoutEntries.length > 0) {
+        if (standardWithoutEntries.length > 0) {
           let idx = 0;
-          while (idx < photosWithoutEntries.length) {
-            const remaining = photosWithoutEntries.length - idx;
+          while (idx < standardWithoutEntries.length) {
+            const remaining = standardWithoutEntries.length - idx;
 
             if (remaining === 1) {
               ensureSpace(minPhotoH);
-              const pl = photosWithoutEntries[idx];
+              const pl = standardWithoutEntries[idx];
               const maxW = pageWidth * 0.6;
               const availH = maxY - currentY;
               const centeredX = tableLeft + (pageWidth - maxW) / 2;
@@ -1561,7 +1695,7 @@ export async function registerRoutes(
               let maxRowH = 0;
 
               for (let c = 0; c < photosInRow; c++) {
-                const pl = photosWithoutEntries[idx + c];
+                const pl = standardWithoutEntries[idx + c];
                 const x = tableLeft + c * (cellW + gap);
                 const result = renderPhoto(pl, x, currentY, cellW, availH);
                 if (result.renderedH > maxRowH) maxRowH = result.renderedH;
