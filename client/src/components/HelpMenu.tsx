@@ -38,8 +38,8 @@ export function FeatureRow({ icon, label, description }: { icon: React.ReactNode
     <div className="flex items-start gap-2.5 py-1.5">
       <div className="mt-0.5">{icon}</div>
       <div>
-        <span className="text-xs font-semibold text-foreground">{label}</span>
-        <p className="text-[11px] text-muted-foreground leading-relaxed">{description}</p>
+        <span className="text-2xl font-semibold text-foreground">{label}</span>
+        <p className="text-[22px] text-muted-foreground leading-relaxed">{description}</p>
       </div>
     </div>
   );
@@ -51,7 +51,7 @@ export function OverviewHelp() {
       <AccordionTrigger className="text-sm font-semibold py-3">
         <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Master Reel Counter — Overview</span>
       </AccordionTrigger>
-      <AccordionContent className="text-xs text-muted-foreground leading-relaxed space-y-2 pb-4">
+      <AccordionContent className="text-2xl text-muted-foreground leading-relaxed space-y-2 pb-4">
         <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
         <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow with Section Photo, Single Entry, and Flagged tabs. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience.</p>
       </AccordionContent>

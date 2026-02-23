@@ -41,7 +41,7 @@ export default function HelpPage() {
           <Cable className="h-5 w-5 text-[hsl(18_70%_50%)]" />
           <h2 className="text-lg font-bold">Sessions Dashboard</h2>
         </div>
-        <p className="text-xs text-muted-foreground mb-3">Managing sessions, folders, sorting, and search from the Sessions Dashboard.</p>
+        <p className="text-2xl text-muted-foreground mb-3">Managing sessions, folders, sorting, and search from the Sessions Dashboard.</p>
         <Accordion type="multiple" className="w-full">
           <DashboardSections />
         </Accordion>
@@ -51,7 +51,7 @@ export default function HelpPage() {
           <Camera className="h-5 w-5 text-[hsl(18_70%_50%)]" />
           <h2 className="text-lg font-bold">Session — Full Mode</h2>
         </div>
-        <p className="text-xs text-muted-foreground mb-3">Photo annotation, pin placement, entry management, collaboration, and exports inside a counting session.</p>
+        <p className="text-2xl text-muted-foreground mb-3">Photo annotation, pin placement, entry management, collaboration, and exports inside a counting session.</p>
         <Accordion type="multiple" className="w-full">
           <SessionSections />
         </Accordion>
@@ -61,7 +61,7 @@ export default function HelpPage() {
           <Smartphone className="h-5 w-5 text-[hsl(18_70%_50%)]" />
           <h2 className="text-lg font-bold">Session — Mobile Flow</h2>
         </div>
-        <p className="text-xs text-muted-foreground mb-3">Streamlined capture workflow for walking through the warehouse with a phone.</p>
+        <p className="text-2xl text-muted-foreground mb-3">Streamlined capture workflow for walking through the warehouse with a phone.</p>
         <Accordion type="multiple" className="w-full">
           <MobileFlowSections />
         </Accordion>
