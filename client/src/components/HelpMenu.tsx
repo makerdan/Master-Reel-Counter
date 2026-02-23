@@ -118,7 +118,7 @@ export function DashboardSections() {
           <span className="flex items-center gap-2"><Folder className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Folder Organization</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Organize your sessions into folders and even nest folders inside other folders for complex projects.</p>
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Organize your sessions into folders and even nest folders inside other folders for complex projects.</p>
           <FeatureRow
             icon={<HelpIcon icon={FolderPlus} />}
             label="Create Folder"
@@ -165,7 +165,7 @@ export function DashboardSections() {
           <span className="flex items-center gap-2"><MoreVertical className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Card Actions</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Each session card shows the name, location, reel count, total footage, photo count, and time. Tap the three-dot menu for actions:</p>
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Each session card shows the name, location, reel count, total footage, photo count, and time. Tap the three-dot menu for actions:</p>
           <FeatureRow
             icon={<HelpIcon icon={CheckCircle2} />}
             label="Mark Complete / Reopen"
@@ -209,7 +209,7 @@ export function DashboardSections() {
           <span className="flex items-center gap-2"><Users className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Shared Sessions</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Sessions shared with you by other users appear in a separate 'Shared with You' section below your own sessions.</p>
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Sessions shared with you by other users appear in a separate 'Shared with You' section below your own sessions.</p>
           <FeatureRow
             icon={<HelpIcon icon={Users} />}
             label="Shared Session Cards"
@@ -228,7 +228,7 @@ export function DashboardSections() {
           <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Card Details</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Each session card displays key information at a glance:</p>
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Each session card displays key information at a glance:</p>
           <FeatureRow
             icon={<HelpIcon icon={Hash} />}
             label="Reel Count"
@@ -662,7 +662,7 @@ export function SessionSections() {
           <p><span className="font-semibold text-foreground">Next Reel Navigation:</span> After placing all your pins, use the orange "Next Reel" button to jump through photos that still need details. The entry table auto-scrolls into view.</p>
           <p><span className="font-semibold text-foreground">Receiving Mode:</span> Type "rec" in the aisle field to auto-fill "Receiving". In Mobile Flow, the Receiving checkbox auto-increments section numbers.</p>
           <p><span className="font-semibold text-foreground">Pin Scale:</span> For photos with many small reels close together, decrease the pin size using the size controls on the right overlay strip. Pin scale is remembered per-photo.</p>
-          <p><span className="font-semibold text-foreground">Nearby Photos:</span> Use the photo strip below the viewer to preview adjacent sections without losing your pin work on the current photo.</p>
+          <p><span className="font-semibold text-foreground">Nearby Photos:</span> Use the photo strip below the viewer to preview adjacent sections without losing your pin work on the current photo. A nearby photo may show a different angle on a reel's tag, helping you correctly identify and input wire data you couldn't read from the current photo.</p>
           <p><span className="font-semibold text-foreground">Flagging Workflow:</span> When you can't read a tag, flag the reel and continue. Later, share the Flagged tab link with someone who can re-photograph those specific reels.</p>
           <p><span className="font-semibold text-foreground">Undo Safety Net:</span> All entry creates, edits, and deletes can be undone. The undo/redo buttons in the header track your action history for the current session.</p>
         </AccordionContent>
