@@ -1599,6 +1599,8 @@ export async function registerRoutes(
         return tblY;
       };
 
+      const deferredUnmatchedSections: { aisle: string; section: string; entries: any[] }[] = [];
+
       let tocSecIdx = 0;
       for (const sec of sortedSections) {
         const allPhotos = sec.photos || [];
@@ -1613,23 +1615,8 @@ export async function registerRoutes(
 
         if (loadedPhotos.length === 0 && sec.entries.length === 0) continue;
 
-        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-        doc.addNamedDestination(`sec-${tocSecIdx}`);
-        tocSecIdx++;
-        currentY = 36;
-        const photoLabel = loadedPhotos.length > 0 ? `${loadedPhotos.length} photo${loadedPhotos.length !== 1 ? "s" : ""}` : undefined;
-        drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
-
         const gap = 10;
         const minPhotoH = 120;
-
-        const ensureSpace = (needed: number) => {
-          if (currentY + needed > maxY) {
-            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-            currentY = 36;
-            drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, `(cont.)`);
-          }
-        };
 
         const matchedEntryIds = new Set<number>();
         const photosWithEntries: { pl: PhotoLayout; entries: any[] }[] = [];
@@ -1655,28 +1642,26 @@ export async function registerRoutes(
         const unmatchedEntries = sec.entries.filter((e: any) => !matchedEntryIds.has(e.id));
 
         if (unmatchedEntries.length > 0) {
-          const hasPhotos = photosWithEntries.length > 0 || photosWithoutEntries.length > 0;
-          if (hasPhotos) {
+          deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: unmatchedEntries });
+        }
+
+        const hasPhotoContent = loadedPhotos.length > 0;
+        if (!hasPhotoContent && unmatchedEntries.length === sec.entries.length) continue;
+
+        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+        doc.addNamedDestination(`sec-${tocSecIdx}`);
+        tocSecIdx++;
+        currentY = 36;
+        const photoLabel = loadedPhotos.length > 0 ? `${loadedPhotos.length} photo${loadedPhotos.length !== 1 ? "s" : ""}` : undefined;
+        drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
+
+        const ensureSpace = (needed: number) => {
+          if (currentY + needed > maxY) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = 36;
+            drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, `(cont.)`);
           }
-          const unmatchedReels = unmatchedEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
-          const unmatchedFootage = unmatchedEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
-          const aisleDisplay = sec.aisle.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${sec.aisle || "—"}`;
-          doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
-          doc.fontSize(11).fillColor(accentHex).text(
-            `Entries Without Photos — ${aisleDisplay} / Section ${sec.section || "—"}`,
-            tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
-          );
-          doc.fontSize(7).fillColor("#666666").text(
-            `${unmatchedEntries.length} entries  |  ${unmatchedReels} reels  |  ${unmatchedFootage.toLocaleString()} ft`,
-            tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
-          );
-          doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
-          currentY += 26;
-          const afterTable = drawEntriesTable(unmatchedEntries, tableLeft, pageWidth, currentY, 6.5, rowHeight);
-          currentY = afterTable + 8;
-        }
+        };
 
         const isReceivingSection = (sec.aisle || "").toLowerCase() === "receiving";
 
@@ -1855,6 +1840,41 @@ export async function registerRoutes(
             const result = renderPhoto(pl, tableLeft, currentY, pageWidth * 0.35, availH);
             currentY += result.renderedH + gap;
           }
+        }
+      }
+
+      // --- Entries Without Photos (deferred, before Summary) ---
+      if (deferredUnmatchedSections.length > 0) {
+        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+        currentY = 36;
+        doc.fontSize(16).fillColor(accentHex).text("Entries Without Photos", 36, currentY);
+        currentY += 24;
+
+        for (const ums of deferredUnmatchedSections) {
+          const unmatchedReels = ums.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+          const unmatchedFootage = ums.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+          const aisleDisplay = ums.aisle.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${ums.aisle || "—"}`;
+
+          if (currentY + 50 > maxY) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+            doc.fontSize(14).fillColor(accentHex).text("Entries Without Photos (cont.)", 36, currentY);
+            currentY += 22;
+          }
+
+          doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
+          doc.fontSize(11).fillColor(accentHex).text(
+            `${aisleDisplay} / Section ${ums.section || "—"}`,
+            tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
+          );
+          doc.fontSize(7).fillColor("#666666").text(
+            `${ums.entries.length} entries  |  ${unmatchedReels} reels  |  ${unmatchedFootage.toLocaleString()} ft`,
+            tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
+          );
+          doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
+          currentY += 26;
+          const afterTable = drawEntriesTable(ums.entries, tableLeft, pageWidth, currentY, 6.5, rowHeight);
+          currentY = afterTable + 12;
         }
       }
 
