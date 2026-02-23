@@ -560,7 +560,7 @@ export default function Dashboard() {
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2">
             {!isShared && (
-              <div className="pt-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <div className="-ml-1 self-center shrink-0" onClick={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={() => toggleSessionSelection(session.id, { stopPropagation: () => {} } as React.MouseEvent)}
