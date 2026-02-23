@@ -156,6 +156,7 @@ function SessionWorkspace({
   })();
   const [mode, setMode] = useState<string>(initialTab);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const previousModeRef = useRef<string | null>(null);
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [navigateToPhotoId, setNavigateToPhotoId] = useState<number | null>(null);
@@ -590,7 +591,7 @@ function SessionWorkspace({
             <EntryTable
               entries={entries}
               photos={photos}
-              onEdit={(entry) => { setEditingEntry(entry); setMode("single"); }}
+              onEdit={(entry) => { previousModeRef.current = mode; setEditingEntry(entry); setMode("single"); }}
               sessionId={sessionId}
               totalFootage={totalFootage}
               onUndoableDelete={pushUndo}
@@ -601,7 +602,7 @@ function SessionWorkspace({
       </div>
 
       {editingEntry && (
-        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) setEditingEntry(null); }}>
+        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) { setEditingEntry(null); if (previousModeRef.current) { setMode(previousModeRef.current); previousModeRef.current = null; } } }}>
           <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-4 pb-2 shrink-0">
               <DialogTitle>Edit Entry #{editingEntry.id}</DialogTitle>
@@ -639,7 +640,7 @@ function SessionWorkspace({
               );
             })()}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
-              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => setEditingEntry(null)} onUndoableSave={pushUndo} canEdit={canEditSession} />
+              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => { setEditingEntry(null); if (previousModeRef.current) { setMode(previousModeRef.current); previousModeRef.current = null; } }} onUndoableSave={pushUndo} canEdit={canEditSession} />
             </div>
           </DialogContent>
         </Dialog>
