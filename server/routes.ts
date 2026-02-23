@@ -1992,6 +1992,7 @@ export async function registerRoutes(
         defaultTheme: "system",
         thumbnailSize: "medium",
         largerTouchTargets: false,
+        textSize: "default",
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch settings" });
@@ -2005,7 +2006,7 @@ export async function registerRoutes(
         "defaultExportFormat", "companyName", "companyLogoKey", "exportFooterText",
         "photoQuality", "useReceivingQuality", "receivingPhotoQuality",
         "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
-        "defaultTheme", "thumbnailSize", "largerTouchTargets",
+        "defaultTheme", "thumbnailSize", "largerTouchTargets", "textSize",
       ];
       const updates: Record<string, any> = {};
       for (const field of allowedFields) {

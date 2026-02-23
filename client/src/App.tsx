@@ -17,6 +17,27 @@ import JoinPage from "@/pages/join";
 import HelpPage from "@/pages/help";
 import NotFound from "@/pages/not-found";
 
+const TEXT_SIZE_MAP: Record<string, string> = {
+  small: "14px",
+  default: "16px",
+  large: "18px",
+  "extra-large": "20px",
+};
+
+function TextSizeSyncer() {
+  const { user } = useAuth();
+  const { data: settings } = useQuery<{ textSize?: string }>({
+    queryKey: ["/api/settings"],
+    enabled: !!user,
+  });
+  useEffect(() => {
+    const size = settings?.textSize || "default";
+    document.documentElement.style.fontSize = TEXT_SIZE_MAP[size] || "16px";
+    return () => { document.documentElement.style.fontSize = ""; };
+  }, [settings?.textSize]);
+  return null;
+}
+
 function ThemeSyncer() {
   const { setThemeMode } = useTheme();
   const { user } = useAuth();
@@ -76,6 +97,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <ThemeSyncer />
+            <TextSizeSyncer />
             <AuthRouter />
           </TooltipProvider>
         </ThemeProvider>

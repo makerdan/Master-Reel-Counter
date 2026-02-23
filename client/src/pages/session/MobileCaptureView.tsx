@@ -75,6 +75,12 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
 
   useEffect(() => {
+    const savedSize = document.documentElement.style.fontSize;
+    document.documentElement.style.fontSize = "16px";
+    return () => { document.documentElement.style.fontSize = savedSize; };
+  }, []);
+
+  useEffect(() => {
     if (!prefixApplied && captureSettings?.defaultAislePrefix && !initialAisle && !aisle) {
       setAisle(captureSettings.defaultAislePrefix);
       setPrefixApplied(true);
@@ -473,8 +479,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       <Card>
         <CardContent className="p-4 space-y-3">
           {!aisle.trim() && (
-            <div className="rounded-md border border-[hsl(18_85%_40%/0.5)] bg-[hsl(18_85%_40%/0.08)] px-3 py-2 text-sm text-muted-foreground" data-testid="text-aisle-required">
-              Enter an aisle below to start capturing photos
+            <div className="px-3 py-2 text-sm text-muted-foreground text-center" data-testid="text-aisle-required">
+              <span className="text-red-500 font-bold">✱</span>{" "}Enter an aisle below to start capturing photos{" "}<span className="text-red-500 font-bold">✱</span>
             </div>
           )}
           <form onSubmit={(e) => e.preventDefault()} className="grid grid-cols-2 gap-3">

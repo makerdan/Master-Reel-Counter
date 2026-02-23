@@ -134,6 +134,7 @@ export const userSettings = pgTable("user_settings", {
   defaultTheme: varchar("default_theme", { length: 10 }).notNull().default("system"),
   thumbnailSize: varchar("thumbnail_size", { length: 10 }).notNull().default("medium"),
   largerTouchTargets: boolean("larger_touch_targets").notNull().default(false),
+  textSize: varchar("text_size", { length: 20 }).notNull().default("default"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

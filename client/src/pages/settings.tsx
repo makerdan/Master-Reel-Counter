@@ -49,6 +49,7 @@ interface UserSettingsResponse {
   defaultTheme: string;
   thumbnailSize: string;
   largerTouchTargets: boolean;
+  textSize: string;
 }
 
 export default function SettingsPage() {
@@ -240,6 +241,28 @@ export default function SettingsPage() {
                 onCheckedChange={(checked) => saveSetting("largerTouchTargets", checked)}
                 data-testid="switch-larger-touch-targets"
               />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Text Size</Label>
+                <p className="text-xs text-muted-foreground">Adjust the base text size across the app. Disabled during Mobile Flow.</p>
+              </div>
+              <Select
+                value={settings?.textSize || "default"}
+                onValueChange={(val) => saveSetting("textSize", val)}
+                data-testid="select-text-size"
+              >
+                <SelectTrigger className="w-[140px]" data-testid="select-trigger-text-size">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">Small</SelectItem>
+                  <SelectItem value="default">Default</SelectItem>
+                  <SelectItem value="large">Large</SelectItem>
+                  <SelectItem value="extra-large">Extra Large</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
