@@ -33,6 +33,7 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ThemeToggle } from "@/components/theme-toggle";
+import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -942,6 +943,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
+            <HelpMenu mode="full" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
