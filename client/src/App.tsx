@@ -13,6 +13,7 @@ import SessionPage from "@/pages/session";
 import SettingsPage from "@/pages/settings";
 import StatsPage from "@/pages/stats";
 import JoinPage from "@/pages/join";
+import HelpPage from "@/pages/help";
 import NotFound from "@/pages/not-found";
 
 function AuthRouter() {
@@ -42,6 +43,9 @@ function AuthRouter() {
       </Route>
       <Route path="/join/:token">
         {user ? <JoinPage /> : <Landing />}
+      </Route>
+      <Route path="/help">
+        {user ? <HelpPage /> : <Landing />}
       </Route>
       <Route component={NotFound} />
     </Switch>

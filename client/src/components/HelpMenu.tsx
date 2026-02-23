@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, MessageSquare, History, Users, Share2, AlertCircle, StickyNote, Focus, ArrowUpDown, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, MessageSquare, History, Users, Share2, AlertCircle, StickyNote, Focus, ArrowUpDown, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription,
@@ -11,8 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLocation } from "wouter";
 
-function HelpBadge({ children }: { children: React.ReactNode }) {
+export function HelpBadge({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1 rounded bg-[hsl(18_85%_40%/0.15)] border border-[hsl(18_85%_40%/0.3)] text-[hsl(18_70%_45%)] dark:text-[hsl(25_70%_65%)] px-1.5 py-0.5 text-[11px] font-mono font-medium">
       {children}
@@ -20,7 +21,7 @@ function HelpBadge({ children }: { children: React.ReactNode }) {
   );
 }
 
-function HelpKey({ children }: { children: React.ReactNode }) {
+export function HelpKey({ children }: { children: React.ReactNode }) {
   return (
     <kbd className="inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] font-mono font-medium text-muted-foreground">
       {children}
@@ -28,11 +29,11 @@ function HelpKey({ children }: { children: React.ReactNode }) {
   );
 }
 
-function HelpIcon({ icon: Icon, className }: { icon: React.ElementType; className?: string }) {
+export function HelpIcon({ icon: Icon, className }: { icon: React.ElementType; className?: string }) {
   return <Icon className={`h-3.5 w-3.5 shrink-0 ${className || "text-[hsl(18_70%_50%)]"}`} />;
 }
 
-function FeatureRow({ icon, label, description }: { icon: React.ReactNode; label: string; description: string }) {
+export function FeatureRow({ icon, label, description }: { icon: React.ReactNode; label: string; description: string }) {
   return (
     <div className="flex items-start gap-2.5 py-1.5">
       <div className="mt-0.5">{icon}</div>
@@ -44,21 +45,225 @@ function FeatureRow({ icon, label, description }: { icon: React.ReactNode; label
   );
 }
 
-function FullModeHelp() {
+export function OverviewHelp() {
   return (
-    <Accordion type="multiple" className="w-full">
-      <AccordionItem value="overview">
+    <AccordionItem value="overview">
+      <AccordionTrigger className="text-sm font-semibold py-3">
+        <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Overview</span>
+      </AccordionTrigger>
+      <AccordionContent className="text-xs text-muted-foreground leading-relaxed space-y-2 pb-4">
+        <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
+        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow with Section Photo, Single Entry, and Flagged tabs. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience.</p>
+      </AccordionContent>
+    </AccordionItem>
+  );
+}
+
+export function DashboardSections() {
+  return (
+    <>
+      <AccordionItem value="dash-header-bar">
         <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Overview</span>
+          <span className="flex items-center gap-2"><Cable className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Header Bar</span>
         </AccordionTrigger>
-        <AccordionContent className="text-xs text-muted-foreground leading-relaxed space-y-2 pb-4">
-          <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
-          <p>Full Mode provides the complete desktop and tablet workflow with three main tabs: <HelpBadge>Section Photo</HelpBadge>, <HelpBadge>Single Entry</HelpBadge>, and <HelpBadge>Flagged</HelpBadge>. Below all tabs is the <HelpBadge>Table View</HelpBadge> showing all committed entries.</p>
-          <p>Switch to <HelpBadge>Mobile Flow</HelpBadge> using the button in the top-right header for a streamlined phone-friendly capture experience.</p>
+        <AccordionContent className="space-y-1 pb-4">
+          <FeatureRow
+            icon={<span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-[hsl(18_70%_50%)]" />}
+            label="Theme Toggle"
+            description="Switch between dark and light mode using the sun/moon icon."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={HelpCircle} />}
+            label="Help"
+            description="Opens this help guide with information about all dashboard features."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={BarChart3} />}
+            label="Stats"
+            description="Opens the summary statistics page showing key metrics across all your sessions — total reels, footage, sessions, and activity charts."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Settings} />}
+            label="Settings"
+            description="Opens your profile and app settings. Edit your display name, manage encryption keys, and configure preferences."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={LogOut} />}
+            label="Sign Out"
+            description="Logs you out of your account. Your sessions are saved and will be waiting when you log back in."
+          />
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="header">
+      <AccordionItem value="dash-creating-sessions">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Plus className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Creating Sessions</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <FeatureRow
+            icon={<HelpIcon icon={Plus} />}
+            label="New Session"
+            description="Tap the + button to create a new counting session. Give it a name and optional location, then start counting reels."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ChevronRight} />}
+            label="Continue Last Session"
+            description="If your most recent session is inside a folder, a 'Continue' shortcut appears at the top for quick access. Tap it to jump right back into where you left off."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="dash-folders">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Folder className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Folder Organization</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Organize your sessions into folders and even nest folders inside other folders for complex projects.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={FolderPlus} />}
+            label="Create Folder"
+            description="Tap the folder+ button to create a new folder. Give it a name to group related sessions together."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Rename Folder"
+            description="Open a folder's action menu (three dots) and select Rename to change its name."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={FolderInput} />}
+            label="Move to Folder (Nested Folders)"
+            description="Move a folder inside another folder using the 'Move to Folder' submenu. Folders can be nested multiple levels deep. You can also move a nested folder back to the root level."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Delete Folder"
+            description="Deleting a folder moves all sessions inside it to 'Unfiled'. Sessions are never deleted when removing a folder."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="dash-sorting-search">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Search className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Sorting & Search</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <FeatureRow
+            icon={<HelpIcon icon={ArrowUpDown} />}
+            label="Sort Sessions"
+            description="Sort your sessions by Date, Name, Reels, or Footage. Tap the sort button to cycle through options. Tap the same option again to reverse the direction (ascending/descending)."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Search} />}
+            label="Search"
+            description="Type in the search bar to instantly filter sessions by name or location. Both your sessions and shared sessions are searched. Results show a count of matches."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="dash-session-cards">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><MoreVertical className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Card Actions</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Each session card shows the name, location, reel count, total footage, photo count, and time. Tap the three-dot menu for actions:</p>
+          <FeatureRow
+            icon={<HelpIcon icon={CheckCircle2} />}
+            label="Mark Complete / Reopen"
+            description="Toggle a session between active and completed status. Completed sessions show a green checkmark badge."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Rename"
+            description="Change the session name and location without opening the session."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Copy} />}
+            label="Duplicate"
+            description="Creates an exact copy of the session with all its entries, photos, and pins. The copy is named with a '(copy)' suffix."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={FolderInput} />}
+            label="Move to Folder"
+            description="Move a session into any folder, or back to Unfiled. Sessions inside folders appear grouped under the folder header."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Lock} />}
+            label="Lock / Unlock"
+            description="Lock a session to prevent any edits. Useful when a count is finalized. A lock icon appears on the session card."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={History} />}
+            label="Activity Log"
+            description="View a timestamped log of all changes — entries created, photos uploaded, collaborators joining, etc. You can copy all entries to clipboard."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Delete"
+            description="Permanently delete a session and all its data. A confirmation dialog appears before deletion."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="dash-shared-sessions">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Users className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Shared Sessions</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Sessions shared with you by other users appear in a separate 'Shared with You' section below your own sessions.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Users} />}
+            label="Shared Session Cards"
+            description="Shared sessions show the owner's name and your role (Editor or Viewer). Tap to open and collaborate."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-bold text-[hsl(18_70%_50%)]">R</span>}
+            label="Your Role"
+            description="Your role determines what you can do: Editors can add and modify entries. Viewers can only view data. The session owner controls roles from within the session."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="dash-session-info">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Card Details</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Each session card displays key information at a glance:</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Hash} />}
+            label="Reel Count"
+            description="The total number of reel entries in the session."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Ruler} />}
+            label="Total Footage"
+            description="The combined footage across all entries, formatted with commas for readability."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Photo Count"
+            description="The number of photos uploaded to the session."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={MapPin} />}
+            label="Location"
+            description="The session's location (if set) appears below the name."
+          />
+          <FeatureRow
+            icon={<span className="inline-block w-3 h-3 rounded-sm bg-primary/20 border border-primary/30" />}
+            label="Thumbnail"
+            description="A small preview of the first photo in the session appears on the card for visual identification."
+          />
+        </AccordionContent>
+      </AccordionItem>
+    </>
+  );
+}
+
+export function SessionSections() {
+  return (
+    <>
+      <AccordionItem value="session-header">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Header</span>
         </AccordionTrigger>
@@ -123,7 +328,7 @@ function FullModeHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="photo-mode">
+      <AccordionItem value="session-photo-mode">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Camera className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Section Photo Tab</span>
         </AccordionTrigger>
@@ -288,7 +493,7 @@ function FullModeHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="single-entry">
+      <AccordionItem value="session-single-entry">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Pencil className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Single Entry Tab</span>
         </AccordionTrigger>
@@ -317,7 +522,7 @@ function FullModeHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="flagged">
+      <AccordionItem value="session-flagged">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Flag className="h-4 w-4 text-yellow-500" /> Flagged Tab</span>
         </AccordionTrigger>
@@ -346,7 +551,7 @@ function FullModeHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="table-view">
+      <AccordionItem value="session-table-view">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Table View</span>
         </AccordionTrigger>
@@ -385,7 +590,7 @@ function FullModeHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="collaboration">
+      <AccordionItem value="session-collaboration">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Users className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Collaboration</span>
         </AccordionTrigger>
@@ -419,7 +624,7 @@ function FullModeHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="export">
+      <AccordionItem value="session-export">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Download className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Export & Sharing</span>
         </AccordionTrigger>
@@ -442,7 +647,7 @@ function FullModeHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="tips">
+      <AccordionItem value="session-tips">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Tips & Efficiency</span>
         </AccordionTrigger>
@@ -457,235 +662,14 @@ function FullModeHelp() {
           <p><span className="font-semibold text-foreground">Undo Safety Net:</span> All entry creates, edits, and deletes can be undone. The undo/redo buttons in the header track your action history for the current session.</p>
         </AccordionContent>
       </AccordionItem>
-    </Accordion>
+    </>
   );
 }
 
-function DashboardHelp() {
+export function MobileFlowSections() {
   return (
-    <Accordion type="multiple" className="w-full">
-      <AccordionItem value="overview">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Dashboard Overview</span>
-        </AccordionTrigger>
-        <AccordionContent className="text-xs text-muted-foreground leading-relaxed space-y-2 pb-4">
-          <p>The Counting Sessions dashboard is your home base. It lists all your counting sessions and folders, lets you create new sessions, organize them into folders, sort, search, and manage everything from one place.</p>
-          <p>Tap any session card to open it and start counting. Shared sessions from collaborators appear in a separate section below your own.</p>
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="header-bar">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Cable className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Header Bar</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <FeatureRow
-            icon={<span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-[hsl(18_70%_50%)]" />}
-            label="Theme Toggle"
-            description="Switch between dark and light mode using the sun/moon icon."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={HelpCircle} />}
-            label="Help"
-            description="Opens this help guide with information about all dashboard features."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={BarChart3} />}
-            label="Stats"
-            description="Opens the summary statistics page showing key metrics across all your sessions — total reels, footage, sessions, and activity charts."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Settings} />}
-            label="Settings"
-            description="Opens your profile and app settings. Edit your display name, manage encryption keys, and configure preferences."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={LogOut} />}
-            label="Sign Out"
-            description="Logs you out of your account. Your sessions are saved and will be waiting when you log back in."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="creating-sessions">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Plus className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Creating Sessions</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <FeatureRow
-            icon={<HelpIcon icon={Plus} />}
-            label="New Session"
-            description="Tap the + button to create a new counting session. Give it a name and optional location, then start counting reels."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={ChevronRight} />}
-            label="Continue Last Session"
-            description="If your most recent session is inside a folder, a 'Continue' shortcut appears at the top for quick access. Tap it to jump right back into where you left off."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="folders">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Folder className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Folder Organization</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Organize your sessions into folders and even nest folders inside other folders for complex projects.</p>
-          <FeatureRow
-            icon={<HelpIcon icon={FolderPlus} />}
-            label="Create Folder"
-            description="Tap the folder+ button to create a new folder. Give it a name to group related sessions together."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Pencil} />}
-            label="Rename Folder"
-            description="Open a folder's action menu (three dots) and select Rename to change its name."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={FolderInput} />}
-            label="Move to Folder (Nested Folders)"
-            description="Move a folder inside another folder using the 'Move to Folder' submenu. Folders can be nested multiple levels deep. You can also move a nested folder back to the root level."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Trash2} />}
-            label="Delete Folder"
-            description="Deleting a folder moves all sessions inside it to 'Unfiled'. Sessions are never deleted when removing a folder."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="sorting-search">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Search className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Sorting & Search</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <FeatureRow
-            icon={<HelpIcon icon={ArrowUpDown} />}
-            label="Sort Sessions"
-            description="Sort your sessions by Date, Name, Reels, or Footage. Tap the sort button to cycle through options. Tap the same option again to reverse the direction (ascending/descending)."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Search} />}
-            label="Search"
-            description="Type in the search bar to instantly filter sessions by name or location. Both your sessions and shared sessions are searched. Results show a count of matches."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="session-cards">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><MoreVertical className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Card Actions</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Each session card shows the name, location, reel count, total footage, photo count, and time. Tap the three-dot menu for actions:</p>
-          <FeatureRow
-            icon={<HelpIcon icon={CheckCircle2} />}
-            label="Mark Complete / Reopen"
-            description="Toggle a session between active and completed status. Completed sessions show a green checkmark badge."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Pencil} />}
-            label="Rename"
-            description="Change the session name and location without opening the session."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Copy} />}
-            label="Duplicate"
-            description="Creates an exact copy of the session with all its entries, photos, and pins. The copy is named with a '(copy)' suffix."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={FolderInput} />}
-            label="Move to Folder"
-            description="Move a session into any folder, or back to Unfiled. Sessions inside folders appear grouped under the folder header."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Lock} />}
-            label="Lock / Unlock"
-            description="Lock a session to prevent any edits. Useful when a count is finalized. A lock icon appears on the session card."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={History} />}
-            label="Activity Log"
-            description="View a timestamped log of all changes — entries created, photos uploaded, collaborators joining, etc. You can copy all entries to clipboard."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Trash2} />}
-            label="Delete"
-            description="Permanently delete a session and all its data. A confirmation dialog appears before deletion."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="shared-sessions">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Users className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Shared Sessions</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Sessions shared with you by other users appear in a separate 'Shared with You' section below your own sessions.</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Users} />}
-            label="Shared Session Cards"
-            description="Shared sessions show the owner's name and your role (Editor or Viewer). Tap to open and collaborate."
-          />
-          <FeatureRow
-            icon={<span className="text-xs font-bold text-[hsl(18_70%_50%)]">R</span>}
-            label="Your Role"
-            description="Your role determines what you can do: Editors can add and modify entries. Viewers can only view data. The session owner controls roles from within the session."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="session-info">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Card Details</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Each session card displays key information at a glance:</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Hash} />}
-            label="Reel Count"
-            description="The total number of reel entries in the session."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Ruler} />}
-            label="Total Footage"
-            description="The combined footage across all entries, formatted with commas for readability."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Camera} />}
-            label="Photo Count"
-            description="The number of photos uploaded to the session."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={MapPin} />}
-            label="Location"
-            description="The session's location (if set) appears below the name."
-          />
-          <FeatureRow
-            icon={<span className="inline-block w-3 h-3 rounded-sm bg-primary/20 border border-primary/30" />}
-            label="Thumbnail"
-            description="A small preview of the first photo in the session appears on the card for visual identification."
-          />
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  );
-}
-
-function MobileFlowHelp() {
-  return (
-    <Accordion type="multiple" className="w-full">
-      <AccordionItem value="overview">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Mobile Flow Overview</span>
-        </AccordionTrigger>
-        <AccordionContent className="text-xs text-muted-foreground leading-relaxed space-y-2 pb-4">
-          <p>Mobile Flow is a streamlined capture mode designed for walking through the warehouse with a phone. Focus on quickly taking photos with location tags — wire details can be entered later in Full Mode.</p>
-          <p>Switch back to <HelpBadge>Full Mode</HelpBadge> at any time using the button in the top-right header to annotate photos with pins and enter reel details.</p>
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="capture">
+    <>
+      <AccordionItem value="mobile-capture">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Camera className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Capturing Photos</span>
         </AccordionTrigger>
@@ -715,7 +699,7 @@ function MobileFlowHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="upload-queue">
+      <AccordionItem value="mobile-upload-queue">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><ArrowUpDown className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Upload Queue & Offline</span>
         </AccordionTrigger>
@@ -744,7 +728,7 @@ function MobileFlowHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="review">
+      <AccordionItem value="mobile-review">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Photo Review</span>
         </AccordionTrigger>
@@ -785,7 +769,7 @@ function MobileFlowHelp() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="tips">
+      <AccordionItem value="mobile-tips">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Mobile Tips</span>
         </AccordionTrigger>
@@ -797,19 +781,20 @@ function MobileFlowHelp() {
           <p><span className="font-semibold text-foreground">Review Later:</span> Mobile Flow is optimized for capturing. Switch to Full Mode on a tablet or desktop to add pins, wire details, and finalize entries.</p>
         </AccordionContent>
       </AccordionItem>
-    </Accordion>
+    </>
   );
 }
 
 export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" | "dashboard" }) {
   const [open, setOpen] = useState(false);
+  const [, setLocation] = useLocation();
 
-  const title = mode === "mobile" ? "Mobile Flow Help" : mode === "dashboard" ? "Dashboard Help" : "Help Guide";
-  const description = mode === "mobile"
-    ? "Quick reference for the mobile capture workflow."
-    : mode === "dashboard"
+  const title = mode === "dashboard" ? "Dashboard Help" : mode === "mobile" ? "Mobile Flow Help" : "Session Help";
+  const description = mode === "dashboard"
     ? "Guide to all dashboard actions and features."
-    : "Comprehensive guide to every feature and workflow.";
+    : mode === "mobile"
+    ? "Quick reference for the mobile capture workflow."
+    : "Comprehensive guide to session features and workflow.";
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -834,8 +819,26 @@ export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" |
           </SheetDescription>
         </SheetHeader>
         <ScrollArea className="flex-1 px-4">
-          {mode === "mobile" ? <MobileFlowHelp /> : mode === "dashboard" ? <DashboardHelp /> : <FullModeHelp />}
-          <div className="h-8" />
+          <Accordion type="multiple" className="w-full">
+            <OverviewHelp />
+            {mode === "dashboard" && <DashboardSections />}
+            {mode === "full" && <SessionSections />}
+            {mode === "mobile" && <MobileFlowSections />}
+          </Accordion>
+          <Separator className="my-3" />
+          <Button
+            variant="outline"
+            className="w-full mb-6 gap-2 text-xs"
+            onClick={() => {
+              setOpen(false);
+              setLocation("/help");
+            }}
+            data-testid="button-full-help-guide"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View Full Help Guide
+          </Button>
+          <div className="h-4" />
         </ScrollArea>
       </SheetContent>
     </Sheet>
