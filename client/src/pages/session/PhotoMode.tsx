@@ -1577,7 +1577,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             : "border-transparent hover-elevate"
                         }`}
                         onClick={async () => {
-                          if (isCurrent) {
+                          if (isCurrent || isViewing) {
                             setViewingNearbyIdx(null);
                           } else {
                             setViewingNearbyIdx(origIdx);
