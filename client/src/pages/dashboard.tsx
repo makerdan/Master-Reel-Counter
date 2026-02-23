@@ -553,7 +553,7 @@ export default function Dashboard() {
     return (
       <Card
         key={session.id}
-        className={`hover-elevate cursor-pointer border ${isSelected ? "border-primary ring-2 ring-primary/30" : "border-primary"}`}
+        className={`hover-elevate cursor-pointer ${isSelected ? "border border-primary ring-2 ring-primary/30" : "border-0"}`}
         data-testid={`card-${prefix}session-${session.id}`}
         onClick={() => setLocation(`/session/${session.id}`)}
       >
