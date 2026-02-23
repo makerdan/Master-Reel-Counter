@@ -35,6 +35,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const [activeDetailParentId, setActiveDetailParentId] = useState<number | null>(detailParentPhotoId ?? null);
   const activeDetailRef = useRef(activeDetailParentId);
   activeDetailRef.current = activeDetailParentId;
+  const [detailNotes, setDetailNotes] = useState("");
   const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
   const [savingNotes, setSavingNotes] = useState<Record<number, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -128,6 +129,12 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         const savedPhoto = await res.json();
 
         if (isDetail) {
+          if (detailNotes.trim()) {
+            try {
+              await apiRequest("PATCH", `/api/photos/${savedPhoto.id}`, { notes: detailNotes.trim() });
+            } catch {}
+          }
+          setDetailNotes("");
           setActiveDetailParentId(null);
           onDetailCaptured?.();
         }
@@ -136,7 +143,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         setRecentPhotos(prev => [...prev, {
           id: savedPhoto.id,
           objectPath: uploadResult.objectPath,
-          notes: "",
+          notes: isDetail ? detailNotes.trim() : "",
           aisle: nextItem.aisle,
           section: nextItem.section,
           isDetailShot: isDetail,
@@ -370,6 +377,19 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <ImagePlus className="h-5 w-5" />
             </Button>
           </div>
+          {activeDetailParentId != null && (
+            <div className="space-y-1">
+              <Label className="text-xs">Notes:</Label>
+              <Textarea
+                value={detailNotes}
+                onChange={(e) => setDetailNotes(e.target.value)}
+                placeholder="Add notes about this detail shot..."
+                rows={2}
+                className="text-sm"
+                data-testid="input-detail-notes"
+              />
+            </div>
+          )}
           {(pendingCount > 0 || failedCount > 0) && (
             <div className="space-y-2" data-testid="upload-queue-status">
               {pendingCount > 0 && (
