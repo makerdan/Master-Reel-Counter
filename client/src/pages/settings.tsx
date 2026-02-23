@@ -333,9 +333,23 @@ export default function SettingsPage() {
                 className="w-full"
                 data-testid="slider-photo-quality"
               />
-              <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                <span>Low (30%)</span>
-                <span>High (100%)</span>
+              <div className="relative w-full h-4 mt-0.5">
+                {[30, 40, 50, 60, 70, 80, 85, 90, 95, 100].map((tick) => {
+                  const pct = ((tick - 30) / 70) * 100;
+                  const isSelected = (settings?.photoQuality ?? 85) === tick;
+                  return (
+                    <div
+                      key={tick}
+                      className="absolute flex flex-col items-center"
+                      style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
+                    >
+                      <div className={`w-px h-1.5 ${isSelected ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                      <span className={`text-[9px] tabular-nums ${isSelected ? "text-primary font-semibold" : "text-muted-foreground/60"}`}>
+                        {tick}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </CardContent>
