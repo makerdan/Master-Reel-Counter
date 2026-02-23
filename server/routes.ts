@@ -2101,14 +2101,26 @@ export async function registerRoutes(
         doc.fontSize(8).fillColor("#999999").text(footerText, 36, currentY, { width: 300, lineBreak: true, height: maxY - currentY });
       }
 
-      const lastContentPage = doc.bufferedPageRange().count;
+      // --- Remove trailing blank pages ---
+      const pageBuf = (doc as any)._pageBuffer;
+      if (pageBuf && pageBuf.length > 1) {
+        while (pageBuf.length > 1) {
+          const lastPg = pageBuf[pageBuf.length - 1];
+          const contentRef = lastPg && lastPg.content;
+          const isBlank = contentRef && contentRef.uncompressedLength != null && contentRef.uncompressedLength <= 20;
+          if (!isBlank) break;
+          pageBuf.pop();
+        }
+      }
+
+      const pageCount = doc.bufferedPageRange().count;
 
       // --- Page Numbers (using buffered pages) ---
-      for (let i = 0; i < lastContentPage; i++) {
+      for (let i = 0; i < pageCount; i++) {
         doc.switchToPage(i);
         doc.fontSize(6).fillColor("#999999");
         doc.text(session.name, 36, doc.page.height - 30, { width: pageWidth / 2, lineBreak: false });
-        doc.text(`Page ${i + 1} of ${lastContentPage}`, 36 + pageWidth / 2, doc.page.height - 30, { width: pageWidth / 2, align: 'right', lineBreak: false });
+        doc.text(`Page ${i + 1} of ${pageCount}`, 36 + pageWidth / 2, doc.page.height - 30, { width: pageWidth / 2, align: 'right', lineBreak: false });
       }
 
       doc.end();
