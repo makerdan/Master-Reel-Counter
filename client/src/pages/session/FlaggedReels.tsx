@@ -198,7 +198,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     title="Mark as resolved"
                   >
                     <Check className="h-3.5 w-3.5 mr-1" />
-                    Resolve
+                    Un-Flag
                   </Button>
                 </div>
               </div>
