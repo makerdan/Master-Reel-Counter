@@ -230,7 +230,7 @@ export default function SettingsPage() {
               <CardTitle className="text-base">Accessibility</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <Label className="text-sm font-medium">Larger Touch Targets</Label>
