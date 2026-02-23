@@ -77,7 +77,15 @@ export function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoA
     start.getMonth() === end.getMonth() &&
     start.getDate() === end.getDate();
   if (sameDay) {
-    return `${dateFmt(firstPhotoAt)}, ${timeFmt(firstPhotoAt)}-${timeFmt(lastPhotoAt)} (${elapsed})`;
+    const startTime = timeFmt(firstPhotoAt);
+    const endTime = timeFmt(lastPhotoAt);
+    const startParts = startTime.match(/^(\d+):(\d+)\s*(AM|PM)?$/i);
+    const endParts = endTime.match(/^(\d+):(\d+)\s*(AM|PM)?$/i);
+    if (startParts && endParts && startParts[1] === endParts[1] && startParts[3] === endParts[3]) {
+      const suffix = startParts[3] ? ` ${startParts[3]}` : "";
+      return `${dateFmt(firstPhotoAt)}, ${startParts[1]}:${startParts[2]}-${endParts[2]}${suffix} (${elapsed})`;
+    }
+    return `${dateFmt(firstPhotoAt)}, ${startTime}-${endTime} (${elapsed})`;
   }
   return `${fmt(firstPhotoAt)} - ${fmt(lastPhotoAt)} (${elapsed})`;
 }
