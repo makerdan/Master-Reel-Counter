@@ -121,6 +121,17 @@ export const userSettings = pgTable("user_settings", {
   encodingEnabled: boolean("encoding_enabled").notNull().default(false),
   encryptionKey: text("encryption_key"),
   encryptionSalt: text("encryption_salt"),
+  defaultExportFormat: varchar("default_export_format", { length: 10 }).notNull().default("pdf"),
+  companyName: text("company_name"),
+  companyLogoKey: text("company_logo_key"),
+  exportFooterText: text("export_footer_text"),
+  photoQuality: integer("photo_quality").notNull().default(85),
+  defaultAislePrefix: text("default_aisle_prefix"),
+  sectionAdvanceStep: integer("section_advance_step").notNull().default(1),
+  defaultUnit: varchar("default_unit", { length: 10 }).notNull().default("feet"),
+  defaultTheme: varchar("default_theme", { length: 10 }).notNull().default("system"),
+  thumbnailSize: varchar("thumbnail_size", { length: 10 }).notNull().default("medium"),
+  largerTouchTargets: boolean("larger_touch_targets").notNull().default(false),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

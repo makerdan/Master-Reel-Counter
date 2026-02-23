@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Camera, Save, X, Loader2, ImagePlus, Flag } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,20 @@ export default function SingleEntryMode({
   const singleCameraRef = useRef<HTMLInputElement>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<{ url: string; objectPath: string; photoId: number } | null>(null);
   const [keepLocation, setKeepLocation] = useState(false);
+
+  const { data: entrySettings } = useQuery<{
+    defaultAislePrefix: string | null;
+    defaultUnit: string;
+    largerTouchTargets: boolean;
+  }>({
+    queryKey: ["/api/settings"],
+    select: (data: any) => ({
+      defaultAislePrefix: data?.defaultAislePrefix ?? null,
+      defaultUnit: data?.defaultUnit ?? "feet",
+      largerTouchTargets: data?.largerTouchTargets ?? false,
+    }),
+  });
+
   const [form, setForm] = useState({
     aisle: editingEntry?.aisle || "",
     section: editingEntry?.section || "",
@@ -97,8 +112,10 @@ export default function SingleEntryMode({
       setCapturedPhoto(null);
       setErrors({});
       setTouched({});
+    } else if (entrySettings?.defaultAislePrefix && !form.aisle) {
+      setForm(prev => ({ ...prev, aisle: entrySettings.defaultAislePrefix! }));
     }
-  }, [editingEntry]);
+  }, [editingEntry, entrySettings?.defaultAislePrefix]);
 
   const getCatalogMatch = (reelTag: string): ParsedCatalogEntry | null => {
     if (!reelTag || reelTag.length < 2) return null;

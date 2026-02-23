@@ -139,6 +139,29 @@ export default function Dashboard() {
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: number; name: string; sessionCount: number } | null>(null);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<{ id: number; name: string } | null>(null);
 
+  const { data: userSettings } = useQuery<{
+    thumbnailSize: string;
+    defaultExportFormat: string;
+    companyName: string | null;
+    exportFooterText: string | null;
+  }>({
+    queryKey: ["/api/settings"],
+    enabled: !!user,
+  });
+
+  const thumbSize = userSettings?.thumbnailSize || "medium";
+  const thumbClasses: Record<string, string> = {
+    none: "hidden",
+    small: "w-8 h-8",
+    medium: "w-12 h-12",
+    large: "w-16 h-16",
+  };
+  const thumbIconClasses: Record<string, string> = {
+    small: "h-3.5 w-3.5",
+    medium: "h-5 w-5",
+    large: "h-6 w-6",
+  };
+
   const { data: sessions, isLoading, isError: sessionsError } = useQuery<SessionWithStats[]>({
     queryKey: ["/api/sessions"],
     enabled: !!user,
@@ -568,16 +591,16 @@ export default function Dashboard() {
                 />
               </div>
             )}
-            <div className="shrink-0" data-testid={`img-session-thumbnail-${session.id}`}>
+            <div className={`shrink-0 ${thumbSize === "none" ? "hidden" : ""}`} data-testid={`img-session-thumbnail-${session.id}`}>
               {session.thumbnailKey ? (
                 <img
                   src={session.thumbnailKey}
                   alt=""
-                  className="w-12 h-12 rounded-md object-cover"
+                  className={`${thumbClasses[thumbSize] || thumbClasses.medium} rounded-md object-cover`}
                 />
               ) : (
-                <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center">
-                  <Camera className="h-5 w-5 text-muted-foreground" />
+                <div className={`${thumbClasses[thumbSize] || thumbClasses.medium} rounded-md bg-muted flex items-center justify-center`}>
+                  <Camera className={thumbIconClasses[thumbSize] || thumbIconClasses.medium + " text-muted-foreground"} />
                 </div>
               )}
             </div>

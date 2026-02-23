@@ -63,6 +63,15 @@ export default function SessionPage() {
     enabled: sessionId > 0,
   });
 
+  const { data: userSettings } = useQuery<{
+    defaultExportFormat: string;
+    companyName: string | null;
+    exportFooterText: string | null;
+    defaultUnit: string;
+  }>({
+    queryKey: ["/api/settings"],
+  });
+
   if (sessionLoading) {
     return (
       <div className="min-h-screen bg-background p-4 space-y-4">
@@ -116,18 +125,20 @@ export default function SessionPage() {
       entriesLoading={entriesLoading}
       photos={photos}
       sessionId={sessionId}
+      userSettings={userSettings}
     />
   );
 }
 
 function SessionWorkspace({
-  session, entries, entriesLoading, photos, sessionId,
+  session, entries, entriesLoading, photos, sessionId, userSettings,
 }: {
   session: Session & { role?: "owner" | "editor" | "viewer"; collaboratorCount?: number };
   entries: Entry[];
   entriesLoading: boolean;
   photos: Photo[];
   sessionId: number;
+  userSettings?: { defaultExportFormat: string; companyName: string | null; exportFooterText: string | null; defaultUnit: string };
 }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -325,7 +336,11 @@ function SessionWorkspace({
 
   const exportPdf = async () => {
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/export/pdf`, { credentials: "include" });
+      const params = new URLSearchParams();
+      if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
+      if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
+      const qs = params.toString();
+      const res = await fetch(`/api/sessions/${sessionId}/export/pdf${qs ? `?${qs}` : ""}`, { credentials: "include" });
       if (!res.ok) throw new Error("PDF export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -351,11 +366,13 @@ function SessionWorkspace({
         <style>body{font-family:Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%;margin-top:12px}
         th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f0eb}
         h1{font-size:18px}h2{font-size:14px;color:#666;margin-top:4px}.audit{margin-top:20px;font-size:10px;color:#999;border-top:1px solid #ddd;padding-top:8px}</style></head><body>
+        ${userSettings?.companyName ? `<h1>${esc(userSettings.companyName)}</h1>` : ""}
         <h1>Master Reel Counter - ${session.name}</h1>
         <h2>Location: ${session.location || "N/A"} | Entries: ${entries.length} | Total Footage: ${totalFootage.toLocaleString()} ft</h2>
         <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Reel Count</th><th>Conductors</th><th>Color</th><th>Manufacturer</th><th>Notes</th></tr></thead>
         <tbody>${rowsHtml}</tbody></table>
         <div class="audit">Generated: ${new Date().toISOString()} | First photo: ${session.firstPhotoAt ? new Date(session.firstPhotoAt).toISOString() : "N/A"} | Last photo: ${session.lastPhotoAt ? new Date(session.lastPhotoAt).toISOString() : "N/A"}</div>
+        ${userSettings?.exportFooterText ? `<div class="audit">${esc(userSettings.exportFooterText)}</div>` : ""}
         <script>setTimeout(()=>window.print(),500)</script></body></html>`);
       w.document.close();
     }

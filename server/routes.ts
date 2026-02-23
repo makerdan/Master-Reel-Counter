@@ -1120,14 +1120,22 @@ export async function registerRoutes(
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       doc.pipe(res);
 
+      const companyName = typeof req.query.companyName === "string" ? req.query.companyName : null;
+      const footerText = typeof req.query.footerText === "string" ? req.query.footerText : null;
+
       const accentHex = "#ea580c";
       const headerBg = "#f5f0eb";
       const borderColor = "#cccccc";
 
-      doc.fontSize(18).fillColor(accentHex).text("Master Reel Counter", 36, 36);
-      doc.fontSize(14).fillColor("#333333").text(session.name, 36, 58);
+      let titleY = 36;
+      if (companyName) {
+        doc.fontSize(12).fillColor("#666666").text(companyName, 36, titleY);
+        titleY += 18;
+      }
+      doc.fontSize(18).fillColor(accentHex).text("Master Reel Counter", 36, titleY);
+      doc.fontSize(14).fillColor("#333333").text(session.name, 36, titleY + 22);
       doc.fontSize(9).fillColor("#666666");
-      let infoY = 78;
+      let infoY = titleY + 42;
       doc.text(`Location: ${session.location || "N/A"}`, 36, infoY);
       infoY += 12;
       doc.text(`Status: ${session.status}`, 36, infoY);
@@ -1784,6 +1792,11 @@ export async function registerRoutes(
       doc.rect(36, currentY, 260, 20).strokeColor(accentHex).lineWidth(1.5).stroke();
       doc.fontSize(7).fillColor(accentHex).text(`VERIFIED EXPORT - ${ctGeneratedAt}`, 42, currentY + 6);
 
+      if (footerText) {
+        currentY += 28;
+        doc.fontSize(8).fillColor("#999999").text(footerText, 36, currentY, { width: 300 });
+      }
+
       doc.end();
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -1829,9 +1842,48 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const settings = await storage.getUserSettings(userId);
-      res.json(settings || { userId, encodingEnabled: false });
+      res.json(settings || {
+        userId,
+        encodingEnabled: false,
+        defaultExportFormat: "pdf",
+        companyName: null,
+        companyLogoKey: null,
+        exportFooterText: null,
+        photoQuality: 85,
+        defaultAislePrefix: null,
+        sectionAdvanceStep: 1,
+        defaultUnit: "feet",
+        defaultTheme: "system",
+        thumbnailSize: "medium",
+        largerTouchTargets: false,
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.patch("/api/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const allowedFields = [
+        "defaultExportFormat", "companyName", "companyLogoKey", "exportFooterText",
+        "photoQuality", "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
+        "defaultTheme", "thumbnailSize", "largerTouchTargets",
+      ];
+      const updates: Record<string, any> = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updates[field] = req.body[field];
+        }
+      }
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+      const result = await storage.upsertUserSettings(userId, updates);
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating settings:", error);
+      res.status(500).json({ message: "Failed to update settings" });
     }
   });
 

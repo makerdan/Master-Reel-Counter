@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Camera, Trash2, X, Loader2, AlertTriangle, Check,
   ImagePlus, RotateCw, ChevronLeft, ChevronRight, ArrowUpDown,
@@ -26,12 +27,29 @@ type UploadQueueItem = {
 
 function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured, onBackToFlagged }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void; onBackToFlagged?: () => void }) {
   const { toast } = useToast();
+
+  const { data: captureSettings } = useQuery<{
+    defaultAislePrefix: string | null;
+    sectionAdvanceStep: number;
+    largerTouchTargets: boolean;
+    photoQuality: number;
+  }>({
+    queryKey: ["/api/settings"],
+    select: (data: any) => ({
+      defaultAislePrefix: data?.defaultAislePrefix ?? null,
+      sectionAdvanceStep: data?.sectionAdvanceStep ?? 1,
+      largerTouchTargets: data?.largerTouchTargets ?? false,
+      photoQuality: data?.photoQuality ?? 85,
+    }),
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const aisleInputRef = useRef<HTMLInputElement>(null);
   const sectionInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState(initialAisle || "");
   const [section, setSection] = useState(initialSection || "");
+  const [prefixApplied, setPrefixApplied] = useState(false);
   const [activeDetailParentId, setActiveDetailParentId] = useState<number | null>(detailParentPhotoId ?? null);
   const activeDetailRef = useRef(activeDetailParentId);
   activeDetailRef.current = activeDetailParentId;
@@ -51,6 +69,13 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
+
+  useEffect(() => {
+    if (!prefixApplied && captureSettings?.defaultAislePrefix && !initialAisle && !aisle) {
+      setAisle(captureSettings.defaultAislePrefix);
+      setPrefixApplied(true);
+    }
+  }, [captureSettings, prefixApplied, initialAisle, aisle]);
 
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
@@ -108,8 +133,41 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
     (async () => {
       try {
+        const quality = (captureSettings?.photoQuality ?? 85) / 100;
+        let fileToUpload: File | Blob = nextItem.file;
+        if (quality < 1 && nextItem.file.type.startsWith("image/")) {
+          try {
+            if (typeof OffscreenCanvas !== "undefined") {
+              const bmp = await createImageBitmap(nextItem.file);
+              const canvas = new OffscreenCanvas(bmp.width, bmp.height);
+              const ctx = canvas.getContext("2d");
+              if (ctx) {
+                ctx.drawImage(bmp, 0, 0);
+                const compressed = await canvas.convertToBlob({ type: "image/jpeg", quality });
+                fileToUpload = new File([compressed], nextItem.file.name, { type: "image/jpeg" });
+              }
+              bmp.close();
+            } else {
+              const img = new Image();
+              const loadedUrl = URL.createObjectURL(nextItem.file);
+              await new Promise<void>((resolve) => { img.onload = () => resolve(); img.src = loadedUrl; });
+              const canvas = document.createElement("canvas");
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              const ctx = canvas.getContext("2d");
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                const compressed = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+                if (compressed) fileToUpload = new File([compressed], nextItem.file.name, { type: "image/jpeg" });
+              }
+              URL.revokeObjectURL(loadedUrl);
+            }
+          } catch {
+            fileToUpload = nextItem.file;
+          }
+        }
         const formData = new FormData();
-        formData.append("file", nextItem.file);
+        formData.append("file", fileToUpload);
         const uploadRes = await fetch("/api/uploads/direct", { method: "POST", body: formData, credentials: "include" });
         if (!uploadRes.ok) throw new Error("Upload failed");
         const uploadResult = await uploadRes.json();
@@ -197,8 +255,9 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       .filter(n => !isNaN(n));
     const allSections = [...existingSections, ...pendingReceivingSections];
     const maxSection = allSections.length > 0 ? Math.max(...allSections) : 0;
-    return String(maxSection + 1).padStart(3, "0");
-  }, [photos, recentPhotos, uploadQueue]);
+    const step = captureSettings?.sectionAdvanceStep ?? 1;
+    return String(maxSection + step).padStart(3, "0");
+  }, [photos, recentPhotos, uploadQueue, captureSettings?.sectionAdvanceStep]);
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -461,7 +520,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
           <div className="flex gap-2">
             <Button
-              className="flex-1"
+              className={`flex-1 ${captureSettings?.largerTouchTargets ? "min-h-[56px] text-base" : ""}`}
               size="lg"
               onClick={() => cameraInputRef.current?.click()}
               disabled={!aisle.trim()}
@@ -473,6 +532,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             <Button
               variant="outline"
               size="lg"
+              className={captureSettings?.largerTouchTargets ? "min-h-[56px]" : ""}
               onClick={() => fileInputRef.current?.click()}
               disabled={!aisle.trim()}
               data-testid="button-mobile-upload"

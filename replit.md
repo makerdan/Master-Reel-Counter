@@ -40,6 +40,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Real-time Communication:** WebSockets for real-time synchronization of session changes, comments, and activity logs.
 - **Data Encoding:** AES-256-GCM encryption for specific entry fields, with key wrapping and user-specific keys.
 - **Flagged Reels Workflow:** Pins can be flagged for re-shoot/review. Dedicated "Flagged" tab shows all flagged pins with photo previews, location indicators, and resolve functionality. Flag state persists through draft-pin auto-save and committed pin creation.
+- **User Settings:** Comprehensive settings stored in userSettings table with PATCH /api/settings endpoint. Settings include: Display (theme: light/dark/system, thumbnail size), Accessibility (larger touch targets), Data Entry (aisle prefix, section advance step, default unit), Photo Capture (quality compression 30-100%), Export (default format, company name, footer text), Data Encoding (AES-256-GCM toggle with collapsible limitations). Settings auto-save on change. Theme provider supports system/light/dark modes with DB-to-localStorage sync.
 
 ## External Dependencies
 - **Replit Auth:** For user authentication (OpenID Connect).

@@ -4,6 +4,8 @@ import { useLocation } from "wouter";
 import {
   ArrowLeft, Settings, Shield, ShieldOff, AlertTriangle, Lock,
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
+  Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
+  ChevronDown, Ruler, Building2, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,30 +13,53 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/theme-toggle";
 import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/lib/theme-provider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserSettingsResponse {
   userId: string;
   encodingEnabled: boolean;
+  defaultExportFormat: string;
+  companyName: string | null;
+  companyLogoKey: string | null;
+  exportFooterText: string | null;
+  photoQuality: number;
+  defaultAislePrefix: string | null;
+  sectionAdvanceStep: number;
+  defaultUnit: string;
+  defaultTheme: string;
+  thumbnailSize: string;
+  largerTouchTargets: boolean;
 }
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { setThemeMode } = useTheme();
   const [confirmDisableOpen, setConfirmDisableOpen] = useState(false);
   const [confirmEnableOpen, setConfirmEnableOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
+  const [limitationsOpen, setLimitationsOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -81,6 +106,23 @@ export default function SettingsPage() {
     },
   });
 
+  const updateSetting = useMutation({
+    mutationFn: async (data: Partial<UserSettingsResponse>) => {
+      const res = await apiRequest("PATCH", "/api/settings", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to save setting", variant: "destructive" });
+    },
+  });
+
+  const saveSetting = (field: string, value: any) => {
+    updateSetting.mutate({ [field]: value } as any);
+  };
+
   const encodingEnabled = settings?.encodingEnabled ?? false;
 
   return (
@@ -118,9 +160,239 @@ export default function SettingsPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-settings-title">Settings</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your account preferences and data security.
+            Manage your account preferences, display, and data options.
           </p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Monitor className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Display</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Theme</Label>
+                <p className="text-xs text-muted-foreground">Choose your preferred color theme.</p>
+              </div>
+              <Select
+                value={settings?.defaultTheme || "system"}
+                onValueChange={(val) => {
+                  saveSetting("defaultTheme", val);
+                  setThemeMode(val as "light" | "dark" | "system");
+                }}
+                data-testid="select-default-theme"
+              >
+                <SelectTrigger className="w-[140px]" data-testid="select-trigger-theme">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light"><span className="flex items-center gap-2"><Sun className="h-3.5 w-3.5" /> Light</span></SelectItem>
+                  <SelectItem value="dark"><span className="flex items-center gap-2"><Moon className="h-3.5 w-3.5" /> Dark</span></SelectItem>
+                  <SelectItem value="system"><span className="flex items-center gap-2"><Monitor className="h-3.5 w-3.5" /> System</span></SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Dashboard Thumbnail Size</Label>
+                <p className="text-xs text-muted-foreground">Size of session preview images on the dashboard.</p>
+              </div>
+              <Select
+                value={settings?.thumbnailSize || "medium"}
+                onValueChange={(val) => saveSetting("thumbnailSize", val)}
+                data-testid="select-thumbnail-size"
+              >
+                <SelectTrigger className="w-[140px]" data-testid="select-trigger-thumbnail">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="small">Small</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="large">Large</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Accessibility</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Larger Touch Targets</Label>
+                <p className="text-xs text-muted-foreground">Increases pin and button tap areas for easier interaction on mobile devices.</p>
+              </div>
+              <Switch
+                checked={settings?.largerTouchTargets ?? false}
+                onCheckedChange={(checked) => saveSetting("largerTouchTargets", checked)}
+                data-testid="switch-larger-touch-targets"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Keyboard className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Data Entry</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Default Aisle Prefix</Label>
+                <p className="text-xs text-muted-foreground">Auto-fill the aisle field with this value for new entries.</p>
+              </div>
+              <Input
+                className="w-[140px]"
+                placeholder="e.g. Receiving"
+                value={settings?.defaultAislePrefix || ""}
+                onChange={(e) => saveSetting("defaultAislePrefix", e.target.value || null)}
+                data-testid="input-default-aisle-prefix"
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Section Auto-Advance Step</Label>
+                <p className="text-xs text-muted-foreground">How much the section number increments automatically (e.g., 1 = 01, 02, 03; 2 = 01, 03, 05).</p>
+              </div>
+              <Select
+                value={String(settings?.sectionAdvanceStep || 1)}
+                onValueChange={(val) => saveSetting("sectionAdvanceStep", parseInt(val))}
+                data-testid="select-section-advance"
+              >
+                <SelectTrigger className="w-[140px]" data-testid="select-trigger-section-advance">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 (01, 02, 03...)</SelectItem>
+                  <SelectItem value="2">2 (01, 03, 05...)</SelectItem>
+                  <SelectItem value="3">3 (01, 04, 07...)</SelectItem>
+                  <SelectItem value="5">5 (01, 06, 11...)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Default Unit of Measurement</Label>
+                <p className="text-xs text-muted-foreground">Unit used for footage values across the app.</p>
+              </div>
+              <Select
+                value={settings?.defaultUnit || "feet"}
+                onValueChange={(val) => saveSetting("defaultUnit", val)}
+                data-testid="select-default-unit"
+              >
+                <SelectTrigger className="w-[140px]" data-testid="select-trigger-unit">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="feet">Feet (ft)</SelectItem>
+                  <SelectItem value="meters">Meters (m)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Camera className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Photo Capture</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between gap-4 mb-2">
+                <div>
+                  <Label className="text-sm font-medium">Photo Quality</Label>
+                  <p className="text-xs text-muted-foreground">Higher quality means larger file sizes and slower uploads. Lower quality saves bandwidth.</p>
+                </div>
+                <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-photo-quality-value">{settings?.photoQuality ?? 85}%</span>
+              </div>
+              <Slider
+                value={[settings?.photoQuality ?? 85]}
+                onValueCommit={(val) => saveSetting("photoQuality", val[0])}
+                min={30}
+                max={100}
+                step={5}
+                className="w-full"
+                data-testid="slider-photo-quality"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                <span>Low (30%)</span>
+                <span>High (100%)</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Download className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Export</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Default Export Format</Label>
+                <p className="text-xs text-muted-foreground">Preferred format when exporting session data.</p>
+              </div>
+              <Select
+                value={settings?.defaultExportFormat || "pdf"}
+                onValueChange={(val) => saveSetting("defaultExportFormat", val)}
+                data-testid="select-export-format"
+              >
+                <SelectTrigger className="w-[140px]" data-testid="select-trigger-export-format">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pdf"><span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" /> PDF</span></SelectItem>
+                  <SelectItem value="csv"><span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" /> CSV</span></SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Separator />
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Company Name</Label>
+              <p className="text-xs text-muted-foreground">Appears in the header of exported PDF reports.</p>
+              <Input
+                placeholder="e.g. Acme Wire Co."
+                value={settings?.companyName || ""}
+                onChange={(e) => saveSetting("companyName", e.target.value || null)}
+                data-testid="input-company-name"
+              />
+            </div>
+            <Separator />
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">PDF Footer Text</Label>
+              <p className="text-xs text-muted-foreground">Custom text displayed at the bottom of each exported PDF page.</p>
+              <Textarea
+                placeholder="e.g. Confidential — Internal Use Only"
+                value={settings?.exportFooterText || ""}
+                onChange={(e) => saveSetting("exportFooterText", e.target.value || null)}
+                rows={2}
+                data-testid="input-export-footer"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -201,87 +473,88 @@ export default function SettingsPage() {
                 </Button>
               </div>
             )}
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              <CardTitle className="text-base">Important: Encoding Limitations</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex gap-3">
-                  <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">External API returns encoded data</p>
-                    <p className="text-xs text-muted-foreground">
-                      The Power Apps external API will return encrypted/unreadable values for encoded fields. 
-                      Any systems pulling data via the external API will see encoded strings instead of readable text.
-                    </p>
+            <Separator />
+
+            <Collapsible open={limitationsOpen} onOpenChange={setLimitationsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2 px-2 w-full justify-start text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-semibold text-sm">Encoding Limitations</span>
+                  <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${limitationsOpen ? "" : "-rotate-90"}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-3 mt-3 pl-1">
+                  <div className="flex gap-3">
+                    <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">External API returns encoded data</p>
+                      <p className="text-xs text-muted-foreground">
+                        The Power Apps external API will return encrypted/unreadable values for encoded fields. 
+                        Any systems pulling data via the external API will see encoded strings instead of readable text.
+                      </p>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="flex gap-3">
+                    <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Manual entry and catalog autocomplete unaffected</p>
+                      <p className="text-xs text-muted-foreground">
+                        Category autocomplete and catalog lookup work from a built-in reference, not from stored entries. 
+                        Any values you save will be encoded before storage.
+                      </p>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="flex gap-3">
+                    <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">CSV/PDF exports are automatically decoded</p>
+                      <p className="text-xs text-muted-foreground">
+                        When you export data through the app, entries are decrypted before export so your files are readable. 
+                        Only data accessed directly through the database or external APIs would appear encoded.
+                      </p>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="flex gap-3">
+                    <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Toggling encoding migrates all existing entries</p>
+                      <p className="text-xs text-muted-foreground">
+                        When you turn encoding on, all your existing entries will be encrypted. When you turn it off, 
+                        they will all be decrypted back to plain text. For large datasets this may take a moment.
+                      </p>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="flex gap-3">
+                    <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Only entry details are encoded</p>
+                      <p className="text-xs text-muted-foreground">
+                        Encoding applies to text fields within entries (reel tags, wire type, gauge, color, manufacturer, notes, 
+                        pallet ID, position). Session names, photo metadata, aisle/section identifiers, and numerical values 
+                        like footage and reel counts remain unencoded for sorting and functionality.
+                      </p>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="flex gap-3">
+                    <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Encryption key is managed automatically</p>
+                      <p className="text-xs text-muted-foreground">
+                        A unique encryption key is generated for your account and secured by the server. You don't need to 
+                        remember a passphrase. The key is protected and cannot be read directly from the database.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <Separator />
-                <div className="flex gap-3">
-                  <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Manual entry and catalog autocomplete unaffected</p>
-                    <p className="text-xs text-muted-foreground">
-                      Category autocomplete and catalog lookup work from a built-in reference, not from stored entries. 
-                      Any values you save will be encoded before storage.
-                    </p>
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex gap-3">
-                  <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">CSV/PDF exports are automatically decoded</p>
-                    <p className="text-xs text-muted-foreground">
-                      When you export data through the app, entries are decrypted before export so your files are readable. 
-                      Only data accessed directly through the database or external APIs would appear encoded.
-                    </p>
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex gap-3">
-                  <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Toggling encoding migrates all existing entries</p>
-                    <p className="text-xs text-muted-foreground">
-                      When you turn encoding on, all your existing entries will be encrypted. When you turn it off, 
-                      they will all be decrypted back to plain text. For large datasets this may take a moment.
-                    </p>
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex gap-3">
-                  <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Only entry details are encoded</p>
-                    <p className="text-xs text-muted-foreground">
-                      Encoding applies to text fields within entries (reel tags, wire type, gauge, color, manufacturer, notes, 
-                      pallet ID, position). Session names, photo metadata, aisle/section identifiers, and numerical values 
-                      like footage and reel counts remain unencoded for sorting and functionality.
-                    </p>
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex gap-3">
-                  <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Encryption key is managed automatically</p>
-                    <p className="text-xs text-muted-foreground">
-                      A unique encryption key is generated for your account and secured by the server. You don't need to 
-                      remember a passphrase. The key is protected and cannot be read directly from the database.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           </CardContent>
         </Card>
 

@@ -1,9 +1,10 @@
+import { useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeProvider } from "@/lib/theme-provider";
+import { ThemeProvider, useTheme } from "@/lib/theme-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -15,6 +16,21 @@ import StatsPage from "@/pages/stats";
 import JoinPage from "@/pages/join";
 import HelpPage from "@/pages/help";
 import NotFound from "@/pages/not-found";
+
+function ThemeSyncer() {
+  const { setThemeMode } = useTheme();
+  const { user } = useAuth();
+  const { data: settings } = useQuery<{ defaultTheme: string }>({
+    queryKey: ["/api/settings"],
+    enabled: !!user,
+  });
+  useEffect(() => {
+    if (settings?.defaultTheme && !localStorage.getItem("themeMode")) {
+      setThemeMode(settings.defaultTheme as "light" | "dark" | "system");
+    }
+  }, [settings?.defaultTheme, setThemeMode]);
+  return null;
+}
 
 function AuthRouter() {
   const { user, isLoading } = useAuth();
@@ -59,6 +75,7 @@ function App() {
         <ThemeProvider>
           <TooltipProvider>
             <Toaster />
+            <ThemeSyncer />
             <AuthRouter />
           </TooltipProvider>
         </ThemeProvider>
