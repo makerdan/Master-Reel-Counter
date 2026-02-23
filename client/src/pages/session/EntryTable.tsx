@@ -156,7 +156,7 @@ function EntryTable({
                         <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(2, "0")}</td>
                         <td style={{ textAlign: "center" }}>{entry.aisle}</td>
                         <td style={{ textAlign: "center" }}>{entry.section}</td>
-                        <td className="mono">
+                        <td className="mono font-bold">
                           {entry.reelTag || "-"}
                           {!entry.reelTag && (
                             <span className="inline-flex items-center ml-1" title="No category">
@@ -166,7 +166,7 @@ function EntryTable({
                         </td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
-                        <td className="mono" style={{ textAlign: "center" }}>
+                        <td className="mono font-bold" style={{ textAlign: "center" }}>
                           {info.totalFootage ? `${info.totalFootage.toLocaleString()}'` : "-"}
                           {!info.totalFootage && (
                             <span className="inline-flex items-center ml-1" title="Zero footage">
