@@ -24,7 +24,7 @@ type UploadQueueItem = {
   retries: number;
 };
 
-function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void }) {
+function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured, onBackToFlagged }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void; onBackToFlagged?: () => void }) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -295,9 +295,23 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         </div>
       )}
       {activeDetailParentId != null && (
-        <div className="rounded-md border border-[hsl(200_70%_50%/0.5)] bg-[hsl(200_70%_50%/0.1)] px-3 py-2 text-sm flex items-center gap-2" data-testid="text-detail-shot-banner">
-          <Camera className="h-4 w-4 text-[hsl(200_70%_50%)] shrink-0" />
-          <span>Detail shot mode — this photo will be linked to the flagged reel's original image.</span>
+        <div className="rounded-md border border-[hsl(200_70%_50%/0.5)] bg-[hsl(200_70%_50%/0.1)] px-3 py-2 text-sm space-y-2" data-testid="text-detail-shot-banner">
+          <div className="flex items-center gap-2">
+            <Camera className="h-4 w-4 text-[hsl(200_70%_50%)] shrink-0" />
+            <span className="flex-1">Detail shot mode — this photo will be linked to the flagged reel's original image.</span>
+          </div>
+          {onBackToFlagged && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full border-[hsl(200_70%_50%/0.5)] text-[hsl(200_70%_50%)] hover:bg-[hsl(200_70%_50%/0.15)]"
+              onClick={onBackToFlagged}
+              data-testid="button-back-to-flagged"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Back to Flagged Reels
+            </Button>
+          )}
         </div>
       )}
       <Card>

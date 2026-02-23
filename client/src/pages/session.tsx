@@ -508,6 +508,13 @@ function SessionWorkspace({
               setMobileFlowInitialSection("");
               setMobileFlowDetailParentPhotoId(null);
             }}
+            onBackToFlagged={() => {
+              setMobileFlowInitialAisle("");
+              setMobileFlowInitialSection("");
+              setMobileFlowDetailParentPhotoId(null);
+              setCaptureMode(false);
+              setMode("flagged");
+            }}
           />
         ) : (
           <>
