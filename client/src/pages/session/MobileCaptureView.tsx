@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
-  Camera, Trash2, X, Loader2, AlertTriangle,
+  Camera, Trash2, X, Loader2, AlertTriangle, Check,
   ImagePlus, RotateCw, ChevronLeft, ChevronRight, ArrowUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const activeDetailRef = useRef(activeDetailParentId);
   activeDetailRef.current = activeDetailParentId;
   const [detailNotes, setDetailNotes] = useState("");
+  const [detailReviewPhoto, setDetailReviewPhoto] = useState<{ id: number; objectPath: string; blobUrl?: string } | null>(null);
+  const [detailSaving, setDetailSaving] = useState(false);
   const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
   const [savingNotes, setSavingNotes] = useState<Record<number, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -129,24 +131,26 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         const savedPhoto = await res.json();
 
         if (isDetail) {
-          if (detailNotes.trim()) {
-            try {
-              await apiRequest("PATCH", `/api/photos/${savedPhoto.id}`, { notes: detailNotes.trim() });
-            } catch {}
+          if (!mountedRef.current) { processingRef.current = false; return; }
+          try {
+            setDetailReviewPhoto({ id: savedPhoto.id, objectPath: uploadResult.objectPath, blobUrl: nextItem.blobUrl });
+            setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
+            removeFromQueue(nextItem.queueId).catch(() => {});
+            queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+          } finally {
+            processingRef.current = false;
           }
-          setDetailNotes("");
-          setActiveDetailParentId(null);
-          onDetailCaptured?.();
+          return;
         }
 
         if (!mountedRef.current) return;
         setRecentPhotos(prev => [...prev, {
           id: savedPhoto.id,
           objectPath: uploadResult.objectPath,
-          notes: isDetail ? detailNotes.trim() : "",
+          notes: "",
           aisle: nextItem.aisle,
           section: nextItem.section,
-          isDetailShot: isDetail,
+          isDetailShot: false,
         }]);
         URL.revokeObjectURL(nextItem.blobUrl);
         blobUrlsRef.current.delete(nextItem.blobUrl);
@@ -294,11 +298,95 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           <span>You're offline. Photos will be saved and uploaded when you reconnect.</span>
         </div>
       )}
-      {activeDetailParentId != null && (
+      {activeDetailParentId != null && detailReviewPhoto && (
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div className="rounded-md border border-green-500/50 bg-green-500/10 px-3 py-2 text-sm flex items-center gap-2" data-testid="text-detail-review-banner">
+              <Check className="h-4 w-4 text-green-500 shrink-0" />
+              <span>Detail shot captured — review your photo and add notes before saving.</span>
+            </div>
+            <div className="rounded-lg overflow-hidden border border-border">
+              <img
+                src={detailReviewPhoto.blobUrl || (detailReviewPhoto.objectPath.startsWith("/uploads/") ? detailReviewPhoto.objectPath : `/uploads/${detailReviewPhoto.objectPath}`)}
+                alt="Detail shot preview"
+                className="w-full max-h-64 object-contain bg-black/20"
+                data-testid="img-detail-review"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notes:</Label>
+              <Textarea
+                value={detailNotes}
+                onChange={(e) => setDetailNotes(e.target.value)}
+                placeholder="Add notes about this detail shot..."
+                rows={3}
+                className="text-sm"
+                data-testid="input-detail-review-notes"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                size="lg"
+                disabled={detailSaving}
+                onClick={async () => {
+                  setDetailSaving(true);
+                  try {
+                    if (detailNotes.trim()) {
+                      await apiRequest("PATCH", `/api/photos/${detailReviewPhoto.id}`, { notes: detailNotes.trim() });
+                    }
+                    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+                    toast({ title: "Detail shot saved" });
+                    if (detailReviewPhoto.blobUrl) {
+                      URL.revokeObjectURL(detailReviewPhoto.blobUrl);
+                      blobUrlsRef.current.delete(detailReviewPhoto.blobUrl);
+                    }
+                    setDetailReviewPhoto(null);
+                    setDetailNotes("");
+                    setActiveDetailParentId(null);
+                    onDetailCaptured?.();
+                    onBackToFlagged?.();
+                  } catch {
+                    toast({ title: "Failed to save notes", variant: "destructive" });
+                  } finally {
+                    setDetailSaving(false);
+                  }
+                }}
+                data-testid="button-detail-save-done"
+              >
+                {detailSaving ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Check className="h-5 w-5 mr-2" />}
+                Save & Done
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={detailSaving}
+                onClick={async () => {
+                  try {
+                    await apiRequest("DELETE", `/api/photos/${detailReviewPhoto.id}`);
+                    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+                  } catch {}
+                  if (detailReviewPhoto.blobUrl) {
+                    URL.revokeObjectURL(detailReviewPhoto.blobUrl);
+                    blobUrlsRef.current.delete(detailReviewPhoto.blobUrl);
+                  }
+                  setDetailReviewPhoto(null);
+                  setDetailNotes("");
+                }}
+                data-testid="button-detail-retake"
+              >
+                <RotateCw className="h-5 w-5 mr-2" />
+                Retake
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {activeDetailParentId != null && !detailReviewPhoto && (
         <div className="rounded-md border border-[hsl(200_70%_50%/0.5)] bg-[hsl(200_70%_50%/0.1)] px-3 py-2 text-sm space-y-2" data-testid="text-detail-shot-banner">
           <div className="flex items-center gap-2">
             <Camera className="h-4 w-4 text-[hsl(200_70%_50%)] shrink-0" />
-            <span className="flex-1">Detail shot mode — this photo will be linked to the flagged reel's original image.</span>
+            <span className="flex-1">Detail shot mode — take a photo of the flagged reel.</span>
           </div>
           {onBackToFlagged && (
             <Button
@@ -314,6 +402,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           )}
         </div>
       )}
+      {!detailReviewPhoto && (
       <Card>
         <CardContent className="p-4 space-y-3">
           {!aisle.trim() && (
@@ -391,19 +480,6 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <ImagePlus className="h-5 w-5" />
             </Button>
           </div>
-          {activeDetailParentId != null && (
-            <div className="space-y-1">
-              <Label className="text-xs">Notes:</Label>
-              <Textarea
-                value={detailNotes}
-                onChange={(e) => setDetailNotes(e.target.value)}
-                placeholder="Add notes about this detail shot..."
-                rows={2}
-                className="text-sm"
-                data-testid="input-detail-notes"
-              />
-            </div>
-          )}
           {(pendingCount > 0 || failedCount > 0) && (
             <div className="space-y-2" data-testid="upload-queue-status">
               {pendingCount > 0 && (
@@ -432,6 +508,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           )}
         </CardContent>
       </Card>
+      )}
 
       {activeDetailParentId == null && (recentPhotos.length > 0 || uploadQueue.length > 0) && (() => {
         type DisplayPhoto = { id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean; queueId?: string; queueStatus?: "pending" | "uploading" | "failed"; blobUrl?: string };
