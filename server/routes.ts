@@ -678,6 +678,25 @@ export async function registerRoutes(
       if (encKey) updateData = encryptEntry(updateData, encKey) as any;
       const updated = await storage.updateEntry(entry.id, updateData);
       const result = encKey && updated ? decryptEntry(updated, encKey) : updated;
+
+      if (req.body.section !== undefined || req.body.aisle !== undefined) {
+        const allSessionPins = await storage.getSessionPins(entry.sessionId);
+        const linkedPin = allSessionPins.find(p => p.entryId === entry.id);
+        if (linkedPin) {
+          const photoUpdate: Record<string, any> = {};
+          if (req.body.section !== undefined) photoUpdate.section = req.body.section;
+          if (req.body.aisle !== undefined) photoUpdate.aisle = req.body.aisle;
+          await storage.updatePhoto(linkedPin.photoId, photoUpdate);
+          const siblingPins = allSessionPins.filter(p => p.photoId === linkedPin.photoId && p.entryId && p.entryId !== entry.id);
+          for (const sp of siblingPins) {
+            if (sp.entryId) {
+              await storage.updateEntry(sp.entryId, photoUpdate);
+            }
+          }
+          broadcastToSession(entry.sessionId, { type: "sync", entity: "photos", sessionId: entry.sessionId });
+        }
+      }
+
       const username = req.user.claims.first_name || req.user.claims.email || userId;
       logActivity(entry.sessionId, userId, username, "entry_updated", "entry", entry.id);
       broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
