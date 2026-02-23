@@ -358,7 +358,7 @@ export default function SettingsPage() {
             <div className="border-t pt-3 mt-3">
               <div className="flex items-center justify-between gap-4 mb-2">
                 <div className="flex-1">
-                  <Label className="text-sm font-medium">Receiving Quality Override</Label>
+                  <Label className="text-sm font-medium">Receiving — Quality Override</Label>
                   <p className="text-xs text-muted-foreground">Reels in Receiving are typically photographed up close, so high zoom clarity isn't needed. Enable this to automatically use a lower quality for Receiving photos, saving bandwidth and storage.</p>
                 </div>
                 <Switch
