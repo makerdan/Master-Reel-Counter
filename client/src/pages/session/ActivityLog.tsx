@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Clock, FileText, Camera, MapPin, MessageSquare, User, AlertTriangle, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTimezone } from "@/hooks/use-timezone";
+import { formatDateOnly, formatTimestamp } from "@/lib/timezone";
 
 interface ActivityLogEntry {
   id: number;
@@ -30,7 +32,7 @@ const ACTION_CONFIG: Record<string, { icon: typeof FileText; label: string; colo
   collaborator_removed: { icon: User, label: "Removed team member", color: "text-red-500" },
 };
 
-function formatTimeAgo(dateStr: string): string {
+function formatTimeAgo(dateStr: string, tz: string): string {
   const now = new Date();
   const date = new Date(dateStr);
   const diff = now.getTime() - date.getTime();
@@ -41,10 +43,11 @@ function formatTimeAgo(dateStr: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatDateOnly(date, tz);
 }
 
 export default function ActivityLog({ sessionId }: { sessionId: number }) {
+  const tz = useTimezone();
   const { data: logs = [], isLoading, isError: logsError } = useQuery<ActivityLogEntry[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "activity"],
     refetchInterval: 30000,
@@ -80,8 +83,7 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
   const copyAll = () => {
     const lines = logs.map((log) => {
       const config = ACTION_CONFIG[log.action] || { label: log.action };
-      const date = new Date(log.createdAt);
-      const timestamp = date.toLocaleString(undefined, {
+      const timestamp = formatTimestamp(log.createdAt, tz, {
         month: "short", day: "numeric", year: "numeric",
         hour: "2-digit", minute: "2-digit",
       });
@@ -120,7 +122,7 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
                 <span className="text-muted-foreground">{config.label}</span>
                 {log.details && <span className="text-muted-foreground"> — {log.details}</span>}
               </p>
-              <span className="text-[10px] text-muted-foreground mono">{formatTimeAgo(log.createdAt)}</span>
+              <span className="text-[10px] text-muted-foreground mono">{formatTimeAgo(log.createdAt, tz)}</span>
             </div>
           </div>
         );

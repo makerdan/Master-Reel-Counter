@@ -1091,6 +1091,16 @@ export async function registerRoutes(
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       const photoMap = new Map(sessionPhotos.map(p => [p.id, p]));
 
+      const userSettingsData = await storage.getUserSettings(userId);
+      const userTz = userSettingsData?.timezone || "America/Chicago";
+
+      const TZ_ABBR: Record<string, string> = {
+        "America/New_York": "ET", "America/Chicago": "CT", "America/Denver": "MT",
+        "America/Los_Angeles": "PT", "America/Anchorage": "AKT", "Pacific/Honolulu": "HT",
+        "America/Phoenix": "MST", "UTC": "UTC",
+      };
+      const tzAbbr = TZ_ABBR[userTz] || userTz;
+
       const formatExportTime = (d: Date) => {
         let h = d.getHours();
         const m = d.getMinutes();
@@ -1114,7 +1124,7 @@ export async function registerRoutes(
         return `${safeName}_${d1}_${t1}-${d2}_${t2}.${ext}`;
       };
 
-      const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 36 });
+      const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 36, bufferPages: true });
       const filename = buildExportFilename("pdf");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -1129,45 +1139,58 @@ export async function registerRoutes(
 
       let titleY = 36;
       if (companyName) {
-        doc.fontSize(12).fillColor("#666666").text(companyName, 36, titleY);
-        titleY += 18;
+        doc.fontSize(12).fillColor("#999999").text(companyName, 36, titleY);
+        titleY += 20;
       }
-      doc.fontSize(18).fillColor(accentHex).text("Master Reel Counter", 36, titleY);
-      doc.fontSize(14).fillColor("#333333").text(session.name, 36, titleY + 22);
-      doc.fontSize(9).fillColor("#666666");
-      let infoY = titleY + 42;
-      doc.text(`Location: ${session.location || "N/A"}`, 36, infoY);
-      infoY += 12;
-      doc.text(`Status: ${session.status}`, 36, infoY);
-      infoY += 12;
-      doc.text(`Entries: ${sessionEntries.length}`, 36, infoY);
-      infoY += 12;
-      doc.text(`Total Footage: ${totalFootage.toLocaleString()} ft`, 36, infoY);
-      infoY += 12;
+      doc.font('Helvetica-Bold').fontSize(20).fillColor(accentHex).text("Master Reel Counter", 36, titleY);
+      titleY += 28;
+      doc.font('Helvetica').fontSize(16).fillColor("#222222").text(session.name, 36, titleY);
+      titleY += 24;
+
+      doc.moveTo(36, titleY).lineTo(36 + (doc.page.width - 72), titleY).strokeColor(accentHex).lineWidth(2).stroke();
+      titleY += 10;
+
+      const statsItems: string[] = [];
+      statsItems.push(`Location: ${session.location || "N/A"}`);
+      statsItems.push(`Status: ${session.status}`);
+      statsItems.push(`Entries: ${sessionEntries.length}`);
+      statsItems.push(`Total Footage: ${totalFootage.toLocaleString()} ft`);
+      statsItems.push(`Photos: ${pt.photoCount}`);
+      doc.fontSize(9).fillColor("#444444").text(statsItems.join("   |   "), 36, titleY, { width: doc.page.width - 72 });
+      titleY += 14;
+
       if (pt.firstPhotoAt) {
-        doc.text(`Session time: ${new Date(pt.firstPhotoAt).toLocaleString()} to ${pt.lastPhotoAt ? new Date(pt.lastPhotoAt).toLocaleString() : "ongoing"}`, 36, infoY);
-        infoY += 12;
+        const startStr = new Intl.DateTimeFormat('en-US', { timeZone: userTz, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(pt.firstPhotoAt));
+        const endStr = pt.lastPhotoAt ? new Intl.DateTimeFormat('en-US', { timeZone: userTz, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(pt.lastPhotoAt)) : "ongoing";
+        doc.fontSize(9).fillColor("#666666").text(`Session time: ${startStr} to ${endStr} ${tzAbbr}`, 36, titleY);
+        titleY += 12;
         if (pt.lastPhotoAt) {
           const diffMs = Math.abs(new Date(pt.lastPhotoAt).getTime() - new Date(pt.firstPhotoAt).getTime());
           const totalMin = Math.floor(diffMs / 60000);
           let elapsedStr: string;
           if (totalMin < 60) { elapsedStr = `${totalMin}m`; }
           else { const h = Math.floor(totalMin / 60); const m = totalMin % 60; elapsedStr = m > 0 ? `${h}h ${m}m` : `${h}h`; }
-          doc.text(`Elapsed time: ${elapsedStr}`, 36, infoY);
-          infoY += 12;
+          doc.text(`Elapsed time: ${elapsedStr}`, 36, titleY);
+          titleY += 12;
         }
+      }
+
+      if (session.description) {
+        titleY += 4;
+        doc.fontSize(9).fillColor("#666666").text(session.description, 36, titleY, { width: doc.page.width - 72 });
+        titleY += doc.heightOfString(session.description, { width: doc.page.width - 72 }) + 4;
       }
 
       const tableLeft = 36;
       const pageWidth = doc.page.width - 72;
       const rowHeight = 16;
       const headerHeight = 18;
-      let currentY = infoY + 4;
-      const maxY = doc.page.height - 80;
+      let currentY = titleY + 8;
+      const maxY = doc.page.height - 50;
 
       const formatCT = (d: Date): string => {
         const parts = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Chicago',
+          timeZone: userTz,
           month: '2-digit', day: '2-digit', year: 'numeric',
           hour: 'numeric', minute: '2-digit', second: '2-digit',
           hour12: false,
@@ -1176,7 +1199,7 @@ export async function registerRoutes(
         let hour = get('hour');
         if (hour.startsWith('0') && hour.length > 1) hour = hour.slice(1);
         if (hour === '24') hour = '0';
-        return `${get('month')}-${get('day')}-${get('year')} at ${hour}:${get('minute')}:${get('second')} CT`;
+        return `${get('month')}-${get('day')}-${get('year')} at ${hour}:${get('minute')}:${get('second')} ${tzAbbr}`;
       };
 
       const formatElapsed = (startMs: number, endMs: number): string => {
@@ -1221,6 +1244,42 @@ export async function registerRoutes(
           const bN = parseInt(b.section) || 0;
           return aN - bN;
         });
+
+      // --- Table of Contents ---
+      const tocSections = sortedSections.filter(sec => {
+        const hasPhotos = (sec.photos || []).length > 0;
+        const hasEntries = sec.entries.length > 0;
+        return hasPhotos || hasEntries;
+      });
+
+      if (tocSections.length > 0) {
+        currentY += 10;
+        doc.font('Helvetica-Bold').fontSize(14).fillColor(accentHex).text("Table of Contents", 36, currentY);
+        currentY += 22;
+
+        const tocLineH = 16;
+        const tocItems: { label: string; destName: string; y: number }[] = [];
+
+        for (let si = 0; si < tocSections.length; si++) {
+          const sec = tocSections[si];
+          if (currentY + tocLineH > maxY) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+          }
+          const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+          const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+          const tocLabel = `Aisle ${sec.aisle || "—"} / Section ${sec.section || "—"} — ${sec.entries.length} entries, ${secReels} reels, ${secFootage.toLocaleString()} ft`;
+          const destName = `sec-${si}`;
+
+          doc.font('Helvetica').fontSize(9).fillColor("#1a6bc4")
+            .text(tocLabel, 44, currentY + 2, { width: pageWidth - 20, lineBreak: false });
+          const textW = Math.min(doc.widthOfString(tocLabel), pageWidth - 20);
+          tocItems.push({ label: tocLabel, destName, y: currentY + 2 });
+          doc.goTo(44, currentY + 2, textW, tocLineH, destName);
+
+          currentY += tocLineH;
+        }
+      }
 
       const secEntryCols = [
         { header: "Vendor:", width: 70 },
@@ -1378,8 +1437,16 @@ export async function registerRoutes(
         const reelTotal = photoEntries
           ? photoEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0)
           : photoPins.reduce((s: number, p: any) => s + (p.reelCount || 1), 0);
+        const captionParts: string[] = [photoName];
+        if (pl.photo.aisle || pl.photo.section) {
+          captionParts.push(`Aisle ${pl.photo.aisle || "—"}, Sec ${pl.photo.section || "—"}`);
+        }
+        captionParts.push(`${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`);
+        if (pl.photo.createdAt) {
+          captionParts.push(formatCT(new Date(pl.photo.createdAt)));
+        }
         doc.font('Helvetica').fontSize(6).fillColor("#666666")
-          .text(`${photoName}  |  ${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`, imgX, y + h + 2, { width: w, align: "center", lineBreak: false });
+          .text(captionParts.join("  |  "), imgX, y + h + 2, { width: w, align: "center", lineBreak: false });
 
         return { renderedW: w, renderedH: h + captionH, imgX };
       };
@@ -1407,8 +1474,16 @@ export async function registerRoutes(
 
         const photoName = pl.photo.originalFilename || `Photo ${pl.photo.id}`;
         const reelTotal = entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+        const compactCaptionParts: string[] = [photoName];
+        if (pl.photo.aisle || pl.photo.section) {
+          compactCaptionParts.push(`Aisle ${pl.photo.aisle || "—"}, Sec ${pl.photo.section || "—"}`);
+        }
+        compactCaptionParts.push(`${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`);
+        if (pl.photo.createdAt) {
+          compactCaptionParts.push(formatCT(new Date(pl.photo.createdAt)));
+        }
         doc.font('Helvetica').fontSize(5.5).fillColor("#666666")
-          .text(`${photoName}  |  ${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`, x, y + h + 1, { width: w, align: "center", lineBreak: false });
+          .text(compactCaptionParts.join("  |  "), x, y + h + 1, { width: w, align: "center", lineBreak: false });
 
         const listX = x + w + 8;
         const listW = maxW - w - 8;
@@ -1486,10 +1561,16 @@ export async function registerRoutes(
           ? [{ header: "Pin:", width: pinColW }, ...secScaled]
           : secScaled;
         let tblY = drawSecEntryHeader(startY, tblX, tblW, allCols);
+        const notesColIdx = allCols.length - 1;
+        const notesColWidth = allCols[notesColIdx].width;
         for (let i = 0; i < entries.length; i++) {
-          if (tblY + rH > maxY) break;
           const e: any = entries[i];
-          if (i % 2 === 1) doc.rect(tblX, tblY, tblW, rH).fill("#fafaf8");
+          const notesText = e.notes || "";
+          doc.font('Helvetica-Bold').fontSize(fontSize);
+          const measuredNotesH = notesText ? doc.heightOfString(notesText, { width: notesColWidth - 4 }) : 0;
+          const actualRowH = Math.max(rH, measuredNotesH + 6);
+          if (tblY + actualRowH > maxY) break;
+          if (i % 2 === 1) doc.rect(tblX, tblY, tblW, actualRowH).fill("#fafaf8");
           doc.font('Helvetica-Bold').fontSize(fontSize).fillColor("#333333");
           let x = tblX;
           const baseVals = [
@@ -1497,22 +1578,28 @@ export async function registerRoutes(
             e.reelTag || "",
             String(e.reelCount || 1),
             e.footage ? `${e.footage.toLocaleString()} ft` : "",
-            e.notes || "",
+            notesText,
           ];
           const vals = pinMap
             ? [pinMap.get(e.id) || "", ...baseVals]
             : baseVals;
           for (let j = 0; j < allCols.length; j++) {
-            doc.text(vals[j], x + 2, tblY + 3, { width: allCols[j].width - 4, lineBreak: false });
+            const isNotesCol = j === notesColIdx;
+            if (isNotesCol) {
+              doc.text(vals[j], x + 2, tblY + 3, { width: allCols[j].width - 4, lineBreak: true, height: actualRowH - 4 });
+            } else {
+              doc.text(vals[j], x + 2, tblY + 3, { width: allCols[j].width - 4, lineBreak: false });
+            }
             x += allCols[j].width;
           }
           doc.font('Helvetica');
-          doc.rect(tblX, tblY, tblW, rH).stroke(borderColor);
-          tblY += rH;
+          doc.rect(tblX, tblY, tblW, actualRowH).stroke(borderColor);
+          tblY += actualRowH;
         }
         return tblY;
       };
 
+      let tocSecIdx = 0;
       for (const sec of sortedSections) {
         const allPhotos = sec.photos || [];
         const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
@@ -1527,6 +1614,8 @@ export async function registerRoutes(
         if (loadedPhotos.length === 0 && sec.entries.length === 0) continue;
 
         doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+        doc.addNamedDestination(`sec-${tocSecIdx}`);
+        tocSecIdx++;
         currentY = 36;
         const photoLabel = loadedPhotos.length > 0 ? `${loadedPhotos.length} photo${loadedPhotos.length !== 1 ? "s" : ""}` : undefined;
         drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
@@ -1931,6 +2020,15 @@ export async function registerRoutes(
         doc.fontSize(8).fillColor("#999999").text(footerText, 36, currentY, { width: 300 });
       }
 
+      // --- Page Numbers (using buffered pages) ---
+      const range = doc.bufferedPageRange();
+      for (let i = range.start; i < range.start + range.count; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(6).fillColor("#999999");
+        doc.text(session.name, 36, doc.page.height - 30, { width: pageWidth / 2, lineBreak: false });
+        doc.text(`Page ${i + 1} of ${range.count}`, 36 + pageWidth / 2, doc.page.height - 30, { width: pageWidth / 2, align: 'right', lineBreak: false });
+      }
+
       doc.end();
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -2006,7 +2104,7 @@ export async function registerRoutes(
         "defaultExportFormat", "companyName", "companyLogoKey", "exportFooterText",
         "photoQuality", "useReceivingQuality", "receivingPhotoQuality",
         "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
-        "defaultTheme", "thumbnailSize", "largerTouchTargets", "textSize",
+        "defaultTheme", "thumbnailSize", "largerTouchTargets", "textSize", "timezone",
       ];
       const updates: Record<string, any> = {};
       for (const field of allowedFields) {

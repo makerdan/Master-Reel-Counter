@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useTimezone } from "@/hooks/use-timezone";
+import { formatDateOnly } from "@/lib/timezone";
 
 interface CommentData {
   id: number;
@@ -21,7 +23,7 @@ interface CommentData {
   updatedAt: string;
 }
 
-function formatTimeAgo(dateStr: string): string {
+function formatTimeAgo(dateStr: string, tz: string): string {
   const now = new Date();
   const date = new Date(dateStr);
   const diff = now.getTime() - date.getTime();
@@ -32,7 +34,7 @@ function formatTimeAgo(dateStr: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatDateOnly(date, tz);
 }
 
 export default function Comments({
@@ -46,6 +48,7 @@ export default function Comments({
   photoId?: number;
   role?: string;
 }) {
+  const tz = useTimezone();
   const { user } = useAuth();
   const { toast } = useToast();
   const [newText, setNewText] = useState("");
@@ -159,7 +162,7 @@ export default function Comments({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-medium">{comment.username || "Unknown"}</span>
-              <span className="text-[10px] text-muted-foreground mono">{formatTimeAgo(comment.createdAt)}</span>
+              <span className="text-[10px] text-muted-foreground mono">{formatTimeAgo(comment.createdAt, tz)}</span>
               {comment.createdAt !== comment.updatedAt && <span className="text-[10px] text-muted-foreground">(edited)</span>}
             </div>
             <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words mt-0.5">{comment.text}</p>

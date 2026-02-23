@@ -27,7 +27,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
     - Per-photo pin scaling and notes.
     - Nearby photo viewer for contextual information.
 - **Collaboration:** Supports collaborative sessions with role-based permissions (owner, editor, viewer) and multiple invitation methods (username, shareable link, email). Real-time updates for collaborative sessions via WebSocket. Online presence tracking with green dot indicators. Role management (editor/viewer toggle), ownership transfer with confirmation dialog, invite link usage tracking (join count), and 7-day auto-expiry on invite links.
-- **Data Export:** Capabilities to export session data as PDF or CSV.
+- **Data Export:** PDF export with redesigned cover page, clickable Table of Contents with internal links, page numbers/running footer, enhanced photo captions (aisle/section/timestamp), note wrapping with variable row heights, timezone-aware timestamps, session description display, and grand totals row. CSV export also supports user timezone. Session description field available for documenting session context.
 - **Undo/Redo:** Implemented for entry and pin modifications.
 - **Summary Statistics:** Dashboard to display key metrics and activity logs.
 - **Security:** Ownership verification on all CRUD routes and optional AES-256-GCM data encryption for sensitive entry fields.

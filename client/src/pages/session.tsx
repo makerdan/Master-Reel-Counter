@@ -31,7 +31,9 @@ import MobileCaptureView from "./session/MobileCaptureView";
 import ActivityLog from "./session/ActivityLog";
 import FlaggedReels from "./session/FlaggedReels";
 import HelpMenu from "@/components/HelpMenu";
-import { buildExportFilename, formatSessionTime } from "./session/utils";
+import { buildExportFilename } from "./session/utils";
+import { useTimezone } from "@/hooks/use-timezone";
+import { formatSessionTimeWithTz, formatTimestamp } from "@/lib/timezone";
 import { useUndoRedo } from "@/hooks/use-undo";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
 import { useAuth } from "@/hooks/use-auth";
@@ -40,6 +42,7 @@ export default function SessionPage() {
   const [, params] = useRoute("/session/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const tz = useTimezone();
   const sessionId = params?.id ? parseInt(params.id) : 0;
 
   useEffect(() => {
@@ -159,6 +162,7 @@ function SessionWorkspace({
   const [navigateSection, setNavigateSection] = useState<string>("");
   const [editName, setEditName] = useState(session.name);
   const [editLocation, setEditLocation] = useState(session.location || "");
+  const [editDescription, setEditDescription] = useState((session as any).description || "");
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -238,10 +242,11 @@ function SessionWorkspace({
   const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
 
   const updateSession = useMutation({
-    mutationFn: async ({ name, location }: { name: string; location: string }) => {
+    mutationFn: async ({ name, location, description }: { name: string; location: string; description?: string }) => {
       const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, {
         name,
         location: location || null,
+        ...(description !== undefined ? { description: description || null } : {}),
       });
       return res.json();
     },
@@ -258,13 +263,13 @@ function SessionWorkspace({
   useEffect(() => {
     if (!editSessionOpen) return;
     if (!editName.trim()) return;
-    if (editName === session.name && (editLocation || "") === (session.location || "")) return;
+    if (editName === session.name && (editLocation || "") === (session.location || "") && (editDescription || "") === ((session as any).description || "")) return;
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      updateSession.mutate({ name: editName, location: editLocation });
+      updateSession.mutate({ name: editName, location: editLocation, description: editDescription });
     }, 1000);
     return () => clearTimeout(autoSaveTimerRef.current);
-  }, [editName, editLocation, editSessionOpen]);
+  }, [editName, editLocation, editDescription, editSessionOpen]);
 
 
   const shareSession = () => {
@@ -275,7 +280,7 @@ function SessionWorkspace({
     lines.push(`Total Footage: ${totalFootage.toLocaleString()} ft`);
     lines.push(`Photos: ${photos.length}`);
     if (session.firstPhotoAt) {
-      lines.push(`Time: ${formatSessionTime(session.firstPhotoAt, session.lastPhotoAt)}`);
+      lines.push(`Time: ${formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz)}`);
     }
     lines.push("");
 
@@ -295,7 +300,7 @@ function SessionWorkspace({
       lines.push("");
     }
 
-    lines.push(`Generated: ${new Date().toLocaleString()}`);
+    lines.push(`Generated: ${formatTimestamp(new Date(), tz)}`);
 
     const subject = encodeURIComponent(`Wire Reel Count - ${session.name}`);
     const body = encodeURIComponent(lines.join("\n"));
@@ -391,9 +396,9 @@ function SessionWorkspace({
               </TooltipTrigger>
               <TooltipContent>Back to dashboard</TooltipContent>
             </Tooltip>
-            <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditSessionOpen(true); }}>
+            <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditDescription((session as any).description || ""); setEditSessionOpen(true); }}>
               <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
-              <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTime(session.firstPhotoAt, session.lastPhotoAt, captureMode)}</span>
+              <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz, captureMode)}</span>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -640,8 +645,8 @@ function SessionWorkspace({
       )}
 
       <Dialog open={editSessionOpen} onOpenChange={(open) => {
-        if (!open && editName.trim() && (editName !== session.name || (editLocation || "") !== (session.location || ""))) {
-          updateSession.mutate({ name: editName, location: editLocation });
+        if (!open && editName.trim() && (editName !== session.name || (editLocation || "") !== (session.location || "") || (editDescription || "") !== ((session as any).description || ""))) {
+          updateSession.mutate({ name: editName, location: editLocation, description: editDescription });
         }
         setEditSessionOpen(open);
       }}>
@@ -666,6 +671,18 @@ function SessionWorkspace({
                 value={editLocation}
                 onChange={(e) => setEditLocation(e.target.value)}
                 data-testid="input-edit-session-location"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-session-description">Description</Label>
+              <textarea
+                id="edit-session-description"
+                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                placeholder="Optional notes about this session"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                data-testid="input-edit-session-description"
+                rows={3}
               />
             </div>
             <p className="text-xs text-muted-foreground text-center">Changes are saved automatically</p>

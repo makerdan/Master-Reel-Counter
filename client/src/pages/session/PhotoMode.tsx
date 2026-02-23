@@ -27,8 +27,11 @@ import type { Photo, Pin } from "@shared/schema";
 import ReelCropPreview from "./ReelCropPreview";
 import type { LocalPin } from "./types";
 import { deriveVendorCode } from "./utils";
+import { useTimezone } from "@/hooks/use-timezone";
+import { formatFullTimestamp } from "@/lib/timezone";
 
 export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0 }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number }) {
+  const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -178,7 +181,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         aisle: p.aisle || "",
         dbId: p.id,
         filename,
-        timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : undefined,
+        timestamp: p.createdAt ? formatFullTimestamp(p.createdAt, tz) : undefined,
         notes: p.notes || "",
         isDetailShot: p.isDetailShot || false,
         parentPhotoId: p.parentPhotoId || undefined,
@@ -475,7 +478,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             aisle: aisle || "",
             dbId: savedPhoto.id,
             filename: numberedName,
-            timestamp: new Date().toLocaleString(),
+            timestamp: formatFullTimestamp(new Date(), tz),
           }];
         });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });

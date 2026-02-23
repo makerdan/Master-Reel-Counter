@@ -37,6 +37,8 @@ import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useTimezone } from "@/hooks/use-timezone";
+import { formatTimestamp } from "@/lib/timezone";
 import type { Session, Folder as FolderType } from "@shared/schema";
 
 type SessionWithStats = Session & {
@@ -59,6 +61,7 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const tz = useTimezone();
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [sessionName, setSessionName] = useState("");
   const [sessionLocation, setSessionLocation] = useState("");
@@ -539,12 +542,7 @@ export default function Dashboard() {
 
   const formatDate = (date: string | Date | null) => {
     if (!date) return "";
-    return new Date(date).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatTimestamp(date, tz);
   };
 
   const formatElapsedMinutes = (first: string | null, last: string | null) => {

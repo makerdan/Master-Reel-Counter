@@ -29,6 +29,7 @@ export const countingSessions = pgTable("counting_sessions", {
   folderId: integer("folder_id").references(() => folders.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   location: text("location"),
+  description: text("description"),
   status: text("status").notNull().default("active"),
   isLocked: boolean("is_locked").default(false).notNull(),
   startedAt: timestamp("started_at").defaultNow().notNull(),
@@ -135,6 +136,7 @@ export const userSettings = pgTable("user_settings", {
   thumbnailSize: varchar("thumbnail_size", { length: 10 }).notNull().default("medium"),
   largerTouchTargets: boolean("larger_touch_targets").notNull().default(false),
   textSize: varchar("text_size", { length: 20 }).notNull().default("default"),
+  timezone: varchar("timezone", { length: 50 }).notNull().default("America/Chicago"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

@@ -5,7 +5,7 @@ import {
   ArrowLeft, Settings, Shield, ShieldOff, AlertTriangle, Lock,
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
   Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
-  ChevronDown, Ruler, Building2, FileText,
+  ChevronDown, Ruler, Building2, FileText, Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,7 @@ interface UserSettingsResponse {
   thumbnailSize: string;
   largerTouchTargets: boolean;
   textSize: string;
+  timezone: string;
 }
 
 export default function SettingsPage() {
@@ -217,6 +218,32 @@ export default function SettingsPage() {
                   <SelectItem value="small">Small</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="large">Large</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">Timezone</Label>
+                <p className="text-xs text-muted-foreground">Used for all timestamps including photo capture times and PDF exports.</p>
+              </div>
+              <Select
+                value={settings?.timezone || "America/Chicago"}
+                onValueChange={(val) => saveSetting("timezone", val)}
+                data-testid="select-timezone"
+              >
+                <SelectTrigger className="w-[200px]" data-testid="select-trigger-timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="America/New_York">Eastern (ET)</SelectItem>
+                  <SelectItem value="America/Chicago">Central (CT)</SelectItem>
+                  <SelectItem value="America/Denver">Mountain (MT)</SelectItem>
+                  <SelectItem value="America/Los_Angeles">Pacific (PT)</SelectItem>
+                  <SelectItem value="America/Anchorage">Alaska (AKT)</SelectItem>
+                  <SelectItem value="Pacific/Honolulu">Hawaii (HT)</SelectItem>
+                  <SelectItem value="America/Phoenix">Arizona (MST)</SelectItem>
+                  <SelectItem value="UTC">UTC</SelectItem>
                 </SelectContent>
               </Select>
             </div>
