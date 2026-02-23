@@ -363,7 +363,6 @@ function SessionWorkspace({
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-4 py-2">
           <div className="flex items-center gap-2 min-w-0">
-            <HelpMenu mode={captureMode ? "mobile" : "full"} />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back">
@@ -485,6 +484,7 @@ function SessionWorkspace({
               </DropdownMenuContent>
             </DropdownMenu>
             <ThemeToggle />
+            <HelpMenu mode={captureMode ? "mobile" : "full"} />
           </div>
         </div>
       </header>
