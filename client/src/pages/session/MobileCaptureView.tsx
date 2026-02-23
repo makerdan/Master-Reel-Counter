@@ -1,11 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Camera, Trash2, X, Loader2, AlertTriangle, Check,
-  ImagePlus, RotateCw, ChevronLeft, ChevronRight, ArrowUpDown,
+  Camera, X, Loader2, AlertTriangle, Check,
+  ImagePlus, RotateCw, ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +21,7 @@ type UploadQueueItem = {
   blobUrl: string;
   aisle: string;
   section: string;
+  notes: string;
   status: "pending" | "uploading" | "failed";
   retries: number;
 };
@@ -61,11 +62,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const [detailReviewPhoto, setDetailReviewPhoto] = useState<{ id: number; objectPath: string; blobUrl?: string } | null>(null);
   const [detailSaving, setDetailSaving] = useState(false);
   const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
-  const [savingNotes, setSavingNotes] = useState<Record<number, boolean>>({});
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
-  const [photoSort, setPhotoSort] = useState<"latest" | "aisle">("aisle");
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
-  const notesTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const [captureNotes, setCaptureNotes] = useState("");
+  const [onFloorChecked, setOnFloorChecked] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -86,6 +84,23 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       setPrefixApplied(true);
     }
   }, [captureSettings, prefixApplied, initialAisle, aisle]);
+
+  const prevOnFloorTextRef = useRef("");
+  useEffect(() => {
+    if (!onFloorChecked || !prevOnFloorTextRef.current) return;
+    const newText = aisle.trim() || section.trim()
+      ? `This reel is on the floor in front of aisle ${aisle.trim() || "##"}, section ${section.trim() || "##"}.`
+      : "This reel is on the floor in front of the recorded aisle and section.";
+    if (newText === prevOnFloorTextRef.current) return;
+    setCaptureNotes(prev => {
+      const old = prevOnFloorTextRef.current;
+      if (old && prev.includes(old)) {
+        return prev.replace(old, newText);
+      }
+      return prev;
+    });
+    prevOnFloorTextRef.current = newText;
+  }, [aisle, section, onFloorChecked]);
 
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
@@ -108,6 +123,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         blobUrl: URL.createObjectURL(item.blob),
         aisle: item.aisle,
         section: item.section,
+        notes: (item as any).notes || "",
         status: "pending" as const,
         retries: 0,
       }));
@@ -192,6 +208,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           mimeType: nextItem.file.type,
           aisle: nextItem.aisle,
           section: nextItem.section,
+          notes: nextItem.notes || undefined,
         };
         const detailParent = activeDetailRef.current;
         const isDetail = detailParent != null;
@@ -219,7 +236,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         setRecentPhotos(prev => [...prev, {
           id: savedPhoto.id,
           objectPath: uploadResult.objectPath,
-          notes: "",
+          notes: nextItem.notes,
           aisle: nextItem.aisle,
           section: nextItem.section,
           isDetailShot: false,
@@ -293,6 +310,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         blobUrl,
         aisle,
         section: sectionValue,
+        notes: captureNotes,
         status: "pending",
         retries: 0,
       });
@@ -305,7 +323,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         blob: item.file,
         aisle: item.aisle,
         section: item.section,
-        notes: "",
+        notes: item.notes,
         isReceiving: item.aisle.toLowerCase() === "receiving",
         createdAt: Date.now(),
       }).catch(() => {});
@@ -328,40 +346,22 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const pendingCount = uploadQueue.filter(q => q.status === "pending" || q.status === "uploading").length;
   const failedCount = uploadQueue.filter(q => q.status === "failed").length;
 
-  const toggleDetailShot = useCallback(async (photoId: number, isDetail: boolean) => {
-    setRecentPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isDetailShot: isDetail } : p));
-    try {
-      await apiRequest("PATCH", `/api/photos/${photoId}`, { isDetailShot: isDetail });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
-    } catch {
-      setRecentPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isDetailShot: !isDetail } : p));
+  const handleOnFloorToggle = useCallback((checked: boolean) => {
+    setOnFloorChecked(checked);
+    if (checked) {
+      const text = aisle.trim() || section.trim()
+        ? `This reel is on the floor in front of aisle ${aisle.trim() || "##"}, section ${section.trim() || "##"}.`
+        : "This reel is on the floor in front of the recorded aisle and section.";
+      setCaptureNotes(prev => prev ? `${prev}\n${text}` : text);
+      prevOnFloorTextRef.current = text;
+    } else {
+      const old = prevOnFloorTextRef.current;
+      if (old) {
+        setCaptureNotes(prev => prev.replace(`\n${old}`, "").replace(old, "").trim());
+      }
+      prevOnFloorTextRef.current = "";
     }
-  }, [sessionId]);
-
-  const deletePhoto = useCallback(async (photoId: number) => {
-    try {
-      await apiRequest("DELETE", `/api/photos/${photoId}`);
-      setRecentPhotos(prev => prev.filter(p => p.id !== photoId));
-      setConfirmDeleteId(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
-      toast({ title: "Photo deleted" });
-    } catch {
-      toast({ title: "Failed to delete photo", variant: "destructive" });
-      setConfirmDeleteId(null);
-    }
-  }, [sessionId, toast]);
-
-  const updatePhotoNotes = useCallback((photoId: number, notes: string) => {
-    setRecentPhotos(prev => prev.map(p => p.id === photoId ? { ...p, notes } : p));
-    if (notesTimerRef.current[photoId]) clearTimeout(notesTimerRef.current[photoId]);
-    notesTimerRef.current[photoId] = setTimeout(async () => {
-      setSavingNotes(prev => ({ ...prev, [photoId]: true }));
-      try {
-        await apiRequest("PATCH", `/api/photos/${photoId}`, { notes });
-      } catch {}
-      setSavingNotes(prev => ({ ...prev, [photoId]: false }));
-    }, 800);
-  }, []);
+  }, [aisle, section]);
 
   return (
     <div className="space-y-4">
@@ -498,21 +498,31 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 data-testid="input-mobile-aisle"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sectionInputRef.current?.focus(); } }}
               />
-              <label className="flex items-center gap-2 cursor-pointer pt-1" data-testid="checkbox-receiving">
-                <Checkbox
-                  checked={isReceiving}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setAisle("Receiving");
-                      setSection("");
-                    } else {
-                      setAisle("");
-                    }
-                  }}
-                  className="h-8 w-8 [&_svg]:h-5 [&_svg]:w-5"
-                />
-                <span className="text-sm text-muted-foreground">Receiving</span>
-              </label>
+              <div className="flex items-center gap-3 pt-1 flex-wrap">
+                <label className="flex items-center gap-2 cursor-pointer" data-testid="checkbox-receiving">
+                  <Checkbox
+                    checked={isReceiving}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setAisle("Receiving");
+                        setSection("");
+                      } else {
+                        setAisle("");
+                      }
+                    }}
+                    className="h-8 w-8 [&_svg]:h-5 [&_svg]:w-5"
+                  />
+                  <span className="text-sm text-muted-foreground">Receiving</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer" data-testid="checkbox-on-floor">
+                  <Checkbox
+                    checked={onFloorChecked}
+                    onCheckedChange={(checked) => handleOnFloorToggle(!!checked)}
+                    className="h-8 w-8 [&_svg]:h-5 [&_svg]:w-5"
+                  />
+                  <span className="text-sm text-muted-foreground">On Floor, In Front Of</span>
+                </label>
+              </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs underline">Section:{!isReceiving && <span className="text-destructive"> *</span>}</Label>
@@ -554,6 +564,16 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <ImagePlus className="h-5 w-5" />
             </Button>
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs underline">Notes:</Label>
+            <Textarea
+              value={captureNotes}
+              onChange={(e) => setCaptureNotes(e.target.value)}
+              placeholder="Photo notes (applied to captured photos)..."
+              rows={2}
+              data-testid="input-mobile-capture-notes"
+            />
+          </div>
           {(pendingCount > 0 || failedCount > 0) && (
             <div className="space-y-2" data-testid="upload-queue-status">
               {pendingCount > 0 && (
@@ -584,200 +604,6 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       </Card>
       )}
 
-      {activeDetailParentId == null && (recentPhotos.length > 0 || uploadQueue.length > 0) && (() => {
-        type DisplayPhoto = { id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean; queueId?: string; queueStatus?: "pending" | "uploading" | "failed"; blobUrl?: string };
-        const sorted: DisplayPhoto[] = [...recentPhotos];
-        if (photoSort === "latest") {
-          sorted.sort((a, b) => b.id - a.id);
-        } else {
-          sorted.sort((a, b) => {
-            const aIsRec = a.aisle.toLowerCase() === "receiving";
-            const bIsRec = b.aisle.toLowerCase() === "receiving";
-            if (aIsRec && !bIsRec) return 1;
-            if (!aIsRec && bIsRec) return -1;
-            if (aIsRec && bIsRec) return b.id - a.id;
-            const aisleComp = a.aisle.localeCompare(b.aisle, undefined, { numeric: true });
-            if (aisleComp !== 0) return aisleComp;
-            return (a.section || "").localeCompare(b.section || "", undefined, { numeric: true });
-          });
-        }
-        uploadQueue.forEach(q => {
-          sorted.push({
-            id: -1,
-            objectPath: "",
-            notes: "",
-            aisle: q.aisle,
-            section: q.section,
-            isDetailShot: false,
-            queueId: q.queueId,
-            queueStatus: q.status,
-            blobUrl: q.blobUrl,
-          });
-        });
-        if (sorted.length === 0) return null;
-        const safeIndex = Math.min(currentPhotoIndex, sorted.length - 1);
-        const photo = sorted[safeIndex];
-        if (!photo) return null;
-        const imgSrc = photo.blobUrl ? photo.blobUrl : (photo.objectPath.startsWith("/uploads/") ? photo.objectPath : `/uploads/${photo.objectPath}`);
-        return (
-          <Card>
-            <CardHeader className="p-3 flex flex-row items-center justify-between gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setCurrentPhotoIndex(i => i - 1)}
-                disabled={safeIndex === 0}
-                data-testid="button-photo-prev-top"
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Prev
-              </Button>
-              <CardTitle className="text-sm" data-testid="text-mobile-photo-count">{safeIndex + 1} / {sorted.length}</CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setCurrentPhotoIndex(i => i + 1)}
-                disabled={safeIndex >= sorted.length - 1}
-                data-testid="button-photo-next-top"
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 space-y-3">
-              <div className="space-y-2" data-testid={`mobile-photo-${photo.queueId || photo.id}`}>
-                <div className="relative">
-                  <img
-                    src={imgSrc}
-                    alt={photo.queueId ? "Uploading..." : `Photo ${photo.id}`}
-                    className={`w-full rounded-md object-cover max-h-64 ${photo.queueStatus ? "opacity-60" : ""}`}
-                    data-testid={`img-mobile-photo-${photo.queueId || photo.id}`}
-                  />
-                  {photo.queueStatus && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md bg-background/40">
-                      {photo.queueStatus === "uploading" && (
-                        <>
-                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                          <span className="text-sm font-medium mt-2">Uploading...</span>
-                        </>
-                      )}
-                      {photo.queueStatus === "pending" && (
-                        <>
-                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground mt-2">Queued</span>
-                        </>
-                      )}
-                      {photo.queueStatus === "failed" && (
-                        <div className="flex flex-col items-center gap-2">
-                          <AlertTriangle className="h-8 w-8 text-destructive" />
-                          <span className="text-sm font-medium text-destructive">Upload failed</span>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => retryUpload(photo.queueId!)} data-testid={`button-retry-inline-${photo.queueId}`}>
-                              <RotateCw className="h-3 w-3 mr-1" /> Retry
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => dismissFailedUpload(photo.queueId!)} data-testid={`button-dismiss-inline-${photo.queueId}`}>
-                              <X className="h-3 w-3 mr-1" /> Dismiss
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {!photo.queueStatus && (
-                <>
-                <div className="flex items-center justify-between gap-2">
-                  {(photo.aisle || (photo.section && photo.section !== "000")) ? (
-                    <p className="text-xs text-muted-foreground">
-                      {photo.aisle && <span>Aisle: {photo.aisle}</span>}
-                      {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
-                      {photo.section && photo.section !== "000" && <span>Section: {photo.section}</span>}
-                    </p>
-                  ) : <div />}
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-1.5 cursor-pointer" data-testid={`checkbox-detail-${photo.id}`}>
-                      <Checkbox
-                        checked={photo.isDetailShot}
-                        onCheckedChange={(checked) => toggleDetailShot(photo.id, !!checked)}
-                      />
-                      <span className="text-xs text-muted-foreground">Detail shot</span>
-                    </label>
-                    {confirmDeleteId === photo.id ? (
-                      <div className="flex items-center gap-1">
-                        <Button size="sm" variant="destructive" onClick={() => { deletePhoto(photo.id); setCurrentPhotoIndex(i => Math.max(0, Math.min(i, sorted.length - 2))); }} data-testid={`button-confirm-delete-${photo.id}`}>
-                          Delete
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)} data-testid={`button-cancel-delete-${photo.id}`}>
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button size="icon" variant="ghost" onClick={() => setConfirmDeleteId(photo.id)} data-testid={`button-delete-photo-${photo.id}`}>
-                        <Trash2 className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs underline">Notes:</Label>
-                  <Textarea
-                    value={photo.notes}
-                    onChange={(e) => updatePhotoNotes(photo.id, e.target.value)}
-                    placeholder="Photo notes..."
-                    rows={2}
-                    data-testid={`input-mobile-notes-${photo.id}`}
-                  />
-                  {savingNotes[photo.id] && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Saving...
-                    </p>
-                  )}
-                </div>
-                </>
-                )}
-                {photo.queueStatus && (photo.aisle || (photo.section && photo.section !== "000")) && (
-                  <p className="text-xs text-muted-foreground">
-                    {photo.aisle && <span>Aisle: {photo.aisle}</span>}
-                    {photo.aisle && photo.section && photo.section !== "000" && <span>, </span>}
-                    {photo.section && photo.section !== "000" && <span>Section: {photo.section}</span>}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center justify-center gap-3 pt-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCurrentPhotoIndex(i => i - 1)}
-                  disabled={safeIndex === 0}
-                  data-testid="button-photo-prev"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Prev
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => { setPhotoSort(s => s === "latest" ? "aisle" : "latest"); setCurrentPhotoIndex(0); }}
-                  data-testid="button-photo-sort"
-                >
-                  <ArrowUpDown className="h-3 w-3 mr-1" />
-                  {photoSort === "latest" ? "By Aisle" : "Latest"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCurrentPhotoIndex(i => i + 1)}
-                  disabled={safeIndex >= sorted.length - 1}
-                  data-testid="button-photo-next"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
     </div>
   );
 }

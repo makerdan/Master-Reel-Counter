@@ -257,10 +257,10 @@ export default function SettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="small">Small</SelectItem>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="large">Large</SelectItem>
-                  <SelectItem value="extra-large">Extra Large</SelectItem>
+                  <SelectItem value="small"><span style={{ fontSize: "12px" }}>Small</span></SelectItem>
+                  <SelectItem value="default"><span style={{ fontSize: "14px" }}>Default</span></SelectItem>
+                  <SelectItem value="large"><span style={{ fontSize: "17px" }}>Large</span></SelectItem>
+                  <SelectItem value="extra-large"><span style={{ fontSize: "20px" }}>Extra Large</span></SelectItem>
                 </SelectContent>
               </Select>
             </div>
