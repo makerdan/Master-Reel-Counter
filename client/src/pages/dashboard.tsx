@@ -388,7 +388,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       invalidateAll();
-      toast({ title: "Folder deleted (sessions moved to unfiled)" });
+      toast({ title: "Folder deleted (sessions moved to main list)" });
     },
     onError: () => {
       toast({ title: "Failed to delete folder", variant: "destructive" });
@@ -1392,7 +1392,7 @@ export default function Dashboard() {
                 {(userFolders || []).length > 0 && (
                   <div className="flex items-center gap-2 mb-2" data-testid="unfiled-header">
                     <Cable className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold text-sm text-muted-foreground">Unfiled</span>
+                    <span className="font-semibold text-sm text-muted-foreground">Sessions:</span>
                     <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
                       {unfiledSessions.length}
                     </Badge>
@@ -1532,7 +1532,7 @@ export default function Dashboard() {
               disabled={bulkMove.isPending}
               data-testid="button-bulk-move-unfiled"
             >
-              <Cable className="h-4 w-4 mr-2" /> Unfiled
+              <Cable className="h-4 w-4 mr-2" /> Sessions
             </Button>
             {(userFolders || []).map(folder => (
               <Button
@@ -1579,7 +1579,7 @@ export default function Dashboard() {
             <AlertDialogTitle>Delete folder "{deleteFolderTarget?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteFolderTarget?.sessionCount
-                ? `This folder contains ${deleteFolderTarget.sessionCount} session${deleteFolderTarget.sessionCount !== 1 ? "s" : ""}. The sessions will not be deleted — they will be moved to unfiled.`
+                ? `This folder contains ${deleteFolderTarget.sessionCount} session${deleteFolderTarget.sessionCount !== 1 ? "s" : ""}. The sessions will not be deleted — they will be moved to the main Sessions list.`
                 : "This empty folder will be permanently removed."}
             </AlertDialogDescription>
           </AlertDialogHeader>

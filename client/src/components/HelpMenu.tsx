@@ -137,7 +137,7 @@ export function DashboardSections() {
           <FeatureRow
             icon={<HelpIcon icon={Trash2} />}
             label="Delete Folder"
-            description="Deleting a folder moves all sessions inside it to 'Unfiled'. Sessions are never deleted when removing a folder."
+            description="Deleting a folder moves all its sessions back to the main Sessions list. Sessions are never deleted when removing a folder."
           />
         </AccordionContent>
       </AccordionItem>
@@ -184,7 +184,7 @@ export function DashboardSections() {
           <FeatureRow
             icon={<HelpIcon icon={FolderInput} />}
             label="Move to Folder"
-            description="Move a session into any folder, or back to Unfiled. Sessions inside folders appear grouped under the folder header."
+            description="Move a session into any folder, or back to the main Sessions list. Sessions inside folders appear grouped under the folder header."
           />
           <FeatureRow
             icon={<HelpIcon icon={Lock} />}
