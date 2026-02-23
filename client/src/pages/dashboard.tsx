@@ -830,10 +830,10 @@ export default function Dashboard() {
         open={!isCollapsed}
         onOpenChange={() => toggleFolderCollapse(folder.id)}
       >
+        <div className="border border-red-500/60 rounded-md p-3">
         <div className="flex items-center gap-2 group" data-testid={`folder-header-${folder.id}`}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1 px-2" data-testid={`button-toggle-folder-${folder.id}`} title="Toggle folder">
-              <ChevronDown className={`h-4 w-4 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+            <Button variant="ghost" size="sm" className="gap-2 px-2" data-testid={`button-toggle-folder-${folder.id}`} title="Toggle folder">
               {isCollapsed ? <Folder className="h-4 w-4 text-primary" /> : <FolderOpen className="h-4 w-4 text-primary" />}
               <span className="font-semibold text-base">{folder.name}</span>
               <Badge variant="secondary" className="ml-1 no-default-hover-elevate no-default-active-elevate text-xs">
@@ -846,7 +846,7 @@ export default function Dashboard() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
                 data-testid={`button-folder-menu-${folder.id}`}
                 title="Folder options"
               >
@@ -916,7 +916,7 @@ export default function Dashboard() {
           </DropdownMenu>
         </div>
         <CollapsibleContent>
-          <div className="space-y-2 mt-1 border border-border/50 rounded-md p-3">
+          <div className="space-y-2 mt-2">
             {(userFolders || []).filter(f => f.parentFolderId === folder.id).map(child => renderFolderSection(child, visited))}
             {folderSessions.length === 0 && (userFolders || []).filter(f => f.parentFolderId === folder.id).length === 0 ? (
               <p className="text-xs text-muted-foreground py-2 pl-2">No sessions in this folder</p>
@@ -925,6 +925,7 @@ export default function Dashboard() {
             )}
           </div>
         </CollapsibleContent>
+        </div>
       </Collapsible>
     );
   };
@@ -1388,19 +1389,8 @@ export default function Dashboard() {
             {(userFolders || []).filter(f => !f.parentFolderId).map(folder => renderFolderSection(folder))}
 
             {unfiledSessions.length > 0 && (
-              <div>
-                {(userFolders || []).length > 0 && (
-                  <div className="flex items-center gap-2 mb-2" data-testid="unfiled-header">
-                    <Cable className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold text-sm text-muted-foreground">Sessions:</span>
-                    <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
-                      {unfiledSessions.length}
-                    </Badge>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  {unfiledSessions.map(session => renderSessionCard(session))}
-                </div>
+              <div className="space-y-2">
+                {unfiledSessions.map(session => renderSessionCard(session))}
               </div>
             )}
           </div>
