@@ -568,6 +568,21 @@ export async function registerRoutes(
       if (Object.keys(safeUpdate).length === 0) return res.status(400).json({ message: "No valid fields to update" });
       const updated = await storage.updatePhoto(photo.id, safeUpdate);
 
+      const cascadeLocationToDetailShots = async (parentId: number, locationUpdate: Record<string, any>, sessionId: number) => {
+        const sessionPhotos = await storage.getSessionPhotos(sessionId);
+        const detailShots = sessionPhotos.filter(p => p.parentPhotoId === parentId);
+        for (const ds of detailShots) {
+          await storage.updatePhoto(ds.id, locationUpdate);
+          const dsPins = await storage.getPhotoPins(ds.id);
+          const dsCommitted = dsPins.filter(p => p.entryId);
+          for (const dp of dsCommitted) {
+            if (dp.entryId) {
+              await storage.updateEntry(dp.entryId, locationUpdate);
+            }
+          }
+        }
+      };
+
       if (safeUpdate.section !== undefined || safeUpdate.aisle !== undefined) {
         const pins = await storage.getPhotoPins(photo.id);
         const committedPins = pins.filter(p => p.entryId);
@@ -577,6 +592,24 @@ export async function registerRoutes(
         for (const pin of committedPins) {
           if (pin.entryId) {
             await storage.updateEntry(pin.entryId, entryUpdate);
+          }
+        }
+        await cascadeLocationToDetailShots(photo.id, entryUpdate, photo.sessionId);
+      }
+
+      if (safeUpdate.parentPhotoId !== undefined && safeUpdate.parentPhotoId !== null) {
+        const parentPhoto = await storage.getPhoto(safeUpdate.parentPhotoId);
+        if (parentPhoto && (parentPhoto.aisle || parentPhoto.section)) {
+          const inheritUpdate: Record<string, any> = {};
+          if (parentPhoto.aisle) inheritUpdate.aisle = parentPhoto.aisle;
+          if (parentPhoto.section) inheritUpdate.section = parentPhoto.section;
+          await storage.updatePhoto(photo.id, inheritUpdate);
+          const dsPins = await storage.getPhotoPins(photo.id);
+          const dsCommitted = dsPins.filter(p => p.entryId);
+          for (const dp of dsCommitted) {
+            if (dp.entryId) {
+              await storage.updateEntry(dp.entryId, inheritUpdate);
+            }
           }
         }
       }
@@ -691,6 +724,17 @@ export async function registerRoutes(
           for (const sp of siblingPins) {
             if (sp.entryId) {
               await storage.updateEntry(sp.entryId, photoUpdate);
+            }
+          }
+          const sessionPhotos = await storage.getSessionPhotos(entry.sessionId);
+          const detailShots = sessionPhotos.filter(p => p.parentPhotoId === linkedPin.photoId);
+          for (const ds of detailShots) {
+            await storage.updatePhoto(ds.id, photoUpdate);
+            const dsPins = allSessionPins.filter(p => p.photoId === ds.id && p.entryId);
+            for (const dp of dsPins) {
+              if (dp.entryId) {
+                await storage.updateEntry(dp.entryId, photoUpdate);
+              }
             }
           }
           broadcastToSession(entry.sessionId, { type: "sync", entity: "photos", sessionId: entry.sessionId });
