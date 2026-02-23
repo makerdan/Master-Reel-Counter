@@ -1680,27 +1680,60 @@ export async function registerRoutes(
 
         const isReceivingSection = (sec.aisle || "").toLowerCase() === "receiving";
 
+        const detailShotsByParent = new Map<number, { pl: PhotoLayout; entries: any[] }[]>();
+        const detailShotsWithoutEntriesByParent = new Map<number, PhotoLayout[]>();
+
         const compactPhotos: { pl: PhotoLayout; entries: any[] }[] = [];
         const standardPhotos: { pl: PhotoLayout; entries: any[] }[] = [];
         for (const item of photosWithEntries) {
-          const isCompact = isReceivingSection || item.pl.photo.isDetailShot;
-          if (isCompact) {
-            compactPhotos.push(item);
+          if (item.pl.photo.isDetailShot && item.pl.photo.parentPhotoId) {
+            const parentId = item.pl.photo.parentPhotoId;
+            if (!detailShotsByParent.has(parentId)) detailShotsByParent.set(parentId, []);
+            detailShotsByParent.get(parentId)!.push(item);
           } else {
-            standardPhotos.push(item);
+            const isCompact = isReceivingSection;
+            if (isCompact) {
+              compactPhotos.push(item);
+            } else {
+              standardPhotos.push(item);
+            }
           }
         }
 
         const compactWithoutEntries: PhotoLayout[] = [];
         const standardWithoutEntries: PhotoLayout[] = [];
         for (const pl of photosWithoutEntries) {
-          const isCompact = isReceivingSection || pl.photo.isDetailShot;
-          if (isCompact) {
-            compactWithoutEntries.push(pl);
+          if (pl.photo.isDetailShot && pl.photo.parentPhotoId) {
+            const parentId = pl.photo.parentPhotoId;
+            if (!detailShotsWithoutEntriesByParent.has(parentId)) detailShotsWithoutEntriesByParent.set(parentId, []);
+            detailShotsWithoutEntriesByParent.get(parentId)!.push(pl);
           } else {
-            standardWithoutEntries.push(pl);
+            const isCompact = isReceivingSection;
+            if (isCompact) {
+              compactWithoutEntries.push(pl);
+            } else {
+              standardWithoutEntries.push(pl);
+            }
           }
         }
+
+        const renderDetailShotsForParent = (parentPhotoId: number) => {
+          const detailWithEntries = detailShotsByParent.get(parentPhotoId) || [];
+          const detailWithout = detailShotsWithoutEntriesByParent.get(parentPhotoId) || [];
+          const compactMinH = 80;
+          for (const { pl, entries: photoEntries } of detailWithEntries) {
+            ensureSpace(compactMinH);
+            const availH = Math.min(maxY - currentY, 180);
+            const result = renderCompactPhotoWithEntries(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
+            currentY += result.renderedH + gap;
+          }
+          for (const pl of detailWithout) {
+            ensureSpace(compactMinH);
+            const availH = Math.min(maxY - currentY, 180);
+            const result = renderPhoto(pl, tableLeft, currentY, pageWidth * 0.35, availH);
+            currentY += result.renderedH + gap;
+          }
+        };
 
         if (compactPhotos.length > 0) {
           const compactMinH = 80;
@@ -1709,6 +1742,7 @@ export async function registerRoutes(
             const availH = Math.min(maxY - currentY, 180);
             const result = renderCompactPhotoWithEntries(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
             currentY += result.renderedH + gap;
+            renderDetailShotsForParent(pl.photo.id);
           }
         }
 
@@ -1734,6 +1768,9 @@ export async function registerRoutes(
               if (result.renderedH > maxRowH) maxRowH = result.renderedH;
             }
             currentY += maxRowH + gap;
+            for (let c = 0; c < perRow; c++) {
+              renderDetailShotsForParent(compactWithoutEntries[idx + c].photo.id);
+            }
             idx += perRow;
           }
         }
@@ -1760,6 +1797,7 @@ export async function registerRoutes(
 
           const photoEndY = currentY + result.renderedH;
           currentY = Math.max(photoEndY, tblEndY) + gap;
+          renderDetailShotsForParent(pl.photo.id);
         }
 
         if (standardWithoutEntries.length > 0) {
@@ -1775,6 +1813,7 @@ export async function registerRoutes(
               const centeredX = tableLeft + (pageWidth - maxW) / 2;
               const result = renderPhoto(pl, centeredX, currentY, maxW, availH);
               currentY += result.renderedH + gap;
+              renderDetailShotsForParent(pl.photo.id);
               idx++;
             } else {
               ensureSpace(minPhotoH);
@@ -1791,8 +1830,30 @@ export async function registerRoutes(
               }
 
               currentY += maxRowH + gap;
+              for (let c = 0; c < photosInRow; c++) {
+                renderDetailShotsForParent(standardWithoutEntries[idx + c].photo.id);
+              }
               idx += photosInRow;
             }
+          }
+        }
+
+        const orphanDetailWithEntries = [...detailShotsByParent.entries()].filter(([parentId]) => !loadedPhotos.some(p => p.photo.id === parentId));
+        const orphanDetailWithout = [...detailShotsWithoutEntriesByParent.entries()].filter(([parentId]) => !loadedPhotos.some(p => p.photo.id === parentId));
+        for (const [, items] of orphanDetailWithEntries) {
+          for (const { pl, entries: photoEntries } of items) {
+            ensureSpace(80);
+            const availH = Math.min(maxY - currentY, 180);
+            const result = renderCompactPhotoWithEntries(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
+            currentY += result.renderedH + gap;
+          }
+        }
+        for (const [, items] of orphanDetailWithout) {
+          for (const pl of items) {
+            ensureSpace(80);
+            const availH = Math.min(maxY - currentY, 180);
+            const result = renderPhoto(pl, tableLeft, currentY, pageWidth * 0.35, availH);
+            currentY += result.renderedH + gap;
           }
         }
       }
@@ -2017,16 +2078,17 @@ export async function registerRoutes(
 
       if (footerText) {
         currentY += 28;
-        doc.fontSize(8).fillColor("#999999").text(footerText, 36, currentY, { width: 300 });
+        doc.fontSize(8).fillColor("#999999").text(footerText, 36, currentY, { width: 300, lineBreak: true, height: maxY - currentY });
       }
 
+      const lastContentPage = doc.bufferedPageRange().count;
+
       // --- Page Numbers (using buffered pages) ---
-      const range = doc.bufferedPageRange();
-      for (let i = range.start; i < range.start + range.count; i++) {
+      for (let i = 0; i < lastContentPage; i++) {
         doc.switchToPage(i);
         doc.fontSize(6).fillColor("#999999");
         doc.text(session.name, 36, doc.page.height - 30, { width: pageWidth / 2, lineBreak: false });
-        doc.text(`Page ${i + 1} of ${range.count}`, 36 + pageWidth / 2, doc.page.height - 30, { width: pageWidth / 2, align: 'right', lineBreak: false });
+        doc.text(`Page ${i + 1} of ${lastContentPage}`, 36 + pageWidth / 2, doc.page.height - 30, { width: pageWidth / 2, align: 'right', lineBreak: false });
       }
 
       doc.end();
