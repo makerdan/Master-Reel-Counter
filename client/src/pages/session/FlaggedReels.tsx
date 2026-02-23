@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, ChevronLeft, Loader2, MapPin, Eye, X, Check, Share2 } from "lucide-react";
+import { Flag, ChevronLeft, Loader2, MapPin, Eye, X, Check, Share2, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -27,9 +27,10 @@ interface FlaggedPin {
 interface FlaggedReelsProps {
   sessionId: number;
   onBack: () => void;
+  onReshoot?: (aisle: string, section: string, parentPhotoId: number) => void;
 }
 
-export default function FlaggedReels({ sessionId, onBack }: FlaggedReelsProps) {
+export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedReelsProps) {
   const { toast } = useToast();
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
@@ -175,18 +176,31 @@ export default function FlaggedReels({ sessionId, onBack }: FlaggedReelsProps) {
                   )}
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => unflagMutation.mutate(pin.id)}
-                  disabled={unflagMutation.isPending}
-                  data-testid={`button-resolve-${pin.id}`}
-                  title="Mark as resolved"
-                >
-                  <Check className="h-3.5 w-3.5 mr-1" />
-                  Resolve
-                </Button>
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  {onReshoot && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
+                      data-testid={`button-reshoot-${pin.id}`}
+                      title="Take a detail photo in Mobile Flow"
+                    >
+                      <Camera className="h-3.5 w-3.5 mr-1" />
+                      Re-shoot
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => unflagMutation.mutate(pin.id)}
+                    disabled={unflagMutation.isPending}
+                    data-testid={`button-resolve-${pin.id}`}
+                    title="Mark as resolved"
+                  >
+                    <Check className="h-3.5 w-3.5 mr-1" />
+                    Resolve
+                  </Button>
+                </div>
               </div>
             </div>
           ))}

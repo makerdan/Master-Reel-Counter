@@ -162,6 +162,9 @@ function SessionWorkspace({
 
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
   const [mobileFlowKey, setMobileFlowKey] = useState(0);
+  const [mobileFlowInitialAisle, setMobileFlowInitialAisle] = useState("");
+  const [mobileFlowInitialSection, setMobileFlowInitialSection] = useState("");
+  const [mobileFlowDetailParentPhotoId, setMobileFlowDetailParentPhotoId] = useState<number | null>(null);
 
   const [showActivity, setShowActivity] = useState(() => {
     try { return new URLSearchParams(window.location.search).get("activity") === "1"; } catch { return false; }
@@ -493,7 +496,19 @@ function SessionWorkspace({
 
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 pb-[50vh] space-y-4">
         {captureMode ? (
-          <MobileCaptureView key={mobileFlowKey} sessionId={sessionId} photos={photos} />
+          <MobileCaptureView
+            key={mobileFlowKey}
+            sessionId={sessionId}
+            photos={photos}
+            initialAisle={mobileFlowInitialAisle}
+            initialSection={mobileFlowInitialSection}
+            detailParentPhotoId={mobileFlowDetailParentPhotoId}
+            onDetailCaptured={() => {
+              setMobileFlowInitialAisle("");
+              setMobileFlowInitialSection("");
+              setMobileFlowDetailParentPhotoId(null);
+            }}
+          />
         ) : (
           <>
             <Tabs value={mode} onValueChange={setMode}>
@@ -536,6 +551,13 @@ function SessionWorkspace({
                 <FlaggedReels
                   sessionId={sessionId}
                   onBack={() => setMode("photo")}
+                  onReshoot={(aisleVal, sectionVal, parentPhotoId) => {
+                    setMobileFlowInitialAisle(aisleVal);
+                    setMobileFlowInitialSection(sectionVal);
+                    setMobileFlowDetailParentPhotoId(parentPhotoId);
+                    setCaptureMode(true);
+                    setMobileFlowKey(k => k + 1);
+                  }}
                 />
               </TabsContent>
             </Tabs>

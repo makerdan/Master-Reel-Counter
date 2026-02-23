@@ -24,14 +24,17 @@ type UploadQueueItem = {
   retries: number;
 };
 
-function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: Photo[] }) {
+function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void }) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const aisleInputRef = useRef<HTMLInputElement>(null);
   const sectionInputRef = useRef<HTMLInputElement>(null);
-  const [aisle, setAisle] = useState("");
-  const [section, setSection] = useState("");
+  const [aisle, setAisle] = useState(initialAisle || "");
+  const [section, setSection] = useState(initialSection || "");
+  const [activeDetailParentId, setActiveDetailParentId] = useState<number | null>(detailParentPhotoId ?? null);
+  const activeDetailRef = useRef(activeDetailParentId);
+  activeDetailRef.current = activeDetailParentId;
   const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
   const [savingNotes, setSavingNotes] = useState<Record<number, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -108,14 +111,26 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         if (!uploadRes.ok) throw new Error("Upload failed");
         const uploadResult = await uploadRes.json();
 
-        const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
+        const photoPayload: Record<string, any> = {
           objectStorageKey: uploadResult.objectPath,
           originalFilename: nextItem.file.name,
           mimeType: nextItem.file.type,
           aisle: nextItem.aisle,
           section: nextItem.section,
-        });
+        };
+        const detailParent = activeDetailRef.current;
+        const isDetail = detailParent != null;
+        if (isDetail) {
+          photoPayload.isDetailShot = true;
+          photoPayload.parentPhotoId = detailParent;
+        }
+        const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, photoPayload);
         const savedPhoto = await res.json();
+
+        if (isDetail) {
+          setActiveDetailParentId(null);
+          onDetailCaptured?.();
+        }
 
         if (!mountedRef.current) return;
         setRecentPhotos(prev => [...prev, {
@@ -124,7 +139,7 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
           notes: "",
           aisle: nextItem.aisle,
           section: nextItem.section,
-          isDetailShot: false,
+          isDetailShot: isDetail,
         }]);
         URL.revokeObjectURL(nextItem.blobUrl);
         blobUrlsRef.current.delete(nextItem.blobUrl);
@@ -270,6 +285,12 @@ function MobileCaptureView({ sessionId, photos }: { sessionId: number; photos: P
         <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-2 text-sm flex items-center gap-2" data-testid="text-offline-banner">
           <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />
           <span>You're offline. Photos will be saved and uploaded when you reconnect.</span>
+        </div>
+      )}
+      {activeDetailParentId != null && (
+        <div className="rounded-md border border-[hsl(200_70%_50%/0.5)] bg-[hsl(200_70%_50%/0.1)] px-3 py-2 text-sm flex items-center gap-2" data-testid="text-detail-shot-banner">
+          <Camera className="h-4 w-4 text-[hsl(200_70%_50%)] shrink-0" />
+          <span>Detail shot mode — next photo will be linked to the flagged reel's original image.</span>
         </div>
       )}
       <Card>
