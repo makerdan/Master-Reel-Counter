@@ -57,13 +57,27 @@ export function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoA
   const fmt = (d: string | Date) => new Date(d).toLocaleString(undefined, {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
+  const timeFmt = (d: string | Date) => new Date(d).toLocaleString(undefined, {
+    hour: "2-digit", minute: "2-digit",
+  });
+  const dateFmt = (d: string | Date) => new Date(d).toLocaleString(undefined, {
+    month: "short", day: "numeric",
+  });
   if (!lastPhotoAt || new Date(firstPhotoAt).getTime() === new Date(lastPhotoAt).getTime()) {
     return elapsedOnly ? "0m" : fmt(firstPhotoAt);
   }
-  const diff = new Date(lastPhotoAt).getTime() - new Date(firstPhotoAt).getTime();
+  const start = new Date(firstPhotoAt);
+  const end = new Date(lastPhotoAt);
+  const diff = end.getTime() - start.getTime();
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
   const elapsed = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
   if (elapsedOnly) return elapsed;
+  const sameDay = start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+  if (sameDay) {
+    return `${dateFmt(firstPhotoAt)}, ${timeFmt(firstPhotoAt)}-${timeFmt(lastPhotoAt)} (${elapsed})`;
+  }
   return `${fmt(firstPhotoAt)} - ${fmt(lastPhotoAt)} (${elapsed})`;
 }
