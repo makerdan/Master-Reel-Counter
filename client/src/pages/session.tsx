@@ -400,7 +400,12 @@ function SessionWorkspace({
               <TooltipContent>Back to dashboard</TooltipContent>
             </Tooltip>
             <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditDescription((session as any).description || ""); setEditSessionOpen(true); }}>
-              <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h1 className="text-sm font-semibold truncate min-w-0" data-testid="text-session-name">{session.name}</h1>
+                {captureMode && (
+                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider bg-primary/15 text-primary px-1.5 py-0.5 rounded" data-testid="badge-mobile-flow">Mobile Flow</span>
+                )}
+              </div>
               <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz, captureMode)}</span>
             </div>
           </div>
