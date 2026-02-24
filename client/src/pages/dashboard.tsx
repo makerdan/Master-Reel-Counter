@@ -1093,7 +1093,7 @@ export default function Dashboard() {
               <DialogTrigger asChild>
                 <Button data-testid="button-new-session" title="Create a new counting session">
                   <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">New Session</span>
+                  New Session
                 </Button>
               </DialogTrigger>
               <DialogContent>
