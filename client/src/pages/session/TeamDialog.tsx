@@ -200,15 +200,15 @@ export default function TeamDialog({
 
           <Tabs defaultValue="username" className="w-full">
             <TabsList className="w-full" data-testid="tabs-invite-method">
-              <TabsTrigger value="username" className="flex-1" data-testid="tab-invite-username">
+              <TabsTrigger value="username" className="flex-1 border border-white/20" data-testid="tab-invite-username">
                 <UserPlus className="h-3 w-3 mr-1" />
                 Username
               </TabsTrigger>
-              <TabsTrigger value="link" className="flex-1" data-testid="tab-invite-link">
+              <TabsTrigger value="link" className="flex-1 border border-white/20" data-testid="tab-invite-link">
                 <Link className="h-3 w-3 sm:mr-1" />
                 <span className="hidden sm:inline">Share Link</span>
               </TabsTrigger>
-              <TabsTrigger value="email" className="flex-1" data-testid="tab-invite-email">
+              <TabsTrigger value="email" className="flex-1 border border-white/20" data-testid="tab-invite-email">
                 <Mail className="h-3 w-3 sm:mr-1" />
                 <span className="hidden sm:inline">Email</span>
               </TabsTrigger>
@@ -244,6 +244,7 @@ export default function TeamDialog({
               <Button
                 size="sm"
                 variant="outline"
+                className="border border-white/20"
                 onClick={() => generateLink.mutate()}
                 disabled={generateLink.isPending}
                 data-testid="button-generate-link"
@@ -308,7 +309,7 @@ export default function TeamDialog({
               >
                 <Input
                   type="email"
-                  placeholder="Email address"
+                  placeholder="Send to [Email Address]"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="min-w-0"
