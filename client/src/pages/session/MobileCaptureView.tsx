@@ -365,9 +365,9 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 px-1" data-testid="header-mobile-flow">
+      <div className="flex items-center justify-center gap-2 px-1" data-testid="header-mobile-flow">
         <Smartphone className="h-5 w-5 text-primary" />
-        <h2 className="text-base font-semibold">Mobile Flow</h2>
+        <h2 className="text-lg font-semibold underline">Mobile Flow</h2>
       </div>
       {!isOnline && (
         <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-2 text-sm flex items-center gap-2" data-testid="text-offline-banner">
