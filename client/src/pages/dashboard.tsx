@@ -720,7 +720,7 @@ export default function Dashboard() {
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuContent align="end" collisionPadding={8} onClick={(e) => e.stopPropagation()}>
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -756,7 +756,7 @@ export default function Dashboard() {
                       <DropdownMenuSubTrigger data-testid={`menu-move-session-${session.id}`}>
                         <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
                       </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent>
+                      <DropdownMenuSubContent collisionPadding={8}>
                         {session.folderId && (
                           <DropdownMenuItem
                             onClick={(e) => {
@@ -888,7 +888,7 @@ export default function Dashboard() {
                 <DropdownMenuSubTrigger data-testid={`menu-move-folder-${folder.id}`}>
                   <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
+                <DropdownMenuSubContent collisionPadding={8}>
                   {folder.parentFolderId && (
                     <DropdownMenuItem
                       onClick={() => moveFolder.mutate({ id: folder.id, parentFolderId: null })}
