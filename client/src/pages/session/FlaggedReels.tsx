@@ -112,7 +112,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
               className="border border-border rounded-lg p-3 bg-card hover:bg-accent/5 transition-colors"
               data-testid={`flagged-pin-card-${pin.id}`}
             >
-              <div className="flex items-start gap-3">
+              {/* Desktop layout */}
+              <div className="hidden sm:flex items-start gap-3">
                 {pin.photoUrl ? (
                   <div
                     className="relative w-20 h-20 rounded overflow-hidden border border-border shrink-0 cursor-pointer"
@@ -143,7 +144,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     <MapPin className="h-5 w-5 text-muted-foreground" />
                   </div>
                 )}
-
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-sm font-medium" data-testid={`text-pin-label-${pin.id}`}>
@@ -155,7 +155,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                       </Badge>
                     )}
                   </div>
-
                   {(pin.photoAisle || pin.photoSection) && (
                     <div className="flex gap-2 text-xs text-muted-foreground mb-0.5" data-testid={`text-location-${pin.id}`}>
                       {pin.photoAisle && <span>Aisle {pin.photoAisle}</span>}
@@ -163,20 +162,17 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                       {pin.photoSection && <span>Section {pin.photoSection}</span>}
                     </div>
                   )}
-
                   <div className="flex gap-3 text-xs text-muted-foreground font-mono">
                     {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}
                     {pin.vendorCode && <span>{pin.vendorCode}</span>}
                     {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
                   </div>
-
                   {pin.photoFilename && (
                     <p className="text-xs text-muted-foreground mt-1 truncate">
                       {pin.photoFilename}
                     </p>
                   )}
                 </div>
-
                 <div className="flex flex-col gap-1.5 shrink-0">
                   {onReshoot && (
                     <Button
@@ -200,6 +196,78 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   >
                     <Check className="h-3.5 w-3.5 mr-1" />
                     Un-Flag
+                  </Button>
+                </div>
+              </div>
+
+              {/* Mobile layout */}
+              <div className="sm:hidden flex flex-col items-center gap-2">
+                <div className="flex items-center gap-2 w-full">
+                  <span className="font-mono text-sm font-medium" data-testid={`text-pin-label-mobile-${pin.id}`}>
+                    Pin {pin.label}
+                  </span>
+                  {pin.wireDetails && (
+                    <Badge variant="outline" className="text-xs" data-testid={`badge-wire-mobile-${pin.id}`}>
+                      {pin.wireDetails}
+                    </Badge>
+                  )}
+                </div>
+                {pin.photoUrl ? (
+                  <div
+                    className="relative w-full aspect-video rounded overflow-hidden border border-border cursor-pointer"
+                    onClick={() => setPreviewPin(pin)}
+                  >
+                    <img
+                      src={pin.photoUrl}
+                      alt={pin.photoFilename || "Photo"}
+                      className="w-full h-full object-cover"
+                    />
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${pin.xPercent}%`,
+                        top: `${pin.yPercent}%`,
+                        transform: "translate(-50%, -50%)",
+                      }}
+                    >
+                      <div className="w-8 h-8 rounded-full animate-pulse" style={{ border: "4px solid #f97316" }} />
+                      <div className="absolute inset-0 w-8 h-8 rounded-full border border-white" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full h-24 rounded bg-muted flex items-center justify-center">
+                    <MapPin className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 w-full text-xs font-mono text-muted-foreground">
+                  <span>Aisle {pin.photoAisle || "—"}</span>
+                  <span>Sect. {pin.photoSection || "—"}</span>
+                  <span>{pin.reelCount} Reel{pin.reelCount !== 1 ? "s" : ""}</span>
+                  <span>{pin.vendorCode || "—"}, {pin.footage ? `${pin.footage.toLocaleString()} ft` : "— ft"}</span>
+                </div>
+                <div className="flex items-center justify-center gap-3 w-full">
+                  {onReshoot && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
+                      data-testid={`button-reshoot-mobile-${pin.id}`}
+                      title="Re-shoot"
+                      aria-label="Re-shoot"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => unflagMutation.mutate(pin.id)}
+                    disabled={unflagMutation.isPending}
+                    data-testid={`button-resolve-mobile-${pin.id}`}
+                    title="Un-Flag"
+                    aria-label="Un-Flag"
+                  >
+                    <Check className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
