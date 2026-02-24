@@ -112,14 +112,15 @@ function EntryTable({
             <thead>
               <tr>
                 <th style={{ width: 65, textAlign: "center", whiteSpace: "nowrap" }}>Pin #:</th>
-                <th style={{ textAlign: "center" }}>Aisle:</th>
-                <th style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
+                <th className="hidden sm:table-cell" style={{ textAlign: "center" }}>Aisle:</th>
+                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
                 <th style={{ textAlign: "center" }}>Category:</th>
+                <th className="sm:hidden" style={{ textAlign: "center", whiteSpace: "nowrap" }}>VEN:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Reels:</th>
-                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ft/Reel:</th>
+                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ft/Reel:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Total Ft:</th>
-                <th style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
-                <th style={{ width: 50, textAlign: "center" }}>Photo:</th>
+                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
+                <th className="hidden sm:table-cell" style={{ width: 50, textAlign: "center" }}>Photo:</th>
                 <th style={{ width: 70, textAlign: "center" }}>Actions:</th>
               </tr>
             </thead>
@@ -154,8 +155,8 @@ function EntryTable({
                       const info = getReelInfo(entry);
                       return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
                         <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(2, "0")}</td>
-                        <td style={{ textAlign: "center" }}>{entry.aisle}</td>
-                        <td style={{ textAlign: "center" }}>{entry.section}</td>
+                        <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.aisle}</td>
+                        <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono font-bold">
                           {entry.reelTag || "-"}
                           {!entry.reelTag && (
@@ -164,8 +165,9 @@ function EntryTable({
                             </span>
                           )}
                         </td>
+                        <td className="sm:hidden" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
-                        <td className="mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
+                        <td className="hidden sm:table-cell mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
                         <td className="mono font-bold" style={{ textAlign: "center" }}>
                           {info.totalFootage ? `${info.totalFootage.toLocaleString()}'` : "-"}
                           {!info.totalFootage && (
@@ -174,8 +176,8 @@ function EntryTable({
                             </span>
                           )}
                         </td>
-                        <td style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
-                        <td style={{ textAlign: "center" }}>
+                        <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
+                        <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>
                           {entry.photoId && photoMap.get(entry.photoId) ? (
                             <Dialog>
                               <DialogTrigger asChild>
@@ -269,7 +271,7 @@ function EntryTable({
               })}
             </tbody>
             <tfoot>
-              <tr>
+              <tr className="hidden sm:table-row">
                 <td colSpan={6} className="font-semibold">
                   Total: {entries.length} entries
                 </td>
@@ -277,6 +279,15 @@ function EntryTable({
                   {totalFootage.toLocaleString()}'
                 </td>
                 <td colSpan={3} />
+              </tr>
+              <tr className="sm:hidden">
+                <td colSpan={4} className="font-semibold">
+                  Total: {entries.length} entries
+                </td>
+                <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage-mobile">
+                  {totalFootage.toLocaleString()}'
+                </td>
+                <td />
               </tr>
             </tfoot>
           </table>
