@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -452,17 +452,30 @@ function SessionWorkspace({
               </div>
             )}
             {isOwner && (
-              <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team" title="Manage team">
-                Team
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team">
+                    <Users className="h-4 w-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Team</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Manage team</TooltipContent>
+              </Tooltip>
             )}
-            <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" title={captureMode ? "Switch to full mode" : "Switch to mobile capture mode"}>
-              {captureMode ? "Full Mode" : "Mobile Flow"}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
+                  {captureMode ? <Monitor className="h-4 w-4 sm:mr-1" /> : <Smartphone className="h-4 w-4 sm:mr-1" />}
+                  <span className="hidden sm:inline">{captureMode ? "Full Mode" : "Mobile Flow"}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{captureMode ? "Switch to full mode" : "Switch to mobile capture mode"}</TooltipContent>
+            </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-export" title="Export session data">
-                  Export
+                  <Share2 className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Export</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -534,17 +547,17 @@ function SessionWorkspace({
           <>
             <Tabs value={mode} onValueChange={setMode}>
               <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
-                <TabsTrigger value="photo" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode">
-                  <Camera className="h-4 w-4 mr-1" />
-                  Section Photo
+                <TabsTrigger value="photo" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Section Photo">
+                  <Camera className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Section Photo</span>
                 </TabsTrigger>
-                <TabsTrigger value="single" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode">
-                  <ListPlus className="h-4 w-4 mr-1" />
-                  Single Entry
+                <TabsTrigger value="single" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode" aria-label="Single Entry">
+                  <ListPlus className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Single Entry</span>
                 </TabsTrigger>
-                <TabsTrigger value="flagged" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode">
-                  <Flag className="h-4 w-4 mr-1" />
-                  Flagged
+                <TabsTrigger value="flagged" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
+                  <Flag className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Flagged</span>
                 </TabsTrigger>
               </TabsList>
 
