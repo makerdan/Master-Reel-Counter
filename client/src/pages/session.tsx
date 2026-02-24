@@ -401,7 +401,6 @@ function SessionWorkspace({
             </Tooltip>
             <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditDescription((session as any).description || ""); setEditSessionOpen(true); }}>
               <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
-              <span className="mono text-xs text-muted-foreground sm:hidden" data-testid="text-session-time-mobile">{formatSessionTimeMobile(session.firstPhotoAt, session.lastPhotoAt, tz)}</span>
               <span className="mono text-xs text-muted-foreground hidden sm:inline" data-testid="text-session-time">{formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz, captureMode)}</span>
             </div>
           </div>
@@ -497,6 +496,9 @@ function SessionWorkspace({
             <ThemeToggle />
             <HelpMenu mode={captureMode ? "mobile" : "full"} />
           </div>
+        </div>
+        <div className="sm:hidden border-t border-border/50 px-4 py-1 text-center" data-testid="header-mobile-date">
+          <span className="mono text-xs text-muted-foreground">{formatSessionTimeMobile(session.firstPhotoAt, session.lastPhotoAt, tz)}</span>
         </div>
       </header>
 
