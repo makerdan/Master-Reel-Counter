@@ -118,7 +118,7 @@ function EntryTable({
                 <th className="hidden sm:table-cell" style={{ textAlign: "center" }}>Aisle:</th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
                 <th style={{ textAlign: "center" }}>Category:</th>
-                <th className="sm:hidden" style={{ textAlign: "center", whiteSpace: "nowrap" }}>VEN:</th>
+                <th className="hidden" style={{ textAlign: "center", whiteSpace: "nowrap" }}>VEN:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                   <span className="sm:hidden" style={{ display: "inline" }}>Rls:</span>
                   <span className="hidden sm:inline">Reels:</span>
@@ -171,13 +171,14 @@ function EntryTable({
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono font-bold">
                           {entry.reelTag || "-"}
+                          {entry.manufacturer && <span className="sm:hidden text-muted-foreground font-normal">-{entry.manufacturer}</span>}
                           {!entry.reelTag && (
                             <span className="inline-flex items-center ml-1" title="No category">
                               <AlertTriangle className="h-3 w-3 text-amber-500" />
                             </span>
                           )}
                         </td>
-                        <td className="sm:hidden" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
+                        <td className="hidden" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
                         <td className="hidden sm:table-cell mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
                         <td className="mono font-bold" style={{ textAlign: "center" }}>
@@ -294,7 +295,7 @@ function EntryTable({
                 <td colSpan={3} />
               </tr>
               <tr className="sm:hidden">
-                <td colSpan={4} className="font-semibold">
+                <td colSpan={3} className="font-semibold">
                   Total: {entries.length} entries
                 </td>
                 <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage-mobile">
