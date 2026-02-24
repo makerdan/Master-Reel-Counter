@@ -1018,9 +1018,9 @@ export default function Dashboard() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" data-testid="button-sort-sessions" title="Sort sessions">
-                  <ArrowUpDown className="h-4 w-4 mr-1" />
-                  {sortField === "date" ? "Date" : sortField === "name" ? "Name" : sortField === "entries" ? "Reels" : "Footage"}
-                  {sortDirection === "desc" ? <ArrowDown className="h-3 w-3 ml-1" /> : <ArrowUp className="h-3 w-3 ml-1" />}
+                  <ArrowUpDown className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">{sortField === "date" ? "Date" : sortField === "name" ? "Name" : sortField === "entries" ? "Reels" : "Footage"}</span>
+                  {sortDirection === "desc" ? <ArrowDown className="h-3 w-3 sm:ml-1" /> : <ArrowUp className="h-3 w-3 sm:ml-1" />}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -1054,7 +1054,7 @@ export default function Dashboard() {
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" data-testid="button-new-folder" title="Create a new folder">
                   <FolderPlus className="h-4 w-4" />
-                  New Folder
+                  <span className="hidden sm:inline">New Folder</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -1093,7 +1093,7 @@ export default function Dashboard() {
               <DialogTrigger asChild>
                 <Button data-testid="button-new-session" title="Create a new counting session">
                   <Plus className="h-4 w-4" />
-                  New Session
+                  <span className="hidden sm:inline">New Session</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -1610,7 +1610,7 @@ export default function Dashboard() {
       </AlertDialog>
 
       {selectedSessions.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-background border border-primary rounded-lg shadow-lg px-4 py-3 flex items-center gap-3" data-testid="bulk-action-bar">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-background border border-primary rounded-lg shadow-lg px-4 py-3 flex items-center gap-2 flex-wrap justify-center max-w-[calc(100vw-2rem)]" data-testid="bulk-action-bar">
           <span className="text-sm font-medium">{selectedSessions.size} selected</span>
           <Button
             size="sm"
