@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, ChevronLeft, Loader2, MapPin, Eye, X, Check, Share2, Camera } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -56,42 +56,33 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onBack}
-          data-testid="button-back-from-flagged"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back
-        </Button>
+      <div className="flex items-center gap-2">
         <h2 className="text-lg font-semibold flex items-center gap-2" data-testid="text-flagged-heading">
           <Flag className="h-5 w-5 text-yellow-500" />
           <span className="sm:hidden">Flagged</span>
           <span className="hidden sm:inline">Flagged Reels</span>
-          <Badge variant="secondary" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
+          <Badge variant="secondary" className="hidden sm:inline-flex" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
         </h2>
-        <div className="ml-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="button-share-flagged"
-            onClick={() => {
-              const url = `${window.location.origin}/session/${sessionId}?tab=flagged`;
-              navigator.clipboard.writeText(url).then(() => {
-                setCopied(true);
-                toast({ title: "Link copied", description: "Share this link with your team member." });
-                setTimeout(() => setCopied(false), 2000);
-              }).catch(() => {
-                toast({ title: "Copy failed", description: url, variant: "destructive" });
-              });
-            }}
-          >
-            {copied ? <Check className="h-3.5 w-3.5 mr-1" /> : <Share2 className="h-3.5 w-3.5 mr-1" />}
-            {copied ? "Copied" : "Share"}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="button-share-flagged"
+          title="Copy shareable link"
+          aria-label="Share"
+          onClick={() => {
+            const url = `${window.location.origin}/session/${sessionId}?tab=flagged`;
+            navigator.clipboard.writeText(url).then(() => {
+              setCopied(true);
+              toast({ title: "Link copied", description: "Share this link with your team member." });
+              setTimeout(() => setCopied(false), 2000);
+            }).catch(() => {
+              toast({ title: "Copy failed", description: url, variant: "destructive" });
+            });
+          }}
+        >
+          {copied ? <Check className="h-3.5 w-3.5 sm:mr-1" /> : <Share2 className="h-3.5 w-3.5 sm:mr-1" />}
+          <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
+        </Button>
       </div>
 
       {isLoading ? (
