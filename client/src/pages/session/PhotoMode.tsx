@@ -1150,6 +1150,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   </Button>
                 )}
               </div>
+              <div className="flex-1 sm:hidden" />
               <div className="hidden sm:flex flex-1 justify-end gap-2">
                 <div>
                   <label className="block text-xs font-bold text-white dark:text-white mb-1">Section:</label>
