@@ -171,7 +171,7 @@ function EntryTable({
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono font-bold">
                           {entry.reelTag || "-"}
-                          {entry.manufacturer && <span className="sm:hidden text-muted-foreground font-normal">-{entry.manufacturer}</span>}
+                          {entry.manufacturer && <span className="sm:hidden font-normal">-{entry.manufacturer}</span>}
                           {!entry.reelTag && (
                             <span className="inline-flex items-center ml-1" title="No category">
                               <AlertTriangle className="h-3 w-3 text-amber-500" />
