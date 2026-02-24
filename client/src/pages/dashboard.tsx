@@ -720,7 +720,7 @@ export default function Dashboard() {
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" collisionPadding={8} onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuContent align="start" collisionPadding={8} onClick={(e) => e.stopPropagation()}>
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
