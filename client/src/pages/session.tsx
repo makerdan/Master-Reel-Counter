@@ -555,8 +555,8 @@ function SessionWorkspace({
                   <span className="hidden sm:inline">Section Photo</span>
                 </TabsTrigger>
                 <TabsTrigger value="single" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode" aria-label="Single Entry">
-                  <ListPlus className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Single Entry</span>
+                  <ListPlus className="hidden sm:inline h-4 w-4 sm:mr-1" />
+                  Single Entry
                 </TabsTrigger>
                 <TabsTrigger value="flagged" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
                   <Flag className="h-4 w-4 sm:mr-1" />

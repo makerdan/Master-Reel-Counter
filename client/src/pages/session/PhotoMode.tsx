@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  AlertCircle, Flag,
+  AlertCircle, Flag, ImagePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1021,18 +1021,20 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading || !canEdit}
             data-testid="button-upload-photos"
+            title="Upload Photos"
           >
-            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-            Upload Photos
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4 sm:mr-1" />}
+            <span className="hidden sm:inline">Upload Photos</span>
           </Button>
           <Button
             className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
             onClick={() => cameraInputRef.current?.click()}
             disabled={isUploading || !canEdit}
             data-testid="button-take-photo"
+            title="Take Photo"
           >
-            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-            Take Photo
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4 sm:mr-1" />}
+            <span className="hidden sm:inline">Take Photo</span>
           </Button>
         </div>
       </div>
@@ -1122,7 +1124,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       }
                     }}
                     placeholder="Section..."
-                    className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
+                    className={`w-14 sm:w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
                     enterKeyHint="done"
                     data-testid="input-photo-section"
                   />
@@ -1130,7 +1132,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               </div>
             </div>
             {currentPhoto && (
-              <div className="flex items-center justify-center gap-3 text-xs mono text-[hsl(25_40%_60%)]" data-testid="text-photo-info">
+              <div className="hidden sm:flex items-center justify-center gap-3 text-xs mono text-[hsl(25_40%_60%)]" data-testid="text-photo-info">
                 {currentPhoto.filename && <span className="truncate max-w-[200px]" title={currentPhoto.filename}>{currentPhoto.filename}</span>}
                 {currentPhoto.timestamp && <span className="whitespace-nowrap">{currentPhoto.timestamp}</span>}
                 {currentPhoto.isDetailShot && (
@@ -1381,7 +1383,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           {currentPhoto && (
             <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 flex flex-col items-center gap-1" data-testid="bottom-photo-nav">
               {currentPhoto.filename && (
-                <span className="text-xs mono text-[hsl(25_40%_60%)] truncate max-w-[260px]" title={currentPhoto.filename} data-testid="text-photo-name-bottom">
+                <span className="hidden sm:inline text-xs mono text-[hsl(25_40%_60%)] truncate max-w-[260px]" title={currentPhoto.filename} data-testid="text-photo-name-bottom">
                   {currentPhoto.filename}
                 </span>
               )}
