@@ -130,7 +130,10 @@ function EntryTable({
                 </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
                 <th className="hidden sm:table-cell" style={{ width: 50, textAlign: "center" }}>Photo:</th>
-                <th style={{ width: 70, textAlign: "center" }}>Actions:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                  <span className="sm:hidden" style={{ display: "inline" }}>Edit:</span>
+                  <span className="hidden sm:inline">Actions:</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -156,7 +159,7 @@ function EntryTable({
                         <div className="flex items-center gap-2">
                           <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
                           <span className="font-semibold">{aisleLabel.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${aisleLabel}`} - {aisleLabel.toLowerCase() === "receiving" && sectionLabel === "000" ? "Section Unknown" : `Section ${sectionLabel}`}</span>
-                          <span className="text-muted-foreground">({sectionEntries.length} {sectionEntries.length === 1 ? "entry" : "entries"}, {sectionFootage.toLocaleString()} ft. total)</span>
+                          <span className="hidden sm:inline text-muted-foreground">({sectionEntries.length} {sectionEntries.length === 1 ? "entry" : "entries"}, {sectionFootage.toLocaleString()} ft. total)</span>
                         </div>
                       </td>
                     </tr>
