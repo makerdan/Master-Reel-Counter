@@ -241,7 +241,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     <Button
                       variant="outline"
                       size="icon"
-                      className="border-2 border-border"
+                      className="border border-white"
                       onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
                       data-testid={`button-reshoot-mobile-${pin.id}`}
                       title="Re-shoot"
@@ -253,7 +253,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   <Button
                     variant="outline"
                     size="icon"
-                    className="border-2 border-border"
+                    className="border border-white"
                     onClick={() => unflagMutation.mutate(pin.id)}
                     disabled={unflagMutation.isPending}
                     data-testid={`button-resolve-mobile-${pin.id}`}
