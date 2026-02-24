@@ -1091,7 +1091,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 space-y-1">
             <div className="flex items-center w-full">
               <div className="flex-1" />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <Button
                   size="icon"
                   className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
