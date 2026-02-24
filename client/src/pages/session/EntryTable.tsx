@@ -111,14 +111,23 @@ function EntryTable({
           <table className="entries-table" data-testid="entries-table">
             <thead>
               <tr>
-                <th style={{ width: 65, textAlign: "center", whiteSpace: "nowrap" }}>Pin #:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                  <span className="sm:hidden" style={{ display: "inline" }}>Pin:</span>
+                  <span className="hidden sm:inline">Pin #:</span>
+                </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center" }}>Aisle:</th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
                 <th style={{ textAlign: "center" }}>Category:</th>
                 <th className="sm:hidden" style={{ textAlign: "center", whiteSpace: "nowrap" }}>VEN:</th>
-                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Reels:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                  <span className="sm:hidden" style={{ display: "inline" }}>Rls:</span>
+                  <span className="hidden sm:inline">Reels:</span>
+                </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ft/Reel:</th>
-                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Total Ft:</th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                  <span className="sm:hidden" style={{ display: "inline" }}>Total:</span>
+                  <span className="hidden sm:inline">Total Ft:</span>
+                </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
                 <th className="hidden sm:table-cell" style={{ width: 50, textAlign: "center" }}>Photo:</th>
                 <th style={{ width: 70, textAlign: "center" }}>Actions:</th>
@@ -243,6 +252,7 @@ function EntryTable({
                                 <Button
                                   size="icon"
                                   variant="ghost"
+                                  className="hidden sm:inline-flex"
                                   disabled={!canEdit}
                                   title="Delete Entry"
                                   data-testid={`button-delete-entry-${entry.id}`}

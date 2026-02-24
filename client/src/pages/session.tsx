@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -19,6 +19,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -259,6 +264,27 @@ function SessionWorkspace({
     },
     onError: () => {
       toast({ title: "Failed to update session", variant: "destructive" });
+    },
+  });
+
+  const deleteEditingEntry = useMutation({
+    mutationFn: async ({ id, entry }: { id: number; entry: Entry }) => {
+      await apiRequest("DELETE", `/api/entries/${id}`);
+      return entry;
+    },
+    onSuccess: (entry) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      const { id, ...rest } = entry;
+      pushUndo({
+        type: "delete-entry",
+        sessionId,
+        entityId: id,
+        data: rest,
+        previousData: rest,
+      });
+      toast({ title: "Entry deleted" });
+      setEditingEntry(null);
+      if (previousModeRef.current) { setMode(previousModeRef.current); previousModeRef.current = null; }
     },
   });
 
@@ -658,6 +684,28 @@ function SessionWorkspace({
             })()}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
               <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => { setEditingEntry(null); if (previousModeRef.current) { setMode(previousModeRef.current); previousModeRef.current = null; } }} onUndoableSave={pushUndo} canEdit={canEditSession} />
+              {canEditSession && (
+                <div className="mt-4 pt-4 border-t border-destructive/20">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="w-full" data-testid="button-delete-entry-modal">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Entry
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Entry?</AlertDialogTitle>
+                        <AlertDialogDescription>This entry will be permanently removed.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteEditingEntry.mutate({ id: editingEntry.id, entry: editingEntry })}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
