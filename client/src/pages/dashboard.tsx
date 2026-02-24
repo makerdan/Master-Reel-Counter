@@ -756,7 +756,7 @@ export default function Dashboard() {
                       <DropdownMenuSubTrigger data-testid={`menu-move-session-${session.id}`}>
                         <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
                       </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent collisionPadding={16} sideOffset={2} alignOffset={-5} className="max-w-[calc(100vw-2rem)]">
+                      <DropdownMenuSubContent collisionPadding={8}>
                         {session.folderId && (
                           <DropdownMenuItem
                             onClick={(e) => {
@@ -888,7 +888,7 @@ export default function Dashboard() {
                 <DropdownMenuSubTrigger data-testid={`menu-move-folder-${folder.id}`}>
                   <FolderInput className="h-4 w-4 mr-2" /> Move to Folder
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent collisionPadding={16} sideOffset={2} alignOffset={-5} className="max-w-[calc(100vw-2rem)]">
+                <DropdownMenuSubContent collisionPadding={8}>
                   {folder.parentFolderId && (
                     <DropdownMenuItem
                       onClick={() => moveFolder.mutate({ id: folder.id, parentFolderId: null })}
