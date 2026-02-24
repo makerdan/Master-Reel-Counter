@@ -973,68 +973,115 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   return (
     <div className="space-y-4 rounded-md border-2 border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4">
-      <div className="flex items-end gap-2 flex-wrap">
-        <div>
-          <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Aisle:</label>
-          <Input
-            value={aisle}
-            onChange={(e) => {
-              let val = e.target.value;
-              if (val.toLowerCase() === "rec") val = "Receiving";
-              setAisle(val);
-              setUploadedPhotos(prev => prev.map((p, i) => i === currentPhotoIdx ? { ...p, aisle: val } : p));
-              const photoDbId = currentPhoto?.dbId;
-              if (aisleSaveTimer.current) clearTimeout(aisleSaveTimer.current);
-              if (photoDbId) {
-                aisleSaveTimer.current = setTimeout(async () => {
-                  try {
-                    await apiRequest("PATCH", `/api/photos/${photoDbId}`, { aisle: val });
-                  } catch {}
-                }, 800);
-              }
-            }}
-            placeholder="Aisle..."
-            className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
-            enterKeyHint="next"
-            data-testid="input-photo-aisle"
-          />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
+      <div className="space-y-2 sm:space-y-0">
+        <div className="flex items-end gap-2 flex-wrap">
+          <div>
+            <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Aisle:</label>
+            <Input
+              value={aisle}
+              onChange={(e) => {
+                let val = e.target.value;
+                if (val.toLowerCase() === "rec") val = "Receiving";
+                setAisle(val);
+                setUploadedPhotos(prev => prev.map((p, i) => i === currentPhotoIdx ? { ...p, aisle: val } : p));
+                const photoDbId = currentPhoto?.dbId;
+                if (aisleSaveTimer.current) clearTimeout(aisleSaveTimer.current);
+                if (photoDbId) {
+                  aisleSaveTimer.current = setTimeout(async () => {
+                    try {
+                      await apiRequest("PATCH", `/api/photos/${photoDbId}`, { aisle: val });
+                    } catch {}
+                  }, 800);
+                }
+              }}
+              placeholder="Aisle..."
+              className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
+              enterKeyHint="next"
+              data-testid="input-photo-aisle"
+            />
+          </div>
+          <div className="sm:hidden">
+            <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Section:</label>
+            <Input
+              value={currentPhoto?.section || ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                const photoDbId = currentPhoto?.dbId;
+                setUploadedPhotos((prev) =>
+                  prev.map((p, i) => i === currentPhotoIdx ? { ...p, section: val } : p)
+                );
+                if (sectionSaveTimer.current) clearTimeout(sectionSaveTimer.current);
+                if (photoDbId) {
+                  sectionSaveTimer.current = setTimeout(async () => {
+                    try {
+                      await apiRequest("PATCH", `/api/photos/${photoDbId}`, { section: val });
+                    } catch {}
+                  }, 800);
+                }
+              }}
+              placeholder="Sec..."
+              className={`w-14 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
+              enterKeyHint="done"
+              data-testid="input-photo-section-top"
+            />
+          </div>
+          <div className="hidden sm:flex items-center gap-2">
+            <Button
+              className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading || !canEdit}
+              data-testid="button-upload-photos"
+              title="Upload Photos"
+            >
+              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4 mr-1" />}
+              Upload Photos
+            </Button>
+            <Button
+              className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={isUploading || !canEdit}
+              data-testid="button-take-photo"
+              title="Take Photo"
+            >
+              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4 mr-1" />}
+              Take Photo
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
+        <div className="flex sm:hidden items-center gap-2">
           <Button
             className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading || !canEdit}
-            data-testid="button-upload-photos"
+            data-testid="button-upload-photos-mobile"
             title="Upload Photos"
           >
-            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4 sm:mr-1" />}
-            <span className="hidden sm:inline">Upload Photos</span>
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
           </Button>
           <Button
             className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
             onClick={() => cameraInputRef.current?.click()}
             disabled={isUploading || !canEdit}
-            data-testid="button-take-photo"
+            data-testid="button-take-photo-mobile"
             title="Take Photo"
           >
-            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4 sm:mr-1" />}
-            <span className="hidden sm:inline">Take Photo</span>
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
           </Button>
         </div>
       </div>
