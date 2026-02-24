@@ -244,7 +244,7 @@ export default function TeamDialog({
               <Button
                 size="sm"
                 variant="outline"
-                className="border border-white/20"
+                className="border border-white"
                 onClick={() => generateLink.mutate()}
                 disabled={generateLink.isPending}
                 data-testid="button-generate-link"
@@ -309,7 +309,7 @@ export default function TeamDialog({
               >
                 <Input
                   type="email"
-                  placeholder="Send to [Email Address]"
+                  placeholder="Send to Email..."
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="min-w-0"
