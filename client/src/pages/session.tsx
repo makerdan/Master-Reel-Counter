@@ -454,24 +454,7 @@ function SessionWorkspace({
             {isOwner && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team" className="gap-1">
-                    {onlineUsers.length > 0 && (
-                      <div className="flex sm:hidden items-center -space-x-1.5 mr-0.5" data-testid="online-users-mobile">
-                        {onlineUsers.slice(0, 2).map((u, i) => (
-                          <div
-                            key={u.userId}
-                            className="relative w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[9px] font-bold uppercase border border-background"
-                            data-testid={`avatar-online-mobile-${i}`}
-                          >
-                            {u.username.charAt(0)}
-                            <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 border border-background" />
-                          </div>
-                        ))}
-                        {onlineUsers.length > 2 && (
-                          <span className="text-[9px] text-muted-foreground ml-1">+{onlineUsers.length - 2}</span>
-                        )}
-                      </div>
-                    )}
+                  <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team">
                     <Users className="h-4 w-4 sm:mr-1" />
                     <span className="hidden sm:inline">Team</span>
                   </Button>
@@ -729,6 +712,7 @@ function SessionWorkspace({
         sessionId={sessionId}
         sessionName={session.name}
         isOwner={(session as any).role === "owner"}
+        onlineUsers={onlineUsers}
       />
     </div>
   );

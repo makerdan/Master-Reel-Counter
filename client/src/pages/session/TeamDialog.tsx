@@ -24,14 +24,17 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Collaborator, InviteLink } from "@shared/schema";
 
+type OnlineUser = { userId: string; username: string };
+
 export default function TeamDialog({
-  open, onOpenChange, sessionId, sessionName, isOwner,
+  open, onOpenChange, sessionId, sessionName, isOwner, onlineUsers = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sessionId: number;
   sessionName: string;
   isOwner: boolean;
+  onlineUsers?: OnlineUser[];
 }) {
   const { toast } = useToast();
   const [username, setUsername] = useState("");
@@ -178,6 +181,23 @@ export default function TeamDialog({
             </DialogTitle>
           </DialogHeader>
 
+          {onlineUsers.length > 0 && (
+            <div className="flex items-center gap-2 px-1 py-1.5 rounded-md bg-muted/50" data-testid="online-users-section">
+              <span className="text-xs text-muted-foreground font-medium shrink-0">Online:</span>
+              <div className="flex items-center gap-1 flex-wrap">
+                {onlineUsers.map((u) => (
+                  <div key={u.userId} className="flex items-center gap-1 text-xs" data-testid={`online-user-${u.userId}`}>
+                    <div className="relative w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[9px] font-bold uppercase border border-background">
+                      {u.username.charAt(0)}
+                      <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 border border-background" />
+                    </div>
+                    <span className="text-foreground">{u.username}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Tabs defaultValue="username" className="w-full">
             <TabsList className="w-full" data-testid="tabs-invite-method">
               <TabsTrigger value="username" className="flex-1" data-testid="tab-invite-username">
@@ -185,12 +205,12 @@ export default function TeamDialog({
                 Username
               </TabsTrigger>
               <TabsTrigger value="link" className="flex-1" data-testid="tab-invite-link">
-                <Link className="h-3 w-3 mr-1" />
-                Share Link
+                <Link className="h-3 w-3 sm:mr-1" />
+                <span className="hidden sm:inline">Share Link</span>
               </TabsTrigger>
               <TabsTrigger value="email" className="flex-1" data-testid="tab-invite-email">
-                <Mail className="h-3 w-3 mr-1" />
-                Email
+                <Mail className="h-3 w-3 sm:mr-1" />
+                <span className="hidden sm:inline">Email</span>
               </TabsTrigger>
             </TabsList>
 
@@ -206,6 +226,7 @@ export default function TeamDialog({
                   placeholder="Replit username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  className="min-w-0"
                   data-testid="input-collaborator-username"
                 />
                 <Button
@@ -290,6 +311,7 @@ export default function TeamDialog({
                   placeholder="Email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="min-w-0"
                   data-testid="input-invite-email"
                 />
                 <Button
