@@ -445,7 +445,7 @@ function SessionWorkspace({
             )}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={undo} disabled={!canUndo} data-testid="button-undo" className="h-8 w-8">
+                <Button size="icon" variant="ghost" onClick={undo} disabled={!canUndo} data-testid="button-undo" className="hidden sm:inline-flex h-8 w-8">
                   <Undo2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -453,7 +453,7 @@ function SessionWorkspace({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={redo} disabled={!canRedo} data-testid="button-redo" className="h-8 w-8">
+                <Button size="icon" variant="ghost" onClick={redo} disabled={!canRedo} data-testid="button-redo" className="hidden sm:inline-flex h-8 w-8">
                   <Redo2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -523,7 +523,13 @@ function SessionWorkspace({
             <HelpMenu mode={captureMode ? "mobile" : "full"} />
           </div>
         </div>
-        <div className="sm:hidden border-t border-border/50 px-4 py-1 text-center" data-testid="header-mobile-date">
+        <div className="sm:hidden border-t border-border/50 px-4 py-1 flex items-center justify-center gap-1" data-testid="header-mobile-date">
+          <Button size="icon" variant="ghost" onClick={undo} disabled={!canUndo} data-testid="button-undo-mobile" className="h-6 w-6" title="Undo" aria-label="Undo">
+            <Undo2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={redo} disabled={!canRedo} data-testid="button-redo-mobile" className="h-6 w-6" title="Redo" aria-label="Redo">
+            <Redo2 className="h-3.5 w-3.5" />
+          </Button>
           <span className="mono text-xs text-muted-foreground">{formatSessionTimeMobile(session.firstPhotoAt, session.lastPhotoAt, tz)}</span>
         </div>
       </header>

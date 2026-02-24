@@ -68,7 +68,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
         </Button>
         <h2 className="text-lg font-semibold flex items-center gap-2" data-testid="text-flagged-heading">
           <Flag className="h-5 w-5 text-yellow-500" />
-          Flagged Reels
+          <span className="sm:hidden">Flagged</span>
+          <span className="hidden sm:inline">Flagged Reels</span>
           <Badge variant="secondary" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
         </h2>
         <div className="ml-auto">

@@ -1064,7 +1064,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             </Button>
           </div>
         </div>
-        <div className="flex sm:hidden items-center gap-2">
+        <div className="flex sm:hidden items-center gap-4">
           <Button
             className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
             onClick={() => fileInputRef.current?.click()}
@@ -1711,7 +1711,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         key={pin.id}
                         data-testid={`pin-entry-row-${index}`}
                         className={`${selectedPinId === pin.id ? "ring-1 ring-primary/40" : ""} ${pin.flagged ? "flagged-row" : ""}`}
-                        onClick={() => setSelectedPinId(pin.id)}
                       >
                         <td>
                           <span className="pin-position-cell">{pin.label}</span>
@@ -1810,6 +1809,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           <select
                             value={pin.vendorCode || ""}
                             onChange={(e) => updatePinField(pin.id, "vendorCode", e.target.value)}
+                            onFocus={() => setSelectedPinId(null)}
                             data-testid={`select-vendor-code-${index}`}
                           >
                             <option value="">--</option>
@@ -1824,6 +1824,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             type="number"
                             value={pin.footage ?? ""}
                             onChange={(e) => updatePinField(pin.id, "footage", e.target.value ? parseInt(e.target.value) : undefined)}
+                            onFocus={() => setSelectedPinId(null)}
                             min={0}
                             inputMode="decimal"
                             autoComplete="off"
@@ -1835,6 +1836,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             type="number"
                             value={pin.reelCount}
                             onChange={(e) => updatePinField(pin.id, "reelCount", Math.max(1, parseInt(e.target.value) || 1))}
+                            onFocus={() => setSelectedPinId(null)}
                             min={1}
                             inputMode="numeric"
                             autoComplete="off"
