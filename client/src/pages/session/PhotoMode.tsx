@@ -990,7 +990,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         onChange={handleFileUpload}
       />
       <div className="space-y-2 sm:space-y-0">
-        <div className="flex items-end gap-2 flex-wrap">
+        <div className="flex items-end gap-2 flex-wrap justify-center sm:justify-start">
           <div>
             <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Aisle:</label>
             <Input
