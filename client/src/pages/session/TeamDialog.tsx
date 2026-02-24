@@ -244,7 +244,7 @@ export default function TeamDialog({
               <Button
                 size="sm"
                 variant="outline"
-                className="border border-input"
+                className="[border-color:hsl(var(--input))]"
                 onClick={() => generateLink.mutate()}
                 disabled={generateLink.isPending}
                 data-testid="button-generate-link"
