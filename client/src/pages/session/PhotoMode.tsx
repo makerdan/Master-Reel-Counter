@@ -1150,7 +1150,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   </Button>
                 )}
               </div>
-              <div className="flex-1 flex justify-end gap-2">
+              <div className="hidden sm:flex flex-1 justify-end gap-2">
                 <div>
                   <label className="block text-xs font-bold text-white dark:text-white mb-1">Section:</label>
                   <Input
@@ -1171,7 +1171,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       }
                     }}
                     placeholder="Section..."
-                    className={`w-14 sm:w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
+                    className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
                     enterKeyHint="done"
                     data-testid="input-photo-section"
                   />
