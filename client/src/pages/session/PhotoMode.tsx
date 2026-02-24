@@ -989,6 +989,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         className="hidden"
         onChange={handleFileUpload}
       />
+      <h2 className="sm:hidden text-lg font-semibold underline text-center mb-2">Full Mode</h2>
       <div className="space-y-2 sm:space-y-0">
         <div className="flex items-end gap-2 flex-wrap justify-center sm:justify-start">
           <div>
