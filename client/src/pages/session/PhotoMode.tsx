@@ -1064,7 +1064,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             </Button>
           </div>
         </div>
-        <div className="flex sm:hidden items-center gap-4">
+        <div className="flex sm:hidden items-center justify-center gap-4">
           <Button
             className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
             onClick={() => fileInputRef.current?.click()}
