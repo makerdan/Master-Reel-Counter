@@ -1258,7 +1258,7 @@ export default function Dashboard() {
                 >
                   <ChevronRight className="h-4 w-4 text-primary" />
                   <span className="text-sm">Continue: <strong>{lastSession.name}</strong></span>
-                  {lastSession.location && <span className="text-xs text-muted-foreground">({lastSession.location})</span>}
+                  {lastSession.location && <span className="hidden sm:inline text-xs text-muted-foreground">({lastSession.location})</span>}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
