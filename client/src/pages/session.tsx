@@ -33,7 +33,7 @@ import FlaggedReels from "./session/FlaggedReels";
 import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename } from "./session/utils";
 import { useTimezone } from "@/hooks/use-timezone";
-import { formatSessionTimeWithTz, formatTimestamp } from "@/lib/timezone";
+import { formatSessionTimeWithTz, formatSessionTimeMobile, formatTimestamp } from "@/lib/timezone";
 import { useUndoRedo } from "@/hooks/use-undo";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
 import { useAuth } from "@/hooks/use-auth";
@@ -401,7 +401,8 @@ function SessionWorkspace({
             </Tooltip>
             <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditDescription((session as any).description || ""); setEditSessionOpen(true); }}>
               <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
-              <span className="mono text-xs text-muted-foreground" data-testid="text-session-time">{formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz, captureMode)}</span>
+              <span className="mono text-xs text-muted-foreground sm:hidden" data-testid="text-session-time-mobile">{formatSessionTimeMobile(session.firstPhotoAt, session.lastPhotoAt, tz)}</span>
+              <span className="mono text-xs text-muted-foreground hidden sm:inline" data-testid="text-session-time">{formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz, captureMode)}</span>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">

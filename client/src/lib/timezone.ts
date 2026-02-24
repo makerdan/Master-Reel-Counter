@@ -31,6 +31,29 @@ export function formatDateOnly(date: string | Date, tz: string): string {
   return d.toLocaleString("en-US", { timeZone: tz, month: "short", day: "numeric" });
 }
 
+export function formatDateShort(date: string | Date, tz: string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "2-digit", day: "2-digit", year: "2-digit" }).format(d);
+  return parts;
+}
+
+export function formatSessionTimeMobile(
+  firstPhotoAt: string | Date | null,
+  lastPhotoAt: string | Date | null,
+  tz: string,
+): string {
+  if (!firstPhotoAt) return "No photos yet";
+  const dateStr = formatDateShort(firstPhotoAt, tz);
+  if (!lastPhotoAt || new Date(firstPhotoAt).getTime() === new Date(lastPhotoAt).getTime()) {
+    return `${dateStr} · 0m`;
+  }
+  const diff = new Date(lastPhotoAt).getTime() - new Date(firstPhotoAt).getTime();
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const elapsed = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  return `${dateStr} · ${elapsed}`;
+}
+
 export function formatTimeOnly(date: string | Date, tz: string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleString("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
