@@ -1652,9 +1652,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             );
           })()}
 
-          {localPins.length > 0 && (
-            <div className="space-y-3">
-              {selectedPinId && currentPhoto && (() => {
+          <div className="space-y-3">
+              {selectedPinId && localPins.length > 0 && currentPhoto && (() => {
                 const selectedPin = localPins.find(p => p.id === selectedPinId);
                 if (!selectedPin) return null;
                 return (
@@ -1924,8 +1923,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   Clear All
                 </Button>
               </div>
-            </div>
-          )}
+          </div>
         </>
       )}
 
