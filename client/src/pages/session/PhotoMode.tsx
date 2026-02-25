@@ -1139,17 +1139,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 >
                   <ChevronRight className="h-5 w-5" />
                 </Button>
-                {totalIncompletePins > 0 && (
-                  <Button
-                    size="sm"
-                    className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)] ml-1"
-                    onClick={navigateToNextIncomplete}
-                    data-testid="button-next-incomplete"
-                  >
-                    <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                    <span className="text-xs font-semibold">Next Reel ({totalIncompletePins})</span>
-                  </Button>
-                )}
               </div>
               <div className="flex-1 sm:hidden" />
               <div className="hidden sm:flex flex-1 justify-end gap-2">
@@ -1485,17 +1474,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   >
                     <ChevronRight className="h-5 w-5" />
                   </Button>
-                  {totalIncompletePins > 0 && (
-                    <Button
-                      size="sm"
-                      className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)] ml-1"
-                      onClick={navigateToNextIncomplete}
-                      data-testid="button-next-incomplete-bottom"
-                    >
-                      <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                      <span className="text-xs font-semibold">Next Reel ({totalIncompletePins})</span>
-                    </Button>
-                  )}
                 </div>
                 <div className="flex-1 flex justify-end">
                 <AlertDialog>
@@ -1909,6 +1887,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Add Reel(s) from Image
                 </Button>
+                {totalIncompletePins > 0 && (
+                  <Button
+                    size="sm"
+                    className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
+                    onClick={navigateToNextIncomplete}
+                    data-testid="button-next-incomplete"
+                  >
+                    <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                    <span className="text-xs font-semibold">Next Reel ({totalIncompletePins})</span>
+                  </Button>
+                )}
               </div>
               {!aisle && (
                 <p className="text-xs text-center text-muted-foreground" data-testid="text-create-entries-hint">

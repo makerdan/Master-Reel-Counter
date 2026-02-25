@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Focus, X, ZoomIn, ZoomOut } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Focus, X, ZoomIn, ZoomOut, RotateCw, RotateCcw } from "lucide-react";
 
 interface ReelCropPreviewProps {
   photoUrl: string;
@@ -17,6 +17,8 @@ const ZOOM_STEP = 0.03;
 const PRESET_CLOSEUP = 0.15;
 const PRESET_WIDE = 0.40;
 
+type Rotation = 0 | 90 | 180 | 270;
+
 export default function ReelCropPreview({
   photoUrl,
   pinX,
@@ -28,8 +30,16 @@ export default function ReelCropPreview({
 }: ReelCropPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const DISPLAY_SIZE = 320;
+  const [rotation, setRotation] = useState<Rotation>(0);
 
   const clamp = (v: number) => Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v)) * 100) / 100;
+
+  const rotateCw = () => setRotation(r => ((r + 90) % 360) as Rotation);
+  const rotateCcw = () => setRotation(r => ((r + 270) % 360) as Rotation);
+
+  useEffect(() => {
+    setRotation(0);
+  }, [photoUrl, pinX, pinY]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,13 +57,20 @@ export default function ReelCropPreview({
       let sy = cy - cropH / 2;
       sx = Math.max(0, Math.min(sx, img.width - cropW));
       sy = Math.max(0, Math.min(sy, img.height - cropH));
-      canvas.width = DISPLAY_SIZE * 2;
-      canvas.height = DISPLAY_SIZE * 2;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+
+      const D = DISPLAY_SIZE * 2;
+      canvas.width = D;
+      canvas.height = D;
+      ctx.clearRect(0, 0, D, D);
+
+      ctx.save();
+      ctx.translate(D / 2, D / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.drawImage(img, sx, sy, cropW, cropH, -D / 2, -D / 2, D, D);
+      ctx.restore();
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY, zoomLevel]);
+  }, [photoUrl, pinX, pinY, zoomLevel, rotation]);
 
   const isCloseup = Math.abs(zoomLevel - PRESET_CLOSEUP) < 0.01;
   const isWide = Math.abs(zoomLevel - PRESET_WIDE) < 0.01;
@@ -108,6 +125,25 @@ export default function ReelCropPreview({
             title="Zoom out"
           >
             <ZoomOut className="h-3.5 w-3.5" />
+          </button>
+          <div className="w-px h-3.5 bg-border mx-0.5" />
+          <button
+            type="button"
+            className="p-0.5 rounded text-muted-foreground hover-elevate"
+            onClick={rotateCcw}
+            data-testid="button-rotate-ccw"
+            title="Rotate counterclockwise"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className="p-0.5 rounded text-muted-foreground hover-elevate"
+            onClick={rotateCw}
+            data-testid="button-rotate-cw"
+            title="Rotate clockwise"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
           </button>
           {onClose && (
             <button
