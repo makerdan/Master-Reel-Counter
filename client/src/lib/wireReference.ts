@@ -344,6 +344,7 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "COP", catalog: "THHN600GY2000", description: "THHN 600 STR GRAY 2000'" },
   { vendor: "COP", catalog: "THHN600RD2000", description: "THHN 600 STR RED 2000'" },
   { vendor: "COP", catalog: "THHN600BR2000", description: "THHN 600 KCMIL WIRE CABLE BROWN AT 2000 FT" },
+  { vendor: "COP", catalog: "THHN600OR2000", description: "THHN 600 KCMIL WIRE CABLE ORANGE AT 2000 FT" },
   { vendor: "COP", catalog: "THHN600YL2000", description: "THHN 600 STR YELLOW 2000'" },
   { vendor: "COP", catalog: "THHN6BK5000", description: "THHN 6 STR BLACK 5000'" },
   { vendor: "COP", catalog: "THHN6GN2500", description: "THHN 6 STR GREEN 2500'" },
