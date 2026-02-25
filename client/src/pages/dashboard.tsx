@@ -642,21 +642,21 @@ export default function Dashboard() {
                   </Badge>
                 ))}
               </div>
-              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+              <div className="flex items-start gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
                 {isShared && (session as SharedSessionWithStats).ownerUsername && (
-                  <span className="flex items-center gap-1" data-testid={`text-shared-session-owner-${session.id}`}>
-                    <Users className="h-3 w-3" />
+                  <span className="flex items-baseline gap-1" data-testid={`text-shared-session-owner-${session.id}`}>
+                    <Users className="h-3 w-3 shrink-0 translate-y-px" />
                     {(session as SharedSessionWithStats).ownerUsername}
                   </span>
                 )}
                 {session.location && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
+                  <span className="flex items-baseline gap-1">
+                    <MapPin className="h-3 w-3 shrink-0 translate-y-px" />
                     {session.location}
                   </span>
                 )}
-                <span className="flex items-center gap-1" data-testid={`text-${prefix}session-time-${session.id}`}>
-                  <Clock className="h-3 w-3" />
+                <span className="flex items-baseline gap-1" data-testid={`text-${prefix}session-time-${session.id}`}>
+                  <Clock className="h-3 w-3 shrink-0 translate-y-px" />
                   {session.firstPhotoAt
                     ? `${formatDate(session.firstPhotoAt)}${session.lastPhotoAt && session.lastPhotoAt !== session.firstPhotoAt ? ` - ${formatDate(session.lastPhotoAt)}` : ""}`
                     : "No photos yet"}
@@ -665,23 +665,23 @@ export default function Dashboard() {
                     return elapsed ? <span className="ml-1 mono" data-testid={`badge-${prefix}session-elapsed-${session.id}`}>({elapsed})</span> : null;
                   })()}
                 </span>
-                <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-photos-${session.id}`}>
-                  <Camera className="h-3 w-3" />
+                <span className="flex items-baseline gap-1 mono" data-testid={`text-${prefix}session-photos-${session.id}`}>
+                  <Camera className="h-3 w-3 shrink-0 translate-y-px" />
                   {session.photoCount} photos
                 </span>
                 {session.sectionCount > 0 && (
-                  <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-sections-${session.id}`}>
-                    <Layers className="h-3 w-3" />
+                  <span className="flex items-baseline gap-1 mono" data-testid={`text-${prefix}session-sections-${session.id}`}>
+                    <Layers className="h-3 w-3 shrink-0 translate-y-px" />
                     {session.sectionCount} sections
                   </span>
                 )}
-                <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-entries-${session.id}`}>
-                  <Hash className="h-3 w-3" />
+                <span className="flex items-baseline gap-1 mono" data-testid={`text-${prefix}session-entries-${session.id}`}>
+                  <Hash className="h-3 w-3 shrink-0 translate-y-px" />
                   {session.entryCount} reels
                 </span>
                 {session.totalFootage > 0 && (
-                  <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-footage-${session.id}`}>
-                    <Ruler className="h-3 w-3" />
+                  <span className="flex items-baseline gap-1 mono" data-testid={`text-${prefix}session-footage-${session.id}`}>
+                    <Ruler className="h-3 w-3 shrink-0 translate-y-px" />
                     {session.totalFootage.toLocaleString()} ft
                   </span>
                 )}
