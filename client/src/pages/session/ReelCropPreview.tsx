@@ -11,8 +11,8 @@ interface ReelCropPreviewProps {
   onClose?: () => void;
 }
 
-const ZOOM_MIN = 0.05;
-const ZOOM_MAX = 0.50;
+const ZOOM_MIN = 0.01;
+const ZOOM_MAX = 0.90;
 const ZOOM_STEP = 0.03;
 const PRESET_CLOSEUP = 0.15;
 const PRESET_WIDE = 0.40;
