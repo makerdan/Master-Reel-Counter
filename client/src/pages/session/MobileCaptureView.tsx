@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Camera, X, Loader2, AlertTriangle, Check,
-  ImagePlus, RotateCw, ChevronLeft, Smartphone,
+  ImagePlus, RotateCw, ChevronLeft, Smartphone, Plus, Minus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -540,6 +540,36 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 data-testid="input-mobile-section"
                 onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.blur(); } }}
               />
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className={`flex-1${captureSettings?.largerTouchTargets ? " min-h-[56px] text-base" : ""}`}
+                  data-testid="button-section-decrement"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    const cur = parseInt(section, 10);
+                    const val = isNaN(cur) ? 0 : Math.max(0, cur - 1);
+                    setSection(String(val).padStart(Math.max(section.length, 1), "0"));
+                  }}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className={`flex-1${captureSettings?.largerTouchTargets ? " min-h-[56px] text-base" : ""}`}
+                  data-testid="button-section-increment"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    const cur = parseInt(section, 10);
+                    const val = isNaN(cur) ? 1 : cur + 1;
+                    setSection(String(val).padStart(Math.max(section.length, 1), "0"));
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </form>
 
