@@ -57,6 +57,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }
 
   const totalIncompletePins = incompletePinsData ? incompletePinsData.reduce((sum, item) => sum + item.incompleteCount, 0) : 0;
+  const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
+  const nextReelCount = localUnfilledCount > 0 ? localUnfilledCount : totalIncompletePins;
 
   useEffect(() => {
     if (viewingNearbyIdx !== null && viewingNearbyIdx >= uploadedPhotos.length) {
@@ -1886,7 +1888,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Add Reel(s) from Image
                 </Button>
-                {totalIncompletePins > 0 && (
+                {nextReelCount > 0 && (
                   <Button
                     size="sm"
                     className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
@@ -1894,7 +1896,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     data-testid="button-next-incomplete"
                   >
                     <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                    <span className="text-xs font-semibold">Next Reel ({totalIncompletePins})</span>
+                    <span className="text-xs font-semibold">Next Reel ({nextReelCount})</span>
                   </Button>
                 )}
               </div>
