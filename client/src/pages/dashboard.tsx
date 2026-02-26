@@ -849,7 +849,6 @@ export default function Dashboard() {
       <Collapsible
         key={folder.id}
         open={!isCollapsed}
-        onOpenChange={() => toggleFolderCollapse(folder.id)}
       >
         <div className="border border-red-500/60 rounded-md p-3">
         <div className="flex items-start gap-2 group" data-testid={`folder-header-${folder.id}`}>
