@@ -852,7 +852,7 @@ export default function Dashboard() {
       >
         <div className="border border-red-500/60 rounded-md p-3">
         <div className="flex items-start gap-2 group" data-testid={`folder-header-${folder.id}`}>
-          <Button variant="ghost" size="sm" className="gap-2 px-2 items-start h-auto touch-manipulation" data-testid={`button-toggle-folder-${folder.id}`} title="Toggle folder" onClick={() => toggleFolderCollapse(folder.id)}>
+          <Button variant="ghost" size="sm" className="gap-2 px-2 items-start h-auto touch-manipulation" data-testid={`button-toggle-folder-${folder.id}`} title="Toggle folder" onPointerDown={(e) => { e.preventDefault(); toggleFolderCollapse(folder.id); }}>
               {isCollapsed ? <Folder className="h-4 w-4 text-primary shrink-0 mt-0.5" /> : <FolderOpen className="h-4 w-4 text-primary shrink-0 mt-0.5" />}
               <span className="font-semibold text-base text-left">{folder.name}</span>
               <Badge variant="secondary" className="ml-1 no-default-hover-elevate no-default-active-elevate text-xs shrink-0 mt-0.5">
