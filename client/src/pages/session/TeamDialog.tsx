@@ -205,16 +205,17 @@ export default function TeamDialog({
                 Username
               </TabsTrigger>
               <TabsTrigger value="link" className="flex-1 border border-white/20" data-testid="tab-invite-link">
-                <Link className="h-3 w-3 sm:mr-1" />
-                <span className="hidden sm:inline">Share Link</span>
+                <Link className="h-3 w-3 mr-1" />
+                Share Link
               </TabsTrigger>
               <TabsTrigger value="email" className="flex-1 border border-white/20" data-testid="tab-invite-email">
-                <Mail className="h-3 w-3 sm:mr-1" />
-                <span className="hidden sm:inline">Email</span>
+                <Mail className="h-3 w-3 mr-1" />
+                Email
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="username" className="space-y-3 mt-3">
+              <p className="text-xs text-muted-foreground">Add a teammate directly by their Replit username. They'll get immediate access.</p>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -241,6 +242,7 @@ export default function TeamDialog({
             </TabsContent>
 
             <TabsContent value="link" className="space-y-3 mt-3">
+              <p className="text-xs text-muted-foreground">Generate a shareable link. Anyone with the link can join this session — no Replit account required.</p>
               <Button
                 size="sm"
                 variant="outline"
@@ -300,6 +302,7 @@ export default function TeamDialog({
             </TabsContent>
 
             <TabsContent value="email" className="space-y-3 mt-3">
+              <p className="text-xs text-muted-foreground">Open your email client with a pre-filled invite message and a join link for this session.</p>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
