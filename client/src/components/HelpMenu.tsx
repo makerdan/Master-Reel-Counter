@@ -353,7 +353,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={AlertCircle} />}
             label="Next Reel Button"
-            description="Appears when there are pins without wire details filled in. Jumps to the next photo with incomplete pins and scrolls to the entry table so you can start filling in details immediately. The orange badge shows the total count of incomplete pins."
+            description="Appears when there are pins without wire details filled in. Jumps to the next photo with incomplete pins and scrolls to the entry table so you can start filling in details immediately. The count updates live as you fill in rows — ticking down in real-time on the current photo, then falling back to the total across all photos."
           />
 
           <Separator className="my-2" />
@@ -604,7 +604,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={Users} />}
             label="Three Invite Methods"
-            description="Invite by username (search and add directly), shareable link (anyone with the link can join), or email invitation. Each method is accessible from the Team dialog."
+            description="Invite by Username (adds by Replit username for immediate access), Share Link (generates a link anyone can use — no account required), or Email (opens your email client with a pre-filled invite). Each tab shows a description of what it does."
           />
           <FeatureRow
             icon={<span className="text-xs font-bold text-[hsl(18_70%_50%)]">R</span>}
@@ -682,7 +682,12 @@ export function MobileFlowSections() {
           <FeatureRow
             icon={<HelpIcon icon={Pencil} />}
             label="Aisle & Section"
-            description="Enter the aisle and section before taking photos. Aisle is required. These values tag every photo you capture until you change them. The aisle field highlights orange when empty as a reminder."
+            description='Enter the aisle and section before taking photos. Aisle is required — a red underlined warning appears until it is filled in. These values tag every photo you capture until you change them.'
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">+/−</span>}
+            label="Section Stepper Buttons"
+            description="Two buttons below the Section field increment or decrement the section number by 1. Whole integers only — the value cannot go below 0. Zero-padding is preserved (e.g. 003 → 002 or 004)."
           />
           <FeatureRow
             icon={<HelpIcon icon={Camera} />}
@@ -780,6 +785,7 @@ export function MobileFlowSections() {
         </AccordionTrigger>
         <AccordionContent className="space-y-2 pb-4 text-[11px] text-muted-foreground leading-relaxed">
           <p><span className="font-semibold text-foreground">Speed Workflow:</span> Set your aisle and section, then rapidly tap "Take Photo" to capture multiple angles. The upload queue handles everything in the background.</p>
+          <p><span className="font-semibold text-foreground">Section Stepper:</span> Use the +/− buttons below the Section field to quickly move between sections by one. Zero-padding is preserved automatically, and the value can't go below 0.</p>
           <p><span className="font-semibold text-foreground">Receiving Mode:</span> Check the Receiving box for dock areas. Sections auto-number so you never have to type them — just keep snapping photos.</p>
           <p><span className="font-semibold text-foreground">Offline Resilience:</span> Head into low-signal warehouse areas with confidence. Photos queue locally and sync when you get back to connectivity.</p>
           <p><span className="font-semibold text-foreground">Batch Capture:</span> Use the gallery upload button to select multiple photos at once from your camera roll — all will be tagged with the current aisle/section.</p>
