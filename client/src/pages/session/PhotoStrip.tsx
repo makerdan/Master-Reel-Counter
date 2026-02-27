@@ -117,6 +117,10 @@ function PhotoCard({
   };
 
   const handleSectionBlur = () => {
+    if (section.trim() === "") {
+      setSection(sectionRef.current);
+      return;
+    }
     if (section !== sectionRef.current) {
       sectionRef.current = section;
       locationMutation.mutate({ section });
