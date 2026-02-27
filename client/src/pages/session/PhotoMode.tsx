@@ -835,7 +835,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const createEntries = useMutation({
     mutationFn: async () => {
       const allPins = [...localPinsRef.current];
-      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0);
+      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && !p.flagged);
       if (pinsToCommit.length === 0) {
         return [];
       }
