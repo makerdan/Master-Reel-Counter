@@ -218,7 +218,7 @@ function PhotoCard({
           <Button
             size="icon"
             variant="ghost"
-            className="absolute top-1 left-1 h-6 w-6 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+            className="absolute top-1 left-1 h-6 w-6 bg-black/50 text-white hover:bg-black/70"
             onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); }}
             disabled={duplicateMutation.isPending}
             data-testid={`button-strip-duplicate-${photo.id}`}
