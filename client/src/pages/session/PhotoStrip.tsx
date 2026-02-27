@@ -26,6 +26,43 @@ function sortPhotos(photos: Photo[]): Photo[] {
   });
 }
 
+function orderWithDetailShots(photos: Photo[]): Photo[] {
+  const sorted = sortPhotos(photos);
+
+  const detailsByParent = new Map<number, Photo[]>();
+  const mainPhotos: Photo[] = [];
+
+  for (const photo of sorted) {
+    if (photo.isDetailShot && photo.parentPhotoId != null) {
+      if (!detailsByParent.has(photo.parentPhotoId)) {
+        detailsByParent.set(photo.parentPhotoId, []);
+      }
+      detailsByParent.get(photo.parentPhotoId)!.push(photo);
+    } else {
+      mainPhotos.push(photo);
+    }
+  }
+
+  const placed = new Set<number>();
+  const result: Photo[] = [];
+
+  for (const photo of mainPhotos) {
+    result.push(photo);
+    for (const detail of detailsByParent.get(photo.id) || []) {
+      result.push(detail);
+      placed.add(detail.id);
+    }
+  }
+
+  for (const details of detailsByParent.values()) {
+    for (const d of details) {
+      if (!placed.has(d.id)) result.push(d);
+    }
+  }
+
+  return result;
+}
+
 function PhotoCard({
   photo,
   sessionId,
@@ -340,7 +377,7 @@ export default function PhotoStrip({
     );
   }
 
-  const sorted = sortPhotos(photos);
+  const sorted = orderWithDetailShots(photos);
 
   type SectionGroup = { section: string; photos: Photo[] };
   type AisleGroup = { aisle: string; sections: SectionGroup[] };
