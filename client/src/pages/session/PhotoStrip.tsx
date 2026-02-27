@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StickyNote, ExternalLink, Loader2, Link2, X, Copy } from "lucide-react";
+import { StickyNote, ExternalLink, Loader2, Link2, X, Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +89,7 @@ function PhotoCard({
   const [isDetail, setIsDetail] = useState(photo.isDetailShot ?? false);
   const [parentId, setParentId] = useState<number | null>(photo.parentPhotoId ?? null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const aisleRef = useRef(aisle);
   const sectionRef = useRef(section);
   const notesRef = useRef(notes);
@@ -183,6 +184,16 @@ function PhotoCard({
       toast({ title: "Photo duplicated" });
     },
     onError: () => toast({ title: "Failed to duplicate photo", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => apiRequest("DELETE", `/api/photos/${photo.id}`),
+    onSuccess: () => {
+      invalidatePhotos();
+      invalidateEntries();
+      toast({ title: "Photo deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete photo", variant: "destructive" }),
   });
 
   const isSaving = locationMutation.isPending || notesMutation.isPending || detailMutation.isPending || unlinkMutation.isPending || linkMutation.isPending;
@@ -319,6 +330,32 @@ function PhotoCard({
                 ? <Loader2 className="h-3 w-3 animate-spin" />
                 : <Copy className="h-3 w-3" />}
             </button>
+          )}
+
+          {canEdit && (
+            confirmDelete ? (
+              <button
+                className="text-[10px] font-medium text-destructive border border-destructive/50 rounded px-1 py-0 h-4 hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                onPointerDown={(e) => { e.preventDefault(); deleteMutation.mutate(); }}
+                onBlur={() => setConfirmDelete(false)}
+                disabled={deleteMutation.isPending}
+                title="Confirm delete"
+                data-testid={`button-strip-delete-confirm-${photo.id}`}
+                autoFocus
+              >
+                {deleteMutation.isPending ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : "Delete?"}
+              </button>
+            ) : (
+              <button
+                className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                onPointerDown={(e) => { e.preventDefault(); setConfirmDelete(true); }}
+                disabled={deleteMutation.isPending}
+                title="Delete this photo"
+                data-testid={`button-strip-delete-${photo.id}`}
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )
           )}
 
           <button
