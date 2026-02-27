@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StickyNote, ExternalLink, Loader2 } from "lucide-react";
+import { StickyNote, ExternalLink, Loader2, Link2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +30,13 @@ function PhotoCard({
   photo,
   sessionId,
   canEdit,
+  allPhotos,
   onJumpToPhoto,
 }: {
   photo: Photo;
   sessionId: number;
   canEdit: boolean;
+  allPhotos: Photo[];
   onJumpToPhoto: (id: number) => void;
 }) {
   const { toast } = useToast();
@@ -42,18 +44,25 @@ function PhotoCard({
   const [section, setSection] = useState(photo.section || "");
   const [notes, setNotes] = useState(photo.notes || "");
   const [notesOpen, setNotesOpen] = useState(false);
+  const [isDetail, setIsDetail] = useState(photo.isDetailShot ?? false);
+  const [parentId, setParentId] = useState<number | null>(photo.parentPhotoId ?? null);
+  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const aisleRef = useRef(aisle);
   const sectionRef = useRef(section);
   const notesRef = useRef(notes);
+
+  const invalidatePhotos = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+  };
+  const invalidateEntries = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+  };
 
   const locationMutation = useMutation({
     mutationFn: async (update: { aisle?: string; section?: string }) => {
       await apiRequest("PATCH", `/api/photos/${photo.id}`, update);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
-    },
+    onSuccess: () => { invalidatePhotos(); invalidateEntries(); },
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
 
@@ -61,10 +70,43 @@ function PhotoCard({
     mutationFn: async (val: string) => {
       await apiRequest("PATCH", `/api/photos/${photo.id}`, { notes: val });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
-    },
+    onSuccess: invalidatePhotos,
     onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
+  });
+
+  const detailMutation = useMutation({
+    mutationFn: async (val: boolean) => {
+      await apiRequest("PATCH", `/api/photos/${photo.id}`, { isDetailShot: val });
+    },
+    onSuccess: (_data, val) => { setIsDetail(val); invalidatePhotos(); },
+    onError: () => toast({ title: "Failed to update Detail status", variant: "destructive" }),
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("PATCH", `/api/photos/${photo.id}`, { parentPhotoId: null, isDetailShot: false });
+    },
+    onSuccess: () => {
+      setParentId(null);
+      setIsDetail(false);
+      invalidatePhotos();
+      invalidateEntries();
+    },
+    onError: () => toast({ title: "Failed to unlink photo", variant: "destructive" }),
+  });
+
+  const linkMutation = useMutation({
+    mutationFn: async (selectedId: number) => {
+      await apiRequest("PATCH", `/api/photos/${photo.id}`, { parentPhotoId: selectedId, isDetailShot: true });
+    },
+    onSuccess: (_data, selectedId) => {
+      setParentId(selectedId);
+      setIsDetail(true);
+      setLinkPickerOpen(false);
+      invalidatePhotos();
+      invalidateEntries();
+    },
+    onError: () => toast({ title: "Failed to link photo", variant: "destructive" }),
   });
 
   const handleAisleBlur = () => {
@@ -88,8 +130,15 @@ function PhotoCard({
     }
   };
 
-  const isSaving = locationMutation.isPending || notesMutation.isPending;
+  const isSaving = locationMutation.isPending || notesMutation.isPending || detailMutation.isPending || unlinkMutation.isPending || linkMutation.isPending;
   const hasNotes = notes.trim().length > 0;
+
+  const parentPhoto = parentId !== null ? allPhotos.find(p => p.id === parentId) : null;
+  const parentLabel = parentPhoto
+    ? `${parentPhoto.aisle || "—"} / ${parentPhoto.section || "—"}`
+    : "Linked";
+
+  const candidateParents = sortPhotos(allPhotos.filter(p => !p.isDetailShot && p.id !== photo.id));
 
   return (
     <div className="rounded-md border border-border bg-card overflow-hidden group relative flex flex-col" data-testid={`strip-card-${photo.id}`}>
@@ -144,16 +193,62 @@ function PhotoCard({
         </div>
 
         <div className="flex items-center gap-1 flex-wrap">
-          {photo.isDetailShot && (
-            <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 no-default-hover-elevate no-default-active-elevate bg-blue-500/15 text-blue-500 border-blue-500/30">
-              Detail
-            </Badge>
+          {canEdit ? (
+            <button
+              className={`inline-flex items-center rounded px-1 py-0 h-4 text-[10px] font-medium border transition-colors ${
+                isDetail
+                  ? "bg-blue-500/15 text-blue-500 border-blue-500/30 hover:bg-blue-500/25"
+                  : "text-muted-foreground border-dashed border-muted-foreground/40 hover:border-blue-400 hover:text-blue-400"
+              }`}
+              onClick={() => detailMutation.mutate(!isDetail)}
+              disabled={detailMutation.isPending}
+              title={isDetail ? "Remove Detail mark" : "Mark as Detail shot"}
+              data-testid={`button-strip-detail-${photo.id}`}
+            >
+              {isDetail ? "Detail" : "+ Detail"}
+            </button>
+          ) : (
+            isDetail && (
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 no-default-hover-elevate no-default-active-elevate bg-blue-500/15 text-blue-500 border-blue-500/30">
+                Detail
+              </Badge>
+            )
           )}
-          {photo.parentPhotoId && (
-            <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 no-default-hover-elevate no-default-active-elevate">
-              Linked
-            </Badge>
+
+          {parentId !== null ? (
+            <span className="inline-flex items-center gap-0.5">
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1 py-0 h-4 no-default-hover-elevate no-default-active-elevate"
+                title={`Linked to: ${parentLabel}`}
+              >
+                → {parentLabel}
+              </Badge>
+              {canEdit && (
+                <button
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                  onClick={() => unlinkMutation.mutate()}
+                  disabled={unlinkMutation.isPending}
+                  title="Unlink from parent"
+                  data-testid={`button-strip-unlink-${photo.id}`}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
+            </span>
+          ) : (
+            canEdit && (
+              <button
+                className="text-muted-foreground hover:text-primary transition-colors"
+                onClick={() => setLinkPickerOpen((o) => !o)}
+                title="Link to a parent photo"
+                data-testid={`button-strip-link-${photo.id}`}
+              >
+                <Link2 className="h-3 w-3" />
+              </button>
+            )
           )}
+
           <button
             className="ml-auto"
             onClick={() => setNotesOpen((o) => !o)}
@@ -163,6 +258,35 @@ function PhotoCard({
             <StickyNote className={`h-3.5 w-3.5 ${hasNotes ? "text-primary fill-primary/20" : "text-muted-foreground"}`} />
           </button>
         </div>
+
+        {linkPickerOpen && canEdit && parentId === null && (
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Link to parent photo</label>
+            <select
+              className="w-full text-xs rounded border border-border bg-background text-foreground px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+              defaultValue=""
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val)) linkMutation.mutate(val);
+              }}
+              disabled={linkMutation.isPending}
+              data-testid={`select-strip-link-${photo.id}`}
+            >
+              <option value="" disabled>Select a photo…</option>
+              {candidateParents.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.aisle || "—"} / {p.section || "—"}{p.originalFilename ? ` · ${p.originalFilename}` : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              className="text-[10px] text-muted-foreground hover:text-foreground self-end"
+              onClick={() => setLinkPickerOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {notesOpen && (
           <Textarea
@@ -242,6 +366,7 @@ export default function PhotoStrip({
                 photo={photo}
                 sessionId={sessionId}
                 canEdit={canEdit}
+                allPhotos={photos}
                 onJumpToPhoto={onJumpToPhoto}
               />
             ))}
