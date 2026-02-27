@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StickyNote, ExternalLink, Loader2, Link2, X } from "lucide-react";
+import { StickyNote, ExternalLink, Loader2, Link2, X, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,11 @@ import type { Photo } from "@shared/schema";
 
 function photoUrl(key: string): string {
   return key.startsWith("/uploads/") ? key : `/uploads/${key}`;
+}
+
+function photoSeqLabel(photo: Photo): string {
+  const stem = (photo.originalFilename || "").replace(/\.\w+$/, "");
+  return stem.length >= 3 ? stem.slice(-3) : String(photo.id);
 }
 
 function sortPhotos(photos: Photo[]): Photo[] {
@@ -171,6 +176,15 @@ function PhotoCard({
     }
   };
 
+  const duplicateMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", `/api/photos/${photo.id}/duplicate`),
+    onSuccess: () => {
+      invalidatePhotos();
+      toast({ title: "Photo duplicated" });
+    },
+    onError: () => toast({ title: "Failed to duplicate photo", variant: "destructive" }),
+  });
+
   const isSaving = locationMutation.isPending || notesMutation.isPending || detailMutation.isPending || unlinkMutation.isPending || linkMutation.isPending;
   const hasNotes = notes.trim().length > 0;
 
@@ -200,6 +214,24 @@ function PhotoCard({
         >
           <ExternalLink className="h-3 w-3" />
         </Button>
+        {canEdit && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="absolute top-1 left-1 h-6 w-6 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+            onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); }}
+            disabled={duplicateMutation.isPending}
+            data-testid={`button-strip-duplicate-${photo.id}`}
+            title="Duplicate this photo"
+          >
+            {duplicateMutation.isPending
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <Copy className="h-3 w-3" />}
+          </Button>
+        )}
+        <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[10px] font-mono font-semibold px-1 rounded leading-4 select-none pointer-events-none">
+          {photoSeqLabel(photo)}
+        </div>
         {isSaving && (
           <div className="absolute bottom-1 right-1">
             <Loader2 className="h-3 w-3 animate-spin text-white drop-shadow" />
@@ -316,7 +348,7 @@ function PhotoCard({
               <option value="" disabled>Select a photo…</option>
               {candidateParents.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.aisle || "—"} / {p.section || "—"}{p.originalFilename ? ` · ${p.originalFilename}` : ""}
+                  {p.aisle || "—"} / {p.section || "—"} · #{photoSeqLabel(p)}
                 </option>
               ))}
             </select>

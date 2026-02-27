@@ -5,7 +5,8 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos } from "@shared/schema";
+import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
 import PDFDocument from "pdfkit";
@@ -619,6 +620,45 @@ export async function registerRoutes(
       }
     } catch (error) {
       res.status(500).json({ message: "Failed to update photo" });
+    }
+  });
+
+  app.post("/api/photos/:id/duplicate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const original = await storage.getPhoto(parseInt(req.params.id));
+      if (!original) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(original.sessionId, userId);
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to duplicate photos" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
+      const displayName = req.user.claims.name || req.user.claims.username || userId;
+      const [newPhoto] = await db.insert(photos).values({
+        sessionId:        original.sessionId,
+        userId:           userId,
+        uploadedBy:       original.uploadedBy,
+        objectStorageKey: original.objectStorageKey,
+        originalFilename: original.originalFilename,
+        mimeType:         original.mimeType,
+        width:            original.width,
+        height:           original.height,
+        exifTimestamp:    original.exifTimestamp,
+        exifGps:          original.exifGps,
+        rotation:         original.rotation ?? 0,
+        aisle:            original.aisle,
+        section:          original.section,
+        notes:            original.notes,
+        isDetailShot:     original.isDetailShot ?? false,
+        parentPhotoId:    original.parentPhotoId,
+        pinScale:         original.pinScale ?? 1,
+        createdAt:        original.createdAt,
+      }).returning();
+      res.json(newPhoto);
+      broadcastToSession(original.sessionId, { type: "sync", entity: "photos", sessionId: original.sessionId });
+      logActivity(original.sessionId, userId, displayName, "photo_uploaded", "photo", newPhoto.id, (original.originalFilename || "") + " (duplicate)");
+    } catch (error) {
+      res.status(500).json({ message: "Failed to duplicate photo" });
     }
   });
 
