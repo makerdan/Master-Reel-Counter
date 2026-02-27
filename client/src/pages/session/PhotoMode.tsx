@@ -57,8 +57,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }
 
   const totalIncompletePins = incompletePinsData ? incompletePinsData.reduce((sum, item) => sum + item.incompleteCount, 0) : 0;
-  const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
-  const nextReelCount = localUnfilledCount > 0 ? localUnfilledCount : totalIncompletePins;
 
   useEffect(() => {
     if (viewingNearbyIdx !== null && viewingNearbyIdx >= uploadedPhotos.length) {
@@ -105,6 +103,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       return next;
     });
   }, []);
+  const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
+  const nextReelCount = localUnfilledCount > 0 ? localUnfilledCount : totalIncompletePins;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number }>>([]);
   const [nearbyCommittedPins, setNearbyCommittedPins] = useState<Array<{ id: string; x: number; y: number; label: string; reelCount: number }>>([]);
