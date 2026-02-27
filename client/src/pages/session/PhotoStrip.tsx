@@ -214,24 +214,6 @@ function PhotoCard({
         >
           <ExternalLink className="h-3 w-3" />
         </Button>
-        {canEdit && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="absolute top-1 left-1 h-6 w-6 bg-black/50 text-white hover:bg-black/70"
-            onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); }}
-            disabled={duplicateMutation.isPending}
-            data-testid={`button-strip-duplicate-${photo.id}`}
-            title="Duplicate this photo"
-          >
-            {duplicateMutation.isPending
-              ? <Loader2 className="h-3 w-3 animate-spin" />
-              : <Copy className="h-3 w-3" />}
-          </Button>
-        )}
-        <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[10px] font-mono font-semibold px-1 rounded leading-4 select-none pointer-events-none">
-          {photoSeqLabel(photo)}
-        </div>
         {isSaving && (
           <div className="absolute bottom-1 right-1">
             <Loader2 className="h-3 w-3 animate-spin text-white drop-shadow" />
@@ -240,6 +222,9 @@ function PhotoCard({
       </div>
 
       <div className="p-2 flex flex-col gap-1.5 flex-1">
+        <div className="text-[10px] font-mono font-semibold text-muted-foreground tracking-wide">
+          {photoSeqLabel(photo)}
+        </div>
         <div className="grid grid-cols-2 gap-1">
           <div>
             <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Aisle</label>
@@ -320,6 +305,20 @@ function PhotoCard({
                 <Link2 className="h-3 w-3" />
               </button>
             )
+          )}
+
+          {canEdit && (
+            <button
+              className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+              onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); }}
+              disabled={duplicateMutation.isPending}
+              title="Duplicate this photo"
+              data-testid={`button-strip-duplicate-${photo.id}`}
+            >
+              {duplicateMutation.isPending
+                ? <Loader2 className="h-3 w-3 animate-spin" />
+                : <Copy className="h-3 w-3" />}
+            </button>
           )}
 
           <button
