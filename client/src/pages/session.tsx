@@ -595,9 +595,9 @@ function SessionWorkspace({
                   <Flag className="h-4 w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Flagged</span>
                 </TabsTrigger>
-                <TabsTrigger value="strip" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(200_70%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photo Strip">
+                <TabsTrigger value="strip" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(200_70%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photos Reel">
                   <LayoutGrid className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Strip</span>
+                  <span className="hidden sm:inline">Photos Reel</span>
                 </TabsTrigger>
               </TabsList>
 
