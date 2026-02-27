@@ -613,6 +613,10 @@ export async function registerRoutes(
       }
 
       res.json(updated);
+      broadcastToSession(photo.sessionId, { type: "sync", entity: "photos", sessionId: photo.sessionId });
+      if (safeUpdate.aisle !== undefined || safeUpdate.section !== undefined) {
+        broadcastToSession(photo.sessionId, { type: "sync", entity: "entries", sessionId: photo.sessionId });
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to update photo" });
     }

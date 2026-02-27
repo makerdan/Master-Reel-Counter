@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2, LayoutGrid,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -35,6 +35,7 @@ import SingleEntryMode from "./session/SingleEntryMode";
 import MobileCaptureView from "./session/MobileCaptureView";
 import ActivityLog from "./session/ActivityLog";
 import FlaggedReels from "./session/FlaggedReels";
+import PhotoStrip from "./session/PhotoStrip";
 import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename } from "./session/utils";
 import { useTimezone } from "@/hooks/use-timezone";
@@ -594,6 +595,10 @@ function SessionWorkspace({
                   <Flag className="h-4 w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Flagged</span>
                 </TabsTrigger>
+                <TabsTrigger value="strip" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(200_70%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photo Strip">
+                  <LayoutGrid className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Strip</span>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="photo">
@@ -626,6 +631,18 @@ function SessionWorkspace({
                     setMobileFlowDetailParentPhotoId(parentPhotoId);
                     setCaptureMode(true);
                     setMobileFlowKey(k => k + 1);
+                  }}
+                />
+              </TabsContent>
+
+              <TabsContent value="strip">
+                <PhotoStrip
+                  sessionId={sessionId}
+                  photos={photos}
+                  canEdit={canEditSession}
+                  onJumpToPhoto={(photoId) => {
+                    setNavigateToPhotoId(photoId);
+                    setMode("photo");
                   }}
                 />
               </TabsContent>
