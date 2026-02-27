@@ -892,7 +892,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       if (errors.length > 0) {
         throw new Error(`Failed to create entries for: ${errors.join(", ")}`);
       }
-      const remainingDraftPins = allPins.filter(p => !p.wireDetails || p.wireDetails.trim().length === 0);
+      const committedSet = new Set(pinsToCommit.map(p => p.id));
+      const remainingDraftPins = allPins.filter(p => !committedSet.has(p.id));
       if (pinPhotoId) {
         try {
           await apiRequest("PUT", `/api/photos/${pinPhotoId}/draft-pins`, {
@@ -901,9 +902,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               yPercent: p.y,
               label: p.label,
               reelCount: p.reelCount,
-              wireDetails: null,
-              vendorCode: null,
-              footage: null,
+              wireDetails: p.wireDetails || null,
+              vendorCode: p.vendorCode || null,
+              footage: p.footage || null,
+              flagged: p.flagged || false,
             })),
           });
         } catch {}
