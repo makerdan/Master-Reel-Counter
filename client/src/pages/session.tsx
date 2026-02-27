@@ -638,7 +638,6 @@ function SessionWorkspace({
               <TabsContent value="strip">
                 <PhotoStrip
                   sessionId={sessionId}
-                  photos={photos}
                   canEdit={canEditSession}
                   onJumpToPhoto={(photoId) => {
                     setNavigateToPhotoId(photoId);

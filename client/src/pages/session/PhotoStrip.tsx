@@ -1,10 +1,11 @@
 import { useState, useRef } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { StickyNote, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Photo } from "@shared/schema";
@@ -181,15 +182,28 @@ function PhotoCard({
 
 export default function PhotoStrip({
   sessionId,
-  photos,
   canEdit,
   onJumpToPhoto,
 }: {
   sessionId: number;
-  photos: Photo[];
   canEdit: boolean;
   onJumpToPhoto: (photoId: number) => void;
 }) {
+  const { data: photos = [], isLoading } = useQuery<Photo[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "photos"],
+    enabled: sessionId > 0,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" data-testid="strip-loading">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="aspect-square rounded-md" />
+        ))}
+      </div>
+    );
+  }
+
   if (photos.length === 0) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground text-sm" data-testid="strip-empty">
