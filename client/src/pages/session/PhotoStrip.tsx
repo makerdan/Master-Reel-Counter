@@ -338,41 +338,73 @@ export default function PhotoStrip({
 
   const sorted = sortPhotos(photos);
 
-  const groups: { aisle: string; photos: Photo[] }[] = [];
+  type SectionGroup = { section: string; photos: Photo[] };
+  type AisleGroup = { aisle: string; sections: SectionGroup[] };
+
+  const aisleGroups: AisleGroup[] = [];
   for (const photo of sorted) {
-    const key = photo.aisle || "";
-    const last = groups[groups.length - 1];
-    if (last && last.aisle === key) {
-      last.photos.push(photo);
-    } else {
-      groups.push({ aisle: key, photos: [photo] });
+    const aisleKey = photo.aisle || "";
+    const sectionKey = photo.section || "";
+
+    let aisleGroup = aisleGroups[aisleGroups.length - 1];
+    if (!aisleGroup || aisleGroup.aisle !== aisleKey) {
+      aisleGroup = { aisle: aisleKey, sections: [] };
+      aisleGroups.push(aisleGroup);
     }
+
+    let sectionGroup = aisleGroup.sections[aisleGroup.sections.length - 1];
+    if (!sectionGroup || sectionGroup.section !== sectionKey) {
+      sectionGroup = { section: sectionKey, photos: [] };
+      aisleGroup.sections.push(sectionGroup);
+    }
+
+    sectionGroup.photos.push(photo);
   }
 
   return (
-    <div className="p-4 space-y-4" data-testid="photo-strip">
-      {groups.map((group) => (
-        <div key={group.aisle}>
-          <div className="col-span-full mb-2 pb-1 border-b">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {group.aisle ? `Aisle: ${group.aisle}` : "No Aisle Set"}
-            </span>
-            <span className="ml-2 text-xs text-muted-foreground">({group.photos.length} photo{group.photos.length !== 1 ? "s" : ""})</span>
+    <div className="p-4 space-y-6" data-testid="photo-strip">
+      {aisleGroups.map((aisleGroup) => {
+        const totalPhotos = aisleGroup.sections.reduce((n, s) => n + s.photos.length, 0);
+        return (
+          <div key={aisleGroup.aisle}>
+            <div className="mb-3 pb-1 border-b">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {aisleGroup.aisle ? `Aisle: ${aisleGroup.aisle}` : "No Aisle Set"}
+              </span>
+              <span className="ml-2 text-xs text-muted-foreground">
+                ({totalPhotos} photo{totalPhotos !== 1 ? "s" : ""})
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {aisleGroup.sections.map((sectionGroup) => (
+                <div key={sectionGroup.section}>
+                  <div className="flex items-center gap-2 mb-2 border-l-2 border-muted-foreground/20 pl-2">
+                    <span className="text-[11px] font-medium text-muted-foreground/80">
+                      {sectionGroup.section ? `Section ${sectionGroup.section}` : "No Section Set"}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground/50">
+                      · {sectionGroup.photos.length} photo{sectionGroup.photos.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {sectionGroup.photos.map((photo) => (
+                      <PhotoCard
+                        key={photo.id}
+                        photo={photo}
+                        sessionId={sessionId}
+                        canEdit={canEdit}
+                        allPhotos={photos}
+                        onJumpToPhoto={onJumpToPhoto}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {group.photos.map((photo) => (
-              <PhotoCard
-                key={photo.id}
-                photo={photo}
-                sessionId={sessionId}
-                canEdit={canEdit}
-                allPhotos={photos}
-                onJumpToPhoto={onJumpToPhoto}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
