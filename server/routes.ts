@@ -958,6 +958,10 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      if (pin.entryId) {
+        await storage.deleteEntry(pin.entryId);
+        broadcastToSession(photo.sessionId, { type: "sync", entity: "entries", sessionId: photo.sessionId });
+      }
       await storage.deletePin(pin.id);
       res.json({ success: true });
     } catch (error) {
@@ -1014,6 +1018,10 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      if (pin.entryId) {
+        await storage.deleteEntry(pin.entryId);
+        broadcastToSession(photo.sessionId, { type: "sync", entity: "entries", sessionId: photo.sessionId });
+      }
       await storage.deletePin(pin.id);
       res.json({ success: true });
     } catch (error) {

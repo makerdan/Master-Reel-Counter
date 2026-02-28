@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { Entry, Pin } from "@shared/schema";
 
 interface FlaggedPin {
   id: number;
@@ -53,6 +54,17 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
     },
   });
+
+  const { data: sessionEntries = [] } = useQuery<Entry[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "entries"],
+  });
+
+  const { data: sessionPins = [] } = useQuery<Pin[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "pins"],
+  });
+
+  const pinnedEntryIds = new Set(sessionPins.filter(p => p.entryId).map(p => p.entryId!));
+  const unpinnedEntries = sessionEntries.filter(e => !pinnedEntryIds.has(e.id));
 
   return (
     <div className="space-y-4">
@@ -266,6 +278,42 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {unpinnedEntries.length > 0 && (
+        <div className="space-y-2" data-testid="section-issues">
+          <div className="flex items-center gap-2 pt-2 border-t border-border">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+            <h3 className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+              Entries Without Photos ({unpinnedEntries.length})
+            </h3>
+          </div>
+          <p className="text-xs text-muted-foreground">These entries have no linked photo. They can be edited or deleted from Table View.</p>
+          <div className="grid gap-2">
+            {unpinnedEntries.map((e) => (
+              <div
+                key={e.id}
+                className="border border-amber-200 dark:border-amber-900/50 rounded-lg p-3 bg-amber-50/50 dark:bg-amber-950/20"
+                data-testid={`issue-entry-card-${e.id}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm font-medium truncate" data-testid={`text-issue-label-${e.id}`}>
+                      {e.reelTag || e.wireType || "Entry"}
+                    </p>
+                    <p className="text-xs text-muted-foreground" data-testid={`text-issue-location-${e.id}`}>
+                      Aisle {e.aisle} / Section {e.section}
+                    </p>
+                  </div>
+                  <div className="text-xs font-mono text-muted-foreground text-right shrink-0">
+                    {e.reelCount && e.reelCount > 0 && <div>{e.reelCount} reel{e.reelCount !== 1 ? "s" : ""}</div>}
+                    {e.footage && <div>{Number(e.footage).toLocaleString()} ft</div>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

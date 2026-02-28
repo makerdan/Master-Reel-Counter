@@ -337,7 +337,11 @@ function SessionWorkspace({
     window.open(`mailto:?subject=${subject}&body=${body}`, "_self");
   };
 
-  const exportCsv = async () => {
+  const [exportWarningOpen, setExportWarningOpen] = useState(false);
+  const [pendingExportType, setPendingExportType] = useState<"pdf" | "csv" | null>(null);
+  const unpinnedEntries = entries.filter(e => !pinByEntryId.has(e.id));
+
+  const doExportCsv = async () => {
     try {
       const res = await apiRequest("GET", `/api/sessions/${sessionId}/export`);
       const data = await res.json();
@@ -369,7 +373,16 @@ function SessionWorkspace({
     }
   };
 
-  const exportPdf = async () => {
+  const exportCsv = async () => {
+    if (unpinnedEntries.length > 0) {
+      setPendingExportType("csv");
+      setExportWarningOpen(true);
+      return;
+    }
+    await doExportCsv();
+  };
+
+  const doExportPdf = async () => {
     try {
       const params = new URLSearchParams();
       if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
@@ -411,6 +424,15 @@ function SessionWorkspace({
         <script>setTimeout(()=>window.print(),500)</script></body></html>`);
       w.document.close();
     }
+  };
+
+  const exportPdf = async () => {
+    if (unpinnedEntries.length > 0) {
+      setPendingExportType("pdf");
+      setExportWarningOpen(true);
+      return;
+    }
+    await doExportPdf();
   };
 
   return (
@@ -802,6 +824,48 @@ function SessionWorkspace({
         isOwner={(session as any).role === "owner"}
         onlineUsers={onlineUsers}
       />
+
+      <AlertDialog open={exportWarningOpen} onOpenChange={(open) => { setExportWarningOpen(open); if (!open) setPendingExportType(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Entries Without Photos</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="mb-3">
+                  {unpinnedEntries.length} {unpinnedEntries.length === 1 ? "entry has" : "entries have"} no linked photo
+                  {pendingExportType === "pdf" ? " and will appear in the \"Entries Without Photos\" section of the PDF." : "."}
+                </p>
+                <div className="space-y-1 max-h-48 overflow-y-auto text-sm">
+                  {unpinnedEntries.slice(0, 10).map((e) => (
+                    <div key={e.id} className="flex items-center justify-between gap-2 py-0.5">
+                      <span className="font-mono text-foreground">{e.reelTag || e.wireType || "Entry"}</span>
+                      <span className="text-muted-foreground text-xs">Aisle {e.aisle} / Section {e.section}</span>
+                    </div>
+                  ))}
+                  {unpinnedEntries.length > 10 && (
+                    <p className="text-muted-foreground text-xs pt-1">…and {unpinnedEntries.length - 10} more.</p>
+                  )}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingExportType(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-export-anyway"
+              onClick={async () => {
+                setExportWarningOpen(false);
+                const type = pendingExportType;
+                setPendingExportType(null);
+                if (type === "pdf") await doExportPdf();
+                else if (type === "csv") await doExportCsv();
+              }}
+            >
+              Export Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

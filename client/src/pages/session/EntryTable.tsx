@@ -71,7 +71,7 @@ function EntryTable({
       <Card>
         <CardContent className="py-8 text-center">
           <Cable className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-muted-foreground text-sm">No entries yet. Add reels using the form above.</p>
+          <p className="text-muted-foreground text-sm">No entries yet. Entries are created by placing and committing pins in Photo Mode.</p>
         </CardContent>
       </Card>
     );

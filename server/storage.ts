@@ -186,6 +186,13 @@ export class DatabaseStorage implements IStorage {
     await db.transaction(async (tx) => {
       await tx.update(photos).set({ parentPhotoId: null, isDetailShot: false }).where(eq(photos.parentPhotoId, id));
       await tx.delete(comments).where(eq(comments.photoId, id));
+      const committedPinRows = await tx.select({ entryId: pins.entryId }).from(pins)
+        .where(and(eq(pins.photoId, id), sql`${pins.entryId} IS NOT NULL`));
+      const pinnedEntryIds = committedPinRows.map(r => r.entryId as number);
+      if (pinnedEntryIds.length > 0) {
+        await tx.delete(comments).where(inArray(comments.entryId, pinnedEntryIds));
+        await tx.delete(entries).where(inArray(entries.id, pinnedEntryIds));
+      }
       await tx.delete(entries).where(eq(entries.photoId, id));
       await tx.delete(pins).where(eq(pins.photoId, id));
       await tx.delete(photos).where(eq(photos.id, id));
