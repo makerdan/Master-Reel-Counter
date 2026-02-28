@@ -106,6 +106,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
   const nextReelCount = localUnfilledCount > 0 ? localUnfilledCount : totalIncompletePins;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number }>>([]);
   const [nearbyCommittedPins, setNearbyCommittedPins] = useState<Array<{ id: string; x: number; y: number; label: string; reelCount: number }>>([]);
   const [pinsLoaded, setPinsLoaded] = useState(false);
@@ -1851,12 +1852,19 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         </td>
                         <td>
                           <input
-                            type="number"
-                            value={pin.footage ?? ""}
-                            onChange={(e) => updatePinField(pin.id, "footage", e.target.value ? parseInt(e.target.value) : undefined)}
-                            onFocus={() => setSelectedPinId(null)}
-                            min={0}
-                            inputMode="decimal"
+                            type="text"
+                            inputMode="numeric"
+                            value={
+                              focusedFootagePinId === pin.id || pin.footage == null
+                                ? (pin.footage ?? "")
+                                : pin.footage.toLocaleString()
+                            }
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/,/g, "");
+                              updatePinField(pin.id, "footage", raw ? parseInt(raw) : undefined);
+                            }}
+                            onFocus={() => { setSelectedPinId(null); setFocusedFootagePinId(pin.id); }}
+                            onBlur={() => setFocusedFootagePinId(null)}
                             autoComplete="off"
                             data-testid={`input-footage-${index}`}
                           />
