@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StickyNote, ExternalLink, Loader2, Link2, X, Copy, Trash2 } from "lucide-react";
+import { StickyNote, ExternalLink, Loader2, Link2, X, Copy, Trash2, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -514,6 +514,19 @@ export default function PhotoStrip({
           </div>
         );
       })}
+
+      <div className="hidden sm:flex justify-center pt-2 pb-1">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="gap-2 text-muted-foreground hover:text-foreground"
+          data-testid="btn-scroll-to-top"
+        >
+          <ArrowUp className="h-4 w-4" />
+          Back to top
+        </Button>
+      </div>
     </div>
   );
 }
