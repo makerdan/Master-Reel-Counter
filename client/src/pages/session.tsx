@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
-  ArrowLeft, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History,
+  ArrowLeft, ArrowUp, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History,
   Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2, LayoutGrid,
 } from "lucide-react";
 import {
@@ -647,6 +647,21 @@ function SessionWorkspace({
               </TabsContent>
             </Tabs>
           </>
+        )}
+
+        {mode === "strip" && mobileFlowDetailParentPhotoId == null && entries.length > 0 && (
+          <div className="hidden sm:flex justify-center py-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              data-testid="btn-scroll-to-top"
+            >
+              <ArrowUp className="h-4 w-4" />
+              Back to top
+            </Button>
+          </div>
         )}
 
         {mobileFlowDetailParentPhotoId == null && (
