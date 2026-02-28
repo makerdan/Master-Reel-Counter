@@ -130,10 +130,7 @@ function EntryTable({
                 </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor:</th>
                 <th className="hidden sm:table-cell" style={{ width: 50, textAlign: "center" }}>Photo:</th>
-                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                  <span className="sm:hidden" style={{ display: "inline" }}>Edit:</span>
-                  <span className="hidden sm:inline">Actions:</span>
-                </th>
+                <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Edit:</th>
               </tr>
             </thead>
             <tbody>
