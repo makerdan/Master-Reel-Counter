@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, StickyNote, Focus, ArrowUpDown, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription,
@@ -353,7 +353,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={AlertCircle} />}
             label="Next Reel Button"
-            description="Appears when there are pins without wire details filled in. Jumps to the next photo with incomplete pins and scrolls to the entry table so you can start filling in details immediately. The count updates live as you fill in rows — ticking down in real-time on the current photo, then falling back to the total across all photos."
+            description="Appears when there are pins without wire details filled in. Jumps to the next photo with incomplete pins and scrolls to the entry table so you can start filling in details immediately. The count updates live as you fill in rows — ticking down in real-time on the current photo, then falling back to the total across all photos. If this is the last remaining incomplete entry, a notification appears instead of navigating away."
           />
 
           <Separator className="my-2" />
@@ -432,7 +432,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
             label="Category Input (Wire Details)"
-            description="Type a wire category and the system searches ~180 catalog entries. Use arrow keys to navigate suggestions and Enter to select. Selecting a category auto-fills the vendor code and footage fields."
+            description="Type a wire category and the system searches ~186 catalog entries. Use arrow keys to navigate suggestions and Enter to select. Selecting a category auto-fills the vendor code and footage fields. The suggestion dropdown scrolls when there are many matches."
           />
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">VND</span>}
@@ -442,7 +442,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
             label="Footage"
-            description="Enter the total footage for this reel position. Auto-calculated from catalog data when a category is selected."
+            description="Enter the total footage for this reel position. Auto-calculated from catalog data when a category is selected. While not focused the value displays with comma formatting (e.g. 2,500) for readability."
           />
           <FeatureRow
             icon={<span className="text-[11px] font-bold text-[hsl(18_70%_50%)]">&#8595;</span>}
@@ -556,12 +556,46 @@ export function SessionSections() {
         </AccordionContent>
       </AccordionItem>
 
+      <AccordionItem value="session-photos-reel">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(200_70%_45%)]" /> Photos Reel Tab</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A visual grid of every photo in the session, grouped and sorted by aisle then section. Use it to review coverage, manage individual photos, and navigate back to any shot.</p>
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(200_70%_45%)]">086</span>}
+            label="Sequence Badge"
+            description="Each photo card shows a 3-digit sequence number (e.g. 086) extracted from its filename for quick identification."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Copy} />}
+            label="Duplicate Photo"
+            description="Tap the copy icon on a photo card to create a duplicate. The duplicate shares the same image file and preserves the original capture timestamp — useful for assigning the same photo to a different aisle or section."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Delete Photo"
+            description="Tap the trash icon, then confirm with a second tap. Deleting a photo also removes its linked entries and pins."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ExternalLink} />}
+            label="Jump to Photo"
+            description="Tap the external-link icon to jump directly to that photo in the Section Photo tab, ready for pinning."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ArrowUp} />}
+            label="Back to Top"
+            description="A 'Back to Top' button appears at the bottom of the Photos Reel grid (above the Table View). Clicking it smoothly scrolls the page back to the top."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
       <AccordionItem value="session-table-view">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Table View</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list.</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list. Columns (desktop): Pin # → Aisle → Section → Category → Vendor → Reels → Ft/Reel → Total Ft → Photo → Edit.</p>
           <FeatureRow
             icon={<HelpIcon icon={ChevronLeft} />}
             label="Collapsible Sections"
@@ -590,7 +624,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
             label="Total Footage"
-            description="The Table View header shows the total footage across all entries for quick reference."
+            description="The Table View footer shows the total footage across all entries for quick reference."
           />
         </AccordionContent>
       </AccordionItem>
