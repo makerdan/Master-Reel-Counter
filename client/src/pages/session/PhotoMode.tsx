@@ -85,7 +85,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           id: `nearby-committed-${p.id}`,
           x: p.xPercent,
           y: p.yPercent,
-          label: p.label || "01",
+          label: p.label || "001",
           reelCount: p.reelCount || 1,
         })));
       } catch {
@@ -334,7 +334,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           dbId: p.id,
           x: p.xPercent,
           y: p.yPercent,
-          label: p.label || "01",
+          label: p.label || "001",
           reelCount: p.reelCount || 1,
         })));
         if (draftPins.length > 0) {
@@ -342,7 +342,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             id: `pin-${p.id}`,
             x: p.xPercent,
             y: p.yPercent,
-            label: p.label || "01",
+            label: p.label || "001",
             reelCount: p.reelCount || 1,
             wireDetails: p.wireDetails || undefined,
             vendorCode: p.vendorCode || undefined,
@@ -573,7 +573,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       id: `pin-${Date.now()}`,
       x,
       y,
-      label: String(nextNumber).padStart(2, "0"),
+      label: String(nextNumber).padStart(3, "0"),
       reelCount: 1,
     };
     setLocalPins((prev) => [...prev, newPin]);
