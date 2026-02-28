@@ -163,7 +163,7 @@ function EntryTable({
                     {isExpanded && sectionEntries.map((entry, idx) => {
                       const info = getReelInfo(entry);
                       return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
-                        <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(2, "0")}</td>
+                        <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(3, "0")}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.aisle}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono font-bold">
