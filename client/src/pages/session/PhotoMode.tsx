@@ -987,6 +987,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         return;
       }
     }
+    toast({ title: "Last remaining entry", description: "This is the only reel still needing details — fill it in and use Add Reel(s) from Image to commit." });
   };
 
   const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
