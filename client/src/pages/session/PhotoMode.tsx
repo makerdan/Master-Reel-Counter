@@ -124,6 +124,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [activeSuggestionPin, setActiveSuggestionPin] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
+  const [suggestionPos, setSuggestionPos] = useState<{ top: number; bottom: number; left: number; width: number } | null>(null);
 
   const [scale, setScale] = useState(1);
   const [panX, setPanX] = useState(0);
@@ -1708,21 +1709,33 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               const matches = lookupCategory(val);
                               setSuggestions(matches);
                               setSuggestionIndex(-1);
-                              setActiveSuggestionPin(matches.length > 0 ? pin.id : null);
+                              if (matches.length > 0) {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setSuggestionPos({ top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width });
+                                setActiveSuggestionPin(pin.id);
+                              } else {
+                                setActiveSuggestionPin(null);
+                                setSuggestionPos(null);
+                              }
                             }}
-                            onFocus={() => {
+                            onFocus={(e) => {
                               setSelectedPinId(pin.id);
                               setSuggestionIndex(-1);
                               if (pin.wireDetails) {
                                 const matches = lookupCategory(pin.wireDetails);
                                 setSuggestions(matches);
-                                setActiveSuggestionPin(matches.length > 0 ? pin.id : null);
+                                if (matches.length > 0) {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setSuggestionPos({ top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width });
+                                  setActiveSuggestionPin(pin.id);
+                                }
                               }
                             }}
                             onBlur={() => {
                               setTimeout(() => {
                                 setActiveSuggestionPin(null);
                                 setSuggestionIndex(-1);
+                                setSuggestionPos(null);
                               }, 200);
                               applyAutoFill(pin.id);
                             }}
@@ -1743,12 +1756,14 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                   setActiveSuggestionPin(null);
                                   setSuggestions([]);
                                   setSuggestionIndex(-1);
+                                  setSuggestionPos(null);
                                   const nextInput = document.querySelector(`[data-testid="input-wire-details-${index + 1}"]`) as HTMLInputElement | null;
                                   if (nextInput) setTimeout(() => nextInput.focus(), 0);
                                 } else if (e.key === "Escape") {
                                   setActiveSuggestionPin(null);
                                   setSuggestions([]);
                                   setSuggestionIndex(-1);
+                                  setSuggestionPos(null);
                                 }
                               }
                             }}
@@ -1758,34 +1773,50 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             placeholder="Type category..."
                             data-testid={`input-wire-details-${index}`}
                           />
-                          {activeSuggestionPin === pin.id && suggestions.length > 0 && (
-                            <div className={`absolute z-50 left-0 right-0 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-lg ${index === localPins.length - 1 ? "bottom-full mb-1" : "top-full mt-1"}`} data-testid={`suggestions-${index}`}>
-                              {suggestions.map((s, si) => (
-                                <button
-                                  key={`${s.vendor}-${s.catalog}`}
-                                  type="button"
-                                  className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer border-b last:border-b-0 border-border/50 ${si === suggestionIndex ? "bg-primary text-primary-foreground font-medium" : ""}`}
-                                  onMouseEnter={() => setSuggestionIndex(si)}
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    updatePinField(pin.id, "wireDetails", s.catalog);
-                                    if (s.vendor) updatePinField(pin.id, "vendorCode", s.vendor);
-                                    if (s.footage) updatePinField(pin.id, "footage", s.footage);
-                                    setActiveSuggestionPin(null);
-                                    setSuggestions([]);
-                                    setSuggestionIndex(-1);
-                                    const nextInput = document.querySelector(`[data-testid="input-wire-details-${index + 1}"]`) as HTMLInputElement | null;
-                                    if (nextInput) setTimeout(() => nextInput.focus(), 0);
-                                  }}
-                                  data-testid={`suggestion-${s.catalog}`}
-                                >
-                                  <span className="font-mono font-semibold">{s.catalog}</span>
-                                  <span className="text-muted-foreground ml-2">{s.description}</span>
-                                  {s.footage && <span className="text-muted-foreground ml-1">({s.footage}')</span>}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          {activeSuggestionPin === pin.id && suggestions.length > 0 && suggestionPos && (() => {
+                            const dropDown = window.innerHeight - suggestionPos.bottom >= 180;
+                            return (
+                              <div
+                                style={{
+                                  position: "fixed",
+                                  left: suggestionPos.left,
+                                  width: Math.max(suggestionPos.width, 220),
+                                  zIndex: 9999,
+                                  ...(dropDown
+                                    ? { top: suggestionPos.bottom + 2 }
+                                    : { bottom: window.innerHeight - suggestionPos.top + 2 }),
+                                }}
+                                className="max-h-48 overflow-y-auto rounded-md border bg-popover shadow-lg"
+                                data-testid={`suggestions-${index}`}
+                              >
+                                {suggestions.map((s, si) => (
+                                  <button
+                                    key={`${s.vendor}-${s.catalog}`}
+                                    type="button"
+                                    className={`w-full text-left px-2 py-1.5 text-xs cursor-pointer border-b last:border-b-0 border-border/50 ${si === suggestionIndex ? "bg-primary text-primary-foreground font-medium" : ""}`}
+                                    onMouseEnter={() => setSuggestionIndex(si)}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      updatePinField(pin.id, "wireDetails", s.catalog);
+                                      if (s.vendor) updatePinField(pin.id, "vendorCode", s.vendor);
+                                      if (s.footage) updatePinField(pin.id, "footage", s.footage);
+                                      setActiveSuggestionPin(null);
+                                      setSuggestions([]);
+                                      setSuggestionIndex(-1);
+                                      setSuggestionPos(null);
+                                      const nextInput = document.querySelector(`[data-testid="input-wire-details-${index + 1}"]`) as HTMLInputElement | null;
+                                      if (nextInput) setTimeout(() => nextInput.focus(), 0);
+                                    }}
+                                    data-testid={`suggestion-${s.catalog}`}
+                                  >
+                                    <span className="font-mono font-semibold">{s.catalog}</span>
+                                    <span className="text-muted-foreground ml-2">{s.description}</span>
+                                    {s.footage && <span className="text-muted-foreground ml-1">({s.footage}')</span>}
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td>
                           <select
