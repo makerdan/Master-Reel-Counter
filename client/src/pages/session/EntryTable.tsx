@@ -125,7 +125,7 @@ function EntryTable({
                 </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ft/Reel:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                  <span className="sm:hidden" style={{ display: "inline" }}>Total:</span>
+                  <span className="sm:hidden">Total:</span>
                   <span className="hidden sm:inline">Total Ft:</span>
                 </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
