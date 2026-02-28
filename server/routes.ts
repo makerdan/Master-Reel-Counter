@@ -1268,28 +1268,47 @@ export async function registerRoutes(
       doc.moveTo(36, titleY).lineTo(36 + (doc.page.width - 72), titleY).strokeColor(accentHex).lineWidth(2).stroke();
       titleY += 10;
 
-      const statsItems: string[] = [];
-      statsItems.push(`Location: ${session.location || "N/A"}`);
-      statsItems.push(`Status: ${session.status}`);
-      statsItems.push(`Entries: ${sessionEntries.length}`);
-      statsItems.push(`Total Footage: ${totalFootage.toLocaleString()} ft`);
-      statsItems.push(`Photos: ${pt.photoCount}`);
-      doc.fontSize(9).fillColor("#444444").text(statsItems.join("   |   "), 36, titleY, { width: doc.page.width - 72 });
-      titleY += 14;
+      const coverLabelW = 100;
+      const coverValueX = 36 + coverLabelW;
+      const coverValueW = doc.page.width - 72 - coverLabelW;
+      const coverLineH = 15;
+      const coverLabelColor = "#888888";
+      const coverValueColor = "#222222";
+      const totalReels = (sessionEntries as any[]).reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+
+      const coverRows: [string, string][] = [
+        ["Location:", session.location || "N/A"],
+        ["Status:", (session.status.charAt(0).toUpperCase() + session.status.slice(1))],
+        ["Entries:", sessionEntries.length.toLocaleString()],
+        ["Total Reels:", totalReels.toLocaleString()],
+        ["Total Footage:", `${totalFootage.toLocaleString()} ft`],
+        ["Photos:", pt.photoCount.toLocaleString()],
+      ];
+      for (const [label, value] of coverRows) {
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(coverLabelColor).text(label, 36, titleY, { width: coverLabelW, lineBreak: false });
+        doc.font('Helvetica').fontSize(9).fillColor(coverValueColor).text(value, coverValueX, titleY, { width: coverValueW, lineBreak: false });
+        titleY += coverLineH;
+      }
 
       if (pt.firstPhotoAt) {
-        const startStr = new Intl.DateTimeFormat('en-US', { timeZone: userTz, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(pt.firstPhotoAt));
-        const endStr = pt.lastPhotoAt ? new Intl.DateTimeFormat('en-US', { timeZone: userTz, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(pt.lastPhotoAt)) : "ongoing";
-        doc.fontSize(9).fillColor("#666666").text(`Session time: ${startStr} to ${endStr} ${tzAbbr}`, 36, titleY);
-        titleY += 12;
+        const dtFmt = (d: Date) => new Intl.DateTimeFormat('en-US', { timeZone: userTz, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+        const startStr = dtFmt(new Date(pt.firstPhotoAt));
+        const endStr = pt.lastPhotoAt ? dtFmt(new Date(pt.lastPhotoAt)) : "ongoing";
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(coverLabelColor).text("Session Time:", 36, titleY, { width: coverLabelW, lineBreak: false });
+        doc.font('Helvetica').fontSize(9).fillColor(coverValueColor).text(`${startStr} ${tzAbbr}`, coverValueX, titleY, { width: coverValueW, lineBreak: false });
+        titleY += coverLineH;
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(coverLabelColor).text("", 36, titleY, { width: coverLabelW, lineBreak: false });
+        doc.font('Helvetica').fontSize(9).fillColor(coverValueColor).text(`to ${endStr} ${tzAbbr}`, coverValueX, titleY, { width: coverValueW, lineBreak: false });
+        titleY += coverLineH;
         if (pt.lastPhotoAt) {
           const diffMs = Math.abs(new Date(pt.lastPhotoAt).getTime() - new Date(pt.firstPhotoAt).getTime());
           const totalMin = Math.floor(diffMs / 60000);
           let elapsedStr: string;
           if (totalMin < 60) { elapsedStr = `${totalMin}m`; }
           else { const h = Math.floor(totalMin / 60); const m = totalMin % 60; elapsedStr = m > 0 ? `${h}h ${m}m` : `${h}h`; }
-          doc.text(`Elapsed time: ${elapsedStr}`, 36, titleY);
-          titleY += 12;
+          doc.font('Helvetica-Bold').fontSize(9).fillColor(coverLabelColor).text("Elapsed Time:", 36, titleY, { width: coverLabelW, lineBreak: false });
+          doc.font('Helvetica').fontSize(9).fillColor(coverValueColor).text(elapsedStr, coverValueX, titleY, { width: coverValueW, lineBreak: false });
+          titleY += coverLineH;
         }
       }
 
@@ -1356,6 +1375,9 @@ export async function registerRoutes(
       const sortedSections = Array.from(sectionGroups.entries())
         .map(([, data]) => data)
         .sort((a, b) => {
+          const aN_aisle = parseInt(a.aisle) || 0;
+          const bN_aisle = parseInt(b.aisle) || 0;
+          if (aN_aisle !== bN_aisle) return aN_aisle - bN_aisle;
           if (a.aisle < b.aisle) return -1;
           if (a.aisle > b.aisle) return 1;
           const aN = parseInt(a.section) || 0;
@@ -1375,7 +1397,15 @@ export async function registerRoutes(
         doc.font('Helvetica-Bold').fontSize(14).fillColor(accentHex).text("Table of Contents", 36, currentY);
         currentY += 22;
 
-        const tocLineH = 16;
+        const tocAvailH = maxY - currentY;
+        const tocLargeLineH = 28;
+        const tocSmallLineH = 16;
+        const tocLargeFontSize = 13;
+        const tocSmallFontSize = 9;
+        const fitsOnOnePage = tocSections.length * tocLargeLineH <= tocAvailH;
+        const tocLineH = fitsOnOnePage ? tocLargeLineH : tocSmallLineH;
+        const tocFontSize = fitsOnOnePage ? tocLargeFontSize : tocSmallFontSize;
+
         const tocItems: { label: string; destName: string; y: number }[] = [];
 
         for (let si = 0; si < tocSections.length; si++) {
@@ -1389,7 +1419,7 @@ export async function registerRoutes(
           const tocLabel = `Aisle ${sec.aisle || "—"} / Section ${sec.section || "—"} — ${sec.entries.length} entries, ${secReels} reels, ${secFootage.toLocaleString()} ft`;
           const destName = `sec-${si}`;
 
-          doc.font('Helvetica').fontSize(9).fillColor("#1a6bc4")
+          doc.font('Helvetica').fontSize(tocFontSize).fillColor("#1a6bc4")
             .text(tocLabel, 44, currentY + 2, { width: pageWidth - 20, lineBreak: false });
           const textW = Math.min(doc.widthOfString(tocLabel), pageWidth - 20);
           tocItems.push({ label: tocLabel, destName, y: currentY + 2 });
@@ -1612,7 +1642,7 @@ export async function registerRoutes(
         for (const e of entries) {
           const entryLines: { text: string; fontSize: number; color: string; font: string; indent: boolean }[] = [];
           const pinLabel = photoPins.find((p: any) => p.entryId === e.id)?.label;
-          const header = pinLabel ? `P${String(pinLabel).padStart(2, "0")} — ${e.reelTag || e.wireType || "Entry"}` : (e.reelTag || e.wireType || "Entry");
+          const header = pinLabel ? `P${String(pinLabel).padStart(3, "0")} — ${e.reelTag || e.wireType || "Entry"}` : (e.reelTag || e.wireType || "Entry");
           entryLines.push({ text: header, fontSize: 6.5, color: accentHex, font: 'Helvetica-Bold', indent: false });
 
           const details: string[] = [];
@@ -1820,20 +1850,85 @@ export async function registerRoutes(
           }
         }
 
+        const renderDetailShotColumnList = (pl: PhotoLayout, photoEntries: any[], x: number, y: number, maxW: number, maxH: number) => {
+          const imgW = Math.min(maxW * 0.38, 220);
+          const captionH = 10;
+          const aspect = pl.origW / pl.origH;
+          let w = imgW;
+          let h = imgW / aspect;
+          const availImgH = maxH - captionH;
+          if (h > availImgH) { h = availImgH; w = h * aspect; if (w > imgW) { w = imgW; h = imgW / aspect; } }
+
+          doc.image(pl.buffer, x, y, { width: w, height: h });
+          const photoPins = allPinsMap.get(pl.photo.id) || [];
+          const pinScale = pl.photo.pinScale || 1;
+          for (const pin of photoPins) {
+            drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale);
+          }
+          doc.rect(x, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
+
+          const photoName = pl.photo.originalFilename || `Photo ${pl.photo.id}`;
+          const reelTotal = photoEntries.length > 0 ? photoEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0) : photoPins.reduce((s: number, p: any) => s + (p.reelCount || 1), 0);
+          const capParts: string[] = [photoName];
+          if (pl.photo.aisle || pl.photo.section) capParts.push(`Aisle ${pl.photo.aisle || "—"}, Sec ${pl.photo.section || "—"}`);
+          capParts.push(`${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`);
+          if (pl.photo.createdAt) capParts.push(formatCT(new Date(pl.photo.createdAt)));
+          doc.font('Helvetica').fontSize(5.5).fillColor("#666666")
+            .text(capParts.join("  |  "), x, y + h + 1, { width: w, align: "center", lineBreak: false });
+
+          const listX = x + w + 10;
+          const listW = maxW - w - 10;
+          let listY = y;
+          const fieldLineH = 10;
+          const entryGap = 6;
+          const fieldLabelW = 72;
+          const fieldValueX = listX + fieldLabelW;
+          const fieldValueW = listW - fieldLabelW;
+
+          for (const e of photoEntries) {
+            const pinLabel = photoPins.find((p: any) => p.entryId === e.id)?.label;
+            const fields: [string, string][] = [
+              ["Pin #:", pinLabel ? String(pinLabel).padStart(3, "0") : "—"],
+              ["Category:", e.reelTag || e.wireType || "—"],
+              ["Vendor Code:", e.manufacturer || "—"],
+              ["# of Reels:", String(e.reelCount || 1)],
+              ["Total Footage:", e.footage ? `${e.footage.toLocaleString()} ft` : "—"],
+              ["Notes:", e.notes || "—"],
+            ];
+            const entryH = fields.length * fieldLineH + entryGap;
+            if (listY + entryH > y + maxH) break;
+            for (const [label, value] of fields) {
+              doc.font('Helvetica-Bold').fontSize(6).fillColor("#666666")
+                .text(label, listX, listY, { width: fieldLabelW, lineBreak: false });
+              doc.font('Helvetica').fontSize(6).fillColor("#222222")
+                .text(value, fieldValueX, listY, { width: fieldValueW, lineBreak: false });
+              listY += fieldLineH;
+            }
+            listY += entryGap;
+            if (photoEntries.indexOf(e) < photoEntries.length - 1) {
+              doc.moveTo(listX, listY - entryGap / 2).lineTo(listX + listW, listY - entryGap / 2)
+                .lineWidth(0.3).strokeColor("#dddddd").stroke();
+            }
+          }
+
+          const totalH = Math.max(h + captionH, listY - y);
+          return { renderedH: totalH };
+        };
+
         const renderDetailShotsForParent = (parentPhotoId: number) => {
           const detailWithEntries = detailShotsByParent.get(parentPhotoId) || [];
           const detailWithout = detailShotsWithoutEntriesByParent.get(parentPhotoId) || [];
-          const compactMinH = 80;
+          const detailMinH = 90;
           for (const { pl, entries: photoEntries } of detailWithEntries) {
-            ensureSpace(compactMinH);
-            const availH = Math.min(maxY - currentY, 180);
-            const result = renderCompactPhotoWithEntries(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
+            ensureSpace(detailMinH);
+            const availH = Math.min(maxY - currentY, 200);
+            const result = renderDetailShotColumnList(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
             currentY += result.renderedH + gap;
           }
           for (const pl of detailWithout) {
-            ensureSpace(compactMinH);
-            const availH = Math.min(maxY - currentY, 180);
-            const result = renderPhoto(pl, tableLeft, currentY, pageWidth * 0.35, availH);
+            ensureSpace(detailMinH);
+            const availH = Math.min(maxY - currentY, 200);
+            const result = renderDetailShotColumnList(pl, [], tableLeft, currentY, pageWidth, availH);
             currentY += result.renderedH + gap;
           }
         };
@@ -1892,7 +1987,7 @@ export async function registerRoutes(
             const entryPinMap = new Map<number, string>();
             for (const pin of photoPins) {
               if (pin.entryId && pin.label) {
-                entryPinMap.set(pin.entryId, `P${String(pin.label).padStart(2, "0")}`);
+                entryPinMap.set(pin.entryId, `P${String(pin.label).padStart(3, "0")}`);
               }
             }
             tblEndY = drawEntriesTable(photoEntries, tblX, tblW, currentY, 5.5, 14, entryPinMap.size > 0 ? entryPinMap : undefined);
@@ -2009,7 +2104,7 @@ export async function registerRoutes(
       for (const [, pins] of allPinsMap) {
         for (const pin of pins) {
           if (pin.entryId && pin.label) {
-            entryPinLabelMap.set(pin.entryId, `P${String(pin.label).padStart(2, "0")}`);
+            entryPinLabelMap.set(pin.entryId, `P${String(pin.label).padStart(3, "0")}`);
           }
         }
       }
