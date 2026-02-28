@@ -44,6 +44,7 @@ export interface IStorage {
   getSessionPhotos(sessionId: number): Promise<Photo[]>;
   updatePhoto(id: number, data: Partial<Photo>): Promise<Photo | undefined>;
   deletePhoto(id: number): Promise<void>;
+  isObjectKeyShared(key: string, excludePhotoId: number): Promise<boolean>;
 
   createEntry(entry: InsertEntry): Promise<Entry>;
   getEntry(id: number): Promise<Entry | undefined>;
@@ -180,6 +181,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(photos.id, id))
       .returning();
     return result;
+  }
+
+  async isObjectKeyShared(key: string, excludePhotoId: number): Promise<boolean> {
+    const rows = await db.select({ id: photos.id }).from(photos)
+      .where(and(eq(photos.objectStorageKey, key), sql`${photos.id} != ${excludePhotoId}`));
+    return rows.length > 0;
   }
 
   async deletePhoto(id: number): Promise<void> {

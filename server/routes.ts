@@ -289,6 +289,20 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can delete sessions" });
+      const sessionPhotos = await storage.getSessionPhotos(access.session.id);
+      for (const photo of sessionPhotos) {
+        try {
+          const shared = await storage.isObjectKeyShared(photo.objectStorageKey, photo.id);
+          if (!shared) {
+            const key = photo.objectStorageKey;
+            const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+            const filePath = path.join(UPLOADS_DIR, filename);
+            await fs.unlink(filePath);
+          }
+        } catch (err) {
+          console.warn("Could not delete photo file on session delete:", err);
+        }
+      }
       await storage.deleteSession(access.session.id);
       res.json({ success: true });
     } catch (error) {
@@ -358,6 +372,20 @@ export async function registerRoutes(
       for (const id of ids) {
         const access = await verifySessionAccess(id, userId);
         if (access && isOwner(access.role)) {
+          const sessionPhotos = await storage.getSessionPhotos(id);
+          for (const photo of sessionPhotos) {
+            try {
+              const shared = await storage.isObjectKeyShared(photo.objectStorageKey, photo.id);
+              if (!shared) {
+                const key = photo.objectStorageKey;
+                const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+                const filePath = path.join(UPLOADS_DIR, filename);
+                await fs.unlink(filePath);
+              }
+            } catch (err) {
+              console.warn("Could not delete photo file on bulk session delete:", err);
+            }
+          }
           await storage.deleteSession(id);
           results.push(id);
         }
@@ -673,9 +701,12 @@ export async function registerRoutes(
       if (lockMsg) return res.status(403).json({ message: lockMsg });
       try {
         const key = photo.objectStorageKey;
-        const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
-        const filePath = path.join(UPLOADS_DIR, filename);
-        await fs.unlink(filePath);
+        const shared = await storage.isObjectKeyShared(key, photo.id);
+        if (!shared) {
+          const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+          const filePath = path.join(UPLOADS_DIR, filename);
+          await fs.unlink(filePath);
+        }
       } catch (err) {
         console.warn("Could not delete uploaded file:", err);
       }

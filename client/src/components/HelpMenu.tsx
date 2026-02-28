@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription,
@@ -552,6 +552,11 @@ export function SessionSections() {
             icon={<HelpIcon icon={Share2} />}
             label="Shareable Link"
             description="Copy a direct link to the Flagged tab to share with team members. The link opens the session directly to this view."
+          />
+          <FeatureRow
+            icon={<AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
+            label="Entries Without Photos"
+            description="An amber-highlighted Issues section appears below the flagged pins list whenever entries exist with no linked photo. Each card shows the reel tag, aisle/section, reel count, and footage. These entries are not yet associated with a pin on any photo — edit or delete them from Table View."
           />
         </AccordionContent>
       </AccordionItem>
