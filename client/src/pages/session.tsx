@@ -650,7 +650,7 @@ function SessionWorkspace({
         )}
 
         {mode === "strip" && mobileFlowDetailParentPhotoId == null && entries.length > 0 && (
-          <div className="hidden sm:flex justify-center py-3">
+          <div className="flex justify-center py-3">
             <Button
               variant="outline"
               size="sm"
