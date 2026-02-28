@@ -125,6 +125,20 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [suggestions, setSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const [suggestionPos, setSuggestionPos] = useState<{ top: number; bottom: number; left: number; width: number } | null>(null);
+  const suggestionsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!activeSuggestionPin) return;
+    const close = (e: Event) => {
+      if (suggestionsRef.current?.contains(e.target as Node)) return;
+      setActiveSuggestionPin(null);
+      setSuggestions([]);
+      setSuggestionIndex(-1);
+      setSuggestionPos(null);
+    };
+    window.addEventListener("scroll", close, true);
+    return () => window.removeEventListener("scroll", close, true);
+  }, [activeSuggestionPin]);
 
   const [scale, setScale] = useState(1);
   const [panX, setPanX] = useState(0);
@@ -1777,6 +1791,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             const dropDown = window.innerHeight - suggestionPos.bottom >= 180;
                             return (
                               <div
+                                ref={suggestionsRef}
                                 style={{
                                   position: "fixed",
                                   left: suggestionPos.left,
