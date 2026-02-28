@@ -112,6 +112,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [pinsLoaded, setPinsLoaded] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipAutoSave = useRef(false);
+  const globalMaxPinRef = useRef<number>(0);
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
   const dragRef = useRef<{
@@ -140,6 +141,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     window.addEventListener("scroll", close, true);
     return () => window.removeEventListener("scroll", close, true);
   }, [activeSuggestionPin]);
+
+  useEffect(() => {
+    apiRequest("GET", `/api/sessions/${sessionId}/pins`).then(async (res) => {
+      const allPins: { label?: string | null }[] = await res.json();
+      const max = allPins.reduce((m, p) => {
+        const n = parseInt(p.label || "0", 10);
+        return isNaN(n) ? m : Math.max(m, n);
+      }, 0);
+      globalMaxPinRef.current = Math.max(globalMaxPinRef.current, max);
+    }).catch(() => {});
+  }, [sessionId]);
 
   const [scale, setScale] = useState(1);
   const [panX, setPanX] = useState(0);
@@ -312,6 +324,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         const dbPins: Pin[] = await res.json();
         const draftPins = dbPins.filter(p => !p.entryId);
         const committed = dbPins.filter(p => !!p.entryId);
+        const photoMax = dbPins.reduce((m, p) => {
+          const n = parseInt(p.label || "0", 10);
+          return isNaN(n) ? m : Math.max(m, n);
+        }, 0);
+        globalMaxPinRef.current = Math.max(globalMaxPinRef.current, photoMax);
         setCommittedPins(committed.map(p => ({
           id: `committed-${p.id}`,
           dbId: p.id,
@@ -550,14 +567,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
     if (x < 0 || x > 100 || y < 0 || y > 100) return;
 
-    const existingNumbers = [
-      ...localPins.map((p) => parseInt(p.label, 10)),
-      ...committedPins.map((p) => parseInt(p.label, 10)),
-    ].filter((n) => !isNaN(n));
-    let nextNumber = 1;
-    while (existingNumbers.includes(nextNumber)) {
-      nextNumber++;
-    }
+    const nextNumber = globalMaxPinRef.current + 1;
+    globalMaxPinRef.current = nextNumber;
     const newPin: LocalPin = {
       id: `pin-${Date.now()}`,
       x,
