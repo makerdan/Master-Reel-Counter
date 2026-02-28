@@ -120,7 +120,7 @@ function EntryTable({
                 <th style={{ textAlign: "center" }}>Category:</th>
                 <th className="hidden" style={{ textAlign: "center", whiteSpace: "nowrap" }}>VEN:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                  <span className="sm:hidden" style={{ display: "inline" }}>Rls:</span>
+                  <span className="sm:hidden">Rls:</span>
                   <span className="hidden sm:inline">Reels:</span>
                 </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ft/Reel:</th>
