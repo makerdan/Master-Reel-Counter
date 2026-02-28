@@ -118,6 +118,7 @@ function EntryTable({
                 <th className="hidden sm:table-cell" style={{ textAlign: "center" }}>Aisle:</th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
                 <th style={{ textAlign: "center" }}>Category:</th>
+                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor:</th>
                 <th className="hidden" style={{ textAlign: "center", whiteSpace: "nowrap" }}>VEN:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                   <span className="sm:hidden">Rls:</span>
@@ -128,7 +129,6 @@ function EntryTable({
                   <span className="sm:hidden">Total:</span>
                   <span className="hidden sm:inline">Total Ft:</span>
                 </th>
-                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor:</th>
                 <th className="hidden sm:table-cell" style={{ width: 50, textAlign: "center" }}>Photo:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Edit:</th>
               </tr>
@@ -175,6 +175,7 @@ function EntryTable({
                             </span>
                           )}
                         </td>
+                        <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td className="hidden" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
                         <td className="hidden sm:table-cell mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
@@ -186,7 +187,6 @@ function EntryTable({
                             </span>
                           )}
                         </td>
-                        <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>
                           {entry.photoId && photoMap.get(entry.photoId) ? (
                             <Dialog>
