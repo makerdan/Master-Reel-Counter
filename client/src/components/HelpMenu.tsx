@@ -556,7 +556,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
             label="Entries Without Photos"
-            description="An amber-highlighted Issues section appears below the flagged pins list whenever entries exist with no linked photo. Each card shows the reel tag, aisle/section, reel count, and footage. These entries are not yet associated with a pin on any photo — edit or delete them from Table View."
+            description="An amber-highlighted Issues section appears below the flagged pins list whenever entries exist with no linked photo. Each card shows the reel tag, aisle/section, reel count, and footage. These entries have no pin number. To identify which physical reel an entry corresponds to, tap the photo thumbnails on the flagged pin cards above to view photos and cross-reference reel locations. Once identified, edit or delete the entry from Table View."
           />
         </AccordionContent>
       </AccordionItem>
