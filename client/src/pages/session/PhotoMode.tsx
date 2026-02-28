@@ -972,6 +972,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const incompletePhotoIds = new Set(incompletePinsData.map(d => d.photoId));
     for (let offset = 1; offset <= uploadedPhotos.length; offset++) {
       const idx = (currentPhotoIdx + offset) % uploadedPhotos.length;
+      if (idx === currentPhotoIdx) continue;
       const photo = uploadedPhotos[idx];
       if (photo?.dbId && incompletePhotoIds.has(photo.dbId)) {
         await flushSavePins();
