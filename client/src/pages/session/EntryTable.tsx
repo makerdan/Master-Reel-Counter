@@ -112,7 +112,7 @@ function EntryTable({
             <thead>
               <tr>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
-                  <span className="sm:hidden" style={{ display: "inline" }}>Pin:</span>
+                  <span className="sm:hidden">Pin:</span>
                   <span className="hidden sm:inline">Pin #:</span>
                 </th>
                 <th className="hidden sm:table-cell" style={{ textAlign: "center" }}>Aisle:</th>
@@ -128,7 +128,7 @@ function EntryTable({
                   <span className="sm:hidden">Total:</span>
                   <span className="hidden sm:inline">Total Ft:</span>
                 </th>
-                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor Code:</th>
+                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor:</th>
                 <th className="hidden sm:table-cell" style={{ width: 50, textAlign: "center" }}>Photo:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                   <span className="sm:hidden" style={{ display: "inline" }}>Edit:</span>
