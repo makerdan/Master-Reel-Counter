@@ -1375,7 +1375,7 @@ export async function registerRoutes(
       const coverValueX = 36 + coverLabelW;
       const coverValueW = doc.page.width - 72 - coverLabelW;
       const coverLineH = 15;
-      const coverLabelColor = "#888888";
+      const coverLabelColor = "#000000";
       const coverValueColor = "#222222";
       const totalReels = (sessionEntries as any[]).reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
 
@@ -1533,10 +1533,10 @@ export async function registerRoutes(
       }
 
       const secEntryCols = [
-        { header: "Vendor:", width: 70 },
         { header: "Category:", width: 110 },
-        { header: "# of Reels:", width: 45 },
-        { header: "Total Footage:", width: 65 },
+        { header: "Vendor:", width: 70 },
+        { header: "# of Reels:", width: 45, centered: true },
+        { header: "Total Footage:", width: 65, centered: true },
         { header: "Notes:", width: 110 },
       ];
 
@@ -1546,14 +1546,18 @@ export async function registerRoutes(
         return secEntryCols.map(c => ({ ...c, width: Math.floor(c.width * secScale) }));
       };
 
-      const drawSecEntryHeader = (y: number, tblX: number, tblW: number, cols: { header: string; width: number }[]) => {
+      const drawSecEntryHeader = (y: number, tblX: number, tblW: number, cols: { header: string; width: number; centered?: boolean }[]) => {
         doc.rect(tblX, y, tblW, headerHeight).fill(headerBg);
         doc.font('Helvetica-Bold').fontSize(6.5).fillColor("#333333");
         let x = tblX;
         for (const col of cols) {
-          doc.text(col.header, x + 2, y + 4, { width: col.width - 4, lineBreak: false });
-          const tw = doc.widthOfString(col.header);
-          doc.save().moveTo(x + 2, y + 13).lineTo(x + 2 + tw, y + 13).lineWidth(0.4).strokeColor("#333333").stroke().restore();
+          if (col.centered) {
+            doc.text(col.header, x, y + 4, { width: col.width, align: 'center', lineBreak: false });
+          } else {
+            doc.text(col.header, x + 2, y + 4, { width: col.width - 4, lineBreak: false });
+            const tw = doc.widthOfString(col.header);
+            doc.save().moveTo(x + 2, y + 13).lineTo(x + 2 + tw, y + 13).lineWidth(0.4).strokeColor("#333333").stroke().restore();
+          }
           x += col.width;
         }
         doc.font('Helvetica');
@@ -1860,8 +1864,8 @@ export async function registerRoutes(
           doc.font('Helvetica-Bold').fontSize(fontSize).fillColor("#333333");
           let x = tblX;
           const baseVals = [
-            e.manufacturer || "",
             e.reelTag || "",
+            e.manufacturer || "",
             String(e.reelCount || 1),
             e.footage ? `${e.footage.toLocaleString()} ft` : "",
             notesText,
@@ -1869,14 +1873,23 @@ export async function registerRoutes(
           const vals = pinMap
             ? [pinMap.get(e.id) || "", ...baseVals]
             : baseVals;
+          const cellTextY = tblY + Math.max(1, (actualRowH - fontSize) / 2);
           for (let j = 0; j < allCols.length; j++) {
             const isNotesCol = j === notesColIdx;
-            if (isNotesCol) {
-              doc.text(vals[j], x + 2, tblY + 3, { width: allCols[j].width - 4, lineBreak: true, height: actualRowH - 4 });
+            const isPinCol = pinMap !== undefined && j === 0;
+            const col = allCols[j] as { header: string; width: number; centered?: boolean };
+            if (isPinCol) {
+              doc.fillColor(accentHex);
+              doc.text(vals[j], x + 2, cellTextY, { width: col.width - 4, lineBreak: false });
+              doc.fillColor("#333333");
+            } else if (isNotesCol) {
+              doc.text(vals[j], x + 2, tblY + 3, { width: col.width - 4, lineBreak: true, height: actualRowH - 4 });
+            } else if (col.centered) {
+              doc.text(vals[j], x, cellTextY, { width: col.width, align: 'center', lineBreak: false });
             } else {
-              doc.text(vals[j], x + 2, tblY + 3, { width: allCols[j].width - 4, lineBreak: false });
+              doc.text(vals[j], x + 2, cellTextY, { width: col.width - 4, lineBreak: false });
             }
-            x += allCols[j].width;
+            x += col.width;
           }
           doc.font('Helvetica');
           doc.rect(tblX, tblY, tblW, actualRowH).stroke(borderColor);
