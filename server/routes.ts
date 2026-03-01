@@ -1638,11 +1638,12 @@ export async function registerRoutes(
         doc.restore();
       };
 
-      // Probe GCS availability once before loading any photos
+      // Probe GCS availability once before loading any photos (1.5s timeout)
       let gcsReachable = false;
       try {
-        await objectStorageClient.bucket(BUCKET_NAME).getMetadata();
-        gcsReachable = true;
+        const gcsProbe = objectStorageClient.bucket(BUCKET_NAME).getMetadata().then(() => true as const);
+        const gcsTimeout = new Promise<false>((resolve) => setTimeout(() => resolve(false), 1500));
+        gcsReachable = await Promise.race([gcsProbe, gcsTimeout]);
       } catch {
         // GCS unavailable — all photos will load from local disk
       }
@@ -1878,18 +1879,27 @@ export async function registerRoutes(
 
       const deferredUnmatchedSections: { aisle: string; section: string; entries: any[] }[] = [];
 
-      let tocSecIdx = 0;
+      // Pre-load ALL photos from all sections in one parallel batch
       const t0 = Date.now();
+      const allPhotosFlat = sortedSections.flatMap((sec: any) => sec.photos || []);
+      const tLoad = Date.now();
+      const allLoadedResults = await Promise.all(allPhotosFlat.map((photo: any) => loadPhoto(photo)));
+      const photoLayoutMap = new Map<number, PhotoLayout>();
+      allPhotosFlat.forEach((photo: any, i: number) => {
+        const pl = allLoadedResults[i];
+        if (pl) photoLayoutMap.set(photo.id, pl);
+      });
+      console.log(`[pdf] preloaded ${photoLayoutMap.size}/${allPhotosFlat.length} photos in ${Date.now() - tLoad}ms`);
+
+      let tocSecIdx = 0;
       for (const sec of sortedSections) {
         const allPhotos = sec.photos || [];
         const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
         const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
 
-        const tLoad = Date.now();
-        const loadedPhotos: PhotoLayout[] = (
-          await Promise.all(allPhotos.map((photo: any) => loadPhoto(photo)))
-        ).filter((pl): pl is PhotoLayout => pl !== null);
-        console.log(`[pdf] sec ${sec.aisle}/${sec.section}: loaded ${loadedPhotos.length}/${allPhotos.length} photos in ${Date.now() - tLoad}ms`);
+        const loadedPhotos: PhotoLayout[] = allPhotos
+          .map((photo: any) => photoLayoutMap.get(photo.id))
+          .filter((pl: PhotoLayout | undefined): pl is PhotoLayout => pl !== undefined);
 
         if (loadedPhotos.length === 0 && sec.entries.length === 0) continue;
 
