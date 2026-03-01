@@ -115,8 +115,7 @@ export async function registerRoutes(
     return `${dirPart}/uploads/${filename}`;
   };
   const toAvatarObjectName = (filename: string): string => {
-    const dirPart = privateDir.replace(/^\/[^/]+\/?/, "");
-    return `${dirPart}/avatars/${filename}`;
+    return toStorageObjectName(`/uploads/${filename}`);
   };
 
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
@@ -2449,45 +2448,23 @@ export async function registerRoutes(
     try {
       if (!req.file) return res.status(400).json({ message: "No file provided" });
       const userId = req.user.claims.sub;
-      const ext = path.extname(req.file.originalname) || ".jpg";
-      const filename = `${randomUUID()}${ext}`;
+      const resizedBuffer = await sharp(req.file.buffer)
+        .rotate()
+        .resize(256, 256, { fit: "cover", position: "center" })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      const filename = `avatar-${randomUUID()}.jpg`;
+      const avatarKey = `/uploads/${filename}`;
       const objName = toAvatarObjectName(filename);
-      await objectStorageClient.bucket(BUCKET_NAME).file(objName).save(req.file.buffer, {
-        contentType: req.file.mimetype,
+      await objectStorageClient.bucket(BUCKET_NAME).file(objName).save(resizedBuffer, {
+        contentType: "image/jpeg",
       });
-      const avatarKey = `/uploads/avatars/${filename}`;
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const user = await authStorage.updateUserAvatar(userId, avatarKey);
       res.json(user);
     } catch (error) {
       console.error("Avatar upload error:", error);
       res.status(500).json({ message: "Failed to upload avatar" });
-    }
-  });
-
-  // Serve user avatars
-  app.get("/uploads/avatars/:filename", isAuthenticated, async (req: any, res) => {
-    try {
-      const filename = req.params.filename;
-      if (filename.includes("..") || filename.includes("/")) {
-        return res.status(400).json({ error: "Invalid filename" });
-      }
-      const ext = path.extname(filename).toLowerCase();
-      const mimeTypes: Record<string, string> = {
-        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
-        ".gif": "image/gif", ".webp": "image/webp",
-      };
-      const objName = toAvatarObjectName(filename);
-      const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(objName);
-      const [existsInGcs] = await gcsFile.exists();
-      if (!existsInGcs) return res.status(404).json({ error: "Avatar not found" });
-      res.set({
-        "Content-Type": mimeTypes[ext] || "application/octet-stream",
-        "Cache-Control": "private, max-age=86400",
-      });
-      gcsFile.createReadStream().pipe(res);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to serve avatar" });
     }
   });
 
@@ -2498,8 +2475,7 @@ export async function registerRoutes(
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const user = await authStorage.getUser(userId);
       if (user?.customAvatarKey) {
-        const filename = user.customAvatarKey.replace("/uploads/avatars/", "");
-        const objName = toAvatarObjectName(filename);
+        const objName = toStorageObjectName(user.customAvatarKey);
         await objectStorageClient.bucket(BUCKET_NAME).file(objName).delete({ ignoreNotFound: true }).catch(() => {});
       }
       const updated = await authStorage.updateUserAvatar(userId, null);
