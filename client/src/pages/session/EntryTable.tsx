@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle } from "lucide-react";
+import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -93,7 +93,7 @@ function EntryTable({
   return (
     <Card>
       <CardHeader className="p-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <CardTitle className="text-sm" data-testid="text-entries-title">Table View - {entries.length} Entries</CardTitle>
           {(() => {
             const warnings = entries.filter(e => !e.reelTag || !e.footage).length;
@@ -101,6 +101,15 @@ function EntryTable({
               <span className="flex items-center gap-1 text-xs text-amber-500" data-testid="text-validation-warnings">
                 <AlertTriangle className="h-3 w-3" />
                 {warnings} warning{warnings !== 1 ? "s" : ""}
+              </span>
+            ) : null;
+          })()}
+          {(() => {
+            const photoless = entries.filter(e => !pinByEntryId.has(e.id)).length;
+            return photoless > 0 ? (
+              <span className="flex items-center gap-1 text-xs text-amber-500" data-testid="text-photoless-warnings">
+                <ImageOff className="h-3 w-3" />
+                {photoless} without photo
               </span>
             ) : null;
           })()}
@@ -162,8 +171,9 @@ function EntryTable({
                     </tr>
                     {isExpanded && sectionEntries.map((entry, idx) => {
                       const info = getReelInfo(entry);
+                      const isUnpinned = !pinByEntryId.has(entry.id);
                       return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
-                        <td className="mono text-muted-foreground" style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(3, "0")}</td>
+                        <td className={`mono ${isUnpinned ? "text-amber-500 border-l-2 border-amber-400" : "text-muted-foreground"}`} style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(3, "0")}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.aisle}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono font-bold">
@@ -232,6 +242,10 @@ function EntryTable({
                                 </div>
                               </DialogContent>
                             </Dialog>
+                          ) : isUnpinned ? (
+                            <span className="flex justify-center" title="No linked photo" data-testid={`icon-no-photo-${entry.id}`}>
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                            </span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}

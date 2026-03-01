@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StickyNote, ExternalLink, Loader2, Link2, X, Copy, Trash2 } from "lucide-react";
+import { StickyNote, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -472,6 +472,10 @@ export default function PhotoStrip({
 
   return (
     <div className="p-4 space-y-6" data-testid="photo-strip">
+      <h2 className="sm:hidden text-lg font-bold underline flex items-center gap-2 -mb-2">
+        <LayoutGrid className="h-5 w-5" />
+        Photos Reel
+      </h2>
       {aisleGroups.map((aisleGroup) => {
         const totalPhotos = aisleGroup.sections.reduce((n, s) => n + s.photos.length, 0);
         return (
