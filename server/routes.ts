@@ -132,6 +132,7 @@ export async function registerRoutes(
       const objectName = toStorageObjectName(objectPath);
       await objectStorageClient.bucket(BUCKET_NAME).file(objectName).save(req.file.buffer, {
         contentType: req.file.mimetype,
+        resumable: false,
       });
       console.log(`Upload success: file="${objectId}", size=${req.file.size}, type=${req.file.mimetype}`);
 
@@ -2458,6 +2459,7 @@ export async function registerRoutes(
       const objName = toAvatarObjectName(filename);
       await objectStorageClient.bucket(BUCKET_NAME).file(objName).save(resizedBuffer, {
         contentType: "image/jpeg",
+        resumable: false,
       });
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const user = await authStorage.updateUserAvatar(userId, avatarKey);
