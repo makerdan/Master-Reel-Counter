@@ -68,34 +68,36 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
 
   return (
     <div className="space-y-4">
-      <div className="relative flex items-center justify-center sm:justify-start gap-2">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center sm:flex sm:justify-start sm:gap-2">
+        <div className="sm:hidden" />
         <h2 className="text-lg font-bold underline flex items-center gap-2" data-testid="text-flagged-heading">
           <Flag className="h-5 w-5 text-yellow-500" />
           <span className="sm:hidden">Flagged</span>
           <span className="hidden sm:inline">Flagged Reels</span>
           <Badge variant="secondary" className="hidden sm:inline-flex" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
         </h2>
-        <Button
-          variant="outline"
-          size="sm"
-          className="absolute right-0 sm:static"
-          data-testid="button-share-flagged"
-          title="Copy shareable link"
-          aria-label="Share"
-          onClick={() => {
-            const url = `${window.location.origin}/session/${sessionId}?tab=flagged`;
-            navigator.clipboard.writeText(url).then(() => {
-              setCopied(true);
-              toast({ title: "Link copied", description: "Share this link with your team member." });
-              setTimeout(() => setCopied(false), 2000);
-            }).catch(() => {
-              toast({ title: "Copy failed", description: url, variant: "destructive" });
-            });
-          }}
-        >
-          {copied ? <Check className="h-3.5 w-3.5 sm:mr-1" /> : <Share2 className="h-3.5 w-3.5 sm:mr-1" />}
-          <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
-        </Button>
+        <div className="flex justify-end sm:contents">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="button-share-flagged"
+            title="Copy shareable link"
+            aria-label="Share"
+            onClick={() => {
+              const url = `${window.location.origin}/session/${sessionId}?tab=flagged`;
+              navigator.clipboard.writeText(url).then(() => {
+                setCopied(true);
+                toast({ title: "Link copied", description: "Share this link with your team member." });
+                setTimeout(() => setCopied(false), 2000);
+              }).catch(() => {
+                toast({ title: "Copy failed", description: url, variant: "destructive" });
+              });
+            }}
+          >
+            {copied ? <Check className="h-3.5 w-3.5 sm:mr-1" /> : <Share2 className="h-3.5 w-3.5 sm:mr-1" />}
+            <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
