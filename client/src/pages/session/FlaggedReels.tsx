@@ -220,13 +220,13 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                 </div>
                 {pin.photoUrl ? (
                   <div
-                    className="relative w-full aspect-video rounded overflow-hidden border border-border cursor-pointer"
+                    className="relative w-full rounded overflow-hidden border border-border cursor-pointer"
                     onClick={() => setPreviewPin(pin)}
                   >
                     <img
                       src={pin.photoUrl}
                       alt={pin.photoFilename || "Photo"}
-                      className="w-full h-full object-cover"
+                      className="w-full h-auto block"
                     />
                     <div
                       className="absolute pointer-events-none"
