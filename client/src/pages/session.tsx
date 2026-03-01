@@ -339,6 +339,7 @@ function SessionWorkspace({
   };
 
   const [exportWarningOpen, setExportWarningOpen] = useState(false);
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [pendingExportType, setPendingExportType] = useState<"pdf" | "csv" | null>(null);
   const unpinnedEntries = entries.filter(e => !pinByEntryId.has(e.id));
 
@@ -384,6 +385,7 @@ function SessionWorkspace({
   };
 
   const doExportPdf = async () => {
+    setIsPdfExporting(true);
     try {
       if (!navigator.onLine) throw new Error("You appear to be offline.");
       const params = new URLSearchParams();
@@ -454,6 +456,8 @@ function SessionWorkspace({
         ${userSettings?.exportFooterText ? `<div class="audit">${esc(userSettings.exportFooterText)}</div>` : ""}
         <script>setTimeout(()=>window.print(),500)</script></body></html>`);
       w.document.close();
+    } finally {
+      setIsPdfExporting(false);
     }
   };
 
@@ -553,19 +557,19 @@ function SessionWorkspace({
             </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data">
-                  <Share2 className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Export</span>
+                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data" disabled={isPdfExporting}>
+                  {isPdfExporting ? <Loader2 className="h-4 w-4 sm:mr-1 animate-spin" /> : <Share2 className="h-4 w-4 sm:mr-1" />}
+                  <span className="hidden sm:inline">{isPdfExporting ? "Exporting…" : "Export"}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={exportCsv} data-testid="button-export-csv">
+                <DropdownMenuItem onClick={exportCsv} data-testid="button-export-csv" disabled={isPdfExporting}>
                   <Download className="h-4 w-4 mr-2" />
                   CSV
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf">
-                  <FileText className="h-4 w-4 mr-2" />
-                  PDF
+                <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isPdfExporting}>
+                  {isPdfExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                  {isPdfExporting ? "Generating PDF…" : "PDF"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={shareSession} data-testid="button-share-session">
                   <Mail className="h-4 w-4 mr-2" />

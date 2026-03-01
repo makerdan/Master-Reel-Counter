@@ -1871,11 +1871,9 @@ export async function registerRoutes(
         const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
         const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
 
-        const loadedPhotos: PhotoLayout[] = [];
-        for (const photo of allPhotos) {
-          const pl = await loadPhoto(photo);
-          if (pl) loadedPhotos.push(pl);
-        }
+        const loadedPhotos: PhotoLayout[] = (
+          await Promise.all(allPhotos.map((photo: any) => loadPhoto(photo)))
+        ).filter((pl): pl is PhotoLayout => pl !== null);
 
         if (loadedPhotos.length === 0 && sec.entries.length === 0) continue;
 
