@@ -1660,12 +1660,13 @@ export async function registerRoutes(
           if (!loadedFromGcs) {
             rawBuffer = await fs.readFile(photoPath);
           }
-          const orientedBuffer = await sharp(rawBuffer!).rotate().toBuffer();
-          const metadata = await sharp(orientedBuffer).metadata();
-          const imgW = metadata.width || 1;
-          const imgH = metadata.height || 1;
+          const { data: orientedBuffer, info } = await sharp(rawBuffer!)
+            .rotate()
+            .resize(1600, 1200, { fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 82 })
+            .toBuffer({ resolveWithObject: true });
           const img = doc.openImage(orientedBuffer);
-          return { photo, buffer: orientedBuffer, imgW: img.width, imgH: img.height, origW: imgW, origH: imgH };
+          return { photo, buffer: orientedBuffer, imgW: img.width, imgH: img.height, origW: info.width, origH: info.height };
         } catch {
           return null;
         }
