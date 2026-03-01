@@ -199,13 +199,19 @@ export async function registerRoutes(
         "Content-Type": mimeTypes[ext] || "application/octet-stream",
         "Cache-Control": "private, max-age=86400",
       };
-      const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(`/uploads/${filename}`));
-      const [existsInGcs] = await gcsFile.exists();
-      if (existsInGcs) {
-        res.set(headers);
-        gcsFile.createReadStream().pipe(res);
-        return;
+      let servedFromGcs = false;
+      try {
+        const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(`/uploads/${filename}`));
+        const [existsInGcs] = await gcsFile.exists();
+        if (existsInGcs) {
+          res.set(headers);
+          gcsFile.createReadStream().pipe(res);
+          servedFromGcs = true;
+        }
+      } catch {
+        // GCS unavailable in dev environment — fall through to local disk
       }
+      if (servedFromGcs) return;
       const filePath = path.join(UPLOADS_DIR, filename);
       try {
         await fs.access(filePath);
