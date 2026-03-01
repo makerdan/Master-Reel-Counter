@@ -27,6 +27,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import type { Session, Entry, Photo, Pin } from "@shared/schema";
 import PhotoMode from "./session/PhotoMode";
 import TeamDialog from "./session/TeamDialog";
@@ -384,6 +385,7 @@ function SessionWorkspace({
 
   const doExportPdf = async () => {
     try {
+      if (!navigator.onLine) throw new Error("You appear to be offline.");
       const params = new URLSearchParams();
       if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
       if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
@@ -404,8 +406,9 @@ function SessionWorkspace({
       URL.revokeObjectURL(url);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "PDF export failed";
+      const isNetworkError = /offline|fetch|network|failed to fetch/i.test(msg);
       let recommendation: string;
-      if (/fetch|network|failed to fetch/i.test(msg)) {
+      if (isNetworkError) {
         recommendation = "Check your internet connection and try again.";
       } else if (/not found|404/i.test(msg)) {
         recommendation = "Try refreshing the page. If the session no longer appears, it may have been deleted.";
@@ -418,6 +421,13 @@ function SessionWorkspace({
         title: "PDF Export Failed",
         description: `${msg} — ${recommendation}`,
         variant: "destructive",
+        ...(!isNetworkError && {
+          action: (
+            <ToastAction altText="Try again" onClick={() => doExportPdf()}>
+              Try Again
+            </ToastAction>
+          ),
+        }),
       });
       const w = window.open("", "_blank");
       if (!w) return;

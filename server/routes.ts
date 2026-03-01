@@ -15,6 +15,7 @@ import sharp from "sharp";
 import { randomUUID, randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
+import { PassThrough } from "stream";
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
 const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null }>();
@@ -1344,9 +1345,10 @@ export async function registerRoutes(
 
       const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 36, bufferPages: true });
       const filename = buildExportFilename("pdf");
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      doc.pipe(res);
+      const bufferStream = new PassThrough();
+      const pdfChunks: Buffer[] = [];
+      bufferStream.on("data", (chunk: Buffer) => pdfChunks.push(chunk));
+      doc.pipe(bufferStream);
 
       const companyName = typeof req.query.companyName === "string" ? req.query.companyName : null;
       const footerText = typeof req.query.footerText === "string" ? req.query.footerText : null;
@@ -2444,6 +2446,17 @@ export async function registerRoutes(
       }
 
       doc.end();
+
+      await new Promise<void>((resolve, reject) => {
+        bufferStream.on("finish", resolve);
+        bufferStream.on("error", reject);
+      });
+
+      const pdfBuffer = Buffer.concat(pdfChunks);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", pdfBuffer.length);
+      res.send(pdfBuffer);
     } catch (error) {
       console.error("Error generating PDF:", error);
       if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
