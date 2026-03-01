@@ -118,6 +118,41 @@ export async function registerRoutes(
     return toStorageObjectName(`/uploads/${filename}`);
   };
 
+  const SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+  const putToObjectStorage = async (
+    bucketName: string,
+    objectName: string,
+    buffer: Buffer,
+    contentType: string,
+    localFallbackPath?: string
+  ): Promise<void> => {
+    try {
+      const signRes = await fetch(`${SIDECAR_ENDPOINT}/object-storage/signed-object-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bucket_name: bucketName,
+          object_name: objectName,
+          method: "PUT",
+          expires_at: new Date(Date.now() + 900_000).toISOString(),
+        }),
+      });
+      if (!signRes.ok) throw new Error(`Sidecar sign: ${signRes.status}`);
+      const { signed_url: signedUrl } = await signRes.json();
+      const uploadRes = await fetch(signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: buffer,
+      });
+      if (!uploadRes.ok) throw new Error(`GCS PUT: ${uploadRes.status}`);
+    } catch (gcsErr) {
+      if (!localFallbackPath) throw gcsErr;
+      console.warn(`Object storage unavailable (${(gcsErr as Error).message}), writing to local disk: ${localFallbackPath}`);
+      await fs.mkdir(path.dirname(localFallbackPath), { recursive: true });
+      await fs.writeFile(localFallbackPath, buffer);
+    }
+  };
+
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
   app.post("/api/uploads/direct", isAuthenticated, upload.single("file"), async (req: any, res) => {
@@ -130,10 +165,8 @@ export async function registerRoutes(
       const objectId = `${randomUUID()}${ext}`;
       const objectPath = `/uploads/${objectId}`;
       const objectName = toStorageObjectName(objectPath);
-      await objectStorageClient.bucket(BUCKET_NAME).file(objectName).save(req.file.buffer, {
-        contentType: req.file.mimetype,
-        resumable: false,
-      });
+      const localFallback = path.join(UPLOADS_DIR, objectId);
+      await putToObjectStorage(BUCKET_NAME, objectName, req.file.buffer, req.file.mimetype, localFallback);
       console.log(`Upload success: file="${objectId}", size=${req.file.size}, type=${req.file.mimetype}`);
 
       res.json({
@@ -2457,10 +2490,8 @@ export async function registerRoutes(
       const filename = `avatar-${randomUUID()}.jpg`;
       const avatarKey = `/uploads/${filename}`;
       const objName = toAvatarObjectName(filename);
-      await objectStorageClient.bucket(BUCKET_NAME).file(objName).save(resizedBuffer, {
-        contentType: "image/jpeg",
-        resumable: false,
-      });
+      const avatarLocalFallback = path.join(UPLOADS_DIR, filename);
+      await putToObjectStorage(BUCKET_NAME, objName, resizedBuffer, "image/jpeg", avatarLocalFallback);
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const user = await authStorage.updateUserAvatar(userId, avatarKey);
       res.json(user);
