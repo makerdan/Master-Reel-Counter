@@ -69,9 +69,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center sm:flex sm:justify-start sm:gap-2">
-        <div className="sm:hidden" />
+        <Flag className="sm:hidden h-5 w-5 text-yellow-500" />
         <h2 className="text-lg font-bold underline flex items-center gap-2" data-testid="text-flagged-heading">
-          <Flag className="h-5 w-5 text-yellow-500" />
+          <Flag className="hidden sm:inline h-5 w-5 text-yellow-500" />
           <span className="sm:hidden">Flagged</span>
           <span className="hidden sm:inline">Flagged Reels</span>
           <Badge variant="secondary" className="hidden sm:inline-flex" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
