@@ -64,14 +64,15 @@ export function formatSessionTime(firstPhotoAt: string | Date | null, lastPhotoA
     month: "short", day: "numeric",
   });
   if (!lastPhotoAt || new Date(firstPhotoAt).getTime() === new Date(lastPhotoAt).getTime()) {
-    return elapsedOnly ? "0m" : fmt(firstPhotoAt);
+    return elapsedOnly ? "0s" : fmt(firstPhotoAt);
   }
   const start = new Date(firstPhotoAt);
   const end = new Date(lastPhotoAt);
   const diff = end.getTime() - start.getTime();
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
-  const elapsed = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  const seconds = Math.floor((diff % 60000) / 1000);
+  const elapsed = hours > 0 ? `${hours}h ${minutes}m` : minutes > 0 ? `${minutes}m` : `${seconds}s`;
   if (elapsedOnly) return elapsed;
   const sameDay = start.getFullYear() === end.getFullYear() &&
     start.getMonth() === end.getMonth() &&

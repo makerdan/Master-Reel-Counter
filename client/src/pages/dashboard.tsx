@@ -549,6 +549,7 @@ export default function Dashboard() {
     if (!first || !last) return null;
     const diff = new Date(last).getTime() - new Date(first).getTime();
     if (diff <= 0) return null;
+    if (diff < 60000) return `${Math.floor(diff / 1000)}s`;
     const totalMinutes = Math.round(diff / 60000);
     if (totalMinutes < 60) return `${totalMinutes}m`;
     const hours = Math.floor(totalMinutes / 60);

@@ -45,12 +45,13 @@ export function formatSessionTimeMobile(
   if (!firstPhotoAt) return "No photos yet";
   const dateStr = formatDateShort(firstPhotoAt, tz);
   if (!lastPhotoAt || new Date(firstPhotoAt).getTime() === new Date(lastPhotoAt).getTime()) {
-    return `${dateStr} · 0m`;
+    return `${dateStr} · 0s`;
   }
   const diff = new Date(lastPhotoAt).getTime() - new Date(firstPhotoAt).getTime();
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
-  const elapsed = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  const seconds = Math.floor((diff % 60000) / 1000);
+  const elapsed = hours > 0 ? `${hours}h ${minutes}m` : minutes > 0 ? `${minutes}m` : `${seconds}s`;
   return `${dateStr} · ${elapsed}`;
 }
 
@@ -84,14 +85,15 @@ export function formatSessionTimeWithTz(
   const dateFmt = (d: string | Date) => formatDateOnly(d, tz);
 
   if (!lastPhotoAt || new Date(firstPhotoAt).getTime() === new Date(lastPhotoAt).getTime()) {
-    return elapsedOnly ? "0m" : fmt(firstPhotoAt);
+    return elapsedOnly ? "0s" : fmt(firstPhotoAt);
   }
   const start = new Date(firstPhotoAt);
   const end = new Date(lastPhotoAt);
   const diff = end.getTime() - start.getTime();
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
-  const elapsed = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  const seconds = Math.floor((diff % 60000) / 1000);
+  const elapsed = hours > 0 ? `${hours}h ${minutes}m` : minutes > 0 ? `${minutes}m` : `${seconds}s`;
   if (elapsedOnly) return elapsed;
 
   const sameDay = (() => {
