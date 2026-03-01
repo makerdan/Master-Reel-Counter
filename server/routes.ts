@@ -1352,6 +1352,7 @@ export async function registerRoutes(
 
       const companyName = typeof req.query.companyName === "string" ? req.query.companyName : null;
       const footerText = typeof req.query.footerText === "string" ? req.query.footerText : null;
+      const exportQuality = req.query.quality === "full" ? "full" : "standard";
 
       const accentHex = "#ea580c";
       const headerBg = "#f5f0eb";
@@ -1673,10 +1674,17 @@ export async function registerRoutes(
           if (!loadedFromGcs) {
             rawBuffer = await fs.readFile(photoPath);
           }
-          const { data: orientedBuffer, info } = await sharp(rawBuffer!)
-            .rotate()
-            .resize(1600, 1200, { fit: "inside", withoutEnlargement: true })
-            .jpeg({ quality: 82 })
+          let sharpPipeline = sharp(rawBuffer!).rotate();
+          if (exportQuality === "standard") {
+            sharpPipeline = sharpPipeline
+              .resize(1600, 1200, { fit: "inside", withoutEnlargement: true })
+              .jpeg({ quality: 82 });
+          }
+          const manualRotation = (photo.rotation ?? 0) % 360;
+          if (manualRotation !== 0) {
+            sharpPipeline = sharpPipeline.rotate(manualRotation);
+          }
+          const { data: orientedBuffer, info } = await sharpPipeline
             .toBuffer({ resolveWithObject: true });
           const img = doc.openImage(orientedBuffer);
           return { photo, buffer: orientedBuffer, imgW: img.width, imgH: img.height, origW: info.width, origH: info.height };

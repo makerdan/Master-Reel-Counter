@@ -37,7 +37,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number; pinScale?: number }>>([]);
+  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number; pinScale?: number; rotation?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const initialRestoredRef = useRef(false);
   const saveEnabledRef = useRef(false);
@@ -161,6 +161,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [pinScale, setPinScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(0.15);
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rotationSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pinTableRef = useRef<HTMLTableElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -228,6 +229,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         isDetailShot: p.isDetailShot || false,
         parentPhotoId: p.parentPhotoId || undefined,
         pinScale: p.pinScale ?? 1,
+        rotation: p.rotation ?? 0,
       };
     });
     mapped.sort((a, b) => {
@@ -426,6 +428,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       setPhotoNotes(currentPhoto.notes || "");
       setIsDetailShot(currentPhoto.isDetailShot || false);
       setParentPhotoId(currentPhoto.parentPhotoId);
+      setRotation(currentPhoto.rotation ?? 0);
     }
   }, [currentPhotoIdx, currentPhoto?.dbId]);
 
@@ -1416,7 +1419,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 </button>
                 <button
                   className="photo-overlay-btn"
-                  onClick={(e) => { e.stopPropagation(); setRotation((r) => (r + 90) % 360); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newRot = (rotation + 90) % 360;
+                    setRotation(newRot);
+                    const photoId = currentPhoto?.dbId;
+                    if (!photoId) return;
+                    setUploadedPhotos(prev => prev.map(p => p.dbId === photoId ? { ...p, rotation: newRot } : p));
+                    if (rotationSaveTimer.current) clearTimeout(rotationSaveTimer.current);
+                    rotationSaveTimer.current = setTimeout(async () => {
+                      try { await apiRequest("PATCH", `/api/photos/${photoId}`, { rotation: newRot }); } catch {}
+                    }, 80);
+                  }}
                   title="Rotate clockwise"
                   data-testid="button-rotate-cw"
                 >
@@ -1424,7 +1438,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 </button>
                 <button
                   className="photo-overlay-btn"
-                  onClick={(e) => { e.stopPropagation(); setRotation((r) => (r - 90 + 360) % 360); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newRot = (rotation - 90 + 360) % 360;
+                    setRotation(newRot);
+                    const photoId = currentPhoto?.dbId;
+                    if (!photoId) return;
+                    setUploadedPhotos(prev => prev.map(p => p.dbId === photoId ? { ...p, rotation: newRot } : p));
+                    if (rotationSaveTimer.current) clearTimeout(rotationSaveTimer.current);
+                    rotationSaveTimer.current = setTimeout(async () => {
+                      try { await apiRequest("PATCH", `/api/photos/${photoId}`, { rotation: newRot }); } catch {}
+                    }, 80);
+                  }}
                   title="Rotate counter-clockwise"
                   data-testid="button-rotate-ccw"
                 >

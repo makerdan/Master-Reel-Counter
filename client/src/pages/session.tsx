@@ -341,6 +341,17 @@ function SessionWorkspace({
   const [exportWarningOpen, setExportWarningOpen] = useState(false);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [pendingExportType, setPendingExportType] = useState<"pdf" | "csv" | null>(null);
+  const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
+  const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
+    () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
+  );
+  const [pdfDialogWaiting, setPdfDialogWaiting] = useState(false);
+  const fullAbortRef = useRef<AbortController | null>(null);
+  const stdAbortRef  = useRef<AbortController | null>(null);
+  const fullBlobRef  = useRef<Blob | null>(null);
+  const stdBlobRef   = useRef<Blob | null>(null);
+  const fullFetchRef = useRef<Promise<Blob | null> | null>(null);
+  const stdFetchRef  = useRef<Promise<Blob | null> | null>(null);
   const unpinnedEntries = entries.filter(e => !pinByEntryId.has(e.id));
 
   const doExportCsv = async () => {
@@ -384,15 +395,88 @@ function SessionWorkspace({
     await doExportCsv();
   };
 
+  const buildPdfUrl = (quality: "full" | "standard") => {
+    const params = new URLSearchParams();
+    if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
+    if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
+    params.set("quality", quality);
+    return `/api/sessions/${sessionId}/export/pdf?${params}`;
+  };
+
+  const startPdfFetch = (quality: "full" | "standard") => {
+    const ctrl = new AbortController();
+    if (quality === "full") fullAbortRef.current = ctrl;
+    else stdAbortRef.current = ctrl;
+    const p = fetch(buildPdfUrl(quality), { credentials: "include", signal: ctrl.signal })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        return blob.size >= 500 ? blob : null;
+      })
+      .catch(() => null);
+    if (quality === "full") fullFetchRef.current = p;
+    else stdFetchRef.current = p;
+    p.then((blob) => {
+      if (quality === "full") fullBlobRef.current = blob;
+      else stdBlobRef.current = blob;
+    });
+  };
+
+  const abortPdfFetches = () => {
+    fullAbortRef.current?.abort(); fullAbortRef.current = null;
+    stdAbortRef.current?.abort();  stdAbortRef.current = null;
+    fullBlobRef.current = null; stdBlobRef.current = null;
+    fullFetchRef.current = null; stdFetchRef.current = null;
+  };
+
+  const openQualityDialogDirect = () => {
+    abortPdfFetches();
+    setPdfQualityOpen(true);
+    startPdfFetch("full");
+    startPdfFetch("standard");
+  };
+
+  const confirmQualityExport = async () => {
+    localStorage.setItem("pdfExportQuality", pdfQualityChoice);
+    if (pdfQualityChoice === "full") { stdAbortRef.current?.abort(); stdAbortRef.current = null; }
+    else { fullAbortRef.current?.abort(); fullAbortRef.current = null; }
+    const blobRef  = pdfQualityChoice === "full" ? fullBlobRef  : stdBlobRef;
+    const fetchRef = pdfQualityChoice === "full" ? fullFetchRef : stdFetchRef;
+    let blob = blobRef.current;
+    if (!blob) {
+      setPdfDialogWaiting(true);
+      blob = (await fetchRef.current) ?? null;
+      setPdfDialogWaiting(false);
+    }
+    setPdfQualityOpen(false);
+    abortPdfFetches();
+    if (!blob) {
+      toast({
+        title: "PDF Export Failed",
+        description: "Export failed — Try again in a moment.",
+        variant: "destructive",
+        action: <ToastAction altText="Try again" onClick={exportPdf}>Try Again</ToastAction>,
+      });
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = buildExportFilename(session, "pdf");
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const cancelQualityDialog = () => {
+    abortPdfFetches();
+    setPdfQualityOpen(false);
+  };
+
   const doExportPdf = async () => {
+    const quality = (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full";
     setIsPdfExporting(true);
     try {
-      if (!navigator.onLine) throw new Error("You appear to be offline.");
-      const params = new URLSearchParams();
-      if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
-      if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
-      const qs = params.toString();
-      const res = await fetch(`/api/sessions/${sessionId}/export/pdf${qs ? `?${qs}` : ""}`, { credentials: "include" });
+      const res = await fetch(buildPdfUrl(quality), { credentials: "include" });
       if (!res.ok) {
         let serverMsg = "PDF export failed";
         try { const body = await res.json(); serverMsg = body.message || body.error || serverMsg; } catch {}
@@ -431,43 +515,22 @@ function SessionWorkspace({
           ),
         }),
       });
-      const w = window.open("", "_blank");
-      if (!w) return;
-      const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const rowsHtml = entries.map((e, i) => `
-        <tr>
-          <td>${i + 1}</td><td>${esc(e.aisle)}</td><td>${esc(e.section)}</td><td>${esc(e.position || "")}</td>
-          <td>${esc(e.palletId || "")}</td><td>${esc(e.reelTag || "")}</td><td>${esc(e.wireType || "")}</td>
-          <td>${esc(e.gauge || "")}</td><td>${e.footage || ""}</td>
-          <td>${e.reelCount || 1}</td><td>${esc(e.conductors || "")}</td><td>${esc(e.color || "")}</td><td>${esc(e.manufacturer || "")}</td>
-          <td>${esc(e.notes || "")}</td>
-        </tr>
-      `).join("");
-      w.document.write(`<!DOCTYPE html><html><head><title>${session.name} - Report</title>
-        <style>body{font-family:Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%;margin-top:12px}
-        th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;font-size:12px}th{background:#f5f0eb}
-        h1{font-size:18px}h2{font-size:14px;color:#666;margin-top:4px}.audit{margin-top:20px;font-size:10px;color:#999;border-top:1px solid #ddd;padding-top:8px}</style></head><body>
-        ${userSettings?.companyName ? `<h1>${esc(userSettings.companyName)}</h1>` : ""}
-        <h1>Master Reel Counter - ${session.name}</h1>
-        <h2>Location: ${session.location || "N/A"} | Entries: ${entries.length} | Total Footage: ${totalFootage.toLocaleString()} ft</h2>
-        <table><thead><tr><th>#</th><th>Aisle</th><th>Section</th><th>Position</th><th>Pallet ID</th><th>Reel Tag</th><th>Wire Type</th><th>Gauge</th><th>Footage</th><th>Reel Count</th><th>Conductors</th><th>Color</th><th>Manufacturer</th><th>Notes</th></tr></thead>
-        <tbody>${rowsHtml}</tbody></table>
-        <div class="audit">Generated: ${new Date().toISOString()} | First photo: ${session.firstPhotoAt ? new Date(session.firstPhotoAt).toISOString() : "N/A"} | Last photo: ${session.lastPhotoAt ? new Date(session.lastPhotoAt).toISOString() : "N/A"}</div>
-        ${userSettings?.exportFooterText ? `<div class="audit">${esc(userSettings.exportFooterText)}</div>` : ""}
-        <script>setTimeout(()=>window.print(),500)</script></body></html>`);
-      w.document.close();
     } finally {
       setIsPdfExporting(false);
     }
   };
 
-  const exportPdf = async () => {
+  const exportPdf = () => {
     if (unpinnedEntries.length > 0) {
       setPendingExportType("pdf");
       setExportWarningOpen(true);
       return;
     }
-    await doExportPdf();
+    if (!navigator.onLine) {
+      toast({ title: "PDF Export Failed", description: "You appear to be offline. Check your internet connection and try again.", variant: "destructive" });
+      return;
+    }
+    openQualityDialogDirect();
   };
 
   return (
@@ -896,7 +959,7 @@ function SessionWorkspace({
                 setExportWarningOpen(false);
                 const type = pendingExportType;
                 setPendingExportType(null);
-                if (type === "pdf") await doExportPdf();
+                if (type === "pdf") openQualityDialogDirect();
                 else if (type === "csv") await doExportCsv();
               }}
             >
@@ -905,6 +968,67 @@ function SessionWorkspace({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={pdfQualityOpen} onOpenChange={(open) => { if (!open) cancelQualityDialog(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>PDF Export Quality</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {(["full", "standard"] as const).map((q) => (
+              <button
+                key={q}
+                onClick={() => setPdfQualityChoice(q)}
+                className={`w-full text-left rounded-lg border-2 p-4 transition-colors ${
+                  pdfQualityChoice === q
+                    ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30"
+                    : "border-border hover:border-muted-foreground/40"
+                }`}
+                data-testid={`button-pdf-quality-${q}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm">
+                    {q === "full" ? "Full Quality" : "Standard"}
+                  </span>
+                  {q === "full" && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 uppercase tracking-wide">
+                      Recommended
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {q === "full"
+                    ? "Original resolution — best for auditing reel labels"
+                    : "1600 px wide — faster download, smaller file"}
+                </p>
+              </button>
+            ))}
+            <p className="text-[11px] text-muted-foreground text-center pt-1">
+              Both versions are already loading — your choice downloads instantly.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={cancelQualityDialog} data-testid="button-pdf-quality-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmQualityExport}
+              disabled={pdfDialogWaiting}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              data-testid="button-pdf-quality-confirm"
+            >
+              {pdfDialogWaiting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                "Export"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
