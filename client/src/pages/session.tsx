@@ -462,7 +462,10 @@ function SessionWorkspace({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = buildExportFilename(session, "pdf");
+    const baseName = buildExportFilename(session, "pdf");
+    a.download = pdfQualityChoice === "standard"
+      ? baseName.replace(/\.pdf$/, " (Standard Quality).pdf")
+      : baseName;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -530,7 +533,7 @@ function SessionWorkspace({
       toast({ title: "PDF Export Failed", description: "You appear to be offline. Check your internet connection and try again.", variant: "destructive" });
       return;
     }
-    openQualityDialogDirect();
+    setTimeout(() => openQualityDialogDirect(), 0);
   };
 
   return (
