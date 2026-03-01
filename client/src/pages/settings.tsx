@@ -66,6 +66,9 @@ export default function SettingsPage() {
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [limitationsOpen, setLimitationsOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [feedbackTopic, setFeedbackTopic] = useState("BUG_REPORT");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -164,6 +167,22 @@ export default function SettingsPage() {
   const saveSetting = (field: string, value: any) => {
     updateSetting.mutate({ [field]: value } as any);
   };
+
+  const submitFeedback = useMutation({
+    mutationFn: async (data: { topic: string; message: string; page: string }) => {
+      const res = await apiRequest("POST", "/api/feedback", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      setFeedbackSent(true);
+      setFeedbackMessage("");
+      setFeedbackTopic("BUG_REPORT");
+      setTimeout(() => setFeedbackSent(false), 3000);
+    },
+    onError: () => {
+      toast({ title: "Failed to send feedback", variant: "destructive" });
+    },
+  });
 
   const encodingEnabled = settings?.encodingEnabled ?? false;
 
@@ -865,21 +884,71 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />
-              <CardTitle className="text-base">Contact</CardTitle>
+              <CardTitle className="text-base">Contact &amp; Feedback</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-2">
-              Questions, feedback, or issues? Reach out to the developer.
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Questions, bug reports, or feature ideas? Send feedback directly to the developer.
             </p>
-            <a
-              href="mailto:makerdantheman@gmail.com"
-              className="text-sm font-medium text-primary hover:underline"
-              data-testid="link-contact-email"
-            >
-              makerdantheman@gmail.com
-            </a>
-            <p className="text-xs text-muted-foreground mt-1">Dan — Developer</p>
+            {feedbackSent ? (
+              <div className="flex items-center gap-2 rounded-md bg-green-500/10 border border-green-500/30 px-3 py-2 text-sm text-green-600 dark:text-green-400" data-testid="feedback-success-message">
+                <Check className="h-4 w-4 shrink-0" />
+                Thank you — feedback received!
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Topic</Label>
+                  <Select value={feedbackTopic} onValueChange={setFeedbackTopic}>
+                    <SelectTrigger className="h-8 text-sm" data-testid="select-feedback-topic">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BUG_REPORT">Bug Report</SelectItem>
+                      <SelectItem value="FEATURE_REQUEST">Feature Request</SelectItem>
+                      <SelectItem value="DESIGN">Design Feedback</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Message</Label>
+                  <Textarea
+                    placeholder="Describe your feedback..."
+                    value={feedbackMessage}
+                    onChange={(e) => setFeedbackMessage(e.target.value)}
+                    maxLength={1000}
+                    rows={4}
+                    className="text-sm resize-none"
+                    data-testid="textarea-feedback-message"
+                  />
+                  <p className="text-xs text-muted-foreground text-right mt-0.5">
+                    {feedbackMessage.length}/1000
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={feedbackMessage.trim().length < 20 || submitFeedback.isPending}
+                  onClick={() => submitFeedback.mutate({ topic: feedbackTopic, message: feedbackMessage.trim(), page: window.location.pathname })}
+                  data-testid="button-send-feedback"
+                >
+                  {submitFeedback.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+                  Send Feedback
+                </Button>
+              </div>
+            )}
+            <Separator />
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Or email Dan directly:</p>
+              <a
+                href="mailto:makerdantheman@gmail.com"
+                className="text-sm font-medium text-primary hover:underline"
+                data-testid="link-contact-email"
+              >
+                makerdantheman@gmail.com
+              </a>
+            </div>
           </CardContent>
         </Card>
       </main>

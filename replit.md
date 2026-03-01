@@ -32,6 +32,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Undo/Redo:** Implemented for entry and pin modifications.
 - **Summary Statistics:** Dashboard to display key metrics and activity logs.
 - **Security:** Ownership verification on all CRUD routes and optional AES-256-GCM data encryption for sensitive entry fields.
+- **In-App Feedback:** Users can submit structured feedback (bug reports, feature requests, design feedback, other) from two places: the Contact & Feedback card in Settings, and a "Send Feedback" dialog at the bottom of every Help drawer. Submissions are stored in the `feedback` DB table with topic, message, page context, and status. The agent can read and triage these via `GET /api/feedback` (owner-restricted).
 
 **System Design Choices:**
 - **Frontend Framework:** React + Vite with TanStack Query for data fetching and wouter for routing.

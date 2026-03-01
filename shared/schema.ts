@@ -233,3 +233,22 @@ export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type Comment = typeof comments.$inferSelect;
+
+export const feedback = pgTable("feedback", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  topic: text("topic").notNull(),
+  message: text("message").notNull(),
+  page: text("page"),
+  status: text("status").notNull().default("PENDING"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFeedbackSchema = createInsertSchema(feedback).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+});
+
+export type Feedback = typeof feedback.$inferSelect;
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;

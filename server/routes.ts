@@ -6,7 +6,7 @@ import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema } from "@shared/schema";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
@@ -2785,6 +2785,34 @@ export async function registerRoutes(
       res.json(users);
     } catch {
       res.json([]);
+    }
+  });
+
+  // Feedback
+  app.post("/api/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const parsed = insertFeedbackSchema.safeParse({ ...req.body, userId: req.user.id });
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid feedback data", details: parsed.error.flatten() });
+      }
+      const row = await storage.createFeedback(parsed.data);
+      return res.status(201).json(row);
+    } catch (error) {
+      console.error("Error creating feedback:", error);
+      return res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+
+  app.get("/api/feedback", isAuthenticated, async (req: any, res) => {
+    if (req.user.id !== "52270193") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const rows = await storage.listFeedback();
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error listing feedback:", error);
+      return res.status(500).json({ error: "Failed to list feedback" });
     }
   });
 

@@ -1,9 +1,20 @@
 import { useState } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Accordion, AccordionItem, AccordionTrigger, AccordionContent,
 } from "@/components/ui/accordion";
@@ -12,6 +23,91 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLocation } from "wouter";
+
+function FeedbackDialog({ page }: { page: string }) {
+  const [open, setOpen] = useState(false);
+  const [topic, setTopic] = useState("BUG_REPORT");
+  const [message, setMessage] = useState("");
+  const { toast } = useToast();
+
+  const submit = useMutation({
+    mutationFn: async (data: { topic: string; message: string; page: string }) => {
+      const res = await apiRequest("POST", "/api/feedback", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      setOpen(false);
+      setMessage("");
+      setTopic("BUG_REPORT");
+      toast({ title: "Feedback sent — thank you!" });
+    },
+    onError: () => {
+      toast({ title: "Failed to send feedback", variant: "destructive" });
+    },
+  });
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        className="w-full mb-2 gap-2 text-xs"
+        onClick={() => setOpen(true)}
+        data-testid="button-send-feedback-help"
+      >
+        <MessageSquare className="h-3.5 w-3.5" />
+        Send Feedback
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Send Feedback</DialogTitle>
+            <DialogDescription className="text-xs">
+              Share a bug report, feature idea, or any other feedback with the developer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Topic</Label>
+              <Select value={topic} onValueChange={setTopic}>
+                <SelectTrigger className="h-8 text-sm" data-testid="select-feedback-topic-help">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BUG_REPORT">Bug Report</SelectItem>
+                  <SelectItem value="FEATURE_REQUEST">Feature Request</SelectItem>
+                  <SelectItem value="DESIGN">Design Feedback</SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Message</Label>
+              <Textarea
+                placeholder="Describe your feedback..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                maxLength={1000}
+                rows={4}
+                className="text-sm resize-none"
+                data-testid="textarea-feedback-message-help"
+              />
+              <p className="text-xs text-muted-foreground text-right mt-0.5">{message.length}/1000</p>
+            </div>
+            <Button
+              className="w-full"
+              disabled={message.trim().length < 20 || submit.isPending}
+              onClick={() => submit.mutate({ topic, message: message.trim(), page })}
+              data-testid="button-submit-feedback-help"
+            >
+              {submit.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+              Send Feedback
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 export function HelpBadge({ children }: { children: React.ReactNode }) {
   return (
@@ -878,7 +974,7 @@ export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" |
           <Separator className="my-3" />
           <Button
             variant="outline"
-            className="w-full mb-6 gap-2 text-xs"
+            className="w-full mb-2 gap-2 text-xs"
             onClick={() => {
               setOpen(false);
               setLocation("/help");
@@ -888,6 +984,7 @@ export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" |
             <ExternalLink className="h-3.5 w-3.5" />
             View Full Help Guide
           </Button>
+          <FeedbackDialog page={mode} />
           <div className="h-4" />
         </ScrollArea>
       </SheetContent>

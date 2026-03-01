@@ -30,6 +30,9 @@ import {
   type ActivityLog,
   type InsertComment,
   type Comment,
+  feedback,
+  type Feedback,
+  type InsertFeedback,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -102,6 +105,9 @@ export interface IStorage {
   getComment(id: number): Promise<Comment | undefined>;
   updateComment(id: number, data: Partial<Comment>): Promise<Comment | undefined>;
   deleteComment(id: number): Promise<void>;
+
+  createFeedback(data: InsertFeedback): Promise<Feedback>;
+  listFeedback(): Promise<Feedback[]>;
 
   getUserStats(userId: string): Promise<{
     totalSessions: number;
@@ -883,6 +889,15 @@ export class DatabaseStorage implements IStorage {
         footage: Number(w.footage) || 0,
       })),
     };
+  }
+
+  async createFeedback(data: InsertFeedback): Promise<Feedback> {
+    const [result] = await db.insert(feedback).values(data).returning();
+    return result;
+  }
+
+  async listFeedback(): Promise<Feedback[]> {
+    return db.select().from(feedback).orderBy(desc(feedback.createdAt));
   }
 }
 
