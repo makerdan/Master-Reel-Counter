@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, Settings, Shield, ShieldOff, AlertTriangle, Lock,
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
   Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
-  ChevronDown, Ruler, Building2, FileText, Globe,
+  ChevronDown, Ruler, Building2, FileText, Globe, Upload, Trash2,
 } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +65,7 @@ export default function SettingsPage() {
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [limitationsOpen, setLimitationsOpen] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -84,6 +86,42 @@ export default function SettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to update name", variant: "destructive" });
+    },
+  });
+
+  const uploadAvatar = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/user/profile/avatar", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Photo updated" });
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    },
+    onError: () => {
+      toast({ title: "Failed to upload photo", variant: "destructive" });
+    },
+  });
+
+  const removeAvatar = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/user/profile/avatar");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Photo removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove photo", variant: "destructive" });
     },
   });
 
@@ -681,6 +719,63 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {(() => {
+              const effectiveAvatar = user?.customAvatarKey || user?.profileImageUrl;
+              const initials = [user?.firstName, user?.lastName].filter(Boolean).map(s => s![0]).join("").toUpperCase() || "?";
+              return (
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={effectiveAvatar || undefined} alt="Profile photo" />
+                    <AvatarFallback className="text-lg">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      data-testid="input-avatar-file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadAvatar.mutate(file);
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={uploadAvatar.isPending}
+                      data-testid="button-upload-avatar"
+                    >
+                      {uploadAvatar.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                      ) : (
+                        <Upload className="h-3 w-3 mr-1.5" />
+                      )}
+                      Upload Photo
+                    </Button>
+                    {user?.customAvatarKey && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => removeAvatar.mutate()}
+                        disabled={removeAvatar.isPending}
+                        data-testid="button-remove-avatar"
+                      >
+                        {removeAvatar.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                        ) : (
+                          <Trash2 className="h-3 w-3 mr-1.5" />
+                        )}
+                        Remove Photo
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+            <Separator />
             {editingName ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">

@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
+import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos } from "@shared/schema";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
@@ -106,6 +107,18 @@ export async function registerRoutes(
 
   const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
+  const privateDir = process.env.PRIVATE_OBJECT_DIR ?? "";
+  const BUCKET_NAME = privateDir.split("/").filter(Boolean)[0] ?? "";
+  const toStorageObjectName = (key: string): string => {
+    const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key;
+    const dirPart = privateDir.replace(/^\/[^/]+\/?/, "");
+    return `${dirPart}/uploads/${filename}`;
+  };
+  const toAvatarObjectName = (filename: string): string => {
+    const dirPart = privateDir.replace(/^\/[^/]+\/?/, "");
+    return `${dirPart}/avatars/${filename}`;
+  };
+
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
   app.post("/api/uploads/direct", isAuthenticated, upload.single("file"), async (req: any, res) => {
@@ -114,15 +127,13 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No file provided" });
       }
 
-      await fs.mkdir(UPLOADS_DIR, { recursive: true });
-
       const ext = path.extname(req.file.originalname) || "";
       const objectId = `${randomUUID()}${ext}`;
-      const filePath = path.join(UPLOADS_DIR, objectId);
-
-      await fs.writeFile(filePath, req.file.buffer);
-
       const objectPath = `/uploads/${objectId}`;
+      const objectName = toStorageObjectName(objectPath);
+      await objectStorageClient.bucket(BUCKET_NAME).file(objectName).save(req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
       console.log(`Upload success: file="${objectId}", size=${req.file.size}, type=${req.file.mimetype}`);
 
       res.json({
@@ -145,22 +156,30 @@ export async function registerRoutes(
       if (filename.includes("..") || filename.includes("/")) {
         return res.status(400).json({ error: "Invalid filename" });
       }
-      const filePath = path.join(UPLOADS_DIR, filename);
-      try {
-        await fs.access(filePath);
-      } catch {
-        return res.status(404).json({ error: "File not found" });
-      }
       const ext = path.extname(filename).toLowerCase();
       const mimeTypes: Record<string, string> = {
         ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
         ".gif": "image/gif", ".webp": "image/webp", ".heic": "image/heic",
         ".heif": "image/heif", ".bmp": "image/bmp", ".tiff": "image/tiff",
       };
-      res.set({
+      const headers = {
         "Content-Type": mimeTypes[ext] || "application/octet-stream",
         "Cache-Control": "private, max-age=86400",
-      });
+      };
+      const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(`/uploads/${filename}`));
+      const [existsInGcs] = await gcsFile.exists();
+      if (existsInGcs) {
+        res.set(headers);
+        gcsFile.createReadStream().pipe(res);
+        return;
+      }
+      const filePath = path.join(UPLOADS_DIR, filename);
+      try {
+        await fs.access(filePath);
+      } catch {
+        return res.status(404).json({ error: "File not found" });
+      }
+      res.set(headers);
       const { createReadStream } = await import("fs");
       createReadStream(filePath).pipe(res);
     } catch (error) {
@@ -297,7 +316,8 @@ export async function registerRoutes(
             const key = photo.objectStorageKey;
             const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
             const filePath = path.join(UPLOADS_DIR, filename);
-            await fs.unlink(filePath);
+            await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
+            await fs.unlink(filePath).catch(() => {});
           }
         } catch (err) {
           console.warn("Could not delete photo file on session delete:", err);
@@ -380,7 +400,8 @@ export async function registerRoutes(
                 const key = photo.objectStorageKey;
                 const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
                 const filePath = path.join(UPLOADS_DIR, filename);
-                await fs.unlink(filePath);
+                await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
+                await fs.unlink(filePath).catch(() => {});
               }
             } catch (err) {
               console.warn("Could not delete photo file on bulk session delete:", err);
@@ -705,7 +726,8 @@ export async function registerRoutes(
         if (!shared) {
           const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
           const filePath = path.join(UPLOADS_DIR, filename);
-          await fs.unlink(filePath);
+          await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
+          await fs.unlink(filePath).catch(() => {});
         }
       } catch (err) {
         console.warn("Could not delete uploaded file:", err);
@@ -1581,8 +1603,15 @@ export async function registerRoutes(
         const photoFilename = photoKey.replace("/uploads/", "");
         const photoPath = path.join(UPLOADS_DIR, photoFilename);
         try {
-          await fs.access(photoPath);
-          const rawBuffer = await fs.readFile(photoPath);
+          let rawBuffer: Buffer;
+          const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
+          const [existsInGcs] = await gcsFile.exists();
+          if (existsInGcs) {
+            const [downloaded] = await gcsFile.download();
+            rawBuffer = downloaded;
+          } else {
+            rawBuffer = await fs.readFile(photoPath);
+          }
           const orientedBuffer = await sharp(rawBuffer).rotate().toBuffer();
           const metadata = await sharp(orientedBuffer).metadata();
           const imgW = metadata.width || 1;
@@ -2412,6 +2441,71 @@ export async function registerRoutes(
       res.json(user);
     } catch (error) {
       res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Upload user avatar
+  app.post("/api/user/profile/avatar", isAuthenticated, upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file provided" });
+      const userId = req.user.claims.sub;
+      const ext = path.extname(req.file.originalname) || ".jpg";
+      const filename = `${randomUUID()}${ext}`;
+      const objName = toAvatarObjectName(filename);
+      await objectStorageClient.bucket(BUCKET_NAME).file(objName).save(req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
+      const avatarKey = `/uploads/avatars/${filename}`;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const user = await authStorage.updateUserAvatar(userId, avatarKey);
+      res.json(user);
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      res.status(500).json({ message: "Failed to upload avatar" });
+    }
+  });
+
+  // Serve user avatars
+  app.get("/uploads/avatars/:filename", isAuthenticated, async (req: any, res) => {
+    try {
+      const filename = req.params.filename;
+      if (filename.includes("..") || filename.includes("/")) {
+        return res.status(400).json({ error: "Invalid filename" });
+      }
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+        ".gif": "image/gif", ".webp": "image/webp",
+      };
+      const objName = toAvatarObjectName(filename);
+      const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(objName);
+      const [existsInGcs] = await gcsFile.exists();
+      if (!existsInGcs) return res.status(404).json({ error: "Avatar not found" });
+      res.set({
+        "Content-Type": mimeTypes[ext] || "application/octet-stream",
+        "Cache-Control": "private, max-age=86400",
+      });
+      gcsFile.createReadStream().pipe(res);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to serve avatar" });
+    }
+  });
+
+  // Delete user avatar (revert to Replit avatar)
+  app.delete("/api/user/profile/avatar", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { authStorage } = await import("./replit_integrations/auth/storage");
+      const user = await authStorage.getUser(userId);
+      if (user?.customAvatarKey) {
+        const filename = user.customAvatarKey.replace("/uploads/avatars/", "");
+        const objName = toAvatarObjectName(filename);
+        await objectStorageClient.bucket(BUCKET_NAME).file(objName).delete({ ignoreNotFound: true }).catch(() => {});
+      }
+      const updated = await authStorage.updateUserAvatar(userId, null);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove avatar" });
     }
   });
 
