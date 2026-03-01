@@ -1645,15 +1645,22 @@ export async function registerRoutes(
         const photoPath = path.join(UPLOADS_DIR, photoFilename);
         try {
           let rawBuffer: Buffer;
-          const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
-          const [existsInGcs] = await gcsFile.exists();
-          if (existsInGcs) {
-            const [downloaded] = await gcsFile.download();
-            rawBuffer = downloaded;
-          } else {
+          let loadedFromGcs = false;
+          try {
+            const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
+            const [existsInGcs] = await gcsFile.exists();
+            if (existsInGcs) {
+              const [downloaded] = await gcsFile.download();
+              rawBuffer = downloaded;
+              loadedFromGcs = true;
+            }
+          } catch {
+            // GCS unavailable (e.g. dev environment) — fall through to local disk
+          }
+          if (!loadedFromGcs) {
             rawBuffer = await fs.readFile(photoPath);
           }
-          const orientedBuffer = await sharp(rawBuffer).rotate().toBuffer();
+          const orientedBuffer = await sharp(rawBuffer!).rotate().toBuffer();
           const metadata = await sharp(orientedBuffer).metadata();
           const imgW = metadata.width || 1;
           const imgH = metadata.height || 1;
