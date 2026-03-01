@@ -246,10 +246,10 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 w-full text-xs font-mono text-muted-foreground">
-                  <span>Aisle {pin.photoAisle || "—"}</span>
-                  <span>Sect. {pin.photoSection || "—"}</span>
+                  <span>Aisle:{pin.photoAisle ? ` ${pin.photoAisle}` : ""}</span>
+                  <span>Section:{pin.photoSection ? ` ${pin.photoSection}` : ""}</span>
                   <span>{pin.reelCount} Reel{pin.reelCount !== 1 ? "s" : ""}</span>
-                  <span>{pin.vendorCode || "—"}, {pin.footage ? `${pin.footage.toLocaleString()} ft` : "— ft"}</span>
+                  <span>{[pin.vendorCode, pin.footage ? `${pin.footage.toLocaleString()} ft` : ""].filter(Boolean).join(", ")}</span>
                 </div>
                 <div className="flex items-center justify-center gap-3 w-full">
                   {onReshoot && (
