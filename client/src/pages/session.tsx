@@ -709,7 +709,7 @@ function SessionWorkspace({
 
       {editingEntry && (
         <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) { setEditingEntry(null); if (previousModeRef.current) { setMode(previousModeRef.current); previousModeRef.current = null; } } }}>
-          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
+          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader className="p-4 pb-2 shrink-0">
               <DialogTitle>Edit Entry #{editingEntry.id}</DialogTitle>
             </DialogHeader>
