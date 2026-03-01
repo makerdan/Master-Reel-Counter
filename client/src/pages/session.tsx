@@ -389,15 +389,36 @@ function SessionWorkspace({
       if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
       const qs = params.toString();
       const res = await fetch(`/api/sessions/${sessionId}/export/pdf${qs ? `?${qs}` : ""}`, { credentials: "include" });
-      if (!res.ok) throw new Error("PDF export failed");
+      if (!res.ok) {
+        let serverMsg = "PDF export failed";
+        try { const body = await res.json(); serverMsg = body.message || body.error || serverMsg; } catch {}
+        throw new Error(serverMsg);
+      }
       const blob = await res.blob();
+      if (blob.size < 500) throw new Error("The PDF was generated but appears to be empty.");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = buildExportFilename(session, "pdf");
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "PDF export failed";
+      let recommendation: string;
+      if (/fetch|network|failed to fetch/i.test(msg)) {
+        recommendation = "Check your internet connection and try again.";
+      } else if (/not found|404/i.test(msg)) {
+        recommendation = "Try refreshing the page. If the session no longer appears, it may have been deleted.";
+      } else if (/empty/i.test(msg)) {
+        recommendation = "Try exporting again. If this keeps happening, submit a bug report from Settings > Contact & Feedback.";
+      } else {
+        recommendation = "Try again in a moment. If the problem persists, submit a bug report from Settings > Contact & Feedback.";
+      }
+      toast({
+        title: "PDF Export Failed",
+        description: `${msg} — ${recommendation}`,
+        variant: "destructive",
+      });
       const w = window.open("", "_blank");
       if (!w) return;
       const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
