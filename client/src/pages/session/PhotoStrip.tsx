@@ -472,7 +472,7 @@ export default function PhotoStrip({
 
   return (
     <div className="p-4 space-y-6" data-testid="photo-strip">
-      <h2 className="sm:hidden text-lg font-bold underline flex items-center gap-2 -mb-2">
+      <h2 className="sm:hidden text-lg font-bold underline flex items-center justify-center gap-2 -mb-2">
         <LayoutGrid className="h-5 w-5" />
         Photos Reel
       </h2>

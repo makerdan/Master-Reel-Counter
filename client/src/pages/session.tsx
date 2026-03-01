@@ -628,7 +628,7 @@ function SessionWorkspace({
               </TabsContent>
 
               <TabsContent value="single">
-                <h2 className="sm:hidden text-lg font-bold underline flex items-center gap-2 mb-3 px-1 pt-1">
+                <h2 className="sm:hidden text-lg font-bold underline flex items-center justify-center gap-2 mb-3 px-1 pt-1">
                   <ListPlus className="h-5 w-5" />
                   Single Entry
                 </h2>
