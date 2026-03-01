@@ -1553,6 +1553,9 @@ export async function registerRoutes(
         for (const col of cols) {
           if (col.centered) {
             doc.text(col.header, x, y + 4, { width: col.width, align: 'center', lineBreak: false });
+            const tw = doc.widthOfString(col.header);
+            const lineX = x + (col.width - tw) / 2;
+            doc.save().moveTo(lineX, y + 13).lineTo(lineX + tw, y + 13).lineWidth(0.4).strokeColor("#333333").stroke().restore();
           } else {
             doc.text(col.header, x + 2, y + 4, { width: col.width - 4, lineBreak: false });
             const tw = doc.widthOfString(col.header);
