@@ -558,8 +558,8 @@ function SessionWorkspace({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-export" title="Export session data" disabled={isPdfExporting}>
-                  {isPdfExporting ? <Loader2 className="h-4 w-4 sm:mr-1 animate-spin" /> : <Share2 className="h-4 w-4 sm:mr-1" />}
-                  <span className="hidden sm:inline">{isPdfExporting ? "Exporting…" : "Export"}</span>
+                  {isPdfExporting ? <Loader2 className="h-4 w-4 sm:mr-1 animate-spin text-orange-600" /> : <Share2 className="h-4 w-4 sm:mr-1" />}
+                  <span className={`hidden sm:inline${isPdfExporting ? " text-orange-600 animate-pulse [animation-duration:1.8s]" : ""}`}>{isPdfExporting ? "Exporting…" : "Export"}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

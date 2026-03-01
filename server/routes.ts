@@ -1638,6 +1638,16 @@ export async function registerRoutes(
         doc.restore();
       };
 
+      // Probe GCS availability once before loading any photos
+      let gcsReachable = false;
+      try {
+        await objectStorageClient.bucket(BUCKET_NAME).getMetadata();
+        gcsReachable = true;
+      } catch {
+        // GCS unavailable — all photos will load from local disk
+      }
+      console.log(`[pdf] GCS reachable: ${gcsReachable}`);
+
       type PhotoLayout = { photo: any; buffer: Buffer; imgW: number; imgH: number; origW: number; origH: number };
       const loadPhoto = async (photo: any): Promise<PhotoLayout | null> => {
         const photoKey = photo.objectStorageKey;
@@ -1646,16 +1656,18 @@ export async function registerRoutes(
         try {
           let rawBuffer: Buffer;
           let loadedFromGcs = false;
-          try {
-            const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
-            const [existsInGcs] = await gcsFile.exists();
-            if (existsInGcs) {
-              const [downloaded] = await gcsFile.download();
-              rawBuffer = downloaded;
-              loadedFromGcs = true;
+          if (gcsReachable) {
+            try {
+              const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
+              const [existsInGcs] = await gcsFile.exists();
+              if (existsInGcs) {
+                const [downloaded] = await gcsFile.download();
+                rawBuffer = downloaded;
+                loadedFromGcs = true;
+              }
+            } catch {
+              // GCS error for this specific file — fall through to local disk
             }
-          } catch {
-            // GCS unavailable (e.g. dev environment) — fall through to local disk
           }
           if (!loadedFromGcs) {
             rawBuffer = await fs.readFile(photoPath);
@@ -1867,14 +1879,17 @@ export async function registerRoutes(
       const deferredUnmatchedSections: { aisle: string; section: string; entries: any[] }[] = [];
 
       let tocSecIdx = 0;
+      const t0 = Date.now();
       for (const sec of sortedSections) {
         const allPhotos = sec.photos || [];
         const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
         const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
 
+        const tLoad = Date.now();
         const loadedPhotos: PhotoLayout[] = (
           await Promise.all(allPhotos.map((photo: any) => loadPhoto(photo)))
         ).filter((pl): pl is PhotoLayout => pl !== null);
+        console.log(`[pdf] sec ${sec.aisle}/${sec.section}: loaded ${loadedPhotos.length}/${allPhotos.length} photos in ${Date.now() - tLoad}ms`);
 
         if (loadedPhotos.length === 0 && sec.entries.length === 0) continue;
 
@@ -2451,6 +2466,7 @@ export async function registerRoutes(
         doc.text(`Page ${i + 1} of ${pageCount}`, 36 + pageWidth / 2, doc.page.height - 30, { width: pageWidth / 2, align: 'right', lineBreak: false });
       }
 
+      console.log(`[pdf] layout+render done in ${Date.now() - t0}ms`);
       doc.end();
 
       await new Promise<void>((resolve, reject) => {
