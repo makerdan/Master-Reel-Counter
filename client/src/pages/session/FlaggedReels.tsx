@@ -69,7 +69,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-center sm:justify-start gap-2">
-        <h2 className="text-lg font-semibold flex items-center gap-2" data-testid="text-flagged-heading">
+        <h2 className="text-lg font-bold underline flex items-center gap-2" data-testid="text-flagged-heading">
           <Flag className="h-5 w-5 text-yellow-500" />
           <span className="sm:hidden">Flagged</span>
           <span className="hidden sm:inline">Flagged Reels</span>
