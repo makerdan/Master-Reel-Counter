@@ -254,9 +254,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                 <div className="flex items-center justify-center gap-3 w-full">
                   {onReshoot && (
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="icon"
-                      className="border border-white"
+                      className="rounded-full border border-white/80 ring-1 ring-white/30"
                       onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
                       data-testid={`button-reshoot-mobile-${pin.id}`}
                       title="Re-shoot"
@@ -266,9 +266,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     </Button>
                   )}
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="border border-white"
+                    className="rounded-full border border-white/80 ring-1 ring-white/30"
                     onClick={() => unflagMutation.mutate(pin.id)}
                     disabled={unflagMutation.isPending}
                     data-testid={`button-resolve-mobile-${pin.id}`}
