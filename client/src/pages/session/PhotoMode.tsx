@@ -104,7 +104,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     });
   }, []);
   const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
-  const nextReelCount = localUnfilledCount > 0 ? localUnfilledCount : totalIncompletePins;
+  const otherPhotosIncompleteCount = totalIncompletePins - (currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0);
+  const nextReelCount = localPins.length + otherPhotosIncompleteCount;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
@@ -2073,7 +2074,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Add Reel(s) from Image
                 </Button>
-                {(localPins.length > 0 || nextReelCount > 0) && (
+                {nextReelCount > 0 && (
                   <Button
                     size="sm"
                     className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
@@ -2081,7 +2082,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     data-testid="button-next-incomplete"
                   >
                     <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                    <span className="text-xs font-semibold">Next Reel ({localPins.length > 0 ? localPins.length : nextReelCount})</span>
+                    <span className="text-xs font-semibold">Next Reel ({nextReelCount})</span>
                   </Button>
                 )}
               </div>
