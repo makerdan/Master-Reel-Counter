@@ -74,12 +74,14 @@ function PhotoCard({
   canEdit,
   allPhotos,
   onJumpToPhoto,
+  onClearUndoHistory,
 }: {
   photo: Photo;
   sessionId: number;
   canEdit: boolean;
   allPhotos: Photo[];
   onJumpToPhoto: (id: number) => void;
+  onClearUndoHistory?: () => void;
 }) {
   const { toast } = useToast();
   const [aisle, setAisle] = useState(photo.aisle || "");
@@ -193,6 +195,7 @@ function PhotoCard({
       invalidateEntries();
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
+      onClearUndoHistory?.();
       toast({ title: "Photo deleted" });
     },
     onError: () => toast({ title: "Failed to delete photo", variant: "destructive" }),
@@ -419,10 +422,12 @@ export default function PhotoStrip({
   sessionId,
   canEdit,
   onJumpToPhoto,
+  onClearUndoHistory,
 }: {
   sessionId: number;
   canEdit: boolean;
   onJumpToPhoto: (photoId: number) => void;
+  onClearUndoHistory?: () => void;
 }) {
   const { data: photos = [], isLoading } = useQuery<Photo[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "photos"],
@@ -511,6 +516,7 @@ export default function PhotoStrip({
                         canEdit={canEdit}
                         allPhotos={photos}
                         onJumpToPhoto={onJumpToPhoto}
+                        onClearUndoHistory={onClearUndoHistory}
                       />
                     ))}
                   </div>

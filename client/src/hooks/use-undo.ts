@@ -28,6 +28,11 @@ export function useUndoRedo(sessionId: number) {
     setRedoStack([]);
   }, []);
 
+  const clearHistory = useCallback(() => {
+    setUndoStack([]);
+    setRedoStack([]);
+  }, []);
+
   const applyReverse = useCallback(async (action: UndoAction): Promise<UndoAction> => {
     switch (action.type) {
       case "create-entry": {
@@ -99,6 +104,7 @@ export function useUndoRedo(sessionId: number) {
 
   return {
     pushUndo,
+    clearHistory,
     undo,
     redo,
     canUndo: undoStack.length > 0,

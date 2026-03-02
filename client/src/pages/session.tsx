@@ -194,7 +194,7 @@ function SessionWorkspace({
   });
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
-  const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
+  const { pushUndo, clearHistory, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
   const [undoRedoSignal, setUndoRedoSignal] = useState(0);
   const [tableExpandKey, setTableExpandKey] = useState<string | null>(null);
   const undoWithSignal = useCallback(async () => { await undo(); setUndoRedoSignal(s => s + 1); }, [undo]);
@@ -705,6 +705,7 @@ function SessionWorkspace({
               setCaptureMode(false);
               setMode("flagged");
             }}
+            onClearUndoHistory={clearHistory}
           />
         ) : (
           <>
@@ -729,7 +730,7 @@ function SessionWorkspace({
               </TabsList>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} />
               </TabsContent>
 
               <TabsContent value="single">
@@ -774,6 +775,7 @@ function SessionWorkspace({
                     setNavigateToPhotoId(photoId);
                     setMode("photo");
                   }}
+                  onClearUndoHistory={clearHistory}
                 />
               </TabsContent>
             </Tabs>

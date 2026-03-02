@@ -26,7 +26,7 @@ type UploadQueueItem = {
   retries: number;
 };
 
-function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured, onBackToFlagged }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void; onBackToFlagged?: () => void }) {
+function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured, onBackToFlagged, onClearUndoHistory }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void; onBackToFlagged?: () => void; onClearUndoHistory?: () => void }) {
   const { toast } = useToast();
 
   const { data: captureSettings } = useQuery<{
@@ -445,6 +445,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
                     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
                     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
+                    onClearUndoHistory?.();
                   } catch {}
                   if (detailReviewPhoto.blobUrl) {
                     URL.revokeObjectURL(detailReviewPhoto.blobUrl);

@@ -30,7 +30,7 @@ import { deriveVendorCode } from "./utils";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, undoRedoSignal, onDraftPinsHint }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -1688,6 +1688,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
+                            onClearUndoHistory?.();
                             toast({ title: "Photo deleted" });
                           } catch {
                             toast({ title: "Failed to delete photo", variant: "destructive" });
