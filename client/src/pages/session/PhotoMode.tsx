@@ -1782,7 +1782,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Nearby Photos ({startIdx + 1}-{endIdx} of {uploadedPhotos.length})
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex gap-2 overflow-x-auto pb-1 pt-3">
                   {nearbyPhotos.map(({ photo, origIdx }) => {
                     const isCurrent = origIdx === currentPhotoIdx;
                     const isViewing = origIdx === viewingNearbyIdx;
