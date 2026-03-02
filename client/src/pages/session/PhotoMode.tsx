@@ -30,7 +30,7 @@ import { deriveVendorCode } from "./utils";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0 }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, undoRedoSignal }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; undoRedoSignal?: number }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -107,7 +107,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const nextReelCount = localUnfilledCount > 0 ? localUnfilledCount : totalIncompletePins;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
-  const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number }>>([]);
+  const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
+  const [pinLoadKey, setPinLoadKey] = useState(0);
   const [nearbyCommittedPins, setNearbyCommittedPins] = useState<Array<{ id: string; x: number; y: number; label: string; reelCount: number }>>([]);
   const [pinsLoaded, setPinsLoaded] = useState(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -330,6 +331,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       y: p.yPercent,
       label: p.label || "001",
       reelCount: p.reelCount || 1,
+      entryId: p.entryId ?? undefined,
+      flagged: p.flagged || false,
     })));
     if (draftPins.length > 0) {
       setLocalPins(draftPins.map(p => ({
@@ -381,7 +384,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       setTimeout(() => { skipAutoSave.current = false; }, 500);
     };
     loadPins();
-  }, [currentPhoto?.dbId, applyPins]);
+  }, [currentPhoto?.dbId, applyPins, pinLoadKey]);
+
+  useEffect(() => {
+    if (!undoRedoSignal || !currentPhoto?.dbId) return;
+    pinFetchCache.current.delete(currentPhoto.dbId);
+    setPinLoadKey(k => k + 1);
+  }, [undoRedoSignal, currentPhoto?.dbId]);
 
   // Preload images and prefetch pins for adjacent photos to eliminate navigation lag
   useEffect(() => {
@@ -865,10 +874,26 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     });
   }, []);
 
-  const deleteCommittedPin = useCallback(async (pin: { id: string; dbId?: number }) => {
+  const deleteCommittedPin = useCallback(async (pin: { id: string; dbId?: number; x?: number; y?: number; label?: string; reelCount?: number; entryId?: number; flagged?: boolean }) => {
     if (pin.dbId) {
       try {
         await apiRequest("DELETE", `/api/pins/${pin.dbId}`);
+        if (onPushUndo && currentPhoto?.dbId) {
+          onPushUndo({
+            type: "delete-pin",
+            sessionId,
+            entityId: pin.dbId,
+            data: { photoId: currentPhoto.dbId },
+            previousData: {
+              xPercent: pin.x,
+              yPercent: pin.y,
+              label: pin.label,
+              reelCount: pin.reelCount,
+              entryId: pin.entryId,
+              flagged: pin.flagged || false,
+            },
+          });
+        }
       } catch {
         toast({ title: "Failed to delete pin", variant: "destructive" });
         return;
@@ -876,7 +901,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     }
     setCommittedPins(prev => prev.filter(p => p.id !== pin.id));
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
-  }, [toast, sessionId]);
+  }, [toast, sessionId, onPushUndo, currentPhoto?.dbId]);
 
   const applyAutoFill = useCallback((pinId: string) => {
     const pin = localPinsRef.current.find(p => p.id === pinId);
@@ -940,6 +965,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
           });
           const entry = await res.json();
+          (pin as any)._entryId = entry.id;
           completed++;
           setBatchProgress({ current: completed, total: totalEntries, errors });
           if (pinPhotoId) {
@@ -1001,6 +1027,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           y: p.y,
           label: p.label,
           reelCount: p.reelCount,
+          entryId: (p as any)._entryId as number | undefined,
+          flagged: p.flagged || false,
         })),
       ]);
       setLocalPins(prev => prev.filter(p => !committedIds.has(p.id)));
@@ -1334,7 +1362,24 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           className="pin-delete-btn"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setLocalPins((prev) => prev.filter((p) => p.id !== pin.id));
+                            const beforePins = localPinsRef.current;
+                            const afterPins = beforePins.filter(p => p.id !== pin.id);
+                            if (onPushUndo && currentPhoto?.dbId) {
+                              const toWire = (arr: typeof beforePins) => arr.map(p => ({
+                                xPercent: p.x, yPercent: p.y, label: p.label,
+                                reelCount: p.reelCount, wireDetails: p.wireDetails || null,
+                                vendorCode: p.vendorCode || null, footage: p.footage || null,
+                                flagged: p.flagged || false,
+                              }));
+                              onPushUndo({
+                                type: "restore-draft-pins",
+                                sessionId,
+                                entityId: currentPhoto.dbId,
+                                data: { photoId: currentPhoto.dbId, pins: toWire(afterPins) },
+                                previousData: { photoId: currentPhoto.dbId, pins: toWire(beforePins) },
+                              });
+                            }
+                            setLocalPins(afterPins);
                           }}
                           title="Delete pin"
                           data-testid={`button-delete-pin-${pin.id}`}

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin";
+type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins";
 
 interface UndoAction {
   type: ActionType;
@@ -55,6 +55,10 @@ export function useUndoRedo(sessionId: number) {
       case "update-pin": {
         await apiRequest("PATCH", `/api/pins/${action.entityId}`, action.previousData);
         return { type: "update-pin", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
+      }
+      case "restore-draft-pins": {
+        await apiRequest("PUT", `/api/photos/${action.previousData.photoId}/draft-pins`, { pins: action.previousData.pins });
+        return { type: "restore-draft-pins", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
       }
     }
   }, []);
