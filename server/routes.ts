@@ -1401,7 +1401,7 @@ export async function registerRoutes(
         return `${safeName}_${d1}_${t1}-${d2}_${t2}.${ext}`;
       };
 
-      const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 36, bufferPages: true });
+      const doc = new PDFDocument({ size: "LETTER", layout: "landscape", margin: 36 });
       const filename = buildExportFilename("pdf");
       const bufferStream = new PassThrough();
       const pdfChunks: Buffer[] = [];
@@ -2756,16 +2756,6 @@ export async function registerRoutes(
           if (!isBlank) break;
           pageBuf.pop();
         }
-      }
-
-      const pageCount = doc.bufferedPageRange().count;
-
-      // --- Page Numbers (using buffered pages) ---
-      for (let i = 0; i < pageCount; i++) {
-        doc.switchToPage(i);
-        doc.fontSize(6).fillColor("#999999");
-        doc.text(session.name, 36, doc.page.height - 30, { width: pageWidth / 2, lineBreak: false });
-        doc.text(`Page ${i + 1} of ${pageCount}`, 36 + pageWidth / 2, doc.page.height - 30, { width: pageWidth / 2, align: 'right', lineBreak: false });
       }
 
       console.log(`[pdf] layout+render done in ${Date.now() - t0}ms`);
