@@ -2420,10 +2420,13 @@ export async function registerRoutes(
         .map(([groupKey, data]) => {
           const category = groupKey.split("|||")[0];
           const wireTypeGroup = extractWireType(category);
-          const isSer = wireTypeGroup.toUpperCase().trim() === "SER";
-          const displayGroup = isSer
-            ? `SER--${data.vendorCode.toUpperCase().trim() || "?"}`
-            : wireTypeGroup;
+          const wtu = wireTypeGroup.toUpperCase().trim();
+          const vendor = data.vendorCode.toUpperCase().trim() || "?";
+          const displayGroup =
+            wtu === "SER"         ? `SER--${vendor}` :
+            wtu.startsWith("RX")  ? `RX--${vendor}`  :
+            wtu.startsWith("TC")  ? `TC--${vendor}`  :
+            wireTypeGroup;
           return { category, wireTypeGroup, displayGroup, reelSizeIdx: extractReelSize(category), ...data };
         });
 
@@ -2493,7 +2496,10 @@ export async function registerRoutes(
             currentY = drawSumHeader(36);
           }
           doc.rect(tableLeft, currentY, pageWidth, groupH).fill("#e8e0d8");
-          doc.font('Helvetica-Bold').fontSize(7.5).fillColor(accentHex).text(cat.displayGroup || "Other", tableLeft + 6, currentY + 5, { width: pageWidth - 160, lineBreak: false });
+          const isRxGrp = cat.displayGroup.startsWith("RX--");
+          const isTcGrp = cat.displayGroup.startsWith("TC--");
+          const headerLabel = isRxGrp ? "RX" : isTcGrp ? "TC" : (cat.displayGroup || "Other");
+          doc.font('Helvetica-Bold').fontSize(7.5).fillColor(accentHex).text(headerLabel, tableLeft + 6, currentY + 5, { width: pageWidth - 160, lineBreak: false });
           const groupCount = groupReelCounts.get(cat.displayGroup) || 0;
           doc.fontSize(7.5).fillColor(accentHex).text(
             `${groupCount} reels`,
