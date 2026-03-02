@@ -1706,6 +1706,85 @@ export async function registerRoutes(
         doc.restore();
       };
 
+      const drawFlaggedPin = (pin: any, imgX: number, imgY: number, imgW: number, imgH: number, _imgOrigW: number, pinScale: number) => {
+        const flagColor = "#cc4400";
+        const pinCenterX = imgX + (pin.xPercent / 100) * imgW;
+        const pinCenterY = imgY + (pin.yPercent / 100) * imgH;
+
+        const refDisplayW = 900;
+        const sf = (imgW / refDisplayW) * pinScale;
+
+        const pw = 82 * sf;
+        const ph = 61 * sf;
+        const borderW = Math.max(1, 4 * sf);
+        const cornerR = Math.max(1, 5 * sf);
+        const px = pinCenterX - pw / 2;
+        const py = pinCenterY - ph / 2;
+
+        doc.save();
+        doc.roundedRect(px, py, pw, ph, cornerR)
+          .strokeColor(flagColor)
+          .lineWidth(borderW)
+          .stroke();
+
+        if (pin.label) {
+          const labelFontSize = Math.max(4, 10 * sf);
+          const labelPadX = Math.max(1, 3 * sf);
+          const labelPadY = Math.max(0.5, 1 * sf);
+          const tabCornerR = Math.max(0.5, 3 * sf);
+
+          const labelText = `P${pin.label}`;
+          doc.font('Helvetica-Bold').fontSize(labelFontSize);
+          const labelTextW = doc.widthOfString(labelText);
+          const labelW = labelTextW + labelPadX * 2;
+          const labelH = labelFontSize + labelPadY * 2;
+
+          const reelCount = pin.reelCount || 1;
+          let badgeW = 0;
+          let badgeText = "";
+          if (reelCount >= 2) {
+            badgeText = `X${reelCount}`;
+            const badgeTextW = doc.widthOfString(badgeText);
+            badgeW = badgeTextW + labelPadX * 2;
+          }
+          const totalTopW = labelW + (badgeW > 0 ? badgeW + sf : 0);
+          const tabX = pinCenterX - totalTopW / 2;
+          const tabY = py - labelH + borderW / 2;
+
+          doc.save();
+          doc.moveTo(tabX + tabCornerR, tabY)
+            .lineTo(tabX + labelW - tabCornerR, tabY)
+            .quadraticCurveTo(tabX + labelW, tabY, tabX + labelW, tabY + tabCornerR)
+            .lineTo(tabX + labelW, tabY + labelH)
+            .lineTo(tabX, tabY + labelH)
+            .lineTo(tabX, tabY + tabCornerR)
+            .quadraticCurveTo(tabX, tabY, tabX + tabCornerR, tabY)
+            .fill(flagColor);
+          doc.fillColor("#ffffff").fontSize(labelFontSize)
+            .text(labelText, tabX + labelPadX, tabY + labelPadY, { lineBreak: false });
+
+          if (reelCount >= 2) {
+            const gapBetween = sf;
+            const badgeX = tabX + labelW + gapBetween;
+            doc.save();
+            doc.moveTo(badgeX + tabCornerR, tabY)
+              .lineTo(badgeX + badgeW - tabCornerR, tabY)
+              .quadraticCurveTo(badgeX + badgeW, tabY, badgeX + badgeW, tabY + tabCornerR)
+              .lineTo(badgeX + badgeW, tabY + labelH)
+              .lineTo(badgeX, tabY + labelH)
+              .lineTo(badgeX, tabY + tabCornerR)
+              .quadraticCurveTo(badgeX, tabY, badgeX + tabCornerR, tabY)
+              .fill(flagColor);
+            doc.fillColor("#ffffff").fontSize(labelFontSize)
+              .text(badgeText, badgeX + labelPadX, tabY + labelPadY, { lineBreak: false });
+            doc.restore();
+          }
+          doc.restore();
+          doc.font('Helvetica');
+        }
+        doc.restore();
+      };
+
       // Probe GCS availability once before loading any photos (1.5s timeout)
       let gcsReachable = false;
       try {
@@ -2297,29 +2376,14 @@ export async function registerRoutes(
 
       // --- Flagged Reels Section ---
       if (flaggedPdfItems.length > 0) {
-        // Group by aisle/section
-        const flaggedGroups = new Map<string, { aisle: string; section: string; entries: any[]; pinMap: Map<number, string> }>();
-        for (const item of flaggedPdfItems) {
-          const a = item.photo?.aisle || "—";
-          const s = item.photo?.section || "—";
-          const key = `${a}-${s}`;
-          if (!flaggedGroups.has(key)) {
-            flaggedGroups.set(key, { aisle: a, section: s, entries: [], pinMap: new Map() });
-          }
-          const grp = flaggedGroups.get(key)!;
-          grp.entries.push(item.entry);
-          if (item.pin.label && item.entry.id) {
-            grp.pinMap.set(item.entry.id, `P${String(item.pin.label).padStart(3, "0")}`);
-          }
-        }
-
-        const sortedFlaggedGroups = Array.from(flaggedGroups.values()).sort((a, b) => {
-          const aN = parseInt(a.aisle) || 0;
-          const bN = parseInt(b.aisle) || 0;
-          if (aN !== bN) return aN - bN;
-          if (a.aisle < b.aisle) return -1;
-          if (a.aisle > b.aisle) return 1;
-          return (parseInt(a.section) || 0) - (parseInt(b.section) || 0);
+        const sortedFlaggedItems = [...flaggedPdfItems].sort((a, b) => {
+          const aA = parseInt(a.photo?.aisle || "0") || 0;
+          const bA = parseInt(b.photo?.aisle || "0") || 0;
+          if (aA !== bA) return aA - bA;
+          const aS = parseInt(a.photo?.section || "0") || 0;
+          const bS = parseInt(b.photo?.section || "0") || 0;
+          if (aS !== bS) return aS - bS;
+          return (parseInt(a.pin.label || "0") || 0) - (parseInt(b.pin.label || "0") || 0);
         });
 
         doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
@@ -2328,7 +2392,6 @@ export async function registerRoutes(
         doc.fontSize(16).fillColor(accentHex).text("Flagged Reels", 36, currentY);
         currentY += 22;
 
-        // Disclaimer box
         const disclaimerH = 28;
         doc.rect(tableLeft, currentY, pageWidth, disclaimerH).fill("#fff3e0");
         doc.rect(tableLeft, currentY, pageWidth, disclaimerH).strokeColor(accentHex).lineWidth(1).stroke();
@@ -2338,32 +2401,97 @@ export async function registerRoutes(
         );
         currentY += disclaimerH + 10;
 
-        for (const grp of sortedFlaggedGroups) {
-          const grpReels = grp.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
-          const grpFootage = grp.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
-          const aisleDisplay = grp.aisle.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${grp.aisle}`;
+        const flaggedItemH = 160;
+        const flaggedGap = 12;
 
-          if (currentY + 50 > maxY) {
+        for (const item of sortedFlaggedItems) {
+          if (currentY + flaggedItemH > maxY) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = 36;
             doc.fontSize(14).fillColor(accentHex).text("Flagged Reels (cont.)", 36, currentY);
             currentY += 22;
           }
 
-          doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
-          doc.fontSize(11).fillColor(accentHex).text(
-            `${aisleDisplay} / Section ${grp.section}`,
-            tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
-          );
-          doc.fontSize(7).fillColor("#666666").text(
-            `${grp.entries.length} entries  |  ${grpReels} reels  |  ${grpFootage.toLocaleString()} ft  ⚑ flagged`,
-            tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
-          );
-          doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
-          currentY += 26;
+          const a = item.photo?.aisle || "—";
+          const s = item.photo?.section || "—";
+          const aisleDisplay = a.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${a}`;
+          const pinLabel = item.pin.label ? `P${String(item.pin.label).padStart(3, "0")}` : "P???";
 
-          const afterTable = drawEntriesTable(grp.entries, tableLeft, pageWidth, currentY, 6.5, rowHeight, grp.pinMap.size > 0 ? grp.pinMap : undefined);
-          currentY = afterTable + 12;
+          doc.rect(tableLeft, currentY, pageWidth, 18).fill("#e8e0d8");
+          doc.fontSize(9).fillColor(accentHex).text(
+            `${aisleDisplay} / Section ${s}  —  ${pinLabel}`,
+            tableLeft + 6, currentY + 4, { width: pageWidth - 120, lineBreak: false }
+          );
+          doc.fontSize(7).fillColor("#cc4400").text(
+            "⚑ flagged",
+            tableLeft + pageWidth - 100, currentY + 5, { width: 90, align: "right", lineBreak: false }
+          );
+          doc.rect(tableLeft, currentY, pageWidth, 18).stroke(borderColor);
+          currentY += 22;
+
+          const pl = photoLayoutMap.get(item.pin.photoId);
+          const photoW = Math.min(pageWidth * 0.4, 280);
+          const infoX = tableLeft + photoW + 14;
+          const infoW = pageWidth - photoW - 14;
+          let photoBottomY = currentY;
+
+          if (pl) {
+            const captionH = 10;
+            const photoMaxH = 140;
+            const availH = photoMaxH - captionH;
+            const aspect = pl.origW / pl.origH;
+            let w = photoW;
+            let h = photoW / aspect;
+            if (h > availH) { h = availH; w = availH * aspect; if (w > photoW) { w = photoW; h = photoW / aspect; } }
+
+            doc.image(pl.buffer, tableLeft, currentY, { width: w, height: h });
+
+            const committedPins = allPinsMap.get(pl.photo.id) || [];
+            const pinScale = pl.photo.pinScale || 1;
+            for (const cp of committedPins) {
+              if (cp.id === item.pin.id) continue;
+              drawCommittedPin(cp, tableLeft, currentY, w, h, pl.origW, pinScale);
+            }
+
+            drawFlaggedPin(item.pin, tableLeft, currentY, w, h, pl.origW, pinScale);
+
+            doc.rect(tableLeft, currentY, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
+
+            const captionParts: string[] = [];
+            if (pl.photo.originalFilename) captionParts.push(pl.photo.originalFilename);
+            captionParts.push(`Aisle ${a}, Sec ${s}`);
+            if (pl.photo.createdAt) captionParts.push(formatCT(new Date(pl.photo.createdAt)));
+            doc.font('Helvetica').fontSize(5.5).fillColor("#666666")
+              .text(captionParts.join("  |  "), tableLeft, currentY + h + 1, { width: w, align: "center", lineBreak: false });
+
+            photoBottomY = currentY + h + captionH;
+          }
+
+          const e = item.entry;
+          const lineH = 13;
+          let infoY = currentY;
+
+          doc.font('Helvetica-Bold').fontSize(9).fillColor("#cc4400")
+            .text(`${pinLabel}  ⚑`, infoX, infoY, { width: infoW, lineBreak: false });
+          infoY += lineH + 2;
+
+          const infoLines: [string, string][] = [
+            ["Category:", e.reelTag || "Unknown"],
+            ["Vendor:", e.manufacturer || "Unknown"],
+            ["Reels:", String(e.reelCount || 1)],
+            ["Footage:", e.footage ? `${e.footage.toLocaleString()} ft` : "0 ft"],
+          ];
+          if (e.notes) infoLines.push(["Notes:", e.notes]);
+
+          for (const [label, value] of infoLines) {
+            doc.font('Helvetica-Bold').fontSize(7).fillColor("#555555")
+              .text(label, infoX, infoY, { width: 55, lineBreak: false });
+            doc.font('Helvetica').fontSize(7).fillColor("#333333")
+              .text(value, infoX + 55, infoY, { width: infoW - 55, lineBreak: false });
+            infoY += lineH;
+          }
+
+          currentY = Math.max(photoBottomY, infoY) + flaggedGap;
         }
       }
 
