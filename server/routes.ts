@@ -1431,7 +1431,6 @@ export async function registerRoutes(
       const coverRows: [string, string][] = [
         ["Location:", session.location || "N/A"],
         ["Status:", (session.status.charAt(0).toUpperCase() + session.status.slice(1))],
-        ["Entries:", activeEntries.length.toLocaleString()],
         ["Total Reels:", totalReels.toLocaleString()],
         ["Total Footage:", `${activeTotalFootage.toLocaleString()} ft`],
         ...(flaggedEntryIds.size > 0 ? [["Flagged (excl.):", `${flaggedReelCount} reels / ${flaggedFootage.toLocaleString()} ft`] as [string, string]] : []),
