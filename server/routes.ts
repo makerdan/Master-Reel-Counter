@@ -2042,42 +2042,21 @@ export async function registerRoutes(
           doc.font('Helvetica').fontSize(5.5).fillColor("#666666")
             .text(capParts.join("  |  "), x, y + h + 1, { width: w, align: "center", lineBreak: false });
 
-          const listX = x + w + 10;
-          const listW = maxW - w - 10;
-          let listY = y;
-          const fieldLineH = 10;
-          const entryGap = 6;
-          const fieldLabelW = 72;
-          const fieldValueX = listX + fieldLabelW;
-          const fieldValueW = listW - fieldLabelW;
+          const tblX = x + w + 10;
+          const tblW = maxW - w - 10;
+          let tblEndY = y;
 
-          for (const e of photoEntries) {
-            const pinLabel = photoPins.find((p: any) => p.entryId === e.id)?.label;
-            const fields: [string, string][] = [
-              ["Pin #:", pinLabel ? String(pinLabel).padStart(3, "0") : "—"],
-              ["Category:", e.reelTag || e.wireType || "—"],
-              ["Vendor Code:", e.manufacturer || "—"],
-              ["# of Reels:", String(e.reelCount || 1)],
-              ["Total Footage:", e.footage ? `${e.footage.toLocaleString()} ft` : "—"],
-              ["Notes:", e.notes || "—"],
-            ];
-            const entryH = fields.length * fieldLineH + entryGap;
-            if (listY + entryH > y + maxH) break;
-            for (const [label, value] of fields) {
-              doc.font('Helvetica-Bold').fontSize(6).fillColor("#666666")
-                .text(label, listX, listY, { width: fieldLabelW, lineBreak: false });
-              doc.font('Helvetica').fontSize(6).fillColor("#222222")
-                .text(value, fieldValueX, listY, { width: fieldValueW, lineBreak: false });
-              listY += fieldLineH;
+          if (photoEntries.length > 0) {
+            const entryPinMap = new Map<number, string>();
+            for (const pin of photoPins) {
+              if (pin.entryId && pin.label) {
+                entryPinMap.set(pin.entryId, `P${String(pin.label).padStart(3, "0")}`);
+              }
             }
-            listY += entryGap;
-            if (photoEntries.indexOf(e) < photoEntries.length - 1) {
-              doc.moveTo(listX, listY - entryGap / 2).lineTo(listX + listW, listY - entryGap / 2)
-                .lineWidth(0.3).strokeColor("#dddddd").stroke();
-            }
+            tblEndY = drawEntriesTable(photoEntries, tblX, tblW, y, 5.5, 14, entryPinMap.size > 0 ? entryPinMap : undefined);
           }
 
-          const totalH = Math.max(h + captionH, listY - y);
+          const totalH = Math.max(h + captionH, tblEndY - y);
           return { renderedH: totalH };
         };
 
