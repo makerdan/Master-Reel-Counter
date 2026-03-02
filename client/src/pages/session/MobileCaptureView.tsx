@@ -442,6 +442,9 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                   try {
                     await apiRequest("DELETE", `/api/photos/${detailReviewPhoto.id}`);
                     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
                   } catch {}
                   if (detailReviewPhoto.blobUrl) {
                     URL.revokeObjectURL(detailReviewPhoto.blobUrl);

@@ -191,6 +191,8 @@ function PhotoCard({
     onSuccess: () => {
       invalidatePhotos();
       invalidateEntries();
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       toast({ title: "Photo deleted" });
     },
     onError: () => toast({ title: "Failed to delete photo", variant: "destructive" }),

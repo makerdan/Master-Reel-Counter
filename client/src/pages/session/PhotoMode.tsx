@@ -1686,6 +1686,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             resetView();
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
                             toast({ title: "Photo deleted" });
                           } catch {
