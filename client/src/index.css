@@ -479,6 +479,17 @@
   margin-bottom: -1px;
   opacity: 1;
 }
+.pin-marker.committed.topbar-below .pin-committed-topbar {
+  bottom: auto;
+  top: 100%;
+  margin-bottom: 0;
+  margin-top: -1px;
+}
+.pin-marker.committed.topbar-below .pin-label,
+.pin-marker.committed.topbar-below .pin-delete-btn,
+.pin-marker.committed.topbar-below .pin-reel-badge {
+  border-radius: 0 0 3px 3px;
+}
 .pin-marker.committed .pin-label {
   background: rgba(234, 88, 12, 1);
   border: none;

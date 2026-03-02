@@ -1429,7 +1429,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {committedPins.map((pin) => (
                     <div
                       key={pin.id}
-                      className="pin-marker committed"
+                      className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}`}
                       style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                       data-testid={`pin-committed-${pin.id}`}
                     >
@@ -1460,7 +1460,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {nearbyCommittedPins.map((pin) => (
                     <div
                       key={pin.id}
-                      className="pin-marker committed"
+                      className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}`}
                       style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                       data-testid={`pin-nearby-committed-${pin.id}`}
                     >
