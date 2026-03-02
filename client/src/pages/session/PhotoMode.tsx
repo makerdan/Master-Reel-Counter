@@ -245,7 +245,31 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       if (secA !== secB) return secA - secB;
       return (a.dbId || 0) - (b.dbId || 0);
     });
-    setUploadedPhotos(mapped);
+    const detailsByParent = new Map<number, typeof mapped>();
+    const mainPhotos: typeof mapped = [];
+    for (const photo of mapped) {
+      if (photo.isDetailShot && photo.parentPhotoId != null) {
+        if (!detailsByParent.has(photo.parentPhotoId)) detailsByParent.set(photo.parentPhotoId, []);
+        detailsByParent.get(photo.parentPhotoId)!.push(photo);
+      } else {
+        mainPhotos.push(photo);
+      }
+    }
+    const placedDetailIds = new Set<number>();
+    const ordered: typeof mapped = [];
+    for (const photo of mainPhotos) {
+      ordered.push(photo);
+      for (const detail of detailsByParent.get(photo.dbId!) || []) {
+        ordered.push(detail);
+        if (detail.dbId != null) placedDetailIds.add(detail.dbId);
+      }
+    }
+    for (const details of detailsByParent.values()) {
+      for (const d of details) {
+        if (d.dbId == null || !placedDetailIds.has(d.dbId)) ordered.push(d);
+      }
+    }
+    setUploadedPhotos(ordered);
     if (!navigateToPhotoId && !initialRestoredRef.current && initialPhotoIndex > 0 && initialPhotoIndex < mapped.length) {
       setCurrentPhotoIdx(initialPhotoIndex);
       const photo = mapped[initialPhotoIndex];
