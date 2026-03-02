@@ -1006,9 +1006,6 @@ function SessionWorkspace({
                 </p>
               </button>
             ))}
-            <p className="text-[11px] text-muted-foreground text-center pt-1">
-              Both versions are already loading — your choice downloads instantly.
-            </p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={cancelQualityDialog} data-testid="button-pdf-quality-cancel">
