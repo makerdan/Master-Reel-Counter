@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, Fragment } from "react";
+import { useState, useRef, useCallback, Fragment, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Entry, Photo, Pin } from "@shared/schema";
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey,
 }: {
   entries: Entry[];
   photos: Photo[];
@@ -27,6 +27,7 @@ function EntryTable({
   totalFootage: number;
   onUndoableDelete?: (action: any) => void;
   canEdit?: boolean;
+  forceExpandKey?: string;
 }) {
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
@@ -65,6 +66,12 @@ function EntryTable({
   };
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (forceExpandKey) {
+      setExpandedSections(prev => ({ ...prev, [forceExpandKey]: true }));
+    }
+  }, [forceExpandKey]);
 
   if (!entries || entries.length === 0) {
     return (

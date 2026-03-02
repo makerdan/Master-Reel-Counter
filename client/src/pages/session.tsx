@@ -196,6 +196,7 @@ function SessionWorkspace({
 
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
   const [undoRedoSignal, setUndoRedoSignal] = useState(0);
+  const [tableExpandKey, setTableExpandKey] = useState<string | null>(null);
   const undoWithSignal = useCallback(async () => { await undo(); setUndoRedoSignal(s => s + 1); }, [undo]);
   const redoWithSignal = useCallback(async () => { await redo(); setUndoRedoSignal(s => s + 1); }, [redo]);
 
@@ -728,7 +729,7 @@ function SessionWorkspace({
               </TabsList>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} undoRedoSignal={undoRedoSignal} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} />
               </TabsContent>
 
               <TabsContent value="single">
@@ -806,6 +807,7 @@ function SessionWorkspace({
               totalFootage={totalFootage}
               onUndoableDelete={pushUndo}
               canEdit={canEditSession}
+              forceExpandKey={tableExpandKey ?? undefined}
             />
           </>
         )}

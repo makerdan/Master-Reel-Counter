@@ -30,7 +30,7 @@ import { deriveVendorCode } from "./utils";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, undoRedoSignal }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; undoRedoSignal?: number }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, undoRedoSignal, onDraftPinsHint }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -391,6 +391,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     pinFetchCache.current.delete(currentPhoto.dbId);
     setPinLoadKey(k => k + 1);
   }, [undoRedoSignal, currentPhoto?.dbId]);
+
+  useEffect(() => {
+    if (localPins.length > 0 && currentPhoto && onDraftPinsHint) {
+      onDraftPinsHint(currentPhoto.aisle || "—", currentPhoto.section || "—");
+    }
+  }, [localPins.length, currentPhoto?.aisle, currentPhoto?.section, onDraftPinsHint]);
 
   // Preload images and prefetch pins for adjacent photos to eliminate navigation lag
   useEffect(() => {
