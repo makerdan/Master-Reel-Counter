@@ -1338,6 +1338,27 @@ export async function registerRoutes(
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       const photoMap = new Map(sessionPhotos.map(p => [p.id, p]));
 
+      const allFlaggedPins = await storage.getSessionFlaggedPins(session.id);
+      const flaggedEntryIds = new Set<number>(
+        allFlaggedPins.filter((p: any) => p.entryId != null).map((p: any) => p.entryId as number)
+      );
+      const flaggedFootage = (sessionEntries as any[])
+        .filter((e: any) => flaggedEntryIds.has(e.id))
+        .reduce((s: number, e: any) => s + (e.footage || 0), 0);
+      const flaggedReelCount = (sessionEntries as any[])
+        .filter((e: any) => flaggedEntryIds.has(e.id))
+        .reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+      const activeEntries = (sessionEntries as any[]).filter((e: any) => !flaggedEntryIds.has(e.id));
+      const activeTotalFootage = totalFootage - flaggedFootage;
+      const flaggedPdfItems: Array<{ pin: any; photo: any; entry: any }> = allFlaggedPins
+        .filter((p: any) => p.entryId != null)
+        .map((p: any) => ({
+          pin: p,
+          photo: photoMap.get(p.photoId),
+          entry: (sessionEntries as any[]).find((e: any) => e.id === p.entryId),
+        }))
+        .filter((item: any) => item.entry);
+
       const userSettingsData = await storage.getUserSettings(userId);
       const userTz = userSettingsData?.timezone || "America/Chicago";
 
@@ -1405,14 +1426,15 @@ export async function registerRoutes(
       const coverLineH = 15;
       const coverLabelColor = "#000000";
       const coverValueColor = "#222222";
-      const totalReels = (sessionEntries as any[]).reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+      const totalReels = activeEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
 
       const coverRows: [string, string][] = [
         ["Location:", session.location || "N/A"],
         ["Status:", (session.status.charAt(0).toUpperCase() + session.status.slice(1))],
-        ["Entries:", sessionEntries.length.toLocaleString()],
+        ["Entries:", activeEntries.length.toLocaleString()],
         ["Total Reels:", totalReels.toLocaleString()],
-        ["Total Footage:", `${totalFootage.toLocaleString()} ft`],
+        ["Total Footage:", `${activeTotalFootage.toLocaleString()} ft`],
+        ...(flaggedEntryIds.size > 0 ? [["Flagged (excl.):", `${flaggedReelCount} reels / ${flaggedFootage.toLocaleString()} ft`] as [string, string]] : []),
         ["Photos:", pt.photoCount.toLocaleString()],
       ];
       for (const [label, value] of coverRows) {
@@ -2265,14 +2287,91 @@ export async function registerRoutes(
         }
       }
 
+      // --- Flagged Reels Section ---
+      if (flaggedPdfItems.length > 0) {
+        // Group by aisle/section
+        const flaggedGroups = new Map<string, { aisle: string; section: string; entries: any[]; pinMap: Map<number, string> }>();
+        for (const item of flaggedPdfItems) {
+          const a = item.photo?.aisle || "—";
+          const s = item.photo?.section || "—";
+          const key = `${a}-${s}`;
+          if (!flaggedGroups.has(key)) {
+            flaggedGroups.set(key, { aisle: a, section: s, entries: [], pinMap: new Map() });
+          }
+          const grp = flaggedGroups.get(key)!;
+          grp.entries.push(item.entry);
+          if (item.pin.label && item.entry.id) {
+            grp.pinMap.set(item.entry.id, `P${String(item.pin.label).padStart(3, "0")}`);
+          }
+        }
+
+        const sortedFlaggedGroups = Array.from(flaggedGroups.values()).sort((a, b) => {
+          const aN = parseInt(a.aisle) || 0;
+          const bN = parseInt(b.aisle) || 0;
+          if (aN !== bN) return aN - bN;
+          if (a.aisle < b.aisle) return -1;
+          if (a.aisle > b.aisle) return 1;
+          return (parseInt(a.section) || 0) - (parseInt(b.section) || 0);
+        });
+
+        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+        currentY = 36;
+
+        doc.fontSize(16).fillColor(accentHex).text("Flagged Reels", 36, currentY);
+        currentY += 22;
+
+        // Disclaimer box
+        const disclaimerH = 28;
+        doc.rect(tableLeft, currentY, pageWidth, disclaimerH).fill("#fff3e0");
+        doc.rect(tableLeft, currentY, pageWidth, disclaimerH).strokeColor(accentHex).lineWidth(1).stroke();
+        doc.fontSize(8).fillColor("#333333").text(
+          "The following reels have been flagged for re-shoot or review. Their footage and reel counts are NOT included in the session totals or Grand Total.",
+          tableLeft + 8, currentY + 8, { width: pageWidth - 16, lineBreak: false }
+        );
+        currentY += disclaimerH + 10;
+
+        for (const grp of sortedFlaggedGroups) {
+          const grpReels = grp.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+          const grpFootage = grp.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+          const aisleDisplay = grp.aisle.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${grp.aisle}`;
+
+          if (currentY + 50 > maxY) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+            doc.fontSize(14).fillColor(accentHex).text("Flagged Reels (cont.)", 36, currentY);
+            currentY += 22;
+          }
+
+          doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
+          doc.fontSize(11).fillColor(accentHex).text(
+            `${aisleDisplay} / Section ${grp.section}`,
+            tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
+          );
+          doc.fontSize(7).fillColor("#666666").text(
+            `${grp.entries.length} entries  |  ${grpReels} reels  |  ${grpFootage.toLocaleString()} ft  ⚑ flagged`,
+            tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
+          );
+          doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
+          currentY += 26;
+
+          const afterTable = drawEntriesTable(grp.entries, tableLeft, pageWidth, currentY, 6.5, rowHeight, grp.pinMap.size > 0 ? grp.pinMap : undefined);
+          currentY = afterTable + 12;
+        }
+      }
+
       // --- Summary Totals Page ---
       doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
       currentY = 36;
 
       doc.fontSize(18).fillColor(accentHex).text("Summary Totals", 36, currentY);
       currentY += 24;
-      doc.fontSize(9).fillColor("#666666").text(`${session.name}  |  ${session.location || "N/A"}  |  ${sessionEntries.length} entries  |  ${totalFootage.toLocaleString()} ft total`, 36, currentY);
-      currentY += 20;
+      doc.fontSize(9).fillColor("#666666").text(`${session.name}  |  ${session.location || "N/A"}  |  ${activeEntries.length} entries  |  ${activeTotalFootage.toLocaleString()} ft total`, 36, currentY);
+      currentY += 14;
+      if (flaggedEntryIds.size > 0) {
+        doc.fontSize(8).fillColor("#cc4400").text(`Note: ${flaggedEntryIds.size} flagged reel(s) with ${flaggedFootage.toLocaleString()} ft excluded from this summary — see Flagged Reels section.`, 36, currentY);
+        currentY += 14;
+      }
+      currentY += 6;
 
       const entryPinLabelMap = new Map<number, string>();
       for (const [, pins] of allPinsMap) {
@@ -2284,7 +2383,7 @@ export async function registerRoutes(
       }
 
       const categoryMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
-      for (const e of sessionEntries as any[]) {
+      for (const e of activeEntries) {
         const cat = e.reelTag || e.wireType || "Uncategorized";
         const vendor = e.manufacturer || "";
         const groupKey = `${cat}|||${vendor}`;
@@ -2450,7 +2549,7 @@ export async function registerRoutes(
       doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill(headerBg);
       doc.font('Helvetica-Bold').fontSize(7).fillColor("#333333");
       let tx = tableLeft;
-      const totalVals = ["GRAND TOTAL", "", `${sortedCategories.reduce((s, c) => s + c.reelCount, 0)} reels`, `${totalFootage.toLocaleString()} total ft`, `${sortedCategories.length} total categories`];
+      const totalVals = ["GRAND TOTAL", "", `${sortedCategories.reduce((s, c) => s + c.reelCount, 0)} reels`, `${activeTotalFootage.toLocaleString()} total ft`, `${sortedCategories.length} total categories`];
       const totalAligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
       for (let j = 0; j < sumScaled.length; j++) {
         doc.text(totalVals[j], tx + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false, align: totalAligns[j] });
