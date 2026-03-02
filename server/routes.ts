@@ -2287,7 +2287,7 @@ export async function registerRoutes(
         return idx >= 0 ? idx : reelSizeOrder.length;
       };
       const extractWireType = (cat: string): string => {
-        return cat.replace(/\d+$/, "");
+        return cat.replace(/\d+$/, "").trim();
       };
 
       const allCategories = Array.from(categoryMap.entries())
