@@ -723,11 +723,39 @@ export async function registerRoutes(
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
       const displayName = req.user.claims.name || req.user.claims.username || userId;
+
+      // Generate a unique storage key for the copied file so the two photos are independent
+      const ext = path.extname(original.objectStorageKey || "");
+      const newId = `${randomUUID()}${ext}`;
+      const newObjectPath = `/uploads/${newId}`;
+      const srcObjectName = toStorageObjectName(original.objectStorageKey!);
+      const destObjectName = toStorageObjectName(newObjectPath);
+      const localSrcFilename = original.objectStorageKey!.startsWith("/uploads/")
+        ? original.objectStorageKey!.slice("/uploads/".length)
+        : original.objectStorageKey!;
+      const localSrcPath = path.join(UPLOADS_DIR, localSrcFilename);
+      const localDestPath = path.join(UPLOADS_DIR, newId);
+
+      let copiedKey = newObjectPath;
+      try {
+        // Server-side GCS copy — no bandwidth cost, works even for large files
+        await objectStorageClient.bucket(BUCKET_NAME).file(srcObjectName)
+          .copy(objectStorageClient.bucket(BUCKET_NAME).file(destObjectName));
+      } catch {
+        // Fall back to local-disk copy if GCS is unavailable
+        try {
+          await fs.copyFile(localSrcPath, localDestPath);
+        } catch {
+          // If neither works, keep the original key (shared reference) so the duplicate at least shows the photo
+          copiedKey = original.objectStorageKey!;
+        }
+      }
+
       const [newPhoto] = await db.insert(photos).values({
         sessionId:        original.sessionId,
         userId:           userId,
         uploadedBy:       original.uploadedBy,
-        objectStorageKey: original.objectStorageKey,
+        objectStorageKey: copiedKey,
         originalFilename: original.originalFilename,
         mimeType:         original.mimeType,
         width:            original.width,
