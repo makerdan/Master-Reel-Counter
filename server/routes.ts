@@ -1826,10 +1826,10 @@ export async function registerRoutes(
         return { renderedH: totalH };
       };
 
-      const drawSectionHeader = (aisle: string, section: string, entryCount: number, reelCount: number, footage: number, photoLabel?: string) => {
+      const drawSectionHeader = (aisle: string, section: string, entryCount: number, reelCount: number, footage: number, photoLabel?: string, titleSuffix?: string) => {
         doc.rect(tableLeft, currentY, pageWidth, 22).fill("#e8e0d8");
         doc.fontSize(11).fillColor(accentHex).text(
-          `Aisle ${aisle || "—"}  /  Section ${section || "—"}`,
+          `Aisle ${aisle || "—"}  /  Section ${section || "—"}${titleSuffix || ""}`,
           tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
         );
         doc.fontSize(7).fillColor("#666666").text(
@@ -1971,7 +1971,7 @@ export async function registerRoutes(
           if (currentY + needed > maxY) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = 36;
-            drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, `(cont.)`);
+            drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, undefined, " (Continued)");
           }
         };
 
@@ -2154,43 +2154,13 @@ export async function registerRoutes(
           return { bottomY: Math.max(y + result.renderedH, tblEndY) };
         };
 
-        if (standardPhotos.length >= 2) {
-          const colW = Math.floor((pageWidth - gap) / 2);
-          const colPhotoW = Math.floor(colW * 0.45);
-          const colTblW = colW - colPhotoW - gap;
-          let idx = 0;
-          while (idx < standardPhotos.length) {
-            if (idx + 1 < standardPhotos.length) {
-              ensureSpace(minPhotoH);
-              const availH = maxY - currentY;
-              const item0 = standardPhotos[idx];
-              const item1 = standardPhotos[idx + 1];
-              const r0 = renderStandardPhotoAt(item0, tableLeft, colPhotoW, colTblW, currentY, availH);
-              const r1 = renderStandardPhotoAt(item1, tableLeft + colW + gap, colPhotoW, colTblW, currentY, availH);
-              currentY = Math.max(r0.bottomY, r1.bottomY) + gap;
-              renderDetailShotsForParent(item0.pl.photo.id);
-              renderDetailShotsForParent(item1.pl.photo.id);
-              idx += 2;
-            } else {
-              ensureSpace(minPhotoH);
-              const item = standardPhotos[idx];
-              const photoW = pageWidth * 0.45;
-              const tblW = pageWidth - photoW - gap;
-              const r = renderStandardPhotoAt(item, tableLeft, photoW, tblW, currentY, maxY - currentY);
-              currentY = r.bottomY + gap;
-              renderDetailShotsForParent(item.pl.photo.id);
-              idx++;
-            }
-          }
-        } else {
-          for (const item of standardPhotos) {
-            ensureSpace(minPhotoH);
-            const photoW = pageWidth * 0.45;
-            const tblW = pageWidth - photoW - gap;
-            const r = renderStandardPhotoAt(item, tableLeft, photoW, tblW, currentY, maxY - currentY);
-            currentY = r.bottomY + gap;
-            renderDetailShotsForParent(item.pl.photo.id);
-          }
+        for (const item of standardPhotos) {
+          ensureSpace(minPhotoH);
+          const photoW = pageWidth * 0.45;
+          const tblW = pageWidth - photoW - gap;
+          const r = renderStandardPhotoAt(item, tableLeft, photoW, tblW, currentY, maxY - currentY);
+          currentY = r.bottomY + gap;
+          renderDetailShotsForParent(item.pl.photo.id);
         }
 
         if (standardWithoutEntries.length > 0) {
@@ -2354,9 +2324,8 @@ export async function registerRoutes(
         const g = dg.toUpperCase().trim();
         if (g === "THHN") return 0;
         if (g === "XHHW") return 1;
-        if (g === "SER--COP") return 2;
-        if (g === "SER--ALU") return 3;
-        return 4;
+        if (g.startsWith("SER")) return 2;
+        return 3;
       };
       allCategories.sort((a, b) => {
         const pa = displayGroupPriority(a.displayGroup);
