@@ -2137,29 +2137,60 @@ export async function registerRoutes(
           }
         }
 
-        for (const { pl, entries: photoEntries } of standardPhotos) {
-          ensureSpace(minPhotoH);
-          const availH = maxY - currentY;
-          const photoW = pageWidth * 0.45;
-          const result = renderPhoto(pl, tableLeft, currentY, photoW, availH, photoEntries);
-
-          const tblX = tableLeft + photoW + gap;
-          const tblW = pageWidth - photoW - gap;
-          let tblEndY = currentY;
-          if (photoEntries.length > 0) {
-            const photoPins = allPinsMap.get(pl.photo.id) || [];
+        const renderStandardPhotoAt = (item: { pl: PhotoLayout; entries: any[] }, x: number, photoW: number, tblW: number, y: number, availH: number) => {
+          const tblX = x + photoW + gap;
+          const result = renderPhoto(item.pl, x, y, photoW, availH, item.entries);
+          let tblEndY = y;
+          if (item.entries.length > 0) {
+            const photoPins = allPinsMap.get(item.pl.photo.id) || [];
             const entryPinMap = new Map<number, string>();
             for (const pin of photoPins) {
               if (pin.entryId && pin.label) {
                 entryPinMap.set(pin.entryId, `P${String(pin.label).padStart(3, "0")}`);
               }
             }
-            tblEndY = drawEntriesTable(photoEntries, tblX, tblW, currentY, 5.5, 14, entryPinMap.size > 0 ? entryPinMap : undefined);
+            tblEndY = drawEntriesTable(item.entries, tblX, tblW, y, 5.5, 14, entryPinMap.size > 0 ? entryPinMap : undefined);
           }
+          return { bottomY: Math.max(y + result.renderedH, tblEndY) };
+        };
 
-          const photoEndY = currentY + result.renderedH;
-          currentY = Math.max(photoEndY, tblEndY) + gap;
-          renderDetailShotsForParent(pl.photo.id);
+        if (standardPhotos.length >= 2) {
+          const colW = Math.floor((pageWidth - gap) / 2);
+          const colPhotoW = Math.floor(colW * 0.45);
+          const colTblW = colW - colPhotoW - gap;
+          let idx = 0;
+          while (idx < standardPhotos.length) {
+            if (idx + 1 < standardPhotos.length) {
+              ensureSpace(minPhotoH);
+              const availH = maxY - currentY;
+              const item0 = standardPhotos[idx];
+              const item1 = standardPhotos[idx + 1];
+              const r0 = renderStandardPhotoAt(item0, tableLeft, colPhotoW, colTblW, currentY, availH);
+              const r1 = renderStandardPhotoAt(item1, tableLeft + colW + gap, colPhotoW, colTblW, currentY, availH);
+              currentY = Math.max(r0.bottomY, r1.bottomY) + gap;
+              renderDetailShotsForParent(item0.pl.photo.id);
+              renderDetailShotsForParent(item1.pl.photo.id);
+              idx += 2;
+            } else {
+              ensureSpace(minPhotoH);
+              const item = standardPhotos[idx];
+              const photoW = pageWidth * 0.45;
+              const tblW = pageWidth - photoW - gap;
+              const r = renderStandardPhotoAt(item, tableLeft, photoW, tblW, currentY, maxY - currentY);
+              currentY = r.bottomY + gap;
+              renderDetailShotsForParent(item.pl.photo.id);
+              idx++;
+            }
+          }
+        } else {
+          for (const item of standardPhotos) {
+            ensureSpace(minPhotoH);
+            const photoW = pageWidth * 0.45;
+            const tblW = pageWidth - photoW - gap;
+            const r = renderStandardPhotoAt(item, tableLeft, photoW, tblW, currentY, maxY - currentY);
+            currentY = r.bottomY + gap;
+            renderDetailShotsForParent(item.pl.photo.id);
+          }
         }
 
         if (standardWithoutEntries.length > 0) {
@@ -2311,22 +2342,28 @@ export async function registerRoutes(
       const allCategories = Array.from(categoryMap.entries())
         .map(([groupKey, data]) => {
           const category = groupKey.split("|||")[0];
-          return { category, wireTypeGroup: extractWireType(category), reelSizeIdx: extractReelSize(category), ...data };
+          const wireTypeGroup = extractWireType(category);
+          const isSer = wireTypeGroup.toUpperCase().trim() === "SER";
+          const displayGroup = isSer
+            ? `SER--${data.vendorCode.toUpperCase().trim() || "?"}`
+            : wireTypeGroup;
+          return { category, wireTypeGroup, displayGroup, reelSizeIdx: extractReelSize(category), ...data };
         });
 
-      const wireTypePriority = (wireType: string, vendor: string): number => {
-        const wt = wireType.toUpperCase().trim();
-        const v = vendor.toUpperCase().trim();
-        if (wt === "THHN" && v === "COP") return 0;
-        if (wt === "XHHW" && v === "ALU") return 1;
-        return 2;
+      const displayGroupPriority = (dg: string): number => {
+        const g = dg.toUpperCase().trim();
+        if (g === "THHN") return 0;
+        if (g === "XHHW") return 1;
+        if (g === "SER--COP") return 2;
+        if (g === "SER--ALU") return 3;
+        return 4;
       };
       allCategories.sort((a, b) => {
-        const pa = wireTypePriority(a.wireTypeGroup, a.vendorCode);
-        const pb = wireTypePriority(b.wireTypeGroup, b.vendorCode);
+        const pa = displayGroupPriority(a.displayGroup);
+        const pb = displayGroupPriority(b.displayGroup);
         if (pa !== pb) return pa - pb;
-        if (a.wireTypeGroup < b.wireTypeGroup) return -1;
-        if (a.wireTypeGroup > b.wireTypeGroup) return 1;
+        if (a.displayGroup < b.displayGroup) return -1;
+        if (a.displayGroup > b.displayGroup) return 1;
         return a.reelSizeIdx - b.reelSizeIdx;
       });
 
@@ -2334,7 +2371,7 @@ export async function registerRoutes(
 
       const groupReelCounts = new Map<string, number>();
       for (const cat of sortedCategories) {
-        const g = cat.wireTypeGroup;
+        const g = cat.displayGroup;
         groupReelCounts.set(g, (groupReelCounts.get(g) || 0) + cat.reelCount);
       }
 
@@ -2374,15 +2411,15 @@ export async function registerRoutes(
         const rowH = 16;
         const cat = sortedCategories[i];
 
-        if (cat.wireTypeGroup !== lastWireTypeGroup) {
+        if (cat.displayGroup !== lastWireTypeGroup) {
           const groupH = 18;
           if (currentY + groupH + rowH > maxY) {
             doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
             currentY = drawSumHeader(36);
           }
           doc.rect(tableLeft, currentY, pageWidth, groupH).fill("#e8e0d8");
-          doc.font('Helvetica-Bold').fontSize(7.5).fillColor(accentHex).text(cat.wireTypeGroup || "Other", tableLeft + 6, currentY + 5, { width: pageWidth - 160, lineBreak: false });
-          const groupCount = groupReelCounts.get(cat.wireTypeGroup) || 0;
+          doc.font('Helvetica-Bold').fontSize(7.5).fillColor(accentHex).text(cat.displayGroup || "Other", tableLeft + 6, currentY + 5, { width: pageWidth - 160, lineBreak: false });
+          const groupCount = groupReelCounts.get(cat.displayGroup) || 0;
           doc.fontSize(7.5).fillColor(accentHex).text(
             `${groupCount} reels`,
             tableLeft + pageWidth - 150, currentY + 5, { width: 140, align: "right", lineBreak: false }
@@ -2390,7 +2427,7 @@ export async function registerRoutes(
           doc.font('Helvetica');
           doc.rect(tableLeft, currentY, pageWidth, groupH).stroke(borderColor);
           currentY += groupH;
-          lastWireTypeGroup = cat.wireTypeGroup;
+          lastWireTypeGroup = cat.displayGroup;
           altIdx = 0;
         }
 
@@ -2450,10 +2487,11 @@ export async function registerRoutes(
       currentY += 14;
       const ctGeneratedAt = formatCT(new Date());
       const auditLabel = (label: string, value: string) => {
-        doc.font('Helvetica').fontSize(7).fillColor("#666666");
+        doc.font('Helvetica-Bold').fontSize(7).fillColor("#000000");
         const labelW = doc.widthOfString(label);
         doc.text(label, 36, currentY, { lineBreak: false });
-        doc.save().moveTo(36, currentY + 8).lineTo(36 + labelW, currentY + 8).lineWidth(0.4).strokeColor("#666666").stroke().restore();
+        doc.save().moveTo(36, currentY + 8).lineTo(36 + labelW, currentY + 8).lineWidth(0.4).strokeColor("#000000").stroke().restore();
+        doc.font('Helvetica').fillColor("#000000");
         doc.text(` ${value}`, 36 + labelW, currentY, { lineBreak: false });
         currentY += 11;
       };
