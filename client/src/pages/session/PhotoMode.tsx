@@ -113,6 +113,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipAutoSave = useRef(false);
   const globalMaxPinRef = useRef<number>(0);
+  const pinFetchCache = useRef<Map<number, Pin[]>>(new Map());
+  const prevPhotoDbIdRef = useRef<number | undefined>(undefined);
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
   const dragRef = useRef<{
@@ -313,47 +315,65 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     }
   }, [uploadedPhotos, currentPhotoIdx]);
 
+  const applyPins = useCallback((dbPins: Pin[]) => {
+    const draftPins = dbPins.filter(p => !p.entryId);
+    const committed = dbPins.filter(p => !!p.entryId);
+    const photoMax = dbPins.reduce((m, p) => {
+      const n = parseInt(p.label || "0", 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+    globalMaxPinRef.current = Math.max(globalMaxPinRef.current, photoMax);
+    setCommittedPins(committed.map(p => ({
+      id: `committed-${p.id}`,
+      dbId: p.id,
+      x: p.xPercent,
+      y: p.yPercent,
+      label: p.label || "001",
+      reelCount: p.reelCount || 1,
+    })));
+    if (draftPins.length > 0) {
+      setLocalPins(draftPins.map(p => ({
+        id: `pin-${p.id}`,
+        x: p.xPercent,
+        y: p.yPercent,
+        label: p.label || "001",
+        reelCount: p.reelCount || 1,
+        wireDetails: p.wireDetails || undefined,
+        vendorCode: p.vendorCode || undefined,
+        footage: p.footage || undefined,
+        flagged: p.flagged || false,
+      })));
+    } else {
+      setLocalPins([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (!currentPhoto?.dbId) {
       setPinsLoaded(false);
       return;
     }
-    setPinsLoaded(false);
+    // Evict the cache for the photo we just left (its pins may have been modified)
+    if (prevPhotoDbIdRef.current && prevPhotoDbIdRef.current !== currentPhoto.dbId) {
+      pinFetchCache.current.delete(prevPhotoDbIdRef.current);
+    }
+    prevPhotoDbIdRef.current = currentPhoto.dbId;
+
     skipAutoSave.current = true;
+    const cached = pinFetchCache.current.get(currentPhoto.dbId);
+    if (cached) {
+      applyPins(cached);
+      setPinsLoaded(true);
+      setTimeout(() => { skipAutoSave.current = false; }, 500);
+      return;
+    }
+    setPinsLoaded(false);
     const loadPins = async () => {
       try {
         const res = await apiRequest("GET", `/api/photos/${currentPhoto.dbId}/pins`);
         const dbPins: Pin[] = await res.json();
-        const draftPins = dbPins.filter(p => !p.entryId);
-        const committed = dbPins.filter(p => !!p.entryId);
-        const photoMax = dbPins.reduce((m, p) => {
-          const n = parseInt(p.label || "0", 10);
-          return isNaN(n) ? m : Math.max(m, n);
-        }, 0);
-        globalMaxPinRef.current = Math.max(globalMaxPinRef.current, photoMax);
-        setCommittedPins(committed.map(p => ({
-          id: `committed-${p.id}`,
-          dbId: p.id,
-          x: p.xPercent,
-          y: p.yPercent,
-          label: p.label || "001",
-          reelCount: p.reelCount || 1,
-        })));
-        if (draftPins.length > 0) {
-          setLocalPins(draftPins.map(p => ({
-            id: `pin-${p.id}`,
-            x: p.xPercent,
-            y: p.yPercent,
-            label: p.label || "001",
-            reelCount: p.reelCount || 1,
-            wireDetails: p.wireDetails || undefined,
-            vendorCode: p.vendorCode || undefined,
-            footage: p.footage || undefined,
-            flagged: p.flagged || false,
-          })));
-        } else {
-          setLocalPins([]);
-        }
+        pinFetchCache.current.set(currentPhoto.dbId!, dbPins);
+        applyPins(dbPins);
       } catch {
         setLocalPins([]);
       }
@@ -361,7 +381,27 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       setTimeout(() => { skipAutoSave.current = false; }, 500);
     };
     loadPins();
-  }, [currentPhoto?.dbId]);
+  }, [currentPhoto?.dbId, applyPins]);
+
+  // Preload images and prefetch pins for adjacent photos to eliminate navigation lag
+  useEffect(() => {
+    if (uploadedPhotos.length <= 1) return;
+    const offsets = [-1, 1, 2];
+    for (const offset of offsets) {
+      const idx = (currentPhotoIdx + offset + uploadedPhotos.length) % uploadedPhotos.length;
+      const photo = uploadedPhotos[idx];
+      if (!photo) continue;
+      const img = new window.Image();
+      img.src = photo.url;
+      if (photo.dbId && !pinFetchCache.current.has(photo.dbId)) {
+        const photoDbId = photo.dbId;
+        apiRequest("GET", `/api/photos/${photoDbId}/pins`)
+          .then(res => res.json())
+          .then((dbPins: Pin[]) => { pinFetchCache.current.set(photoDbId, dbPins); })
+          .catch(() => {});
+      }
+    }
+  }, [currentPhotoIdx, uploadedPhotos]);
 
   useEffect(() => {
     if (pinScaleSaveTimer.current) {
