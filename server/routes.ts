@@ -2305,8 +2305,7 @@ export async function registerRoutes(
         const g = dg.toUpperCase().trim();
         if (g === "THHN") return 0;
         if (g === "XHHW") return 1;
-        if (g.startsWith("SER")) return 2;
-        return 3;
+        return 2;
       };
       allCategories.sort((a, b) => {
         const pa = displayGroupPriority(a.displayGroup);
