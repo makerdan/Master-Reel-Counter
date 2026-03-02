@@ -2380,11 +2380,16 @@ export async function registerRoutes(
           altIdx = 0;
         }
 
-        if (currentY + rowH > maxY) {
+        const locText = cat.locations.join(", ");
+        doc.font('Helvetica').fontSize(6.5);
+        const locH = locText ? doc.heightOfString(locText, { width: sumScaled[4].width - 6 }) : 0;
+        const actualRowH = Math.max(rowH, locH + 8);
+
+        if (currentY + actualRowH > maxY) {
           doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
           currentY = drawSumHeader(36);
         }
-        if (altIdx % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, rowH).fill("#fafaf8");
+        if (altIdx % 2 === 1) doc.rect(tableLeft, currentY, pageWidth, actualRowH).fill("#fafaf8");
         doc.fontSize(6.5).fillColor("#333333");
         let x = tableLeft;
         const vals = [
@@ -2392,17 +2397,24 @@ export async function registerRoutes(
           cat.vendorCode,
           String(cat.reelCount),
           `${cat.totalFootage.toLocaleString()} ft`,
-          cat.locations.join(", "),
+          locText,
         ];
         const aligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
         for (let j = 0; j < sumScaled.length; j++) {
+          const cellY = j < 4
+            ? currentY + Math.max(1, (actualRowH - 6.5) / 2)
+            : currentY + 4;
           if (j === 3) doc.font('Helvetica-Bold');
-          doc.text(vals[j], x + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false, align: aligns[j] });
+          if (j === 4) {
+            doc.text(vals[j], x + 3, cellY, { width: sumScaled[j].width - 6, lineBreak: true, height: actualRowH - 8 });
+          } else {
+            doc.text(vals[j], x + 3, cellY, { width: sumScaled[j].width - 6, lineBreak: false, align: aligns[j] });
+          }
           if (j === 3) doc.font('Helvetica');
           x += sumScaled[j].width;
         }
-        doc.rect(tableLeft, currentY, pageWidth, rowH).stroke(borderColor);
-        currentY += rowH;
+        doc.rect(tableLeft, currentY, pageWidth, actualRowH).stroke(borderColor);
+        currentY += actualRowH;
         altIdx++;
       }
 
@@ -2410,7 +2422,7 @@ export async function registerRoutes(
       doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill(headerBg);
       doc.font('Helvetica-Bold').fontSize(7).fillColor("#333333");
       let tx = tableLeft;
-      const totalVals = ["GRAND TOTAL", "", String(sortedCategories.reduce((s, c) => s + c.reelCount, 0)), `${totalFootage.toLocaleString()} ft`, `${sortedCategories.length} categories`];
+      const totalVals = ["GRAND TOTAL", "", `${sortedCategories.reduce((s, c) => s + c.reelCount, 0)} reels`, `${totalFootage.toLocaleString()} total ft`, `${sortedCategories.length} total categories`];
       const totalAligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
       for (let j = 0; j < sumScaled.length; j++) {
         doc.text(totalVals[j], tx + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false, align: totalAligns[j] });
@@ -2453,7 +2465,7 @@ export async function registerRoutes(
         auditLabel("Elapsed Time:", "N/A");
       }
       if (session.completedAt) { auditLabel("Completed:", formatCT(new Date(session.completedAt))); }
-      auditLabel("Entry Count:", String(sessionEntries.length));
+      auditLabel("Total Number of Reels:", String(sortedCategories.reduce((s, c) => s + c.reelCount, 0)));
       auditLabel("Data Encoding:", key ? "Active (entries decrypted for export)" : "Off");
       currentY += 5;
 
