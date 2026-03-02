@@ -1407,7 +1407,8 @@ export async function registerRoutes(
           const diffMs = Math.abs(new Date(pt.lastPhotoAt).getTime() - new Date(pt.firstPhotoAt).getTime());
           const totalMin = Math.floor(diffMs / 60000);
           let elapsedStr: string;
-          if (totalMin < 60) { elapsedStr = `${totalMin}m`; }
+          if (diffMs < 60000) { elapsedStr = `${Math.round(diffMs / 1000)}s`; }
+          else if (totalMin < 60) { elapsedStr = `${totalMin}m`; }
           else { const h = Math.floor(totalMin / 60); const m = totalMin % 60; elapsedStr = m > 0 ? `${h}h ${m}m` : `${h}h`; }
           doc.font('Helvetica-Bold').fontSize(9).fillColor(coverLabelColor).text("Elapsed Time:", 36, titleY, { width: coverLabelW, lineBreak: false });
           doc.font('Helvetica').fontSize(9).fillColor(coverValueColor).text(elapsedStr, coverValueX, titleY, { width: coverValueW, lineBreak: false });
@@ -1444,6 +1445,7 @@ export async function registerRoutes(
 
       const formatElapsed = (startMs: number, endMs: number): string => {
         const diffMs = Math.abs(endMs - startMs);
+        if (diffMs < 60000) return `${Math.round(diffMs / 1000)}s`;
         const totalMin = Math.floor(diffMs / 60000);
         if (totalMin < 60) return `${totalMin}m`;
         const h = Math.floor(totalMin / 60);
