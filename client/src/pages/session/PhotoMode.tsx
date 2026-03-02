@@ -104,8 +104,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     });
   }, []);
   const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
-  const otherPhotosIncompleteCount = totalIncompletePins - (currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0);
-  const nextReelCount = localPins.length + otherPhotosIncompleteCount;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
@@ -211,6 +209,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, [scale, panX, panY, clampPan]);
 
   const currentPhoto = uploadedPhotos[currentPhotoIdx];
+  const otherPhotosIncompleteCount = totalIncompletePins - (currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0);
+  const nextReelCount = localPins.length + otherPhotosIncompleteCount;
   const displayedPhotoIdx = viewingNearbyIdx !== null ? viewingNearbyIdx : currentPhotoIdx;
   const displayedPhoto = uploadedPhotos[displayedPhotoIdx];
 
