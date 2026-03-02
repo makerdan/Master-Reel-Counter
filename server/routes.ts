@@ -1351,13 +1351,22 @@ export async function registerRoutes(
       const activeEntries = (sessionEntries as any[]).filter((e: any) => !flaggedEntryIds.has(e.id));
       const activeTotalFootage = totalFootage - flaggedFootage;
       const flaggedPdfItems: Array<{ pin: any; photo: any; entry: any }> = allFlaggedPins
-        .filter((p: any) => p.entryId != null)
-        .map((p: any) => ({
-          pin: p,
-          photo: photoMap.get(p.photoId),
-          entry: (sessionEntries as any[]).find((e: any) => e.id === p.entryId),
-        }))
-        .filter((item: any) => item.entry);
+        .map((p: any) => {
+          const photo = photoMap.get(p.photoId);
+          const entry = p.entryId != null
+            ? (sessionEntries as any[]).find((e: any) => e.id === p.entryId)
+            : null;
+          const syntheticEntry = entry || {
+            id: -p.id,
+            reelTag: p.wireDetails || "Unknown",
+            manufacturer: p.vendorCode || "Unknown",
+            reelCount: p.reelCount || 1,
+            footage: p.footage || 0,
+            notes: "Flagged — not yet committed",
+          };
+          return { pin: p, photo, entry: syntheticEntry };
+        })
+        .filter((item: any) => item.photo);
 
       const userSettingsData = await storage.getUserSettings(userId);
       const userTz = userSettingsData?.timezone || "America/Chicago";
