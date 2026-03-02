@@ -2073,7 +2073,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Add Reel(s) from Image
                 </Button>
-                {nextReelCount > 0 && (
+                {(localPins.length > 0 || nextReelCount > 0) && (
                   <Button
                     size="sm"
                     className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
@@ -2081,7 +2081,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     data-testid="button-next-incomplete"
                   >
                     <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                    <span className="text-xs font-semibold">Next Reel ({nextReelCount})</span>
+                    <span className="text-xs font-semibold">Next Reel ({localPins.length > 0 ? localPins.length : nextReelCount})</span>
                   </Button>
                 )}
               </div>
