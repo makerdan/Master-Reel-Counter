@@ -961,8 +961,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const createEntries = useMutation({
     mutationFn: async () => {
       const allPins = [...localPinsRef.current];
-      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && !p.flagged);
+      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && p.footage && p.footage > 0 && !p.flagged);
       if (pinsToCommit.length === 0) {
+        const withDetails = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && !p.flagged);
+        if (withDetails.length > 0 && withDetails.some(p => !p.footage || p.footage <= 0)) {
+          throw new Error("All pins with categories are missing footage. Fill in footage before committing.");
+        }
         return [];
       }
       const isDetail = currentPhoto?.isDetailShot || false;
@@ -1050,6 +1054,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       const totalCreated = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
       const committedIds = new Set(pinsToCommit.map(p => p.id));
+      const skippedNoFootage = localPinsRef.current.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && (!p.footage || p.footage <= 0) && !p.flagged && !committedIds.has(p.id)).length;
       setCommittedPins(prev => [
         ...prev,
         ...pinsToCommit.map(p => ({
@@ -1066,7 +1071,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       setLocalPins(prev => prev.filter(p => !committedIds.has(p.id)));
       setSelectedPinId(prev => prev && committedIds.has(prev) ? null : prev);
       setBatchProgress(null);
-      toast({ title: `Created ${totalCreated} entries from ${pinsToCommit.length} pins` });
+      if (skippedNoFootage > 0) {
+        toast({ title: `Created ${totalCreated} entries from ${pinsToCommit.length} pins. ${skippedNoFootage} pin${skippedNoFootage !== 1 ? "s" : ""} skipped (missing footage).`, variant: "destructive" });
+      } else {
+        toast({ title: `Created ${totalCreated} entries from ${pinsToCommit.length} pins` });
+      }
     },
     onError: (error: Error) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
