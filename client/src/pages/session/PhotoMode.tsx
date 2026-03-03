@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  AlertCircle, Flag, ImagePlus,
+  AlertCircle, Flag, ImagePlus, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,6 +120,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const prevPhotoDbIdRef = useRef<number | undefined>(undefined);
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
+  const [relabelIsCommitted, setRelabelIsCommitted] = useState(false);
   const dragRef = useRef<{
     isDragging: boolean;
     pinId: string | null;
@@ -872,21 +873,45 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, [screenToImagePercent]);
 
   const openRelabel = useCallback((pinId: string) => {
-    const pin = localPins.find((p) => p.id === pinId);
-    if (pin) {
+    const localPin = localPins.find((p) => p.id === pinId);
+    if (localPin) {
       setRelabelPinId(pinId);
-      setRelabelValue(pin.label);
+      setRelabelValue(localPin.label);
+      setRelabelIsCommitted(false);
+      return;
     }
-  }, [localPins]);
+    const committed = committedPins.find((p) => p.id === pinId);
+    if (committed) {
+      setRelabelPinId(pinId);
+      setRelabelValue(committed.label);
+      setRelabelIsCommitted(true);
+    }
+  }, [localPins, committedPins]);
 
-  const applyRelabel = useCallback(() => {
+  const applyRelabel = useCallback(async () => {
     if (!relabelPinId || !relabelValue.trim()) return;
-    setLocalPins((prev) =>
-      prev.map((p) => p.id === relabelPinId ? { ...p, label: relabelValue.trim() } : p)
-    );
+    const newLabel = relabelValue.trim();
+    if (relabelIsCommitted) {
+      const pin = committedPins.find((p) => p.id === relabelPinId);
+      if (pin?.dbId) {
+        try {
+          await apiRequest("PATCH", `/api/pins/${pin.dbId}`, { label: newLabel });
+          setCommittedPins((prev) =>
+            prev.map((p) => p.id === relabelPinId ? { ...p, label: newLabel } : p)
+          );
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+        } catch {
+        }
+      }
+    } else {
+      setLocalPins((prev) =>
+        prev.map((p) => p.id === relabelPinId ? { ...p, label: newLabel } : p)
+      );
+    }
     setRelabelPinId(null);
     setRelabelValue("");
-  }, [relabelPinId, relabelValue]);
+    setRelabelIsCommitted(false);
+  }, [relabelPinId, relabelValue, relabelIsCommitted, committedPins, sessionId]);
 
   const updatePinField = useCallback((pinId: string, field: keyof LocalPin, value: any) => {
     setLocalPins((prev) =>
@@ -1528,6 +1553,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           data-testid={`button-delete-committed-${pin.id}`}
                         >
                           &times;
+                        </button>
+                        <button
+                          className="pin-delete-btn hidden sm:inline-flex"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openRelabel(pin.id);
+                          }}
+                          title="Relabel pin"
+                          data-testid={`button-relabel-committed-${pin.id}`}
+                        >
+                          <Pencil className="w-2.5 h-2.5" />
                         </button>
                         <div className="pin-label">P{pin.label}</div>
                         {pin.reelCount >= 2 && (
@@ -2213,7 +2249,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         </>
       )}
 
-      <Dialog open={!!relabelPinId} onOpenChange={(open) => { if (!open) { setRelabelPinId(null); setRelabelValue(""); } }}>
+      <Dialog open={!!relabelPinId} onOpenChange={(open) => { if (!open) { setRelabelPinId(null); setRelabelValue(""); setRelabelIsCommitted(false); } }}>
         <DialogContent className="max-w-xs">
           <DialogHeader>
             <DialogTitle>Rename Pin</DialogTitle>
@@ -2227,12 +2263,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") { e.preventDefault(); applyRelabel(); }
-              if (e.key === "Escape") { setRelabelPinId(null); setRelabelValue(""); }
+              if (e.key === "Escape") { setRelabelPinId(null); setRelabelValue(""); setRelabelIsCommitted(false); }
             }}
             data-testid="input-relabel-pin"
           />
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => { setRelabelPinId(null); setRelabelValue(""); }} data-testid="button-cancel-relabel">
+            <Button variant="outline" className="flex-1" onClick={() => { setRelabelPinId(null); setRelabelValue(""); setRelabelIsCommitted(false); }} data-testid="button-cancel-relabel">
               Cancel
             </Button>
             <Button className="flex-1" onClick={applyRelabel} disabled={!relabelValue.trim()} data-testid="button-save-relabel">
