@@ -115,6 +115,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const globalMaxPinRef = useRef<number>(0);
   const pinFetchCache = useRef<Map<number, Pin[]>>(new Map());
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+  const previewRef = useRef<HTMLDivElement>(null);
   const prevPhotoDbIdRef = useRef<number | undefined>(undefined);
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
@@ -148,8 +149,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   useEffect(() => {
     if (!selectedPinId) return;
-    const el = rowRefs.current.get(selectedPinId);
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => {
+        const rowEl = rowRefs.current.get(selectedPinId);
+        const rect = rowEl?.getBoundingClientRect();
+        if (rect && rect.bottom > window.innerHeight) {
+          window.scrollBy({ top: rect.bottom - window.innerHeight + 16, behavior: "smooth" });
+        }
+      }, 350);
+    } else {
+      rowRefs.current.get(selectedPinId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }, [selectedPinId]);
 
   useEffect(() => {
@@ -1874,7 +1885,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 const selectedPin = localPins.find(p => p.id === selectedPinId);
                 if (!selectedPin) return null;
                 return (
-                  <div className="sticky top-[53px] z-[999] bg-background py-1">
+                  <div ref={previewRef} className="bg-background py-1">
                     <ReelCropPreview
                       photoUrl={currentPhoto.url}
                       pinX={selectedPin.x}
