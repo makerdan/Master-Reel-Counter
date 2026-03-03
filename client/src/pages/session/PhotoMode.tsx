@@ -1027,23 +1027,28 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             });
             return await res.json();
           });
+          if (pinPhotoId) {
+            try {
+              const savedPin = await withRetry(async () => {
+                const pinRes = await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
+                  xPercent: pin.x,
+                  yPercent: pin.y,
+                  label: pin.label,
+                  reelCount: pin.reelCount,
+                  entryId: entry.id,
+                  flagged: pin.flagged || false,
+                });
+                return await pinRes.json();
+              });
+              (pin as any)._dbPinId = savedPin.id;
+            } catch {
+              try { await apiRequest("DELETE", `/api/entries/${entry.id}`); } catch {}
+              throw new Error("pin-creation-failed");
+            }
+          }
           (pin as any)._entryId = entry.id;
           completed++;
           setBatchProgress({ current: completed, total: totalEntries, errors });
-          if (pinPhotoId) {
-            const savedPin = await withRetry(async () => {
-              const pinRes = await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
-                xPercent: pin.x,
-                yPercent: pin.y,
-                label: pin.label,
-                reelCount: pin.reelCount,
-                entryId: entry.id,
-                flagged: pin.flagged || false,
-              });
-              return await pinRes.json();
-            });
-            (pin as any)._dbPinId = savedPin.id;
-          }
         } catch {
           errors.push(`Pin ${pin.label}`);
           setBatchProgress({ current: completed, total: totalEntries, errors });
