@@ -155,7 +155,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         const rowEl = rowRefs.current.get(selectedPinId);
         const rect = rowEl?.getBoundingClientRect();
         if (rect && rect.bottom > window.innerHeight) {
-          window.scrollBy({ top: rect.bottom - window.innerHeight + 16, behavior: "smooth" });
+          rowEl.scrollIntoView({ behavior: "smooth", block: "end" });
         }
       }, 350);
     } else {
