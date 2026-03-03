@@ -1895,11 +1895,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 <table className="pin-entry-table" ref={pinTableRef} data-testid="pin-entry-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 70 }}>PIN #:</th>
+                      <th style={{ width: 70, textAlign: "center" }}>PIN #:</th>
                       <th style={{ minWidth: 140 }}>Category:</th>
-                      <th style={{ width: 80 }}>Vendor Code:</th>
+                      <th style={{ width: 80, textAlign: "center" }}>Vendor Code:</th>
                       <th style={{ width: 80 }}>Reel Footage:</th>
-                      <th style={{ width: 60 }}>Reels:</th>
+                      <th style={{ width: 60, textAlign: "center" }}>Reels:</th>
                       <th style={{ width: 40 }}></th>
                     </tr>
                   </thead>
@@ -1910,7 +1910,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         data-testid={`pin-entry-row-${index}`}
                         className={`${selectedPinId === pin.id ? "ring-1 ring-primary/40" : ""} ${pin.flagged ? "flagged-row" : ""}`}
                       >
-                        <td>
+                        <td style={{ textAlign: "center" }}>
                           <span className="pin-position-cell">{pin.label}</span>
                         </td>
                         <td className="relative">
@@ -2034,7 +2034,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             );
                           })()}
                         </td>
-                        <td>
+                        <td style={{ textAlign: "center" }}>
                           <select
                             value={pin.vendorCode || ""}
                             onChange={(e) => updatePinField(pin.id, "vendorCode", e.target.value)}
@@ -2067,7 +2067,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             data-testid={`input-footage-${index}`}
                           />
                         </td>
-                        <td>
+                        <td style={{ textAlign: "center" }}>
                           <input
                             type="number"
                             value={pin.reelCount}
@@ -2076,7 +2076,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             min={1}
                             inputMode="numeric"
                             autoComplete="off"
-                            style={{ width: "100%" }}
+                            style={{ width: "100%", textAlign: "center" }}
                             data-testid={`input-reels-${index}`}
                           />
                         </td>
