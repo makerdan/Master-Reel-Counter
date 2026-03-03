@@ -433,11 +433,11 @@ export default function LabelScannerTab({
         <div className="flex items-center gap-2 min-w-[200px]">
           <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
           <Slider
-            value={[globalZoom]}
+            value={[ZOOM_MAX - globalZoom + ZOOM_MIN]}
             min={ZOOM_MIN}
             max={ZOOM_MAX}
             step={ZOOM_STEP}
-            onValueChange={([v]) => applyGlobalZoom(v)}
+            onValueChange={([v]) => applyGlobalZoom(ZOOM_MAX - v + ZOOM_MIN)}
             className="flex-1"
             data-testid="slider-global-zoom"
           />
@@ -499,17 +499,17 @@ export default function LabelScannerTab({
                     />
                   </div>
                   <div className="flex items-center gap-1.5 px-1">
-                    <ZoomIn className="h-3 w-3 text-white/30 flex-shrink-0" />
+                    <ZoomOut className="h-3 w-3 text-white/30 flex-shrink-0" />
                     <Slider
-                      value={[card.zoomLevel]}
+                      value={[ZOOM_MAX - card.zoomLevel + ZOOM_MIN]}
                       min={ZOOM_MIN}
                       max={ZOOM_MAX}
                       step={ZOOM_STEP}
-                      onValueChange={([v]) => setCardZoom(card.pin.id, v)}
+                      onValueChange={([v]) => setCardZoom(card.pin.id, ZOOM_MAX - v + ZOOM_MIN)}
                       className="flex-1"
                       data-testid={`slider-zoom-${card.pin.id}`}
                     />
-                    <ZoomOut className="h-3 w-3 text-white/30 flex-shrink-0" />
+                    <ZoomIn className="h-3 w-3 text-white/30 flex-shrink-0" />
                   </div>
                 </div>
               )}
