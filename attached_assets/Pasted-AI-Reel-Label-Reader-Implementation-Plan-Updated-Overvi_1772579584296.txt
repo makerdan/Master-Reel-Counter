@@ -1,0 +1,87 @@
+AI Reel Label Reader — Implementation Plan (Updated)
+Overview
+A dedicated "Label Scanner" tab in Photo Mode shows each committed pin's cropped region as a live preview. The user adjusts crop zoom per pin until the label text is clearly within frame, then sends all crops to OpenAI Vision in a single batched request. Results are matched locally against the wire catalog and presented for confirmation before being applied to entries.
+
+1. New tab: Label Scanner
+Location: A new tab alongside the existing Photo / Table tabs in the session view
+
+Visible only when the current photo has committed pins. Shows a grid of crop preview cards — one per committed pin on the currently viewed photo.
+
+Each card contains:
+
+The pin label (e.g. P067)
+A live crop preview image — rendered client-side using a <canvas> element, no server call needed at this stage
+Plus / Minus zoom buttons that expand or contract the crop window around the pin's x/y coordinates (e.g. 10% / 25% / 40% / 60% of image width — stepped, not continuous)
+A zoom level indicator (e.g. "Medium")
+If the pin already has wireDetails filled in, show a "Already filled" badge and gray it out — excluded from analysis by default but user can override
+A global zoom preset at the top applies to all cards at once as a starting point, which the user can then fine-tune per pin.
+
+2. Client: Live crop preview
+File: New client/src/pages/session/LabelScannerTab.tsx
+
+The full photo is loaded into memory once (already available from the existing photo viewer)
+Each card uses a <canvas> element that draws the cropped region from the in-memory image using drawImage() with source coordinates derived from the pin's x/y percentage and the current zoom level
+No server calls during the preview phase — everything is computed locally in the browser
+Zoom changes instantly re-draw the canvas
+3. Server: Image cropping utility
+File: server/lib/cropPhoto.ts (new)
+
+Called only when the user is satisfied with the previews and clicks "Analyze"
+Accepts the photo buffer and an array of { pinId, x, y, zoomLevel } — zoom level per pin as chosen by the user
+Crops each region using sharp, capped at 600px square regardless of zoom level chosen
+Returns { pinId, base64 } array
+4. Server: AI analysis endpoint
+File: server/routes.ts (new route)
+
+Endpoint: POST /api/photos/:photoId/analyze-labels
+
+Request body: { pins: [{ pinId, x, y, zoomLevel }] }
+
+Flow:
+
+Verify session access (owner/editor only)
+Fetch photo from object storage
+Call cropPhoto() with the user-specified zoom levels
+Single OpenAI vision request:
+System prompt: "You are reading wire reel labels in a warehouse. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON array of strings in the same order as the images. If a label is unreadable, return null for that entry."
+One image block per crop in pin label order
+Model: gpt-4o, response format: json_object
+Return: { results: [{ pinId, pinLabel, rawText, readable }] }
+5. Client: Local catalog matching utility
+File: client/src/lib/labelMatcher.ts (new)
+
+matchLabelText(rawText: string) function:
+
+Normalizes input (strip spaces, dashes, slashes)
+Exact match against catalog codes
+Fuzzy fallback (contains/substring match)
+Returns best matching catalog entry or null
+Runs entirely client-side after results arrive from the server.
+
+6. Client: Results review
+File: Inline in LabelScannerTab.tsx — results appear in place, replacing the crop preview cards after analysis completes
+
+Each card updates to show:
+
+The crop preview remains visible for reference
+Raw text read — verbatim from AI, shown prominently
+Matched catalog entry — green badge if matched, amber if not
+Editable fields for catalog code, footage, vendor — pre-filled from match
+Checkbox to include/exclude from apply
+An "Apply Selected" button at the bottom commits the approved results via PATCH to pins and entries, then invalidates the query cache.
+
+7. Caching
+Server-side Map<photoId, results> — raw text results cached per photo. If the user re-opens the scanner tab for the same photo, cached results are shown immediately without re-querying.
+
+8. Cost controls
+Only pins without existing wireDetails are included by default
+Crops capped at 600px square
+Warning shown if more than 20 pins selected (OpenAI image limit); batch is automatically split into two sequential requests if needed
+Dependencies
+sharp — server-side cropping
+openai — already configured
+No new DB tables required
+Out of scope
+Mobile support (desktop only)
+Draft pin analysis (committed pins only)
+Automatic analysis without user preview step
