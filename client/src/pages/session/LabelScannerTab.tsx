@@ -10,17 +10,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { matchLabelText, type LabelMatchResult } from "@/lib/labelMatcher";
 import type { Photo, Pin } from "@shared/schema";
 
-const ZOOM_LEVELS = [
-  { value: 0, label: "Tight", fraction: 0.10 },
-  { value: 1, label: "Close", fraction: 0.25 },
-  { value: 2, label: "Medium", fraction: 0.40 },
-  { value: 3, label: "Wide", fraction: 0.60 },
-] as const;
+const ZOOM_MIN = 0.03;
+const ZOOM_MAX = 0.80;
+const ZOOM_STEP = 0.01;
+const ZOOM_DEFAULT = 0.15;
+
+function zoomLabel(fraction: number): string {
+  const pct = Math.round(fraction * 100);
+  return `${pct}%`;
+}
 
 interface AnalysisResult {
   pinId: number;
@@ -64,7 +68,7 @@ function CropCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const fraction = ZOOM_LEVELS[zoomLevel]?.fraction ?? 0.25;
+    const fraction = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomLevel));
     const cropW = img.naturalWidth * fraction;
     const cropH = img.naturalHeight * fraction;
 
@@ -126,7 +130,7 @@ export default function LabelScannerTab({
 }) {
   const { toast } = useToast();
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
-  const [globalZoom, setGlobalZoom] = useState(1);
+  const [globalZoom, setGlobalZoom] = useState(ZOOM_DEFAULT);
   const [cards, setCards] = useState<PinCard[]>([]);
   const [phase, setPhase] = useState<"preview" | "results">("preview");
   const [analyzing, setAnalyzing] = useState(false);
@@ -426,20 +430,19 @@ export default function LabelScannerTab({
             {onlyCommitted.length} pin{onlyCommitted.length !== 1 ? "s" : ""}
           </Badge>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-white/60">Global zoom:</span>
-          <Select value={String(globalZoom)} onValueChange={(v) => applyGlobalZoom(parseInt(v))}>
-            <SelectTrigger className="w-[100px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-global-zoom">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ZOOM_LEVELS.map((z) => (
-                <SelectItem key={z.value} value={String(z.value)}>
-                  {z.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2 min-w-[200px]">
+          <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+          <Slider
+            value={[globalZoom]}
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
+            step={ZOOM_STEP}
+            onValueChange={([v]) => applyGlobalZoom(v)}
+            className="flex-1"
+            data-testid="slider-global-zoom"
+          />
+          <ZoomIn className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+          <span className="text-[10px] font-mono text-white/50 min-w-[32px] text-right">{zoomLabel(globalZoom)}</span>
         </div>
       </div>
 
@@ -479,42 +482,35 @@ export default function LabelScannerTab({
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-white/60 hover:text-white"
-                    onClick={() => setCardZoom(card.pin.id, Math.max(0, card.zoomLevel - 1))}
-                    disabled={card.zoomLevel <= 0}
-                    data-testid={`btn-zoom-out-${card.pin.id}`}
-                  >
-                    <ZoomOut className="h-3.5 w-3.5" />
-                  </Button>
-                  <span className="text-[10px] text-white/50 min-w-[42px] text-center font-mono">
-                    {ZOOM_LEVELS[card.zoomLevel]?.label ?? "Close"}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-white/60 hover:text-white"
-                    onClick={() => setCardZoom(card.pin.id, Math.min(3, card.zoomLevel + 1))}
-                    disabled={card.zoomLevel >= 3}
-                    data-testid={`btn-zoom-in-${card.pin.id}`}
-                  >
-                    <ZoomIn className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                <span className="text-[10px] font-mono text-white/50 min-w-[28px] text-right">
+                  {zoomLabel(card.zoomLevel)}
+                </span>
               </div>
 
               {photoUrl && (
-                <div className="flex justify-center">
-                  <CropCanvas
-                    photoUrl={photoUrl}
-                    xPercent={card.pin.xPercent}
-                    yPercent={card.pin.yPercent}
-                    zoomLevel={card.zoomLevel}
-                    size={180}
-                  />
+                <div className="space-y-1.5">
+                  <div className="flex justify-center">
+                    <CropCanvas
+                      photoUrl={photoUrl}
+                      xPercent={card.pin.xPercent}
+                      yPercent={card.pin.yPercent}
+                      zoomLevel={card.zoomLevel}
+                      size={180}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 px-1">
+                    <ZoomIn className="h-3 w-3 text-white/30 flex-shrink-0" />
+                    <Slider
+                      value={[card.zoomLevel]}
+                      min={ZOOM_MIN}
+                      max={ZOOM_MAX}
+                      step={ZOOM_STEP}
+                      onValueChange={([v]) => setCardZoom(card.pin.id, v)}
+                      className="flex-1"
+                      data-testid={`slider-zoom-${card.pin.id}`}
+                    />
+                    <ZoomOut className="h-3 w-3 text-white/30 flex-shrink-0" />
+                  </div>
                 </div>
               )}
 

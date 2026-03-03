@@ -12,13 +12,8 @@ interface CropResult {
   base64: string;
 }
 
-const ZOOM_FRACTIONS: Record<number, number> = {
-  0: 0.10,
-  1: 0.25,
-  2: 0.40,
-  3: 0.60,
-};
-
+const MIN_ZOOM = 0.03;
+const MAX_ZOOM = 1.0;
 const MAX_CROP_PX = 600;
 
 export async function cropPhoto(
@@ -32,7 +27,7 @@ export async function cropPhoto(
   const results: CropResult[] = [];
 
   for (const pin of pins) {
-    const fraction = ZOOM_FRACTIONS[pin.zoomLevel] ?? 0.25;
+    const fraction = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pin.zoomLevel));
 
     let cropW = Math.round(imgWidth * fraction);
     let cropH = Math.round(imgHeight * fraction);
@@ -42,6 +37,9 @@ export async function cropPhoto(
 
     cropW = Math.min(cropW, imgWidth);
     cropH = Math.min(cropH, imgHeight);
+
+    if (cropW < 1) cropW = 1;
+    if (cropH < 1) cropH = 1;
 
     const centerX = Math.round((pin.x / 100) * imgWidth);
     const centerY = Math.round((pin.y / 100) * imgHeight);
