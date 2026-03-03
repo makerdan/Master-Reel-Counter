@@ -1046,6 +1046,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       }
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       const totalCreated = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
       const committedIds = new Set(pinsToCommit.map(p => p.id));
