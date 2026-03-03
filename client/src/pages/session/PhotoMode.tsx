@@ -114,6 +114,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const skipAutoSave = useRef(false);
   const globalMaxPinRef = useRef<number>(0);
   const pinFetchCache = useRef<Map<number, Pin[]>>(new Map());
+  const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
   const prevPhotoDbIdRef = useRef<number | undefined>(undefined);
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
@@ -144,6 +145,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     window.addEventListener("scroll", close, true);
     return () => window.removeEventListener("scroll", close, true);
   }, [activeSuggestionPin]);
+
+  useEffect(() => {
+    if (!selectedPinId) return;
+    const el = rowRefs.current.get(selectedPinId);
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [selectedPinId]);
 
   useEffect(() => {
     apiRequest("GET", `/api/sessions/${sessionId}/pins`).then(async (res) => {
@@ -1907,6 +1914,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     {localPins.map((pin, index) => (
                       <tr
                         key={pin.id}
+                        ref={(el) => { if (el) rowRefs.current.set(pin.id, el); else rowRefs.current.delete(pin.id); }}
                         data-testid={`pin-entry-row-${index}`}
                         className={`${selectedPinId === pin.id ? "ring-1 ring-primary/40" : ""} ${pin.flagged ? "flagged-row" : ""}`}
                       >
@@ -2038,7 +2046,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           <select
                             value={pin.vendorCode || ""}
                             onChange={(e) => updatePinField(pin.id, "vendorCode", e.target.value)}
-                            onFocus={() => setSelectedPinId(null)}
+                            onFocus={() => setSelectedPinId(pin.id)}
                             data-testid={`select-vendor-code-${index}`}
                           >
                             <option value="">--</option>
@@ -2061,7 +2069,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               const raw = e.target.value.replace(/,/g, "");
                               updatePinField(pin.id, "footage", raw ? parseInt(raw) : undefined);
                             }}
-                            onFocus={() => { setSelectedPinId(null); setFocusedFootagePinId(pin.id); }}
+                            onFocus={() => { setSelectedPinId(pin.id); setFocusedFootagePinId(pin.id); }}
                             onBlur={() => setFocusedFootagePinId(null)}
                             autoComplete="off"
                             data-testid={`input-footage-${index}`}
@@ -2072,7 +2080,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             type="number"
                             value={pin.reelCount}
                             onChange={(e) => updatePinField(pin.id, "reelCount", Math.max(1, parseInt(e.target.value) || 1))}
-                            onFocus={() => setSelectedPinId(null)}
+                            onFocus={() => setSelectedPinId(pin.id)}
                             min={1}
                             inputMode="numeric"
                             autoComplete="off"
