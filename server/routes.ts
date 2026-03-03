@@ -16,6 +16,8 @@ import { randomUUID, randomBytes } from "crypto";
 import path from "path";
 import fs from "fs/promises";
 import { PassThrough } from "stream";
+import { cropPhoto } from "./lib/cropPhoto";
+import { openai } from "./replit_integrations/image/client";
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
 const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null }>();
@@ -1126,6 +1128,129 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error saving draft pins:", error);
       res.status(500).json({ message: "Failed to save draft pins" });
+    }
+  });
+
+  const labelResultsCache = new Map<number, { results: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> }>();
+
+  async function loadPhotoBuffer(photoKey: string): Promise<Buffer> {
+    const photoFilename = photoKey.startsWith("/uploads/") ? photoKey.slice("/uploads/".length) : photoKey.replace(/^\/objects\/uploads\//, "");
+    try {
+      const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
+      const [existsInGcs] = await gcsFile.exists();
+      if (existsInGcs) {
+        const [downloaded] = await gcsFile.download();
+        return downloaded;
+      }
+    } catch {}
+    return fs.readFile(path.join(UPLOADS_DIR, photoFilename));
+  }
+
+  app.post("/api/photos/:photoId/analyze-labels", isAuthenticated, async (req: any, res) => {
+    try {
+      const photoId = parseInt(req.params.photoId);
+      const photo = await storage.getPhoto(photoId);
+      if (!photo) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to analyze labels" });
+
+      const { pins: pinData } = req.body;
+      if (!Array.isArray(pinData) || pinData.length === 0) {
+        return res.status(400).json({ message: "pins array is required" });
+      }
+
+      const photoBuffer = await loadPhotoBuffer(photo.objectStorageKey);
+
+      let orientedBuffer = photoBuffer;
+      const manualRotation = (photo.rotation ?? 0) % 360;
+      let pipeline = sharp(photoBuffer).rotate();
+      if (manualRotation !== 0) {
+        pipeline = pipeline.rotate(manualRotation);
+      }
+      orientedBuffer = await pipeline.toBuffer();
+
+      const MAX_BATCH = 20;
+      const allResults: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> = [];
+
+      for (let i = 0; i < pinData.length; i += MAX_BATCH) {
+        const batch = pinData.slice(i, i + MAX_BATCH);
+        const crops = await cropPhoto(orientedBuffer, batch.map((p: any) => ({
+          pinId: p.pinId,
+          x: p.x,
+          y: p.y,
+          zoomLevel: p.zoomLevel ?? 1,
+        })));
+
+        const imageMessages = crops.map((crop) => ({
+          type: "image_url" as const,
+          image_url: { url: `data:image/jpeg;base64,${crop.base64}`, detail: "high" as const },
+        }));
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: "You are reading wire reel labels in a warehouse. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: `Read the text on each of these ${crops.length} wire reel label images. Return the result as a JSON object: {"labels": ["text from image 1", "text from image 2", ...]}` },
+                ...imageMessages,
+              ],
+            },
+          ],
+          max_tokens: 2000,
+        });
+
+        const content = response.choices?.[0]?.message?.content ?? "{}";
+        let parsed: { labels?: (string | null)[] } = {};
+        try {
+          parsed = JSON.parse(content);
+        } catch {
+          console.error("[analyze-labels] Failed to parse OpenAI response:", content);
+        }
+
+        const labels = parsed.labels ?? [];
+        for (let j = 0; j < batch.length; j++) {
+          const rawText = labels[j] ?? null;
+          allResults.push({
+            pinId: batch[j].pinId,
+            pinLabel: batch[j].pinLabel || `P${String(j + i + 1).padStart(3, "0")}`,
+            rawText,
+            readable: rawText !== null,
+          });
+        }
+      }
+
+      const cacheEntry = { results: allResults };
+      labelResultsCache.set(photoId, cacheEntry);
+
+      res.json(cacheEntry);
+    } catch (error) {
+      console.error("Error analyzing labels:", error);
+      res.status(500).json({ message: "Failed to analyze labels" });
+    }
+  });
+
+  app.get("/api/photos/:photoId/label-cache", isAuthenticated, async (req: any, res) => {
+    try {
+      const photoId = parseInt(req.params.photoId);
+      const photo = await storage.getPhoto(photoId);
+      if (!photo) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+
+      const cached = labelResultsCache.get(photoId);
+      if (cached) {
+        return res.json(cached);
+      }
+      res.json({ results: null });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch label cache" });
     }
   });
 

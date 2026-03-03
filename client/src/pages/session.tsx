@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, ArrowUp, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2, LayoutGrid,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2, LayoutGrid, ScanLine,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -37,6 +37,7 @@ import MobileCaptureView from "./session/MobileCaptureView";
 import ActivityLog from "./session/ActivityLog";
 import FlaggedReels from "./session/FlaggedReels";
 import PhotoStrip from "./session/PhotoStrip";
+import LabelScannerTab from "./session/LabelScannerTab";
 import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename } from "./session/utils";
 import { useTimezone } from "@/hooks/use-timezone";
@@ -157,7 +158,7 @@ function SessionWorkspace({
     try {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
-      if (tab && ["photo", "single", "flagged"].includes(tab)) return tab;
+      if (tab && ["photo", "single", "flagged", "scanner"].includes(tab)) return tab;
     } catch {}
     return "photo";
   })();
@@ -727,6 +728,10 @@ function SessionWorkspace({
                   <LayoutGrid className="h-4 w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Photos Reel</span>
                 </TabsTrigger>
+                <TabsTrigger value="scanner" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(280_60%_35%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-scanner-mode" aria-label="Label Scanner">
+                  <ScanLine className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Label Scanner</span>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="photo">
@@ -776,6 +781,15 @@ function SessionWorkspace({
                     setMode("photo");
                   }}
                   onClearUndoHistory={clearHistory}
+                />
+              </TabsContent>
+
+              <TabsContent value="scanner">
+                <LabelScannerTab
+                  sessionId={sessionId}
+                  photos={photos}
+                  currentPhotoId={photos[session.lastPhotoIndex ?? 0]?.id ?? null}
+                  canEdit={canEditSession}
                 />
               </TabsContent>
             </Tabs>
