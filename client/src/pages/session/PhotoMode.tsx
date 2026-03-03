@@ -1278,11 +1278,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
                 <div className="flex items-center gap-1 text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter">
-                  {currentPhotoIncompleteCount > 0 && (
-                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[hsl(30_90%_45%)] text-white text-[10px] font-bold px-1" data-testid="badge-current-incomplete-top">
-                      {currentPhotoIncompleteCount}
-                    </span>
-                  )}
                   <input
                     type="text"
                     inputMode="numeric"
@@ -1663,11 +1658,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     <ChevronLeft className="h-5 w-5" />
                   </Button>
                   <div className="flex items-center gap-1 text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter-bottom">
-                    {currentPhotoIncompleteCount > 0 && (
-                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[hsl(30_90%_45%)] text-white text-[10px] font-bold px-1" data-testid="badge-current-incomplete-bottom">
-                        {currentPhotoIncompleteCount}
-                      </span>
-                    )}
                     <input
                       type="text"
                       inputMode="numeric"
