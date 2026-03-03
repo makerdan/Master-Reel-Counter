@@ -999,37 +999,49 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       let completed = 0;
       setBatchProgress({ current: 0, total: totalEntries, errors: [] });
 
+      const withRetry = async <T,>(fn: () => Promise<T>, retries = 2, delay = 500): Promise<T> => {
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          try { return await fn(); }
+          catch (e) { if (attempt === retries) throw e; await new Promise(r => setTimeout(r, delay)); }
+        }
+        throw new Error("unreachable");
+      };
+
       for (const pin of pinsToCommit) {
         try {
           const reelLabel = pin.wireDetails || `Pin ${pin.label}`;
           const totalFootage = pin.footage ? pin.footage * pin.reelCount : undefined;
           const noteParts: string[] = [];
           if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
-          const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
-            aisle: entryAisle,
-            section: entrySection,
-            position: "",
-            reelTag: reelLabel,
-            manufacturer: pin.vendorCode || undefined,
-            footage: totalFootage,
-            reelCount: pin.reelCount,
-            photoId: entryPhotoId || undefined,
-            notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
+          const entry = await withRetry(async () => {
+            const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
+              aisle: entryAisle,
+              section: entrySection,
+              position: "",
+              reelTag: reelLabel,
+              manufacturer: pin.vendorCode || undefined,
+              footage: totalFootage,
+              reelCount: pin.reelCount,
+              photoId: entryPhotoId || undefined,
+              notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
+            });
+            return await res.json();
           });
-          const entry = await res.json();
           (pin as any)._entryId = entry.id;
           completed++;
           setBatchProgress({ current: completed, total: totalEntries, errors });
           if (pinPhotoId) {
-            const pinRes = await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
-              xPercent: pin.x,
-              yPercent: pin.y,
-              label: pin.label,
-              reelCount: pin.reelCount,
-              entryId: entry.id,
-              flagged: pin.flagged || false,
+            const savedPin = await withRetry(async () => {
+              const pinRes = await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
+                xPercent: pin.x,
+                yPercent: pin.y,
+                label: pin.label,
+                reelCount: pin.reelCount,
+                entryId: entry.id,
+                flagged: pin.flagged || false,
+              });
+              return await pinRes.json();
             });
-            const savedPin = await pinRes.json();
             (pin as any)._dbPinId = savedPin.id;
           }
         } catch {
