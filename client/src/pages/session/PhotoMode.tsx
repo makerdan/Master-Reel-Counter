@@ -1020,10 +1020,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           setBatchProgress({ current: completed, total: totalEntries, errors });
         }
       }
-      if (errors.length > 0) {
-        throw new Error(`Failed to create entries for: ${errors.join(", ")}`);
-      }
-      const committedSet = new Set(pinsToCommit.map(p => p.id));
+      const successfulPins = pinsToCommit.filter(p => (p as any)._entryId);
+      const committedSet = new Set(successfulPins.map(p => p.id));
       const remainingDraftPins = allPins.filter(p => !committedSet.has(p.id));
       if (pinPhotoId) {
         try {
@@ -1041,10 +1039,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           });
         } catch {}
       }
-      return pinsToCommit;
+      return { successful: successfulPins, errors };
     },
-    onSuccess: (pinsToCommit) => {
-      if (pinsToCommit.length === 0) {
+    onSuccess: ({ successful, errors: commitErrors }) => {
+      if (successful.length === 0 && commitErrors.length === 0) {
         toast({ title: "No pins have category details entered yet" });
         return;
       }
@@ -1052,30 +1050,33 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
-      const totalCreated = pinsToCommit.reduce((sum, pin) => sum + pin.reelCount, 0);
-      const committedIds = new Set(pinsToCommit.map(p => p.id));
-      const skippedNoFootage = localPinsRef.current.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && (!p.footage || p.footage <= 0) && !p.flagged && !committedIds.has(p.id)).length;
-      setCommittedPins(prev => [
-        ...prev,
-        ...pinsToCommit.map(p => ({
-          id: `committed-${p.id}-${Date.now()}`,
-          dbId: (p as any)._dbPinId as number | undefined,
-          x: p.x,
-          y: p.y,
-          label: p.label,
-          reelCount: p.reelCount,
-          entryId: (p as any)._entryId as number | undefined,
-          flagged: p.flagged || false,
-        })),
-      ]);
-      setLocalPins(prev => prev.filter(p => !committedIds.has(p.id)));
-      setSelectedPinId(prev => prev && committedIds.has(prev) ? null : prev);
-      setBatchProgress(null);
-      if (skippedNoFootage > 0) {
-        toast({ title: `Created ${totalCreated} entries from ${pinsToCommit.length} pins. ${skippedNoFootage} pin${skippedNoFootage !== 1 ? "s" : ""} skipped (missing footage).`, variant: "destructive" });
-      } else {
-        toast({ title: `Created ${totalCreated} entries from ${pinsToCommit.length} pins` });
+      if (successful.length > 0) {
+        const totalCreated = successful.reduce((sum, pin) => sum + pin.reelCount, 0);
+        const committedIds = new Set(successful.map(p => p.id));
+        const skippedNoFootage = localPinsRef.current.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && (!p.footage || p.footage <= 0) && !p.flagged && !committedIds.has(p.id)).length;
+        setCommittedPins(prev => [
+          ...prev,
+          ...successful.map(p => ({
+            id: `committed-${p.id}-${Date.now()}`,
+            dbId: (p as any)._dbPinId as number | undefined,
+            x: p.x,
+            y: p.y,
+            label: p.label,
+            reelCount: p.reelCount,
+            entryId: (p as any)._entryId as number | undefined,
+            flagged: p.flagged || false,
+          })),
+        ]);
+        setLocalPins(prev => prev.filter(p => !committedIds.has(p.id)));
+        setSelectedPinId(prev => prev && committedIds.has(prev) ? null : prev);
+        const parts: string[] = [`Created ${totalCreated} entries from ${successful.length} pins`];
+        if (commitErrors.length > 0) parts.push(`${commitErrors.length} failed: ${commitErrors.join(", ")}`);
+        if (skippedNoFootage > 0) parts.push(`${skippedNoFootage} skipped (missing footage)`);
+        toast({ title: parts.join(". ") + ".", variant: commitErrors.length > 0 || skippedNoFootage > 0 ? "destructive" : "default" });
+      } else if (commitErrors.length > 0) {
+        toast({ title: `All ${commitErrors.length} pins failed to commit: ${commitErrors.join(", ")}`, variant: "destructive" });
       }
+      setBatchProgress(null);
     },
     onError: (error: Error) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
