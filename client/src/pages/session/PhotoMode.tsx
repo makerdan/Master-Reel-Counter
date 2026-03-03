@@ -125,6 +125,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     moved: boolean;
   }>({ isDragging: false, pinId: null, startX: 0, startY: 0, moved: false });
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
+  const [conflictDialog, setConflictDialog] = useState<{ conflicts: Array<{ label: string; entryId?: number; dbPinId?: number }>; pinsToCommit: LocalPin[] } | null>(null);
   const [activeSuggestionPin, setActiveSuggestionPin] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
@@ -959,7 +960,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, []);
 
   const createEntries = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ overwrite = false }: { overwrite?: boolean } = {}) => {
       const allPins = [...localPinsRef.current];
       const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && p.footage && p.footage > 0 && !p.flagged);
       if (pinsToCommit.length === 0) {
@@ -967,7 +968,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         if (withDetails.length > 0 && withDetails.some(p => !p.footage || p.footage <= 0)) {
           throw new Error("All pins with categories are missing footage. Fill in footage before committing.");
         }
-        return [];
+        return { successful: [], errors: [] };
+      }
+      if (overwrite) {
+        const conflicting = committedPins.filter(cp => pinsToCommit.some(p => p.label === cp.label));
+        for (const cp of conflicting) {
+          if (cp.entryId) {
+            try { await apiRequest("DELETE", `/api/entries/${cp.entryId}`); } catch {}
+          }
+        }
       }
       const isDetail = currentPhoto?.isDetailShot || false;
       const parentPhoto = isDetail && currentPhoto?.parentPhotoId
@@ -1041,7 +1050,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       }
       return { successful: successfulPins, errors };
     },
-    onSuccess: ({ successful, errors: commitErrors }) => {
+    onSuccess: ({ successful, errors: commitErrors }, variables) => {
       if (successful.length === 0 && commitErrors.length === 0) {
         toast({ title: "No pins have category details entered yet" });
         return;
@@ -1054,8 +1063,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         const totalCreated = successful.reduce((sum, pin) => sum + pin.reelCount, 0);
         const committedIds = new Set(successful.map(p => p.id));
         const skippedNoFootage = localPinsRef.current.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && (!p.footage || p.footage <= 0) && !p.flagged && !committedIds.has(p.id)).length;
+        const overwrittenLabels = variables?.overwrite ? new Set(successful.map(p => p.label)) : new Set<string>();
         setCommittedPins(prev => [
-          ...prev,
+          ...prev.filter(cp => !overwrittenLabels.has(cp.label)),
           ...successful.map(p => ({
             id: `committed-${p.id}-${Date.now()}`,
             dbId: (p as any)._dbPinId as number | undefined,
@@ -1085,6 +1095,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     },
   });
 
+  const handleCommitClick = useCallback(() => {
+    const allPins = [...localPinsRef.current];
+    const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && p.footage && p.footage > 0 && !p.flagged);
+    const conflicts = committedPins
+      .filter(cp => pinsToCommit.some(p => p.label === cp.label))
+      .map(cp => ({ label: cp.label, entryId: cp.entryId, dbPinId: cp.dbId }));
+    if (conflicts.length > 0) {
+      setConflictDialog({ conflicts, pinsToCommit });
+    } else {
+      createEntries.mutate({});
+    }
+  }, [committedPins, createEntries]);
 
   const resetView = () => {
     setScale(1);
@@ -2104,7 +2126,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   className="bg-[hsl(145_60%_28%)] text-white border-[hsl(145_60%_22%)]"
-                  onClick={() => createEntries.mutate()}
+                  onClick={handleCommitClick}
                   disabled={createEntries.isPending || !aisle}
                   data-testid="button-create-entries-from-pins"
                 >
@@ -2180,6 +2202,42 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!conflictDialog} onOpenChange={(open) => { if (!open) setConflictDialog(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pin label conflict detected</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="mb-2">The following pin labels already have committed entries for this photo:</p>
+                <p className="font-mono font-semibold text-foreground mb-3">
+                  {conflictDialog?.conflicts.map(c => c.label).join(", ")}
+                </p>
+                <p>How would you like to proceed?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={() => setConflictDialog(null)} data-testid="button-conflict-cancel">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={() => { setConflictDialog(null); createEntries.mutate({ overwrite: false }); }}
+              data-testid="button-conflict-duplicates"
+            >
+              Create duplicates
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-white"
+              onClick={() => { setConflictDialog(null); createEntries.mutate({ overwrite: true }); }}
+              data-testid="button-conflict-overwrite"
+            >
+              Overwrite existing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
