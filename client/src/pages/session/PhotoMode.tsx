@@ -105,6 +105,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, []);
   const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [previewHeight, setPreviewHeight] = useState(0);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
   const [pinLoadKey, setPinLoadKey] = useState(0);
@@ -149,18 +150,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   useEffect(() => {
     if (!selectedPinId) return;
-    if (previewRef.current) {
-      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      setTimeout(() => {
-        const rowEl = rowRefs.current.get(selectedPinId);
-        const rect = rowEl?.getBoundingClientRect();
-        if (rect && rect.bottom > window.innerHeight) {
-          rowEl.scrollIntoView({ behavior: "smooth", block: "end" });
-        }
-      }, 350);
-    } else {
-      rowRefs.current.get(selectedPinId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
+    rowRefs.current.get(selectedPinId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [selectedPinId]);
 
   useEffect(() => {
@@ -1885,17 +1875,29 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 const selectedPin = localPins.find(p => p.id === selectedPinId);
                 if (!selectedPin) return null;
                 return (
-                  <div ref={previewRef} className="bg-background py-1">
-                    <ReelCropPreview
-                      photoUrl={currentPhoto.url}
-                      pinX={selectedPin.x}
-                      pinY={selectedPin.y}
-                      label={selectedPin.label}
-                      zoomLevel={zoomLevel}
-                      onZoomChange={setZoomLevel}
-                      onClose={() => setSelectedPinId(null)}
-                    />
-                  </div>
+                  <>
+                    <div
+                      ref={(el) => {
+                        previewRef.current = el;
+                        if (el) {
+                          const h = el.offsetHeight;
+                          if (h !== previewHeight) setPreviewHeight(h);
+                        }
+                      }}
+                      className="fixed top-[53px] left-0 right-0 z-[40] bg-background/95 backdrop-blur px-4 py-1 border-b shadow-sm"
+                    >
+                      <ReelCropPreview
+                        photoUrl={currentPhoto.url}
+                        pinX={selectedPin.x}
+                        pinY={selectedPin.y}
+                        label={selectedPin.label}
+                        zoomLevel={zoomLevel}
+                        onZoomChange={setZoomLevel}
+                        onClose={() => setSelectedPinId(null)}
+                      />
+                    </div>
+                    <div style={{ height: previewHeight }} />
+                  </>
                 );
               })()}
               <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Position</div>
