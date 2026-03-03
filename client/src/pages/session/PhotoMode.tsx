@@ -1632,6 +1632,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {currentPhoto.filename}
                 </span>
               )}
+              <div className="flex items-center gap-3 text-xs" data-testid="bottom-nav-aisle-section">
+                <span>
+                  <span className="text-[hsl(18_80%_60%)] font-semibold mr-1">Aisle</span>
+                  <span className="font-mono text-[hsl(30_40%_85%)]">{aisle.trim() || "—"}</span>
+                </span>
+                <span className="text-[hsl(25_20%_40%)]">·</span>
+                <span>
+                  <span className="text-[hsl(18_80%_60%)] font-semibold mr-1">§</span>
+                  <span className="font-mono text-[hsl(30_40%_85%)]">{(currentPhoto?.section || "").trim() || "—"}</span>
+                </span>
+              </div>
               <div className="flex items-center w-full">
                 <div className="flex-1" />
                 <div className="flex items-center gap-3">
