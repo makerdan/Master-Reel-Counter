@@ -211,7 +211,6 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "ALU", catalog: "XHHW500RD2500", description: "AL XHHW 500 KCMIL RED 2500'" },
   { vendor: "ALU", catalog: "XHHW250BL2500", description: "AL XHHW 250 KCMIL BLUE 2500'" },
   { vendor: "ALU", catalog: "XHHW40OR5000", description: "AL XHHW 4/0 AWG ORANGE 5000'" },
-  { vendor: "ALU", catalog: "XHHW30WH5000", description: "AL XHHW 3/0 AWG WHITE 5000'" },
   { vendor: "COP", catalog: "BARE20ST1000", description: "BARE CU 2/0-19 STR 1000" },
   { vendor: "COP", catalog: "BARE40ST1000", description: "BARE CU 4/0 STR 1000" },
   { vendor: "COP", catalog: "RX43WG500", description: "4/3 WG ROMEX-500'" },
@@ -383,20 +382,30 @@ export const CATALOG: CatalogEntry[] = [
 
 export const PARSED_CATALOG: ParsedCatalogEntry[] = CATALOG.map(parseCatalogEntry);
 
+function dedup(entries: ParsedCatalogEntry[]): ParsedCatalogEntry[] {
+  const seen = new Set<string>();
+  return entries.filter(e => {
+    const key = `${e.vendor}|${e.catalog}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function lookupCategory(query: string): ParsedCatalogEntry[] {
   if (!query || query.length < 2) return [];
   const upper = query.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
   const exact = PARSED_CATALOG.filter(e => e.catalog === upper);
-  if (exact.length > 0) return exact;
+  if (exact.length > 0) return dedup(exact);
 
   const prefix = PARSED_CATALOG.filter(e => e.catalog.startsWith(upper));
-  if (prefix.length > 0) return prefix.slice(0, 15);
+  if (prefix.length > 0) return dedup(prefix).slice(0, 15);
 
   const contains = PARSED_CATALOG.filter(e =>
     e.catalog.includes(upper) || e.description.toUpperCase().includes(upper)
   );
-  return contains.slice(0, 15);
+  return dedup(contains).slice(0, 15);
 }
 
 const CATALOG_CODES = CATALOG.map(c => c.catalog);
