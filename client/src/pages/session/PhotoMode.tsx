@@ -1895,10 +1895,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 <table className="pin-entry-table" ref={pinTableRef} data-testid="pin-entry-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 70 }}>Reel #:</th>
+                      <th style={{ width: 70 }}>PIN #:</th>
                       <th style={{ minWidth: 140 }}>Category:</th>
                       <th style={{ width: 80 }}>Vendor Code:</th>
-                      <th style={{ width: 80 }}>Footage:</th>
+                      <th style={{ width: 80 }}>Reel Footage:</th>
                       <th style={{ width: 60 }}>Reels:</th>
                       <th style={{ width: 40 }}></th>
                     </tr>
