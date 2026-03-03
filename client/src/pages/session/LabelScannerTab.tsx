@@ -16,14 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 import { matchLabelText, type LabelMatchResult } from "@/lib/labelMatcher";
 import type { Photo, Pin } from "@shared/schema";
 
-const ZOOM_MIN = 0.03;
-const ZOOM_MAX = 0.80;
-const ZOOM_STEP = 0.01;
-const ZOOM_DEFAULT = 0.15;
+const ZOOM_MIN = 0.005;
+const ZOOM_MAX = 1.0;
+const ZOOM_STEP = 0.005;
+const ZOOM_DEFAULT = 0.12;
 
 function zoomLabel(fraction: number): string {
-  const pct = Math.round(fraction * 100);
-  return `${pct}%`;
+  const pct = fraction * 100;
+  return pct < 1 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
 }
 
 interface AnalysisResult {
@@ -527,25 +527,73 @@ export default function LabelScannerTab({
                   </div>
 
                   {card.matchResult && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] uppercase text-white/40 tracking-wider">Match:</span>
-                      {card.matchResult.confidence !== "none" ? (
-                        <Badge
-                          className={`text-[10px] ${
-                            card.matchResult.confidence === "high"
-                              ? "bg-green-900/50 text-green-300 border-green-700/40"
-                              : card.matchResult.confidence === "medium"
-                              ? "bg-amber-900/50 text-amber-300 border-amber-700/40"
-                              : "bg-red-900/50 text-red-300 border-red-700/40"
-                          }`}
-                          data-testid={`badge-match-${card.pin.id}`}
-                        >
-                          {card.matchResult.match?.catalog} ({card.matchResult.confidence})
-                        </Badge>
-                      ) : (
-                        <Badge className="text-[10px] bg-zinc-800 text-zinc-400 border-zinc-700" data-testid={`badge-no-match-${card.pin.id}`}>
-                          No match
-                        </Badge>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] uppercase text-white/40 tracking-wider">Match:</span>
+                        {card.matchResult.confidence !== "none" ? (
+                          <>
+                            <Badge
+                              className={`text-[10px] ${
+                                card.matchResult.confidence === "high"
+                                  ? "bg-green-900/50 text-green-300 border-green-700/40"
+                                  : card.matchResult.confidence === "medium"
+                                  ? "bg-amber-900/50 text-amber-300 border-amber-700/40"
+                                  : "bg-red-900/50 text-red-300 border-red-700/40"
+                              }`}
+                              data-testid={`badge-match-${card.pin.id}`}
+                            >
+                              {card.matchResult.match?.catalog} ({card.matchResult.confidence})
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] border-white/15 text-white/40"
+                              data-testid={`badge-method-${card.pin.id}`}
+                            >
+                              {card.matchResult.matchMethod}
+                            </Badge>
+                          </>
+                        ) : (
+                          <Badge className="text-[10px] bg-zinc-800 text-zinc-400 border-zinc-700" data-testid={`badge-no-match-${card.pin.id}`}>
+                            No match
+                          </Badge>
+                        )}
+                      </div>
+                      {card.matchResult.match && (
+                        <div className="space-y-0.5">
+                          <p
+                            className="text-[10px] text-white/50 leading-tight break-words"
+                            data-testid={`text-description-${card.pin.id}`}
+                          >
+                            {card.matchResult.match.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {card.matchResult.match.wireType && (
+                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-wiretype-${card.pin.id}`}>
+                                {card.matchResult.match.wireType}
+                              </span>
+                            )}
+                            {card.matchResult.match.wireSize && (
+                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-wiresize-${card.pin.id}`}>
+                                {card.matchResult.match.wireSize}
+                              </span>
+                            )}
+                            {card.matchResult.match.color && (
+                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-color-${card.pin.id}`}>
+                                {card.matchResult.match.color}
+                              </span>
+                            )}
+                            {card.matchResult.match.footage && (
+                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-footage-${card.pin.id}`}>
+                                {card.matchResult.match.footage}ft
+                              </span>
+                            )}
+                            {card.matchResult.match.conductors && (
+                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-conductors-${card.pin.id}`}>
+                                {card.matchResult.match.conductors}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

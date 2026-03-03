@@ -12,7 +12,7 @@ interface CropResult {
   base64: string;
 }
 
-const MIN_ZOOM = 0.03;
+const MIN_ZOOM = 0.005;
 const MAX_ZOOM = 1.0;
 const MAX_CROP_PX = 600;
 
