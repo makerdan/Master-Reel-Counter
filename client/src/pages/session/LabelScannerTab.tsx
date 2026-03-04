@@ -280,19 +280,19 @@ export default function LabelScannerTab({
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
-      return onlyCommitted.map((pin) => {
+      const activePins = onlyCommitted.filter((pin) => !pin.wireDetails || pin.footage == null);
+      return activePins.map((pin) => {
         const ex = existing.get(pin.id);
         if (ex && ex.pin.id === pin.id) {
           return { ...ex, pin };
         }
-        const hasFilled = !!(pin.wireDetails && pin.footage);
         const savedZoom = savedZooms[String(pin.id)];
         return {
           pin,
           zoomLevel: savedZoom ?? globalZoom,
           panX: 0,
           panY: 0,
-          included: !hasFilled,
+          included: true,
           editCatalog: "",
           editFootage: "",
           editVendor: "",
