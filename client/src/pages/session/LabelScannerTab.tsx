@@ -689,46 +689,46 @@ export default function LabelScannerTab({
               {card.result && phase === "results" && (
                 <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
                   {card.matchResult && card.matchResult.confidence !== "none" ? (
-                    <Badge
-                      className={`py-1 px-2 ${
-                        card.matchResult.confidence === "high"
-                          ? "bg-green-900/50 text-green-300 border-green-700/40"
-                          : card.matchResult.confidence === "medium"
-                          ? "bg-amber-900/50 text-amber-300 border-amber-700/40"
-                          : "bg-red-900/50 text-red-300 border-red-700/40"
-                      }`}
-                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}
-                      data-testid={`badge-match-${card.pin.id}`}
-                    >
-                      {card.matchResult.match?.catalog}
-                    </Badge>
+                    <div className={`rounded-md border px-2 py-1 ${
+                      card.matchResult.confidence === "high"
+                        ? "bg-green-900/50 border-green-700/40"
+                        : card.matchResult.confidence === "medium"
+                        ? "bg-amber-900/50 border-amber-700/40"
+                        : "bg-red-900/50 border-red-700/40"
+                    }`}>
+                      <Input
+                        value={card.editCatalog}
+                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
+                        className={`border-0 bg-transparent uppercase p-0 h-auto ${
+                          card.matchResult.confidence === "high" ? "text-green-300" : card.matchResult.confidence === "medium" ? "text-amber-300" : "text-red-300"
+                        }`}
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}
+                        data-testid={`input-catalog-${card.pin.id}`}
+                      />
+                    </div>
                   ) : (
-                    <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }} data-testid={`badge-no-match-${card.pin.id}`}>
-                      No match — enter manually
-                    </Badge>
-                  )}
-
-                  <div className="flex gap-1.5">
-                    <div className="flex-1 min-w-0">
+                    <div>
                       <label className="text-[10px] text-white/40">Category</label>
                       <Input
                         value={card.editCatalog}
                         onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
                         className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                         style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                        placeholder="Enter category..."
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
                     </div>
-                    <div className="w-20 flex-shrink-0">
-                      <label className="text-[10px] text-white/40">Vendor</label>
-                      <Input
-                        value={card.editVendor}
-                        onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
-                        className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
-                        data-testid={`input-vendor-${card.pin.id}`}
-                      />
-                    </div>
+                  )}
+
+                  <div className="w-20">
+                    <label className="text-[10px] text-white/40">Vendor</label>
+                    <Input
+                      value={card.editVendor}
+                      onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
+                      className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                      data-testid={`input-vendor-${card.pin.id}`}
+                    />
                   </div>
                 </div>
               )}
@@ -738,27 +738,26 @@ export default function LabelScannerTab({
                   <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }} data-testid={`badge-manual-${card.pin.id}`}>
                     Not analyzed — enter manually
                   </Badge>
-                  <div className="flex gap-1.5">
-                    <div className="flex-1 min-w-0">
-                      <label className="text-[10px] text-white/40">Category</label>
-                      <Input
-                        value={card.editCatalog}
-                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
-                        className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
-                        data-testid={`input-catalog-manual-${card.pin.id}`}
-                      />
-                    </div>
-                    <div className="w-20 flex-shrink-0">
-                      <label className="text-[10px] text-white/40">Vendor</label>
-                      <Input
-                        value={card.editVendor}
-                        onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
-                        className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
-                        data-testid={`input-vendor-manual-${card.pin.id}`}
-                      />
-                    </div>
+                  <div>
+                    <label className="text-[10px] text-white/40">Category</label>
+                    <Input
+                      value={card.editCatalog}
+                      onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
+                      className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                      placeholder="Enter category..."
+                      data-testid={`input-catalog-manual-${card.pin.id}`}
+                    />
+                  </div>
+                  <div className="w-20">
+                    <label className="text-[10px] text-white/40">Vendor</label>
+                    <Input
+                      value={card.editVendor}
+                      onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
+                      className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                      data-testid={`input-vendor-manual-${card.pin.id}`}
+                    />
                   </div>
                 </div>
               )}
