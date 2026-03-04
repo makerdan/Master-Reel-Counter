@@ -669,7 +669,7 @@ export default function LabelScannerTab({
           return (
             <div
               key={card.pin.id}
-              className={`rounded-lg border p-3 space-y-2 transition-colors ${
+              className={`rounded-lg border p-3 space-y-2 transition-colors overflow-hidden ${
                 card.included
                   ? "bg-[hsl(25_12%_16%)] border-[hsl(18_60%_30%/0.3)]"
                   : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)] opacity-60"
@@ -775,8 +775,8 @@ export default function LabelScannerTab({
               )}
 
               {!card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
-                  <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }} data-testid={`badge-manual-${card.pin.id}`}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)] overflow-hidden" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                  <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
                     Not analyzed — enter manually
                   </Badge>
                   <div>
