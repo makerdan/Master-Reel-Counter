@@ -36,6 +36,8 @@ interface AnalysisResult {
 interface PinCard {
   pin: Pin;
   zoomLevel: number;
+  panX: number;
+  panY: number;
   included: boolean;
   result?: AnalysisResult;
   matchResult?: LabelMatchResult;
@@ -50,16 +52,23 @@ function CropCanvas({
   xPercent,
   yPercent,
   zoomLevel,
+  panX = 0,
+  panY = 0,
+  onPan,
   size = 180,
 }: {
   photoUrl: string;
   xPercent: number;
   yPercent: number;
   zoomLevel: number;
+  panX?: number;
+  panY?: number;
+  onPan?: (dx: number, dy: number) => void;
   size?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -73,8 +82,8 @@ function CropCanvas({
     const cropW = img.naturalWidth * fraction;
     const cropH = img.naturalHeight * fraction;
 
-    const centerX = (xPercent / 100) * img.naturalWidth;
-    const centerY = (yPercent / 100) * img.naturalHeight;
+    const centerX = (xPercent / 100) * img.naturalWidth + panX;
+    const centerY = (yPercent / 100) * img.naturalHeight + panY;
 
     let sx = centerX - cropW / 2;
     let sy = centerY - cropH / 2;
@@ -86,7 +95,7 @@ function CropCanvas({
     canvas.width = size;
     canvas.height = size;
     ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, size, size);
-  }, [xPercent, yPercent, zoomLevel, size]);
+  }, [xPercent, yPercent, zoomLevel, panX, panY, size]);
 
   useEffect(() => {
     if (imgRef.current && imgRef.current.src === photoUrl && imgRef.current.complete) {
@@ -106,13 +115,55 @@ function CropCanvas({
     draw();
   }, [draw]);
 
+  const getPointerPos = (e: React.MouseEvent | React.TouchEvent) => {
+    if ("touches" in e) {
+      const t = e.touches[0] || (e as React.TouchEvent).changedTouches[0];
+      return { x: t.clientX, y: t.clientY };
+    }
+    return { x: (e as React.MouseEvent).clientX, y: (e as React.MouseEvent).clientY };
+  };
+
+  const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
+    const pos = getPointerPos(e);
+    dragRef.current = { startX: pos.x, startY: pos.y, startPanX: panX, startPanY: panY };
+  };
+
+  const handlePointerMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!dragRef.current || !onPan || !imgRef.current) return;
+    const pos = getPointerPos(e);
+    const dx = pos.x - dragRef.current.startX;
+    const dy = pos.y - dragRef.current.startY;
+    const fraction = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomLevel));
+    const scale = (imgRef.current.naturalWidth * fraction) / size;
+    const rawPanX = dragRef.current.startPanX - dx * scale;
+    const rawPanY = dragRef.current.startPanY - dy * scale;
+    const maxPanX = imgRef.current.naturalWidth * (1 - fraction) / 2;
+    const maxPanY = imgRef.current.naturalHeight * (1 - fraction) / 2;
+    onPan(
+      Math.max(-maxPanX, Math.min(maxPanX, rawPanX)),
+      Math.max(-maxPanY, Math.min(maxPanY, rawPanY))
+    );
+  };
+
+  const handlePointerUp = () => {
+    dragRef.current = null;
+  };
+
   return (
     <canvas
       ref={canvasRef}
       width={size}
       height={size}
       className="rounded border border-[hsl(18_60%_30%/0.3)] bg-black"
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
+      onMouseDown={handlePointerDown}
+      onMouseMove={handlePointerMove}
+      onMouseUp={handlePointerUp}
+      onMouseLeave={handlePointerUp}
+      onTouchStart={handlePointerDown}
+      onTouchMove={handlePointerMove}
+      onTouchEnd={handlePointerUp}
+      onTouchCancel={handlePointerUp}
       data-testid="canvas-crop-preview"
     />
   );
@@ -178,6 +229,8 @@ export default function LabelScannerTab({
         return {
           pin,
           zoomLevel: globalZoom,
+          panX: 0,
+          panY: 0,
           included: !hasFilled,
           editCatalog: "",
           editFootage: "",
@@ -219,7 +272,13 @@ export default function LabelScannerTab({
 
   const setCardZoom = (pinId: number, zoom: number) => {
     setCards((prev) =>
-      prev.map((c) => (c.pin.id === pinId ? { ...c, zoomLevel: zoom } : c))
+      prev.map((c) => (c.pin.id === pinId ? { ...c, zoomLevel: zoom, panX: 0, panY: 0 } : c))
+    );
+  };
+
+  const setCardPan = (pinId: number, px: number, py: number) => {
+    setCards((prev) =>
+      prev.map((c) => (c.pin.id === pinId ? { ...c, panX: px, panY: py } : c))
     );
   };
 
@@ -237,7 +296,7 @@ export default function LabelScannerTab({
 
   const applyGlobalZoom = (zoom: number) => {
     setGlobalZoom(zoom);
-    setCards((prev) => prev.map((c) => ({ ...c, zoomLevel: zoom })));
+    setCards((prev) => prev.map((c) => ({ ...c, zoomLevel: zoom, panX: 0, panY: 0 })));
   };
 
   const includedCards = cards.filter((c) => c.included);
@@ -285,7 +344,9 @@ export default function LabelScannerTab({
       const succeededPinIds: number[] = [];
 
       for (const card of cardsToApply) {
-        if (!card.result || !card.included) continue;
+        if (!card.included) continue;
+        const hasData = !!(card.result || card.editCatalog || card.editVendor);
+        if (!hasData) continue;
         const updates: Record<string, any> = {};
         if (card.editCatalog) updates.wireDetails = card.editCatalog;
         if (card.editVendor) updates.vendorCode = card.editVendor;
@@ -419,7 +480,7 @@ export default function LabelScannerTab({
     );
   }
 
-  const selectedForApply = cards.filter((c) => c.included && c.result);
+  const selectedForApply = cards.filter((c) => c.included && (c.result || c.editCatalog || c.editVendor));
 
   const currentPhotoIndex = photos.findIndex((p) => p.id === currentPhotoId);
   const nextPhoto = currentPhotoIndex >= 0 && currentPhotoIndex < photos.length - 1
@@ -563,11 +624,14 @@ export default function LabelScannerTab({
                       xPercent={card.pin.xPercent}
                       yPercent={card.pin.yPercent}
                       zoomLevel={card.zoomLevel}
+                      panX={card.panX}
+                      panY={card.panY}
+                      onPan={(px, py) => setCardPan(card.pin.id, px, py)}
                       size={180}
                     />
                   </div>
                   <div className="flex items-center gap-1.5 px-1">
-                    <ZoomOut className="h-3 w-3 text-white/30 flex-shrink-0" />
+                    <ZoomOut className="h-6 w-6 text-white/30 flex-shrink-0" />
                     <Slider
                       value={[ZOOM_MAX - card.zoomLevel + ZOOM_MIN]}
                       min={ZOOM_MIN}
@@ -577,29 +641,29 @@ export default function LabelScannerTab({
                       className="flex-1"
                       data-testid={`slider-zoom-${card.pin.id}`}
                     />
-                    <ZoomIn className="h-3 w-3 text-white/30 flex-shrink-0" />
+                    <ZoomIn className="h-6 w-6 text-white/30 flex-shrink-0" />
                   </div>
                 </div>
               )}
 
               {card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
                   {card.matchResult && card.matchResult.confidence !== "none" ? (
                     <Badge
-                      className={`text-sm py-1 px-2 ${
+                      className={`py-1 px-2 ${
                         card.matchResult.confidence === "high"
                           ? "bg-green-900/50 text-green-300 border-green-700/40"
                           : card.matchResult.confidence === "medium"
                           ? "bg-amber-900/50 text-amber-300 border-amber-700/40"
                           : "bg-red-900/50 text-red-300 border-red-700/40"
                       }`}
-                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }}
+                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}
                       data-testid={`badge-match-${card.pin.id}`}
                     >
                       {card.matchResult.match?.catalog}
                     </Badge>
                   ) : (
-                    <Badge className="text-sm py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-no-match-${card.pin.id}`}>
+                    <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }} data-testid={`badge-no-match-${card.pin.id}`}>
                       No match — enter manually
                     </Badge>
                   )}
@@ -610,19 +674,49 @@ export default function LabelScannerTab({
                       <Input
                         value={card.editCatalog}
                         onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
-                        className="h-8 bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }}
+                        className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
                     </div>
-                    <div className="w-16 flex-shrink-0">
+                    <div className="w-20 flex-shrink-0">
                       <label className="text-[10px] text-white/40">Vendor</label>
                       <Input
                         value={card.editVendor}
                         onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
-                        className="h-8 bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }}
+                        className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                         data-testid={`input-vendor-${card.pin.id}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!card.result && phase === "results" && (
+                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                  <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }} data-testid={`badge-manual-${card.pin.id}`}>
+                    Not analyzed — enter manually
+                  </Badge>
+                  <div className="flex gap-1.5">
+                    <div className="flex-1 min-w-0">
+                      <label className="text-[10px] text-white/40">Category</label>
+                      <Input
+                        value={card.editCatalog}
+                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
+                        className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                        data-testid={`input-catalog-manual-${card.pin.id}`}
+                      />
+                    </div>
+                    <div className="w-20 flex-shrink-0">
+                      <label className="text-[10px] text-white/40">Vendor</label>
+                      <Input
+                        value={card.editVendor}
+                        onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
+                        className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                        data-testid={`input-vendor-manual-${card.pin.id}`}
                       />
                     </div>
                   </div>
