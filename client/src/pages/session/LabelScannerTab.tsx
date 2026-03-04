@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, Sparkles, ChevronRight,
+  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -471,14 +471,13 @@ export default function LabelScannerTab({
             </div>
             {nextPhoto && (
               <Button
-                variant="outline"
                 size="sm"
                 onClick={advanceToNextPhoto}
-                className="gap-1 h-7 text-xs border-[hsl(18_60%_30%/0.3)] text-white/70 hover:text-white"
+                className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
                 data-testid="btn-next-photo"
               >
-                Next
-                <ChevronRight className="h-3.5 w-3.5" />
+                <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                <span className="text-xs font-semibold">Next Photo ({photos.length - currentPhotoIndex - 1})</span>
               </Button>
             )}
           </div>
