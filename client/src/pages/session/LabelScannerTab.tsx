@@ -19,7 +19,7 @@ import type { Photo, Pin } from "@shared/schema";
 const ZOOM_MIN = 0.005;
 const ZOOM_MAX = 1.0;
 const ZOOM_STEP = 0.005;
-const ZOOM_CLICK_STEP = 0.05;
+const ZOOM_CLICK_STEP = 0.015;
 const ZOOM_DEFAULT = 0.12;
 
 function getZoomStorageKey(sessionId: number) {
@@ -486,7 +486,7 @@ export default function LabelScannerTab({
           setCards([]);
         }}
       >
-        <SelectTrigger className="w-[200px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
+        <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
           <SelectValue placeholder="Select a photo..." />
         </SelectTrigger>
         <SelectContent>
@@ -594,7 +594,7 @@ export default function LabelScannerTab({
                 setCards([]);
               }}
             >
-              <SelectTrigger className="w-[160px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
+              <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
