@@ -606,7 +606,7 @@ export default function LabelScannerTab({
               </SelectContent>
             </Select>
             <Badge variant="outline" className="text-xs border-[hsl(18_60%_30%/0.4)] text-white/70">
-              {onlyCommitted.length} pin{onlyCommitted.length !== 1 ? "s" : ""}
+              {onlyCommitted.filter((p) => !p.wireDetails || p.footage == null).length} active pin{onlyCommitted.filter((p) => !p.wireDetails || p.footage == null).length !== 1 ? "s" : ""}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
