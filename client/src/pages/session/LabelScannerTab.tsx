@@ -434,7 +434,7 @@ export default function LabelScannerTab({
   const photoSelector = (
     <div className="flex items-center gap-2 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(18_60%_30%/0.2)]">
       <ScanLine className="h-5 w-5 text-[hsl(18_85%_55%)]" />
-      <span className="font-semibold text-white text-sm">Label Scanner</span>
+      <span className="font-semibold text-white text-sm">AI Scanner</span>
       <Select
         value={currentPhotoId ? String(currentPhotoId) : ""}
         onValueChange={(v) => {
@@ -499,7 +499,7 @@ export default function LabelScannerTab({
         {photoSelector}
         <div className="p-6 text-center text-muted-foreground">
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p>No committed pins on this photo. Commit pins in the Section Photo tab to use the label scanner.</p>
+          <p>No committed pins on this photo. Commit pins in the Section Photo tab to use the AI scanner.</p>
         </div>
       </div>
     );
@@ -528,7 +528,7 @@ export default function LabelScannerTab({
           <div className="flex items-center gap-2">
             <ScanLine className="h-5 w-5 text-[hsl(18_85%_55%)]" />
             <span className="font-semibold text-white text-sm">
-              Label Scanner
+              AI Scanner
             </span>
             <Select
               value={currentPhotoId ? String(currentPhotoId) : ""}

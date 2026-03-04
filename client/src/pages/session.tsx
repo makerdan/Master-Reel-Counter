@@ -728,9 +728,9 @@ function SessionWorkspace({
                   <LayoutGrid className="h-4 w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Photos Reel</span>
                 </TabsTrigger>
-                <TabsTrigger value="scanner" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(280_60%_35%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-scanner-mode" aria-label="Label Scanner">
+                <TabsTrigger value="scanner" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(280_60%_35%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-scanner-mode" aria-label="AI Scanner">
                   <ScanLine className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Label Scanner</span>
+                  <span className="hidden sm:inline">AI Scanner</span>
                 </TabsTrigger>
               </TabsList>
 
