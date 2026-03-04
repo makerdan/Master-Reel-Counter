@@ -267,6 +267,18 @@ export default function LabelScannerTab({
     }
   }
 
+  const retryRequest = async (method: string, url: string, body: any, retries = 2): Promise<void> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        await apiRequest(method, url, body);
+        return;
+      } catch (err) {
+        if (attempt === retries) throw err;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+  };
+
   const applyMutation = useMutation({
     mutationFn: async (cardsToApply: PinCard[]) => {
       const failures: string[] = [];
@@ -281,13 +293,14 @@ export default function LabelScannerTab({
 
         if (Object.keys(updates).length > 0) {
           try {
-            await apiRequest("PATCH", `/api/pins/${card.pin.id}`, updates);
+            await retryRequest("PATCH", `/api/pins/${card.pin.id}`, updates);
 
             if (card.pin.entryId) {
               const entryUpdates: Record<string, any> = {};
               if (card.editCatalog) entryUpdates.reelTag = card.editCatalog;
               if (card.editVendor) entryUpdates.manufacturer = card.editVendor;
               if (card.editFootage) entryUpdates.footage = parseInt(card.editFootage) || null;
+              entryUpdates.reelCount = card.pin.reelCount ?? 1;
               if (card.matchResult?.match) {
                 if (card.matchResult.match.wireType) entryUpdates.wireType = card.matchResult.match.wireType;
                 if (card.matchResult.match.wireSize) entryUpdates.gauge = card.matchResult.match.wireSize;
@@ -295,7 +308,7 @@ export default function LabelScannerTab({
                 if (card.matchResult.match.conductors) entryUpdates.conductors = card.matchResult.match.conductors;
               }
               if (Object.keys(entryUpdates).length > 0) {
-                await apiRequest("PATCH", `/api/entries/${card.pin.entryId}`, entryUpdates);
+                await retryRequest("PATCH", `/api/entries/${card.pin.entryId}`, entryUpdates);
               }
             }
             succeededPinIds.push(card.pin.id);
@@ -570,42 +583,45 @@ export default function LabelScannerTab({
               )}
 
               {card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]">
+                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }}>
                   {card.matchResult && card.matchResult.confidence !== "none" ? (
                     <Badge
-                      className={`text-sm py-1 px-2 font-mono ${
+                      className={`text-sm py-1 px-2 ${
                         card.matchResult.confidence === "high"
                           ? "bg-green-900/50 text-green-300 border-green-700/40"
                           : card.matchResult.confidence === "medium"
                           ? "bg-amber-900/50 text-amber-300 border-amber-700/40"
                           : "bg-red-900/50 text-red-300 border-red-700/40"
                       }`}
+                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }}
                       data-testid={`badge-match-${card.pin.id}`}
                     >
-                      {card.matchResult.match?.catalog} — {card.matchResult.confidence}
+                      {card.matchResult.match?.catalog}
                     </Badge>
                   ) : (
-                    <Badge className="text-sm py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" data-testid={`badge-no-match-${card.pin.id}`}>
+                    <Badge className="text-sm py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-no-match-${card.pin.id}`}>
                       No match — enter manually
                     </Badge>
                   )}
 
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div>
+                  <div className="flex gap-1.5">
+                    <div className="flex-1 min-w-0">
                       <label className="text-[10px] text-white/40">Category</label>
                       <Input
                         value={card.editCatalog}
                         onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
-                        className="h-8 text-xs font-mono bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        className="h-8 bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }}
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
                     </div>
-                    <div>
+                    <div className="w-16 flex-shrink-0">
                       <label className="text-[10px] text-white/40">Vendor</label>
                       <Input
                         value={card.editVendor}
                         onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
-                        className="h-8 text-xs font-mono bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        className="h-8 bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }}
                         data-testid={`input-vendor-${card.pin.id}`}
                       />
                     </div>
