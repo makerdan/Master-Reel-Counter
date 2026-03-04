@@ -42,6 +42,7 @@ interface PinCard {
   editCatalog: string;
   editFootage: string;
   editVendor: string;
+  catalogCode: string;
 }
 
 function CropCanvas({
@@ -181,6 +182,7 @@ export default function LabelScannerTab({
           editCatalog: "",
           editFootage: "",
           editVendor: "",
+          catalogCode: "",
         };
       });
     });
@@ -205,9 +207,10 @@ export default function LabelScannerTab({
           ...card,
           result,
           matchResult,
-          editCatalog: parsed?.catalog ?? "",
+          editCatalog: parsed?.description ?? parsed?.catalog ?? "",
           editFootage: parsed?.footage ? String(parsed.footage) : "",
           editVendor: parsed?.vendor ?? "",
+          catalogCode: parsed?.catalog ?? "",
         };
       })
     );
@@ -226,7 +229,7 @@ export default function LabelScannerTab({
     );
   };
 
-  const setCardField = (pinId: number, field: "editCatalog" | "editFootage" | "editVendor", value: string) => {
+  const setCardField = (pinId: number, field: "editCatalog" | "editVendor", value: string) => {
     setCards((prev) =>
       prev.map((c) => (c.pin.id === pinId ? { ...c, [field]: value } : c))
     );
@@ -316,7 +319,7 @@ export default function LabelScannerTab({
         toast({ title: "Applied", description: `Updated ${data.successCount} pin(s) successfully` });
       }
       setPhase("preview");
-      setCards((prev) => prev.map((c) => ({ ...c, result: undefined, matchResult: undefined, editCatalog: "", editFootage: "", editVendor: "" })));
+      setCards((prev) => prev.map((c) => ({ ...c, result: undefined, matchResult: undefined, editCatalog: "", editFootage: "", editVendor: "", catalogCode: "" })));
     },
     onError: (error: any) => {
       toast({ title: "Apply failed", description: error.message, variant: "destructive" });
@@ -516,113 +519,41 @@ export default function LabelScannerTab({
 
               {card.result && phase === "results" && (
                 <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]">
-                  <div>
-                    <span className="text-[10px] uppercase text-white/40 tracking-wider">Raw text</span>
-                    <p
-                      className="text-sm font-mono text-amber-200 bg-[hsl(25_15%_12%)] rounded px-2 py-1 mt-0.5 break-words"
-                      data-testid={`text-raw-${card.pin.id}`}
+                  {card.matchResult && card.matchResult.confidence !== "none" ? (
+                    <Badge
+                      className={`text-sm py-1 px-2 font-mono ${
+                        card.matchResult.confidence === "high"
+                          ? "bg-green-900/50 text-green-300 border-green-700/40"
+                          : card.matchResult.confidence === "medium"
+                          ? "bg-amber-900/50 text-amber-300 border-amber-700/40"
+                          : "bg-red-900/50 text-red-300 border-red-700/40"
+                      }`}
+                      data-testid={`badge-match-${card.pin.id}`}
                     >
-                      {card.result.readable ? card.result.rawText : <em className="text-red-400">Unreadable</em>}
-                    </p>
-                  </div>
-
-                  {card.matchResult && (
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] uppercase text-white/40 tracking-wider">Match:</span>
-                        {card.matchResult.confidence !== "none" ? (
-                          <>
-                            <Badge
-                              className={`text-[10px] ${
-                                card.matchResult.confidence === "high"
-                                  ? "bg-green-900/50 text-green-300 border-green-700/40"
-                                  : card.matchResult.confidence === "medium"
-                                  ? "bg-amber-900/50 text-amber-300 border-amber-700/40"
-                                  : "bg-red-900/50 text-red-300 border-red-700/40"
-                              }`}
-                              data-testid={`badge-match-${card.pin.id}`}
-                            >
-                              {card.matchResult.match?.catalog} ({card.matchResult.confidence})
-                            </Badge>
-                            <Badge
-                              variant="outline"
-                              className="text-[9px] border-white/15 text-white/40"
-                              data-testid={`badge-method-${card.pin.id}`}
-                            >
-                              {card.matchResult.matchMethod}
-                            </Badge>
-                          </>
-                        ) : (
-                          <Badge className="text-[10px] bg-zinc-800 text-zinc-400 border-zinc-700" data-testid={`badge-no-match-${card.pin.id}`}>
-                            No match
-                          </Badge>
-                        )}
-                      </div>
-                      {card.matchResult.match && (
-                        <div className="space-y-0.5">
-                          <p
-                            className="text-[10px] text-white/50 leading-tight break-words"
-                            data-testid={`text-description-${card.pin.id}`}
-                          >
-                            {card.matchResult.match.description}
-                          </p>
-                          <div className="flex flex-wrap gap-1">
-                            {card.matchResult.match.wireType && (
-                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-wiretype-${card.pin.id}`}>
-                                {card.matchResult.match.wireType}
-                              </span>
-                            )}
-                            {card.matchResult.match.wireSize && (
-                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-wiresize-${card.pin.id}`}>
-                                {card.matchResult.match.wireSize}
-                              </span>
-                            )}
-                            {card.matchResult.match.color && (
-                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-color-${card.pin.id}`}>
-                                {card.matchResult.match.color}
-                              </span>
-                            )}
-                            {card.matchResult.match.footage && (
-                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-footage-${card.pin.id}`}>
-                                {card.matchResult.match.footage}ft
-                              </span>
-                            )}
-                            {card.matchResult.match.conductors && (
-                              <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-[hsl(25_15%_18%)] text-amber-300/70" data-testid={`tag-conductors-${card.pin.id}`}>
-                                {card.matchResult.match.conductors}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      {card.matchResult.match?.catalog} — {card.matchResult.confidence}
+                    </Badge>
+                  ) : (
+                    <Badge className="text-sm py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700" data-testid={`badge-no-match-${card.pin.id}`}>
+                      No match — enter manually
+                    </Badge>
                   )}
 
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-2 gap-1.5">
                     <div>
-                      <label className="text-[10px] text-white/40">Catalog</label>
+                      <label className="text-[10px] text-white/40">Category</label>
                       <Input
                         value={card.editCatalog}
-                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                        className="h-7 text-xs font-mono bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white"
+                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
+                        className="h-8 text-xs font-mono bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                         data-testid={`input-catalog-${card.pin.id}`}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-white/40">Footage</label>
-                      <Input
-                        value={card.editFootage}
-                        onChange={(e) => setCardField(card.pin.id, "editFootage", e.target.value)}
-                        className="h-7 text-xs font-mono bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white"
-                        data-testid={`input-footage-${card.pin.id}`}
                       />
                     </div>
                     <div>
                       <label className="text-[10px] text-white/40">Vendor</label>
                       <Input
                         value={card.editVendor}
-                        onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
-                        className="h-7 text-xs font-mono bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white"
+                        onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
+                        className="h-8 text-xs font-mono bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                         data-testid={`input-vendor-${card.pin.id}`}
                       />
                     </div>
@@ -663,7 +594,7 @@ export default function LabelScannerTab({
                 onClick={() => {
                   setPhase("preview");
                   setUseCachedResults(false);
-                  setCards((prev) => prev.map((c) => ({ ...c, result: undefined, matchResult: undefined, editCatalog: "", editFootage: "", editVendor: "" })));
+                  setCards((prev) => prev.map((c) => ({ ...c, result: undefined, matchResult: undefined, editCatalog: "", editFootage: "", editVendor: "", catalogCode: "" })));
                 }}
                 className="gap-2 border-[hsl(18_60%_30%/0.3)] text-white/70 hover:text-white"
                 data-testid="btn-back-to-preview"
