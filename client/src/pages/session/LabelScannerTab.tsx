@@ -692,9 +692,6 @@ export default function LabelScannerTab({
                     </Badge>
                   )}
                 </div>
-                <span className="text-[10px] font-mono text-white/50 min-w-[28px] text-right">
-                  {zoomLabel(card.zoomLevel)}
-                </span>
               </div>
 
               {photoUrl && (
