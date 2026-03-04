@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, Sparkles,
+  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, Sparkles, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -270,7 +270,7 @@ export default function LabelScannerTab({
   const applyMutation = useMutation({
     mutationFn: async (cardsToApply: PinCard[]) => {
       const failures: string[] = [];
-      let successCount = 0;
+      const succeededPinIds: number[] = [];
 
       for (const card of cardsToApply) {
         if (!card.result || !card.included) continue;
@@ -298,13 +298,13 @@ export default function LabelScannerTab({
                 await apiRequest("PATCH", `/api/entries/${card.pin.entryId}`, entryUpdates);
               }
             }
-            successCount++;
+            succeededPinIds.push(card.pin.id);
           } catch (err: any) {
             failures.push(card.pin.label || `Pin ${card.pin.id}`);
           }
         }
       }
-      return { successCount, failures };
+      return { successCount: succeededPinIds.length, failures, succeededPinIds };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/photos", String(currentPhotoId), "pins"] });
@@ -318,8 +318,14 @@ export default function LabelScannerTab({
       } else {
         toast({ title: "Applied", description: `Updated ${data.successCount} pin(s) successfully` });
       }
-      setPhase("preview");
-      setCards((prev) => prev.map((c) => ({ ...c, result: undefined, matchResult: undefined, editCatalog: "", editFootage: "", editVendor: "", catalogCode: "" })));
+      const successSet = new Set(data.succeededPinIds);
+      setCards((prev) => {
+        const remaining = prev.filter((c) => !successSet.has(c.pin.id));
+        if (remaining.length === 0) {
+          setPhase("preview");
+        }
+        return remaining;
+      });
     },
     onError: (error: any) => {
       toast({ title: "Apply failed", description: error.message, variant: "destructive" });
@@ -402,51 +408,98 @@ export default function LabelScannerTab({
 
   const selectedForApply = cards.filter((c) => c.included && c.result);
 
+  const currentPhotoIndex = photos.findIndex((p) => p.id === currentPhotoId);
+  const nextPhoto = currentPhotoIndex >= 0 && currentPhotoIndex < photos.length - 1
+    ? photos[currentPhotoIndex + 1]
+    : null;
+
+  const advanceToNextPhoto = () => {
+    if (nextPhoto) {
+      setSelectedPhotoId(nextPhoto.id);
+      setPhase("preview");
+      setCards([]);
+      setUseCachedResults(true);
+    }
+  };
+
   return (
     <div className="space-y-4" data-testid="label-scanner-tab">
-      <div className="flex items-center justify-between flex-wrap gap-2 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(18_60%_30%/0.2)]">
-        <div className="flex items-center gap-2">
-          <ScanLine className="h-5 w-5 text-[hsl(18_85%_55%)]" />
-          <span className="font-semibold text-white text-sm">
-            Label Scanner
-          </span>
-          <Select
-            value={currentPhotoId ? String(currentPhotoId) : ""}
-            onValueChange={(v) => {
-              setSelectedPhotoId(parseInt(v));
-              setPhase("preview");
-              setCards([]);
-            }}
-          >
-            <SelectTrigger className="w-[160px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {photos.map((p, idx) => (
-                <SelectItem key={p.id} value={String(p.id)}>
-                  Photo {idx + 1}{p.aisle ? ` — ${p.aisle}` : ""}{p.section ? ` / ${p.section}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Badge variant="outline" className="text-xs border-[hsl(18_60%_30%/0.4)] text-white/70">
-            {onlyCommitted.length} pin{onlyCommitted.length !== 1 ? "s" : ""}
-          </Badge>
+      <div className="bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(18_60%_30%/0.2)] space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <ScanLine className="h-5 w-5 text-[hsl(18_85%_55%)]" />
+            <span className="font-semibold text-white text-sm">
+              Label Scanner
+            </span>
+            <Select
+              value={currentPhotoId ? String(currentPhotoId) : ""}
+              onValueChange={(v) => {
+                setSelectedPhotoId(parseInt(v));
+                setPhase("preview");
+                setCards([]);
+              }}
+            >
+              <SelectTrigger className="w-[160px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {photos.map((p, idx) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    Photo {idx + 1}{p.aisle ? ` — ${p.aisle}` : ""}{p.section ? ` / ${p.section}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Badge variant="outline" className="text-xs border-[hsl(18_60%_30%/0.4)] text-white/70">
+              {onlyCommitted.length} pin{onlyCommitted.length !== 1 ? "s" : ""}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-[160px]">
+              <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+              <Slider
+                value={[ZOOM_MAX - globalZoom + ZOOM_MIN]}
+                min={ZOOM_MIN}
+                max={ZOOM_MAX}
+                step={ZOOM_STEP}
+                onValueChange={([v]) => applyGlobalZoom(ZOOM_MAX - v + ZOOM_MIN)}
+                className="flex-1"
+                data-testid="slider-global-zoom"
+              />
+              <ZoomIn className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+              <span className="text-[10px] font-mono text-white/50 min-w-[32px] text-right">{zoomLabel(globalZoom)}</span>
+            </div>
+            {nextPhoto && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={advanceToNextPhoto}
+                className="gap-1 h-7 text-xs border-[hsl(18_60%_30%/0.3)] text-white/70 hover:text-white"
+                data-testid="btn-next-photo"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 min-w-[200px]">
-          <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
-          <Slider
-            value={[ZOOM_MAX - globalZoom + ZOOM_MIN]}
-            min={ZOOM_MIN}
-            max={ZOOM_MAX}
-            step={ZOOM_STEP}
-            onValueChange={([v]) => applyGlobalZoom(ZOOM_MAX - v + ZOOM_MIN)}
-            className="flex-1"
-            data-testid="slider-global-zoom"
-          />
-          <ZoomIn className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
-          <span className="text-[10px] font-mono text-white/50 min-w-[32px] text-right">{zoomLabel(globalZoom)}</span>
-        </div>
+        {photo && (photo.aisle || photo.section) && (
+          <div className="flex items-center gap-3 pl-7" data-testid="text-aisle-section">
+            {photo.aisle && (
+              <span className="text-base font-bold text-[hsl(18_85%_55%)] font-mono" data-testid="text-aisle">
+                Aisle {photo.aisle}
+              </span>
+            )}
+            {photo.aisle && photo.section && (
+              <span className="text-white/30">/</span>
+            )}
+            {photo.section && (
+              <span className="text-base font-bold text-white/80 font-mono" data-testid="text-section">
+                Section {photo.section}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {includedCards.length > 20 && phase === "preview" && (
