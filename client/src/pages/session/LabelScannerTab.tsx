@@ -22,6 +22,38 @@ const ZOOM_STEP = 0.005;
 const ZOOM_CLICK_STEP = 0.05;
 const ZOOM_DEFAULT = 0.12;
 
+function getZoomStorageKey(sessionId: number) {
+  return `scanner-zoom-${sessionId}`;
+}
+
+function loadSavedZooms(sessionId: number): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(getZoomStorageKey(sessionId));
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveZoomLevel(sessionId: number, pinId: number, zoom: number) {
+  try {
+    const saved = loadSavedZooms(sessionId);
+    saved[String(pinId)] = zoom;
+    localStorage.setItem(getZoomStorageKey(sessionId), JSON.stringify(saved));
+  } catch {}
+}
+
+function saveGlobalZoom(sessionId: number, zoom: number) {
+  try {
+    localStorage.setItem(`scanner-global-zoom-${sessionId}`, String(zoom));
+  } catch {}
+}
+
+function loadGlobalZoom(sessionId: number): number {
+  try {
+    const v = localStorage.getItem(`scanner-global-zoom-${sessionId}`);
+    return v ? parseFloat(v) : ZOOM_DEFAULT;
+  } catch { return ZOOM_DEFAULT; }
+}
+
 function zoomLabel(fraction: number): string {
   const pct = fraction * 100;
   return pct < 1 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
@@ -183,7 +215,7 @@ export default function LabelScannerTab({
 }) {
   const { toast } = useToast();
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
-  const [globalZoom, setGlobalZoom] = useState(ZOOM_DEFAULT);
+  const [globalZoom, setGlobalZoom] = useState(() => loadGlobalZoom(sessionId));
   const [cards, setCards] = useState<PinCard[]>([]);
   const [phase, setPhase] = useState<"preview" | "results">("preview");
   const [analyzing, setAnalyzing] = useState(false);
@@ -247,15 +279,17 @@ export default function LabelScannerTab({
 
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
+      const savedZooms = loadSavedZooms(sessionId);
       return onlyCommitted.map((pin) => {
         const ex = existing.get(pin.id);
         if (ex && ex.pin.id === pin.id) {
           return { ...ex, pin };
         }
         const hasFilled = !!(pin.wireDetails && pin.footage);
+        const savedZoom = savedZooms[String(pin.id)];
         return {
           pin,
-          zoomLevel: globalZoom,
+          zoomLevel: savedZoom ?? globalZoom,
           panX: 0,
           panY: 0,
           included: !hasFilled,
@@ -301,6 +335,7 @@ export default function LabelScannerTab({
     setCards((prev) =>
       prev.map((c) => (c.pin.id === pinId ? { ...c, zoomLevel: zoom, panX: 0, panY: 0 } : c))
     );
+    saveZoomLevel(sessionId, pinId, zoom);
   };
 
   const setCardPan = (pinId: number, px: number, py: number) => {
@@ -323,7 +358,12 @@ export default function LabelScannerTab({
 
   const applyGlobalZoom = (zoom: number) => {
     setGlobalZoom(zoom);
-    setCards((prev) => prev.map((c) => ({ ...c, zoomLevel: zoom, panX: 0, panY: 0 })));
+    saveGlobalZoom(sessionId, zoom);
+    setCards((prev) => {
+      const updated = prev.map((c) => ({ ...c, zoomLevel: zoom, panX: 0, panY: 0 }));
+      updated.forEach((c) => saveZoomLevel(sessionId, c.pin.id, zoom));
+      return updated;
+    });
   };
 
   const includedCards = cards.filter((c) => c.included);
