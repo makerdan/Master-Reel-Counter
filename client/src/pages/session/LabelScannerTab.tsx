@@ -290,7 +290,16 @@ export default function LabelScannerTab({
   });
 
   const activePinsForPhoto = useMemo(() => {
-    const draftPins = committedPins.filter((p) => !p.entryId);
+    const committedKeys = new Set(
+      committedPins
+        .filter((p) => p.entryId)
+        .map((p) => `${p.xPercent.toFixed(5)}_${p.yPercent.toFixed(5)}_${p.label}`)
+    );
+    const draftPins = committedPins.filter((p) => {
+      if (p.entryId) return false;
+      const key = `${p.xPercent.toFixed(5)}_${p.yPercent.toFixed(5)}_${p.label}`;
+      return !committedKeys.has(key);
+    });
     const incompleteCommitted = committedPins.filter((p) => p.entryId && (!p.wireDetails || p.footage == null));
     return [...draftPins, ...incompleteCommitted];
   }, [committedPins]);
@@ -324,7 +333,14 @@ export default function LabelScannerTab({
     for (const rp of receivingPhotos) {
       if (result.length >= MAX_POOLED) break;
       const rpPins = allSessionPins.filter((pin) => pin.photoId === rp.id);
-      const rpActive = rpPins.filter((pin) => !pin.entryId || (pin.entryId && (!pin.wireDetails || pin.footage == null)));
+      const rpCommittedKeys = new Set(
+        rpPins.filter((p) => p.entryId).map((p) => `${p.xPercent.toFixed(5)}_${p.yPercent.toFixed(5)}_${p.label}`)
+      );
+      const rpActive = rpPins.filter((pin) => {
+        if (pin.entryId) return !pin.wireDetails || pin.footage == null;
+        const ck = `${pin.xPercent.toFixed(5)}_${pin.yPercent.toFixed(5)}_${pin.label}`;
+        return !rpCommittedKeys.has(ck);
+      });
       for (const pin of rpActive) {
         if (result.length >= MAX_POOLED) break;
         if (!currentIds.has(pin.id)) {
@@ -491,6 +507,7 @@ export default function LabelScannerTab({
     mutationFn: async (cardsToApply: PinCard[]) => {
       const failures: string[] = [];
       const succeededPinIds: number[] = [];
+      const draftSuccessByPhoto = new Map<number, Set<string>>();
 
       for (const card of cardsToApply) {
         if (!card.included) continue;
@@ -541,20 +558,9 @@ export default function LabelScannerTab({
               throw pinErr;
             }
 
-            const allPhotoPins = await (await fetch(`/api/photos/${card.pin.photoId}/pins`, { credentials: "include" })).json();
-            const remainingDrafts = allPhotoPins.filter((p: Pin) => !p.entryId && p.id !== card.pin.id);
-            await retryRequest("PUT", `/api/photos/${card.pin.photoId}/draft-pins`, {
-              pins: remainingDrafts.map((p: Pin) => ({
-                xPercent: p.xPercent,
-                yPercent: p.yPercent,
-                label: p.label,
-                reelCount: p.reelCount ?? 1,
-                wireDetails: p.wireDetails || "",
-                vendorCode: p.vendorCode || "",
-                footage: p.footage,
-                flagged: p.flagged || false,
-              })),
-            });
+            const pinKey = `${card.pin.xPercent.toFixed(5)}_${card.pin.yPercent.toFixed(5)}_${card.pin.label}`;
+            if (!draftSuccessByPhoto.has(card.pin.photoId)) draftSuccessByPhoto.set(card.pin.photoId, new Set());
+            draftSuccessByPhoto.get(card.pin.photoId)!.add(pinKey);
 
             succeededPinIds.push(card.pin.id);
           } else {
@@ -589,6 +595,30 @@ export default function LabelScannerTab({
           failures.push(card.pin.label || `Pin ${card.pin.id}`);
         }
       }
+
+      for (const [photoId, succeededKeys] of draftSuccessByPhoto) {
+        try {
+          const allPhotoPins = await (await fetch(`/api/photos/${photoId}/pins`, { credentials: "include" })).json();
+          const remainingDrafts = allPhotoPins.filter((p: Pin) => {
+            if (p.entryId) return false;
+            const pinKey = `${p.xPercent.toFixed(5)}_${p.yPercent.toFixed(5)}_${p.label}`;
+            return !succeededKeys.has(pinKey);
+          });
+          await retryRequest("PUT", `/api/photos/${photoId}/draft-pins`, {
+            pins: remainingDrafts.map((p: Pin) => ({
+              xPercent: p.xPercent,
+              yPercent: p.yPercent,
+              label: p.label,
+              reelCount: p.reelCount ?? 1,
+              wireDetails: p.wireDetails || "",
+              vendorCode: p.vendorCode || "",
+              footage: p.footage,
+              flagged: p.flagged || false,
+            })),
+          });
+        } catch {}
+      }
+
       return { successCount: succeededPinIds.length, failures, succeededPinIds };
     },
     onSuccess: (data) => {
