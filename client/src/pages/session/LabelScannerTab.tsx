@@ -415,8 +415,8 @@ export default function LabelScannerTab({
         const hasData = !!(card.result || card.editCatalog || card.editVendor);
         if (!hasData) continue;
         const updates: Record<string, any> = {};
-        if (card.editCatalog) updates.wireDetails = card.editCatalog;
-        if (card.editVendor) updates.vendorCode = card.editVendor;
+        if (card.editCatalog) updates.wireDetails = card.editCatalog.toUpperCase();
+        if (card.editVendor) updates.vendorCode = card.editVendor.toUpperCase();
         if (card.editFootage) updates.footage = parseInt(card.editFootage) || null;
 
         if (Object.keys(updates).length > 0) {
@@ -425,8 +425,8 @@ export default function LabelScannerTab({
 
             if (card.pin.entryId) {
               const entryUpdates: Record<string, any> = {};
-              if (card.editCatalog) entryUpdates.reelTag = card.editCatalog;
-              if (card.editVendor) entryUpdates.manufacturer = card.editVendor;
+              if (card.editCatalog) entryUpdates.reelTag = card.editCatalog.toUpperCase();
+              if (card.editVendor) entryUpdates.manufacturer = card.editVendor.toUpperCase();
               if (card.editFootage) entryUpdates.footage = parseInt(card.editFootage) || null;
               entryUpdates.reelCount = card.pin.reelCount ?? 1;
               if (card.matchResult?.match) {
@@ -736,7 +736,7 @@ export default function LabelScannerTab({
                     }`}>
                       <Input
                         value={card.editCatalog}
-                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
+                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                         className={`border-0 bg-transparent uppercase p-0 h-auto ${
                           card.matchResult.confidence === "high" ? "text-green-300" : card.matchResult.confidence === "medium" ? "text-amber-300" : "text-red-300"
                         }`}
@@ -749,7 +749,7 @@ export default function LabelScannerTab({
                       <label className="text-[10px] text-white/40">Category</label>
                       <Input
                         value={card.editCatalog}
-                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
+                        onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                         className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                         style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                         placeholder="Enter category..."
@@ -762,7 +762,7 @@ export default function LabelScannerTab({
                     <label className="text-[10px] text-white/40">Vendor</label>
                     <Input
                       value={card.editVendor}
-                      onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
+                      onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-${card.pin.id}`}
@@ -780,7 +780,7 @@ export default function LabelScannerTab({
                     <label className="text-[10px] text-white/40">Category</label>
                     <Input
                       value={card.editCatalog}
-                      onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value.toUpperCase())}
+                      onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                       className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       placeholder="Enter category..."
@@ -791,7 +791,7 @@ export default function LabelScannerTab({
                     <label className="text-[10px] text-white/40">Vendor</label>
                     <Input
                       value={card.editVendor}
-                      onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value.toUpperCase())}
+                      onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-manual-${card.pin.id}`}
