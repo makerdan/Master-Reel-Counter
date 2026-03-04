@@ -206,7 +206,7 @@ export default function LabelScannerTab({
   const availablePhotos = useMemo(() => {
     return photos.filter((p) => {
       const photoPins = allSessionPins.filter((pin) => pin.photoId === p.id && pin.entryId);
-      if (photoPins.length === 0) return true;
+      if (photoPins.length === 0) return false;
       return photoPins.some((pin) => !pin.wireDetails || pin.footage == null);
     });
   }, [photos, allSessionPins]);
