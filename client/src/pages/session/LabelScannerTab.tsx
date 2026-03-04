@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight,
@@ -199,6 +199,30 @@ export default function LabelScannerTab({
       })()
     : null;
 
+  const { data: allSessionPins = [] } = useQuery<Pin[]>({
+    queryKey: ["/api/sessions", String(sessionId), "pins"],
+  });
+
+  const availablePhotos = useMemo(() => {
+    return photos.filter((p) => {
+      const photoPins = allSessionPins.filter((pin) => pin.photoId === p.id && pin.entryId);
+      if (photoPins.length === 0) return true;
+      return photoPins.some((pin) => !pin.wireDetails || pin.footage == null);
+    });
+  }, [photos, allSessionPins]);
+
+  useEffect(() => {
+    if (currentPhotoId && availablePhotos.length > 0 && !availablePhotos.some((p) => p.id === currentPhotoId)) {
+      setSelectedPhotoId(availablePhotos[0].id);
+      setPhase("preview");
+      setCards([]);
+    } else if (currentPhotoId && availablePhotos.length === 0) {
+      setSelectedPhotoId(null);
+      setPhase("preview");
+      setCards([]);
+    }
+  }, [availablePhotos, currentPhotoId]);
+
   const { data: committedPins = [], isLoading: pinsLoading } = useQuery<Pin[]>({
     queryKey: ["/api/photos", String(currentPhotoId), "pins"],
     enabled: !!currentPhotoId,
@@ -382,6 +406,7 @@ export default function LabelScannerTab({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/photos", String(currentPhotoId), "pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "entries"] });
       if (data.failures.length > 0) {
         toast({
@@ -422,7 +447,7 @@ export default function LabelScannerTab({
           <SelectValue placeholder="Select a photo..." />
         </SelectTrigger>
         <SelectContent>
-          {photos.map((p, idx) => (
+          {availablePhotos.map((p, idx) => (
             <SelectItem key={p.id} value={String(p.id)}>
               Photo {idx + 1}{p.aisle ? ` — ${p.aisle}` : ""}{p.section ? ` / ${p.section}` : ""}
             </SelectItem>
@@ -432,13 +457,13 @@ export default function LabelScannerTab({
     </div>
   );
 
-  if (!photos.length) {
+  if (!availablePhotos.length) {
     return (
       <div className="space-y-4" data-testid="scanner-no-photos">
         {photoSelector}
         <div className="p-6 text-center text-muted-foreground">
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p>No photos in this session yet. Upload photos in the Section Photo tab first.</p>
+          <p>{photos.length > 0 ? "All photos have been fully scanned and applied." : "No photos in this session yet. Upload photos in the Section Photo tab first."}</p>
         </div>
       </div>
     );
@@ -482,9 +507,9 @@ export default function LabelScannerTab({
 
   const selectedForApply = cards.filter((c) => c.included && (c.result || c.editCatalog || c.editVendor));
 
-  const currentPhotoIndex = photos.findIndex((p) => p.id === currentPhotoId);
-  const nextPhoto = currentPhotoIndex >= 0 && currentPhotoIndex < photos.length - 1
-    ? photos[currentPhotoIndex + 1]
+  const currentPhotoIndex = availablePhotos.findIndex((p) => p.id === currentPhotoId);
+  const nextPhoto = currentPhotoIndex >= 0 && currentPhotoIndex < availablePhotos.length - 1
+    ? availablePhotos[currentPhotoIndex + 1]
     : null;
 
   const advanceToNextPhoto = () => {
@@ -517,7 +542,7 @@ export default function LabelScannerTab({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {photos.map((p, idx) => (
+                {availablePhotos.map((p, idx) => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     Photo {idx + 1}{p.aisle ? ` — ${p.aisle}` : ""}{p.section ? ` / ${p.section}` : ""}
                   </SelectItem>
@@ -551,7 +576,7 @@ export default function LabelScannerTab({
                 data-testid="btn-next-photo"
               >
                 <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                <span className="text-xs font-semibold">Next Photo ({photos.length - currentPhotoIndex - 1})</span>
+                <span className="text-xs font-semibold">Next Photo ({availablePhotos.length - currentPhotoIndex - 1})</span>
               </Button>
             )}
           </div>
