@@ -72,6 +72,7 @@ interface PinCard {
   panX: number;
   panY: number;
   included: boolean;
+  isDraft: boolean;
   result?: AnalysisResult;
   matchResult?: LabelMatchResult;
   editCatalog: string;
@@ -207,11 +208,13 @@ export default function LabelScannerTab({
   photos,
   currentPhotoId: initialPhotoId,
   canEdit = true,
+  onPinDataChanged,
 }: {
   sessionId: number;
   photos: Photo[];
   currentPhotoId: number | null;
   canEdit?: boolean;
+  onPinDataChanged?: () => void;
 }) {
   const { toast } = useToast();
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
@@ -238,9 +241,11 @@ export default function LabelScannerTab({
 
   const availablePhotos = useMemo(() => {
     return photos.filter((p) => {
-      const photoPins = allSessionPins.filter((pin) => pin.photoId === p.id && pin.entryId);
+      const photoPins = allSessionPins.filter((pin) => pin.photoId === p.id);
       if (photoPins.length === 0) return false;
-      return photoPins.some((pin) => !pin.wireDetails || pin.footage == null);
+      const hasDraftPins = photoPins.some((pin) => !pin.entryId);
+      const hasIncompleteCommitted = photoPins.some((pin) => pin.entryId && (!pin.wireDetails || pin.footage == null));
+      return hasDraftPins || hasIncompleteCommitted;
     });
   }, [photos, allSessionPins]);
 
@@ -268,10 +273,14 @@ export default function LabelScannerTab({
     enabled: !!currentPhotoId && useCachedResults,
   });
 
-  const onlyCommitted = committedPins.filter((p) => p.entryId);
+  const activePinsForPhoto = useMemo(() => {
+    const draftPins = committedPins.filter((p) => !p.entryId);
+    const incompleteCommitted = committedPins.filter((p) => p.entryId && (!p.wireDetails || p.footage == null));
+    return [...draftPins, ...incompleteCommitted];
+  }, [committedPins]);
 
   useEffect(() => {
-    if (!onlyCommitted.length) {
+    if (!activePinsForPhoto.length) {
       setCards([]);
       setPhase("preview");
       return;
@@ -280,11 +289,10 @@ export default function LabelScannerTab({
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
-      const activePins = onlyCommitted.filter((pin) => !pin.wireDetails || pin.footage == null);
-      return activePins.map((pin) => {
+      return activePinsForPhoto.map((pin) => {
         const ex = existing.get(pin.id);
         if (ex && ex.pin.id === pin.id) {
-          return { ...ex, pin };
+          return { ...ex, pin, isDraft: !pin.entryId };
         }
         const savedZoom = savedZooms[String(pin.id)];
         return {
@@ -293,6 +301,7 @@ export default function LabelScannerTab({
           panX: 0,
           panY: 0,
           included: true,
+          isDraft: !pin.entryId,
           editCatalog: "",
           editFootage: "",
           editVendor: "",
@@ -300,7 +309,7 @@ export default function LabelScannerTab({
         };
       });
     });
-  }, [onlyCommitted.length, currentPhotoId]);
+  }, [activePinsForPhoto.length, currentPhotoId]);
 
   const hasCachedResults = !!(cachedResults?.results);
 
@@ -393,11 +402,15 @@ export default function LabelScannerTab({
     }
   }
 
-  const retryRequest = async (method: string, url: string, body: any, retries = 2): Promise<void> => {
+  const retryRequest = async (method: string, url: string, body: any, retries = 2): Promise<any> => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        await apiRequest(method, url, body);
-        return;
+        const res = await apiRequest(method, url, body);
+        try {
+          return await res.json();
+        } catch {
+          return undefined;
+        }
       } catch (err) {
         if (attempt === retries) throw err;
         await new Promise((r) => setTimeout(r, 500));
@@ -414,35 +427,97 @@ export default function LabelScannerTab({
         if (!card.included) continue;
         const hasData = !!(card.result || card.editCatalog || card.editVendor);
         if (!hasData) continue;
-        const updates: Record<string, any> = {};
-        if (card.editCatalog) updates.wireDetails = card.editCatalog.toUpperCase();
-        if (card.editVendor) updates.vendorCode = card.editVendor.toUpperCase();
-        if (card.editFootage) updates.footage = parseInt(card.editFootage) || null;
 
-        if (Object.keys(updates).length > 0) {
-          try {
-            await retryRequest("PATCH", `/api/pins/${card.pin.id}`, updates);
+        try {
+          if (card.isDraft) {
+            const cardPhoto = photos.find((p) => p.id === card.pin.photoId);
+            const aisle = cardPhoto?.aisle || "";
+            const section = cardPhoto?.section || "";
+            const footage = card.editFootage ? (parseInt(card.editFootage) || null) : null;
+            const reelCount = card.pin.reelCount ?? 1;
+            const computedFootage = footage && reelCount > 1 ? footage * reelCount : footage;
 
-            if (card.pin.entryId) {
-              const entryUpdates: Record<string, any> = {};
-              if (card.editCatalog) entryUpdates.reelTag = card.editCatalog.toUpperCase();
-              if (card.editVendor) entryUpdates.manufacturer = card.editVendor.toUpperCase();
-              if (card.editFootage) entryUpdates.footage = parseInt(card.editFootage) || null;
-              entryUpdates.reelCount = card.pin.reelCount ?? 1;
-              if (card.matchResult?.match) {
-                if (card.matchResult.match.wireType) entryUpdates.wireType = card.matchResult.match.wireType;
-                if (card.matchResult.match.wireSize) entryUpdates.gauge = card.matchResult.match.wireSize;
-                if (card.matchResult.match.color) entryUpdates.color = card.matchResult.match.color;
-                if (card.matchResult.match.conductors) entryUpdates.conductors = card.matchResult.match.conductors;
-              }
-              if (Object.keys(entryUpdates).length > 0) {
-                await retryRequest("PATCH", `/api/entries/${card.pin.entryId}`, entryUpdates);
-              }
+            const entryData: Record<string, any> = {
+              aisle,
+              section,
+              reelTag: card.editCatalog ? card.editCatalog.toUpperCase() : "",
+              manufacturer: card.editVendor ? card.editVendor.toUpperCase() : "",
+              footage: computedFootage,
+              reelCount,
+              photoId: card.pin.photoId,
+            };
+            if (card.matchResult?.match) {
+              if (card.matchResult.match.wireType) entryData.wireType = card.matchResult.match.wireType;
+              if (card.matchResult.match.wireSize) entryData.gauge = card.matchResult.match.wireSize;
+              if (card.matchResult.match.color) entryData.color = card.matchResult.match.color;
+              if (card.matchResult.match.conductors) entryData.conductors = card.matchResult.match.conductors;
             }
+
+            const entry = await retryRequest("POST", `/api/sessions/${sessionId}/entries`, entryData);
+
+            try {
+              await retryRequest("POST", `/api/photos/${card.pin.photoId}/pins`, {
+                xPercent: card.pin.xPercent,
+                yPercent: card.pin.yPercent,
+                label: card.pin.label,
+                reelCount,
+                entryId: entry.id,
+                wireDetails: card.editCatalog ? card.editCatalog.toUpperCase() : undefined,
+                vendorCode: card.editVendor ? card.editVendor.toUpperCase() : undefined,
+                footage,
+                flagged: card.pin.flagged || false,
+              });
+            } catch (pinErr) {
+              try { await apiRequest("DELETE", `/api/entries/${entry.id}`); } catch {}
+              throw pinErr;
+            }
+
+            const allPhotoPins = await (await fetch(`/api/photos/${card.pin.photoId}/pins`, { credentials: "include" })).json();
+            const remainingDrafts = allPhotoPins.filter((p: Pin) => !p.entryId && p.id !== card.pin.id);
+            await retryRequest("PUT", `/api/photos/${card.pin.photoId}/draft-pins`, {
+              pins: remainingDrafts.map((p: Pin) => ({
+                xPercent: p.xPercent,
+                yPercent: p.yPercent,
+                label: p.label,
+                reelCount: p.reelCount ?? 1,
+                wireDetails: p.wireDetails || "",
+                vendorCode: p.vendorCode || "",
+                footage: p.footage,
+                flagged: p.flagged || false,
+              })),
+            });
+
             succeededPinIds.push(card.pin.id);
-          } catch (err: any) {
-            failures.push(card.pin.label || `Pin ${card.pin.id}`);
+          } else {
+            const updates: Record<string, any> = {};
+            if (card.editCatalog) updates.wireDetails = card.editCatalog.toUpperCase();
+            if (card.editVendor) updates.vendorCode = card.editVendor.toUpperCase();
+            if (card.editFootage) updates.footage = parseInt(card.editFootage) || null;
+
+            if (Object.keys(updates).length > 0) {
+              await retryRequest("PATCH", `/api/pins/${card.pin.id}`, updates);
+
+              if (card.pin.entryId) {
+                const entryUpdates: Record<string, any> = {};
+                if (card.editCatalog) entryUpdates.reelTag = card.editCatalog.toUpperCase();
+                if (card.editVendor) entryUpdates.manufacturer = card.editVendor.toUpperCase();
+                if (card.editFootage) entryUpdates.footage = parseInt(card.editFootage) || null;
+                entryUpdates.reelCount = card.pin.reelCount ?? 1;
+                if (card.matchResult?.match) {
+                  if (card.matchResult.match.wireType) entryUpdates.wireType = card.matchResult.match.wireType;
+                  if (card.matchResult.match.wireSize) entryUpdates.gauge = card.matchResult.match.wireSize;
+                  if (card.matchResult.match.color) entryUpdates.color = card.matchResult.match.color;
+                  if (card.matchResult.match.conductors) entryUpdates.conductors = card.matchResult.match.conductors;
+                }
+                if (Object.keys(entryUpdates).length > 0) {
+                  await retryRequest("PATCH", `/api/entries/${card.pin.entryId}`, entryUpdates);
+                }
+              }
+              succeededPinIds.push(card.pin.id);
+            }
           }
+        } catch (err: any) {
+          failures.push(card.pin.label || `Pin ${card.pin.id}`);
         }
       }
       return { successCount: succeededPinIds.length, failures, succeededPinIds };
@@ -451,6 +526,7 @@ export default function LabelScannerTab({
       queryClient.invalidateQueries({ queryKey: ["/api/photos", String(currentPhotoId), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "entries"] });
+      onPinDataChanged?.();
       if (data.failures.length > 0) {
         toast({
           title: `Applied ${data.successCount} of ${data.successCount + data.failures.length}`,
@@ -536,7 +612,7 @@ export default function LabelScannerTab({
     );
   }
 
-  if (!onlyCommitted.length) {
+  if (!activePinsForPhoto.length) {
     const idx = availablePhotos.findIndex((p) => p.id === currentPhotoId);
     const next = idx >= 0 && idx < availablePhotos.length - 1 ? availablePhotos[idx + 1] : null;
     return (
@@ -544,7 +620,7 @@ export default function LabelScannerTab({
         {photoSelector}
         <div className="p-6 text-center text-muted-foreground">
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p>No committed pins on this photo. Commit pins in the Section Photo tab to use the AI scanner.</p>
+          <p>No active pins on this photo. Place pins in the Section Photo tab to use the AI scanner.</p>
           {next && (
             <Button
               size="sm"
@@ -606,7 +682,7 @@ export default function LabelScannerTab({
               </SelectContent>
             </Select>
             <Badge variant="outline" className="text-xs border-[hsl(18_60%_30%/0.4)] text-white/70">
-              {onlyCommitted.filter((p) => !p.wireDetails || p.footage == null).length} active pin{onlyCommitted.filter((p) => !p.wireDetails || p.footage == null).length !== 1 ? "s" : ""}
+              {activePinsForPhoto.length} active pin{activePinsForPhoto.length !== 1 ? "s" : ""}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
@@ -686,7 +762,12 @@ export default function LabelScannerTab({
                   <span className="font-mono text-sm font-bold text-white">
                     {card.pin.label || `#${card.pin.id}`}
                   </span>
-                  {hasFilled && (
+                  {card.isDraft && (
+                    <Badge className="text-[10px] bg-blue-900/50 text-blue-300 border-blue-700/40" data-testid={`badge-draft-${card.pin.id}`}>
+                      Draft
+                    </Badge>
+                  )}
+                  {hasFilled && !card.isDraft && (
                     <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-filled-${card.pin.id}`}>
                       Already filled
                     </Badge>

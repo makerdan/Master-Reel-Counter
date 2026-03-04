@@ -165,6 +165,8 @@ function SessionWorkspace({
   const [mode, setMode] = useState<string>(initialTab);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const previousModeRef = useRef<string | null>(null);
+  const [pinRefreshSignal, setPinRefreshSignal] = useState(0);
+  const triggerPinRefresh = useCallback(() => setPinRefreshSignal((s) => s + 1), []);
   const [editSessionOpen, setEditSessionOpen] = useState(false);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [navigateToPhotoId, setNavigateToPhotoId] = useState<number | null>(null);
@@ -735,7 +737,7 @@ function SessionWorkspace({
               </TabsList>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} />
               </TabsContent>
 
               <TabsContent value="single">
@@ -790,6 +792,7 @@ function SessionWorkspace({
                   photos={photos}
                   currentPhotoId={photos[session.lastPhotoIndex ?? 0]?.id ?? null}
                   canEdit={canEditSession}
+                  onPinDataChanged={triggerPinRefresh}
                 />
               </TabsContent>
             </Tabs>
