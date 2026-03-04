@@ -19,6 +19,7 @@ import type { Photo, Pin } from "@shared/schema";
 const ZOOM_MIN = 0.005;
 const ZOOM_MAX = 1.0;
 const ZOOM_STEP = 0.005;
+const ZOOM_CLICK_STEP = 0.05;
 const ZOOM_DEFAULT = 0.12;
 
 function zoomLabel(fraction: number): string {
@@ -570,7 +571,7 @@ export default function LabelScannerTab({
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 min-w-[160px]">
-              <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+              <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0 cursor-pointer" onClick={() => applyGlobalZoom(Math.min(ZOOM_MAX, globalZoom + ZOOM_CLICK_STEP))} data-testid="btn-global-zoom-out" />
               <Slider
                 value={[ZOOM_MAX - globalZoom + ZOOM_MIN]}
                 min={ZOOM_MIN}
@@ -580,7 +581,7 @@ export default function LabelScannerTab({
                 className="flex-1"
                 data-testid="slider-global-zoom"
               />
-              <ZoomIn className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+              <ZoomIn className="h-3.5 w-3.5 text-white/40 flex-shrink-0 cursor-pointer" onClick={() => applyGlobalZoom(Math.max(ZOOM_MIN, globalZoom - ZOOM_CLICK_STEP))} data-testid="btn-global-zoom-in" />
               <span className="text-[10px] font-mono text-white/50 min-w-[32px] text-right">{zoomLabel(globalZoom)}</span>
             </div>
             {nextPhoto && (
@@ -671,7 +672,7 @@ export default function LabelScannerTab({
                     />
                   </div>
                   <div className="flex items-center gap-1.5 px-1">
-                    <ZoomOut className="h-6 w-6 text-white/30 flex-shrink-0" />
+                    <ZoomOut className="h-6 w-6 text-white/30 flex-shrink-0 cursor-pointer" onClick={() => setCardZoom(card.pin.id, Math.min(ZOOM_MAX, card.zoomLevel + ZOOM_CLICK_STEP))} data-testid={`btn-zoom-out-${card.pin.id}`} />
                     <Slider
                       value={[ZOOM_MAX - card.zoomLevel + ZOOM_MIN]}
                       min={ZOOM_MIN}
@@ -681,7 +682,7 @@ export default function LabelScannerTab({
                       className="flex-1"
                       data-testid={`slider-zoom-${card.pin.id}`}
                     />
-                    <ZoomIn className="h-6 w-6 text-white/30 flex-shrink-0" />
+                    <ZoomIn className="h-6 w-6 text-white/30 flex-shrink-0 cursor-pointer" onClick={() => setCardZoom(card.pin.id, Math.max(ZOOM_MIN, card.zoomLevel - ZOOM_CLICK_STEP))} data-testid={`btn-zoom-in-${card.pin.id}`} />
                   </div>
                 </div>
               )}
