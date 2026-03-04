@@ -212,7 +212,9 @@ export default function LabelScannerTab({
   }, [photos, allSessionPins]);
 
   useEffect(() => {
-    if (currentPhotoId && availablePhotos.length > 0 && !availablePhotos.some((p) => p.id === currentPhotoId)) {
+    if (!currentPhotoId && availablePhotos.length > 0) {
+      setSelectedPhotoId(availablePhotos[0].id);
+    } else if (currentPhotoId && availablePhotos.length > 0 && !availablePhotos.some((p) => p.id === currentPhotoId)) {
       setSelectedPhotoId(availablePhotos[0].id);
       setPhase("preview");
       setCards([]);
