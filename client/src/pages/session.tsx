@@ -172,6 +172,8 @@ function SessionWorkspace({
   const [navigateToPhotoId, setNavigateToPhotoId] = useState<number | null>(null);
   const [navigateAisle, setNavigateAisle] = useState<string>("");
   const [navigateSection, setNavigateSection] = useState<string>("");
+  const syncedPhotoIdRef = useRef<number | null>(null);
+  const lastPhotoModePhotoIdRef = useRef<number | null>(null);
   const [editName, setEditName] = useState(session.name);
   const [editLocation, setEditLocation] = useState(session.location || "");
   const [editDescription, setEditDescription] = useState((session as any).description || "");
@@ -712,7 +714,17 @@ function SessionWorkspace({
           />
         ) : (
           <>
-            <Tabs value={mode} onValueChange={setMode}>
+            <Tabs value={mode} onValueChange={(newMode) => {
+              if (newMode === "photo" && syncedPhotoIdRef.current) {
+                setNavigateToPhotoId(syncedPhotoIdRef.current);
+                setNavigateAisle("");
+                setNavigateSection("");
+              }
+              if (newMode === "scanner" && lastPhotoModePhotoIdRef.current) {
+                syncedPhotoIdRef.current = lastPhotoModePhotoIdRef.current;
+              }
+              setMode(newMode);
+            }}>
               <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
                 <TabsTrigger value="photo" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Section Photo">
                   <Camera className="h-4 w-4 sm:mr-1" />
@@ -737,7 +749,7 @@ function SessionWorkspace({
               </TabsList>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} />
               </TabsContent>
 
               <TabsContent value="single">
@@ -790,9 +802,10 @@ function SessionWorkspace({
                 <LabelScannerTab
                   sessionId={sessionId}
                   photos={photos}
-                  currentPhotoId={photos[session.lastPhotoIndex ?? 0]?.id ?? null}
+                  currentPhotoId={syncedPhotoIdRef.current ?? photos[session.lastPhotoIndex ?? 0]?.id ?? null}
                   canEdit={canEditSession}
                   onPinDataChanged={triggerPinRefresh}
+                  onPhotoChange={(photoId) => { syncedPhotoIdRef.current = photoId; }}
                 />
               </TabsContent>
             </Tabs>

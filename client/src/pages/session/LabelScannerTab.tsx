@@ -209,19 +209,35 @@ export default function LabelScannerTab({
   currentPhotoId: initialPhotoId,
   canEdit = true,
   onPinDataChanged,
+  onPhotoChange,
 }: {
   sessionId: number;
   photos: Photo[];
   currentPhotoId: number | null;
   canEdit?: boolean;
   onPinDataChanged?: () => void;
+  onPhotoChange?: (photoId: number | null) => void;
 }) {
   const { toast } = useToast();
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
+  const lastInitialPhotoIdRef = useRef(initialPhotoId);
   const [globalZoom, setGlobalZoom] = useState(() => loadGlobalZoom(sessionId));
   const [cards, setCards] = useState<PinCard[]>([]);
   const [phase, setPhase] = useState<"preview" | "results">("preview");
   const [analyzing, setAnalyzing] = useState(false);
+
+  useEffect(() => {
+    if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
+      lastInitialPhotoIdRef.current = initialPhotoId;
+      setSelectedPhotoId(initialPhotoId);
+      setPhase("preview");
+      setCards([]);
+    }
+  }, [initialPhotoId]);
+
+  useEffect(() => {
+    onPhotoChange?.(selectedPhotoId);
+  }, [selectedPhotoId]);
 
   const [useCachedResults, setUseCachedResults] = useState(true);
   const currentPhotoId = selectedPhotoId;
@@ -279,8 +295,51 @@ export default function LabelScannerTab({
     return [...draftPins, ...incompleteCommitted];
   }, [committedPins]);
 
+  const isReceiving = useMemo(() => {
+    if (!photo) return false;
+    const a = (photo.aisle || "").toLowerCase();
+    const s = (photo.section || "").toLowerCase();
+    return a.includes("receiving") || s.includes("receiving");
+  }, [photo]);
+
+  const getPhotoUrl = useCallback((p: Photo | undefined | null): string | null => {
+    if (!p?.objectStorageKey) return null;
+    const key = p.objectStorageKey;
+    if (key.startsWith("/uploads/") || key.startsWith("/objects/")) return key;
+    return `/uploads/${key}`;
+  }, []);
+
+  const pooledPins = useMemo(() => {
+    if (!isReceiving) return activePinsForPhoto;
+    const MAX_POOLED = 9;
+    const result: Pin[] = [...activePinsForPhoto];
+    if (result.length >= MAX_POOLED) return result.slice(0, MAX_POOLED);
+    const currentIds = new Set(result.map((p) => p.id));
+    const receivingPhotos = availablePhotos.filter((p) => {
+      if (p.id === currentPhotoId) return false;
+      const a = (p.aisle || "").toLowerCase();
+      const s = (p.section || "").toLowerCase();
+      return a.includes("receiving") || s.includes("receiving");
+    });
+    for (const rp of receivingPhotos) {
+      if (result.length >= MAX_POOLED) break;
+      const rpPins = allSessionPins.filter((pin) => pin.photoId === rp.id);
+      const rpActive = rpPins.filter((pin) => !pin.entryId || (pin.entryId && (!pin.wireDetails || pin.footage == null)));
+      for (const pin of rpActive) {
+        if (result.length >= MAX_POOLED) break;
+        if (!currentIds.has(pin.id)) {
+          result.push(pin);
+          currentIds.add(pin.id);
+        }
+      }
+    }
+    return result;
+  }, [isReceiving, activePinsForPhoto, availablePhotos, currentPhotoId, allSessionPins]);
+
+  const effectivePins = isReceiving ? pooledPins : activePinsForPhoto;
+
   useEffect(() => {
-    if (!activePinsForPhoto.length) {
+    if (!effectivePins.length) {
       setCards([]);
       setPhase("preview");
       return;
@@ -289,7 +348,7 @@ export default function LabelScannerTab({
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
-      return activePinsForPhoto.map((pin) => {
+      return effectivePins.map((pin) => {
         const ex = existing.get(pin.id);
         if (ex && ex.pin.id === pin.id) {
           return { ...ex, pin, isDraft: !pin.entryId };
@@ -309,7 +368,7 @@ export default function LabelScannerTab({
         };
       });
     });
-  }, [activePinsForPhoto.length, currentPhotoId]);
+  }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving]);
 
   const hasCachedResults = !!(cachedResults?.results);
 
@@ -381,19 +440,29 @@ export default function LabelScannerTab({
     if (!currentPhotoId || !includedCards.length) return;
     setAnalyzing(true);
     try {
-      const pinData = includedCards.map((c) => ({
-        pinId: c.pin.id,
-        pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
-        x: c.pin.xPercent,
-        y: c.pin.yPercent,
-        zoomLevel: c.zoomLevel,
-      }));
+      const byPhoto = new Map<number, typeof includedCards>();
+      for (const c of includedCards) {
+        const pid = c.pin.photoId;
+        if (!byPhoto.has(pid)) byPhoto.set(pid, []);
+        byPhoto.get(pid)!.push(c);
+      }
 
-      const res = await apiRequest("POST", `/api/photos/${currentPhotoId}/analyze-labels`, { pins: pinData });
-      const data = await res.json();
-      if (data.results) {
-        applyResults(data.results);
-        toast({ title: "Analysis complete", description: `Read ${data.results.length} label(s)` });
+      const allResults: AnalysisResult[] = [];
+      for (const [photoId, photoCards] of byPhoto) {
+        const pinData = photoCards.map((c) => ({
+          pinId: c.pin.id,
+          pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
+          x: c.pin.xPercent,
+          y: c.pin.yPercent,
+          zoomLevel: c.zoomLevel,
+        }));
+        const res = await apiRequest("POST", `/api/photos/${photoId}/analyze-labels`, { pins: pinData });
+        const data = await res.json();
+        if (data.results) allResults.push(...data.results);
+      }
+      if (allResults.length) {
+        applyResults(allResults);
+        toast({ title: "Analysis complete", description: `Read ${allResults.length} label(s)` });
       }
     } catch (error: any) {
       toast({ title: "Analysis failed", description: error.message, variant: "destructive" });
@@ -524,6 +593,14 @@ export default function LabelScannerTab({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/photos", String(currentPhotoId), "pins"] });
+      if (isReceiving) {
+        const involvedPhotoIds = new Set(cards.map((c) => c.pin.photoId));
+        involvedPhotoIds.forEach((pid) => {
+          if (pid !== currentPhotoId) {
+            queryClient.invalidateQueries({ queryKey: ["/api/photos", String(pid), "pins"] });
+          }
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "entries"] });
       onPinDataChanged?.();
@@ -612,7 +689,7 @@ export default function LabelScannerTab({
     );
   }
 
-  if (!activePinsForPhoto.length) {
+  if (!effectivePins.length) {
     const idx = availablePhotos.findIndex((p) => p.id === currentPhotoId);
     const next = idx >= 0 && idx < availablePhotos.length - 1 ? availablePhotos[idx + 1] : null;
     return (
@@ -682,8 +759,13 @@ export default function LabelScannerTab({
               </SelectContent>
             </Select>
             <Badge variant="outline" className="text-xs border-[hsl(18_60%_30%/0.4)] text-white/70">
-              {activePinsForPhoto.length} active pin{activePinsForPhoto.length !== 1 ? "s" : ""}
+              {effectivePins.length} active pin{effectivePins.length !== 1 ? "s" : ""}
             </Badge>
+            {isReceiving && effectivePins.length > activePinsForPhoto.length && (
+              <Badge className="text-[10px] bg-purple-900/50 text-purple-300 border-purple-700/40" data-testid="badge-receiving-pooled">
+                Pooled from {new Set(effectivePins.map((p) => p.photoId)).size} photos
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 min-w-[160px]">
@@ -742,6 +824,9 @@ export default function LabelScannerTab({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {cards.map((card) => {
           const hasFilled = !!(card.pin.wireDetails && card.pin.footage);
+          const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
+          const cardPhotoObj = isFromOtherPhoto ? photos.find((p) => p.id === card.pin.photoId) : photo;
+          const cardPhotoUrl = isFromOtherPhoto ? getPhotoUrl(cardPhotoObj) : photoUrl;
           return (
             <div
               key={card.pin.id}
@@ -753,7 +838,7 @@ export default function LabelScannerTab({
               data-testid={`card-pin-${card.pin.id}`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Checkbox
                     checked={card.included}
                     onCheckedChange={(v) => setCardIncluded(card.pin.id, !!v)}
@@ -772,14 +857,19 @@ export default function LabelScannerTab({
                       Already filled
                     </Badge>
                   )}
+                  {isFromOtherPhoto && cardPhotoObj && (
+                    <Badge className="text-[10px] bg-purple-900/50 text-purple-300 border-purple-700/40" data-testid={`badge-pooled-${card.pin.id}`}>
+                      {cardPhotoObj.aisle || ""}{cardPhotoObj.section ? ` / ${cardPhotoObj.section}` : ""}
+                    </Badge>
+                  )}
                 </div>
               </div>
 
-              {photoUrl && (
+              {cardPhotoUrl && (
                 <div className="space-y-1.5">
                   <div className="flex justify-center">
                     <CropCanvas
-                      photoUrl={photoUrl}
+                      photoUrl={cardPhotoUrl}
                       xPercent={card.pin.xPercent}
                       yPercent={card.pin.yPercent}
                       zoomLevel={card.zoomLevel}
