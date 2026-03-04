@@ -81,6 +81,28 @@ interface PinCard {
   catalogCode: string;
 }
 
+const imageCache = new Map<string, HTMLImageElement>();
+const IMAGE_CACHE_MAX = 20;
+
+function getOrLoadImage(url: string): HTMLImageElement {
+  const cached = imageCache.get(url);
+  if (cached) {
+    imageCache.delete(url);
+    imageCache.set(url, cached);
+    return cached;
+  }
+  if (imageCache.size >= IMAGE_CACHE_MAX) {
+    const oldest = imageCache.keys().next().value;
+    if (oldest) imageCache.delete(oldest);
+  }
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onerror = () => { imageCache.delete(url); };
+  img.src = url;
+  imageCache.set(url, img);
+  return img;
+}
+
 function CropCanvas({
   photoUrl,
   xPercent,
@@ -132,17 +154,15 @@ function CropCanvas({
   }, [xPercent, yPercent, zoomLevel, panX, panY, size]);
 
   useEffect(() => {
-    if (imgRef.current && imgRef.current.src === photoUrl && imgRef.current.complete) {
+    const img = getOrLoadImage(photoUrl);
+    imgRef.current = img;
+    if (img.complete && img.naturalWidth) {
       draw();
-      return;
+    } else {
+      const onLoad = () => { draw(); };
+      img.addEventListener("load", onLoad);
+      return () => { img.removeEventListener("load", onLoad); };
     }
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imgRef.current = img;
-      draw();
-    };
-    img.src = photoUrl;
   }, [photoUrl, draw]);
 
   useEffect(() => {
@@ -351,6 +371,19 @@ export default function LabelScannerTab({
     }
     return result;
   }, [isReceiving, activePinsForPhoto, availablePhotos, currentPhotoId, allSessionPins]);
+
+  useEffect(() => {
+    if (photoUrl) getOrLoadImage(photoUrl);
+    if (isReceiving && pooledPins.length > 0) {
+      const pooledPhotoIds = new Set(pooledPins.map((p) => p.photoId));
+      pooledPhotoIds.delete(currentPhotoId!);
+      for (const pid of pooledPhotoIds) {
+        const p = photos.find((ph) => ph.id === pid);
+        const url = getPhotoUrl(p);
+        if (url) getOrLoadImage(url);
+      }
+    }
+  }, [photoUrl, isReceiving, pooledPins, currentPhotoId, photos, getPhotoUrl]);
 
   const effectivePins = isReceiving ? pooledPins : activePinsForPhoto;
 
