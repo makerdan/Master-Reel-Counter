@@ -473,6 +473,14 @@ export function correctWireDetails(rawDetails: string): CorrectionResult {
     input = "MHF40402041000";
   }
 
+  const SPECIAL_ALIASES: Record<string, string> = {
+    "25001XHHWALBR": "XHHW250BR1000",
+    "25001XHHWALOR": "XHHW250OR1000",
+  };
+  if (SPECIAL_ALIASES[input]) {
+    input = SPECIAL_ALIASES[input];
+  }
+
   const catalogResult = matchCatalog(input);
   if (catalogResult) {
     return {
