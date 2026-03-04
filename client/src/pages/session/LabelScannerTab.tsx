@@ -496,12 +496,25 @@ export default function LabelScannerTab({
   }
 
   if (!onlyCommitted.length) {
+    const idx = availablePhotos.findIndex((p) => p.id === currentPhotoId);
+    const next = idx >= 0 && idx < availablePhotos.length - 1 ? availablePhotos[idx + 1] : null;
     return (
       <div className="space-y-4" data-testid="scanner-no-pins">
         {photoSelector}
         <div className="p-6 text-center text-muted-foreground">
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p>No committed pins on this photo. Commit pins in the Section Photo tab to use the AI scanner.</p>
+          {next && (
+            <Button
+              size="sm"
+              onClick={() => { setSelectedPhotoId(next.id); setPhase("preview"); setCards([]); }}
+              className="mt-3 bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
+              data-testid="btn-next-photo-no-pins"
+            >
+              <AlertCircle className="h-3.5 w-3.5 mr-1" />
+              <span className="text-xs font-semibold">Next Photo ({availablePhotos.length - idx - 1})</span>
+            </Button>
+          )}
         </div>
       </div>
     );
