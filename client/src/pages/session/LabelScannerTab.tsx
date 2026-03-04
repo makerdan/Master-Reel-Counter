@@ -207,7 +207,7 @@ export default function LabelScannerTab({
           ...card,
           result,
           matchResult,
-          editCatalog: parsed?.description ?? parsed?.catalog ?? "",
+          editCatalog: parsed?.catalog ?? "",
           editFootage: parsed?.footage ? String(parsed.footage) : "",
           editVendor: parsed?.vendor ?? "",
           catalogCode: parsed?.catalog ?? "",
