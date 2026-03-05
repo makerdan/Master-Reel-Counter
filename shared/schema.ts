@@ -252,3 +252,25 @@ export const insertFeedbackSchema = createInsertSchema(feedback).omit({
 
 export type Feedback = typeof feedback.$inferSelect;
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+
+export const scanResults = pgTable("scan_results", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  photoId: integer("photo_id").notNull(),
+  pinId: integer("pin_id").notNull().unique(),
+  pinLabel: text("pin_label"),
+  rawText: text("raw_text"),
+  readable: boolean("readable").default(false),
+  scannedBy: varchar("scanned_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertScanResultSchema = createInsertSchema(scanResults).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ScanResult = typeof scanResults.$inferSelect;
+export type InsertScanResult = z.infer<typeof insertScanResultSchema>;

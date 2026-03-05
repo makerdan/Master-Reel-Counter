@@ -33,6 +33,9 @@ import {
   feedback,
   type Feedback,
   type InsertFeedback,
+  scanResults,
+  type ScanResult,
+  type InsertScanResult,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -108,6 +111,10 @@ export interface IStorage {
 
   createFeedback(data: InsertFeedback): Promise<Feedback>;
   listFeedback(): Promise<Feedback[]>;
+
+  upsertScanResults(results: InsertScanResult[]): Promise<ScanResult[]>;
+  getSessionScanResults(sessionId: number): Promise<ScanResult[]>;
+  deleteSessionScanResults(sessionId: number): Promise<void>;
 
   getUserStats(userId: string): Promise<{
     totalSessions: number;
@@ -898,6 +905,38 @@ export class DatabaseStorage implements IStorage {
 
   async listFeedback(): Promise<Feedback[]> {
     return db.select().from(feedback).orderBy(desc(feedback.createdAt));
+  }
+
+  async upsertScanResults(results: InsertScanResult[]): Promise<ScanResult[]> {
+    if (!results.length) return [];
+    const inserted: ScanResult[] = [];
+    for (const r of results) {
+      const [row] = await db.insert(scanResults)
+        .values(r)
+        .onConflictDoUpdate({
+          target: scanResults.pinId,
+          set: {
+            rawText: r.rawText,
+            readable: r.readable,
+            pinLabel: r.pinLabel,
+            scannedBy: r.scannedBy,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      inserted.push(row);
+    }
+    return inserted;
+  }
+
+  async getSessionScanResults(sessionId: number): Promise<ScanResult[]> {
+    return db.select().from(scanResults)
+      .where(eq(scanResults.sessionId, sessionId))
+      .orderBy(desc(scanResults.createdAt));
+  }
+
+  async deleteSessionScanResults(sessionId: number): Promise<void> {
+    await db.delete(scanResults).where(eq(scanResults.sessionId, sessionId));
   }
 }
 

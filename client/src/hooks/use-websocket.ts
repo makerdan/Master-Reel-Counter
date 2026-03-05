@@ -29,6 +29,8 @@ export function useSessionWebSocket(sessionId: number | null, onMessage?: Messag
             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "photos"] });
           } else if (msg.entity === "pins") {
             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "pins"] });
+          } else if (msg.entity === "scan_results") {
+            queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "scan-results"] });
           }
         } else if (msg.type === "comment") {
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });

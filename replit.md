@@ -42,7 +42,8 @@ The application is built with a React frontend, an Express.js backend, and Postg
     - **Special Aliases:** `correctWireDetails` maps non-standard OCR results to standard catalog codes (e.g. `25001XHHWALBR` → `XHHW250BR1000`, `25001XHHWALOR` → `XHHW250OR1000`, `MHF` → `MHF40402041000`).
     - **Image Cache:** Module-level LRU cache (`imageCache`, max 20 entries) shares `HTMLImageElement` objects across all `CropCanvas` instances. `getOrLoadImage(url)` checks cache first, evicts oldest on overflow, and removes entries on load error. Pre-warm `useEffect` triggers on photo selection (and for pooled Receiving photos) so the image download starts before cards mount.
     - **Files:** `client/src/pages/session/LabelScannerTab.tsx` (tab UI), `client/src/lib/labelMatcher.ts` (catalog matching), `client/src/lib/wireReference.ts` (catalog + aliases), `server/lib/cropPhoto.ts` (sharp-based cropping utility)
-    - **API:** `POST /api/photos/:photoId/analyze-labels`, `GET /api/photos/:photoId/label-cache`
+    - **Real-Time Sync:** Scan results are persisted to the `scan_results` DB table and broadcast via WebSocket (`sync` entity `scan_results`). Other users in the same session automatically receive updated scan results through query invalidation, enabling multiple users to divide scanning work and see each other's results in real time. Client also caches to localStorage as a secondary fallback.
+    - **API:** `POST /api/photos/:photoId/analyze-labels`, `GET /api/photos/:photoId/label-cache`, `GET /api/sessions/:id/scan-results`, `DELETE /api/sessions/:id/scan-results`
 - **Undo/Redo:** Implemented for entry and pin modifications.
 - **Summary Statistics:** Dashboard to display key metrics and activity logs.
 - **Security:** Ownership verification on all CRUD routes and optional AES-256-GCM data encryption for sensitive entry fields.

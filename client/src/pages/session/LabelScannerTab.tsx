@@ -141,6 +141,7 @@ interface PinCard {
   editFootage: string;
   editVendor: string;
   catalogCode: string;
+  _serverTs?: number;
 }
 
 const imageCache = new Map<string, HTMLImageElement>();
@@ -373,6 +374,14 @@ export default function LabelScannerTab({
     enabled: !!currentPhotoId && useCachedResults,
   });
 
+  const { data: serverScanResults = [] } = useQuery<Array<{
+    id: number; sessionId: number; photoId: number; pinId: number;
+    pinLabel: string | null; rawText: string | null; readable: boolean | null;
+    scannedBy: string | null; createdAt: string; updatedAt: string;
+  }>>({
+    queryKey: ["/api/sessions", String(sessionId), "scan-results"],
+  });
+
   const activePinsForPhoto = useMemo(() => {
     const committedKeys = new Set(
       committedPins
@@ -481,6 +490,10 @@ export default function LabelScannerTab({
     }
   }, [photoUrl, batchMode, isReceiving, pooledPins, allSessionActivePins, currentPhotoId, photos, getPhotoUrl]);
 
+  const serverScanResultsKey = useMemo(() => {
+    return serverScanResults.map((r) => `${r.pinId}:${r.updatedAt || r.createdAt}`).join(",");
+  }, [serverScanResults]);
+
   useEffect(() => {
     if (!effectivePins.length) {
       setCards([]);
@@ -488,43 +501,67 @@ export default function LabelScannerTab({
       return;
     }
 
+    const serverResultsMap = new Map(serverScanResults.map((r) => [r.pinId, r]));
+
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
-      const savedResults = loadSavedResults(sessionId);
-      const savedResultsMap = new Map(savedResults.map((r) => [r.pinId, r]));
+      const localResults = loadSavedResults(sessionId);
+      const localResultsMap = new Map(localResults.map((r) => [r.pinId, r]));
       const pinCountByPhoto = new Map<number, number>();
       for (const p of effectivePins) {
         pinCountByPhoto.set(p.photoId, (pinCountByPhoto.get(p.photoId) || 0) + 1);
       }
+
+      function buildResultFromServer(sr: typeof serverScanResults[0], pin: Pin) {
+        const matchResult = sr.rawText ? matchLabelText(sr.rawText) : undefined;
+        const parsed = matchResult?.match;
+        return {
+          result: { pinId: pin.id, pinLabel: sr.pinLabel || pin.label || "", rawText: sr.rawText, readable: !!sr.readable } as AnalysisResult,
+          matchResult,
+          editCatalog: parsed?.catalog ?? "",
+          editFootage: parsed?.footage ? String(parsed.footage) : "",
+          editVendor: parsed?.vendor ?? "",
+          catalogCode: parsed?.catalog ?? "",
+        };
+      }
+
       const built = effectivePins.map((pin) => {
+        const sr = serverResultsMap.get(pin.id);
         const ex = existing.get(pin.id);
         if (ex && ex.pin.id === pin.id) {
+          if (sr) {
+            const serverTime = new Date(sr.updatedAt || sr.createdAt).getTime();
+            const hasNewerServer = !ex.result || serverTime > (ex._serverTs ?? 0);
+            if (hasNewerServer) {
+              return { ...ex, pin, isDraft: !pin.entryId, _serverTs: serverTime, ...buildResultFromServer(sr, pin) };
+            }
+          }
           return { ...ex, pin, isDraft: !pin.entryId };
         }
         const savedZoom = savedZooms[String(pin.id)];
         const smartZoom = computeSmartZoom(pinCountByPhoto.get(pin.photoId) || 1);
-        const saved = savedResultsMap.get(pin.id);
-        return {
-          pin,
-          zoomLevel: savedZoom ?? smartZoom,
-          panX: 0,
-          panY: 0,
-          included: true,
-          isDraft: !pin.entryId,
-          editCatalog: saved?.editCatalog ?? "",
-          editFootage: saved?.editFootage ?? "",
-          editVendor: saved?.editVendor ?? "",
-          catalogCode: saved?.editCatalog ?? "",
-          ...(saved ? {
-            result: { pinId: pin.id, pinLabel: pin.label || "", rawText: saved.rawText, readable: saved.readable } as AnalysisResult,
-            matchResult: saved.rawText ? matchLabelText(saved.rawText) : undefined,
-          } : {}),
-        };
+        const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: true, isDraft: !pin.entryId };
+        if (sr) {
+          return { ...base, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
+        }
+        const local = localResultsMap.get(pin.id);
+        if (local && local.rawText !== null) {
+          return {
+            ...base,
+            editCatalog: local.editCatalog ?? "",
+            editFootage: local.editFootage ?? "",
+            editVendor: local.editVendor ?? "",
+            catalogCode: local.editCatalog ?? "",
+            result: { pinId: pin.id, pinLabel: pin.label || "", rawText: local.rawText, readable: local.readable } as AnalysisResult,
+            matchResult: local.rawText ? matchLabelText(local.rawText) : undefined,
+          };
+        }
+        return { ...base, editCatalog: "", editFootage: "", editVendor: "", catalogCode: "" };
       });
       return built.some((c) => c.result) ? sortCardsByCatalog(built) : built;
     });
-  }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving, batchMode]);
+  }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving, batchMode, serverScanResultsKey]);
 
   const hasCachedResults = !!(cachedResults?.results);
 
@@ -666,6 +703,7 @@ export default function LabelScannerTab({
       }
 
       if (totalResults > 0) {
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "scan-results"] });
         setCards((prev) => {
           const sorted = sortCardsByCatalog(prev);
           saveAnalysisResults(sessionId, sorted);

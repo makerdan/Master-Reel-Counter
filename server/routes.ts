@@ -1229,6 +1229,22 @@ export async function registerRoutes(
       const cacheEntry = { results: allResults };
       labelResultsCache.set(photoId, cacheEntry);
 
+      try {
+        const scanResultRows = allResults.map((r) => ({
+          sessionId: photo.sessionId,
+          photoId,
+          pinId: r.pinId,
+          pinLabel: r.pinLabel,
+          rawText: r.rawText,
+          readable: r.readable,
+          scannedBy: req.user?.claims?.sub || null,
+        }));
+        await storage.upsertScanResults(scanResultRows);
+        broadcastToSession(photo.sessionId, { type: "sync", entity: "scan_results", sessionId: photo.sessionId });
+      } catch (e) {
+        console.error("[analyze-labels] Failed to persist scan results:", e);
+      }
+
       res.json(cacheEntry);
     } catch (error) {
       console.error("Error analyzing labels:", error);
@@ -1251,6 +1267,32 @@ export async function registerRoutes(
       res.json({ results: null });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch label cache" });
+    }
+  });
+
+  app.get("/api/sessions/:id/scan-results", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const results = await storage.getSessionScanResults(sessionId);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch scan results" });
+    }
+  });
+
+  app.delete("/api/sessions/:id/scan-results", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "No permission" });
+      await storage.deleteSessionScanResults(sessionId);
+      broadcastToSession(sessionId, { type: "sync", entity: "scan_results", sessionId });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete scan results" });
     }
   });
 
