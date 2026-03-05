@@ -211,7 +211,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     data-testid={`button-resolve-${pin.id}`}
                     title="Mark as resolved"
                   >
-                    <Pencil className="h-5 w-5 mr-1.5" />
+                    <Check className="h-5 w-5 mr-1.5" />
                     Un-Flag
                   </Button>
                 </div>
@@ -293,7 +293,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     title="Un-Flag"
                     aria-label="Un-Flag"
                   >
-                    <Pencil className="h-7 w-7" />
+                    <Check className="h-7 w-7" />
                   </Button>
                 </div>
               </div>
