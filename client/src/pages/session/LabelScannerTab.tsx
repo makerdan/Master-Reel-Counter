@@ -41,31 +41,14 @@ function saveZoomLevel(sessionId: number, pinId: number, zoom: number) {
   } catch {}
 }
 
-function saveGlobalZoom(sessionId: number, zoom: number) {
-  try {
-    localStorage.setItem(`scanner-global-zoom-${sessionId}`, String(zoom));
-  } catch {}
-}
 
-function loadGlobalZoom(sessionId: number): number {
-  try {
-    const v = localStorage.getItem(`scanner-global-zoom-${sessionId}`);
-    return v ? parseFloat(v) : ZOOM_DEFAULT;
-  } catch { return ZOOM_DEFAULT; }
-}
-
-function zoomLabel(fraction: number): string {
-  const pct = fraction * 100;
-  return pct < 1 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
-}
-
-function parseSortKey(catalog: string): { type: string; size: number; color: string; footage: number } {
+function parseSortKey(catalog: string): { type: string; color: string; size: number; footage: number } {
   const s = (catalog || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const m = s.match(/^([A-Z]+?)(\d+)([A-Z]{2})(\d+)$/);
-  if (m) return { type: m[1], size: parseInt(m[2]), color: m[3], footage: parseInt(m[4]) };
+  if (m) return { type: m[1], color: m[3], size: parseInt(m[2]), footage: parseInt(m[4]) };
   const m2 = s.match(/^([A-Z]+?)(\d+)$/);
-  if (m2) return { type: m2[1], size: parseInt(m2[2]), color: "", footage: 0 };
-  return { type: s || "ZZZZ", size: 99999, color: "ZZ", footage: 99999 };
+  if (m2) return { type: m2[1], color: "", size: parseInt(m2[2]), footage: 0 };
+  return { type: s || "ZZZZ", color: "ZZ", size: 99999, footage: 99999 };
 }
 
 function getResultsStorageKey(sessionId: number) {
@@ -304,7 +287,6 @@ export default function LabelScannerTab({
   const { toast } = useToast();
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
   const lastInitialPhotoIdRef = useRef(initialPhotoId);
-  const [globalZoom, setGlobalZoom] = useState(() => loadGlobalZoom(sessionId));
   const [cards, setCards] = useState<PinCard[]>([]);
   const [phase, setPhase] = useState<"preview" | "results">("preview");
   const [analyzing, setAnalyzing] = useState(false);
@@ -624,16 +606,6 @@ export default function LabelScannerTab({
     );
   };
 
-  const applyGlobalZoom = (zoom: number) => {
-    setGlobalZoom(zoom);
-    saveGlobalZoom(sessionId, zoom);
-    setCards((prev) => {
-      const updated = prev.map((c) => ({ ...c, zoomLevel: zoom, panX: 0, panY: 0 }));
-      updated.forEach((c) => saveZoomLevel(sessionId, c.pin.id, zoom));
-      return updated;
-    });
-  };
-
   const includedCards = cards.filter((c) => c.included);
 
   const toggleFlag = useCallback(async (pinId: number) => {
@@ -654,16 +626,40 @@ export default function LabelScannerTab({
   }, [cards, sessionId]);
 
   function sortCardsByCatalog(cardsToSort: PinCard[]): PinCard[] {
+    const freq = new Map<string, number>();
+    for (const c of cardsToSort) {
+      if (c.result && c.editCatalog) {
+        const key = c.editCatalog.toUpperCase().trim();
+        freq.set(key, (freq.get(key) || 0) + 1);
+      }
+    }
+
+    const photoUserMap = new Map(photos.map((p) => [p.id, p.userId]));
+
     return [...cardsToSort].sort((a, b) => {
+      const flagA = !!a.pin.flagged;
+      const flagB = !!b.pin.flagged;
+      if (flagA !== flagB) return flagA ? 1 : -1;
+      if (flagA && flagB) {
+        const userA = photoUserMap.get(a.pin.photoId) || "";
+        const userB = photoUserMap.get(b.pin.photoId) || "";
+        if (userA !== userB) return userA.localeCompare(userB);
+      }
+
       const hasA = !!(a.result && a.editCatalog);
       const hasB = !!(b.result && b.editCatalog);
       if (hasA !== hasB) return hasA ? -1 : 1;
       if (!hasA) return 0;
+
+      const freqA = freq.get(a.editCatalog.toUpperCase().trim()) || 0;
+      const freqB = freq.get(b.editCatalog.toUpperCase().trim()) || 0;
+      if (freqA !== freqB) return freqB - freqA;
+
       const ka = parseSortKey(a.editCatalog);
       const kb = parseSortKey(b.editCatalog);
       if (ka.type !== kb.type) return ka.type.localeCompare(kb.type);
-      if (ka.size !== kb.size) return ka.size - kb.size;
       if (ka.color !== kb.color) return ka.color.localeCompare(kb.color);
+      if (ka.size !== kb.size) return ka.size - kb.size;
       return ka.footage - kb.footage;
     });
   }
@@ -893,25 +889,27 @@ export default function LabelScannerTab({
     <div className="flex items-center gap-2 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(18_60%_30%/0.2)]">
       <ScanLine className="h-5 w-5 text-[hsl(18_85%_55%)]" />
       <span className="font-semibold text-white text-sm">AI Scanner</span>
-      <Select
-        value={currentPhotoId ? String(currentPhotoId) : ""}
-        onValueChange={(v) => {
-          setSelectedPhotoId(parseInt(v));
-          setPhase("preview");
-          setCards([]);
-        }}
-      >
-        <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
-          <SelectValue placeholder="Select a photo..." />
-        </SelectTrigger>
-        <SelectContent>
-          {availablePhotos.map((p, idx) => (
-            <SelectItem key={p.id} value={String(p.id)}>
-              Photo {idx + 1}{p.aisle ? ` — ${p.aisle}` : ""}{p.section ? ` / ${p.section}` : ""}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {!batchMode && (
+        <Select
+          value={currentPhotoId ? String(currentPhotoId) : ""}
+          onValueChange={(v) => {
+            setSelectedPhotoId(parseInt(v));
+            setPhase("preview");
+            setCards([]);
+          }}
+        >
+          <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
+            <SelectValue placeholder="Select a photo..." />
+          </SelectTrigger>
+          <SelectContent>
+            {availablePhotos.map((p, idx) => (
+              <SelectItem key={p.id} value={String(p.id)}>
+                Photo {idx + 1}{p.aisle ? ` — ${p.aisle}` : ""}{p.section ? ` / ${p.section}` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 
@@ -1001,25 +999,27 @@ export default function LabelScannerTab({
             <span className="font-semibold text-white text-sm">
               AI Scanner
             </span>
-            <Select
-              value={currentPhotoId ? String(currentPhotoId) : ""}
-              onValueChange={(v) => {
-                setSelectedPhotoId(parseInt(v));
-                setPhase("preview");
-                setCards([]);
-              }}
-            >
-              <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availablePhotos.map((p, idx) => (
-                  <SelectItem key={p.id} value={String(p.id)}>
-                    Photo {idx + 1}{p.aisle ? ` — ${p.aisle}` : ""}{p.section ? ` / ${p.section}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!batchMode && (
+              <Select
+                value={currentPhotoId ? String(currentPhotoId) : ""}
+                onValueChange={(v) => {
+                  setSelectedPhotoId(parseInt(v));
+                  setPhase("preview");
+                  setCards([]);
+                }}
+              >
+                <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availablePhotos.map((p, idx) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      Photo {idx + 1}{p.aisle ? ` — ${p.aisle}` : ""}{p.section ? ` / ${p.section}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Badge variant="outline" className="text-xs border-[hsl(18_60%_30%/0.4)] text-white/70">
               {effectivePins.length} active pin{effectivePins.length !== 1 ? "s" : ""}
             </Badge>
@@ -1029,35 +1029,19 @@ export default function LabelScannerTab({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 min-w-[160px]">
-              <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0 cursor-pointer" onClick={() => applyGlobalZoom(Math.min(ZOOM_MAX, globalZoom + ZOOM_CLICK_STEP))} data-testid="btn-global-zoom-out" />
-              <Slider
-                value={[ZOOM_MAX - globalZoom + ZOOM_MIN]}
-                min={ZOOM_MIN}
-                max={ZOOM_MAX}
-                step={ZOOM_STEP}
-                onValueChange={([v]) => applyGlobalZoom(ZOOM_MAX - v + ZOOM_MIN)}
-                className="flex-1"
-                data-testid="slider-global-zoom"
-              />
-              <ZoomIn className="h-3.5 w-3.5 text-white/40 flex-shrink-0 cursor-pointer" onClick={() => applyGlobalZoom(Math.max(ZOOM_MIN, globalZoom - ZOOM_CLICK_STEP))} data-testid="btn-global-zoom-in" />
-              <span className="text-[10px] font-mono text-white/50 min-w-[32px] text-right">{zoomLabel(globalZoom)}</span>
-            </div>
-            {nextPhoto && (
-              <Button
-                size="sm"
-                onClick={advanceToNextPhoto}
-                className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
-                data-testid="btn-next-photo"
-              >
-                <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                <span className="text-xs font-semibold">Next Photo ({availablePhotos.length - currentPhotoIndex - 1})</span>
-              </Button>
-            )}
-          </div>
+          {!batchMode && nextPhoto && (
+            <Button
+              size="sm"
+              onClick={advanceToNextPhoto}
+              className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
+              data-testid="btn-next-photo"
+            >
+              <AlertCircle className="h-3.5 w-3.5 mr-1" />
+              <span className="text-xs font-semibold">Next Photo ({availablePhotos.length - currentPhotoIndex - 1})</span>
+            </Button>
+          )}
         </div>
-        {photo && (photo.aisle || photo.section) && (
+        {!batchMode && photo && (photo.aisle || photo.section) && (
           <div className="flex items-center gap-3 pl-7" data-testid="text-aisle-section">
             {photo.aisle && (
               <span className="text-base font-bold text-[hsl(18_85%_55%)] font-mono" data-testid="text-aisle">
@@ -1272,6 +1256,7 @@ export default function LabelScannerTab({
                     <Input
                       value={card.editVendor}
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
+                      maxLength={3}
                       className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-${card.pin.id}`}
@@ -1301,6 +1286,7 @@ export default function LabelScannerTab({
                     <Input
                       value={card.editVendor}
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
+                      maxLength={3}
                       className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-manual-${card.pin.id}`}
