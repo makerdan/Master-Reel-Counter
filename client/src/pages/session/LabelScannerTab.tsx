@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight,
+  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight, Grid3X3, List,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -245,6 +245,7 @@ export default function LabelScannerTab({
   const [cards, setCards] = useState<PinCard[]>([]);
   const [phase, setPhase] = useState<"preview" | "results">("preview");
   const [analyzing, setAnalyzing] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
 
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
@@ -831,6 +832,18 @@ export default function LabelScannerTab({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {phase === "preview" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setBatchMode((v) => !v)}
+                className={`h-7 w-7 p-0 ${batchMode ? "bg-[hsl(18_60%_30%/0.4)] text-white" : "text-white/40 hover:text-white/70"}`}
+                title={batchMode ? "Switch to detail view" : "Switch to batch view (10 cards)"}
+                data-testid="btn-toggle-batch-mode"
+              >
+                {batchMode ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
+              </Button>
+            )}
             <div className="flex items-center gap-2 min-w-[160px]">
               <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0 cursor-pointer" onClick={() => applyGlobalZoom(Math.min(ZOOM_MAX, globalZoom + ZOOM_CLICK_STEP))} data-testid="btn-global-zoom-out" />
               <Slider
@@ -884,16 +897,27 @@ export default function LabelScannerTab({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {cards.map((card) => {
+      {batchMode && phase === "preview" && cards.length > 10 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(25_12%_20%)] border border-[hsl(18_60%_30%/0.2)] rounded text-white/60 text-xs" data-testid="batch-overflow-note">
+          Showing first 10 of {cards.length} cards in batch view.
+        </div>
+      )}
+
+      <div className={`grid gap-3 ${
+        batchMode && phase === "preview"
+          ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      }`}>
+        {(batchMode && phase === "preview" ? cards.slice(0, 10) : cards).map((card) => {
           const hasFilled = !!(card.pin.wireDetails && card.pin.footage);
           const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
           const cardPhotoObj = isFromOtherPhoto ? photos.find((p) => p.id === card.pin.photoId) : photo;
           const cardPhotoUrl = isFromOtherPhoto ? getPhotoUrl(cardPhotoObj) : photoUrl;
+          const isBatch = batchMode && phase === "preview";
           return (
             <div
               key={card.pin.id}
-              className={`rounded-lg border p-3 space-y-2 transition-colors overflow-hidden ${
+              className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors overflow-hidden ${
                 card.included
                   ? "bg-[hsl(25_12%_16%)] border-[hsl(18_60%_30%/0.3)]"
                   : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)] opacity-60"
@@ -901,26 +925,26 @@ export default function LabelScannerTab({
               data-testid={`card-pin-${card.pin.id}`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <Checkbox
                     checked={card.included}
                     onCheckedChange={(v) => setCardIncluded(card.pin.id, !!v)}
                     data-testid={`checkbox-pin-${card.pin.id}`}
                   />
-                  <span className="font-mono text-sm font-bold text-white">
+                  <span className={`font-mono font-bold text-white ${isBatch ? "text-xs" : "text-sm"}`}>
                     {card.pin.label || `#${card.pin.id}`}
                   </span>
-                  {card.isDraft && (
+                  {!isBatch && card.isDraft && (
                     <Badge className="text-[10px] bg-blue-900/50 text-blue-300 border-blue-700/40" data-testid={`badge-draft-${card.pin.id}`}>
                       Draft
                     </Badge>
                   )}
-                  {hasFilled && !card.isDraft && (
+                  {!isBatch && hasFilled && !card.isDraft && (
                     <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-filled-${card.pin.id}`}>
                       Already filled
                     </Badge>
                   )}
-                  {isFromOtherPhoto && cardPhotoObj && (
+                  {!isBatch && isFromOtherPhoto && cardPhotoObj && (
                     <Badge className="text-[10px] bg-purple-900/50 text-purple-300 border-purple-700/40" data-testid={`badge-pooled-${card.pin.id}`}>
                       {cardPhotoObj.aisle || ""}{cardPhotoObj.section ? ` / ${cardPhotoObj.section}` : ""}
                     </Badge>
@@ -929,7 +953,7 @@ export default function LabelScannerTab({
               </div>
 
               {cardPhotoUrl && (
-                <div className="space-y-1.5">
+                <div className={isBatch ? "space-y-1" : "space-y-1.5"}>
                   <div className="flex justify-center">
                     <CropCanvas
                       photoUrl={cardPhotoUrl}
@@ -939,11 +963,11 @@ export default function LabelScannerTab({
                       panX={card.panX}
                       panY={card.panY}
                       onPan={(px, py) => setCardPan(card.pin.id, px, py)}
-                      size={180}
+                      size={isBatch ? 200 : 180}
                     />
                   </div>
                   <div className="flex items-center gap-1.5 px-1">
-                    <ZoomOut className="h-6 w-6 text-white/30 flex-shrink-0 cursor-pointer" onClick={() => setCardZoom(card.pin.id, Math.min(ZOOM_MAX, card.zoomLevel + ZOOM_CLICK_STEP))} data-testid={`btn-zoom-out-${card.pin.id}`} />
+                    <ZoomOut className={`${isBatch ? "h-4 w-4" : "h-6 w-6"} text-white/30 flex-shrink-0 cursor-pointer`} onClick={() => setCardZoom(card.pin.id, Math.min(ZOOM_MAX, card.zoomLevel + ZOOM_CLICK_STEP))} data-testid={`btn-zoom-out-${card.pin.id}`} />
                     <Slider
                       value={[ZOOM_MAX - card.zoomLevel + ZOOM_MIN]}
                       min={ZOOM_MIN}
@@ -953,13 +977,22 @@ export default function LabelScannerTab({
                       className="flex-1"
                       data-testid={`slider-zoom-${card.pin.id}`}
                     />
-                    <ZoomIn className="h-6 w-6 text-white/30 flex-shrink-0 cursor-pointer" onClick={() => setCardZoom(card.pin.id, Math.max(ZOOM_MIN, card.zoomLevel - ZOOM_CLICK_STEP))} data-testid={`btn-zoom-in-${card.pin.id}`} />
+                    <ZoomIn className={`${isBatch ? "h-4 w-4" : "h-6 w-6"} text-white/30 flex-shrink-0 cursor-pointer`} onClick={() => setCardZoom(card.pin.id, Math.max(ZOOM_MIN, card.zoomLevel - ZOOM_CLICK_STEP))} data-testid={`btn-zoom-in-${card.pin.id}`} />
                   </div>
                 </div>
               )}
 
               {card.result && phase === "results" && (
                 <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                  <div className="rounded bg-black/30 px-2 py-1" data-testid={`raw-text-${card.pin.id}`}>
+                    <span className="text-[10px] text-white/30 uppercase tracking-wider" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AI Raw</span>
+                    <p
+                      className="text-[11px] text-white/50 break-words whitespace-pre-wrap"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {card.result.rawText ? card.result.rawText : <em className="text-white/30">unreadable</em>}
+                    </p>
+                  </div>
                   {card.matchResult && card.matchResult.confidence !== "none" ? (
                     <div className={`rounded-md border px-2 py-1 ${
                       card.matchResult.confidence === "high"
