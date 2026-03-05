@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -23,6 +23,8 @@ interface FlaggedPin {
   photoFilename?: string;
   photoAisle?: string | null;
   photoSection?: string | null;
+  hasDetailPhoto?: boolean;
+  hasNotes?: boolean;
 }
 
 interface FlaggedReelsProps {
@@ -160,6 +162,15 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                         {pin.wireDetails}
                       </Badge>
                     )}
+                    {(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails) ? (
+                      <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-addressed-${pin.id}`}>
+                        Addressed
+                      </Badge>
+                    ) : (
+                      <Badge className="text-[10px] bg-amber-900/50 text-amber-300 border-amber-700/40" data-testid={`badge-needs-attention-${pin.id}`}>
+                        Needs Attention
+                      </Badge>
+                    )}
                   </div>
                   {(pin.photoAisle || pin.photoSection) && (
                     <div className="flex gap-2 text-xs text-muted-foreground mb-0.5" data-testid={`text-location-${pin.id}`}>
@@ -179,28 +190,28 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     </p>
                   )}
                 </div>
-                <div className="flex flex-col gap-1.5 shrink-0">
+                <div className="flex flex-col gap-3 shrink-0">
                   {onReshoot && (
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="lg"
                       onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
                       data-testid={`button-reshoot-${pin.id}`}
                       title="Take a detail photo in Mobile Flow"
                     >
-                      <Camera className="h-3.5 w-3.5 mr-1" />
+                      <Camera className="h-5 w-5 mr-1.5" />
                       Re-shoot
                     </Button>
                   )}
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="lg"
                     onClick={() => unflagMutation.mutate(pin.id)}
                     disabled={unflagMutation.isPending}
                     data-testid={`button-resolve-${pin.id}`}
                     title="Mark as resolved"
                   >
-                    <Check className="h-3.5 w-3.5 mr-1" />
+                    <Pencil className="h-5 w-5 mr-1.5" />
                     Un-Flag
                   </Button>
                 </div>
@@ -215,6 +226,15 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   {pin.wireDetails && (
                     <Badge variant="outline" className="text-xs" data-testid={`badge-wire-mobile-${pin.id}`}>
                       {pin.wireDetails}
+                    </Badge>
+                  )}
+                  {(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails) ? (
+                    <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-addressed-mobile-${pin.id}`}>
+                      Addressed
+                    </Badge>
+                  ) : (
+                    <Badge className="text-[10px] bg-amber-900/50 text-amber-300 border-amber-700/40" data-testid={`badge-needs-attention-mobile-${pin.id}`}>
+                      Needs Attention
                     </Badge>
                   )}
                 </div>
@@ -251,31 +271,29 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   <span>{pin.reelCount} Reel{pin.reelCount !== 1 ? "s" : ""}</span>
                   <span>{[pin.vendorCode, pin.footage ? `${pin.footage.toLocaleString()} ft` : ""].filter(Boolean).join(", ")}</span>
                 </div>
-                <div className="flex items-center justify-center gap-3 w-full">
+                <div className="flex items-center justify-center gap-10 w-full py-2">
                   {onReshoot && (
                     <Button
                       variant="ghost"
-                      size="icon"
-                      className="rounded-full border border-white/80 ring-1 ring-white/30"
+                      className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
                       onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
                       data-testid={`button-reshoot-mobile-${pin.id}`}
                       title="Re-shoot"
                       aria-label="Re-shoot"
                     >
-                      <Camera className="h-4 w-4" />
+                      <Camera className="h-7 w-7" />
                     </Button>
                   )}
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="rounded-full border border-white/80 ring-1 ring-white/30"
+                    className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
                     onClick={() => unflagMutation.mutate(pin.id)}
                     disabled={unflagMutation.isPending}
                     data-testid={`button-resolve-mobile-${pin.id}`}
                     title="Un-Flag"
                     aria-label="Un-Flag"
                   >
-                    <Check className="h-4 w-4" />
+                    <Pencil className="h-7 w-7" />
                   </Button>
                 </div>
               </div>

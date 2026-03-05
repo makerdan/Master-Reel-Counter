@@ -963,6 +963,11 @@ export async function registerRoutes(
       const flaggedPins = await storage.getSessionFlaggedPins(sessionId);
       const sessionPhotos = await storage.getSessionPhotos(sessionId);
       const photoMap = new Map(sessionPhotos.map(p => [p.id, p]));
+      const detailParentIds = new Set(
+        sessionPhotos.filter(p => p.isDetailShot && p.parentPhotoId).map(p => p.parentPhotoId!)
+      );
+      const sessionEntries = await storage.getSessionEntries(sessionId);
+      const entryMap = new Map(sessionEntries.map(e => [e.id, e]));
       const enriched = flaggedPins.map(pin => {
         const photo = photoMap.get(pin.photoId);
         let photoUrl: string | null = null;
@@ -970,12 +975,15 @@ export async function registerRoutes(
           const key = photo.objectStorageKey;
           photoUrl = key.startsWith("/uploads/") ? key : key.startsWith("/objects/") ? key : `/uploads/${key}`;
         }
+        const linkedEntry = pin.entryId ? entryMap.get(pin.entryId) : null;
         return {
           ...pin,
           photoUrl,
           photoFilename: photo?.originalFilename || null,
           photoAisle: photo?.aisle || null,
           photoSection: photo?.section || null,
+          hasDetailPhoto: detailParentIds.has(pin.photoId),
+          hasNotes: !!(linkedEntry?.notes),
         };
       });
       res.json(enriched);
