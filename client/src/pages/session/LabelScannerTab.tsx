@@ -373,20 +373,50 @@ export default function LabelScannerTab({
     return result;
   }, [isReceiving, activePinsForPhoto, availablePhotos, currentPhotoId, allSessionPins]);
 
+  const allSessionActivePins = useMemo(() => {
+    const byPhoto = new Map<number, Pin[]>();
+    for (const pin of allSessionPins) {
+      if (!byPhoto.has(pin.photoId)) byPhoto.set(pin.photoId, []);
+      byPhoto.get(pin.photoId)!.push(pin);
+    }
+    const result: Pin[] = [];
+    for (const [, photoPins] of byPhoto) {
+      const committedKeys = new Set(
+        photoPins.filter((p) => p.entryId).map((p) => `${p.xPercent.toFixed(5)}_${p.yPercent.toFixed(5)}_${p.label}`)
+      );
+      for (const pin of photoPins) {
+        if (pin.entryId) {
+          if (!pin.wireDetails || pin.footage == null) {
+            result.push(pin);
+          }
+        } else {
+          const key = `${pin.xPercent.toFixed(5)}_${pin.yPercent.toFixed(5)}_${pin.label}`;
+          if (!committedKeys.has(key)) {
+            result.push(pin);
+          }
+        }
+      }
+    }
+    return result;
+  }, [allSessionPins]);
+
+  const effectivePins = batchMode
+    ? allSessionActivePins
+    : isReceiving ? pooledPins : activePinsForPhoto;
+
   useEffect(() => {
     if (photoUrl) getOrLoadImage(photoUrl);
-    if (isReceiving && pooledPins.length > 0) {
-      const pooledPhotoIds = new Set(pooledPins.map((p) => p.photoId));
-      pooledPhotoIds.delete(currentPhotoId!);
-      for (const pid of pooledPhotoIds) {
+    const crossPhotoPins = batchMode ? allSessionActivePins : (isReceiving && pooledPins.length > 0 ? pooledPins : []);
+    if (crossPhotoPins.length > 0) {
+      const otherPhotoIds = new Set(crossPhotoPins.map((p) => p.photoId));
+      otherPhotoIds.delete(currentPhotoId!);
+      for (const pid of otherPhotoIds) {
         const p = photos.find((ph) => ph.id === pid);
         const url = getPhotoUrl(p);
         if (url) getOrLoadImage(url);
       }
     }
-  }, [photoUrl, isReceiving, pooledPins, currentPhotoId, photos, getPhotoUrl]);
-
-  const effectivePins = isReceiving ? pooledPins : activePinsForPhoto;
+  }, [photoUrl, batchMode, isReceiving, pooledPins, allSessionActivePins, currentPhotoId, photos, getPhotoUrl]);
 
   useEffect(() => {
     if (!effectivePins.length) {
@@ -418,7 +448,7 @@ export default function LabelScannerTab({
         };
       });
     });
-  }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving]);
+  }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving, batchMode]);
 
   const hasCachedResults = !!(cachedResults?.results);
 
@@ -487,7 +517,7 @@ export default function LabelScannerTab({
   const includedCards = cards.filter((c) => c.included);
 
   async function handleAnalyze() {
-    if (!currentPhotoId || !includedCards.length) return;
+    if ((!currentPhotoId && !batchMode) || !includedCards.length) return;
     setAnalyzing(true);
     try {
       const byPhoto = new Map<number, typeof includedCards>();
@@ -729,7 +759,7 @@ export default function LabelScannerTab({
     );
   }
 
-  if (!photo || !currentPhotoId) {
+  if (!batchMode && (!photo || !currentPhotoId)) {
     return (
       <div className="space-y-4" data-testid="scanner-no-photo">
         {photoSelector}
@@ -741,7 +771,7 @@ export default function LabelScannerTab({
     );
   }
 
-  if (pinsLoading) {
+  if (!batchMode && pinsLoading) {
     return (
       <div className="space-y-4" data-testid="scanner-loading">
         {photoSelector}
@@ -897,9 +927,10 @@ export default function LabelScannerTab({
         </div>
       )}
 
-      {batchMode && phase === "preview" && cards.length > 10 && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(25_12%_20%)] border border-[hsl(18_60%_30%/0.2)] rounded text-white/60 text-xs" data-testid="batch-overflow-note">
-          Showing first 10 of {cards.length} cards in batch view.
+      {batchMode && phase === "preview" && cards.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(25_12%_20%)] border border-[hsl(18_60%_30%/0.2)] rounded text-white/60 text-xs" data-testid="batch-summary-note">
+          <Grid3X3 className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>{cards.length} pin{cards.length !== 1 ? "s" : ""} across {new Set(cards.map((c) => c.pin.photoId)).size} photo{new Set(cards.map((c) => c.pin.photoId)).size !== 1 ? "s" : ""}</span>
         </div>
       )}
 
@@ -908,11 +939,12 @@ export default function LabelScannerTab({
           ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
           : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
       }`}>
-        {(batchMode && phase === "preview" ? cards.slice(0, 10) : cards).map((card) => {
+        {cards.map((card) => {
           const hasFilled = !!(card.pin.wireDetails && card.pin.footage);
           const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
           const cardPhotoObj = isFromOtherPhoto ? photos.find((p) => p.id === card.pin.photoId) : photo;
-          const cardPhotoUrl = isFromOtherPhoto ? getPhotoUrl(cardPhotoObj) : photoUrl;
+          const batchPhotoObj = batchMode ? photos.find((p) => p.id === card.pin.photoId) || photo : null;
+          const cardPhotoUrl = (batchMode || isFromOtherPhoto) ? getPhotoUrl(batchPhotoObj || cardPhotoObj) : photoUrl;
           const isBatch = batchMode && phase === "preview";
           return (
             <div
@@ -947,6 +979,11 @@ export default function LabelScannerTab({
                   {!isBatch && isFromOtherPhoto && cardPhotoObj && (
                     <Badge className="text-[10px] bg-purple-900/50 text-purple-300 border-purple-700/40" data-testid={`badge-pooled-${card.pin.id}`}>
                       {cardPhotoObj.aisle || ""}{cardPhotoObj.section ? ` / ${cardPhotoObj.section}` : ""}
+                    </Badge>
+                  )}
+                  {isBatch && batchPhotoObj && (
+                    <Badge className="text-[9px] bg-[hsl(25_30%_25%)] text-white/50 border-[hsl(18_30%_30%/0.3)] py-0 px-1" data-testid={`badge-batch-source-${card.pin.id}`}>
+                      {batchPhotoObj.aisle || "?"}{batchPhotoObj.section ? `/${batchPhotoObj.section}` : ""}
                     </Badge>
                   )}
                 </div>
