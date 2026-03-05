@@ -103,21 +103,51 @@ function EntryTable({
         <div className="flex items-center gap-2 flex-wrap">
           <CardTitle className="text-sm" data-testid="text-entries-title">Table View - {entries.length} Entries</CardTitle>
           {(() => {
-            const warnings = entries.filter(e => !e.reelTag || !e.footage).length;
-            return warnings > 0 ? (
-              <span className="flex items-center gap-1 text-xs text-amber-500" data-testid="text-validation-warnings">
+            const warningEntries = entries.filter(e => !e.reelTag || !e.footage);
+            return warningEntries.length > 0 ? (
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-amber-500 hover:underline cursor-pointer"
+                onClick={() => {
+                  const affectedKeys = new Set<string>();
+                  for (const e of warningEntries) {
+                    affectedKeys.add(`${e.aisle || "—"}-${e.section || "—"}`);
+                  }
+                  const next: Record<string, boolean> = {};
+                  for (const key of sectionKeys) {
+                    next[key] = affectedKeys.has(key);
+                  }
+                  setExpandedSections(next);
+                }}
+                data-testid="btn-validation-warnings"
+              >
                 <AlertTriangle className="h-3 w-3" />
-                {warnings} warning{warnings !== 1 ? "s" : ""}
-              </span>
+                {warningEntries.length} warning{warningEntries.length !== 1 ? "s" : ""}
+              </button>
             ) : null;
           })()}
           {(() => {
-            const photoless = entries.filter(e => !pinByEntryId.has(e.id)).length;
-            return photoless > 0 ? (
-              <span className="flex items-center gap-1 text-xs text-amber-500" data-testid="text-photoless-warnings">
+            const photolessEntries = entries.filter(e => !pinByEntryId.has(e.id));
+            return photolessEntries.length > 0 ? (
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs text-amber-500 hover:underline cursor-pointer"
+                onClick={() => {
+                  const affectedKeys = new Set<string>();
+                  for (const e of photolessEntries) {
+                    affectedKeys.add(`${e.aisle || "—"}-${e.section || "—"}`);
+                  }
+                  const next: Record<string, boolean> = {};
+                  for (const key of sectionKeys) {
+                    next[key] = affectedKeys.has(key);
+                  }
+                  setExpandedSections(next);
+                }}
+                data-testid="btn-photoless-warnings"
+              >
                 <ImageOff className="h-3 w-3" />
-                {photoless} without photo
-              </span>
+                {photolessEntries.length} without photo
+              </button>
             ) : null;
           })()}
         </div>
