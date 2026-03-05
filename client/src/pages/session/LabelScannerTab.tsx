@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight, Grid3X3, List,
+  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight, Grid3X3, List, Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,68 @@ function loadGlobalZoom(sessionId: number): number {
 function zoomLabel(fraction: number): string {
   const pct = fraction * 100;
   return pct < 1 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
+}
+
+function parseSortKey(catalog: string): { type: string; size: number; color: string; footage: number } {
+  const s = (catalog || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const m = s.match(/^([A-Z]+?)(\d+)([A-Z]{2})(\d+)$/);
+  if (m) return { type: m[1], size: parseInt(m[2]), color: m[3], footage: parseInt(m[4]) };
+  const m2 = s.match(/^([A-Z]+?)(\d+)$/);
+  if (m2) return { type: m2[1], size: parseInt(m2[2]), color: "", footage: 0 };
+  return { type: s || "ZZZZ", size: 99999, color: "ZZ", footage: 99999 };
+}
+
+function getResultsStorageKey(sessionId: number) {
+  return `scanner-results-${sessionId}`;
+}
+
+interface SavedCardResult {
+  pinId: number;
+  rawText: string | null;
+  readable: boolean;
+  editCatalog: string;
+  editVendor: string;
+  editFootage: string;
+  confidence: string;
+  timestamp: number;
+}
+
+function saveAnalysisResults(sessionId: number, cards: PinCard[]) {
+  try {
+    const data: SavedCardResult[] = cards
+      .filter((c) => c.result)
+      .map((c) => ({
+        pinId: c.pin.id,
+        rawText: c.result!.rawText,
+        readable: c.result!.readable,
+        editCatalog: c.editCatalog,
+        editVendor: c.editVendor,
+        editFootage: c.editFootage,
+        confidence: c.matchResult?.confidence ?? "none",
+        timestamp: Date.now(),
+      }));
+    localStorage.setItem(getResultsStorageKey(sessionId), JSON.stringify(data));
+  } catch {}
+}
+
+function loadSavedResults(sessionId: number): SavedCardResult[] {
+  try {
+    const raw = localStorage.getItem(getResultsStorageKey(sessionId));
+    if (!raw) return [];
+    const data: SavedCardResult[] = JSON.parse(raw);
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const valid = data.filter((d) => d.timestamp > cutoff);
+    if (valid.length !== data.length) {
+      localStorage.setItem(getResultsStorageKey(sessionId), JSON.stringify(valid));
+    }
+    return valid;
+  } catch { return []; }
+}
+
+function computeSmartZoom(pinCount: number): number {
+  if (pinCount <= 3) return 0.15;
+  if (pinCount <= 6) return 0.12;
+  return 0.08;
 }
 
 interface AnalysisResult {
@@ -245,6 +307,7 @@ export default function LabelScannerTab({
   const [cards, setCards] = useState<PinCard[]>([]);
   const [phase, setPhase] = useState<"preview" | "results">("preview");
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [batchMode, setBatchMode] = useState(false);
 
   useEffect(() => {
@@ -428,25 +491,38 @@ export default function LabelScannerTab({
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
-      return effectivePins.map((pin) => {
+      const savedResults = loadSavedResults(sessionId);
+      const savedResultsMap = new Map(savedResults.map((r) => [r.pinId, r]));
+      const pinCountByPhoto = new Map<number, number>();
+      for (const p of effectivePins) {
+        pinCountByPhoto.set(p.photoId, (pinCountByPhoto.get(p.photoId) || 0) + 1);
+      }
+      const built = effectivePins.map((pin) => {
         const ex = existing.get(pin.id);
         if (ex && ex.pin.id === pin.id) {
           return { ...ex, pin, isDraft: !pin.entryId };
         }
         const savedZoom = savedZooms[String(pin.id)];
+        const smartZoom = computeSmartZoom(pinCountByPhoto.get(pin.photoId) || 1);
+        const saved = savedResultsMap.get(pin.id);
         return {
           pin,
-          zoomLevel: savedZoom ?? globalZoom,
+          zoomLevel: savedZoom ?? smartZoom,
           panX: 0,
           panY: 0,
           included: true,
           isDraft: !pin.entryId,
-          editCatalog: "",
-          editFootage: "",
-          editVendor: "",
-          catalogCode: "",
+          editCatalog: saved?.editCatalog ?? "",
+          editFootage: saved?.editFootage ?? "",
+          editVendor: saved?.editVendor ?? "",
+          catalogCode: saved?.editCatalog ?? "",
+          ...(saved ? {
+            result: { pinId: pin.id, pinLabel: pin.label || "", rawText: saved.rawText, readable: saved.readable } as AnalysisResult,
+            matchResult: saved.rawText ? matchLabelText(saved.rawText) : undefined,
+          } : {}),
         };
       });
+      return built.some((c) => c.result) ? sortCardsByCatalog(built) : built;
     });
   }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving, batchMode]);
 
@@ -457,6 +533,13 @@ export default function LabelScannerTab({
       applyResults(cachedResults.results);
     }
   }, [cachedResults]);
+
+  const cardsWithResults = cards.filter((c) => c.result).length;
+  useEffect(() => {
+    if (phase === "preview" && cards.length > 0 && cardsWithResults > 0) {
+      setPhase("results");
+    }
+  }, [cards.length, cardsWithResults, phase]);
 
   function applyResults(results: AnalysisResult[]) {
     setCards((prev) =>
@@ -516,6 +599,38 @@ export default function LabelScannerTab({
 
   const includedCards = cards.filter((c) => c.included);
 
+  const toggleFlag = useCallback(async (pinId: number) => {
+    const card = cards.find((c) => c.pin.id === pinId);
+    if (!card) return;
+    const newFlagged = !card.pin.flagged;
+    setCards((prev) =>
+      prev.map((c) => (c.pin.id === pinId ? { ...c, pin: { ...c.pin, flagged: newFlagged } } : c))
+    );
+    try {
+      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: newFlagged });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
+    } catch {
+      setCards((prev) =>
+        prev.map((c) => (c.pin.id === pinId ? { ...c, pin: { ...c.pin, flagged: !newFlagged } } : c))
+      );
+    }
+  }, [cards, sessionId]);
+
+  function sortCardsByCatalog(cardsToSort: PinCard[]): PinCard[] {
+    return [...cardsToSort].sort((a, b) => {
+      const hasA = !!(a.result && a.editCatalog);
+      const hasB = !!(b.result && b.editCatalog);
+      if (hasA !== hasB) return hasA ? -1 : 1;
+      if (!hasA) return 0;
+      const ka = parseSortKey(a.editCatalog);
+      const kb = parseSortKey(b.editCatalog);
+      if (ka.type !== kb.type) return ka.type.localeCompare(kb.type);
+      if (ka.size !== kb.size) return ka.size - kb.size;
+      if (ka.color !== kb.color) return ka.color.localeCompare(kb.color);
+      return ka.footage - kb.footage;
+    });
+  }
+
   async function handleAnalyze() {
     if ((!currentPhotoId && !batchMode) || !includedCards.length) return;
     setAnalyzing(true);
@@ -527,7 +642,11 @@ export default function LabelScannerTab({
         byPhoto.get(pid)!.push(c);
       }
 
-      const allResults: AnalysisResult[] = [];
+      const totalBatches = byPhoto.size;
+      let doneBatches = 0;
+      setAnalyzeProgress({ done: 0, total: totalBatches });
+      let totalResults = 0;
+
       for (const [photoId, photoCards] of byPhoto) {
         const pinData = photoCards.map((c) => ({
           pinId: c.pin.id,
@@ -538,16 +657,27 @@ export default function LabelScannerTab({
         }));
         const res = await apiRequest("POST", `/api/photos/${photoId}/analyze-labels`, { pins: pinData });
         const data = await res.json();
-        if (data.results) allResults.push(...data.results);
+        if (data.results) {
+          applyResults(data.results);
+          totalResults += data.results.length;
+        }
+        doneBatches++;
+        setAnalyzeProgress({ done: doneBatches, total: totalBatches });
       }
-      if (allResults.length) {
-        applyResults(allResults);
-        toast({ title: "Analysis complete", description: `Read ${allResults.length} label(s)` });
+
+      if (totalResults > 0) {
+        setCards((prev) => {
+          const sorted = sortCardsByCatalog(prev);
+          saveAnalysisResults(sessionId, sorted);
+          return sorted;
+        });
+        toast({ title: "Analysis complete", description: `Read ${totalResults} label(s)` });
       }
     } catch (error: any) {
       toast({ title: "Analysis failed", description: error.message, variant: "destructive" });
     } finally {
       setAnalyzing(false);
+      setAnalyzeProgress(null);
     }
   }
 
@@ -862,18 +992,6 @@ export default function LabelScannerTab({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {phase === "preview" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setBatchMode((v) => !v)}
-                className={`h-7 w-7 p-0 ${batchMode ? "bg-[hsl(18_60%_30%/0.4)] text-white" : "text-white/40 hover:text-white/70"}`}
-                title={batchMode ? "Switch to detail view" : "Switch to batch view (10 cards)"}
-                data-testid="btn-toggle-batch-mode"
-              >
-                {batchMode ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
-              </Button>
-            )}
             <div className="flex items-center gap-2 min-w-[160px]">
               <ZoomOut className="h-3.5 w-3.5 text-white/40 flex-shrink-0 cursor-pointer" onClick={() => applyGlobalZoom(Math.min(ZOOM_MAX, globalZoom + ZOOM_CLICK_STEP))} data-testid="btn-global-zoom-out" />
               <Slider
@@ -917,6 +1035,43 @@ export default function LabelScannerTab({
               </span>
             )}
           </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2" data-testid="batch-mode-toggle-row">
+        <div className="flex rounded-md border border-[hsl(18_60%_30%/0.3)] overflow-hidden">
+          <button
+            onClick={() => setBatchMode(false)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+              !batchMode
+                ? "bg-[hsl(18_85%_32%)] text-white"
+                : "bg-[hsl(25_12%_18%)] text-white/50 hover:text-white/70"
+            }`}
+            data-testid="btn-mode-single"
+          >
+            <List className="h-3.5 w-3.5" />
+            Single Photo
+          </button>
+          <button
+            onClick={() => setBatchMode(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+              batchMode
+                ? "bg-[hsl(18_85%_32%)] text-white"
+                : "bg-[hsl(25_12%_18%)] text-white/50 hover:text-white/70"
+            }`}
+            data-testid="btn-mode-batch"
+          >
+            <Grid3X3 className="h-3.5 w-3.5" />
+            All Photos
+            {batchMode && allSessionActivePins.length > 0 && (
+              <Badge className="text-[9px] bg-white/15 text-white/80 border-0 py-0 px-1.5 ml-0.5">{allSessionActivePins.length} pins</Badge>
+            )}
+          </button>
+        </div>
+        {phase === "results" && (
+          <Badge className="text-[10px] bg-[hsl(25_30%_20%)] text-white/50 border-[hsl(18_30%_30%/0.3)]">
+            Sorted by type / size / color
+          </Badge>
         )}
       </div>
 
@@ -966,6 +1121,18 @@ export default function LabelScannerTab({
                   <span className={`font-mono font-bold text-white ${isBatch ? "text-xs" : "text-sm"}`}>
                     {card.pin.label || `#${card.pin.id}`}
                   </span>
+                  <button
+                    onClick={() => toggleFlag(card.pin.id)}
+                    className={`p-0.5 rounded transition-colors ${
+                      card.pin.flagged
+                        ? "text-amber-400 hover:text-amber-300"
+                        : "text-white/20 hover:text-white/40"
+                    }`}
+                    title={card.pin.flagged ? "Remove flag" : "Flag for review"}
+                    data-testid={`btn-flag-${card.pin.id}`}
+                  >
+                    <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"} ${card.pin.flagged ? "fill-amber-400" : ""}`} />
+                  </button>
                   {!isBatch && card.isDraft && (
                     <Badge className="text-[10px] bg-blue-900/50 text-blue-300 border-blue-700/40" data-testid={`badge-draft-${card.pin.id}`}>
                       Draft
@@ -1119,7 +1286,9 @@ export default function LabelScannerTab({
             {analyzing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Analyzing...
+                {analyzeProgress
+                  ? `Batch ${analyzeProgress.done}/${analyzeProgress.total}...`
+                  : "Analyzing..."}
               </>
             ) : (
               <>

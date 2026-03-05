@@ -1193,7 +1193,7 @@ export async function registerRoutes(
           messages: [
             {
               role: "system",
-              content: "You are reading wire reel labels in a warehouse. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
+              content: "You are reading wire reel labels in a warehouse. The labels may be printed on curved cylindrical reel surfaces, at various angles, upside down, or partially obscured. Read all visible text regardless of orientation. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
             },
             {
               role: "user",
