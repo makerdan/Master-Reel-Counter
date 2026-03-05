@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Entry, Pin } from "@shared/schema";
@@ -25,6 +27,14 @@ interface FlaggedPin {
   photoSection?: string | null;
   hasDetailPhoto?: boolean;
   hasNotes?: boolean;
+  entryNotes?: string | null;
+}
+
+interface EditingState {
+  wireDetails: string;
+  vendorCode: string;
+  footage: string;
+  notes: string;
 }
 
 interface FlaggedReelsProps {
@@ -37,6 +47,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
   const { toast } = useToast();
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editingPinId, setEditingPinId] = useState<number | null>(null);
+  const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "" });
 
   const { data: flaggedPins = [], isLoading } = useQuery<FlaggedPin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"],
@@ -56,6 +68,40 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
     },
   });
+
+  const savePinMutation = useMutation({
+    mutationFn: async ({ pinId, entryId, data }: { pinId: number; entryId: number | null; data: EditingState }) => {
+      const parsedFootage = data.footage ? Number(data.footage) : null;
+      await apiRequest("PATCH", `/api/pins/${pinId}`, {
+        wireDetails: data.wireDetails || null,
+        vendorCode: data.vendorCode || null,
+        footage: parsedFootage && Number.isFinite(parsedFootage) ? parsedFootage : null,
+      });
+      if (entryId && data.notes !== undefined) {
+        await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: data.notes || null });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      setEditingPinId(null);
+      toast({ title: "Saved", description: "Pin details updated." });
+    },
+    onError: () => {
+      toast({ title: "Save failed", variant: "destructive" });
+    },
+  });
+
+  const openEditor = useCallback((pin: FlaggedPin) => {
+    setEditingPinId(pin.id);
+    setEditState({
+      wireDetails: pin.wireDetails || "",
+      vendorCode: pin.vendorCode || "",
+      footage: pin.footage ? String(pin.footage) : "",
+      notes: pin.entryNotes || "",
+    });
+  }, []);
 
   const { data: sessionEntries = [] } = useQuery<Entry[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "entries"],
@@ -206,6 +252,16 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   <Button
                     variant="outline"
                     size="lg"
+                    onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
+                    data-testid={`button-edit-${pin.id}`}
+                    title="Edit details"
+                  >
+                    <Pencil className="h-5 w-5 mr-1.5" />
+                    {editingPinId === pin.id ? "Close" : "Edit"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
                     onClick={() => unflagMutation.mutate(pin.id)}
                     disabled={unflagMutation.isPending}
                     data-testid={`button-resolve-${pin.id}`}
@@ -216,6 +272,64 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   </Button>
                 </div>
               </div>
+              {editingPinId === pin.id && (
+                <div className="hidden sm:block border-t border-border pt-3 mt-1">
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div>
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
+                      <Input
+                        value={editState.wireDetails}
+                        onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value }))}
+                        placeholder="e.g. THHN #12 Black"
+                        data-testid={`input-wire-details-${pin.id}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
+                      <Input
+                        value={editState.vendorCode}
+                        onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.slice(0, 3) }))}
+                        placeholder="e.g. SOU"
+                        maxLength={3}
+                        data-testid={`input-vendor-code-${pin.id}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage</label>
+                      <Input
+                        type="number"
+                        value={editState.footage}
+                        onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
+                        placeholder="e.g. 1000"
+                        data-testid={`input-footage-${pin.id}`}
+                      />
+                    </div>
+                  </div>
+                  {pin.entryId && (
+                    <div className="mb-3">
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
+                      <Textarea
+                        value={editState.notes}
+                        onChange={(e) => setEditState(s => ({ ...s, notes: e.target.value }))}
+                        placeholder="Add notes about this reel..."
+                        rows={2}
+                        data-testid={`input-notes-${pin.id}`}
+                      />
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      onClick={() => savePinMutation.mutate({ pinId: pin.id, entryId: pin.entryId, data: editState })}
+                      disabled={savePinMutation.isPending}
+                      data-testid={`button-save-edit-${pin.id}`}
+                    >
+                      {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Mobile layout */}
               <div className="sm:hidden flex flex-col items-center gap-2">
@@ -287,6 +401,16 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   <Button
                     variant="ghost"
                     className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
+                    onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
+                    data-testid={`button-edit-mobile-${pin.id}`}
+                    title="Edit details"
+                    aria-label="Edit details"
+                  >
+                    <Pencil className="h-7 w-7" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
                     onClick={() => unflagMutation.mutate(pin.id)}
                     disabled={unflagMutation.isPending}
                     data-testid={`button-resolve-mobile-${pin.id}`}
@@ -296,6 +420,64 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     <Check className="h-7 w-7" />
                   </Button>
                 </div>
+                {editingPinId === pin.id && (
+                  <div className="w-full border-t border-border pt-3 mt-1 space-y-3">
+                    <div>
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
+                      <Input
+                        value={editState.wireDetails}
+                        onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value }))}
+                        placeholder="e.g. THHN #12 Black"
+                        data-testid={`input-wire-details-mobile-${pin.id}`}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
+                        <Input
+                          value={editState.vendorCode}
+                          onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.slice(0, 3) }))}
+                          placeholder="e.g. SOU"
+                          maxLength={3}
+                          data-testid={`input-vendor-code-mobile-${pin.id}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage</label>
+                        <Input
+                          type="number"
+                          value={editState.footage}
+                          onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
+                          placeholder="e.g. 1000"
+                          data-testid={`input-footage-mobile-${pin.id}`}
+                        />
+                      </div>
+                    </div>
+                    {pin.entryId && (
+                      <div>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
+                        <Textarea
+                          value={editState.notes}
+                          onChange={(e) => setEditState(s => ({ ...s, notes: e.target.value }))}
+                          placeholder="Add notes about this reel..."
+                          rows={2}
+                          data-testid={`input-notes-mobile-${pin.id}`}
+                        />
+                      </div>
+                    )}
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={() => savePinMutation.mutate({ pinId: pin.id, entryId: pin.entryId, data: editState })}
+                        disabled={savePinMutation.isPending}
+                        data-testid={`button-save-edit-mobile-${pin.id}`}
+                      >
+                        {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}

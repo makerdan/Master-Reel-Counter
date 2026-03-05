@@ -984,6 +984,7 @@ export async function registerRoutes(
           photoSection: photo?.section || null,
           hasDetailPhoto: detailParentIds.has(pin.photoId),
           hasNotes: !!(linkedEntry?.notes),
+          entryNotes: linkedEntry?.notes || null,
         };
       });
       res.json(enriched);
