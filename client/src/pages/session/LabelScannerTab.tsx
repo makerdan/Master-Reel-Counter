@@ -779,12 +779,12 @@ export default function LabelScannerTab({
     return markers;
   }
 
-  async function handleDetectMarkers() {
+  async function handleDetectMarkers(forceBatch = false) {
     if (detecting) return;
     setDetecting(true);
     setDetectProgress(null);
     try {
-      if (batchMode) {
+      if (batchMode || forceBatch) {
         const photosWithNoPins = photos.filter(p => {
           const photoPins = allSessionPins.filter(pin => pin.photoId === p.id);
           return photoPins.length === 0 && !p.isDetailShot;
@@ -1070,6 +1070,10 @@ export default function LabelScannerTab({
   );
 
   if (!availablePhotos.length) {
+    const hasPhotosWithNoPins = photos.some(p => {
+      const photoPins = allSessionPins.filter(pin => pin.photoId === p.id);
+      return photoPins.length === 0 && !p.isDetailShot;
+    });
     return (
       <div className="space-y-4" data-testid="scanner-no-photos">
         {photoSelector}
@@ -1077,6 +1081,35 @@ export default function LabelScannerTab({
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p>{photos.length > 0 ? "All photos have been fully scanned and applied." : "No photos in this session yet. Upload photos in the Section Photo tab first."}</p>
         </div>
+        {photos.length > 0 && hasPhotosWithNoPins && canEdit && (
+          <div className="flex justify-center pt-2">
+            <Button
+              onClick={() => handleDetectMarkers(true)}
+              disabled={detecting || detectionLockedByOther}
+              className="gap-2 bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"
+              data-testid="btn-detect-markers-empty"
+            >
+              {detectionLockedByOther ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Detection in progress...
+                </>
+              ) : detecting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {detectProgress
+                    ? `Photo ${detectProgress.done}/${detectProgress.total}...`
+                    : "Detecting..."}
+                </>
+              ) : (
+                <>
+                  <ScanSearch className="h-4 w-4" />
+                  Auto-Detect Pins on All Photos
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -1459,7 +1492,7 @@ export default function LabelScannerTab({
         {phase === "preview" && (
           <div className="flex items-center gap-2 flex-wrap">
             <Button
-              onClick={handleDetectMarkers}
+              onClick={() => handleDetectMarkers()}
               disabled={detecting || analyzing || detectionLockedByOther || !canEdit || (!batchMode && !currentPhotoId)}
               className="gap-2 bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"
               data-testid="btn-detect-markers"
