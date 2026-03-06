@@ -1146,6 +1146,7 @@ export async function registerRoutes(
 
   const detectionLocks = new Map<number, { userId: string; startedAt: number }>();
   const DETECTION_LOCK_TTL = 5 * 60 * 1000;
+  const detectionCompleted = new Map<number, { completedBy: string; completedAt: number }>();
 
   function acquireDetectionLock(sessionId: number, userId: string): { acquired: boolean; lockedBy?: string } {
     const existing = detectionLocks.get(sessionId);
@@ -1308,6 +1309,11 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to detect markers" });
 
+      const completed = detectionCompleted.get(photo.sessionId);
+      if (completed) {
+        return res.status(409).json({ message: "Detection already completed for this session", completedBy: completed.completedBy });
+      }
+
       const cached = markerDetectionCache.get(photoId);
       if (cached) {
         return res.json({ ...cached, cached: true });
@@ -1407,13 +1413,45 @@ export async function registerRoutes(
       const sessionId = parseInt(req.params.id);
       const access = await verifySessionAccess(sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Session not found" });
+      const completed = detectionCompleted.get(sessionId);
+      if (completed) {
+        return res.json({ locked: false, lockedBy: null, completed: true, completedBy: completed.completedBy });
+      }
       const lock = detectionLocks.get(sessionId);
       if (lock && (Date.now() - lock.startedAt) < DETECTION_LOCK_TTL) {
-        return res.json({ locked: true, lockedBy: lock.userId });
+        return res.json({ locked: true, lockedBy: lock.userId, completed: false });
       }
-      res.json({ locked: false, lockedBy: null });
+      res.json({ locked: false, lockedBy: null, completed: false });
     } catch (error) {
       res.status(500).json({ message: "Failed to check detection lock" });
+    }
+  });
+
+  app.post("/api/sessions/:id/detection-complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission" });
+      const userId = req.user.claims.sub;
+      detectionCompleted.set(sessionId, { completedBy: userId, completedAt: Date.now() });
+      releaseDetectionLock(sessionId);
+      res.json({ completed: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark detection complete" });
+    }
+  });
+
+  app.delete("/api/sessions/:id/detection-complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission" });
+      detectionCompleted.delete(sessionId);
+      res.json({ completed: false });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reset detection" });
     }
   });
 

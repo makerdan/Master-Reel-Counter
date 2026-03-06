@@ -318,6 +318,7 @@ export default function LabelScannerTab({
   const [detecting, setDetecting] = useState(false);
   const [detectProgress, setDetectProgress] = useState<{ done: number; total: number } | null>(null);
   const [detectionLockedByOther, setDetectionLockedByOther] = useState(false);
+  const [detectionCompleted, setDetectionCompleted] = useState(false);
 
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
@@ -380,7 +381,10 @@ export default function LabelScannerTab({
         const res = await fetch(`/api/sessions/${sessionId}/detection-lock`, { credentials: "include" });
         if (!res.ok || cancelled) return;
         const data = await res.json();
-        if (!cancelled) setDetectionLockedByOther(!!data.locked);
+        if (!cancelled) {
+          setDetectionLockedByOther(!!data.locked);
+          setDetectionCompleted(!!data.completed);
+        }
       } catch {}
     };
     poll();
@@ -780,7 +784,7 @@ export default function LabelScannerTab({
   }
 
   async function handleDetectMarkers(forceBatch = false) {
-    if (detecting) return;
+    if (detecting || detectionCompleted) return;
     setDetecting(true);
     setDetectProgress(null);
     try {
@@ -825,6 +829,10 @@ export default function LabelScannerTab({
           queryClient.invalidateQueries({ queryKey: ["/api/photos", String(p.id), "pins"] });
         }
         onPinDataChanged?.();
+        try {
+          await apiRequest("POST", `/api/sessions/${sessionId}/detection-complete`);
+          setDetectionCompleted(true);
+        } catch {}
         toast({ title: "Auto-detect complete", description: `Placed ${totalPinsPlaced} pin${totalPinsPlaced !== 1 ? "s" : ""} across ${photosProcessed} photo${photosProcessed !== 1 ? "s" : ""}.` });
       } else {
         if (!currentPhotoId) return;
@@ -1081,11 +1089,11 @@ export default function LabelScannerTab({
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p>{photos.length > 0 ? "All photos have been fully scanned and applied." : "No photos in this session yet. Upload photos in the Section Photo tab first."}</p>
         </div>
-        {photos.length > 0 && hasPhotosWithNoPins && canEdit && (
+        {photos.length > 0 && hasPhotosWithNoPins && canEdit && !detectionCompleted && (
           <div className="flex justify-center pt-2">
             <Button
               onClick={() => handleDetectMarkers(true)}
-              disabled={detecting || detectionLockedByOther}
+              disabled={detecting || detectionLockedByOther || detectionCompleted}
               className="gap-2 bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"
               data-testid="btn-detect-markers-empty"
             >
@@ -1493,11 +1501,16 @@ export default function LabelScannerTab({
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               onClick={() => handleDetectMarkers()}
-              disabled={detecting || analyzing || detectionLockedByOther || !canEdit || (!batchMode && !currentPhotoId)}
-              className="gap-2 bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"
+              disabled={detecting || analyzing || detectionLockedByOther || detectionCompleted || !canEdit || (!batchMode && !currentPhotoId)}
+              className={`gap-2 ${detectionCompleted ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"}`}
               data-testid="btn-detect-markers"
             >
-              {detectionLockedByOther ? (
+              {detectionCompleted ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Detection Complete
+                </>
+              ) : detectionLockedByOther ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Detection in progress...
