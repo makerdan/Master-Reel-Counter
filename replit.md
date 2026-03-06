@@ -20,7 +20,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 
 **Technical Implementations & Feature Specifications:**
 - **Session Management:** Users can create and manage counting sessions, with functionality for duplicating, moving, and organizing sessions into folders.
-- **Entry Management:** Manual entry of reel data with category autocomplete for efficient data input, including auto-calculation of total footage based on catalog data. Quick Entry panel available in the Section Photo tab for creating entries without pins (collapsible, auto-fills aisle/section from current photo).
+- **Entry Management:** Manual entry of reel data with category autocomplete for efficient data input, including auto-calculation of total footage based on catalog data. Quick Entry panel available in the Section Photo tab for creating entries without pins (collapsible, auto-fills aisle/section from current photo). Quick Entry toggle button is in the top toolbar (next to Take Photo) on both desktop and mobile.
 - **Photo Management:**
     - Photo annotation with pin placement to link entries directly to visual cues on reels.
     - Background photo uploads and an offline photo queue with IndexedDB persistence for seamless operation in varying network conditions.
@@ -43,6 +43,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
     - **Image Cache:** Module-level LRU cache (`imageCache`, max 20 entries) shares `HTMLImageElement` objects across all `CropCanvas` instances. `getOrLoadImage(url)` checks cache first, evicts oldest on overflow, and removes entries on load error. Pre-warm `useEffect` triggers on photo selection (and for pooled Receiving photos) so the image download starts before cards mount.
     - **Files:** `client/src/pages/session/LabelScannerTab.tsx` (tab UI), `client/src/lib/labelMatcher.ts` (catalog matching), `client/src/lib/wireReference.ts` (catalog + aliases), `server/lib/cropPhoto.ts` (sharp-based cropping utility)
     - **Real-Time Sync:** Scan results are persisted to the `scan_results` DB table and broadcast via WebSocket (`sync` entity `scan_results`). Other users in the same session automatically receive updated scan results through query invalidation, enabling multiple users to divide scanning work and see each other's results in real time. Client also caches to localStorage as a secondary fallback.
+    - **Auto-Detect Pins:** Batch marker detection via GPT-4o vision. Processes photos one at a time with per-photo pin saving and live query invalidation (pins appear on UI as each photo completes). Resumable — photos with existing pins are skipped, so users can quit mid-scan and resume later. Cancel button stops after the current photo finishes. Server-side session lock (5-min TTL) prevents concurrent detection by multiple users. Per-photo marker cache (localStorage + server memory) avoids re-analyzing already-detected photos.
     - **API:** `POST /api/photos/:photoId/analyze-labels`, `GET /api/photos/:photoId/label-cache`, `GET /api/sessions/:id/scan-results`, `DELETE /api/sessions/:id/scan-results`
 - **Undo/Redo:** Implemented for entry and pin modifications.
 - **Summary Statistics:** Dashboard to display key metrics and activity logs.

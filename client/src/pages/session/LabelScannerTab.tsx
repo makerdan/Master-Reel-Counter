@@ -318,7 +318,7 @@ export default function LabelScannerTab({
   const [detecting, setDetecting] = useState(false);
   const [detectProgress, setDetectProgress] = useState<{ done: number; total: number } | null>(null);
   const [detectionLockedByOther, setDetectionLockedByOther] = useState(false);
-  const [detectionCompleted, setDetectionCompleted] = useState(false);
+  const cancelDetectionRef = useRef(false);
 
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
@@ -383,7 +383,6 @@ export default function LabelScannerTab({
         const data = await res.json();
         if (!cancelled) {
           setDetectionLockedByOther(!!data.locked);
-          setDetectionCompleted(!!data.completed);
         }
       } catch {}
     };
@@ -784,7 +783,8 @@ export default function LabelScannerTab({
   }
 
   async function handleDetectMarkers(forceBatch = false) {
-    if (detecting || detectionCompleted) return;
+    if (detecting) return;
+    cancelDetectionRef.current = false;
     setDetecting(true);
     setDetectProgress(null);
     try {
@@ -800,7 +800,12 @@ export default function LabelScannerTab({
         setDetectProgress({ done: 0, total: photosWithNoPins.length });
         let totalPinsPlaced = 0;
         let photosProcessed = 0;
+        let wasCancelled = false;
         for (const p of photosWithNoPins) {
+          if (cancelDetectionRef.current) {
+            wasCancelled = true;
+            break;
+          }
           let markers: Array<{ x: number; y: number }>;
           try {
             markers = await fetchMarkers(p.id);
@@ -823,17 +828,15 @@ export default function LabelScannerTab({
           }
           photosProcessed++;
           setDetectProgress({ done: photosProcessed, total: photosWithNoPins.length });
-        }
-        queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
-        for (const p of photosWithNoPins) {
           queryClient.invalidateQueries({ queryKey: ["/api/photos", String(p.id), "pins"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
+          onPinDataChanged?.();
         }
-        onPinDataChanged?.();
-        try {
-          await apiRequest("POST", `/api/sessions/${sessionId}/detection-complete`);
-          setDetectionCompleted(true);
-        } catch {}
-        toast({ title: "Auto-detect complete", description: `Placed ${totalPinsPlaced} pin${totalPinsPlaced !== 1 ? "s" : ""} across ${photosProcessed} photo${photosProcessed !== 1 ? "s" : ""}.` });
+        if (wasCancelled) {
+          toast({ title: "Detection paused", description: `Processed ${photosProcessed} of ${photosWithNoPins.length} photos (${totalPinsPlaced} pin${totalPinsPlaced !== 1 ? "s" : ""} placed). Resume anytime to continue.` });
+        } else {
+          toast({ title: "Auto-detect complete", description: `Placed ${totalPinsPlaced} pin${totalPinsPlaced !== 1 ? "s" : ""} across ${photosProcessed} photo${photosProcessed !== 1 ? "s" : ""}.` });
+        }
       } else {
         if (!currentPhotoId) return;
         const existingPins = allSessionPins.filter(pin => pin.photoId === currentPhotoId);
@@ -1089,11 +1092,11 @@ export default function LabelScannerTab({
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p>{photos.length > 0 ? "All photos have been fully scanned and applied." : "No photos in this session yet. Upload photos in the Section Photo tab first."}</p>
         </div>
-        {photos.length > 0 && hasPhotosWithNoPins && canEdit && !detectionCompleted && (
+        {photos.length > 0 && hasPhotosWithNoPins && canEdit && (
           <div className="flex justify-center pt-2">
             <Button
               onClick={() => handleDetectMarkers(true)}
-              disabled={detecting || detectionLockedByOther || detectionCompleted}
+              disabled={detecting || detectionLockedByOther}
               className="gap-2 bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"
               data-testid="btn-detect-markers-empty"
             >
@@ -1501,16 +1504,11 @@ export default function LabelScannerTab({
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               onClick={() => handleDetectMarkers()}
-              disabled={detecting || analyzing || detectionLockedByOther || detectionCompleted || !canEdit || (!batchMode && !currentPhotoId)}
-              className={`gap-2 ${detectionCompleted ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"}`}
+              disabled={detecting || analyzing || detectionLockedByOther || !canEdit || (!batchMode && !currentPhotoId)}
+              className="gap-2 bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"
               data-testid="btn-detect-markers"
             >
-              {detectionCompleted ? (
-                <>
-                  <Check className="h-4 w-4" />
-                  Detection Complete
-                </>
-              ) : detectionLockedByOther ? (
+              {detectionLockedByOther ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Detection in progress...
@@ -1529,6 +1527,17 @@ export default function LabelScannerTab({
                 </>
               )}
             </Button>
+            {detecting && (
+              <Button
+                onClick={() => { cancelDetectionRef.current = true; }}
+                variant="outline"
+                className="gap-2 border-red-400 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-950"
+                data-testid="btn-cancel-detection"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+            )}
             <Button
               onClick={handleAnalyze}
               disabled={analyzing || !includedCards.length || !canEdit}

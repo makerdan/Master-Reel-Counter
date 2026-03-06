@@ -1294,6 +1294,16 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4 mr-1" />}
               Take Photo
             </Button>
+            <Button
+              variant="outline"
+              className="border-[hsl(200_50%_40%/0.5)] text-[hsl(200_60%_50%)] dark:text-[hsl(200_60%_70%)] dark:border-[hsl(200_50%_40%/0.4)]"
+              onClick={() => setShowQuickEntry(prev => !prev)}
+              data-testid="button-quick-entry-toggle"
+            >
+              <ListPlus className="h-4 w-4 mr-1" />
+              Quick Entry
+              {showQuickEntry ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
+            </Button>
           </div>
         </div>
         <div className="flex sm:hidden items-center justify-center gap-4">
@@ -1314,6 +1324,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             title="Take Photo"
           >
             {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="outline"
+            className="border-[hsl(200_50%_40%/0.5)] text-[hsl(200_60%_50%)] dark:text-[hsl(200_60%_70%)] dark:border-[hsl(200_50%_40%/0.4)]"
+            onClick={() => setShowQuickEntry(prev => !prev)}
+            data-testid="button-quick-entry-toggle-mobile"
+            title="Quick Entry"
+          >
+            <ListPlus className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -2256,16 +2275,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   data-testid="button-clear-pins"
                 >
                   Clear All
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-[hsl(200_50%_40%/0.5)] text-[hsl(200_60%_50%)] dark:text-[hsl(200_60%_70%)] dark:border-[hsl(200_50%_40%/0.4)]"
-                  onClick={() => setShowQuickEntry(prev => !prev)}
-                  data-testid="button-quick-entry-toggle"
-                >
-                  <ListPlus className="h-4 w-4 mr-1" />
-                  Quick Entry
-                  {showQuickEntry ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
                 </Button>
               </div>
 
