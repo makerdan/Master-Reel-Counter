@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
-  ArrowLeft, ArrowUp, Camera, ListPlus, Download, FileText, Mail, Undo2, Redo2, History,
+  ArrowLeft, ArrowUp, Camera, Download, FileText, Mail, Undo2, Redo2, History,
   Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2, LayoutGrid, ScanLine,
 } from "lucide-react";
 import {
@@ -158,13 +158,13 @@ function SessionWorkspace({
     try {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
-      if (tab && ["photo", "single", "flagged", "scanner"].includes(tab)) return tab;
+      if (tab === "single") return "photo";
+      if (tab && ["photo", "flagged", "scanner", "strip"].includes(tab)) return tab;
     } catch {}
     return "photo";
   })();
   const [mode, setMode] = useState<string>(initialTab);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
-  const previousModeRef = useRef<string | null>(null);
   const [pinRefreshSignal, setPinRefreshSignal] = useState(0);
   const triggerPinRefresh = useCallback(() => setPinRefreshSignal((s) => s + 1), []);
   const [editSessionOpen, setEditSessionOpen] = useState(false);
@@ -295,7 +295,6 @@ function SessionWorkspace({
       });
       toast({ title: "Entry deleted" });
       setEditingEntry(null);
-      if (previousModeRef.current) { setMode(previousModeRef.current); previousModeRef.current = null; }
     },
   });
 
@@ -730,10 +729,6 @@ function SessionWorkspace({
                   <Camera className="h-4 w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Section Photo</span>
                 </TabsTrigger>
-                <TabsTrigger value="single" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-single-mode" aria-label="Single Entry">
-                  <ListPlus className="h-4 w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Single Entry</span>
-                </TabsTrigger>
                 <TabsTrigger value="flagged" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
                   <Flag className="h-4 w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Flagged</span>
@@ -750,26 +745,6 @@ function SessionWorkspace({
 
               <TabsContent value="photo">
                 <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} />
-              </TabsContent>
-
-              <TabsContent value="single">
-                <h2 className="sm:hidden text-lg font-bold underline flex items-center justify-center gap-2 mb-3 px-1 pt-1">
-                  <ListPlus className="h-5 w-5" />
-                  Single Entry
-                </h2>
-                <SingleEntryMode
-                  sessionId={sessionId}
-                  editingEntry={editingEntry}
-                  onDoneEditing={() => setEditingEntry(null)}
-                  onSwitchToPhoto={(photoId: number, aisleVal: string, sectionVal: string) => {
-                    setNavigateToPhotoId(photoId);
-                    setNavigateAisle(aisleVal);
-                    setNavigateSection(sectionVal);
-                    setMode("photo");
-                  }}
-                  onUndoableSave={pushUndo}
-                  canEdit={canEditSession}
-                />
               </TabsContent>
 
               <TabsContent value="flagged">
@@ -834,7 +809,7 @@ function SessionWorkspace({
             <EntryTable
               entries={entries}
               photos={photos}
-              onEdit={(entry) => { previousModeRef.current = mode; setEditingEntry(entry); setMode("single"); }}
+              onEdit={(entry) => { setEditingEntry(entry); }}
               sessionId={sessionId}
               totalFootage={totalFootage}
               onUndoableDelete={pushUndo}
@@ -846,7 +821,7 @@ function SessionWorkspace({
       </div>
 
       {editingEntry && (
-        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) { setEditingEntry(null); if (previousModeRef.current) { setMode(previousModeRef.current); previousModeRef.current = null; } } }}>
+        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) { setEditingEntry(null); } }}>
           <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader className="p-4 pb-2 shrink-0">
               <DialogTitle>Edit Entry #{editingEntry.id}</DialogTitle>
@@ -884,7 +859,7 @@ function SessionWorkspace({
               );
             })()}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
-              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => { setEditingEntry(null); if (previousModeRef.current) { setMode(previousModeRef.current); previousModeRef.current = null; } }} onUndoableSave={pushUndo} canEdit={canEditSession} />
+              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => { setEditingEntry(null); }} onUndoableSave={pushUndo} canEdit={canEditSession} />
               {canEditSession && (
                 <div className="mt-4 pt-4 border-t border-destructive/20">
                   <AlertDialog>

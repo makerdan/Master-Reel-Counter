@@ -20,7 +20,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 
 **Technical Implementations & Feature Specifications:**
 - **Session Management:** Users can create and manage counting sessions, with functionality for duplicating, moving, and organizing sessions into folders.
-- **Entry Management:** Manual entry of reel data with category autocomplete for efficient data input, including auto-calculation of total footage based on catalog data.
+- **Entry Management:** Manual entry of reel data with category autocomplete for efficient data input, including auto-calculation of total footage based on catalog data. Quick Entry panel available in the Section Photo tab for creating entries without pins (collapsible, auto-fills aisle/section from current photo).
 - **Photo Management:**
     - Photo annotation with pin placement to link entries directly to visual cues on reels.
     - Background photo uploads and an offline photo queue with IndexedDB persistence for seamless operation in varying network conditions.

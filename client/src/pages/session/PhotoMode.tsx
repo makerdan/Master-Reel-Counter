@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  AlertCircle, Flag, ImagePlus, Pencil,
+  AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import type { LocalPin } from "./types";
 import { deriveVendorCode } from "./utils";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
+import SingleEntryMode from "./SingleEntryMode";
 
 export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void }) {
   const tz = useTimezone();
@@ -130,6 +131,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }>({ isDragging: false, pinId: null, startX: 0, startY: 0, moved: false });
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
   const [conflictDialog, setConflictDialog] = useState<{ conflicts: Array<{ label: string; entryId?: number; dbPinId?: number }>; pinsToCommit: LocalPin[] } | null>(null);
+  const [showQuickEntry, setShowQuickEntry] = useState(false);
   const [activeSuggestionPin, setActiveSuggestionPin] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
@@ -2255,7 +2257,46 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 >
                   Clear All
                 </Button>
+                <Button
+                  variant="outline"
+                  className="border-[hsl(200_50%_40%/0.5)] text-[hsl(200_60%_50%)] dark:text-[hsl(200_60%_70%)] dark:border-[hsl(200_50%_40%/0.4)]"
+                  onClick={() => setShowQuickEntry(prev => !prev)}
+                  data-testid="button-quick-entry-toggle"
+                >
+                  <ListPlus className="h-4 w-4 mr-1" />
+                  Quick Entry
+                  {showQuickEntry ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
+                </Button>
               </div>
+
+              {showQuickEntry && (
+                <div className="mt-3 p-3 rounded-md border border-[hsl(200_50%_40%/0.3)] bg-[hsl(25_10%_95%)] dark:bg-[hsl(25_10%_12%)]" data-testid="quick-entry-panel">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-[hsl(200_60%_35%)] dark:text-[hsl(200_60%_70%)] flex items-center gap-1.5">
+                      <ListPlus className="h-4 w-4" />
+                      Quick Entry (no pin)
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowQuickEntry(false)}
+                      data-testid="button-quick-entry-close"
+                    >
+                      ×
+                    </Button>
+                  </div>
+                  <SingleEntryMode
+                    sessionId={sessionId}
+                    editingEntry={null}
+                    onDoneEditing={() => {}}
+                    onUndoableSave={onPushUndo}
+                    canEdit={canEdit}
+                    defaultAisle={currentPhoto?.aisle || aisle || ""}
+                    defaultSection={currentPhoto?.section || ""}
+                  />
+                </div>
+              )}
           </div>
         </>
       )}

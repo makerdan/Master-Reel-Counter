@@ -14,7 +14,7 @@ import { lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/w
 import type { Entry, Pin } from "@shared/schema";
 
 export default function SingleEntryMode({
-  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true,
+  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true, defaultAisle, defaultSection,
 }: {
   sessionId: number;
   editingEntry: Entry | null;
@@ -22,6 +22,8 @@ export default function SingleEntryMode({
   onSwitchToPhoto?: (photoId: number, aisle: string, section: string) => void;
   onUndoableSave?: (action: any) => void;
   canEdit?: boolean;
+  defaultAisle?: string;
+  defaultSection?: string;
 }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -29,6 +31,7 @@ export default function SingleEntryMode({
   const singleCameraRef = useRef<HTMLInputElement>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<{ url: string; objectPath: string; photoId: number } | null>(null);
   const [keepLocation, setKeepLocation] = useState(false);
+  const prevDefaultsRef = useRef({ aisle: defaultAisle || "", section: defaultSection || "" });
 
   const { data: entrySettings } = useQuery<{
     defaultAislePrefix: string | null;
@@ -44,8 +47,8 @@ export default function SingleEntryMode({
   });
 
   const [form, setForm] = useState({
-    aisle: editingEntry?.aisle || "",
-    section: editingEntry?.section || "",
+    aisle: editingEntry?.aisle || defaultAisle || "",
+    section: editingEntry?.section || defaultSection || "",
     position: editingEntry?.position || "",
     reelTag: editingEntry?.reelTag || "",
     wireType: editingEntry?.wireType || "",
@@ -116,6 +119,27 @@ export default function SingleEntryMode({
       setForm(prev => ({ ...prev, aisle: entrySettings.defaultAislePrefix! }));
     }
   }, [editingEntry, entrySettings?.defaultAislePrefix]);
+
+  useEffect(() => {
+    if (editingEntry) return;
+    if (defaultAisle !== undefined) {
+      setForm(prev => {
+        if (!prev.aisle || prev.aisle === prevDefaultsRef.current.aisle) {
+          return { ...prev, aisle: defaultAisle };
+        }
+        return prev;
+      });
+    }
+    if (defaultSection !== undefined) {
+      setForm(prev => {
+        if (!prev.section || prev.section === prevDefaultsRef.current.section) {
+          return { ...prev, section: defaultSection };
+        }
+        return prev;
+      });
+    }
+    prevDefaultsRef.current = { aisle: defaultAisle || "", section: defaultSection || "" };
+  }, [defaultAisle, defaultSection, editingEntry]);
 
   const getCatalogMatch = (reelTag: string): ParsedCatalogEntry | null => {
     if (!reelTag || reelTag.length < 2) return null;
@@ -295,8 +319,8 @@ export default function SingleEntryMode({
         const savedAisle = form.aisle;
         const savedSection = form.section;
         setForm({
-          aisle: keepLocation ? savedAisle : "",
-          section: keepLocation ? savedSection : "",
+          aisle: keepLocation ? savedAisle : (defaultAisle || ""),
+          section: keepLocation ? savedSection : (defaultSection || ""),
           position: "", reelTag: "", wireType: "", gauge: "",
           footage: "", color: "", manufacturer: "", notes: "", reelCount: "1", conductors: "",
         });
