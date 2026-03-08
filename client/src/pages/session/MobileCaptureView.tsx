@@ -510,7 +510,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`flex-1 rounded-sm border-black dark:border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
+                  className={`flex-1 rounded-sm !border-black dark:!border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-aisle-decrement"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -525,7 +525,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`flex-1 rounded-sm border-black dark:border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
+                  className={`flex-1 rounded-sm !border-black dark:!border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-aisle-increment"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -580,7 +580,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`flex-1 rounded-sm border-black dark:border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
+                  className={`flex-1 rounded-sm !border-black dark:!border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-section-decrement"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -594,7 +594,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`flex-1 rounded-sm border-black dark:border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
+                  className={`flex-1 rounded-sm !border-black dark:!border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-section-increment"
                   onPointerDown={(e) => {
                     e.preventDefault();
