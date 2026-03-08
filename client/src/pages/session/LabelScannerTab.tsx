@@ -914,7 +914,7 @@ export default function LabelScannerTab({
         if (remaining.length === 0) {
           setPhase("preview");
         }
-        return remaining;
+        return remaining.map((c) => ({ ...c, included: false }));
       });
     },
     onError: (error: any) => {
