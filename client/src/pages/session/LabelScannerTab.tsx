@@ -370,6 +370,7 @@ export default function LabelScannerTab({
     enabled: !!currentPhotoId,
   });
 
+
   const { data: cachedResults } = useQuery<{ results: AnalysisResult[] | null }>({
     queryKey: ["/api/photos", String(currentPhotoId), "label-cache"],
     enabled: !!currentPhotoId && useCachedResults,
@@ -496,6 +497,15 @@ export default function LabelScannerTab({
   }, [serverScanResults]);
 
   useEffect(() => {
+    if (!batchMode && !isReceiving && currentPhotoId) {
+      const stale = effectivePins.length > 0 && effectivePins.every((p) => p.photoId !== currentPhotoId);
+      if (stale) {
+        setCards([]);
+        setPhase("preview");
+        return;
+      }
+    }
+
     if (!effectivePins.length) {
       setCards([]);
       setPhase("preview");
