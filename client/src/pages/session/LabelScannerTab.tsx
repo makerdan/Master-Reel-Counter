@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight, Grid3X3, List, Flag,
+  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, Grid3X3, List, Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -143,7 +143,6 @@ interface PinCard {
   editCatalog: string;
   editFootage: string;
   editVendor: string;
-  catalogCode: string;
   _serverTs?: number;
 }
 
@@ -526,7 +525,6 @@ export default function LabelScannerTab({
           editCatalog: parsed?.catalog ?? "",
           editFootage: parsed?.footage ? String(parsed.footage) : "",
           editVendor: parsed?.vendor ?? "",
-          catalogCode: parsed?.catalog ?? "",
         };
       }
 
@@ -557,12 +555,11 @@ export default function LabelScannerTab({
             editCatalog: local.editCatalog ?? "",
             editFootage: local.editFootage ?? "",
             editVendor: local.editVendor ?? "",
-            catalogCode: local.editCatalog ?? "",
             result: { pinId: pin.id, pinLabel: pin.label || "", rawText: local.rawText, readable: local.readable } as AnalysisResult,
             matchResult: local.rawText ? matchLabelText(local.rawText) : undefined,
           };
         }
-        return { ...base, editCatalog: "", editFootage: "", editVendor: "", catalogCode: "" };
+        return { ...base, editCatalog: "", editFootage: "", editVendor: "" };
       });
       return built.some((c) => c.result) ? sortCardsByCatalog(built) : built;
     });
@@ -597,7 +594,6 @@ export default function LabelScannerTab({
           editCatalog: parsed?.catalog ?? "",
           editFootage: parsed?.footage ? String(parsed.footage) : "",
           editVendor: parsed?.vendor ?? "",
-          catalogCode: parsed?.catalog ?? "",
         };
       })
     );
@@ -1395,7 +1391,7 @@ export default function LabelScannerTab({
                 onClick={() => {
                   setPhase("preview");
                   setUseCachedResults(false);
-                  setCards((prev) => prev.map((c) => ({ ...c, result: undefined, matchResult: undefined, editCatalog: "", editFootage: "", editVendor: "", catalogCode: "" })));
+                  setCards((prev) => prev.map((c) => ({ ...c, result: undefined, matchResult: undefined, editCatalog: "", editFootage: "", editVendor: "" })));
                 }}
                 className="gap-2 border-[hsl(18_60%_30%/0.3)] text-white/70 hover:text-white"
                 data-testid="btn-back-to-preview"
