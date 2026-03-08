@@ -1125,7 +1125,7 @@ export default function LabelScannerTab({
       </div>
 
       {includedCards.length > 20 && phase === "preview" && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-yellow-900/30 border border-yellow-700/40 rounded text-yellow-200 text-xs" data-testid="warning-batch-split">
+        <div className="flex items-center gap-2 px-3 py-2 bg-[hsl(0_0%_5%)] border border-[hsl(18_60%_30%/0.4)] rounded text-[hsl(18_85%_55%)] text-xs" data-testid="warning-batch-split">
           <AlertTriangle className="h-4 w-4 flex-shrink-0" />
           <span>{includedCards.length} pins selected — analysis will be split into {Math.ceil(includedCards.length / 20)} batches.</span>
         </div>
