@@ -1044,7 +1044,7 @@ export default function LabelScannerTab({
           )}
         </div>
         {phase === "preview" && (
-          <div className="pt-1">
+          <div className="pt-1 flex justify-end">
             <Button
               size="sm"
               onClick={handleAnalyze}
