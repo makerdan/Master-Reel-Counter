@@ -618,6 +618,21 @@ function matchWireType(s: string): { original: string; corrected: string | null;
     }
   }
 
+  const prefixMatch = s.match(/^([A-Z]+)(?=\d)/);
+  if (prefixMatch && prefixMatch[1].length >= 2) {
+    const prefix = prefixMatch[1];
+    const NON_HEURISTIC = ["SJ", "SE", "MH", "LT", "UF", "TC", "RX", "BA"];
+    const skip = NON_HEURISTIC.some(p => prefix.includes(p)) || prefix.includes("M");
+    if (!skip) {
+      if (prefix.includes("N")) {
+        return { original: prefix, corrected: "THHN", confident: true };
+      }
+      if (prefix.includes("W")) {
+        return { original: prefix, corrected: "XHHW", confident: true };
+      }
+    }
+  }
+
   return null;
 }
 
