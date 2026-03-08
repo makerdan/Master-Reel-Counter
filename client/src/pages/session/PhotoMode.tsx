@@ -1480,9 +1480,20 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           )}
 
           {currentPhoto && (
+            <div className="flex items-stretch">
+              {uploadedPhotos.length > 1 && (
+                <button
+                  className="w-7 min-w-[28px] flex items-center justify-center bg-[hsl(18_85%_32%)] hover:bg-[hsl(18_85%_38%)] text-white rounded-l-md opacity-60 hover:opacity-100 transition-opacity shrink-0"
+                  onClick={async (e) => { e.stopPropagation(); await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i - 1 + uploadedPhotos.length) % uploadedPhotos.length); resetView(); }}
+                  data-testid="btn-photo-prev-edge"
+                  title="Previous photo"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+              )}
             <div
               ref={containerRef}
-              className="photo-viewer-container w-full"
+              className="photo-viewer-container w-full min-w-0"
               style={{ cursor: panMode ? "grab" : "crosshair" }}
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
@@ -1741,6 +1752,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <span className="inline-block w-2.5 h-2.5 border-2 border-current rounded-sm" />
                 </button>
               </div>
+            </div>
+              {uploadedPhotos.length > 1 && (
+                <button
+                  className="w-7 min-w-[28px] flex items-center justify-center bg-[hsl(18_85%_32%)] hover:bg-[hsl(18_85%_38%)] text-white rounded-r-md opacity-60 hover:opacity-100 transition-opacity shrink-0"
+                  onClick={async (e) => { e.stopPropagation(); await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i + 1) % uploadedPhotos.length); resetView(); }}
+                  data-testid="btn-photo-next-edge"
+                  title="Next photo"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              )}
             </div>
           )}
 
