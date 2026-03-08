@@ -1483,7 +1483,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             <div className="flex items-stretch">
               {uploadedPhotos.length > 1 && (
                 <button
-                  className="w-7 min-w-[28px] flex items-center justify-center bg-transparent hover:bg-black/30 text-white/0 hover:text-white rounded-l-md transition-all shrink-0"
+                  className="w-7 min-w-[28px] flex items-center justify-center bg-transparent hover:bg-[hsl(18_85%_40%)] text-white/0 hover:text-white rounded-l-md transition-all shrink-0"
                   onClick={async (e) => { e.stopPropagation(); await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i - 1 + uploadedPhotos.length) % uploadedPhotos.length); resetView(); }}
                   data-testid="btn-photo-prev-edge"
                   title="Previous photo"
@@ -1755,7 +1755,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             </div>
               {uploadedPhotos.length > 1 && (
                 <button
-                  className="w-7 min-w-[28px] flex items-center justify-center bg-transparent hover:bg-black/30 text-white/0 hover:text-white rounded-r-md transition-all shrink-0"
+                  className="w-7 min-w-[28px] flex items-center justify-center bg-transparent hover:bg-[hsl(18_85%_40%)] text-white/0 hover:text-white rounded-r-md transition-all shrink-0"
                   onClick={async (e) => { e.stopPropagation(); await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i + 1) % uploadedPhotos.length); resetView(); }}
                   data-testid="btn-photo-next-edge"
                   title="Next photo"
