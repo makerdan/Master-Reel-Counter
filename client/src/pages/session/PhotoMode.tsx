@@ -1526,7 +1526,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
                         startPinDrag(e, pin.id);
                       }}
-                      onClick={(e) => { e.stopPropagation(); if (justDraggedRef.current) { justDraggedRef.current = false; return; } setSelectedPinId(pin.id); }}
+                      onClick={(e) => { e.stopPropagation(); if (justDraggedRef.current) { justDraggedRef.current = false; } }}
                       data-testid={`pin-${pin.id}`}
                     >
                       <div className="pin-top-row">
