@@ -526,7 +526,6 @@ export default function LabelScannerTab({
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
-      const savedSelections = loadSavedSelections(sessionId);
       const localResults = loadSavedResults(sessionId);
       const localResultsMap = new Map(localResults.map((r) => [r.pinId, r]));
       const pinCountByPhoto = new Map<number, number>();
@@ -561,8 +560,7 @@ export default function LabelScannerTab({
         }
         const savedZoom = savedZooms[String(pin.id)];
         const smartZoom = computeSmartZoom(pinCountByPhoto.get(pin.photoId) || 1);
-        const savedIncluded = savedSelections[String(pin.id)];
-        const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: savedIncluded ?? true, isDraft: !pin.entryId };
+        const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: true, isDraft: !pin.entryId };
         if (sr) {
           return { ...base, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
         }
