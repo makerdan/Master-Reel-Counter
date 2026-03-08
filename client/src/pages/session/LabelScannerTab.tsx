@@ -41,6 +41,25 @@ function saveZoomLevel(sessionId: number, pinId: number, zoom: number) {
   } catch {}
 }
 
+function getSelectStorageKey(sessionId: number) {
+  return `scanner-select-${sessionId}`;
+}
+
+function loadSavedSelections(sessionId: number): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(getSelectStorageKey(sessionId));
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveSelectionState(sessionId: number, pinId: number, included: boolean) {
+  try {
+    const saved = loadSavedSelections(sessionId);
+    saved[String(pinId)] = included;
+    localStorage.setItem(getSelectStorageKey(sessionId), JSON.stringify(saved));
+  } catch {}
+}
+
 
 function parseSortKey(catalog: string): { type: string; color: string; size: number; footage: number } {
   const s = (catalog || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -490,6 +509,7 @@ export default function LabelScannerTab({
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
+      const savedSelections = loadSavedSelections(sessionId);
       const localResults = loadSavedResults(sessionId);
       const localResultsMap = new Map(localResults.map((r) => [r.pinId, r]));
       const pinCountByPhoto = new Map<number, number>();
@@ -525,7 +545,8 @@ export default function LabelScannerTab({
         }
         const savedZoom = savedZooms[String(pin.id)];
         const smartZoom = computeSmartZoom(pinCountByPhoto.get(pin.photoId) || 1);
-        const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: true, isDraft: !pin.entryId };
+        const savedIncluded = savedSelections[String(pin.id)];
+        const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: savedIncluded ?? true, isDraft: !pin.entryId };
         if (sr) {
           return { ...base, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
         }
@@ -606,6 +627,7 @@ export default function LabelScannerTab({
     setCards((prev) =>
       prev.map((c) => (c.pin.id === pinId ? { ...c, included } : c))
     );
+    saveSelectionState(sessionId, pinId, included);
   };
 
   const setCardField = (pinId: number, field: "editCatalog" | "editVendor", value: string) => {
