@@ -506,6 +506,38 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 data-testid="input-mobile-aisle"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sectionInputRef.current?.focus(); } }}
               />
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className={`flex-1${captureSettings?.largerTouchTargets ? " min-h-[56px] text-base" : ""}`}
+                  data-testid="button-aisle-decrement"
+                  disabled={isReceiving}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    const cur = parseInt(aisle, 10);
+                    const val = isNaN(cur) ? 0 : Math.max(0, cur - 1);
+                    setAisle(String(val).padStart(Math.max(aisle.length, 1), "0"));
+                  }}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className={`flex-1${captureSettings?.largerTouchTargets ? " min-h-[56px] text-base" : ""}`}
+                  data-testid="button-aisle-increment"
+                  disabled={isReceiving}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    const cur = parseInt(aisle, 10);
+                    const val = isNaN(cur) ? 1 : cur + 1;
+                    setAisle(String(val).padStart(Math.max(aisle.length, 1), "0"));
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
               <div className="flex items-center gap-3 pt-1 flex-wrap">
                 <label className="flex items-center gap-2 cursor-pointer" data-testid="checkbox-receiving">
                   <Checkbox
