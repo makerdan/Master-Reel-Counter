@@ -585,7 +585,13 @@ export default function LabelScannerTab({
 
   const setCardZoom = (pinId: number, zoom: number) => {
     setCards((prev) =>
-      prev.map((c) => (c.pin.id === pinId ? { ...c, zoomLevel: zoom, panX: 0, panY: 0 } : c))
+      prev.map((c) => {
+        if (c.pin.id !== pinId) return c;
+        const oldFraction = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, c.zoomLevel));
+        const newFraction = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom));
+        const scale = newFraction / oldFraction;
+        return { ...c, zoomLevel: zoom, panX: c.panX * scale, panY: c.panY * scale };
+      })
     );
     saveZoomLevel(sessionId, pinId, zoom);
   };
