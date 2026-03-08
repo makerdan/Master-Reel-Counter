@@ -61,6 +61,13 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **User Settings:** Comprehensive settings stored in userSettings table with PATCH /api/settings endpoint. Settings include: Display (theme: light/dark/system, thumbnail size), Accessibility (larger touch targets, text size: small/default/large/extra-large with automatic disable during Mobile Flow), Data Entry (aisle prefix, section advance step, default unit), Photo Capture (quality compression 30-100% with Receiving quality override for close-up reel photos), Export (default format, company name, footer text), Data Encoding (AES-256-GCM toggle with collapsible limitations). Settings auto-save on change. Theme provider supports system/light/dark modes with DB-to-localStorage sync. TextSizeSyncer applies root font-size from settings; MobileCaptureView forces 16px default on mount.
 - **User Profile Avatar:** Users can upload a custom profile photo from the Settings > Account section. Avatar stored in Replit Object Storage (`.private/avatars/`), key saved to `users.customAvatarKey`. Served via `GET /uploads/avatars/:filename`. Removing reverts to the Replit-sourced `profileImageUrl`. Effective avatar = `customAvatarKey || profileImageUrl`.
 
+## Planned Updates
+- **Share Tech Mono font:** Switch scanner card text (raw AI text, wire details, catalog codes) to Share Tech Mono for better readability and visual match with industrial label aesthetics. Optimized for OCR-style display of wire codes on curved/distorted label text.
+
+## Help System
+- **Help Menu** (`client/src/components/HelpMenu.tsx`): Context-aware help drawer (Sheet) with accordion sections. Three modes: `dashboard`, `full` (session), `mobile`. Sections: Overview, Dashboard (header/folders/sorting/cards/shared), Session Full Mode (header/Section Photo with Quick Entry/Flagged/Photos Reel/AI Scanner/Table View/Collaboration/Export/Tips), Mobile Flow (capture/upload queue/review/tips). Feedback dialog at bottom. Standalone `/help` page also available.
+- **AI Scanner Help:** Comprehensive section covering photo & card selection, zoom/pan, include/exclude, Single vs All Photos mode, Analyze Labels, raw AI text, matched results, Apply to Entries, Receiving pooling, and real-time sync.
+
 ## External Dependencies
 - **Replit Auth:** For user authentication (OpenID Connect).
 - **Replit Object Storage:** For storing uploaded photos.

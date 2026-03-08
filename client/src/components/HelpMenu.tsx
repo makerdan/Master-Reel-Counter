@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2 } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -149,7 +149,7 @@ export function OverviewHelp() {
       </AccordionTrigger>
       <AccordionContent className="text-2xl text-muted-foreground leading-relaxed space-y-2 pb-4">
         <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
-        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow with Section Photo, Single Entry, and Flagged tabs. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience.</p>
+        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow with Section Photo, Flagged, Photos Reel, and AI Scanner tabs. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience.</p>
       </AccordionContent>
     </AccordionItem>
   );
@@ -181,7 +181,7 @@ export function DashboardSections() {
           <FeatureRow
             icon={<HelpIcon icon={Settings} />}
             label="Settings"
-            description="Opens your profile and app settings. Edit your display name, manage encryption keys, and configure preferences."
+            description="Opens your profile and app settings. Upload a custom profile avatar, edit your display name, manage encryption keys, and configure preferences for display, accessibility, data entry, photo capture, and export."
           />
           <FeatureRow
             icon={<HelpIcon icon={LogOut} />}
@@ -371,8 +371,8 @@ export function SessionSections() {
           />
           <FeatureRow
             icon={<HelpIcon icon={Pencil} />}
-            label="Session Name & Time"
-            description="Tap the session name to edit the name and location. Changes auto-save after closing the dialog."
+            label="Session Name, Location & Description"
+            description="Tap the session name to edit the name, location, and an optional description for documenting session context. Changes auto-save after closing the dialog."
           />
           <FeatureRow
             icon={<HelpIcon icon={Lock} />}
@@ -467,7 +467,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={RotateCw} />}
             label="Rotate"
-            description="Rotate the photo 90° clockwise or counter-clockwise if it was taken at an angle."
+            description="Rotate the photo 90° clockwise or counter-clockwise if it was taken at an angle. The rotation is saved to the database and persists across sessions and users. PDF exports apply the saved rotation automatically."
           />
           <FeatureRow
             icon={<span className="inline-block w-3.5 h-3.5 border-2 border-[hsl(18_70%_50%)] rounded-sm" />}
@@ -581,34 +581,33 @@ export function SessionSections() {
             label="Nearby Photo Strip"
             description="Shows a horizontal strip of photos sorted by aisle/section location, centered on the current photo. Tap a thumbnail to preview that photo's image and committed pins without leaving your current pin context. An orange badge shows the incomplete pin count for each nearby photo."
           />
-        </AccordionContent>
-      </AccordionItem>
 
-      <AccordionItem value="session-single-entry">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Pencil className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Single Entry Tab</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">For manual entry without photos. Also used as the editing form when you tap "Edit" on an existing entry.</p>
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Quick Entry Panel</p>
           <FeatureRow
             icon={<HelpIcon icon={Pencil} />}
-            label="Entry Form"
-            description="Fill in aisle, section, pallet position, reel tag, wire type, gauge, footage, reel count, conductors, color, manufacturer, and notes. All fields have appropriate input types and validation."
+            label="Quick Entry Toggle"
+            description="Tap the Quick Entry button in the top toolbar (next to Take Photo) to expand a collapsible entry form. Creates entries without placing pins on the photo. When expanded, Upload Photos and Take Photo buttons are faded out and disabled."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">AUTO</span>}
+            label="Auto-Fill Location"
+            description="The Quick Entry panel automatically fills in the aisle and section from the currently viewed photo, so you don't have to type them."
           />
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
             label="Catalog Autocomplete"
-            description="The category field searches the same ~180 wire catalog entries. Selecting a match auto-fills related fields."
+            description="The category field searches the same ~186 wire catalog entries. Selecting a match auto-fills the vendor code and footage fields."
           />
           <FeatureRow
-            icon={<HelpIcon icon={Flag} className="text-yellow-500" />}
-            label="Flag Toggle"
-            description="When editing an entry that has a linked pin, a flag toggle appears. Use it to flag or unflag the reel for re-shoot directly from the edit form."
+            icon={<HelpIcon icon={Check} />}
+            label="On Floor, In Front Of"
+            description='A single combined checkbox that toggles both "On Floor" and "In Front Of" note tags on the entry. Useful for quickly marking reels that are not on the pallet.'
           />
           <FeatureRow
-            icon={<HelpIcon icon={Camera} />}
-            label="Jump to Photo"
-            description="When editing a photo-linked entry, a button appears to jump directly to that photo in the Section Photo tab with the correct aisle and section pre-set."
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">REC</span>}
+            label="Receiving Mode"
+            description="The Receiving checkbox auto-fills the next sequential Receiving section number, computed from both existing photos and entries in the session."
           />
         </AccordionContent>
       </AccordionItem>
@@ -687,6 +686,82 @@ export function SessionSections() {
             icon={<HelpIcon icon={ArrowUp} />}
             label="Back to Top"
             description="A 'Back to Top' button appears at the bottom of the Photos Reel grid (above the Table View). Clicking it smoothly scrolls the page back to the top."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="session-ai-scanner">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-[hsl(270_60%_55%)]" /> AI Scanner Tab</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Uses AI vision to read wire reel labels from photo crops. Select a photo, preview cropped regions around pins, analyze labels in batch, review results, and apply them as entries.</p>
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo & Card Selection</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Photo Selection"
+            description="Choose a photo from the session. The scanner shows a card for each pin on the photo with a cropped preview of the label area."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ZoomIn} />}
+            label="Zoom & Pan Controls"
+            description="Each card shows a cropped preview of the pin area. Adjust the zoom level to frame the label, and drag to pan the crop window for the best view of the text."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={SquareCheck} />}
+            label="Include / Exclude Cards"
+            description="Each card has a checkbox to include or exclude it from the analysis batch. Uncheck cards with unreadable or irrelevant labels to save processing time."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Single Photo vs All Photos</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Grid3X3} />}
+            label="All Photos Mode"
+            description="Toggle the grid icon to switch to All Photos mode, which shows a dense grid of ALL active pins across the entire session — every photo with draft or incomplete pins. Each card shows a badge with its source photo location. The scanner defaults to this mode when previous results exist."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ListChecks} />}
+            label="Single Photo Mode"
+            description="The default view shows only pins from the currently selected photo. Use this for focused analysis of one section at a time."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Analysis & Results</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Sparkles} />}
+            label="Analyze Labels"
+            description="Sends the cropped pin images to AI vision for label reading. Cards are batched automatically (up to 20 per request). A progress bar shows the analysis status. Results are cached on the server so re-analyzing the same photo is instant."
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(270_60%_55%)]">RAW</span>}
+            label="Raw AI Text"
+            description='Each analyzed card displays the literal text the AI read from the label in a monospace block. Shows "unreadable" in italic if the AI could not read the label.'
+          />
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
+            label="Matched Results"
+            description="The raw text is automatically matched against the ~186 wire catalog entries. The best match fills in the category, vendor code, and footage fields. You can edit any field to correct the AI before applying."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Check} />}
+            label="Apply to Entries"
+            description="Commits the scanned results as entries. Draft pins become committed entries with their wire details filled in. Incomplete committed pins get their existing entries updated with the scanned data."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Advanced Features</p>
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(270_60%_55%)]">REC</span>}
+            label="Receiving Pooling"
+            description={`When a photo's location contains "Receiving", the scanner pools pins from all Receiving photos (up to 9 cards) to batch more labels per analysis. Pooled cards from other photos show a purple badge with their source location.`}
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Users} />}
+            label="Real-Time Sync"
+            description="Scan results are saved to the server and synced via WebSocket. Multiple team members can divide scanning work and see each other's results in real time."
           />
         </AccordionContent>
       </AccordionItem>
@@ -777,7 +852,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={FileText} />}
             label="PDF Export"
-            description="Generates a formatted PDF report of the session, suitable for printing or sharing with warehouse managers."
+            description="Generates a formatted PDF report. A quality picker dialog opens with two options — Full Quality (original resolution, recommended for auditing reel labels) and Standard (smaller file). Both begin generating in parallel; the chosen version downloads instantly. Your last-used choice is remembered."
           />
           <FeatureRow
             icon={<HelpIcon icon={Mail} />}
