@@ -733,7 +733,14 @@ export default function LabelScannerTab({
         setCards((prev) => {
           const sorted = sortCardsByCatalog(prev);
           saveAnalysisResults(sessionId, sorted);
-          return sorted;
+          const updated = sorted.map((c) => {
+            if (c.result?.rawText && !c.editCatalog.trim() && !c.editVendor.trim()) {
+              saveSelectionState(sessionId, c.pin.id, false);
+              return { ...c, included: false };
+            }
+            return c;
+          });
+          return updated;
         });
         toast({ title: "Analysis complete", description: `Read ${totalResults} label(s)` });
       }
@@ -1355,6 +1362,31 @@ export default function LabelScannerTab({
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+        {phase === "preview" && (
+          <div className="flex w-full justify-end">
+            <Button
+              size="sm"
+              onClick={handleAnalyze}
+              disabled={analyzing || !includedCards.length || !canEdit}
+              className="gap-2 bg-[hsl(18_85%_32%)] hover:bg-[hsl(18_85%_38%)] text-white"
+              data-testid="btn-analyze-labels-bottom"
+            >
+              {analyzing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {analyzeProgress
+                    ? `Batch ${analyzeProgress.done}/${analyzeProgress.total}...`
+                    : "Analyzing..."}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Analyze {includedCards.length} Label{includedCards.length !== 1 ? "s" : ""}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
         {phase === "results" && (
           <>
             <div className="flex items-center gap-2">
