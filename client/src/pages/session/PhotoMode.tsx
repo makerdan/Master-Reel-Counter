@@ -129,6 +129,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     startY: number;
     moved: boolean;
   }>({ isDragging: false, pinId: null, startX: 0, startY: 0, moved: false });
+  const justDraggedRef = useRef(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
   const [conflictDialog, setConflictDialog] = useState<{ conflicts: Array<{ label: string; entryId?: number; dbPinId?: number }>; pinsToCommit: LocalPin[] } | null>(null);
   const [showQuickEntry, setShowQuickEntry] = useState(false);
@@ -868,6 +869,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       if (marker) marker.classList.remove("dragging");
 
       if (pos && dragRef.current.moved) {
+        justDraggedRef.current = true;
         setLocalPins((prev) =>
           prev.map((p) => p.id === pinId ? { ...p, x: pos.x, y: pos.y } : p)
         );
@@ -1524,7 +1526,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
                         startPinDrag(e, pin.id);
                       }}
-                      onClick={(e) => { e.stopPropagation(); setSelectedPinId(pin.id); }}
+                      onClick={(e) => { e.stopPropagation(); if (justDraggedRef.current) { justDraggedRef.current = false; return; } setSelectedPinId(pin.id); }}
                       data-testid={`pin-${pin.id}`}
                     >
                       <div className="pin-top-row">
