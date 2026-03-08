@@ -20,7 +20,6 @@ const ZOOM_MIN = 0.005;
 const ZOOM_MAX = 1.0;
 const ZOOM_STEP = 0.005;
 const ZOOM_CLICK_STEP = 0.015;
-const ZOOM_DEFAULT = 0.12;
 
 function getZoomStorageKey(sessionId: number) {
   return `scanner-zoom-${sessionId}`;
@@ -483,7 +482,7 @@ export default function LabelScannerTab({
     const crossPhotoPins = batchMode ? allSessionActivePins : (isReceiving && pooledPins.length > 0 ? pooledPins : []);
     if (crossPhotoPins.length > 0) {
       const otherPhotoIds = new Set(crossPhotoPins.map((p) => p.photoId));
-      otherPhotoIds.delete(currentPhotoId!);
+      if (currentPhotoId) otherPhotoIds.delete(currentPhotoId);
       for (const pid of otherPhotoIds) {
         const p = photos.find((ph) => ph.id === pid);
         const url = getPhotoUrl(p);
@@ -564,8 +563,6 @@ export default function LabelScannerTab({
       return built.some((c) => c.result) ? sortCardsByCatalog(built) : built;
     });
   }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving, batchMode, serverScanResultsKey]);
-
-  const hasCachedResults = !!(cachedResults?.results);
 
   useEffect(() => {
     if (cachedResults?.results && phase === "preview" && useCachedResults) {
@@ -883,8 +880,10 @@ export default function LabelScannerTab({
       return { successCount: succeededPinIds.length, failures, succeededPinIds };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/photos", String(currentPhotoId), "pins"] });
-      if (isReceiving) {
+      if (currentPhotoId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/photos", String(currentPhotoId), "pins"] });
+      }
+      if (isReceiving || batchMode) {
         const involvedPhotoIds = new Set(cards.map((c) => c.pin.photoId));
         involvedPhotoIds.forEach((pid) => {
           if (pid !== currentPhotoId) {
