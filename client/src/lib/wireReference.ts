@@ -683,5 +683,34 @@ function matchColor(s: string): { original: string; corrected: string | null; co
     }
   }
 
+  if (s.length >= 2 && s[0] === "0" && s[1] === "R" && (s.length < 3 || s[2] !== "D")) {
+    const fixed = "O" + s.slice(1);
+    for (const c of COLOR_CODES) {
+      if (fixed.startsWith(c)) {
+        return { original: s.slice(0, c.length), corrected: c, confident: true };
+      }
+    }
+  }
+
+  if (s.length >= 1 && s[0] === "P") {
+    if (s.length >= 2 && (s[1] === "R" || s[1] === "K")) {
+      const code = s.slice(0, 2);
+      if (COLOR_CODES.includes(code)) {
+        return { original: code, corrected: code, confident: true };
+      }
+    } else {
+      const fixed = "R" + s.slice(1);
+      for (const c of COLOR_CODES) {
+        if (fixed.startsWith(c)) {
+          return { original: s.slice(0, c.length), corrected: c, confident: true };
+        }
+      }
+    }
+  }
+
+  if (s[0] === "K") {
+    return { original: "K", corrected: "BK", confident: false };
+  }
+
   return null;
 }

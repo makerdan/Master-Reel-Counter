@@ -537,12 +537,20 @@ export default function LabelScannerTab({
       function buildResultFromServer(sr: typeof serverScanResults[0], pin: Pin) {
         const matchResult = sr.rawText ? matchLabelText(sr.rawText) : undefined;
         const parsed = matchResult?.match;
+        let vendor = parsed?.vendor ?? "";
+        const catalogCode = parsed?.catalog ?? "";
+        const rawUpper = (sr.rawText ?? "").toUpperCase();
+        if (catalogCode.startsWith("THHN") && !rawUpper.includes("ALU")) {
+          vendor = "COP";
+        } else if (catalogCode.startsWith("XHHW") && !rawUpper.includes("COP")) {
+          vendor = "ALU";
+        }
         return {
           result: { pinId: pin.id, pinLabel: sr.pinLabel || pin.label || "", rawText: sr.rawText, readable: !!sr.readable } as AnalysisResult,
           matchResult,
-          editCatalog: parsed?.catalog ?? "",
+          editCatalog: catalogCode,
           editFootage: parsed?.footage ? String(parsed.footage) : "",
-          editVendor: parsed?.vendor ?? "",
+          editVendor: vendor,
         };
       }
 
@@ -610,13 +618,21 @@ export default function LabelScannerTab({
         if (!result) return card;
         const matchResult = result.rawText ? matchLabelText(result.rawText) : undefined;
         const parsed = matchResult?.match;
+        let vendor = parsed?.vendor ?? "";
+        const catalogCode = parsed?.catalog ?? "";
+        const rawUpper = (result.rawText ?? "").toUpperCase();
+        if (catalogCode.startsWith("THHN") && !rawUpper.includes("ALU")) {
+          vendor = "COP";
+        } else if (catalogCode.startsWith("XHHW") && !rawUpper.includes("COP")) {
+          vendor = "ALU";
+        }
         const updated = {
           ...card,
           result,
           matchResult,
-          editCatalog: parsed?.catalog ?? "",
+          editCatalog: catalogCode,
           editFootage: parsed?.footage ? String(parsed.footage) : "",
-          editVendor: parsed?.vendor ?? "",
+          editVendor: vendor,
           included: false,
         };
         saveSelectionState(sessionId, card.pin.id, false);

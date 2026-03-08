@@ -175,5 +175,41 @@ export function matchLabelText(rawText: string): LabelMatchResult {
     }
   }
 
+  if (/\d$/.test(normalized)) {
+    let padded = normalized;
+    for (let i = 0; i < 3; i++) {
+      padded += "0";
+      const exactPadded = tryExactCatalogMatch(padded);
+      if (exactPadded) {
+        return { match: exactPadded, confidence: "medium", normalizedInput: normalized, matchMethod: "fuzzy" };
+      }
+      const corrPadded = tryCorrectionMatch(padded);
+      if (corrPadded) {
+        return { match: corrPadded.entry, confidence: corrPadded.confident ? "medium" : "low", normalizedInput: normalized, matchMethod: "correction" };
+      }
+    }
+  }
+
+  if (normalized.startsWith("URD") && normalized.length > 3) {
+    const urdBody = normalized.slice(3);
+    const variants = [
+      urdBody.replace(/7/g, "2"),
+      urdBody.replace(/1/g, "2"),
+      urdBody.replace(/7/g, "2").replace(/1/g, "2"),
+    ];
+    for (const v of variants) {
+      if (v === urdBody) continue;
+      const candidate = "URD" + v;
+      const exactUrd = tryExactCatalogMatch(candidate);
+      if (exactUrd) {
+        return { match: exactUrd, confidence: "medium", normalizedInput: normalized, matchMethod: "fuzzy" };
+      }
+      const corrUrd = tryCorrectionMatch(candidate);
+      if (corrUrd) {
+        return { match: corrUrd.entry, confidence: corrUrd.confident ? "medium" : "low", normalizedInput: normalized, matchMethod: "correction" };
+      }
+    }
+  }
+
   return { match: null, confidence: "none", normalizedInput: normalized, matchMethod: "none" };
 }
