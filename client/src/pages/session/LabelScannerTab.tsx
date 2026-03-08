@@ -310,16 +310,6 @@ export default function LabelScannerTab({
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [batchMode, setBatchMode] = useState(false);
-  const cardsPhotoRef = useRef<number | null>(initialPhotoId);
-
-  useLayoutEffect(() => {
-    if (!batchMode && selectedPhotoId !== cardsPhotoRef.current) {
-      cardsPhotoRef.current = selectedPhotoId;
-      setCards([]);
-      setPhase("preview");
-    }
-  }, [selectedPhotoId, batchMode]);
-
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
       lastInitialPhotoIdRef.current = initialPhotoId;
@@ -505,7 +495,7 @@ export default function LabelScannerTab({
     return serverScanResults.map((r) => `${r.pinId}:${r.updatedAt || r.createdAt}`).join(",");
   }, [serverScanResults]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!batchMode && !isReceiving && currentPhotoId) {
       const stale = effectivePins.length > 0 && effectivePins.every((p) => p.photoId !== currentPhotoId);
       if (stale) {
@@ -523,6 +513,7 @@ export default function LabelScannerTab({
 
     const serverResultsMap = new Map(serverScanResults.map((r) => [r.pinId, r]));
 
+    let builtHasResults = false;
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
@@ -577,8 +568,10 @@ export default function LabelScannerTab({
         }
         return { ...base, editCatalog: "", editFootage: "", editVendor: "" };
       });
-      return built.some((c) => c.result) ? sortCardsByCatalog(built) : built;
+      builtHasResults = built.some((c) => c.result);
+      return builtHasResults ? sortCardsByCatalog(built) : built;
     });
+    if (builtHasResults) setPhase("results");
   }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving, batchMode, serverScanResultsKey]);
 
   useEffect(() => {
