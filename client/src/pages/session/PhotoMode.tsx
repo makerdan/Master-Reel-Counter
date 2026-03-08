@@ -1337,6 +1337,35 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         </div>
       </div>
 
+      {showQuickEntry && (
+        <div className="mt-2 p-3 rounded-md border border-[hsl(200_50%_40%/0.3)] bg-[hsl(25_10%_95%)] dark:bg-[hsl(25_10%_12%)]" data-testid="quick-entry-panel">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-[hsl(200_60%_35%)] dark:text-[hsl(200_60%_70%)] flex items-center gap-1.5">
+              <ListPlus className="h-4 w-4" />
+              Quick Entry (no pin)
+            </h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowQuickEntry(false)}
+              data-testid="button-quick-entry-close"
+            >
+              ×
+            </Button>
+          </div>
+          <SingleEntryMode
+            sessionId={sessionId}
+            editingEntry={null}
+            onDoneEditing={() => {}}
+            onUndoableSave={onPushUndo}
+            canEdit={canEdit}
+            defaultAisle={currentPhoto?.aisle || aisle || ""}
+            defaultSection={currentPhoto?.section || ""}
+          />
+        </div>
+      )}
+
       {uploadedPhotos.length > 0 && (
         <>
           <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 space-y-1">
@@ -2278,34 +2307,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 </Button>
               </div>
 
-              {showQuickEntry && (
-                <div className="mt-3 p-3 rounded-md border border-[hsl(200_50%_40%/0.3)] bg-[hsl(25_10%_95%)] dark:bg-[hsl(25_10%_12%)]" data-testid="quick-entry-panel">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-[hsl(200_60%_35%)] dark:text-[hsl(200_60%_70%)] flex items-center gap-1.5">
-                      <ListPlus className="h-4 w-4" />
-                      Quick Entry (no pin)
-                    </h3>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                      onClick={() => setShowQuickEntry(false)}
-                      data-testid="button-quick-entry-close"
-                    >
-                      ×
-                    </Button>
-                  </div>
-                  <SingleEntryMode
-                    sessionId={sessionId}
-                    editingEntry={null}
-                    onDoneEditing={() => {}}
-                    onUndoableSave={onPushUndo}
-                    canEdit={canEdit}
-                    defaultAisle={currentPhoto?.aisle || aisle || ""}
-                    defaultSection={currentPhoto?.section || ""}
-                  />
-                </div>
-              )}
           </div>
         </>
       )}
