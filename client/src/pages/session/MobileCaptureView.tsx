@@ -509,8 +509,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <div className="flex gap-2 pt-1">
                 <Button
                   variant="outline"
-                  size="lg"
-                  className={`flex-1${captureSettings?.largerTouchTargets ? " min-h-[56px] text-base" : ""}`}
+                  size="sm"
+                  className={`flex-1 rounded-sm border-black dark:border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-aisle-decrement"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -520,12 +520,12 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setAisle(String(val).padStart(Math.max(aisle.length, 1), "0"));
                   }}
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="outline"
-                  size="lg"
-                  className={`flex-1${captureSettings?.largerTouchTargets ? " min-h-[56px] text-base" : ""}`}
+                  size="sm"
+                  className={`flex-1 rounded-sm border-black dark:border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-aisle-increment"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -535,7 +535,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setAisle(String(val).padStart(Math.max(aisle.length, 1), "0"));
                   }}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
               <div className="flex items-center gap-3 pt-1 flex-wrap">
@@ -579,8 +579,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <div className="flex gap-2 pt-1">
                 <Button
                   variant="outline"
-                  size="lg"
-                  className={`flex-1${captureSettings?.largerTouchTargets ? " min-h-[56px] text-base" : ""}`}
+                  size="sm"
+                  className={`flex-1 rounded-sm border-black dark:border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-section-decrement"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -589,12 +589,12 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setSection(String(val).padStart(Math.max(section.length, 1), "0"));
                   }}
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="outline"
-                  size="lg"
-                  className={`flex-1${captureSettings?.largerTouchTargets ? " min-h-[56px] text-base" : ""}`}
+                  size="sm"
+                  className={`flex-1 rounded-sm border-black dark:border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-section-increment"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -603,7 +603,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setSection(String(val).padStart(Math.max(section.length, 1), "0"));
                   }}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
