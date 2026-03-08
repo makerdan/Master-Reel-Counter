@@ -589,6 +589,12 @@ export default function LabelScannerTab({
     }
   }, [cachedResults]);
 
+  const displayCards = useMemo(() => {
+    if (batchMode || isReceiving) return cards;
+    if (!currentPhotoId) return cards;
+    return cards.filter((c) => c.pin.photoId === currentPhotoId);
+  }, [cards, batchMode, isReceiving, currentPhotoId]);
+
   const cardsWithResults = displayCards.filter((c) => c.result).length;
   useEffect(() => {
     if (phase === "preview" && displayCards.length > 0 && cardsWithResults > 0) {
@@ -647,12 +653,6 @@ export default function LabelScannerTab({
       prev.map((c) => (c.pin.id === pinId ? { ...c, [field]: value } : c))
     );
   };
-
-  const displayCards = useMemo(() => {
-    if (batchMode || isReceiving) return cards;
-    if (!currentPhotoId) return cards;
-    return cards.filter((c) => c.pin.photoId === currentPhotoId);
-  }, [cards, batchMode, isReceiving, currentPhotoId]);
 
   const includedCards = displayCards.filter((c) => c.included);
 
