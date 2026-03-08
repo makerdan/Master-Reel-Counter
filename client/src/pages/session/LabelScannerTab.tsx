@@ -292,6 +292,7 @@ export default function LabelScannerTab({
   photos,
   currentPhotoId: initialPhotoId,
   canEdit = true,
+  isAdmin = false,
   onPinDataChanged,
   onPhotoChange,
 }: {
@@ -299,6 +300,7 @@ export default function LabelScannerTab({
   photos: Photo[];
   currentPhotoId: number | null;
   canEdit?: boolean;
+  isAdmin?: boolean;
   onPinDataChanged?: () => void;
   onPhotoChange?: (photoId: number | null) => void;
 }) {
@@ -310,6 +312,7 @@ export default function LabelScannerTab({
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [batchMode, setBatchMode] = useState(false);
+  const batchModeInitRef = useRef(false);
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
       lastInitialPhotoIdRef.current = initialPhotoId;
@@ -382,6 +385,13 @@ export default function LabelScannerTab({
   }>>({
     queryKey: ["/api/sessions", String(sessionId), "scan-results"],
   });
+
+  useEffect(() => {
+    if (!batchModeInitRef.current && serverScanResults.length > 0) {
+      batchModeInitRef.current = true;
+      setBatchMode(true);
+    }
+  }, [serverScanResults.length]);
 
   const activePinsForPhoto = useMemo(() => {
     const committedKeys = new Set(
@@ -1089,7 +1099,7 @@ export default function LabelScannerTab({
             </Button>
           )}
         </div>
-        {phase === "preview" && (
+        {(phase === "preview" || isAdmin) && (
           <div className="pt-1 flex justify-end">
             <Button
               size="sm"
@@ -1373,7 +1383,7 @@ export default function LabelScannerTab({
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
-        {phase === "preview" && (
+        {(phase === "preview" || isAdmin) && (
           <div className="flex w-full justify-end">
             <Button
               size="sm"

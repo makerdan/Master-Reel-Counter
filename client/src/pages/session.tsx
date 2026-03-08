@@ -779,6 +779,7 @@ function SessionWorkspace({
                   photos={photos}
                   currentPhotoId={syncedPhotoIdRef.current ?? photos[session.lastPhotoIndex ?? 0]?.id ?? null}
                   canEdit={canEditSession}
+                  isAdmin={isOwner}
                   onPinDataChanged={triggerPinRefresh}
                   onPhotoChange={(photoId) => { syncedPhotoIdRef.current = photoId; }}
                 />
