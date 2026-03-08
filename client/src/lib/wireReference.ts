@@ -491,6 +491,7 @@ export function correctWireDetails(rawDetails: string): CorrectionResult {
 
   const SPECIAL_ALIASES: Record<string, string> = {
     "25001XHHWALBR": "XHHW250BR1000",
+    "25001XHHWALBN": "XHHW250BR1000",
     "25001XHHWALOR": "XHHW250OR1000",
   };
   if (SPECIAL_ALIASES[input]) {
