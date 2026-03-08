@@ -23,7 +23,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { lookupCategory, type ParsedCatalogEntry } from "@/lib/wireReference";
-import type { Photo, Pin } from "@shared/schema";
+import type { Photo, Pin, Entry } from "@shared/schema";
 import ReelCropPreview from "./ReelCropPreview";
 import type { LocalPin } from "./types";
 import { deriveVendorCode } from "./utils";
@@ -48,6 +48,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"],
     enabled: sessionId > 0,
     refetchInterval: 10000,
+  });
+
+  const { data: sessionEntries } = useQuery<Entry[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "entries"],
+    enabled: sessionId > 0,
   });
 
   const incompletePinsMap = new Map<number, number>();
@@ -579,18 +584,21 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const parentPhotoOptions = uploadedPhotos.filter((p, i) => i !== currentPhotoIdx && p.dbId && !p.isDetailShot);
 
   const getNextReceivingSection = useCallback(() => {
-    const isRec = aisle.trim().toLowerCase() === "receiving";
-    if (!isRec) return "000";
     const allReceivingPhotos = [
       ...photos.filter(p => (p.aisle || "").toLowerCase() === "receiving"),
       ...uploadedPhotos.filter(p => (p.aisle || "").toLowerCase() === "receiving" && !photos.some(pp => pp.id === p.dbId)),
     ];
-    const existingSections = allReceivingPhotos
+    const photoSections = allReceivingPhotos
       .map(p => parseInt(p.section || "0", 10))
       .filter(n => !isNaN(n));
-    const maxSection = existingSections.length > 0 ? Math.max(...existingSections) : 0;
+    const entrySections = (sessionEntries || [])
+      .filter(e => (e.aisle || "").toLowerCase() === "receiving")
+      .map(e => parseInt(e.section || "0", 10))
+      .filter(n => !isNaN(n));
+    const allSections = [...photoSections, ...entrySections];
+    const maxSection = allSections.length > 0 ? Math.max(...allSections) : 0;
     return String(maxSection + 1).padStart(3, "0");
-  }, [aisle, photos, uploadedPhotos]);
+  }, [photos, uploadedPhotos, sessionEntries]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -1277,9 +1285,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           </div>
           <div className="hidden sm:flex items-center gap-2">
             <Button
-              className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
+              className={`bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)] transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || !canEdit}
+              disabled={isUploading || !canEdit || showQuickEntry}
               data-testid="button-upload-photos"
               title="Upload Photos"
             >
@@ -1287,9 +1295,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               Upload Photos
             </Button>
             <Button
-              className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
+              className={`bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)] transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
               onClick={() => cameraInputRef.current?.click()}
-              disabled={isUploading || !canEdit}
+              disabled={isUploading || !canEdit || showQuickEntry}
               data-testid="button-take-photo"
               title="Take Photo"
             >
@@ -1310,18 +1318,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         </div>
         <div className="flex sm:hidden items-center justify-center gap-4">
           <Button
-            className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
+            className={`bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)] transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading || !canEdit}
+            disabled={isUploading || !canEdit || showQuickEntry}
             data-testid="button-upload-photos-mobile"
             title="Upload Photos"
           >
             {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
           </Button>
           <Button
-            className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]"
+            className={`bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)] transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
             onClick={() => cameraInputRef.current?.click()}
-            disabled={isUploading || !canEdit}
+            disabled={isUploading || !canEdit || showQuickEntry}
             data-testid="button-take-photo-mobile"
             title="Take Photo"
           >
@@ -1364,6 +1372,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             canEdit={canEdit}
             defaultAisle={currentPhoto?.aisle || aisle || ""}
             defaultSection={currentPhoto?.section || ""}
+            getNextReceivingSection={getNextReceivingSection}
           />
         </div>
       )}

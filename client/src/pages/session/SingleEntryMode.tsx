@@ -14,7 +14,7 @@ import { lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/w
 import type { Entry, Pin } from "@shared/schema";
 
 export default function SingleEntryMode({
-  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true, defaultAisle, defaultSection,
+  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true, defaultAisle, defaultSection, getNextReceivingSection,
 }: {
   sessionId: number;
   editingEntry: Entry | null;
@@ -24,6 +24,7 @@ export default function SingleEntryMode({
   canEdit?: boolean;
   defaultAisle?: string;
   defaultSection?: string;
+  getNextReceivingSection?: () => string;
 }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -60,8 +61,9 @@ export default function SingleEntryMode({
     reelCount: editingEntry?.reelCount?.toString() || "1",
     conductors: editingEntry?.conductors || "",
   });
-  const [onFloor, setOnFloor] = useState(editingEntry?.notes?.includes("On Floor") || false);
-  const [inFrontOf, setInFrontOf] = useState(editingEntry?.notes?.includes("In Front Of") || false);
+  const [onFloorInFront, setOnFloorInFront] = useState(
+    (editingEntry?.notes?.includes("On Floor") || editingEntry?.notes?.includes("In Front Of")) || false
+  );
   const [receivingChecked, setReceivingChecked] = useState(editingEntry?.aisle?.toLowerCase() === "receiving" || false);
   const [footageOverride, setFootageOverride] = useState(!!editingEntry);
   const lastMatchedCatalog = useRef<string | null>(null);
@@ -107,8 +109,9 @@ export default function SingleEntryMode({
         reelCount: editingEntry.reelCount?.toString() || "1",
         conductors: editingEntry.conductors || "",
       });
-      setOnFloor(editingEntry.notes?.includes("On Floor") || false);
-      setInFrontOf(editingEntry.notes?.includes("In Front Of") || false);
+      setOnFloorInFront(
+        (editingEntry.notes?.includes("On Floor") || editingEntry.notes?.includes("In Front Of")) || false
+      );
       setReceivingChecked(editingEntry.aisle?.toLowerCase() === "receiving" || false);
       setFootageOverride(true);
       lastMatchedCatalog.current = editingEntry.reelTag?.toUpperCase().replace(/[^A-Z0-9]/g, "") || null;
@@ -324,8 +327,7 @@ export default function SingleEntryMode({
           position: "", reelTag: "", wireType: "", gauge: "",
           footage: "", color: "", manufacturer: "", notes: "", reelCount: "1", conductors: "",
         });
-        setOnFloor(false);
-        setInFrontOf(false);
+        setOnFloorInFront(false);
         setReceivingChecked(false);
         setFootageOverride(false);
         lastMatchedCatalog.current = null;
@@ -444,7 +446,8 @@ export default function SingleEntryMode({
               setReceivingChecked(checked);
               if (checked) {
                 update("aisle", "Receiving");
-                update("section", "000");
+                const nextSection = getNextReceivingSection ? getNextReceivingSection() : "000";
+                update("section", nextSection);
               } else {
                 update("aisle", "");
                 update("section", "");
@@ -456,27 +459,16 @@ export default function SingleEntryMode({
         </label>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <Checkbox
-            checked={onFloor}
+            checked={onFloorInFront}
             onCheckedChange={(c) => {
               const checked = !!c;
-              setOnFloor(checked);
+              setOnFloorInFront(checked);
               toggleNoteTag("On Floor", checked);
-            }}
-            data-testid="checkbox-on-floor"
-          />
-          On Floor
-        </label>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox
-            checked={inFrontOf}
-            onCheckedChange={(c) => {
-              const checked = !!c;
-              setInFrontOf(checked);
               toggleNoteTag("In Front Of", checked);
             }}
-            data-testid="checkbox-in-front-of"
+            data-testid="checkbox-on-floor-in-front"
           />
-          In Front Of
+          On Floor, In Front Of
         </label>
       </div>
 
