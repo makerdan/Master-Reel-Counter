@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight, Grid3X3, List, Flag, ScanSearch,
+  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, ChevronRight, Grid3X3, List, Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -98,28 +98,6 @@ function loadSavedResults(sessionId: number): SavedCardResult[] {
   } catch { return []; }
 }
 
-function getMarkerCacheKey(sessionId: number, photoId: number) {
-  return `marker-detect-${sessionId}-${photoId}`;
-}
-
-function loadCachedMarkers(sessionId: number, photoId: number): Array<{ x: number; y: number }> | null {
-  try {
-    const raw = localStorage.getItem(getMarkerCacheKey(sessionId, photoId));
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
-      return data.markers;
-    }
-    localStorage.removeItem(getMarkerCacheKey(sessionId, photoId));
-    return null;
-  } catch { return null; }
-}
-
-function saveCachedMarkers(sessionId: number, photoId: number, markers: Array<{ x: number; y: number }>) {
-  try {
-    localStorage.setItem(getMarkerCacheKey(sessionId, photoId), JSON.stringify({ markers, timestamp: Date.now() }));
-  } catch {}
-}
 
 function computeSmartZoom(pinCount: number): number {
   if (pinCount <= 3) return 0.15;
@@ -315,10 +293,6 @@ export default function LabelScannerTab({
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [batchMode, setBatchMode] = useState(false);
-  const [detecting, setDetecting] = useState(false);
-  const [detectProgress, setDetectProgress] = useState<{ done: number; total: number } | null>(null);
-  const [detectionLockedByOther, setDetectionLockedByOther] = useState(false);
-  const cancelDetectionRef = useRef(false);
 
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
@@ -373,23 +347,6 @@ export default function LabelScannerTab({
     }
   }, [availablePhotos, currentPhotoId]);
 
-  useEffect(() => {
-    if (detecting) return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/sessions/${sessionId}/detection-lock`, { credentials: "include" });
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
-        if (!cancelled) {
-          setDetectionLockedByOther(!!data.locked);
-        }
-      } catch {}
-    };
-    poll();
-    const interval = setInterval(poll, 5000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [sessionId, detecting]);
 
   const { data: committedPins = [], isLoading: pinsLoading } = useQuery<Pin[]>({
     queryKey: ["/api/photos", String(currentPhotoId), "pins"],
@@ -760,128 +717,6 @@ export default function LabelScannerTab({
     }
   }
 
-  async function fetchMarkers(photoId: number): Promise<Array<{ x: number; y: number }>> {
-    const local = loadCachedMarkers(sessionId, photoId);
-    if (local) return local;
-
-    try {
-      const cacheRes = await fetch(`/api/photos/${photoId}/marker-cache`, { credentials: "include" });
-      if (cacheRes.ok) {
-        const cacheData = await cacheRes.json();
-        if (cacheData.markers && Array.isArray(cacheData.markers)) {
-          saveCachedMarkers(sessionId, photoId, cacheData.markers);
-          return cacheData.markers;
-        }
-      }
-    } catch {}
-
-    const res = await apiRequest("POST", `/api/photos/${photoId}/detect-markers`, {});
-    const data = await res.json();
-    const markers = data.markers || [];
-    saveCachedMarkers(sessionId, photoId, markers);
-    return markers;
-  }
-
-  async function handleDetectMarkers(forceBatch = false) {
-    if (detecting) return;
-    cancelDetectionRef.current = false;
-    setDetecting(true);
-    setDetectProgress(null);
-    try {
-      if (batchMode || forceBatch) {
-        const photosWithNoPins = photos.filter(p => {
-          const photoPins = allSessionPins.filter(pin => pin.photoId === p.id);
-          return photoPins.length === 0 && !p.isDetailShot;
-        });
-        if (photosWithNoPins.length === 0) {
-          toast({ title: "No photos to scan", description: "All photos already have pins placed." });
-          return;
-        }
-        setDetectProgress({ done: 0, total: photosWithNoPins.length });
-        let totalPinsPlaced = 0;
-        let photosProcessed = 0;
-        let wasCancelled = false;
-        for (const p of photosWithNoPins) {
-          if (cancelDetectionRef.current) {
-            wasCancelled = true;
-            break;
-          }
-          let markers: Array<{ x: number; y: number }>;
-          try {
-            markers = await fetchMarkers(p.id);
-          } catch (err: any) {
-            if (err?.message?.includes("409")) {
-              toast({ title: "Detection in progress", description: "Another user is already running detection.", variant: "destructive" });
-              return;
-            }
-            throw err;
-          }
-          if (markers.length > 0) {
-            const draftPins = markers.map((m, i) => ({
-              xPercent: m.x,
-              yPercent: m.y,
-              label: String(i + 1).padStart(3, "0"),
-              reelCount: 1,
-            }));
-            await apiRequest("PUT", `/api/photos/${p.id}/draft-pins`, { pins: draftPins });
-            totalPinsPlaced += markers.length;
-          }
-          photosProcessed++;
-          setDetectProgress({ done: photosProcessed, total: photosWithNoPins.length });
-          queryClient.invalidateQueries({ queryKey: ["/api/photos", String(p.id), "pins"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
-          onPinDataChanged?.();
-        }
-        if (wasCancelled) {
-          toast({ title: "Detection paused", description: `Processed ${photosProcessed} of ${photosWithNoPins.length} photos (${totalPinsPlaced} pin${totalPinsPlaced !== 1 ? "s" : ""} placed). Resume anytime to continue.` });
-        } else {
-          toast({ title: "Auto-detect complete", description: `Placed ${totalPinsPlaced} pin${totalPinsPlaced !== 1 ? "s" : ""} across ${photosProcessed} photo${photosProcessed !== 1 ? "s" : ""}.` });
-        }
-      } else {
-        if (!currentPhotoId) return;
-        const existingPins = allSessionPins.filter(pin => pin.photoId === currentPhotoId);
-        const existingDrafts = existingPins.filter(p => !p.entryId);
-        if (existingDrafts.length > 0) {
-          if (!window.confirm(`This photo has ${existingDrafts.length} draft pin${existingDrafts.length !== 1 ? "s" : ""}. Auto-detect will replace them. Continue?`)) {
-            return;
-          }
-        }
-        let markers: Array<{ x: number; y: number }>;
-        try {
-          markers = await fetchMarkers(currentPhotoId);
-        } catch (err: any) {
-          if (err?.message?.includes("409")) {
-            toast({ title: "Detection in progress", description: "Another user is already running detection.", variant: "destructive" });
-            return;
-          }
-          throw err;
-        }
-        if (markers.length === 0) {
-          toast({ title: "No markers found", description: "No orange sticker dots were detected in this photo." });
-          return;
-        }
-        const committedPins = existingPins.filter(p => p.entryId);
-        const startLabel = committedPins.length;
-        const draftPins = markers.map((m, i) => ({
-          xPercent: m.x,
-          yPercent: m.y,
-          label: String(startLabel + i + 1).padStart(3, "0"),
-          reelCount: 1,
-        }));
-        await apiRequest("PUT", `/api/photos/${currentPhotoId}/draft-pins`, { pins: draftPins });
-        queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/photos", String(currentPhotoId), "pins"] });
-        onPinDataChanged?.();
-        toast({ title: "Markers detected", description: `Placed ${markers.length} pin${markers.length !== 1 ? "s" : ""} on this photo.` });
-      }
-    } catch (error: any) {
-      toast({ title: "Detection failed", description: error.message || "Failed to detect markers", variant: "destructive" });
-    } finally {
-      setDetecting(false);
-      setDetectProgress(null);
-    }
-  }
-
   const retryRequest = async (method: string, url: string, body: any, retries = 2): Promise<any> => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -1081,10 +916,6 @@ export default function LabelScannerTab({
   );
 
   if (!availablePhotos.length) {
-    const hasPhotosWithNoPins = photos.some(p => {
-      const photoPins = allSessionPins.filter(pin => pin.photoId === p.id);
-      return photoPins.length === 0 && !p.isDetailShot;
-    });
     return (
       <div className="space-y-4" data-testid="scanner-no-photos">
         {photoSelector}
@@ -1092,35 +923,6 @@ export default function LabelScannerTab({
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p>{photos.length > 0 ? "All photos have been fully scanned and applied." : "No photos in this session yet. Upload photos in the Section Photo tab first."}</p>
         </div>
-        {photos.length > 0 && hasPhotosWithNoPins && canEdit && (
-          <div className="flex justify-center pt-2">
-            <Button
-              onClick={() => handleDetectMarkers(true)}
-              disabled={detecting || detectionLockedByOther}
-              className="gap-2 bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"
-              data-testid="btn-detect-markers-empty"
-            >
-              {detectionLockedByOther ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Detection in progress...
-                </>
-              ) : detecting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {detectProgress
-                    ? `Photo ${detectProgress.done}/${detectProgress.total}...`
-                    : "Detecting..."}
-                </>
-              ) : (
-                <>
-                  <ScanSearch className="h-4 w-4" />
-                  Auto-Detect Pins on All Photos
-                </>
-              )}
-            </Button>
-          </div>
-        )}
       </div>
     );
   }
@@ -1241,6 +1043,31 @@ export default function LabelScannerTab({
             </Button>
           )}
         </div>
+        {phase === "preview" && (
+          <div className="pt-1">
+            <Button
+              size="sm"
+              onClick={handleAnalyze}
+              disabled={analyzing || !includedCards.length || !canEdit}
+              className="gap-2 bg-[hsl(18_85%_32%)] hover:bg-[hsl(18_85%_38%)] text-white"
+              data-testid="btn-analyze-labels"
+            >
+              {analyzing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {analyzeProgress
+                    ? `Batch ${analyzeProgress.done}/${analyzeProgress.total}...`
+                    : "Analyzing..."}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Analyze {includedCards.length} Label{includedCards.length !== 1 ? "s" : ""}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
         {!batchMode && photo && (photo.aisle || photo.section) && (
           <div className="flex items-center gap-3 pl-7" data-testid="text-aisle-section">
             {photo.aisle && (
@@ -1500,66 +1327,6 @@ export default function LabelScannerTab({
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
-        {phase === "preview" && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              onClick={() => handleDetectMarkers()}
-              disabled={detecting || analyzing || detectionLockedByOther || !canEdit || (!batchMode && !currentPhotoId)}
-              className="gap-2 bg-[hsl(25_70%_25%)] hover:bg-[hsl(25_70%_32%)] text-white"
-              data-testid="btn-detect-markers"
-            >
-              {detectionLockedByOther ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Detection in progress...
-                </>
-              ) : detecting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {detectProgress
-                    ? `Photo ${detectProgress.done}/${detectProgress.total}...`
-                    : "Detecting..."}
-                </>
-              ) : (
-                <>
-                  <ScanSearch className="h-4 w-4" />
-                  {batchMode ? "Auto-Detect All" : "Auto-Detect Pins"}
-                </>
-              )}
-            </Button>
-            {detecting && (
-              <Button
-                onClick={() => { cancelDetectionRef.current = true; }}
-                variant="outline"
-                className="gap-2 border-red-400 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-950"
-                data-testid="btn-cancel-detection"
-              >
-                <X className="h-4 w-4" />
-                Cancel
-              </Button>
-            )}
-            <Button
-              onClick={handleAnalyze}
-              disabled={analyzing || !includedCards.length || !canEdit}
-              className="gap-2 bg-[hsl(18_85%_32%)] hover:bg-[hsl(18_85%_38%)] text-white"
-              data-testid="btn-analyze-labels"
-            >
-              {analyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {analyzeProgress
-                    ? `Batch ${analyzeProgress.done}/${analyzeProgress.total}...`
-                    : "Analyzing..."}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  Analyze {includedCards.length} Label{includedCards.length !== 1 ? "s" : ""}
-                </>
-              )}
-            </Button>
-          </div>
-        )}
         {phase === "results" && (
           <>
             <div className="flex items-center gap-2">
