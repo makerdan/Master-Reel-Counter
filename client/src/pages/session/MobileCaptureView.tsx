@@ -571,6 +571,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
                 placeholder={isReceiving ? "Optional" : "Section"}
+                className={!isReceiving && !section.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
                 tabIndex={2}
                 enterKeyHint="done"
                 data-testid="input-mobile-section"
