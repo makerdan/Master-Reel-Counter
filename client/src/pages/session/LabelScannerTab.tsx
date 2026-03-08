@@ -563,12 +563,13 @@ export default function LabelScannerTab({
         const smartZoom = computeSmartZoom(pinCountByPhoto.get(pin.photoId) || 1);
         const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: true, isDraft: !pin.entryId };
         if (sr) {
-          return { ...base, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
+          return { ...base, included: false, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
         }
         const local = localResultsMap.get(pin.id);
         if (local && local.rawText !== null) {
           return {
             ...base,
+            included: false,
             editCatalog: local.editCatalog ?? "",
             editFootage: local.editFootage ?? "",
             editVendor: local.editVendor ?? "",
@@ -591,9 +592,8 @@ export default function LabelScannerTab({
   }, [cachedResults]);
 
   const displayCards = useMemo(() => {
-    if (batchMode || isReceiving) return cards;
-    if (!currentPhotoId) return cards;
-    return cards.filter((c) => c.pin.photoId === currentPhotoId);
+    const base = (batchMode || isReceiving) ? cards : !currentPhotoId ? cards : cards.filter((c) => c.pin.photoId === currentPhotoId);
+    return base.filter((c) => !c.pin.flagged);
   }, [cards, batchMode, isReceiving, currentPhotoId]);
 
   const cardsWithResults = displayCards.filter((c) => c.result).length;
@@ -610,14 +610,17 @@ export default function LabelScannerTab({
         if (!result) return card;
         const matchResult = result.rawText ? matchLabelText(result.rawText) : undefined;
         const parsed = matchResult?.match;
-        return {
+        const updated = {
           ...card,
           result,
           matchResult,
           editCatalog: parsed?.catalog ?? "",
           editFootage: parsed?.footage ? String(parsed.footage) : "",
           editVendor: parsed?.vendor ?? "",
+          included: false,
         };
+        saveSelectionState(sessionId, card.pin.id, false);
+        return updated;
       })
     );
     setPhase("results");
