@@ -116,15 +116,14 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center sm:flex sm:justify-start sm:gap-2">
-        <Flag className="sm:hidden h-5 w-5 text-yellow-500" />
-        <h2 className="text-lg font-bold underline flex items-center gap-2" data-testid="text-flagged-heading">
-          <Flag className="hidden sm:inline h-5 w-5 text-yellow-500" />
+      <div className="flex flex-col items-center gap-2">
+        <h2 className="text-lg font-bold underline flex items-center gap-2 justify-center" data-testid="text-flagged-heading">
+          <Flag className="h-5 w-5 text-yellow-500" />
           <span className="sm:hidden">Flagged</span>
           <span className="hidden sm:inline">Flagged Reels</span>
-          <Badge variant="secondary" className="hidden sm:inline-flex" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
+          <Badge variant="secondary" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
         </h2>
-        <div className="flex justify-end sm:contents">
+        <div className="flex justify-center">
           <Button
             variant="outline"
             size="sm"
@@ -219,10 +218,10 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     )}
                   </div>
                   {(pin.photoAisle || pin.photoSection) && (
-                    <div className="flex gap-2 text-xs text-muted-foreground mb-0.5" data-testid={`text-location-${pin.id}`}>
-                      {pin.photoAisle && <span>Aisle {pin.photoAisle}</span>}
+                    <div className="flex gap-2 text-sm font-mono mb-0.5" data-testid={`text-location-${pin.id}`}>
+                      {pin.photoAisle && <span><span className="font-bold">Aisle</span> {pin.photoAisle}</span>}
                       {pin.photoAisle && pin.photoSection && <span>&middot;</span>}
-                      {pin.photoSection && <span>Section {pin.photoSection}</span>}
+                      {pin.photoSection && <span><span className="font-bold">Section</span> {pin.photoSection}</span>}
                     </div>
                   )}
                   <div className="flex gap-3 text-xs text-muted-foreground font-mono">
@@ -379,9 +378,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                     <MapPin className="h-5 w-5 text-muted-foreground" />
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 w-full text-xs font-mono text-muted-foreground">
-                  <span>Aisle:{pin.photoAisle ? ` ${pin.photoAisle}` : ""}</span>
-                  <span>Section:{pin.photoSection ? ` ${pin.photoSection}` : ""}</span>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 w-full text-sm font-mono text-muted-foreground">
+                  <span><span className="font-bold">Aisle</span>{pin.photoAisle ? ` ${pin.photoAisle}` : ""}</span>
+                  <span><span className="font-bold">Section</span>{pin.photoSection ? ` ${pin.photoSection}` : ""}</span>
                   <span>{pin.reelCount} Reel{pin.reelCount !== 1 ? "s" : ""}</span>
                   <span>{[pin.vendorCode, pin.footage ? `${pin.footage.toLocaleString()} ft` : ""].filter(Boolean).join(", ")}</span>
                 </div>

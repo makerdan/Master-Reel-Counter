@@ -62,7 +62,7 @@ export default function SingleEntryMode({
     conductors: editingEntry?.conductors || "",
   });
   const [onFloorInFront, setOnFloorInFront] = useState(
-    (editingEntry?.notes?.includes("On Floor") || editingEntry?.notes?.includes("In Front Of")) || false
+    (editingEntry?.notes?.includes("On the floor, in front of.") || editingEntry?.notes?.includes("On Floor") || editingEntry?.notes?.includes("In Front Of")) || false
   );
   const [receivingChecked, setReceivingChecked] = useState(editingEntry?.aisle?.toLowerCase() === "receiving" || false);
   const [footageOverride, setFootageOverride] = useState(!!editingEntry);
@@ -110,7 +110,7 @@ export default function SingleEntryMode({
         conductors: editingEntry.conductors || "",
       });
       setOnFloorInFront(
-        (editingEntry.notes?.includes("On Floor") || editingEntry.notes?.includes("In Front Of")) || false
+        (editingEntry.notes?.includes("On the floor, in front of.") || editingEntry.notes?.includes("On Floor") || editingEntry.notes?.includes("In Front Of")) || false
       );
       setReceivingChecked(editingEntry.aisle?.toLowerCase() === "receiving" || false);
       setFootageOverride(true);
@@ -463,8 +463,11 @@ export default function SingleEntryMode({
             onCheckedChange={(c) => {
               const checked = !!c;
               setOnFloorInFront(checked);
-              toggleNoteTag("On Floor", checked);
-              toggleNoteTag("In Front Of", checked);
+              setForm((f) => {
+                const parts = f.notes.split("; ").filter(p => p.trim() && p.trim() !== "On the floor, in front of." && p.trim() !== "On Floor" && p.trim() !== "In Front Of");
+                if (checked) parts.unshift("On the floor, in front of.");
+                return { ...f, notes: parts.join("; ") };
+              });
             }}
             data-testid="checkbox-on-floor-in-front"
           />
