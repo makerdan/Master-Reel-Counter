@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, Grid3X3, List, Flag,
@@ -310,6 +310,15 @@ export default function LabelScannerTab({
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const [batchMode, setBatchMode] = useState(false);
+  const cardsPhotoRef = useRef<number | null>(initialPhotoId);
+
+  useLayoutEffect(() => {
+    if (!batchMode && selectedPhotoId !== cardsPhotoRef.current) {
+      cardsPhotoRef.current = selectedPhotoId;
+      setCards([]);
+      setPhase("preview");
+    }
+  }, [selectedPhotoId, batchMode]);
 
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
@@ -580,12 +589,12 @@ export default function LabelScannerTab({
     }
   }, [cachedResults]);
 
-  const cardsWithResults = cards.filter((c) => c.result).length;
+  const cardsWithResults = displayCards.filter((c) => c.result).length;
   useEffect(() => {
-    if (phase === "preview" && cards.length > 0 && cardsWithResults > 0) {
+    if (phase === "preview" && displayCards.length > 0 && cardsWithResults > 0) {
       setPhase("results");
     }
-  }, [cards.length, cardsWithResults, phase]);
+  }, [displayCards.length, cardsWithResults, phase]);
 
   function applyResults(results: AnalysisResult[]) {
     setCards((prev) =>
@@ -639,7 +648,13 @@ export default function LabelScannerTab({
     );
   };
 
-  const includedCards = cards.filter((c) => c.included);
+  const displayCards = useMemo(() => {
+    if (batchMode || isReceiving) return cards;
+    if (!currentPhotoId) return cards;
+    return cards.filter((c) => c.pin.photoId === currentPhotoId);
+  }, [cards, batchMode, isReceiving, currentPhotoId]);
+
+  const includedCards = displayCards.filter((c) => c.included);
 
   const toggleFlag = useCallback(async (pinId: number) => {
     const card = cards.find((c) => c.pin.id === pinId);
@@ -1016,7 +1031,7 @@ export default function LabelScannerTab({
     );
   }
 
-  const selectedForApply = cards.filter((c) => c.included && (c.result || c.editCatalog || c.editVendor));
+  const selectedForApply = displayCards.filter((c) => c.included && (c.result || c.editCatalog || c.editVendor));
 
   const currentPhotoIndex = availablePhotos.findIndex((p) => p.id === currentPhotoId);
   const nextPhoto = currentPhotoIndex >= 0 && currentPhotoIndex < availablePhotos.length - 1
@@ -1171,10 +1186,10 @@ export default function LabelScannerTab({
         </div>
       )}
 
-      {batchMode && phase === "preview" && cards.length > 0 && (
+      {batchMode && phase === "preview" && displayCards.length > 0 && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(25_12%_20%)] border border-[hsl(18_60%_30%/0.2)] rounded text-white/60 text-xs" data-testid="batch-summary-note">
           <Grid3X3 className="h-3.5 w-3.5 flex-shrink-0" />
-          <span>{cards.length} pin{cards.length !== 1 ? "s" : ""} across {new Set(cards.map((c) => c.pin.photoId)).size} photo{new Set(cards.map((c) => c.pin.photoId)).size !== 1 ? "s" : ""}</span>
+          <span>{displayCards.length} pin{displayCards.length !== 1 ? "s" : ""} across {new Set(displayCards.map((c) => c.pin.photoId)).size} photo{new Set(displayCards.map((c) => c.pin.photoId)).size !== 1 ? "s" : ""}</span>
         </div>
       )}
 
@@ -1183,7 +1198,7 @@ export default function LabelScannerTab({
           ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
           : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
       }`}>
-        {cards.map((card) => {
+        {displayCards.map((card) => {
           const hasFilled = !!(card.pin.wireDetails && card.pin.footage);
           const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
           const cardPhotoObj = isFromOtherPhoto ? photos.find((p) => p.id === card.pin.photoId) : photo;
@@ -1410,7 +1425,7 @@ export default function LabelScannerTab({
               </Button>
             </div>
             <Button
-              onClick={() => applyMutation.mutate(cards)}
+              onClick={() => applyMutation.mutate(displayCards)}
               disabled={applyMutation.isPending || !selectedForApply.length}
               className="gap-2 bg-green-800 hover:bg-green-700 text-white"
               data-testid="btn-apply-labels"
