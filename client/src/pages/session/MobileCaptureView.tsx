@@ -493,7 +493,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           )}
           <form onSubmit={(e) => e.preventDefault()} className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className={`text-xs underline${!aisle.trim() ? " text-[hsl(18,85%,40%)]" : ""}`}>Aisle: <span className="text-destructive">*</span></Label>
+              <Label className={`text-xs underline${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Aisle: <span className="text-destructive">*</span></Label>
               <Input
                 ref={aisleInputRef}
                 value={aisle}
@@ -565,7 +565,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               </div>
             </div>
             <div className="space-y-1">
-              <Label className={`text-xs underline${!isReceiving && !section.trim() ? " text-[hsl(18,85%,40%)]" : ""}`}>Section:{!isReceiving && <span className="text-destructive"> *</span>}</Label>
+              <Label className={`text-xs underline${!isReceiving && !section.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Section:{!isReceiving && <span className="text-destructive"> *</span>}</Label>
               <Input
                 ref={sectionInputRef}
                 value={section}
