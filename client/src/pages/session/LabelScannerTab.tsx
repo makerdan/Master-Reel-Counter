@@ -585,7 +585,7 @@ export default function LabelScannerTab({
             matchResult: local.rawText ? matchLabelText(local.rawText) : undefined,
           };
         }
-        return { ...base, editCatalog: "", editFootage: "", editVendor: "" };
+        return { ...base, included: false, editCatalog: "", editFootage: "", editVendor: "" };
       });
       builtHasResults = built.some((c) => c.result);
       return builtHasResults ? sortCardsByCatalog(built) : built;
