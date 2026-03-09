@@ -708,6 +708,45 @@ function matchColor(s: string): { original: string; corrected: string | null; co
     }
   }
 
+  if (s.length >= 2) {
+    const c1 = s[0], c2 = s[1];
+    const FIRST_CHAR_SUBS: Record<string, { replacement: string; confident: boolean }> = {
+      "8": { replacement: "B", confident: true },
+      "6": { replacement: "G", confident: true },
+      "V": { replacement: "Y", confident: false },
+    };
+    const SECOND_CHAR_SUBS: Record<string, { replacement: string; confident: boolean }> = {
+      "1": { replacement: "L", confident: true },
+      "I": { replacement: "L", confident: true },
+      "H": { replacement: "N", confident: false },
+      "N": { replacement: "H", confident: false },
+      "0": { replacement: "D", confident: false },
+    };
+
+    const sub1 = FIRST_CHAR_SUBS[c1];
+    if (sub1) {
+      const candidate = sub1.replacement + c2;
+      if (COLOR_CODES.includes(candidate)) {
+        return { original: s.slice(0, 2), corrected: candidate, confident: sub1.confident };
+      }
+    }
+
+    const sub2 = SECOND_CHAR_SUBS[c2];
+    if (sub2) {
+      const candidate = c1 + sub2.replacement;
+      if (COLOR_CODES.includes(candidate)) {
+        return { original: s.slice(0, 2), corrected: candidate, confident: sub2.confident };
+      }
+    }
+
+    if (sub1 && sub2) {
+      const candidate = sub1.replacement + sub2.replacement;
+      if (COLOR_CODES.includes(candidate)) {
+        return { original: s.slice(0, 2), corrected: candidate, confident: false };
+      }
+    }
+  }
+
   if (s[0] === "K") {
     return { original: "K", corrected: "BK", confident: false };
   }
