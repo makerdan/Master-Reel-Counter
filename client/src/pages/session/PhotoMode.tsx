@@ -2105,12 +2105,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               }
                             }}
                             onBlur={() => {
+                              const hasSuggestionsOpen = activeSuggestionPin === pin.id && suggestions.length > 0;
                               setTimeout(() => {
                                 setActiveSuggestionPin(null);
                                 setSuggestionIndex(-1);
                                 setSuggestionPos(null);
                               }, 200);
-                              applyAutoFill(pin.id);
+                              if (!hasSuggestionsOpen || suggestionIndex >= 0) {
+                                applyAutoFill(pin.id);
+                              }
                             }}
                             onKeyDown={(e) => {
                               if (activeSuggestionPin === pin.id && suggestions.length > 0) {
