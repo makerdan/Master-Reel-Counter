@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StickyNote, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid } from "lucide-react";
+import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Photo } from "@shared/schema";
+import type { Photo, Pin } from "@shared/schema";
 
 function photoUrl(key: string): string {
   return key.startsWith("/uploads/") ? key : `/uploads/${key}`;
@@ -73,6 +73,7 @@ function PhotoCard({
   sessionId,
   canEdit,
   allPhotos,
+  pins,
   onJumpToPhoto,
   onClearUndoHistory,
 }: {
@@ -80,6 +81,7 @@ function PhotoCard({
   sessionId: number;
   canEdit: boolean;
   allPhotos: Photo[];
+  pins: Pin[];
   onJumpToPhoto: (id: number) => void;
   onClearUndoHistory?: () => void;
 }) {
@@ -220,6 +222,20 @@ function PhotoCard({
           className="w-full h-full object-cover"
           loading="lazy"
         />
+        {pins.map((pin) => (
+          <div
+            key={pin.id}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${pin.xPercent}%`,
+              top: `${pin.yPercent}%`,
+              transform: "translate(-50%, -50%)",
+            }}
+            title={pin.label || "Pin"}
+          >
+            <div className="w-3 h-3 rounded-full bg-amber-400 border-2 border-white shadow-md" />
+          </div>
+        ))}
         <Button
           size="icon"
           variant="ghost"
@@ -369,7 +385,7 @@ function PhotoCard({
             title={hasNotes ? "View/edit notes" : "Add notes"}
             data-testid={`button-strip-notes-${photo.id}`}
           >
-            <StickyNote className={`h-3.5 w-3.5 ${hasNotes ? "text-primary fill-primary/20" : "text-muted-foreground"}`} />
+            <Pencil className={`h-3.5 w-3.5 ${hasNotes ? "text-primary fill-primary/20" : "text-muted-foreground"}`} />
           </button>
         </div>
 
@@ -433,6 +449,17 @@ export default function PhotoStrip({
     queryKey: ["/api/sessions", sessionId.toString(), "photos"],
     enabled: sessionId > 0,
   });
+
+  const { data: allPins = [] } = useQuery<Pin[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "pins"],
+    enabled: sessionId > 0,
+  });
+
+  const pinsByPhoto = new Map<number, Pin[]>();
+  for (const pin of allPins) {
+    if (!pinsByPhoto.has(pin.photoId)) pinsByPhoto.set(pin.photoId, []);
+    pinsByPhoto.get(pin.photoId)!.push(pin);
+  }
 
   if (isLoading) {
     return (
@@ -506,6 +533,12 @@ export default function PhotoStrip({
                     <span className="text-[11px] text-muted-foreground/50">
                       · {sectionGroup.photos.length} photo{sectionGroup.photos.length !== 1 ? "s" : ""}
                     </span>
+                    {sectionGroup.photos.length > 1 && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-500 bg-blue-500/10 border border-blue-500/20 rounded px-1 py-0">
+                        <Link2 className="h-2.5 w-2.5" />
+                        Linked
+                      </span>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {sectionGroup.photos.map((photo) => (
@@ -515,6 +548,7 @@ export default function PhotoStrip({
                         sessionId={sessionId}
                         canEdit={canEdit}
                         allPhotos={photos}
+                        pins={pinsByPhoto.get(photo.id) ?? []}
                         onJumpToPhoto={onJumpToPhoto}
                         onClearUndoHistory={onClearUndoHistory}
                       />
