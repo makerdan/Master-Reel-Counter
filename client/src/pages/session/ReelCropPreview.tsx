@@ -111,25 +111,41 @@ export default function ReelCropPreview({
     dragStartRef.current = { x: e.clientX, y: e.clientY, panX: panRef.current.x, panY: panRef.current.y };
   }, []);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!draggingRef.current || !dragStartRef.current || e.pointerId !== activePointerRef.current) return;
-    const img = imgRef.current;
-    if (!img) return;
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
-    const scaleX = (img.width * zoomLevel) / DISPLAY_SIZE;
-    const scaleY = (img.height * zoomLevel) / DISPLAY_SIZE;
-    const cosR = Math.cos((-rotation * Math.PI) / 180);
-    const sinR = Math.sin((-rotation * Math.PI) / 180);
-    const rotDx = dx * cosR - dy * sinR;
-    const rotDy = dx * sinR + dy * cosR;
-    const maxPanX = img.width * 0.5;
-    const maxPanY = img.height * 0.5;
-    const newPanX = Math.max(-maxPanX, Math.min(maxPanX, dragStartRef.current.panX - rotDx * scaleX));
-    const newPanY = Math.max(-maxPanY, Math.min(maxPanY, dragStartRef.current.panY - rotDy * scaleY));
-    setPanX(newPanX);
-    setPanY(newPanY);
-  }, [zoomLevel, rotation]);
+  const zoomLevelRef = useRef(zoomLevel);
+  zoomLevelRef.current = zoomLevel;
+  const rotationRef = useRef(rotation);
+  rotationRef.current = rotation;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onMove = (e: PointerEvent) => {
+      if (!draggingRef.current || !dragStartRef.current || e.pointerId !== activePointerRef.current) return;
+      e.preventDefault();
+      const img = imgRef.current;
+      if (!img) return;
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      const scaleX = (img.width * zoomLevelRef.current) / DISPLAY_SIZE;
+      const scaleY = (img.height * zoomLevelRef.current) / DISPLAY_SIZE;
+      const rot = rotationRef.current;
+      const cosR = Math.cos((-rot * Math.PI) / 180);
+      const sinR = Math.sin((-rot * Math.PI) / 180);
+      const rotDx = dx * cosR - dy * sinR;
+      const rotDy = dx * sinR + dy * cosR;
+      const maxPanX = img.width * 0.5;
+      const maxPanY = img.height * 0.5;
+      const newPanX = Math.max(-maxPanX, Math.min(maxPanX, dragStartRef.current.panX - rotDx * scaleX));
+      const newPanY = Math.max(-maxPanY, Math.min(maxPanY, dragStartRef.current.panY - rotDy * scaleY));
+      setPanX(newPanX);
+      setPanY(newPanY);
+    };
+    canvas.addEventListener("pointermove", onMove, { passive: false });
+    return () => canvas.removeEventListener("pointermove", onMove);
+  }, []);
+
+  const handlePointerMove = useCallback((_e: React.PointerEvent<HTMLCanvasElement>) => {
+  }, []);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerId !== activePointerRef.current) return;
