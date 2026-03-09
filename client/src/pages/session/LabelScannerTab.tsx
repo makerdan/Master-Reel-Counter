@@ -668,6 +668,17 @@ export default function LabelScannerTab({
     saveSelectionState(sessionId, pinId, included);
   };
 
+  const toggleAllCards = (checked: boolean) => {
+    const displayIds = new Set(displayCards.map((c) => c.pin.id));
+    setCards((prev) =>
+      prev.map((c) => {
+        if (!displayIds.has(c.pin.id)) return c;
+        saveSelectionState(sessionId, c.pin.id, checked);
+        return { ...c, included: checked };
+      })
+    );
+  };
+
   const setCardField = (pinId: number, field: "editCatalog" | "editVendor", value: string) => {
     setCards((prev) =>
       prev.map((c) => (c.pin.id === pinId ? { ...c, [field]: value } : c))
@@ -675,6 +686,8 @@ export default function LabelScannerTab({
   };
 
   const includedCards = displayCards.filter((c) => c.included);
+  const allChecked = displayCards.length > 0 && displayCards.every((c) => c.included);
+  const someChecked = displayCards.some((c) => c.included);
 
   const toggleFlag = useCallback(async (pinId: number) => {
     const card = cards.find((c) => c.pin.id === pinId);
@@ -1141,6 +1154,42 @@ export default function LabelScannerTab({
                 </>
               )}
             </Button>
+          </div>
+        )}
+        {displayCards.length > 0 && (
+          <div className="pt-1 flex items-center justify-between gap-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-select-all">
+              <Checkbox
+                checked={allChecked}
+                data-state={someChecked && !allChecked ? "indeterminate" : undefined}
+                onCheckedChange={(v) => toggleAllCards(!!v)}
+                data-testid="checkbox-select-all"
+              />
+              <span className="text-xs text-white/60">
+                {allChecked ? "Deselect all" : "Select all"} ({displayCards.length})
+              </span>
+            </label>
+            {phase === "results" && (
+              <Button
+                size="sm"
+                onClick={() => applyMutation.mutate(displayCards)}
+                disabled={applyMutation.isPending || !selectedForApply.length}
+                className="gap-2 bg-green-800 hover:bg-green-700 text-white"
+                data-testid="btn-apply-labels-top"
+              >
+                {applyMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Applying...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Apply {selectedForApply.length} Selected
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
         {!batchMode && photo && (photo.aisle || photo.section) && (
