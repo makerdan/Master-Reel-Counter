@@ -1,5 +1,6 @@
 import {
   CATALOG,
+  WIRE_TYPES,
   parseCatalogEntry,
   correctWireDetails,
   type ParsedCatalogEntry,
@@ -65,12 +66,21 @@ function tryDescriptionMatch(tokens: string[]): { entry: ParsedCatalogEntry; sco
   let bestEntry: CatalogEntry | null = null;
   let bestScore = 0;
 
-  for (const entry of CATALOG) {
+  const upperTokens = tokens.map(t => t.toUpperCase());
+  const preferredType = WIRE_TYPES.find(wt =>
+    upperTokens.some(t => t === wt || t.startsWith(wt + "/") || t.startsWith(wt + "-"))
+  ) ?? null;
+
+  const candidates = preferredType
+    ? CATALOG.filter(e => e.catalog.startsWith(preferredType))
+    : CATALOG;
+
+  for (const entry of candidates) {
     const descUpper = entry.description.toUpperCase();
     const catUpper = entry.catalog.toUpperCase();
     let score = 0;
 
-    for (const token of tokens) {
+    for (const token of upperTokens) {
       if (token.length < 2) continue;
       if (descUpper.includes(token)) score += token.length;
       if (catUpper.includes(token)) score += token.length * 1.5;
@@ -82,7 +92,7 @@ function tryDescriptionMatch(tokens: string[]): { entry: ParsedCatalogEntry; sco
     }
   }
 
-  if (bestEntry && bestScore >= 6) {
+  if (bestEntry && bestScore >= 15) {
     return { entry: parseCatalogEntry(bestEntry), score: bestScore };
   }
   return null;
