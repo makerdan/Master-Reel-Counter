@@ -1241,11 +1241,6 @@ export default function LabelScannerTab({
             )}
           </button>
         </div>
-        {phase === "results" && (
-          <Badge className="text-[10px] bg-[hsl(25_30%_20%)] text-white/50 border-[hsl(18_30%_30%/0.3)]">
-            Sorted by type / size / color
-          </Badge>
-        )}
       </div>
 
       {includedCards.length > 20 && phase === "preview" && (
