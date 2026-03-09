@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Focus, X, ZoomIn, ZoomOut, RotateCw, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Focus, X, ZoomIn, ZoomOut, RotateCw, RotateCcw, Crosshair } from "lucide-react";
 
 interface ReelCropPreviewProps {
   photoUrl: string;
@@ -31,14 +31,22 @@ export default function ReelCropPreview({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const DISPLAY_SIZE = 320;
   const [rotation, setRotation] = useState<Rotation>(0);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const imgCacheRef = useRef<HTMLImageElement | null>(null);
 
   const clamp = (v: number) => Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v)) * 100) / 100;
 
   const rotateCw = () => setRotation(r => ((r + 90) % 360) as Rotation);
   const rotateCcw = () => setRotation(r => ((r + 270) % 360) as Rotation);
 
+  const resetPan = useCallback(() => { setPanX(0); setPanY(0); }, []);
+
   useEffect(() => {
     setRotation(0);
+    resetPan();
   }, [photoUrl, pinX, pinY]);
 
   useEffect(() => {
@@ -47,12 +55,13 @@ export default function ReelCropPreview({
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
+      imgCacheRef.current = img;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       const cropW = img.width * zoomLevel;
       const cropH = img.height * zoomLevel;
-      const cx = (pinX / 100) * img.width;
-      const cy = (pinY / 100) * img.height;
+      const cx = (pinX / 100) * img.width + panX;
+      const cy = (pinY / 100) * img.height + panY;
       let sx = cx - cropW / 2;
       let sy = cy - cropH / 2;
       sx = Math.max(0, Math.min(sx, img.width - cropW));
@@ -70,8 +79,51 @@ export default function ReelCropPreview({
       ctx.restore();
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY, zoomLevel, rotation]);
+  }, [photoUrl, pinX, pinY, zoomLevel, rotation, panX, panY]);
 
+  const activePointerRef = useRef<number | null>(null);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointerRef.current !== null) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.setPointerCapture(e.pointerId);
+    activePointerRef.current = e.pointerId;
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY, panX, panY };
+  }, [panX, panY]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dragStartRef.current || !isDragging || e.pointerId !== activePointerRef.current) return;
+    const img = imgCacheRef.current;
+    if (!img) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    const scaleX = (img.width * zoomLevel) / DISPLAY_SIZE;
+    const scaleY = (img.height * zoomLevel) / DISPLAY_SIZE;
+    const cosR = Math.cos((-rotation * Math.PI) / 180);
+    const sinR = Math.sin((-rotation * Math.PI) / 180);
+    const rotDx = dx * cosR - dy * sinR;
+    const rotDy = dx * sinR + dy * cosR;
+    const maxPanX = img.width * 0.5;
+    const maxPanY = img.height * 0.5;
+    const newPanX = Math.max(-maxPanX, Math.min(maxPanX, dragStartRef.current.panX - rotDx * scaleX));
+    const newPanY = Math.max(-maxPanY, Math.min(maxPanY, dragStartRef.current.panY - rotDy * scaleY));
+    setPanX(newPanX);
+    setPanY(newPanY);
+  }, [isDragging, zoomLevel, rotation]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerId !== activePointerRef.current) return;
+    const canvas = canvasRef.current;
+    if (canvas) canvas.releasePointerCapture(e.pointerId);
+    activePointerRef.current = null;
+    setIsDragging(false);
+    dragStartRef.current = null;
+  }, []);
+
+  const isPanned = Math.abs(panX) > 1 || Math.abs(panY) > 1;
   const isCloseup = Math.abs(zoomLevel - PRESET_CLOSEUP) < 0.01;
   const isWide = Math.abs(zoomLevel - PRESET_WIDE) < 0.01;
 
@@ -81,6 +133,18 @@ export default function ReelCropPreview({
         <Focus className="h-3 w-3" />
         Reel Preview — {label}
         <div className="flex items-center gap-1 ml-auto">
+          {isPanned && (
+            <button
+              type="button"
+              className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors bg-amber-600/20 text-amber-400 hover:bg-amber-600/30"
+              onClick={resetPan}
+              data-testid="button-recenter"
+              title="Re-center on pin"
+            >
+              <Crosshair className="h-3 w-3 inline mr-0.5" />
+              Re-center
+            </button>
+          )}
           <button
             type="button"
             className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors ${
@@ -88,7 +152,7 @@ export default function ReelCropPreview({
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover-elevate"
             }`}
-            onClick={() => onZoomChange(PRESET_CLOSEUP)}
+            onClick={() => { onZoomChange(PRESET_CLOSEUP); resetPan(); }}
             data-testid="button-crop-closeup"
           >
             Close-up
@@ -100,7 +164,7 @@ export default function ReelCropPreview({
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover-elevate"
             }`}
-            onClick={() => onZoomChange(PRESET_WIDE)}
+            onClick={() => { onZoomChange(PRESET_WIDE); resetPan(); }}
             data-testid="button-crop-wide"
           >
             Wide
@@ -160,8 +224,16 @@ export default function ReelCropPreview({
       <div className="rounded-md border border-border/50 overflow-hidden bg-black inline-block">
         <canvas
           ref={canvasRef}
-          className="block"
-          style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE }}
+          className="block touch-none"
+          style={{
+            width: DISPLAY_SIZE,
+            height: DISPLAY_SIZE,
+            cursor: isDragging ? "grabbing" : "grab",
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
           data-testid="reel-crop-canvas"
         />
       </div>
