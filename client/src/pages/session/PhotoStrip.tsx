@@ -86,6 +86,7 @@ function PhotoCard({
   onClearUndoHistory?: () => void;
 }) {
   const { toast } = useToast();
+  const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [aisle, setAisle] = useState(photo.aisle || "");
   const [section, setSection] = useState(photo.section || "");
   const [notes, setNotes] = useState(photo.notes || "");
@@ -221,21 +222,39 @@ function PhotoCard({
           alt={`Photo ${photo.id}`}
           className="w-full h-full object-cover"
           loading="lazy"
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+          }}
         />
-        {pins.map((pin) => (
-          <div
-            key={pin.id}
-            className="absolute pointer-events-none"
-            style={{
-              left: `${pin.xPercent}%`,
-              top: `${pin.yPercent}%`,
-              transform: "translate(-50%, -50%)",
-            }}
-            title={pin.label || "Pin"}
-          >
-            <div className="w-3 h-3 rounded-full bg-amber-400 border-2 border-white shadow-md" />
-          </div>
-        ))}
+        {pins.map((pin) => {
+          let displayX = pin.xPercent;
+          let displayY = pin.yPercent;
+          if (imgNaturalSize) {
+            const { w: iw, h: ih } = imgNaturalSize;
+            if (iw > ih) {
+              const ratio = iw / ih;
+              displayX = pin.xPercent * ratio - (ratio - 1) * 50;
+            } else if (ih > iw) {
+              const ratio = ih / iw;
+              displayY = pin.yPercent * ratio - (ratio - 1) * 50;
+            }
+          }
+          return (
+            <div
+              key={pin.id}
+              className="absolute pointer-events-none"
+              style={{
+                left: `${displayX}%`,
+                top: `${displayY}%`,
+                transform: "translate(-50%, -50%)",
+              }}
+              title={pin.label || "Pin"}
+            >
+              <div className="w-3 h-3 rounded-full bg-amber-400 border-2 border-white shadow-md" />
+            </div>
+          );
+        })}
         <Button
           size="icon"
           variant="ghost"
