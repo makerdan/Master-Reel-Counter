@@ -34,8 +34,14 @@ export default function ReelCropPreview({
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const draggingRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
-  const imgCacheRef = useRef<HTMLImageElement | null>(null);
+  const activePointerRef = useRef<number | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const imgUrlRef = useRef<string>("");
+
+  const panRef = useRef({ x: 0, y: 0 });
+  panRef.current = { x: panX, y: panY };
 
   const clamp = (v: number) => Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v)) * 100) / 100;
 
@@ -49,39 +55,49 @@ export default function ReelCropPreview({
     resetPan();
   }, [photoUrl, pinX, pinY]);
 
-  useEffect(() => {
+  const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const img = imgRef.current;
+    if (!canvas || !img || !img.complete || !img.naturalWidth) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const cropW = img.width * zoomLevel;
+    const cropH = img.height * zoomLevel;
+    const cx = (pinX / 100) * img.width + panRef.current.x;
+    const cy = (pinY / 100) * img.height + panRef.current.y;
+    let sx = cx - cropW / 2;
+    let sy = cy - cropH / 2;
+    sx = Math.max(0, Math.min(sx, img.width - cropW));
+    sy = Math.max(0, Math.min(sy, img.height - cropH));
+
+    const D = DISPLAY_SIZE * 2;
+    canvas.width = D;
+    canvas.height = D;
+    ctx.clearRect(0, 0, D, D);
+
+    ctx.save();
+    ctx.translate(D / 2, D / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.drawImage(img, sx, sy, cropW, cropH, -D / 2, -D / 2, D, D);
+    ctx.restore();
+  }, [pinX, pinY, zoomLevel, rotation]);
+
+  useEffect(() => {
+    if (imgUrlRef.current === photoUrl && imgRef.current) {
+      drawCanvas();
+      return;
+    }
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      imgCacheRef.current = img;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const cropW = img.width * zoomLevel;
-      const cropH = img.height * zoomLevel;
-      const cx = (pinX / 100) * img.width + panX;
-      const cy = (pinY / 100) * img.height + panY;
-      let sx = cx - cropW / 2;
-      let sy = cy - cropH / 2;
-      sx = Math.max(0, Math.min(sx, img.width - cropW));
-      sy = Math.max(0, Math.min(sy, img.height - cropH));
-
-      const D = DISPLAY_SIZE * 2;
-      canvas.width = D;
-      canvas.height = D;
-      ctx.clearRect(0, 0, D, D);
-
-      ctx.save();
-      ctx.translate(D / 2, D / 2);
-      ctx.rotate((rotation * Math.PI) / 180);
-      ctx.drawImage(img, sx, sy, cropW, cropH, -D / 2, -D / 2, D, D);
-      ctx.restore();
+      imgRef.current = img;
+      imgUrlRef.current = photoUrl;
+      drawCanvas();
     };
     img.src = photoUrl;
-  }, [photoUrl, pinX, pinY, zoomLevel, rotation, panX, panY]);
-
-  const activePointerRef = useRef<number | null>(null);
+  }, [photoUrl, pinX, pinY, zoomLevel, rotation, panX, panY, drawCanvas]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (activePointerRef.current !== null) return;
@@ -90,13 +106,14 @@ export default function ReelCropPreview({
     if (!canvas) return;
     canvas.setPointerCapture(e.pointerId);
     activePointerRef.current = e.pointerId;
+    draggingRef.current = true;
     setIsDragging(true);
-    dragStartRef.current = { x: e.clientX, y: e.clientY, panX, panY };
-  }, [panX, panY]);
+    dragStartRef.current = { x: e.clientX, y: e.clientY, panX: panRef.current.x, panY: panRef.current.y };
+  }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!dragStartRef.current || !isDragging || e.pointerId !== activePointerRef.current) return;
-    const img = imgCacheRef.current;
+    if (!draggingRef.current || !dragStartRef.current || e.pointerId !== activePointerRef.current) return;
+    const img = imgRef.current;
     if (!img) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
@@ -112,13 +129,14 @@ export default function ReelCropPreview({
     const newPanY = Math.max(-maxPanY, Math.min(maxPanY, dragStartRef.current.panY - rotDy * scaleY));
     setPanX(newPanX);
     setPanY(newPanY);
-  }, [isDragging, zoomLevel, rotation]);
+  }, [zoomLevel, rotation]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerId !== activePointerRef.current) return;
     const canvas = canvasRef.current;
     if (canvas) canvas.releasePointerCapture(e.pointerId);
     activePointerRef.current = null;
+    draggingRef.current = false;
     setIsDragging(false);
     dragStartRef.current = null;
   }, []);
@@ -224,7 +242,7 @@ export default function ReelCropPreview({
       <div className="rounded-md border border-border/50 overflow-hidden bg-black inline-block">
         <canvas
           ref={canvasRef}
-          className="block touch-none"
+          className="block touch-none select-none"
           style={{
             width: DISPLAY_SIZE,
             height: DISPLAY_SIZE,
