@@ -1,13 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Entry, Pin } from "@shared/schema";
+import type { Entry, Pin, Photo } from "@shared/schema";
+import { detectDuplicatePins, loadScannerResults, type DuplicateGroup } from "@/lib/duplicateDetector";
 
 interface FlaggedPin {
   id: number;
@@ -43,12 +44,17 @@ interface FlaggedReelsProps {
   onReshoot?: (aisle: string, section: string, parentPhotoId: number) => void;
 }
 
+function photoUrl(key: string): string {
+  return key.startsWith("/uploads/") ? key : `/uploads/${key}`;
+}
+
 export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedReelsProps) {
   const { toast } = useToast();
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "" });
+  const [dupsOpen, setDupsOpen] = useState(true);
 
   const { data: flaggedPins = [], isLoading } = useQuery<FlaggedPin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"],
@@ -111,6 +117,16 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
     queryKey: ["/api/sessions", sessionId.toString(), "pins"],
   });
 
+  const { data: sessionPhotos = [] } = useQuery<Photo[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "photos"],
+  });
+
+  const duplicateGroups = useMemo<DuplicateGroup[]>(() => {
+    if (!sessionPins.length || !sessionPhotos.length) return [];
+    const scannerResults = loadScannerResults(sessionId);
+    return detectDuplicatePins(sessionPins, sessionPhotos, scannerResults);
+  }, [sessionPins, sessionPhotos, sessionId]);
+
   const pinnedEntryIds = new Set(sessionPins.filter(p => p.entryId).map(p => p.entryId!));
   const unpinnedEntries = sessionEntries.filter(e => !pinnedEntryIds.has(e.id));
 
@@ -146,6 +162,106 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
           </Button>
         </div>
       </div>
+
+      {duplicateGroups.length > 0 && (
+        <div className="space-y-2" data-testid="section-duplicates">
+          <button
+            className="flex items-center gap-2 w-full pt-2 border-t border-border text-left"
+            onClick={() => setDupsOpen((o) => !o)}
+            data-testid="button-toggle-duplicates"
+          >
+            <Copy className="h-4 w-4 text-orange-500 shrink-0" />
+            <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400 flex-1">
+              Possible Duplicates ({duplicateGroups.length})
+            </h3>
+            {dupsOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          {dupsOpen && (
+            <div className="grid gap-2">
+              {duplicateGroups.map((group) => (
+                <div
+                  key={`${group.label}-${group.aisle}-${group.section}`}
+                  className={`border rounded-lg p-3 ${group.isDefiniteDoubleCount ? "border-orange-400/50 dark:border-orange-700/50 bg-orange-50/50 dark:bg-orange-950/20" : "border-amber-300/50 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/10"}`}
+                  data-testid={`dup-group-${group.label}`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-mono text-sm font-semibold" data-testid={`text-dup-label-${group.label}`}>
+                      Reel #{group.label}
+                    </span>
+                    {(group.aisle || group.section) && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {[group.aisle && `Aisle ${group.aisle}`, group.section && `Section ${group.section}`].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
+                    <Badge
+                      className={`ml-auto text-[10px] ${group.isDefiniteDoubleCount ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : "bg-amber-900/50 text-amber-300 border-amber-700/40"}`}
+                      data-testid={`badge-dup-type-${group.label}`}
+                    >
+                      {group.isDefiniteDoubleCount ? "Double Count" : "Check Needed"}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {group.pins.map((pin) => (
+                      <div
+                        key={pin.pinId}
+                        className="flex-1 min-w-[140px] max-w-[220px] border border-border rounded overflow-hidden bg-card"
+                        data-testid={`dup-pin-${pin.pinId}`}
+                      >
+                        {pin.photoObjectStorageKey ? (
+                          <div className="relative w-full aspect-video bg-muted overflow-hidden">
+                            <img
+                              src={photoUrl(pin.photoObjectStorageKey)}
+                              alt={`Pin ${pin.pinId}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <div
+                              className="absolute pointer-events-none"
+                              style={{
+                                left: `${pin.xPercent}%`,
+                                top: `${pin.yPercent}%`,
+                                transform: "translate(-50%, -50%)",
+                              }}
+                            >
+                              <div className="w-5 h-5 rounded-full bg-amber-400 border-2 border-white shadow-md" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-full aspect-video bg-muted flex items-center justify-center">
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="p-1.5 space-y-0.5">
+                          {pin.wireDetails && (
+                            <p className="text-[10px] font-mono font-semibold truncate" data-testid={`text-dup-wire-${pin.pinId}`}>
+                              {pin.wireDetails}
+                            </p>
+                          )}
+                          {pin.scannerCatalog && (
+                            <p className="text-[10px] font-mono text-muted-foreground truncate" data-testid={`text-dup-scanner-${pin.pinId}`}>
+                              Scan: {pin.scannerCatalog}
+                              {pin.scannerConfidence && pin.scannerConfidence !== "none" && (
+                                <span className={`ml-1 ${pin.scannerConfidence === "high" ? "text-green-500" : pin.scannerConfidence === "medium" ? "text-amber-500" : "text-red-400"}`}>
+                                  ({pin.scannerConfidence})
+                                </span>
+                              )}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-muted-foreground font-mono">
+                            {[pin.vendorCode, pin.footage ? `${pin.footage.toLocaleString()} ft` : null].filter(Boolean).join(" · ")}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {pin.entryId ? `Entry #${pin.entryId}` : "No entry"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
