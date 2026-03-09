@@ -468,6 +468,7 @@ export default function LabelScannerTab({
         photoPins.filter((p) => p.entryId).map((p) => `${p.xPercent.toFixed(5)}_${p.yPercent.toFixed(5)}_${p.label}`)
       );
       for (const pin of photoPins) {
+        if (pin.flagged) continue;
         if (pin.entryId) {
           if (!pin.wireDetails || pin.footage == null) {
             result.push(pin);

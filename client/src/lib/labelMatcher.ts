@@ -138,7 +138,8 @@ export function matchLabelText(rawText: string): LabelMatchResult {
     return { match: null, confidence: "none", normalizedInput: "", matchMethod: "none" };
   }
 
-  const normalized = normalize(rawText);
+  let normalized = normalize(rawText);
+  normalized = normalized.replace(/400R(\d)/g, "40OR$1").replace(/300R(\d)/g, "30OR$1");
   const tokens = extractTokens(rawText);
 
   const exactMatch = tryExactCatalogMatch(normalized);
