@@ -316,6 +316,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
         if (cmp !== 0) return cmp;
         return (a.photoSection || "").localeCompare(b.photoSection || "", undefined, { numeric: true });
       });
+      for (const g of groups) {
+        g.pins.sort((a, b) => (a.label || "").localeCompare(b.label || "", undefined, { numeric: true }));
+      }
     } else if (sortBy === "label") {
       groups.sort((a, b) => {
         const labelA = a.pins[0]?.label || "";
