@@ -49,42 +49,23 @@ function photoUrl(key: string): string {
 }
 
 function DupPinTile({ pin }: { pin: DuplicatePinInfo }) {
-  const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
-
-  let displayX = pin.xPercent;
-  let displayY = pin.yPercent;
-  if (imgNaturalSize) {
-    const { w: iw, h: ih } = imgNaturalSize;
-    if (iw > ih) {
-      const ratio = iw / ih;
-      displayX = pin.xPercent * ratio - (ratio - 1) * 50;
-    } else if (ih > iw) {
-      const ratio = ih / iw;
-      displayY = pin.yPercent * ratio - (ratio - 1) * 50;
-    }
-  }
-
   return (
     <div
-      className="flex-1 min-w-[140px] max-w-[220px] border border-border rounded overflow-hidden bg-card"
+      className="flex-1 min-w-[180px] max-w-[280px] border border-border rounded overflow-hidden bg-card"
       data-testid={`dup-pin-${pin.pinId}`}
     >
       {pin.photoObjectStorageKey ? (
-        <div className="relative w-full aspect-video bg-muted overflow-hidden">
+        <div className="relative w-full bg-muted">
           <img
             src={photoUrl(pin.photoObjectStorageKey)}
             alt={`Pin ${pin.pinId}`}
-            className="w-full h-full object-cover"
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-            }}
+            className="w-full h-auto block"
           />
           <div
             className="absolute pointer-events-none"
             style={{
-              left: `${displayX}%`,
-              top: `${displayY}%`,
+              left: `${pin.xPercent}%`,
+              top: `${pin.yPercent}%`,
               transform: "translate(-50%, -50%)",
             }}
           >
@@ -92,7 +73,7 @@ function DupPinTile({ pin }: { pin: DuplicatePinInfo }) {
           </div>
         </div>
       ) : (
-        <div className="w-full aspect-video bg-muted flex items-center justify-center">
+        <div className="w-full h-32 bg-muted flex items-center justify-center">
           <MapPin className="h-4 w-4 text-muted-foreground" />
         </div>
       )}
