@@ -999,6 +999,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         if (withDetails.length > 0 && withDetails.some(p => !p.footage || p.footage <= 0)) {
           throw new Error("All pins with categories are missing footage. Fill in footage before committing.");
         }
+        const flaggedWithDetails = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && p.flagged);
+        if (flaggedWithDetails.length > 0) {
+          throw new Error(`${flaggedWithDetails.length} pin(s) with categories are flagged for re-shoot. Unflag them first to commit.`);
+        }
         return { successful: [], errors: [] };
       }
       if (overwrite) {
