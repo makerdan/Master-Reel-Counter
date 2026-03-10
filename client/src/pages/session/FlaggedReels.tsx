@@ -111,7 +111,7 @@ function DupPinTile({
 
   return (
     <div
-      className="flex-1 min-w-[180px] max-w-[280px] border border-border rounded overflow-hidden bg-card"
+      className="flex-1 min-w-[180px] max-w-[280px] border border-black rounded overflow-hidden bg-card"
       data-testid={`dup-pin-${pin.pinId}`}
     >
       {pin.photoObjectStorageKey ? (
@@ -324,7 +324,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       {visibleDupGroups.length > 0 && (
         <div className="space-y-2" data-testid="section-duplicates">
           <button
-            className="flex items-center gap-2 w-full pt-2 border-t border-border text-left"
+            className="flex items-center gap-2 w-full pt-2 border-t border-black text-left"
             onClick={() => setDupsOpen((o) => !o)}
             data-testid="button-toggle-duplicates"
           >
@@ -339,7 +339,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
               {visibleDupGroups.map((group) => (
                 <div
                   key={`${group.label}-${group.aisle}-${group.section}`}
-                  className={`border rounded-lg p-3 ${group.isDefiniteDoubleCount ? "border-orange-400/50 dark:border-orange-700/50 bg-orange-50/50 dark:bg-orange-950/20" : "border-amber-300/50 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/10"}`}
+                  className={`border border-black rounded-lg p-3 ${group.isDefiniteDoubleCount ? "bg-orange-50/50 dark:bg-orange-950/20" : "bg-amber-50/30 dark:bg-amber-950/10"}`}
                   data-testid={`dup-group-${group.label}`}
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -408,7 +408,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
               <div className="hidden sm:flex items-start gap-3">
                 {pin.photoUrl ? (
                   <div
-                    className="relative w-20 h-20 rounded overflow-hidden border border-border shrink-0 cursor-pointer"
+                    className="relative w-20 h-20 rounded overflow-hidden border border-black shrink-0 cursor-pointer"
                     onClick={() => setPreviewPin(pin)}
                   >
                     <img
@@ -523,7 +523,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                 </div>
               </div>
               {editingPinId === pin.id && (
-                <div className="hidden sm:block border-t border-border pt-3 mt-1">
+                <div className="hidden sm:block border-t border-black pt-3 mt-1">
                   <div className="grid grid-cols-3 gap-3 mb-3">
                     <div>
                       <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
@@ -604,7 +604,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                 </div>
                 {pin.photoUrl ? (
                   <div
-                    className="relative w-full rounded overflow-hidden border border-border cursor-pointer"
+                    className="relative w-full rounded overflow-hidden border border-black cursor-pointer"
                     onClick={() => setPreviewPin(pin)}
                   >
                     <img
@@ -683,7 +683,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                   </Button>
                 </div>
                 {editingPinId === pin.id && (
-                  <div className="w-full border-t border-border pt-3 mt-1 space-y-3">
+                  <div className="w-full border-t border-black pt-3 mt-1 space-y-3">
                     <div>
                       <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
                       <Input
@@ -748,7 +748,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
 
       {unpinnedEntries.length > 0 && (
         <div className="space-y-2" data-testid="section-issues">
-          <div className="flex items-center gap-2 pt-2 border-t border-border">
+          <div className="flex items-center gap-2 pt-2 border-t border-black">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
             <h3 className="text-sm font-semibold text-amber-600 dark:text-amber-400">
               Entries Without Photos ({unpinnedEntries.length})
@@ -759,7 +759,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             {unpinnedEntries.map((e) => (
               <div
                 key={e.id}
-                className="border border-amber-200 dark:border-amber-900/50 rounded-lg p-3 bg-amber-50/50 dark:bg-amber-950/20"
+                className="border border-black rounded-lg p-3 bg-amber-50/50 dark:bg-amber-950/20"
                 data-testid={`issue-entry-card-${e.id}`}
               >
                 <div className="flex items-start justify-between gap-2">
