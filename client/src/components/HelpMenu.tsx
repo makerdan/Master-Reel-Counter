@@ -541,11 +541,6 @@ export function SessionSections() {
             description="Enter the total footage for this reel position. Auto-calculated from catalog data when a category is selected. While not focused the value displays with comma formatting (e.g. 2,500) for readability."
           />
           <FeatureRow
-            icon={<span className="text-[11px] font-bold text-[hsl(18_70%_50%)]">&#8595;</span>}
-            label="Copy Down"
-            description="Copies the current row's category, vendor code, and footage to the next row. Great for sections with identical reels."
-          />
-          <FeatureRow
             icon={<X className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" />}
             label="Clear Row"
             description="Clears all fields in a single row back to empty, keeping the pin position."
@@ -868,7 +863,6 @@ export function SessionSections() {
         </AccordionTrigger>
         <AccordionContent className="space-y-2 pb-4 text-[11px] text-muted-foreground leading-relaxed">
           <p><span className="font-semibold text-foreground">Rapid Data Entry:</span> Type a few letters of a wire category and use <HelpKey>Arrow Down</HelpKey> + <HelpKey>Enter</HelpKey> to select. The cursor auto-advances to the next row.</p>
-          <p><span className="font-semibold text-foreground">Copy Down:</span> When multiple reels are the same type, fill one row then tap <HelpBadge>&#8595;</HelpBadge> to copy the data down to the next row repeatedly.</p>
           <p><span className="font-semibold text-foreground">Next Reel Navigation:</span> After placing all your pins, use the orange "Next Reel" button to jump through photos that still need details. The entry table auto-scrolls into view.</p>
           <p><span className="font-semibold text-foreground">Receiving Mode:</span> Type "rec" in the aisle field to auto-fill "Receiving". In Mobile Flow, the Receiving checkbox auto-increments section numbers.</p>
           <p><span className="font-semibold text-foreground">Pin Scale:</span> For photos with many small reels close together, decrease the pin size using the size controls on the right overlay strip. Pin scale is remembered per-photo.</p>

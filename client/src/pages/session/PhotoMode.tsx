@@ -925,17 +925,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     );
   }, []);
 
-  const copyRowDown = useCallback((index: number) => {
-    setLocalPins((prev) => {
-      if (index >= prev.length - 1) return prev;
-      const src = prev[index];
-      return prev.map((p, i) =>
-        i === index + 1
-          ? { ...p, wireDetails: src.wireDetails, vendorCode: src.vendorCode, footage: src.footage }
-          : p
-      );
-    });
-  }, []);
 
   const deleteCommittedPin = useCallback(async (pin: { id: string; dbId?: number; x?: number; y?: number; label?: string; reelCount?: number; entryId?: number; flagged?: boolean }) => {
     if (pin.dbId) {
@@ -2188,15 +2177,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           />
                         </td>
                         <td style={{ whiteSpace: "nowrap", textAlign: "center" }}>
-                          <button
-                            type="button"
-                            className="copy-down-btn"
-                            onClick={() => copyRowDown(index)}
-                            title="Copy to next row"
-                            data-testid={`button-copy-down-${index}`}
-                          >
-                            &#8595;
-                          </button>
                           <button
                             type="button"
                             className="clear-row-btn"

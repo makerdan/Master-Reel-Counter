@@ -691,7 +691,6 @@
   border: 2px solid #f59e0b !important;
   background-color: rgba(245, 158, 11, 0.1) !important;
 }
-.copy-down-btn,
 .clear-row-btn {
   width: 28px;
   height: 28px;
@@ -707,11 +706,6 @@
   justify-content: center;
   vertical-align: middle;
   transition: all 0.2s;
-}
-.copy-down-btn:hover {
-  background: #ea580c;
-  color: white;
-  border-color: #ea580c;
 }
 .clear-row-btn {
   font-size: 12px;
