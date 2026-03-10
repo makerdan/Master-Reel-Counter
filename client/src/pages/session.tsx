@@ -758,6 +758,10 @@ function SessionWorkspace({
                     setCaptureMode(true);
                     setMobileFlowKey(k => k + 1);
                   }}
+                  onViewInPhoto={(photoId) => {
+                    setNavigateToPhotoId(photoId);
+                    setMode("photo");
+                  }}
                 />
               </TabsContent>
 

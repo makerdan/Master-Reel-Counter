@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ interface FlaggedReelsProps {
   sessionId: number;
   onBack: () => void;
   onReshoot?: (aisle: string, section: string, parentPhotoId: number) => void;
+  onViewInPhoto?: (photoId: number) => void;
 }
 
 function photoUrl(key: string): string {
@@ -191,7 +192,7 @@ function DupPinTile({
   );
 }
 
-export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedReelsProps) {
+export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPhoto }: FlaggedReelsProps) {
   const { toast } = useToast();
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
@@ -474,6 +475,18 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   )}
                 </div>
                 <div className="flex flex-col gap-3 shrink-0">
+                  {onViewInPhoto && pin.photoId && (
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => onViewInPhoto(pin.photoId)}
+                      data-testid={`button-view-in-photo-${pin.id}`}
+                      title="Go to this photo in Section Photo"
+                    >
+                      <ScanSearch className="h-5 w-5 mr-1.5" />
+                      View in Photo
+                    </Button>
+                  )}
                   {onReshoot && (
                     <Button
                       variant="outline"
@@ -623,6 +636,18 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                   <span>{[pin.vendorCode, pin.footage ? `${pin.footage.toLocaleString()} ft` : ""].filter(Boolean).join(", ")}</span>
                 </div>
                 <div className="flex items-center justify-center gap-10 w-full py-2">
+                  {onViewInPhoto && pin.photoId && (
+                    <Button
+                      variant="ghost"
+                      className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
+                      onClick={() => onViewInPhoto(pin.photoId)}
+                      data-testid={`button-view-in-photo-mobile-${pin.id}`}
+                      title="View in Photo"
+                      aria-label="View in Photo"
+                    >
+                      <ScanSearch className="h-7 w-7" />
+                    </Button>
+                  )}
                   {onReshoot && (
                     <Button
                       variant="ghost"
