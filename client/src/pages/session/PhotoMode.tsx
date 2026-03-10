@@ -378,7 +378,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       reelCount: p.reelCount || 1,
       entryId: p.entryId ?? undefined,
       flagged: p.flagged || false,
-    })));
+    })).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })));
     if (draftPins.length > 0) {
       setLocalPins(draftPins.map(p => ({
         id: `pin-${p.id}`,
@@ -390,7 +390,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         vendorCode: p.vendorCode || undefined,
         footage: p.footage || undefined,
         flagged: p.flagged || false,
-      })));
+      })).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })));
     } else {
       setLocalPins([]);
     }
