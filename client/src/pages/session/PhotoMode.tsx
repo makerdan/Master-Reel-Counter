@@ -1063,7 +1063,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   label: pin.label,
                   reelCount: pin.reelCount,
                   entryId: entry.id,
-                  flagged: pin.flagged || false,
+                  flagged: false,
                 });
                 return await pinRes.json();
               });

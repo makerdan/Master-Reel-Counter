@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, asc, inArray, sql, count, sum, min, max, ilike, or } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, sql, count, sum, min, max, ilike, or, isNull } from "drizzle-orm";
 import {
   countingSessions,
   photos,
@@ -300,7 +300,8 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(pins).where(
       and(
         inArray(pins.photoId, photoIds),
-        eq(pins.flagged, true)
+        eq(pins.flagged, true),
+        isNull(pins.entryId)
       )
     );
   }
