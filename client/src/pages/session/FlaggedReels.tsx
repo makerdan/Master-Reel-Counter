@@ -171,7 +171,7 @@ function DupPinTile({
               title="Keep this pin, delete others"
             >
               {keepMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-0.5" />}
-              Keep This Pin, Delete Only Other Pin(s)
+              Keep This, Remove Duplicate(s)
             </Button>
           )}
           <Button
