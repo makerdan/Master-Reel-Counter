@@ -380,7 +380,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           <CardContent className="p-4 space-y-4">
             <div className="rounded-md border border-green-500/50 bg-green-500/10 px-3 py-2 text-sm flex items-center gap-2" data-testid="text-detail-review-banner">
               <Check className="h-4 w-4 text-green-500 shrink-0" />
-              <span>Detail shot captured — review your photo and add notes before saving.</span>
+              <span>Flagged shot captured — review your photo and add notes before saving.</span>
             </div>
             <div className="rounded-lg overflow-hidden border border-border">
               <img
@@ -467,7 +467,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         <div className="rounded-md border border-[hsl(200_70%_50%/0.5)] bg-[hsl(200_70%_50%/0.1)] px-3 py-2 text-sm space-y-2" data-testid="text-detail-shot-banner">
           <div className="flex items-center gap-2">
             <Camera className="h-4 w-4 text-[hsl(200_70%_50%)] shrink-0" />
-            <span className="flex-1">Detail shot mode — take a photo of the flagged reel.</span>
+            <span className="flex-1">Flagged shot mode — take a close-up photo of the flagged reel.</span>
           </div>
           {onBackToFlagged && (
             <Button

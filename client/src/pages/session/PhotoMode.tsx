@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -188,8 +187,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const containerRef = useRef<HTMLDivElement>(null);
   const photoImgRef = useRef<HTMLImageElement>(null);
   const [photoNotes, setPhotoNotes] = useState("");
-  const [isDetailShot, setIsDetailShot] = useState(false);
-  const [parentPhotoId, setParentPhotoId] = useState<number | undefined>(undefined);
   const noteSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sectionSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aisleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -535,23 +532,19 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     }
     if (currentPhoto) {
       setPhotoNotes(currentPhoto.notes || "");
-      setIsDetailShot(currentPhoto.isDetailShot || false);
-      setParentPhotoId(currentPhoto.parentPhotoId);
       setRotation(currentPhoto.rotation ?? 0);
     }
   }, [currentPhotoIdx, currentPhoto?.dbId]);
 
-  const savePhotoMeta = useCallback(async (notes: string, detail: boolean, parentId: number | undefined) => {
+  const savePhotoMeta = useCallback(async (notes: string) => {
     if (!currentPhoto?.dbId) return;
     try {
       await apiRequest("PATCH", `/api/photos/${currentPhoto.dbId}`, {
         notes: notes || null,
-        isDetailShot: detail,
-        parentPhotoId: parentId || null,
       });
       setUploadedPhotos((prev) =>
         prev.map((p, i) =>
-          i === currentPhotoIdx ? { ...p, notes, isDetailShot: detail, parentPhotoId: parentId } : p
+          i === currentPhotoIdx ? { ...p, notes } : p
         )
       );
     } catch {}
@@ -561,27 +554,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     setPhotoNotes(val);
     if (noteSaveTimer.current) clearTimeout(noteSaveTimer.current);
     noteSaveTimer.current = setTimeout(() => {
-      savePhotoMeta(val, isDetailShot, parentPhotoId);
+      savePhotoMeta(val);
     }, 1200);
-  }, [savePhotoMeta, isDetailShot, parentPhotoId]);
-
-  const handleDetailShotToggle = useCallback((checked: boolean) => {
-    setIsDetailShot(checked);
-    if (!checked) {
-      setParentPhotoId(undefined);
-      savePhotoMeta(photoNotes, checked, undefined);
-    } else {
-      savePhotoMeta(photoNotes, checked, parentPhotoId);
-    }
-  }, [savePhotoMeta, photoNotes, parentPhotoId]);
-
-  const handleParentPhotoChange = useCallback((val: string) => {
-    const id = val ? parseInt(val) : undefined;
-    setParentPhotoId(id);
-    savePhotoMeta(photoNotes, isDetailShot, id);
-  }, [savePhotoMeta, photoNotes, isDetailShot]);
-
-  const parentPhotoOptions = uploadedPhotos.filter((p, i) => i !== currentPhotoIdx && p.dbId && !p.isDetailShot);
+  }, [savePhotoMeta]);
 
   const getNextReceivingSection = useCallback(() => {
     const allReceivingPhotos = [
@@ -1900,12 +1875,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               <div className="flex items-center gap-2 flex-wrap">
                 <StickyNote className="h-4 w-4 text-[hsl(18_70%_50%)]" />
                 <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)]">Photo Notes:</span>
-                {isDetailShot && (
-                  <Badge className="bg-[hsl(200_70%_30%)] text-white text-[10px] px-1.5 py-0 no-default-hover-elevate no-default-active-elevate" data-testid="badge-detail-shot">
-                    <Focus className="h-3 w-3 mr-1" />
-                    Detail Shot
-                  </Badge>
-                )}
               </div>
               <Textarea
                 value={photoNotes}
@@ -1915,33 +1884,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 rows={2}
                 data-testid="textarea-photo-notes"
               />
-              <div className="flex items-center gap-4 flex-wrap">
-                <label className="flex items-center gap-2 cursor-pointer" data-testid="toggle-detail-shot">
-                  <Checkbox
-                    checked={isDetailShot}
-                    onCheckedChange={(checked) => handleDetailShotToggle(!!checked)}
-                  />
-                  <span className="text-xs text-[hsl(25_50%_65%)]">This is a detail/close-up shot</span>
-                </label>
-                {isDetailShot && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs text-[hsl(25_50%_65%)] whitespace-nowrap">Linked to:</label>
-                    <select
-                      value={parentPhotoId ?? ""}
-                      onChange={(e) => handleParentPhotoChange(e.target.value)}
-                      className="rounded-md border border-[hsl(18_40%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] px-2 py-1 text-xs min-w-[120px] focus:outline-none focus:ring-2 focus:ring-[hsl(18_85%_48%)]"
-                      data-testid="select-parent-photo"
-                    >
-                      <option value="">-- Select parent photo --</option>
-                      {parentPhotoOptions.map((p) => (
-                        <option key={p.dbId} value={p.dbId}>
-                          {p.filename || `Photo ${uploadedPhotos.indexOf(p) + 1}`} {p.section ? `(${p.section})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
