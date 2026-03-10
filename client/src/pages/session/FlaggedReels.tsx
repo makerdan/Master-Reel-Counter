@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -48,7 +48,66 @@ function photoUrl(key: string): string {
   return key.startsWith("/uploads/") ? key : `/uploads/${key}`;
 }
 
-function DupPinTile({ pin }: { pin: DuplicatePinInfo }) {
+function loadDisregardedKeys(sessionId: number): Set<string> {
+  try {
+    const raw = localStorage.getItem(`disregarded-dups-${sessionId}`);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDisregardedKeys(sessionId: number, keys: Set<string>) {
+  localStorage.setItem(`disregarded-dups-${sessionId}`, JSON.stringify([...keys]));
+}
+
+function dupGroupKey(group: DuplicateGroup): string {
+  return `${group.label}||${group.aisle ?? ""}||${group.section ?? ""}`;
+}
+
+function DupPinTile({
+  pin,
+  siblingPinIds,
+  sessionId,
+}: {
+  pin: DuplicatePinInfo;
+  siblingPinIds: number[];
+  sessionId: number;
+}) {
+  const { toast } = useToast();
+
+  const keepMutation = useMutation({
+    mutationFn: async () => {
+      for (const id of siblingPinIds) {
+        await apiRequest("DELETE", `/api/pins/${id}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      toast({ title: "Kept", description: "Other duplicate pin(s) removed." });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Could not delete duplicate pins.", variant: "destructive" });
+    },
+  });
+
+  const deletePhotoMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/photos/${pin.photoId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+      toast({ title: "Photo deleted", description: "Photo and its pins have been removed." });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Could not delete photo.", variant: "destructive" });
+    },
+  });
+
   return (
     <div
       className="flex-1 min-w-[180px] max-w-[280px] border border-border rounded overflow-hidden bg-card"
@@ -77,7 +136,7 @@ function DupPinTile({ pin }: { pin: DuplicatePinInfo }) {
           <MapPin className="h-4 w-4 text-muted-foreground" />
         </div>
       )}
-      <div className="p-1.5 space-y-0.5">
+      <div className="p-1.5 space-y-1">
         {pin.wireDetails && (
           <p className="text-[10px] font-mono font-semibold truncate" data-testid={`text-dup-wire-${pin.pinId}`}>
             {pin.wireDetails}
@@ -99,6 +158,34 @@ function DupPinTile({ pin }: { pin: DuplicatePinInfo }) {
         <p className="text-[10px] text-muted-foreground">
           {pin.entryId ? `Entry #${pin.entryId}` : "No entry"}
         </p>
+        <div className="flex gap-1 pt-0.5">
+          {siblingPinIds.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 h-6 text-[10px] px-1 text-green-600 border-green-600/40 hover:bg-green-50 dark:hover:bg-green-950/30"
+              onClick={() => keepMutation.mutate()}
+              disabled={keepMutation.isPending || deletePhotoMutation.isPending}
+              data-testid={`button-keep-${pin.pinId}`}
+              title="Keep this pin, delete others"
+            >
+              {keepMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-0.5" />}
+              Keep
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 h-6 text-[10px] px-1 text-red-600 border-red-600/40 hover:bg-red-50 dark:hover:bg-red-950/30"
+            onClick={() => deletePhotoMutation.mutate()}
+            disabled={keepMutation.isPending || deletePhotoMutation.isPending}
+            data-testid={`button-delete-photo-${pin.pinId}`}
+            title="Delete this photo entirely"
+          >
+            {deletePhotoMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 mr-0.5" />}
+            Delete Photo
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -111,6 +198,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "" });
   const [dupsOpen, setDupsOpen] = useState(true);
+  const [disregardedKeys, setDisregardedKeys] = useState<Set<string>>(() => loadDisregardedKeys(sessionId));
 
   const { data: flaggedPins = [], isLoading } = useQuery<FlaggedPin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"],
@@ -183,6 +271,19 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
     return detectDuplicatePins(sessionPins, sessionPhotos, scannerResults);
   }, [sessionPins, sessionPhotos, sessionId]);
 
+  const visibleDupGroups = useMemo(
+    () => duplicateGroups.filter((g) => !disregardedKeys.has(dupGroupKey(g))),
+    [duplicateGroups, disregardedKeys],
+  );
+
+  function handleDisregard(group: DuplicateGroup) {
+    const key = dupGroupKey(group);
+    const next = new Set(disregardedKeys);
+    next.add(key);
+    saveDisregardedKeys(sessionId, next);
+    setDisregardedKeys(next);
+  }
+
   const pinnedEntryIds = new Set(sessionPins.filter(p => p.entryId).map(p => p.entryId!));
   const unpinnedEntries = sessionEntries.filter(e => !pinnedEntryIds.has(e.id));
 
@@ -219,7 +320,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
         </div>
       </div>
 
-      {duplicateGroups.length > 0 && (
+      {visibleDupGroups.length > 0 && (
         <div className="space-y-2" data-testid="section-duplicates">
           <button
             className="flex items-center gap-2 w-full pt-2 border-t border-border text-left"
@@ -228,13 +329,13 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
           >
             <Copy className="h-4 w-4 text-orange-500 shrink-0" />
             <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400 flex-1">
-              Possible Duplicates ({duplicateGroups.length})
+              Possible Duplicates ({visibleDupGroups.length})
             </h3>
             {dupsOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           </button>
           {dupsOpen && (
             <div className="grid gap-2">
-              {duplicateGroups.map((group) => (
+              {visibleDupGroups.map((group) => (
                 <div
                   key={`${group.label}-${group.aisle}-${group.section}`}
                   className={`border rounded-lg p-3 ${group.isDefiniteDoubleCount ? "border-orange-400/50 dark:border-orange-700/50 bg-orange-50/50 dark:bg-orange-950/20" : "border-amber-300/50 dark:border-amber-800/50 bg-amber-50/30 dark:bg-amber-950/10"}`}
@@ -250,15 +351,31 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot }: FlaggedRe
                       </span>
                     )}
                     <Badge
-                      className={`ml-auto text-[10px] ${group.isDefiniteDoubleCount ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : "bg-amber-900/50 text-amber-300 border-amber-700/40"}`}
+                      className={`text-[10px] ${group.isDefiniteDoubleCount ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : "bg-amber-900/50 text-amber-300 border-amber-700/40"}`}
                       data-testid={`badge-dup-type-${group.label}`}
                     >
                       {group.isDefiniteDoubleCount ? "Double Count" : "Check Needed"}
                     </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-auto h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground gap-1"
+                      onClick={() => handleDisregard(group)}
+                      data-testid={`button-disregard-${group.label}`}
+                      title="Dismiss this duplicate warning"
+                    >
+                      <EyeOff className="h-3 w-3" />
+                      Disregard
+                    </Button>
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     {group.pins.map((pin) => (
-                      <DupPinTile key={pin.pinId} pin={pin} />
+                      <DupPinTile
+                        key={pin.pinId}
+                        pin={pin}
+                        siblingPinIds={group.pins.filter(p => p.pinId !== pin.pinId).map(p => p.pinId)}
+                        sessionId={sessionId}
+                      />
                     ))}
                   </div>
                 </div>
