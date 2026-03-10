@@ -741,7 +741,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       e.stopPropagation();
       const oldScale = scaleRef.current;
       const delta = e.ctrlKey ? -e.deltaY * 0.01 : (e.deltaY < 0 ? 0.2 : -0.2);
-      const newScale = Math.min(5, Math.max(1, oldScale + delta));
+      const newScale = Math.min(8, Math.max(1, oldScale + delta));
       zoomAtPointRef.current(e.clientX, e.clientY, newScale);
     };
 
@@ -787,7 +787,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       const dy = e.touches[1].clientY - e.touches[0].clientY;
       const dist = Math.hypot(dx, dy);
       const ratio = dist / pinchRef.current.dist;
-      const newScale = Math.min(5, Math.max(1, pinchRef.current.scale * ratio));
+      const newScale = Math.min(8, Math.max(1, pinchRef.current.scale * ratio));
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       zoomAtPoint(midX, midY, newScale);
@@ -1662,7 +1662,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               <div className="photo-overlay-controls right-strip">
                 <button
                   className="photo-overlay-btn"
-                  onClick={(e) => { e.stopPropagation(); setScale((s) => Math.min(5, s + 0.5)); }}
+                  onClick={(e) => { e.stopPropagation(); setScale((s) => Math.min(8, s + 0.5)); }}
                   title="Zoom in"
                   data-testid="button-zoom-in"
                 >
