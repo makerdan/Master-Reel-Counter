@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch, ArrowUpDown, Filter } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -201,7 +201,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [dupsOpen, setDupsOpen] = useState(true);
   const [disregardedKeys, setDisregardedKeys] = useState<Set<string>>(() => loadDisregardedKeys(sessionId));
   const [sortBy, setSortBy] = useState<"location" | "label" | "count">("location");
-  const [filterBy, setFilterBy] = useState<"all" | "attention" | "addressed">("all");
 
   const { data: flaggedPins = [], isLoading } = useQuery<FlaggedPin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"],
@@ -287,17 +286,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     setDisregardedKeys(next);
   }
 
-  const filteredPins = useMemo(() => {
-    if (filterBy === "all") return flaggedPins;
-    return flaggedPins.filter(pin => {
-      const isAddressed = !!(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails);
-      return filterBy === "addressed" ? isAddressed : !isAddressed;
-    });
-  }, [flaggedPins, filterBy]);
-
   const photoGroups = useMemo(() => {
     const groupMap = new Map<number, FlaggedPin[]>();
-    for (const pin of filteredPins) {
+    for (const pin of flaggedPins) {
       const existing = groupMap.get(pin.photoId);
       if (existing) existing.push(pin);
       else groupMap.set(pin.photoId, [pin]);
@@ -329,7 +320,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       groups.sort((a, b) => b.pins.length - a.pins.length);
     }
     return groups;
-  }, [filteredPins, sortBy]);
+  }, [flaggedPins, sortBy]);
 
   const pinnedEntryIds = new Set(sessionPins.filter(p => p.entryId).map(p => p.entryId!));
   const unpinnedEntries = sessionEntries.filter(e => !pinnedEntryIds.has(e.id));
@@ -380,19 +371,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
               <option value="location">Aisle / Section</option>
               <option value="label">Pin Label</option>
               <option value="count">Pin Count</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <select
-              value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value as typeof filterBy)}
-              className="text-xs border !border-black rounded px-2 py-1 bg-card text-foreground"
-              data-testid="select-filter"
-            >
-              <option value="all">All ({flaggedPins.length})</option>
-              <option value="attention">Needs Attention ({flaggedPins.filter(p => !(p.hasDetailPhoto || p.hasNotes || p.wireDetails)).length})</option>
-              <option value="addressed">Addressed ({flaggedPins.filter(p => !!(p.hasDetailPhoto || p.hasNotes || p.wireDetails)).length})</option>
             </select>
           </div>
         </div>
@@ -472,11 +450,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           <Flag className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="text-sm">No flagged reels in this session.</p>
           <p className="text-xs mt-1">Use the flag button on pins in Photo Mode to mark reels for re-shoot.</p>
-        </div>
-      ) : filteredPins.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground" data-testid="text-no-filtered">
-          <Filter className="h-8 w-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No pins match this filter.</p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -571,15 +544,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           {pin.wireDetails && (
                             <Badge variant="outline" className="text-xs" data-testid={`badge-wire-${pin.id}`}>
                               {pin.wireDetails}
-                            </Badge>
-                          )}
-                          {(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails) ? (
-                            <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-addressed-${pin.id}`}>
-                              Addressed
-                            </Badge>
-                          ) : (
-                            <Badge className="text-[10px] bg-orange-500 text-white border-orange-600" data-testid={`badge-needs-attention-${pin.id}`}>
-                              Needs Attention
                             </Badge>
                           )}
                         </div>
@@ -681,15 +645,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         {pin.wireDetails && (
                           <Badge variant="outline" className="text-xs" data-testid={`badge-wire-mobile-${pin.id}`}>
                             {pin.wireDetails}
-                          </Badge>
-                        )}
-                        {(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails) ? (
-                          <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-addressed-mobile-${pin.id}`}>
-                            Addressed
-                          </Badge>
-                        ) : (
-                          <Badge className="text-[10px] bg-orange-500 text-white border-orange-600" data-testid={`badge-needs-attention-mobile-${pin.id}`}>
-                            Needs Attention
                           </Badge>
                         )}
                       </div>
