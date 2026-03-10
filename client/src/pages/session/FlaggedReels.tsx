@@ -474,7 +474,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     </p>
                   )}
                 </div>
-                <div className="flex flex-col gap-3 shrink-0">
+                <div className="flex flex-col gap-3 shrink-0 [--button-outline:black]">
                   {onViewInPhoto && pin.photoId && (
                     <Button
                       variant="outline"
@@ -639,7 +639,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                   {onViewInPhoto && pin.photoId && (
                     <Button
                       variant="ghost"
-                      className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
+                      className="rounded-full border border-black w-14 h-14"
                       onClick={() => onViewInPhoto(pin.photoId)}
                       data-testid={`button-view-in-photo-mobile-${pin.id}`}
                       title="View in Photo"
@@ -651,7 +651,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                   {onReshoot && (
                     <Button
                       variant="ghost"
-                      className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
+                      className="rounded-full border border-black w-14 h-14"
                       onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
                       data-testid={`button-reshoot-mobile-${pin.id}`}
                       title="Re-shoot"
@@ -662,7 +662,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                   )}
                   <Button
                     variant="ghost"
-                    className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
+                    className="rounded-full border border-black w-14 h-14"
                     onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
                     data-testid={`button-edit-mobile-${pin.id}`}
                     title="Edit details"
@@ -672,7 +672,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                   </Button>
                   <Button
                     variant="ghost"
-                    className="rounded-full border border-white/80 ring-1 ring-white/30 w-14 h-14"
+                    className="rounded-full border border-black w-14 h-14"
                     onClick={() => unflagMutation.mutate(pin.id)}
                     disabled={unflagMutation.isPending}
                     data-testid={`button-resolve-mobile-${pin.id}`}
