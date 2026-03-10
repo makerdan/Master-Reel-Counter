@@ -451,7 +451,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         Addressed
                       </Badge>
                     ) : (
-                      <Badge className="text-[10px] bg-amber-900/50 text-amber-300 border-amber-700/40" data-testid={`badge-needs-attention-${pin.id}`}>
+                      <Badge className="text-[10px] bg-orange-500 text-white border-orange-600" data-testid={`badge-needs-attention-${pin.id}`}>
                         Needs Attention
                       </Badge>
                     )}
@@ -597,7 +597,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       Addressed
                     </Badge>
                   ) : (
-                    <Badge className="text-[10px] bg-amber-900/50 text-amber-300 border-amber-700/40" data-testid={`badge-needs-attention-mobile-${pin.id}`}>
+                    <Badge className="text-[10px] bg-orange-500 text-white border-orange-600" data-testid={`badge-needs-attention-mobile-${pin.id}`}>
                       Needs Attention
                     </Badge>
                   )}
