@@ -285,6 +285,23 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     setDisregardedKeys(next);
   }
 
+  const photoGroups = useMemo(() => {
+    const groupMap = new Map<number, FlaggedPin[]>();
+    for (const pin of flaggedPins) {
+      const existing = groupMap.get(pin.photoId);
+      if (existing) existing.push(pin);
+      else groupMap.set(pin.photoId, [pin]);
+    }
+    return Array.from(groupMap.entries()).map(([photoId, pins]) => ({
+      photoId,
+      photoUrl: pins[0].photoUrl || null,
+      photoFilename: pins[0].photoFilename || null,
+      photoAisle: pins[0].photoAisle || null,
+      photoSection: pins[0].photoSection || null,
+      pins,
+    }));
+  }, [flaggedPins]);
+
   const pinnedEntryIds = new Set(sessionPins.filter(p => p.entryId).map(p => p.entryId!));
   const unpinnedEntries = sessionEntries.filter(e => !pinnedEntryIds.has(e.id));
 
@@ -397,349 +414,336 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           <p className="text-xs mt-1">Use the flag button on pins in Photo Mode to mark reels for re-shoot.</p>
         </div>
       ) : (
-        <div className="grid gap-3">
-          {flaggedPins.map((pin) => (
+        <div className="grid gap-4">
+          {photoGroups.map((group) => (
             <div
-              key={pin.id}
-              className="border !border-black rounded-lg p-3 bg-card hover:bg-accent/5 transition-colors"
-              data-testid={`flagged-pin-card-${pin.id}`}
+              key={group.photoId}
+              className="border !border-black rounded-lg overflow-hidden bg-card"
+              data-testid={`flagged-group-${group.photoId}`}
             >
-              {/* Desktop layout */}
-              <div className="hidden sm:flex items-start gap-3">
-                {pin.photoUrl ? (
-                  <div
-                    className="relative w-20 h-20 rounded overflow-hidden border border-black shrink-0 cursor-pointer"
-                    onClick={() => setPreviewPin(pin)}
-                  >
-                    <img
-                      src={pin.photoUrl}
-                      alt={pin.photoFilename || "Photo"}
-                      className="w-full h-full object-cover"
-                    />
-                    <div
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: `${pin.xPercent}%`,
-                        top: `${pin.yPercent}%`,
-                        transform: "translate(-50%, -50%)",
-                      }}
-                    >
-                      <div className="w-8 h-8 rounded-full animate-pulse" style={{ border: "4px solid #f97316" }} />
-                      <div className="absolute inset-0 w-8 h-8 rounded-full border border-white" />
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/30 transition-opacity">
-                      <Eye className="h-4 w-4 text-white" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-20 h-20 rounded bg-muted flex items-center justify-center shrink-0">
-                    <MapPin className="h-5 w-5 text-muted-foreground" />
-                  </div>
+              <div className="bg-muted/50 px-3 py-2 flex items-center gap-2 border-b !border-black flex-wrap" data-testid={`flagged-group-header-${group.photoId}`}>
+                <MapPin className="h-4 w-4 text-orange-500 shrink-0" />
+                <span className="font-mono text-sm font-semibold">
+                  {[group.photoAisle && `Aisle ${group.photoAisle}`, group.photoSection && `Section ${group.photoSection}`].filter(Boolean).join(" · ") || "No location"}
+                </span>
+                <Badge variant="secondary" className="text-[10px]" data-testid={`badge-group-count-${group.photoId}`}>
+                  {group.pins.length} pin{group.pins.length !== 1 ? "s" : ""}
+                </Badge>
+                {group.photoFilename && (
+                  <span className="text-xs text-muted-foreground truncate max-w-[200px] hidden sm:inline">{group.photoFilename}</span>
                 )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-sm font-medium" data-testid={`text-pin-label-${pin.id}`}>
-                      Pin {pin.label}
-                    </span>
-                    {pin.wireDetails && (
-                      <Badge variant="outline" className="text-xs" data-testid={`badge-wire-${pin.id}`}>
-                        {pin.wireDetails}
-                      </Badge>
-                    )}
-                    {(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails) ? (
-                      <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-addressed-${pin.id}`}>
-                        Addressed
-                      </Badge>
-                    ) : (
-                      <Badge className="text-[10px] bg-orange-500 text-white border-orange-600" data-testid={`badge-needs-attention-${pin.id}`}>
-                        Needs Attention
-                      </Badge>
-                    )}
-                  </div>
-                  {(pin.photoAisle || pin.photoSection) && (
-                    <div className="flex gap-2 text-sm font-mono mb-0.5" data-testid={`text-location-${pin.id}`}>
-                      {pin.photoAisle && <span><span className="font-bold">Aisle</span> {pin.photoAisle}</span>}
-                      {pin.photoAisle && pin.photoSection && <span>&middot;</span>}
-                      {pin.photoSection && <span><span className="font-bold">Section</span> {pin.photoSection}</span>}
-                    </div>
-                  )}
-                  <div className="flex gap-3 text-xs text-muted-foreground font-mono">
-                    {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}
-                    {pin.vendorCode && <span>{pin.vendorCode}</span>}
-                    {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
-                  </div>
-                  {pin.photoFilename && (
-                    <p className="text-xs text-muted-foreground mt-1 truncate">
-                      {pin.photoFilename}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col gap-3 shrink-0 [--button-outline:black]">
-                  {onViewInPhoto && pin.photoId && (
+                <div className="flex gap-2 ml-auto shrink-0 [--button-outline:black]">
+                  {onViewInPhoto && (
                     <Button
                       variant="outline"
-                      size="lg"
-                      onClick={() => onViewInPhoto(pin.photoId)}
-                      data-testid={`button-view-in-photo-${pin.id}`}
+                      size="sm"
+                      onClick={() => onViewInPhoto(group.photoId)}
+                      data-testid={`button-view-in-photo-group-${group.photoId}`}
                       title="Go to this photo in Section Photo"
                     >
-                      <ScanSearch className="h-5 w-5 mr-1.5" />
-                      View in Photo
+                      <ScanSearch className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">View in Photo</span>
                     </Button>
                   )}
                   {onReshoot && (
                     <Button
                       variant="outline"
-                      size="lg"
-                      onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
-                      data-testid={`button-reshoot-${pin.id}`}
+                      size="sm"
+                      onClick={() => onReshoot(group.photoAisle || "", group.photoSection || "", group.photoId)}
+                      data-testid={`button-reshoot-group-${group.photoId}`}
                       title="Take a detail photo in Mobile Flow"
                     >
-                      <Camera className="h-5 w-5 mr-1.5" />
-                      Re-shoot
+                      <Camera className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Re-shoot</span>
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
-                    data-testid={`button-edit-${pin.id}`}
-                    title="Edit details"
-                  >
-                    <Pencil className="h-5 w-5 mr-1.5" />
-                    {editingPinId === pin.id ? "Close" : "Edit"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => unflagMutation.mutate(pin.id)}
-                    disabled={unflagMutation.isPending}
-                    data-testid={`button-resolve-${pin.id}`}
-                    title="Mark as resolved"
-                  >
-                    <Check className="h-5 w-5 mr-1.5" />
-                    Un-Flag
-                  </Button>
                 </div>
               </div>
-              {editingPinId === pin.id && (
-                <div className="hidden sm:block border-t border-black pt-3 mt-1">
-                  <div className="grid grid-cols-3 gap-3 mb-3">
-                    <div>
-                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
-                      <Input
-                        value={editState.wireDetails}
-                        onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value }))}
-                        placeholder="e.g. THHN #12 Black"
-                        data-testid={`input-wire-details-${pin.id}`}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
-                      <Input
-                        value={editState.vendorCode}
-                        onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.slice(0, 3) }))}
-                        placeholder="e.g. SOU"
-                        maxLength={3}
-                        data-testid={`input-vendor-code-${pin.id}`}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage</label>
-                      <Input
-                        type="number"
-                        value={editState.footage}
-                        onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
-                        placeholder="e.g. 1000"
-                        data-testid={`input-footage-${pin.id}`}
-                      />
-                    </div>
-                  </div>
-                  {pin.entryId && (
-                    <div className="mb-3">
-                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
-                      <Textarea
-                        value={editState.notes}
-                        onChange={(e) => setEditState(s => ({ ...s, notes: e.target.value }))}
-                        placeholder="Add notes about this reel..."
-                        rows={2}
-                        data-testid={`input-notes-${pin.id}`}
-                      />
-                    </div>
-                  )}
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      onClick={() => savePinMutation.mutate({ pinId: pin.id, entryId: pin.entryId, data: editState })}
-                      disabled={savePinMutation.isPending}
-                      data-testid={`button-save-edit-${pin.id}`}
-                    >
-                      {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                      Save
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Mobile layout */}
-              <div className="sm:hidden flex flex-col items-center gap-2">
-                <div className="flex items-center gap-2 w-full">
-                  <span className="font-mono text-sm font-medium" data-testid={`text-pin-label-mobile-${pin.id}`}>
-                    Pin {pin.label}
-                  </span>
-                  {pin.wireDetails && (
-                    <Badge variant="outline" className="text-xs" data-testid={`badge-wire-mobile-${pin.id}`}>
-                      {pin.wireDetails}
-                    </Badge>
-                  )}
-                  {(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails) ? (
-                    <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-addressed-mobile-${pin.id}`}>
-                      Addressed
-                    </Badge>
-                  ) : (
-                    <Badge className="text-[10px] bg-orange-500 text-white border-orange-600" data-testid={`badge-needs-attention-mobile-${pin.id}`}>
-                      Needs Attention
-                    </Badge>
-                  )}
-                </div>
-                {pin.photoUrl ? (
+              <div className="grid gap-2 p-3">
+                {group.pins.map((pin) => (
                   <div
-                    className="relative w-full rounded overflow-hidden border border-black cursor-pointer"
-                    onClick={() => setPreviewPin(pin)}
+                    key={pin.id}
+                    className="border !border-black rounded-lg p-3 hover:bg-accent/5 transition-colors"
+                    data-testid={`flagged-pin-card-${pin.id}`}
                   >
-                    <img
-                      src={pin.photoUrl}
-                      alt={pin.photoFilename || "Photo"}
-                      className="w-full h-auto block"
-                    />
-                    <div
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: `${pin.xPercent}%`,
-                        top: `${pin.yPercent}%`,
-                        transform: "translate(-50%, -50%)",
-                      }}
-                    >
-                      <div className="w-8 h-8 rounded-full animate-pulse" style={{ border: "4px solid #f97316" }} />
-                      <div className="absolute inset-0 w-8 h-8 rounded-full border border-white" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-full h-24 rounded bg-muted flex items-center justify-center">
-                    <MapPin className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 w-full text-sm font-mono text-muted-foreground">
-                  <span><span className="font-bold">Aisle</span>{pin.photoAisle ? ` ${pin.photoAisle}` : ""}</span>
-                  <span><span className="font-bold">Section</span>{pin.photoSection ? ` ${pin.photoSection}` : ""}</span>
-                  <span>{pin.reelCount} Reel{pin.reelCount !== 1 ? "s" : ""}</span>
-                  <span>{[pin.vendorCode, pin.footage ? `${pin.footage.toLocaleString()} ft` : ""].filter(Boolean).join(", ")}</span>
-                </div>
-                <div className="flex items-center justify-center gap-10 w-full py-2">
-                  {onViewInPhoto && pin.photoId && (
-                    <Button
-                      variant="ghost"
-                      className="rounded-full border border-black w-14 h-14"
-                      onClick={() => onViewInPhoto(pin.photoId)}
-                      data-testid={`button-view-in-photo-mobile-${pin.id}`}
-                      title="View in Photo"
-                      aria-label="View in Photo"
-                    >
-                      <ScanSearch className="h-7 w-7" />
-                    </Button>
-                  )}
-                  {onReshoot && (
-                    <Button
-                      variant="ghost"
-                      className="rounded-full border border-black w-14 h-14"
-                      onClick={() => onReshoot(pin.photoAisle || "", pin.photoSection || "", pin.photoId)}
-                      data-testid={`button-reshoot-mobile-${pin.id}`}
-                      title="Re-shoot"
-                      aria-label="Re-shoot"
-                    >
-                      <Camera className="h-7 w-7" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    className="rounded-full border border-black w-14 h-14"
-                    onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
-                    data-testid={`button-edit-mobile-${pin.id}`}
-                    title="Edit details"
-                    aria-label="Edit details"
-                  >
-                    <Pencil className="h-7 w-7" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="rounded-full border border-black w-14 h-14"
-                    onClick={() => unflagMutation.mutate(pin.id)}
-                    disabled={unflagMutation.isPending}
-                    data-testid={`button-resolve-mobile-${pin.id}`}
-                    title="Un-Flag"
-                    aria-label="Un-Flag"
-                  >
-                    <Check className="h-7 w-7" />
-                  </Button>
-                </div>
-                {editingPinId === pin.id && (
-                  <div className="w-full border-t border-black pt-3 mt-1 space-y-3">
-                    <div>
-                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
-                      <Input
-                        value={editState.wireDetails}
-                        onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value }))}
-                        placeholder="e.g. THHN #12 Black"
-                        data-testid={`input-wire-details-mobile-${pin.id}`}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
-                        <Input
-                          value={editState.vendorCode}
-                          onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.slice(0, 3) }))}
-                          placeholder="e.g. SOU"
-                          maxLength={3}
-                          data-testid={`input-vendor-code-mobile-${pin.id}`}
-                        />
+                    {/* Desktop layout */}
+                    <div className="hidden sm:flex items-start gap-3">
+                      {pin.photoUrl ? (
+                        <div
+                          className="relative w-20 h-20 rounded overflow-hidden border border-black shrink-0 cursor-pointer"
+                          onClick={() => setPreviewPin(pin)}
+                        >
+                          <img
+                            src={pin.photoUrl}
+                            alt={pin.photoFilename || "Photo"}
+                            className="w-full h-full object-cover"
+                          />
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${pin.xPercent}%`,
+                              top: `${pin.yPercent}%`,
+                              transform: "translate(-50%, -50%)",
+                            }}
+                          >
+                            <div className="w-8 h-8 rounded-full animate-pulse" style={{ border: "4px solid #f97316" }} />
+                            <div className="absolute inset-0 w-8 h-8 rounded-full border border-white" />
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/30 transition-opacity">
+                            <Eye className="h-4 w-4 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded bg-muted flex items-center justify-center shrink-0">
+                          <MapPin className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono text-sm font-medium" data-testid={`text-pin-label-${pin.id}`}>
+                            Pin {pin.label}
+                          </span>
+                          {pin.wireDetails && (
+                            <Badge variant="outline" className="text-xs" data-testid={`badge-wire-${pin.id}`}>
+                              {pin.wireDetails}
+                            </Badge>
+                          )}
+                          {(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails) ? (
+                            <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-addressed-${pin.id}`}>
+                              Addressed
+                            </Badge>
+                          ) : (
+                            <Badge className="text-[10px] bg-orange-500 text-white border-orange-600" data-testid={`badge-needs-attention-${pin.id}`}>
+                              Needs Attention
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex gap-3 text-xs text-muted-foreground font-mono">
+                          {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}
+                          {pin.vendorCode && <span>{pin.vendorCode}</span>}
+                          {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage</label>
-                        <Input
-                          type="number"
-                          value={editState.footage}
-                          onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
-                          placeholder="e.g. 1000"
-                          data-testid={`input-footage-mobile-${pin.id}`}
-                        />
+                      <div className="flex flex-col gap-2 shrink-0 [--button-outline:black]">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
+                          data-testid={`button-edit-${pin.id}`}
+                          title="Edit details"
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          {editingPinId === pin.id ? "Close" : "Edit"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => unflagMutation.mutate(pin.id)}
+                          disabled={unflagMutation.isPending}
+                          data-testid={`button-resolve-${pin.id}`}
+                          title="Mark as resolved"
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Un-Flag
+                        </Button>
                       </div>
                     </div>
-                    {pin.entryId && (
-                      <div>
-                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
-                        <Textarea
-                          value={editState.notes}
-                          onChange={(e) => setEditState(s => ({ ...s, notes: e.target.value }))}
-                          placeholder="Add notes about this reel..."
-                          rows={2}
-                          data-testid={`input-notes-mobile-${pin.id}`}
-                        />
+                    {editingPinId === pin.id && (
+                      <div className="hidden sm:block border-t border-black pt-3 mt-1">
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
+                            <Input
+                              value={editState.wireDetails}
+                              onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value }))}
+                              placeholder="e.g. THHN #12 Black"
+                              data-testid={`input-wire-details-${pin.id}`}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
+                            <Input
+                              value={editState.vendorCode}
+                              onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.slice(0, 3) }))}
+                              placeholder="e.g. SOU"
+                              maxLength={3}
+                              data-testid={`input-vendor-code-${pin.id}`}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage</label>
+                            <Input
+                              type="number"
+                              value={editState.footage}
+                              onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
+                              placeholder="e.g. 1000"
+                              data-testid={`input-footage-${pin.id}`}
+                            />
+                          </div>
+                        </div>
+                        {pin.entryId && (
+                          <div className="mb-3">
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
+                            <Textarea
+                              value={editState.notes}
+                              onChange={(e) => setEditState(s => ({ ...s, notes: e.target.value }))}
+                              placeholder="Add notes about this reel..."
+                              rows={2}
+                              data-testid={`input-notes-${pin.id}`}
+                            />
+                          </div>
+                        )}
+                        <div className="flex justify-end">
+                          <Button
+                            size="sm"
+                            onClick={() => savePinMutation.mutate({ pinId: pin.id, entryId: pin.entryId, data: editState })}
+                            disabled={savePinMutation.isPending}
+                            data-testid={`button-save-edit-${pin.id}`}
+                          >
+                            {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                            Save
+                          </Button>
+                        </div>
                       </div>
                     )}
-                    <div className="flex justify-end">
-                      <Button
-                        size="sm"
-                        onClick={() => savePinMutation.mutate({ pinId: pin.id, entryId: pin.entryId, data: editState })}
-                        disabled={savePinMutation.isPending}
-                        data-testid={`button-save-edit-mobile-${pin.id}`}
-                      >
-                        {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                        Save
-                      </Button>
+
+                    {/* Mobile layout */}
+                    <div className="sm:hidden flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2 w-full">
+                        <span className="font-mono text-sm font-medium" data-testid={`text-pin-label-mobile-${pin.id}`}>
+                          Pin {pin.label}
+                        </span>
+                        {pin.wireDetails && (
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-wire-mobile-${pin.id}`}>
+                            {pin.wireDetails}
+                          </Badge>
+                        )}
+                        {(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails) ? (
+                          <Badge className="text-[10px] bg-green-900/50 text-green-300 border-green-700/40" data-testid={`badge-addressed-mobile-${pin.id}`}>
+                            Addressed
+                          </Badge>
+                        ) : (
+                          <Badge className="text-[10px] bg-orange-500 text-white border-orange-600" data-testid={`badge-needs-attention-mobile-${pin.id}`}>
+                            Needs Attention
+                          </Badge>
+                        )}
+                      </div>
+                      {pin.photoUrl ? (
+                        <div
+                          className="relative w-full rounded overflow-hidden border border-black cursor-pointer"
+                          onClick={() => setPreviewPin(pin)}
+                        >
+                          <img
+                            src={pin.photoUrl}
+                            alt={pin.photoFilename || "Photo"}
+                            className="w-full h-auto block"
+                          />
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${pin.xPercent}%`,
+                              top: `${pin.yPercent}%`,
+                              transform: "translate(-50%, -50%)",
+                            }}
+                          >
+                            <div className="w-8 h-8 rounded-full animate-pulse" style={{ border: "4px solid #f97316" }} />
+                            <div className="absolute inset-0 w-8 h-8 rounded-full border border-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full h-24 rounded bg-muted flex items-center justify-center">
+                          <MapPin className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex gap-3 text-xs text-muted-foreground font-mono w-full">
+                        {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}
+                        {pin.vendorCode && <span>{pin.vendorCode}</span>}
+                        {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
+                      </div>
+                      <div className="flex items-center justify-center gap-10 w-full py-2">
+                        <Button
+                          variant="ghost"
+                          className="rounded-full border border-black w-14 h-14"
+                          onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
+                          data-testid={`button-edit-mobile-${pin.id}`}
+                          title="Edit details"
+                          aria-label="Edit details"
+                        >
+                          <Pencil className="h-7 w-7" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="rounded-full border border-black w-14 h-14"
+                          onClick={() => unflagMutation.mutate(pin.id)}
+                          disabled={unflagMutation.isPending}
+                          data-testid={`button-resolve-mobile-${pin.id}`}
+                          title="Un-Flag"
+                          aria-label="Un-Flag"
+                        >
+                          <Check className="h-7 w-7" />
+                        </Button>
+                      </div>
+                      {editingPinId === pin.id && (
+                        <div className="w-full border-t border-black pt-3 mt-1 space-y-3">
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
+                            <Input
+                              value={editState.wireDetails}
+                              onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value }))}
+                              placeholder="e.g. THHN #12 Black"
+                              data-testid={`input-wire-details-mobile-${pin.id}`}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
+                              <Input
+                                value={editState.vendorCode}
+                                onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.slice(0, 3) }))}
+                                placeholder="e.g. SOU"
+                                maxLength={3}
+                                data-testid={`input-vendor-code-mobile-${pin.id}`}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage</label>
+                              <Input
+                                type="number"
+                                value={editState.footage}
+                                onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
+                                placeholder="e.g. 1000"
+                                data-testid={`input-footage-mobile-${pin.id}`}
+                              />
+                            </div>
+                          </div>
+                          {pin.entryId && (
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
+                              <Textarea
+                                value={editState.notes}
+                                onChange={(e) => setEditState(s => ({ ...s, notes: e.target.value }))}
+                                placeholder="Add notes about this reel..."
+                                rows={2}
+                                data-testid={`input-notes-mobile-${pin.id}`}
+                              />
+                            </div>
+                          )}
+                          <div className="flex justify-end">
+                            <Button
+                              size="sm"
+                              onClick={() => savePinMutation.mutate({ pinId: pin.id, entryId: pin.entryId, data: editState })}
+                              disabled={savePinMutation.isPending}
+                              data-testid={`button-save-edit-mobile-${pin.id}`}
+                            >
+                              {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
           ))}
