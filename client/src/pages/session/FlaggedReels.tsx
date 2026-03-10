@@ -170,7 +170,7 @@ function DupPinTile({
               title="Keep this pin, delete others"
             >
               {keepMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-0.5" />}
-              Keep
+              Keep This Pin, Delete Only Other Pin(s)
             </Button>
           )}
           <Button
@@ -183,7 +183,7 @@ function DupPinTile({
             title="Delete this photo entirely"
           >
             {deletePhotoMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 mr-0.5" />}
-            Delete Photo
+            Delete This Photo & All Pins
           </Button>
         </div>
       </div>
