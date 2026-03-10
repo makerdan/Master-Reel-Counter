@@ -401,7 +401,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           {flaggedPins.map((pin) => (
             <div
               key={pin.id}
-              className="border border-border rounded-lg p-3 bg-card hover:bg-accent/5 transition-colors"
+              className="border border-black rounded-lg p-3 bg-card hover:bg-accent/5 transition-colors"
               data-testid={`flagged-pin-card-${pin.id}`}
             >
               {/* Desktop layout */}
