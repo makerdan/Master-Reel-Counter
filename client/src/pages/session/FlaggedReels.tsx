@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch, ArrowUpDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -200,6 +200,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "" });
   const [dupsOpen, setDupsOpen] = useState(true);
   const [disregardedKeys, setDisregardedKeys] = useState<Set<string>>(() => loadDisregardedKeys(sessionId));
+  const [sortBy, setSortBy] = useState<"location" | "label" | "count">("location");
+  const [filterBy, setFilterBy] = useState<"all" | "attention" | "addressed">("all");
 
   const { data: flaggedPins = [], isLoading } = useQuery<FlaggedPin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"],
@@ -285,14 +287,22 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     setDisregardedKeys(next);
   }
 
+  const filteredPins = useMemo(() => {
+    if (filterBy === "all") return flaggedPins;
+    return flaggedPins.filter(pin => {
+      const isAddressed = !!(pin.hasDetailPhoto || pin.hasNotes || pin.wireDetails);
+      return filterBy === "addressed" ? isAddressed : !isAddressed;
+    });
+  }, [flaggedPins, filterBy]);
+
   const photoGroups = useMemo(() => {
     const groupMap = new Map<number, FlaggedPin[]>();
-    for (const pin of flaggedPins) {
+    for (const pin of filteredPins) {
       const existing = groupMap.get(pin.photoId);
       if (existing) existing.push(pin);
       else groupMap.set(pin.photoId, [pin]);
     }
-    return Array.from(groupMap.entries()).map(([photoId, pins]) => ({
+    const groups = Array.from(groupMap.entries()).map(([photoId, pins]) => ({
       photoId,
       photoUrl: pins[0].photoUrl || null,
       photoFilename: pins[0].photoFilename || null,
@@ -300,7 +310,23 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       photoSection: pins[0].photoSection || null,
       pins,
     }));
-  }, [flaggedPins]);
+    if (sortBy === "location") {
+      groups.sort((a, b) => {
+        const cmp = (a.photoAisle || "").localeCompare(b.photoAisle || "", undefined, { numeric: true });
+        if (cmp !== 0) return cmp;
+        return (a.photoSection || "").localeCompare(b.photoSection || "", undefined, { numeric: true });
+      });
+    } else if (sortBy === "label") {
+      groups.sort((a, b) => {
+        const labelA = a.pins[0]?.label || "";
+        const labelB = b.pins[0]?.label || "";
+        return labelA.localeCompare(labelB, undefined, { numeric: true });
+      });
+    } else if (sortBy === "count") {
+      groups.sort((a, b) => b.pins.length - a.pins.length);
+    }
+    return groups;
+  }, [filteredPins, sortBy]);
 
   const pinnedEntryIds = new Set(sessionPins.filter(p => p.entryId).map(p => p.entryId!));
   const unpinnedEntries = sessionEntries.filter(e => !pinnedEntryIds.has(e.id));
@@ -320,7 +346,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             size="sm"
             data-testid="button-share-flagged"
             title="Copy shareable link"
-            aria-label="Share"
+            aria-label="Share Link"
             onClick={() => {
               const url = `${window.location.origin}/session/${sessionId}?tab=flagged`;
               navigator.clipboard.writeText(url).then(() => {
@@ -333,10 +359,41 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             }}
           >
             {copied ? <Check className="h-3.5 w-3.5 sm:mr-1" /> : <Share2 className="h-3.5 w-3.5 sm:mr-1" />}
-            <span className="hidden sm:inline">{copied ? "Copied" : "Share"}</span>
+            <span className="hidden sm:inline">{copied ? "Copied" : "Share Link"}</span>
           </Button>
         </div>
       </div>
+
+      {flaggedPins.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 justify-center" data-testid="flagged-sort-filter">
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="text-xs border !border-black rounded px-2 py-1 bg-card text-foreground"
+              data-testid="select-sort"
+            >
+              <option value="location">Aisle / Section</option>
+              <option value="label">Pin Label</option>
+              <option value="count">Pin Count</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <select
+              value={filterBy}
+              onChange={(e) => setFilterBy(e.target.value as typeof filterBy)}
+              className="text-xs border !border-black rounded px-2 py-1 bg-card text-foreground"
+              data-testid="select-filter"
+            >
+              <option value="all">All ({flaggedPins.length})</option>
+              <option value="attention">Needs Attention ({flaggedPins.filter(p => !(p.hasDetailPhoto || p.hasNotes || p.wireDetails)).length})</option>
+              <option value="addressed">Addressed ({flaggedPins.filter(p => !!(p.hasDetailPhoto || p.hasNotes || p.wireDetails)).length})</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {visibleDupGroups.length > 0 && (
         <div className="space-y-2" data-testid="section-duplicates">
@@ -412,6 +469,11 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           <Flag className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="text-sm">No flagged reels in this session.</p>
           <p className="text-xs mt-1">Use the flag button on pins in Photo Mode to mark reels for re-shoot.</p>
+        </div>
+      ) : filteredPins.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground" data-testid="text-no-filtered">
+          <Filter className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No pins match this filter.</p>
         </div>
       ) : (
         <div className="grid gap-4">
