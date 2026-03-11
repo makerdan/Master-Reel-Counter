@@ -583,7 +583,28 @@ export function correctWireDetails(rawDetails: string): CorrectionResult {
     }
   }
 
+  if (parts.footage === "2000" && gaugeResult) {
+    const currentGauge = gaugeResult.corrected || gaugeResult.original;
+    if (currentGauge !== "600") {
+      parts.gauge = { original: gaugeResult.original, corrected: "600", confident: true };
+      correctedParts[1] = "600";
+      wasModified = true;
+    }
+  }
+
   const correctedDetails = correctedParts.join("");
+
+  const rebuiltCatalog = correctedDetails;
+  const rebuiltMatch = CATALOG.find(e => e.catalog === rebuiltCatalog);
+  if (rebuiltMatch) {
+    return {
+      correctedDetails,
+      wasModified,
+      confident: overallConfident,
+      catalogMatch: rebuiltMatch,
+      parts,
+    };
+  }
 
   return {
     correctedDetails,
