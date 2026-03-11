@@ -251,7 +251,7 @@ function PhotoCard({
               }}
               title={pin.label || "Pin"}
             >
-              <div className="w-3 h-3 rounded-full bg-amber-400 border-2 border-white shadow-md" />
+              <div className="w-3 h-3 rounded-full bg-orange-400 border-2 border-white shadow-md" />
             </div>
           );
         })}
@@ -534,9 +534,13 @@ export default function PhotoStrip({
         return (
           <div key={aisleGroup.aisle}>
             <div className="mb-3 pb-1 border-b">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <button
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary hover:underline transition-colors cursor-pointer"
+                onClick={() => onJumpToPhoto(aisleGroup.sections[0].photos[0].id)}
+                data-testid={`link-strip-aisle-${aisleGroup.aisle || "none"}`}
+              >
                 {aisleGroup.aisle ? `Aisle: ${aisleGroup.aisle}` : "No Aisle Set"}
-              </span>
+              </button>
               <span className="ml-2 text-xs text-muted-foreground">
                 ({totalPhotos} photo{totalPhotos !== 1 ? "s" : ""})
               </span>
@@ -546,9 +550,13 @@ export default function PhotoStrip({
               {aisleGroup.sections.map((sectionGroup) => (
                 <div key={sectionGroup.section}>
                   <div className="flex items-center gap-2 mb-2 border-l-2 border-muted-foreground/20 pl-2">
-                    <span className="text-[11px] font-medium text-muted-foreground/80">
+                    <button
+                      className="text-[11px] font-medium text-muted-foreground/80 hover:text-primary hover:underline transition-colors cursor-pointer"
+                      onClick={() => onJumpToPhoto(sectionGroup.photos[0].id)}
+                      data-testid={`link-strip-section-${aisleGroup.aisle || "none"}-${sectionGroup.section || "none"}`}
+                    >
                       {sectionGroup.section ? `Section ${sectionGroup.section}` : "No Section Set"}
-                    </span>
+                    </button>
                     <span className="text-[11px] text-muted-foreground/50">
                       · {sectionGroup.photos.length} photo{sectionGroup.photos.length !== 1 ? "s" : ""}
                     </span>
