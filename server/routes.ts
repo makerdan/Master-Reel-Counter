@@ -1732,6 +1732,7 @@ export async function registerRoutes(
         const committed = photoPins.filter((pin: any) => pin.entryId != null);
         if (committed.length > 0) allPinsMap.set(p.id, committed);
       }
+      const flaggedPinIds = new Set(allFlaggedPins.map((p: any) => p.id));
 
       const sortedSections = Array.from(sectionGroups.entries())
         .map(([, data]) => data)
@@ -2058,7 +2059,11 @@ export async function registerRoutes(
         const photoPins = allPinsMap.get(pl.photo.id) || [];
         const pinScale = pl.photo.pinScale || 1;
         for (const pin of photoPins) {
-          drawCommittedPin(pin, imgX, y, w, h, pl.origW, pinScale);
+          if (flaggedPinIds.has(pin.id)) {
+            drawFlaggedPin(pin, imgX, y, w, h, pl.origW, pinScale);
+          } else {
+            drawCommittedPin(pin, imgX, y, w, h, pl.origW, pinScale);
+          }
         }
 
         doc.rect(imgX, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
@@ -2068,9 +2073,6 @@ export async function registerRoutes(
           ? photoEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0)
           : photoPins.reduce((s: number, p: any) => s + (p.reelCount || 1), 0);
         const captionParts: string[] = [photoName];
-        if (pl.photo.aisle || pl.photo.section) {
-          captionParts.push(`Aisle ${pl.photo.aisle || "—"}, Sec ${pl.photo.section || "—"}`);
-        }
         captionParts.push(`${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`);
         if (pl.photo.createdAt) {
           captionParts.push(formatCT(new Date(pl.photo.createdAt)));
@@ -2098,16 +2100,17 @@ export async function registerRoutes(
         const photoPins = allPinsMap.get(pl.photo.id) || [];
         const pinScale = pl.photo.pinScale || 1;
         for (const pin of photoPins) {
-          drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale);
+          if (flaggedPinIds.has(pin.id)) {
+            drawFlaggedPin(pin, x, y, w, h, pl.origW, pinScale);
+          } else {
+            drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale);
+          }
         }
         doc.rect(x, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
 
         const photoName = pl.photo.originalFilename || `Photo ${pl.photo.id}`;
         const reelTotal = entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
         const compactCaptionParts: string[] = [photoName];
-        if (pl.photo.aisle || pl.photo.section) {
-          compactCaptionParts.push(`Aisle ${pl.photo.aisle || "—"}, Sec ${pl.photo.section || "—"}`);
-        }
         compactCaptionParts.push(`${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`);
         if (pl.photo.createdAt) {
           compactCaptionParts.push(formatCT(new Date(pl.photo.createdAt)));
@@ -2297,21 +2300,6 @@ export async function registerRoutes(
         const hasPhotoContent = loadedPhotos.length > 0;
         if (!hasPhotoContent && unmatchedEntries.length === sec.entries.length) continue;
 
-        doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-        doc.addNamedDestination(`sec-${tocSecIdx}`);
-        tocSecIdx++;
-        currentY = 36;
-        const photoLabel = loadedPhotos.length > 0 ? `${loadedPhotos.length} photo${loadedPhotos.length !== 1 ? "s" : ""}` : undefined;
-        drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
-
-        const ensureSpace = (needed: number) => {
-          if (currentY + needed > maxY) {
-            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
-            currentY = 36;
-            drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, undefined, " (Continued)");
-          }
-        };
-
         const isReceivingSection = (sec.aisle || "").toLowerCase() === "receiving";
 
         const detailShotsByParent = new Map<number, { pl: PhotoLayout; entries: any[] }[]>();
@@ -2351,6 +2339,36 @@ export async function registerRoutes(
           }
         }
 
+        const isReceivingCompactSingle = isReceivingSection
+          && compactPhotos.length === 1
+          && compactWithoutEntries.length === 0
+          && standardPhotos.length === 0
+          && standardWithoutEntries.length === 0
+          && detailShotsByParent.size === 0
+          && detailShotsWithoutEntriesByParent.size === 0;
+
+        const sectionHeaderH = 28;
+        const compactBlockMinH = 100;
+        const neededForReceivingStack = sectionHeaderH + compactBlockMinH;
+        const canFitOnCurrentPage = isReceivingCompactSingle && currentY > 36 && (currentY + neededForReceivingStack <= maxY);
+
+        if (!canFitOnCurrentPage) {
+          doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+          currentY = 36;
+        }
+        doc.addNamedDestination(`sec-${tocSecIdx}`);
+        tocSecIdx++;
+        const photoLabel = loadedPhotos.length > 0 ? `${loadedPhotos.length} photo${loadedPhotos.length !== 1 ? "s" : ""}` : undefined;
+        drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
+
+        const ensureSpace = (needed: number) => {
+          if (currentY + needed > maxY) {
+            doc.addPage({ size: "LETTER", layout: "landscape", margin: 36 });
+            currentY = 36;
+            drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, undefined, " (Continued)");
+          }
+        };
+
         const renderDetailShotColumnList = (pl: PhotoLayout, photoEntries: any[], x: number, y: number, maxW: number, maxH: number) => {
           const imgW = Math.min(maxW * 0.38, 220);
           const captionH = 10;
@@ -2364,14 +2382,17 @@ export async function registerRoutes(
           const photoPins = allPinsMap.get(pl.photo.id) || [];
           const pinScale = pl.photo.pinScale || 1;
           for (const pin of photoPins) {
-            drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale);
+            if (flaggedPinIds.has(pin.id)) {
+              drawFlaggedPin(pin, x, y, w, h, pl.origW, pinScale);
+            } else {
+              drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale);
+            }
           }
           doc.rect(x, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
 
           const photoName = pl.photo.originalFilename || `Photo ${pl.photo.id}`;
           const reelTotal = photoEntries.length > 0 ? photoEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0) : photoPins.reduce((s: number, p: any) => s + (p.reelCount || 1), 0);
           const capParts: string[] = [photoName];
-          if (pl.photo.aisle || pl.photo.section) capParts.push(`Aisle ${pl.photo.aisle || "—"}, Sec ${pl.photo.section || "—"}`);
           capParts.push(`${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`);
           if (pl.photo.createdAt) capParts.push(formatCT(new Date(pl.photo.createdAt)));
           doc.font('Helvetica').fontSize(5.5).fillColor("#666666")
@@ -2621,7 +2642,7 @@ export async function registerRoutes(
             tableLeft + 6, currentY + 4, { width: pageWidth - 120, lineBreak: false }
           );
           doc.fontSize(7).fillColor("#cc4400").text(
-            "⚑ flagged",
+            "[FLAGGED]",
             tableLeft + pageWidth - 100, currentY + 5, { width: 90, align: "right", lineBreak: false }
           );
           doc.rect(tableLeft, currentY, pageWidth, 18).stroke(borderColor);
@@ -2657,7 +2678,6 @@ export async function registerRoutes(
 
             const captionParts: string[] = [];
             if (pl.photo.originalFilename) captionParts.push(pl.photo.originalFilename);
-            captionParts.push(`Aisle ${a}, Sec ${s}`);
             if (pl.photo.createdAt) captionParts.push(formatCT(new Date(pl.photo.createdAt)));
             doc.font('Helvetica').fontSize(5.5).fillColor("#666666")
               .text(captionParts.join("  |  "), tableLeft, currentY + h + 1, { width: w, align: "center", lineBreak: false });
@@ -2670,7 +2690,7 @@ export async function registerRoutes(
           let infoY = currentY;
 
           doc.font('Helvetica-Bold').fontSize(9).fillColor("#cc4400")
-            .text(`${pinLabel}  ⚑`, infoX, infoY, { width: infoW, lineBreak: false });
+            .text(`${pinLabel}  [FLAGGED]`, infoX, infoY, { width: infoW, lineBreak: false });
           infoY += lineH + 2;
 
           if (item.pin.flagReason) {
