@@ -1793,7 +1793,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 </span>
               </div>
               <div className="flex items-center w-full">
-                <div className="flex-1" />
+                <div className="flex-1 flex items-center">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-[hsl(30_40%_85%)] hover:bg-[hsl(18_60%_30%/0.4)]"
+                    onClick={() => setPinsVisible(v => !v)}
+                    title={pinsVisible ? "Hide pins" : "Show pins"}
+                    data-testid="button-toggle-pins-visible-bottom"
+                  >
+                    {pinsVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </Button>
+                </div>
                 <div className="flex items-center gap-3">
                   <Button
                     size="icon"
