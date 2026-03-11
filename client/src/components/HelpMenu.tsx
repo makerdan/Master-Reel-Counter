@@ -841,11 +841,6 @@ export function SessionSections() {
             label="Session Locking"
             description="The owner can lock a session to freeze all edits. Collaborators see a lock banner and cannot make changes until the owner unlocks."
           />
-          <FeatureRow
-            icon={<HelpIcon icon={Unlock} />}
-            label="Per-Aisle Locking"
-            description="The owner can lock individual aisles while leaving others open for counting. Use the Lock Aisles button in the session header to open a popover listing all aisles with lock toggles. Locked aisles show a lock icon on their photos and entries. Collaborators cannot edit anything in a locked aisle but can continue working in unlocked aisles."
-          />
         </AccordionContent>
       </AccordionItem>
 

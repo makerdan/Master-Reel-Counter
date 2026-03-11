@@ -36,8 +36,6 @@ import {
   scanResults,
   type ScanResult,
   type InsertScanResult,
-  lockedAisles,
-  type LockedAisle,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -118,9 +116,6 @@ export interface IStorage {
   getSessionScanResults(sessionId: number): Promise<ScanResult[]>;
   deleteSessionScanResults(sessionId: number): Promise<void>;
 
-  getLockedAisles(sessionId: number): Promise<LockedAisle[]>;
-  lockAisle(sessionId: number, aisle: string, lockedBy: string): Promise<LockedAisle>;
-  unlockAisle(sessionId: number, aisle: string): Promise<void>;
 
   getUserStats(userId: string): Promise<{
     totalSessions: number;
@@ -946,24 +941,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(scanResults).where(eq(scanResults.sessionId, sessionId));
   }
 
-  async getLockedAisles(sessionId: number): Promise<LockedAisle[]> {
-    return db.select().from(lockedAisles).where(eq(lockedAisles.sessionId, sessionId));
-  }
-
-  async lockAisle(sessionId: number, aisle: string, lockedBy: string): Promise<LockedAisle> {
-    const existing = await db.select().from(lockedAisles).where(
-      and(eq(lockedAisles.sessionId, sessionId), eq(lockedAisles.aisle, aisle))
-    );
-    if (existing.length > 0) return existing[0];
-    const [result] = await db.insert(lockedAisles).values({ sessionId, aisle, lockedBy }).returning();
-    return result;
-  }
-
-  async unlockAisle(sessionId: number, aisle: string): Promise<void> {
-    await db.delete(lockedAisles).where(
-      and(eq(lockedAisles.sessionId, sessionId), eq(lockedAisles.aisle, aisle))
-    );
-  }
 }
 
 export const storage = new DatabaseStorage();

@@ -33,7 +33,7 @@ import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 import SingleEntryMode from "./SingleEntryMode";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, lockedAisles, isOwner = false }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; lockedAisles?: Set<string>; isOwner?: boolean }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -230,8 +230,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, [scale, panX, panY, clampPan]);
 
   const currentPhoto = uploadedPhotos[currentPhotoIdx];
-  const currentPhotoAisleLocked = !isOwner && !!lockedAisles?.has(currentPhoto?.aisle || "");
-  const effectiveCanEdit = canEdit && !currentPhotoAisleLocked;
+  const effectiveCanEdit = canEdit;
   const otherPhotosIncompleteCount = totalIncompletePins - (currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0);
   const nextReelCount = localPins.length + otherPhotosIncompleteCount;
   const displayedPhotoIdx = viewingNearbyIdx !== null ? viewingNearbyIdx : currentPhotoIdx;
@@ -1459,12 +1458,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             )}
           </div>
 
-          {currentPhotoAisleLocked && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/15 border border-amber-500/30 rounded-md text-xs text-amber-600 dark:text-amber-400" data-testid="aisle-locked-banner">
-              <Lock className="h-3 w-3 shrink-0" />
-              <span>Aisle "{currentPhoto?.aisle}" is locked. Editing is disabled.</span>
-            </div>
-          )}
 
           {viewingNearbyIdx !== null && viewingNearbyIdx !== currentPhotoIdx && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(18_85%_40%/0.15)] border border-[hsl(18_85%_40%/0.3)] rounded-md text-xs text-[hsl(30_40%_85%)]" data-testid="nearby-viewing-banner">
