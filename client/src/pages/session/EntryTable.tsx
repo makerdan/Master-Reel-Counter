@@ -119,6 +119,12 @@ function EntryTable({
                     next[key] = affectedKeys.has(key);
                   }
                   setExpandedSections(next);
+                  const firstId = warningEntries[0]?.id;
+                  if (firstId) {
+                    setTimeout(() => {
+                      document.querySelector(`[data-testid="row-entry-${firstId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 50);
+                  }
                 }}
                 data-testid="btn-validation-warnings"
               >
@@ -143,6 +149,12 @@ function EntryTable({
                     next[key] = affectedKeys.has(key);
                   }
                   setExpandedSections(next);
+                  const firstId = photolessEntries[0]?.id;
+                  if (firstId) {
+                    setTimeout(() => {
+                      document.querySelector(`[data-testid="row-entry-${firstId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 50);
+                  }
                 }}
                 data-testid="btn-photoless-warnings"
               >
