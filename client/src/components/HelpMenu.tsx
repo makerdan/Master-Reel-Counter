@@ -548,7 +548,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={Flag} className="text-yellow-500" />}
             label="Flag for Re-shoot"
-            description="Marks a pin as needing a re-shoot or additional info. Flagged pins appear in the Flagged tab and have a yellow highlight."
+            description="Marks a pin as needing a re-shoot or additional info. A popover lets you enter an optional reason (e.g. 'label obscured', 'bad angle'). Flagged pins appear in the Flagged tab with their reason and have a yellow highlight."
           />
           <FeatureRow
             icon={<Plus className="h-3.5 w-3.5 shrink-0 text-green-500" />}
@@ -612,7 +612,7 @@ export function SessionSections() {
           <span className="flex items-center gap-2"><Flag className="h-4 w-4 text-yellow-500" /> Flagged Tab</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Dedicated view for all reels that have been flagged for re-shoot or additional information.</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Dedicated view for all reels that have been flagged for re-shoot or additional information. Each card shows the flag reason (if provided) and allows inline editing.</p>
           <FeatureRow
             icon={<HelpIcon icon={Eye} />}
             label="Photo Preview"
@@ -629,9 +629,14 @@ export function SessionSections() {
             description='Tap "Re-shoot" to enter detail-shot mode in Mobile Flow. The aisle and section are pre-filled from the original photo. After capturing, a review screen shows your photo with an editable notes field. Tap "Save & Done" to save or "Retake" to try again.'
           />
           <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Flag Reason"
+            description="Each flagged pin displays its reason below the card. Tap the reason text to edit it inline — changes save automatically. Useful for communicating what needs to be re-checked."
+          />
+          <FeatureRow
             icon={<HelpIcon icon={Check} />}
             label="Un-Flag"
-            description='Tap "Un-Flag" to unflag a reel once the re-shoot or additional info has been captured. The reel disappears from the flagged list.'
+            description='Tap "Un-Flag" to unflag a reel once the re-shoot or additional info has been captured. The reason is cleared and the reel disappears from the flagged list.'
           />
           <FeatureRow
             icon={<HelpIcon icon={ChevronLeft} />}
@@ -768,6 +773,11 @@ export function SessionSections() {
         <AccordionContent className="space-y-1 pb-4">
           <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list. Columns (desktop): Pin # → Aisle → Section → Category → Vendor → Reels → Ft/Reel → Total Ft → Photo → Edit.</p>
           <FeatureRow
+            icon={<HelpIcon icon={MapPin} />}
+            label="Clickable Pin #"
+            description="Tap any Pin # in the table to jump directly to that pin's photo in Section Photo mode. The target pin flashes with a yellow glow for a few seconds so you can spot it immediately — useful for zooming in on a label you need to verify."
+          />
+          <FeatureRow
             icon={<HelpIcon icon={ChevronLeft} />}
             label="Collapsible Sections"
             description="Entries are grouped by aisle-section. Tap a section header to expand or collapse it. The header shows the entry count for that section."
@@ -830,6 +840,11 @@ export function SessionSections() {
             icon={<HelpIcon icon={Lock} />}
             label="Session Locking"
             description="The owner can lock a session to freeze all edits. Collaborators see a lock banner and cannot make changes until the owner unlocks."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Unlock} />}
+            label="Per-Aisle Locking"
+            description="The owner can lock individual aisles while leaving others open for counting. Use the Lock Aisles button in the session header to open a popover listing all aisles with lock toggles. Locked aisles show a lock icon on their photos and entries. Collaborators cannot edit anything in a locked aisle but can continue working in unlocked aisles."
           />
         </AccordionContent>
       </AccordionItem>
