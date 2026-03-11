@@ -134,8 +134,8 @@ function normalizeWire(w: string | null | undefined): string {
 function wireDetailsMatch(a: Pin, b: Pin): boolean {
   const wa = normalizeWire(a.wireDetails);
   const wb = normalizeWire(b.wireDetails);
-  if (wa === "" && wb === "") return true;
-  return wa !== "" && wb !== "" && wa === wb;
+  if (wa === "" || wb === "") return true;
+  return wa === wb;
 }
 
 function pinDistance(a: Pin, b: Pin): number {
