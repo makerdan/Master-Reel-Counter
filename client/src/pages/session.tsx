@@ -351,7 +351,7 @@ function SessionWorkspace({
 
   const [exportWarningOpen, setExportWarningOpen] = useState(false);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
-  const [pendingExportType, setPendingExportType] = useState<"pdf" | "csv" | null>(null);
+  const [pendingExportType, setPendingExportType] = useState<"pdf" | "excel" | null>(null);
   const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
   const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
     () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
@@ -365,45 +365,32 @@ function SessionWorkspace({
   const stdFetchRef  = useRef<Promise<Blob | null> | null>(null);
   const unpinnedEntries = entries.filter(e => !pinByEntryId.has(e.id));
 
-  const doExportCsv = async () => {
+  const doExportExcel = async () => {
     try {
-      const res = await apiRequest("GET", `/api/sessions/${sessionId}/export`);
-      const data = await res.json();
-      const exportEntries = data.entries || entries;
-      const exportPhotos = data.photos || [];
-      const photoMap = new Map(exportPhotos.map((p: any) => [p.id, p]));
-      const headers = ["#", "Aisle", "Section", "Position", "Pallet ID", "Reel Tag", "Wire Type", "Gauge", "Footage", "Reel Count", "Conductors", "Color", "Manufacturer", "Notes", "Photo", "Photo Notes", "Detail Shot", "Parent Photo"];
-      const rows = exportEntries.map((e: any, i: number) => {
-        const photo = e.photoId ? photoMap.get(e.photoId) : null;
-        const parentPhoto = photo?.parentPhotoId ? photoMap.get(photo.parentPhotoId) : null;
-        return [
-          i + 1, e.aisle, e.section, e.position || "", e.palletId || "", e.reelTag || "",
-          e.wireType || "", e.gauge || "", e.footage || "", e.reelCount || 1,
-          e.conductors || "", e.color || "", e.manufacturer || "", e.notes || "",
-          photo?.originalFilename || "", photo?.notes || "",
-          photo?.isDetailShot ? "Yes" : "", parentPhoto?.originalFilename || "",
-        ];
-      });
-      const csv = [headers.join(","), ...rows.map((r: any[]) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
+      const params = new URLSearchParams();
+      if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
+      const url = `/api/sessions/${sessionId}/export/excel?${params}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = buildExportFilename(session, "csv");
+      a.href = blobUrl;
+      a.download = buildExportFilename(session, "xlsx");
       a.click();
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(blobUrl);
     } catch {
-      toast({ title: "Failed to export CSV", variant: "destructive" });
+      toast({ title: "Failed to export Excel", variant: "destructive" });
     }
   };
 
-  const exportCsv = async () => {
+  const exportExcel = async () => {
     if (unpinnedEntries.length > 0) {
-      setPendingExportType("csv");
+      setPendingExportType("excel");
       setExportWarningOpen(true);
       return;
     }
-    await doExportCsv();
+    await doExportExcel();
   };
 
   const buildPdfUrl = (quality: "full" | "standard") => {
@@ -640,9 +627,9 @@ function SessionWorkspace({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={exportCsv} data-testid="button-export-csv" disabled={isPdfExporting}>
+                <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isPdfExporting}>
                   <Download className="h-4 w-4 mr-2" />
-                  CSV
+                  Excel
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isPdfExporting}>
                   {isPdfExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
@@ -992,7 +979,7 @@ function SessionWorkspace({
                 const type = pendingExportType;
                 setPendingExportType(null);
                 if (type === "pdf") openQualityDialogDirect();
-                else if (type === "csv") await doExportCsv();
+                else if (type === "excel") await doExportExcel();
               }}
             >
               Export Anyway

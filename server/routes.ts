@@ -17,6 +17,7 @@ import path from "path";
 import fs from "fs/promises";
 import { PassThrough } from "stream";
 import { cropPhoto } from "./lib/cropPhoto";
+import ExcelJS from "exceljs";
 import { openai } from "./replit_integrations/image/client";
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
@@ -2994,6 +2995,504 @@ export async function registerRoutes(
       res.json({ session, entries: sessionEntries, photos: sessionPhotos });
     } catch (error) {
       res.status(500).json({ message: "Failed to export session" });
+    }
+  });
+
+  app.get("/api/sessions/:id/export/excel", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const access = await verifySessionAccess(parseInt(req.params.id), userId);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const session = access.session;
+      const rawEntries = await storage.getSessionEntries(session.id);
+      const key = await getEncryptionKey(userId);
+      const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
+      const sessionPhotos = await storage.getSessionPhotos(session.id);
+      const photoMap = new Map(sessionPhotos.map((p: any) => [p.id, p]));
+      const allFlaggedPins = await storage.getSessionFlaggedPins(session.id);
+      const flaggedEntryIds = new Set<number>(
+        allFlaggedPins.filter((p: any) => p.entryId != null).map((p: any) => p.entryId as number)
+      );
+      const photoStats = await storage.getSessionPhotoStats([session.id]);
+      const pt = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
+
+      const userSettingsData = await storage.getUserSettings(userId);
+      const userTz = userSettingsData?.timezone || "America/Chicago";
+      const companyName = typeof req.query.companyName === "string" ? req.query.companyName : null;
+
+      const TZ_ABBR: Record<string, string> = {
+        "America/New_York": "ET", "America/Chicago": "CT", "America/Denver": "MT",
+        "America/Los_Angeles": "PT", "America/Anchorage": "AKT", "Pacific/Honolulu": "HT",
+        "America/Phoenix": "MST", "UTC": "UTC",
+      };
+      const tzAbbr = TZ_ABBR[userTz] || userTz;
+      const fmtDt = (d: Date) => new Intl.DateTimeFormat('en-US', { timeZone: userTz, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+      const fmtElapsed = (ms: number): string => {
+        if (ms < 60000) return `${Math.round(ms / 1000)}s`;
+        const totalMin = Math.floor(ms / 60000);
+        if (totalMin < 60) return `${totalMin}m`;
+        const h = Math.floor(totalMin / 60); const m = totalMin % 60;
+        return m > 0 ? `${h}h ${m}m` : `${h}h`;
+      };
+
+      const allPinsByPhoto = new Map<number, any[]>();
+      for (const p of sessionPhotos) {
+        const photoPins = await storage.getPhotoPins(p.id);
+        const committed = photoPins.filter((pin: any) => pin.entryId != null);
+        if (committed.length > 0) allPinsByPhoto.set(p.id, committed);
+      }
+      const entryPinMap = new Map<number, any>();
+      for (const [, pins] of allPinsByPhoto) {
+        for (const pin of pins) {
+          if (pin.entryId) entryPinMap.set(pin.entryId, pin);
+        }
+      }
+
+      const activeEntries = (sessionEntries as any[]).filter((e: any) => !flaggedEntryIds.has(e.id));
+      const flaggedEntries = (sessionEntries as any[]).filter((e: any) => flaggedEntryIds.has(e.id));
+      const activeTotalFootage = activeEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+      const totalReels = activeEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+      const flaggedFootage = flaggedEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+      const flaggedReelCount = flaggedEntries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+
+      const safeStr = (v: any): string => {
+        if (v == null) return "";
+        const s = String(v);
+        if (s.length > 0 && "=+-@\t\r".includes(s[0])) return "'" + s;
+        return s;
+      };
+
+      const accentHex = "EA580C";
+      const headerBg = "F5F0EB";
+      const sectionBandBg = "E8E0D8";
+      const altRowBg = "FAFAF8";
+      const flaggedRowBg = "FFF0F0";
+      const flaggedBandBg = "FFDDCC";
+      const summaryGroupBg = "E8E0D8";
+
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "Master Reel Counter";
+      wb.created = new Date();
+      const ws = wb.addWorksheet("Reel Count", { views: [{ showGridLines: false }] });
+
+      ws.columns = [
+        { key: "pin", width: 8 },
+        { key: "aisle", width: 10 },
+        { key: "section", width: 10 },
+        { key: "category", width: 22 },
+        { key: "vendor", width: 14 },
+        { key: "reels", width: 10 },
+        { key: "footage", width: 14 },
+        { key: "gauge", width: 10 },
+        { key: "color", width: 12 },
+        { key: "conductors", width: 12 },
+        { key: "notes", width: 28 },
+        { key: "flagged", width: 10 },
+        { key: "flagReason", width: 22 },
+      ];
+
+      const thinBorder: Partial<ExcelJS.Borders> = {
+        top: { style: "thin", color: { argb: "CCCCCC" } },
+        bottom: { style: "thin", color: { argb: "CCCCCC" } },
+        left: { style: "thin", color: { argb: "CCCCCC" } },
+        right: { style: "thin", color: { argb: "CCCCCC" } },
+      };
+
+      let row = 1;
+
+      if (companyName) {
+        const r = ws.getRow(row);
+        r.getCell(1).value = safeStr(companyName);
+        r.getCell(1).font = { size: 10, color: { argb: "999999" } };
+        row++;
+      }
+
+      const titleRow = ws.getRow(row);
+      titleRow.getCell(1).value = "Master Reel Counter";
+      titleRow.getCell(1).font = { size: 16, bold: true, color: { argb: accentHex } };
+      row++;
+
+      const nameRow = ws.getRow(row);
+      nameRow.getCell(1).value = session.name;
+      nameRow.getCell(1).font = { size: 13, color: { argb: "222222" } };
+      row++;
+
+      const coverData: [string, string][] = [
+        ["Location:", session.location || "N/A"],
+        ["Status:", session.status.charAt(0).toUpperCase() + session.status.slice(1)],
+        ["Total Reels:", totalReels.toLocaleString()],
+        ["Total Footage:", `${activeTotalFootage.toLocaleString()} ft`],
+      ];
+      if (flaggedEntryIds.size > 0) {
+        coverData.push(["Flagged (excl.):", `${flaggedReelCount} reels / ${flaggedFootage.toLocaleString()} ft`]);
+      }
+      coverData.push(["Photos:", pt.photoCount.toLocaleString()]);
+      if (pt.firstPhotoAt) {
+        coverData.push(["Session Start:", `${fmtDt(new Date(pt.firstPhotoAt))} ${tzAbbr}`]);
+        if (pt.lastPhotoAt) {
+          coverData.push(["Session End:", `${fmtDt(new Date(pt.lastPhotoAt))} ${tzAbbr}`]);
+          const diffMs = Math.abs(new Date(pt.lastPhotoAt).getTime() - new Date(pt.firstPhotoAt).getTime());
+          coverData.push(["Elapsed Time:", fmtElapsed(diffMs)]);
+        }
+      }
+
+      for (const [label, value] of coverData) {
+        const r = ws.getRow(row);
+        r.getCell(1).value = label;
+        r.getCell(1).font = { size: 9, bold: true, color: { argb: "000000" } };
+        r.getCell(2).value = value;
+        r.getCell(2).font = { size: 9, color: { argb: "222222" } };
+        row++;
+      }
+
+      if (session.description) {
+        row++;
+        const r = ws.getRow(row);
+        r.getCell(1).value = safeStr(session.description);
+        r.getCell(1).font = { size: 9, color: { argb: "666666" } };
+        ws.mergeCells(row, 1, row, 6);
+        row++;
+      }
+
+      row += 2;
+
+      const sortEntries = (entries: any[]) => {
+        return [...entries].sort((a: any, b: any) => {
+          const aA = parseInt(a.aisle) || 0;
+          const bA = parseInt(b.aisle) || 0;
+          if (aA !== bA) return aA - bA;
+          if ((a.aisle || "") < (b.aisle || "")) return -1;
+          if ((a.aisle || "") > (b.aisle || "")) return 1;
+          const aS = parseInt(a.section) || 0;
+          const bS = parseInt(b.section) || 0;
+          if (aS !== bS) return aS - bS;
+          const aPin = entryPinMap.get(a.id);
+          const bPin = entryPinMap.get(b.id);
+          const aPL = parseInt(aPin?.label || "999") || 999;
+          const bPL = parseInt(bPin?.label || "999") || 999;
+          return aPL - bPL;
+        });
+      };
+
+      const entryHeaders = ["Pin", "Aisle", "Section", "Category", "Vendor", "# Reels", "Footage", "Gauge", "Color", "Conductors", "Notes", "Flagged", "Flag Reason"];
+      const headerRow = ws.getRow(row);
+      entryHeaders.forEach((h, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = h;
+        cell.font = { size: 9, bold: true, color: { argb: "333333" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerBg } };
+        cell.border = thinBorder;
+        cell.alignment = { vertical: "middle" };
+      });
+      headerRow.height = 20;
+      ws.views = [{ state: "frozen", ySplit: row, xSplit: 0 }];
+      row++;
+
+      const writeEntryRow = (e: any, isFlagged: boolean, altShade: boolean) => {
+        const pin = entryPinMap.get(e.id);
+        const pinLabel = pin?.label ? `P${String(pin.label).padStart(3, "0")}` : "";
+        const flagPin = isFlagged ? allFlaggedPins.find((fp: any) => fp.entryId === e.id) : null;
+        const vals = [
+          pinLabel, safeStr(e.aisle), safeStr(e.section),
+          safeStr(e.reelTag), safeStr(e.manufacturer),
+          e.reelCount || 1, e.footage || 0,
+          safeStr(e.gauge), safeStr(e.color), safeStr(e.conductors),
+          safeStr(e.notes),
+          isFlagged ? "Yes" : "",
+          safeStr(flagPin?.flagReason),
+        ];
+        const r = ws.getRow(row);
+        r.height = 16;
+        vals.forEach((v, i) => {
+          const cell = r.getCell(i + 1);
+          cell.value = v;
+          cell.font = { size: 8.5, color: { argb: isFlagged ? "CC4400" : "333333" } };
+          cell.border = thinBorder;
+          cell.alignment = { vertical: "middle", wrapText: i === 10 };
+          if (i === 0 && pinLabel) cell.font = { size: 8.5, bold: true, color: { argb: accentHex } };
+          if (i === 5 || i === 6) cell.alignment = { vertical: "middle", horizontal: "center" };
+          if (i === 6 && typeof v === "number" && v > 0) cell.numFmt = '#,##0" ft"';
+          if (isFlagged) {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: flaggedRowBg } };
+          } else if (altShade) {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altRowBg } };
+          }
+        });
+        row++;
+      };
+
+      const writeSectionBand = (aisle: string, section: string, entryCount: number, reelCount: number, footage: number) => {
+        const r = ws.getRow(row);
+        const label = `Aisle ${aisle || "—"}  /  Section ${section || "—"}  —  ${entryCount} entries, ${reelCount} reels, ${footage.toLocaleString()} ft`;
+        r.getCell(1).value = label;
+        r.getCell(1).font = { size: 9.5, bold: true, color: { argb: accentHex } };
+        ws.mergeCells(row, 1, row, 13);
+        r.height = 22;
+        for (let c = 1; c <= 13; c++) {
+          r.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionBandBg } };
+          r.getCell(c).border = thinBorder;
+        }
+        row++;
+      };
+
+      const sortedActive = sortEntries(activeEntries);
+      let lastSecKey = "";
+      let altIdx = 0;
+      for (const e of sortedActive) {
+        const secKey = `${e.aisle || ""}|||${e.section || ""}`;
+        if (secKey !== lastSecKey) {
+          const secEntries = sortedActive.filter((x: any) => `${x.aisle || ""}|||${x.section || ""}` === secKey);
+          const secReels = secEntries.reduce((s: number, x: any) => s + (x.reelCount || 1), 0);
+          const secFt = secEntries.reduce((s: number, x: any) => s + (x.footage || 0), 0);
+          writeSectionBand(e.aisle || "", e.section || "", secEntries.length, secReels, secFt);
+          lastSecKey = secKey;
+          altIdx = 0;
+        }
+        writeEntryRow(e, false, altIdx % 2 === 1);
+        altIdx++;
+      }
+
+      if (flaggedEntries.length > 0) {
+        row++;
+        const flagBandRow = ws.getRow(row);
+        flagBandRow.getCell(1).value = `Flagged Reels (${flaggedEntries.length}) — excluded from totals`;
+        flagBandRow.getCell(1).font = { size: 9.5, bold: true, color: { argb: "CC4400" } };
+        ws.mergeCells(row, 1, row, 13);
+        flagBandRow.height = 22;
+        for (let c = 1; c <= 13; c++) {
+          flagBandRow.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: flaggedBandBg } };
+          flagBandRow.getCell(c).border = thinBorder;
+        }
+        row++;
+
+        const sortedFlagged = sortEntries(flaggedEntries);
+        for (let fi = 0; fi < sortedFlagged.length; fi++) {
+          writeEntryRow(sortedFlagged[fi], true, fi % 2 === 1);
+        }
+      }
+
+      row += 2;
+
+      const sumTitleRow = ws.getRow(row);
+      sumTitleRow.getCell(1).value = "Summary Totals";
+      sumTitleRow.getCell(1).font = { size: 14, bold: true, color: { argb: accentHex } };
+      row++;
+      const sumSubRow = ws.getRow(row);
+      sumSubRow.getCell(1).value = `${session.name}  |  ${session.location || "N/A"}  |  ${activeEntries.length} entries  |  ${activeTotalFootage.toLocaleString()} ft total`;
+      sumSubRow.getCell(1).font = { size: 8.5, color: { argb: "666666" } };
+      ws.mergeCells(row, 1, row, 8);
+      row++;
+      if (flaggedEntryIds.size > 0) {
+        const noteRow = ws.getRow(row);
+        noteRow.getCell(1).value = `Note: ${flaggedEntryIds.size} flagged reel(s) with ${flaggedFootage.toLocaleString()} ft excluded from this summary — see Flagged Reels above.`;
+        noteRow.getCell(1).font = { size: 8, color: { argb: "CC4400" } };
+        ws.mergeCells(row, 1, row, 10);
+        row++;
+      }
+      row++;
+
+      const sumHeaders = ["Category", "Vendor Code", "# Reels", "Total Footage", "Reel Location(s)"];
+      const sumHeaderRow = ws.getRow(row);
+      sumHeaders.forEach((h, i) => {
+        const cell = sumHeaderRow.getCell(i + 1);
+        cell.value = h;
+        cell.font = { size: 9, bold: true, color: { argb: "333333" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerBg } };
+        cell.border = thinBorder;
+      });
+      sumHeaderRow.height = 20;
+      row++;
+
+      const extractWireType = (cat: string) => cat.replace(/\d+$/, "").trim();
+      const reelSizeOrder = [500, 1000, 2000, 2500, 5000];
+      const extractReelSize = (cat: string): number => {
+        const match = cat.match(/(\d+)$/);
+        if (!match) return 999999;
+        const num = parseInt(match[1]);
+        const idx = reelSizeOrder.indexOf(num);
+        return idx >= 0 ? idx : reelSizeOrder.length;
+      };
+
+      const categoryMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
+      for (const e of activeEntries) {
+        const cat = e.reelTag || e.wireType || "Uncategorized";
+        const vendor = e.manufacturer || "";
+        const groupKey = `${cat}|||${vendor}`;
+        const existing = categoryMap.get(groupKey);
+        const pin = entryPinMap.get(e.id);
+        const pinLabel = pin?.label ? `P${String(pin.label).padStart(3, "0")}` : undefined;
+        const locParts = [e.aisle, e.section, pinLabel].filter(Boolean);
+        const loc = locParts.join("-");
+        if (existing) {
+          existing.totalFootage += (e.footage || 0);
+          existing.reelCount += (e.reelCount || 1);
+          if (loc) existing.locations.push(loc);
+        } else {
+          categoryMap.set(groupKey, { vendorCode: vendor, totalFootage: e.footage || 0, reelCount: e.reelCount || 1, locations: loc ? [loc] : [] });
+        }
+      }
+
+      const allCategories = Array.from(categoryMap.entries()).map(([groupKey, data]) => {
+        const category = groupKey.split("|||")[0];
+        const wireTypeGroup = extractWireType(category);
+        const wtu = wireTypeGroup.toUpperCase().trim();
+        const vendor = data.vendorCode.toUpperCase().trim() || "?";
+        const displayGroup = wtu === "SER" ? `SER--${vendor}` : wtu.startsWith("RX") ? `RX--${vendor}` : wtu.startsWith("TC") ? `TC--${vendor}` : wireTypeGroup;
+        return { category, wireTypeGroup, displayGroup, reelSizeIdx: extractReelSize(category), ...data };
+      });
+
+      const displayGroupPriority = (dg: string): number => {
+        const g = dg.toUpperCase().trim();
+        if (g === "THHN") return 0;
+        if (g === "XHHW") return 1;
+        return 2;
+      };
+      allCategories.sort((a, b) => {
+        const pa = displayGroupPriority(a.displayGroup);
+        const pb = displayGroupPriority(b.displayGroup);
+        if (pa !== pb) return pa - pb;
+        if (a.displayGroup < b.displayGroup) return -1;
+        if (a.displayGroup > b.displayGroup) return 1;
+        return a.reelSizeIdx - b.reelSizeIdx;
+      });
+
+      const groupReelCounts = new Map<string, number>();
+      for (const cat of allCategories) {
+        groupReelCounts.set(cat.displayGroup, (groupReelCounts.get(cat.displayGroup) || 0) + cat.reelCount);
+      }
+
+      let lastDisplayGroup = "";
+      let sumAltIdx = 0;
+      for (const cat of allCategories) {
+        if (cat.displayGroup !== lastDisplayGroup) {
+          const isRx = cat.displayGroup.startsWith("RX--");
+          const isTc = cat.displayGroup.startsWith("TC--");
+          const headerLabel = isRx ? "RX" : isTc ? "TC" : (cat.displayGroup || "Other");
+          const groupCount = groupReelCounts.get(cat.displayGroup) || 0;
+          const gRow = ws.getRow(row);
+          gRow.getCell(1).value = headerLabel;
+          gRow.getCell(1).font = { size: 9, bold: true, color: { argb: accentHex } };
+          gRow.getCell(5).value = `${groupCount} reels`;
+          gRow.getCell(5).font = { size: 9, color: { argb: accentHex } };
+          gRow.getCell(5).alignment = { horizontal: "right" };
+          ws.mergeCells(row, 1, row, 4);
+          gRow.height = 20;
+          for (let c = 1; c <= 5; c++) {
+            gRow.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: summaryGroupBg } };
+            gRow.getCell(c).border = thinBorder;
+          }
+          row++;
+          lastDisplayGroup = cat.displayGroup;
+          sumAltIdx = 0;
+        }
+
+        const r = ws.getRow(row);
+        const catVals: any[] = [safeStr(cat.category), safeStr(cat.vendorCode), cat.reelCount, cat.totalFootage, safeStr(cat.locations.join(", "))];
+        catVals.forEach((v, i) => {
+          const cell = r.getCell(i + 1);
+          cell.value = v;
+          cell.font = { size: 8.5, color: { argb: "333333" } };
+          if (i === 3) cell.font = { size: 8.5, bold: true, color: { argb: "333333" } };
+          cell.border = thinBorder;
+          if (i === 2 || i === 3) cell.alignment = { horizontal: "center" };
+          if (i === 3 && typeof v === "number") cell.numFmt = '#,##0" ft"';
+          if (i === 4) cell.alignment = { wrapText: true };
+          if (sumAltIdx % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altRowBg } };
+        });
+        row++;
+        sumAltIdx++;
+      }
+
+      const grandRow = ws.getRow(row);
+      const grandVals = ["GRAND TOTAL", "", allCategories.reduce((s, c) => s + c.reelCount, 0), activeTotalFootage, `${allCategories.length} categories`];
+      const thickBorder: Partial<ExcelJS.Borders> = {
+        top: { style: "medium", color: { argb: "000000" } },
+        bottom: { style: "medium", color: { argb: "000000" } },
+        left: { style: "medium", color: { argb: "000000" } },
+        right: { style: "medium", color: { argb: "000000" } },
+      };
+      grandVals.forEach((v, i) => {
+        const cell = grandRow.getCell(i + 1);
+        cell.value = v;
+        cell.font = { size: 9, bold: true, color: { argb: "333333" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerBg } };
+        cell.border = thickBorder;
+        if (i === 2 || i === 3) cell.alignment = { horizontal: "center" };
+        if (i === 3 && typeof v === "number") cell.numFmt = '#,##0" ft"';
+        if (i === 2 && typeof v === "number") cell.numFmt = '#,##0" reels"';
+      });
+      grandRow.height = 20;
+      row += 3;
+
+      const auditTitleRow = ws.getRow(row);
+      auditTitleRow.getCell(1).value = "Audit Trail";
+      auditTitleRow.getCell(1).font = { size: 11, bold: true, color: { argb: "333333" } };
+      row++;
+      const nowStr = fmtDt(new Date()) + " " + tzAbbr;
+      const auditData: [string, string][] = [
+        ["Report Generated:", nowStr],
+        ["Starting Photo:", pt.firstPhotoAt ? fmtDt(new Date(pt.firstPhotoAt)) + " " + tzAbbr : "N/A"],
+        ["Ending Photo:", pt.lastPhotoAt ? fmtDt(new Date(pt.lastPhotoAt)) + " " + tzAbbr : "N/A"],
+      ];
+      if (pt.firstPhotoAt && pt.lastPhotoAt) {
+        auditData.push(["Elapsed Time:", fmtElapsed(Math.abs(new Date(pt.lastPhotoAt).getTime() - new Date(pt.firstPhotoAt).getTime()))]);
+      }
+      if (session.completedAt) auditData.push(["Completed:", fmtDt(new Date(session.completedAt)) + " " + tzAbbr]);
+      auditData.push(["Total Reels:", String(totalReels)]);
+      auditData.push(["Data Encoding:", key ? "Active (entries decrypted for export)" : "Off"]);
+
+      for (const [label, value] of auditData) {
+        const r = ws.getRow(row);
+        r.getCell(1).value = label;
+        r.getCell(1).font = { size: 8, bold: true, color: { argb: "000000" } };
+        r.getCell(2).value = value;
+        r.getCell(2).font = { size: 8, color: { argb: "000000" } };
+        row++;
+      }
+      row++;
+      const verifiedRow = ws.getRow(row);
+      verifiedRow.getCell(1).value = `VERIFIED EXPORT - ${nowStr}`;
+      verifiedRow.getCell(1).font = { size: 8, bold: true, color: { argb: accentHex } };
+      verifiedRow.getCell(1).border = {
+        top: { style: "medium", color: { argb: accentHex } },
+        bottom: { style: "medium", color: { argb: accentHex } },
+        left: { style: "medium", color: { argb: accentHex } },
+        right: { style: "medium", color: { argb: accentHex } },
+      };
+      ws.mergeCells(row, 1, row, 4);
+
+      const formatExportTime = (d: Date) => {
+        let h = d.getHours();
+        const m = d.getMinutes();
+        const ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12 || 12;
+        return `${h}'${String(m).padStart(2, "0")}${ampm}`;
+      };
+      const formatExportDate = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const buildFilename = () => {
+        const safeName = session.name.replace(/[^a-zA-Z0-9 _-]/g, "").replace(/\s+/g, " ").trim();
+        const first = pt.firstPhotoAt ? new Date(pt.firstPhotoAt) : null;
+        const last = pt.lastPhotoAt ? new Date(pt.lastPhotoAt) : null;
+        if (!first) return `${safeName.replace(/ /g, "_")}.xlsx`;
+        const d1 = formatExportDate(first);
+        const t1 = formatExportTime(first);
+        if (!last || first.getTime() === last.getTime()) return `${safeName}_${d1}_${t1}.xlsx`;
+        const d2 = formatExportDate(last);
+        const t2 = formatExportTime(last);
+        if (d1 === d2) return `${safeName}_${d1}_${t1}-${t2}.xlsx`;
+        return `${safeName}_${d1}_${t1}-${d2}_${t2}.xlsx`;
+      };
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const filename = buildFilename();
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", (buffer as Buffer).length);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Error generating Excel:", error);
+      if (!res.headersSent) res.status(500).json({ message: "Failed to generate Excel report" });
     }
   });
 
