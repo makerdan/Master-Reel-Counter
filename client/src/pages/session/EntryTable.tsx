@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, Fragment, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, ImageOff } from "lucide-react";
+import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, ImageOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -33,7 +33,7 @@ function EntryTable({
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
 
-  const { data: sessionPins = [] } = useQuery<Pin[]>({
+  const { data: sessionPins = [], isFetching: pinsFetching } = useQuery<Pin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "pins"],
   });
   const pinByEntryId = new Map(sessionPins.filter(p => p.entryId).map(p => [p.entryId!, p]));
@@ -233,7 +233,7 @@ function EntryTable({
                       const info = getReelInfo(entry);
                       const isUnpinned = !pinByEntryId.has(entry.id);
                       return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
-                        <td className={`mono ${isUnpinned ? "text-amber-500 border-l-2 border-amber-400" : "text-muted-foreground"}`} style={{ textAlign: "center" }}>{(() => { const pin = pinByEntryId.get(entry.id); if (pin && onJumpToPin) { return <button className="underline decoration-dotted hover:text-foreground transition-colors cursor-pointer" data-testid={`link-pin-${pin.id}`} onClick={() => onJumpToPin(pin.photoId, pin.id)}>{pin.label}</button>; } return pin?.label || String(idx + 1).padStart(3, "0"); })()}</td>
+                        <td className={`mono ${isUnpinned ? "" : "text-muted-foreground"}`} style={{ textAlign: "center" }}>{(() => { const pin = pinByEntryId.get(entry.id); if (pin && onJumpToPin) { return <button className="underline decoration-dotted hover:text-foreground transition-colors cursor-pointer" data-testid={`link-pin-${pin.id}`} onClick={() => onJumpToPin(pin.photoId, pin.id)}>{pin.label}</button>; } if (pin) return pin.label; if (pinsFetching) return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground mx-auto" data-testid={`spinner-pin-${entry.id}`} />; return <span className="text-muted-foreground">—</span>; })()}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.aisle}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono font-bold">
