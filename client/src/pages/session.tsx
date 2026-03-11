@@ -828,6 +828,7 @@ function SessionWorkspace({
                 setNavigateToPhotoId(photoId);
                 setNavigateToPinId(pinId);
                 setMode("photo");
+                window.scrollTo({ top: 0, behavior: "smooth" });
               }}
             />
           </>
