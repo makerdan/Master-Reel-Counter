@@ -124,6 +124,26 @@ export function detectDuplicatePins(
   return result;
 }
 
+const BASE_PIN_DIAMETER_PCT = 4;
+const PROXIMITY_MULTIPLIER = 3;
+
+function normalizeWire(w: string | null | undefined): string {
+  return w?.trim().toUpperCase() || "";
+}
+
+function wireDetailsMatch(a: Pin, b: Pin): boolean {
+  const wa = normalizeWire(a.wireDetails);
+  const wb = normalizeWire(b.wireDetails);
+  if (wa === "" && wb === "") return true;
+  return wa !== "" && wb !== "" && wa === wb;
+}
+
+function pinDistance(a: Pin, b: Pin): number {
+  const dx = a.xPercent - b.xPercent;
+  const dy = a.yPercent - b.yPercent;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 export function detectSameReelDuplicates(
   pins: Pin[],
   photos: Photo[],
@@ -134,35 +154,58 @@ export function detectSameReelDuplicates(
 
   const byPhoto = new Map<number, Pin[]>();
   for (const pin of pins) {
-    if (!pin.wireDetails?.trim()) continue;
     const list = byPhoto.get(pin.photoId) ?? [];
     list.push(pin);
     byPhoto.set(pin.photoId, list);
   }
 
-  const seen = new Set<string>();
   const result: DuplicateGroup[] = [];
 
   for (const [photoId, photoPins] of byPhoto) {
+    if (photoPins.length < 2) continue;
     const photo = photoMap.get(photoId);
     const aisle = photo?.aisle ?? null;
     const section = photo?.section ?? null;
+    const pinScale = photo?.pinScale ?? 1;
+    const threshold = BASE_PIN_DIAMETER_PCT * pinScale * PROXIMITY_MULTIPLIER;
 
-    const byWire = new Map<string, Pin[]>();
-    for (const pin of photoPins) {
-      const key = pin.wireDetails!.trim().toUpperCase();
-      const list = byWire.get(key) ?? [];
-      list.push(pin);
-      byWire.set(key, list);
+    const parent = new Map<number, number>();
+    for (const pin of photoPins) parent.set(pin.id, pin.id);
+
+    function find(x: number): number {
+      while (parent.get(x) !== x) {
+        parent.set(x, parent.get(parent.get(x)!)!);
+        x = parent.get(x)!;
+      }
+      return x;
+    }
+    function union(a: number, b: number) {
+      const ra = find(a), rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
     }
 
-    for (const [, group] of byWire) {
+    for (let i = 0; i < photoPins.length; i++) {
+      for (let j = i + 1; j < photoPins.length; j++) {
+        const a = photoPins[i], b = photoPins[j];
+        if (wireDetailsMatch(a, b) && pinDistance(a, b) <= threshold) {
+          union(a.id, b.id);
+        }
+      }
+    }
+
+    const clusters = new Map<number, Pin[]>();
+    for (const pin of photoPins) {
+      const root = find(pin.id);
+      const list = clusters.get(root) ?? [];
+      list.push(pin);
+      clusters.set(root, list);
+    }
+
+    for (const [, group] of clusters) {
       if (group.length < 2) continue;
 
-      const sortedIds = group.map(p => p.id).sort((a, b) => a - b);
-      const dedupeKey = `samereel||${sortedIds.join("||")}`;
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
+      const firstWire = normalizeWire(group[0].wireDetails);
+      const labelText = firstWire || "No Details";
 
       const groupPins: DuplicatePinInfo[] = group.map(pin => {
         const scanner = scannerMap.get(pin.id);
@@ -191,7 +234,7 @@ export function detectSameReelDuplicates(
       });
 
       result.push({
-        label: group[0].wireDetails!.trim().toUpperCase(),
+        label: labelText,
         aisle,
         section,
         pins: groupPins,
