@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Entry, Pin, Photo } from "@shared/schema";
-import { detectDuplicatePins, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
+import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
 
 interface FlaggedPin {
   id: number;
@@ -66,7 +66,11 @@ function saveDisregardedKeys(sessionId: number, keys: Set<string>) {
 }
 
 function dupGroupKey(group: DuplicateGroup): string {
-  return `${group.label}||${group.aisle ?? ""}||${group.section ?? ""}`;
+  if (group.groupType === "same-reel") {
+    const sortedIds = group.pins.map(p => p.pinId).sort((a, b) => a - b);
+    return `samereel||${sortedIds.join("||")}`;
+  }
+  return `label||${group.label}||${group.aisle ?? ""}||${group.section ?? ""}`;
 }
 
 function DupPinTile({
@@ -277,7 +281,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const duplicateGroups = useMemo<DuplicateGroup[]>(() => {
     if (!sessionPins.length || !sessionPhotos.length) return [];
     const scannerResults = loadScannerResults(sessionId);
-    return detectDuplicatePins(sessionPins, sessionPhotos, scannerResults);
+    const labelDups = detectDuplicatePins(sessionPins, sessionPhotos, scannerResults);
+    const sameReelDups = detectSameReelDuplicates(sessionPins, sessionPhotos, scannerResults);
+    return [...labelDups, ...sameReelDups];
   }, [sessionPins, sessionPhotos, sessionId]);
 
   const visibleDupGroups = useMemo(
@@ -398,15 +404,18 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           </button>
           {dupsOpen && (
             <div className="grid gap-2">
-              {visibleDupGroups.map((group) => (
+              {visibleDupGroups.map((group) => {
+                const isSameReel = group.groupType === "same-reel";
+                const groupKey = dupGroupKey(group);
+                return (
                 <div
-                  key={`${group.label}-${group.aisle}-${group.section}`}
-                  className={`border border-black rounded-lg p-3 ${group.isDefiniteDoubleCount ? "bg-orange-50/50 dark:bg-orange-950/20" : "bg-amber-50/30 dark:bg-amber-950/10"}`}
-                  data-testid={`dup-group-${group.label}`}
+                  key={groupKey}
+                  className={`border border-black rounded-lg p-3 ${isSameReel ? "bg-violet-50/40 dark:bg-violet-950/15" : group.isDefiniteDoubleCount ? "bg-orange-50/50 dark:bg-orange-950/20" : "bg-amber-50/30 dark:bg-amber-950/10"}`}
+                  data-testid={`dup-group-${groupKey}`}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="font-mono text-sm font-semibold" data-testid={`text-dup-label-${group.label}`}>
-                      Reel #{group.label}
+                    <span className="font-mono text-sm font-semibold" data-testid={`text-dup-label-${groupKey}`}>
+                      {isSameReel ? group.label : `Reel #${group.label}`}
                     </span>
                     {(group.aisle || group.section) && (
                       <span className="text-xs text-muted-foreground font-mono">
@@ -414,17 +423,17 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       </span>
                     )}
                     <Badge
-                      className={`text-[10px] ${group.isDefiniteDoubleCount ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : "bg-amber-900/50 text-amber-300 border-amber-700/40"}`}
-                      data-testid={`badge-dup-type-${group.label}`}
+                      className={`text-[10px] ${isSameReel ? "bg-violet-900/50 text-violet-300 border-violet-700/40" : group.isDefiniteDoubleCount ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : "bg-amber-900/50 text-amber-300 border-amber-700/40"}`}
+                      data-testid={`badge-dup-type-${groupKey}`}
                     >
-                      {group.isDefiniteDoubleCount ? "Double Count" : "Check Needed"}
+                      {isSameReel ? "Same Reel?" : group.isDefiniteDoubleCount ? "Double Count" : "Check Needed"}
                     </Badge>
                     <Button
                       size="sm"
                       variant="ghost"
                       className="ml-auto h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground gap-1"
                       onClick={() => handleDisregard(group)}
-                      data-testid={`button-disregard-${group.label}`}
+                      data-testid={`button-disregard-${groupKey}`}
                       title="Dismiss this duplicate warning"
                     >
                       <EyeOff className="h-3 w-3" />
@@ -442,7 +451,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     ))}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

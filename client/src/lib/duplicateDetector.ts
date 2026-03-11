@@ -34,6 +34,7 @@ export interface DuplicateGroup {
   section: string | null;
   pins: DuplicatePinInfo[];
   isDefiniteDoubleCount: boolean;
+  groupType: "label-match" | "same-reel";
 }
 
 export function detectDuplicatePins(
@@ -110,6 +111,7 @@ export function detectDuplicatePins(
       section: sectionPart,
       pins: groupPins,
       isDefiniteDoubleCount: uniqueNonNullEntries.size > 1,
+      groupType: "label-match",
     });
   }
 
@@ -119,6 +121,87 @@ export function detectDuplicatePins(
     return a.label.localeCompare(b.label);
   });
 
+  return result;
+}
+
+export function detectSameReelDuplicates(
+  pins: Pin[],
+  photos: Photo[],
+  scannerResults: ScannerResultSlim[],
+): DuplicateGroup[] {
+  const photoMap = new Map(photos.map((p) => [p.id, p]));
+  const scannerMap = new Map(scannerResults.map((r) => [r.pinId, r]));
+
+  const byPhoto = new Map<number, Pin[]>();
+  for (const pin of pins) {
+    if (!pin.wireDetails?.trim()) continue;
+    const list = byPhoto.get(pin.photoId) ?? [];
+    list.push(pin);
+    byPhoto.set(pin.photoId, list);
+  }
+
+  const seen = new Set<string>();
+  const result: DuplicateGroup[] = [];
+
+  for (const [photoId, photoPins] of byPhoto) {
+    const photo = photoMap.get(photoId);
+    const aisle = photo?.aisle ?? null;
+    const section = photo?.section ?? null;
+
+    const byWire = new Map<string, Pin[]>();
+    for (const pin of photoPins) {
+      const key = pin.wireDetails!.trim().toUpperCase();
+      const list = byWire.get(key) ?? [];
+      list.push(pin);
+      byWire.set(key, list);
+    }
+
+    for (const [, group] of byWire) {
+      if (group.length < 2) continue;
+
+      const sortedIds = group.map(p => p.id).sort((a, b) => a - b);
+      const dedupeKey = `samereel||${sortedIds.join("||")}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+
+      const groupPins: DuplicatePinInfo[] = group.map(pin => {
+        const scanner = scannerMap.get(pin.id);
+        return {
+          pinId: pin.id,
+          photoId: pin.photoId,
+          entryId: pin.entryId,
+          wireDetails: pin.wireDetails,
+          vendorCode: pin.vendorCode,
+          footage: pin.footage,
+          reelCount: pin.reelCount,
+          xPercent: pin.xPercent,
+          yPercent: pin.yPercent,
+          photoAisle: aisle,
+          photoSection: section,
+          photoObjectStorageKey: photo?.objectStorageKey ?? "",
+          ...(scanner
+            ? {
+                scannerCatalog: scanner.editCatalog,
+                scannerVendor: scanner.editVendor,
+                scannerFootage: scanner.editFootage,
+                scannerConfidence: scanner.confidence,
+              }
+            : {}),
+        };
+      });
+
+      result.push({
+        label: group[0].wireDetails!.trim().toUpperCase(),
+        aisle,
+        section,
+        pins: groupPins,
+        isDefiniteDoubleCount: false,
+        groupType: "same-reel",
+      });
+    }
+  }
+
+  result.sort((a, b) => a.label.localeCompare(b.label));
   return result;
 }
 
