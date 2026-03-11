@@ -2326,7 +2326,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 <Button
                   className="bg-[hsl(145_60%_28%)] text-white border-[hsl(145_60%_22%)]"
                   onClick={handleCommitClick}
-                  disabled={createEntries.isPending || !aisle || !effectiveCanEdit}
+                  disabled={createEntries.isPending || !aisle || !effectiveCanEdit || localPins.length === 0}
                   data-testid="button-create-entries-from-pins"
                 >
                   {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
