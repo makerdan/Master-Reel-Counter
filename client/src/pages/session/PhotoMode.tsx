@@ -33,7 +33,7 @@ import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 import SingleEntryMode from "./SingleEntryMode";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, lockedAisles, isOwner = false }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; lockedAisles?: Set<string>; isOwner?: boolean }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, lockedAisles, isOwner = false }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; lockedAisles?: Set<string>; isOwner?: boolean }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -113,6 +113,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, []);
   const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [highlightedCommittedPinDbId, setHighlightedCommittedPinDbId] = useState<number | null>(null);
   const [previewHeight, setPreviewHeight] = useState(0);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
@@ -317,6 +318,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       setAisle(navigateAisle || "");
       if (navigateSection) {
         setUploadedPhotos(prev => prev.map((p, i) => i === idx ? { ...p, section: navigateSection } : p));
+      }
+      if (navigateToPinId) {
+        setTimeout(() => {
+          setHighlightedCommittedPinDbId(navigateToPinId);
+          setTimeout(() => setHighlightedCommittedPinDbId(null), 3000);
+        }, 200);
       }
       onNavigated?.();
     }
@@ -1608,7 +1615,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   {committedPins.map((pin) => (
                     <div
                       key={pin.id}
-                      className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}`}
+                      className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}${highlightedCommittedPinDbId && pin.dbId === highlightedCommittedPinDbId ? " pin-highlight-pulse" : ""}`}
                       style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                       data-testid={`pin-committed-${pin.id}`}
                     >

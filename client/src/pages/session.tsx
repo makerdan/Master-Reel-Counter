@@ -175,6 +175,7 @@ function SessionWorkspace({
   const [navigateToPhotoId, setNavigateToPhotoId] = useState<number | null>(null);
   const [navigateAisle, setNavigateAisle] = useState<string>("");
   const [navigateSection, setNavigateSection] = useState<string>("");
+  const [navigateToPinId, setNavigateToPinId] = useState<number | null>(null);
   const syncedPhotoIdRef = useRef<number | null>(null);
   const lastPhotoModePhotoIdRef = useRef<number | null>(null);
   const [editName, setEditName] = useState(session.name);
@@ -830,7 +831,7 @@ function SessionWorkspace({
               </TabsList>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} lockedAisles={lockedAisleSet} isOwner={isOwner} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} lockedAisles={lockedAisleSet} isOwner={isOwner} />
               </TabsContent>
 
               <TabsContent value="flagged">
@@ -908,6 +909,11 @@ function SessionWorkspace({
               forceExpandKey={tableExpandKey ?? undefined}
               lockedAisles={lockedAisleSet}
               isOwner={isOwner}
+              onJumpToPin={(photoId, pinId) => {
+                setNavigateToPhotoId(photoId);
+                setNavigateToPinId(pinId);
+                setMode("photo");
+              }}
             />
           </>
         )}

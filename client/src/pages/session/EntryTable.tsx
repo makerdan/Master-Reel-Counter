@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Entry, Photo, Pin } from "@shared/schema";
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, lockedAisles, isOwner = false,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, lockedAisles, isOwner = false, onJumpToPin,
 }: {
   entries: Entry[];
   photos: Photo[];
@@ -30,6 +30,7 @@ function EntryTable({
   forceExpandKey?: string;
   lockedAisles?: Set<string>;
   isOwner?: boolean;
+  onJumpToPin?: (photoId: number, pinId: number) => void;
 }) {
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
@@ -216,7 +217,7 @@ function EntryTable({
                       const isUnpinned = !pinByEntryId.has(entry.id);
                       const entryAisleLocked = !isOwner && !!lockedAisles?.has(entry.aisle);
                       return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
-                        <td className={`mono ${isUnpinned ? "text-amber-500 border-l-2 border-amber-400" : "text-muted-foreground"}`} style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(3, "0")}</td>
+                        <td className={`mono ${isUnpinned ? "text-amber-500 border-l-2 border-amber-400" : "text-muted-foreground"}`} style={{ textAlign: "center" }}>{(() => { const pin = pinByEntryId.get(entry.id); if (pin && onJumpToPin) { return <button className="underline decoration-dotted hover:text-foreground transition-colors cursor-pointer" data-testid={`link-pin-${pin.id}`} onClick={() => onJumpToPin(pin.photoId, pin.id)}>{pin.label}</button>; } return pin?.label || String(idx + 1).padStart(3, "0"); })()}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.aisle}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.section}</td>
                         <td className="mono font-bold">
