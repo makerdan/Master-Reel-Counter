@@ -470,7 +470,7 @@
   z-index: 20;
   border-color: #facc15;
   box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.5), 0 0 12px rgba(250, 204, 21, 0.4);
-  animation: pin-pulse-glow 0.8s ease-in-out 11;
+  animation: pin-pulse-glow 3.2s ease-in-out 3;
 }
 @keyframes pin-pulse-glow {
   0%, 100% { box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.5), 0 0 12px rgba(250, 204, 21, 0.4); }
