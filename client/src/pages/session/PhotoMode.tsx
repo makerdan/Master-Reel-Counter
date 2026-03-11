@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
-  Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
+  Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye, EyeOff,
   AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -114,6 +114,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [highlightedCommittedPinDbId, setHighlightedCommittedPinDbId] = useState<number | null>(null);
+  const [pinsVisible, setPinsVisible] = useState(true);
   const [previewHeight, setPreviewHeight] = useState(0);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
@@ -1367,7 +1368,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         <>
           <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 space-y-1">
             <div className="flex items-center w-full">
-              <div className="flex-1" />
+              <div className="flex-1 flex items-center">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-[hsl(30_40%_85%)] hover:bg-[hsl(18_60%_30%/0.4)]"
+                  onClick={() => setPinsVisible(v => !v)}
+                  title={pinsVisible ? "Hide pins" : "Show pins"}
+                  data-testid="button-toggle-pins-visible"
+                >
+                  {pinsVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </Button>
+              </div>
               <div className="flex items-center gap-3">
                 <Button
                   size="icon"
@@ -1519,7 +1531,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               />
               {viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx ? (
                 <>
-                  {localPins.map((pin) => (
+                  {pinsVisible && localPins.map((pin) => (
                     <div
                       key={pin.id}
                       className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""} ${pin.flagged ? "flagged" : ""}`}
@@ -1605,7 +1617,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       </div>
                     </div>
                   ))}
-                  {committedPins.map((pin) => (
+                  {pinsVisible && committedPins.map((pin) => (
                     <div
                       key={pin.id}
                       className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}${highlightedCommittedPinDbId && pin.dbId === highlightedCommittedPinDbId ? " pin-highlight-pulse" : ""}`}
@@ -1647,7 +1659,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 </>
               ) : (
                 <>
-                  {nearbyCommittedPins.map((pin) => (
+                  {pinsVisible && nearbyCommittedPins.map((pin) => (
                     <div
                       key={pin.id}
                       className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}`}
