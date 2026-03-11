@@ -1,4 +1,4 @@
-import { Cable, Camera, Search, FileText, ClipboardList, Users, Link2, Shield, ImagePlus, Download } from "lucide-react";
+import { Cable, Camera, Search, FileText, ClipboardList, Users, Link2, Shield, ImagePlus, Download, Flag, ScanLine, GalleryHorizontalEnd, FileSpreadsheet, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -10,9 +10,29 @@ const features = [
     description: "Upload pallet photos, place pins directly on reels, and annotate sections visually with zoom, pan, and rotate.",
   },
   {
+    icon: ScanLine,
+    title: "AI Scanner",
+    description: "Scan reel labels with AI-powered OCR. Automatically read catalog codes, footage, and tag numbers from photos.",
+  },
+  {
     icon: Search,
     title: "Catalog Autocomplete",
-    description: "Type a catalog code and auto-fill vendor, footage, wire type, and size from a built-in 180+ entry catalog.",
+    description: "Type a catalog code and auto-fill vendor, footage, wire type, and size from a built-in 180+ entry wire catalog.",
+  },
+  {
+    icon: Flag,
+    title: "Flagged Reels",
+    description: "Flag reels that need attention — damaged, misplaced, or questionable. Review all flagged items in a dedicated tab with notes.",
+  },
+  {
+    icon: GalleryHorizontalEnd,
+    title: "Photos Reel",
+    description: "Browse every photo in a session organized by aisle and section. Tap any header to jump straight to that section's annotation view.",
+  },
+  {
+    icon: ImagePlus,
+    title: "Detail Shot Linking",
+    description: "Mark photos as close-up detail shots and link them to parent overview photos. Browse nearby photos for context.",
   },
   {
     icon: Users,
@@ -22,17 +42,17 @@ const features = [
   {
     icon: Link2,
     title: "Easy Invites",
-    description: "Add teammates by username, send a shareable link, or invite by email \u2014 three simple ways to bring your crew onboard.",
-  },
-  {
-    icon: ImagePlus,
-    title: "Detail Shot Linking",
-    description: "Mark photos as close-up detail shots and link them to parent overview photos. Browse nearby photos for context.",
+    description: "Add teammates by username, send a shareable link, or invite by email — three simple ways to bring your crew onboard.",
   },
   {
     icon: FileText,
-    title: "PDF & CSV Export",
-    description: "Generate professional PDF audit reports or CSV spreadsheets with full session data including reel counts and footage totals.",
+    title: "PDF Export",
+    description: "Generate professional PDF audit reports with annotated photos, pin markers, flagged reel indicators, and footage summaries.",
+  },
+  {
+    icon: FileSpreadsheet,
+    title: "Excel & CSV Export",
+    description: "Download full session data as formatted Excel workbooks or CSV spreadsheets with color-coded rows and section bands.",
   },
   {
     icon: Shield,
@@ -44,13 +64,18 @@ const features = [
     title: "Session Management",
     description: "Organize counts into sessions by warehouse location. Track status, entry counts, and photo timestamps at a glance.",
   },
+  {
+    icon: Layers,
+    title: "Receiving Mode",
+    description: "Compact single-photo layout for receiving dock counts. Sections stack efficiently in both the app and exported PDFs.",
+  },
 ];
 
 const steps = [
-  { step: "1", title: "Create a Session", detail: "Name your counting session and set the warehouse location." },
-  { step: "2", title: "Upload & Annotate", detail: "Photograph rack sections, place pins on reels, and enter catalog codes." },
-  { step: "3", title: "Invite Your Team", detail: "Share the session with teammates so everyone can contribute entries." },
-  { step: "4", title: "Export & Report", detail: "Download CSV or generate a PDF audit report when the count is complete." },
+  { step: "1", title: "Create a Session", detail: "Name your counting session and set the warehouse or receiving location." },
+  { step: "2", title: "Photograph & Pin", detail: "Snap photos of rack sections, place pins on each reel, and enter catalog codes or let AI scan them." },
+  { step: "3", title: "Review & Flag", detail: "Flag questionable reels, add notes, and browse all photos in the Photos Reel for a full overview." },
+  { step: "4", title: "Export & Report", detail: "Download Excel spreadsheets or generate annotated PDF audit reports when the count is complete." },
 ];
 
 export default function Landing() {
@@ -81,7 +106,7 @@ export default function Landing() {
             </h1>
 
             <p className="text-lg text-amber-100/70 max-w-lg mx-auto leading-relaxed">
-              The warehouse wire reel counting tool built for teams. Annotate photos, look up catalog codes, collaborate in real time, and export professional audit reports.
+              The warehouse wire reel counting tool built for teams. Annotate photos, scan labels with AI, flag issues, collaborate in real time, and export professional audit reports.
             </p>
 
             <div className="flex items-center justify-center gap-3 flex-wrap pt-4">
@@ -98,9 +123,9 @@ export default function Landing() {
             </div>
 
             <div className="flex items-center justify-center gap-6 flex-wrap pt-6 text-sm text-amber-200/50">
+              <span className="flex items-center gap-1.5"><ScanLine className="h-3.5 w-3.5" /> AI label scanning</span>
               <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Team sharing</span>
-              <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> AES-256 encryption</span>
-              <span className="flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> PDF & CSV export</span>
+              <span className="flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> PDF & Excel export</span>
             </div>
           </div>
         </main>
