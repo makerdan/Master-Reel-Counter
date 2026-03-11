@@ -12,6 +12,7 @@ export interface LocalPin {
   vendorCode?: string;
   footage?: number;
   flagged?: boolean;
+  flagReason?: string;
 }
 
 export interface SessionWithRole extends Session {

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye,
-  AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp,
+  AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,9 @@ import { Progress } from "@/components/ui/progress";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -30,7 +33,7 @@ import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 import SingleEntryMode from "./SingleEntryMode";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, lockedAisles, isOwner = false }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; lockedAisles?: Set<string>; isOwner?: boolean }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -137,6 +140,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
   const [conflictDialog, setConflictDialog] = useState<{ conflicts: Array<{ label: string; entryId?: number; dbPinId?: number }>; pinsToCommit: LocalPin[] } | null>(null);
   const [showQuickEntry, setShowQuickEntry] = useState(false);
+  const [flagPopoverPinId, setFlagPopoverPinId] = useState<string | null>(null);
+  const [flagReasonDraft, setFlagReasonDraft] = useState("");
   const [activeSuggestionPin, setActiveSuggestionPin] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
@@ -224,6 +229,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, [scale, panX, panY, clampPan]);
 
   const currentPhoto = uploadedPhotos[currentPhotoIdx];
+  const currentPhotoAisleLocked = !isOwner && !!lockedAisles?.has(currentPhoto?.aisle || "");
+  const effectiveCanEdit = canEdit && !currentPhotoAisleLocked;
   const otherPhotosIncompleteCount = totalIncompletePins - (currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0);
   const nextReelCount = localPins.length + otherPhotosIncompleteCount;
   const displayedPhotoIdx = viewingNearbyIdx !== null ? viewingNearbyIdx : currentPhotoIdx;
@@ -355,6 +362,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           vendorCode: p.vendorCode || null,
           footage: p.footage || null,
           flagged: p.flagged || false,
+          flagReason: p.flagReason || null,
         })),
       });
     } catch {
@@ -390,6 +398,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         vendorCode: p.vendorCode || undefined,
         footage: p.footage || undefined,
         flagged: p.flagged || false,
+        flagReason: p.flagReason || undefined,
       })).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })));
     } else {
       setLocalPins([]);
@@ -506,6 +515,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             vendorCode: p.vendorCode || null,
             footage: p.footage || null,
             flagged: p.flagged || false,
+            flagReason: p.flagReason || null,
           })),
         });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
@@ -630,6 +640,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   const handleContainerClick = (e: React.MouseEvent) => {
     if (isPanning || panMode) return;
+    if (!effectiveCanEdit) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -1085,6 +1096,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               vendorCode: p.vendorCode || null,
               footage: p.footage || null,
               flagged: p.flagged || false,
+              flagReason: p.flagReason || null,
             })),
           });
         } catch {}
@@ -1337,7 +1349,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             editingEntry={null}
             onDoneEditing={() => {}}
             onUndoableSave={onPushUndo}
-            canEdit={canEdit}
+            canEdit={effectiveCanEdit}
             defaultAisle={currentPhoto?.aisle || aisle || ""}
             defaultSection={currentPhoto?.section || ""}
             getNextReceivingSection={getNextReceivingSection}
@@ -1440,6 +1452,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             )}
           </div>
 
+          {currentPhotoAisleLocked && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/15 border border-amber-500/30 rounded-md text-xs text-amber-600 dark:text-amber-400" data-testid="aisle-locked-banner">
+              <Lock className="h-3 w-3 shrink-0" />
+              <span>Aisle "{currentPhoto?.aisle}" is locked. Editing is disabled.</span>
+            </div>
+          )}
+
           {viewingNearbyIdx !== null && viewingNearbyIdx !== currentPhotoIdx && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(18_85%_40%/0.15)] border border-[hsl(18_85%_40%/0.3)] rounded-md text-xs text-[hsl(30_40%_85%)]" data-testid="nearby-viewing-banner">
               <Eye className="h-3 w-3 flex-shrink-0" />
@@ -1471,7 +1490,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             <div
               ref={containerRef}
               className="photo-viewer-container w-full min-w-0"
-              style={{ cursor: panMode ? "grab" : "crosshair" }}
+              style={{ cursor: panMode ? "grab" : effectiveCanEdit ? "crosshair" : "not-allowed" }}
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
               onTouchStart={handleTouchStart}
@@ -1529,7 +1548,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                 xPercent: p.x, yPercent: p.y, label: p.label,
                                 reelCount: p.reelCount, wireDetails: p.wireDetails || null,
                                 vendorCode: p.vendorCode || null, footage: p.footage || null,
-                                flagged: p.flagged || false,
+                                flagged: p.flagged || false, flagReason: p.flagReason || null,
                               }));
                               onPushUndo({
                                 type: "restore-draft-pins",
@@ -2186,18 +2205,88 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           >
                             &#10005;
                           </button>
-                          <button
-                            type="button"
-                            className={`flag-btn ${pin.flagged ? "flagged" : ""}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updatePinField(pin.id, "flagged", !pin.flagged);
-                            }}
-                            title={pin.flagged ? "Remove re-shoot flag" : "Flag for re-shoot"}
-                            data-testid={`button-flag-${index}`}
-                          >
-                            <Flag className="h-3.5 w-3.5" />
-                          </button>
+                          {pin.flagged ? (
+                            <button
+                              type="button"
+                              className="flag-btn flagged"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updatePinField(pin.id, "flagged", false);
+                                updatePinField(pin.id, "flagReason", undefined);
+                              }}
+                              title="Remove re-shoot flag"
+                              data-testid={`button-flag-${index}`}
+                            >
+                              <Flag className="h-3.5 w-3.5" />
+                            </button>
+                          ) : (
+                            <Popover
+                              open={flagPopoverPinId === pin.id}
+                              onOpenChange={(open) => {
+                                if (open) {
+                                  setFlagPopoverPinId(pin.id);
+                                  setFlagReasonDraft("");
+                                } else {
+                                  setFlagPopoverPinId(null);
+                                }
+                              }}
+                            >
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="flag-btn"
+                                  onClick={(e) => e.stopPropagation()}
+                                  title="Flag for re-shoot"
+                                  data-testid={`button-flag-${index}`}
+                                >
+                                  <Flag className="h-3.5 w-3.5" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-64 p-3 space-y-2"
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={`popover-flag-reason-${index}`}
+                              >
+                                <p className="text-xs font-medium">Flag for re-shoot</p>
+                                <Input
+                                  placeholder="Reason (optional)"
+                                  value={flagReasonDraft}
+                                  onChange={(e) => setFlagReasonDraft(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      updatePinField(pin.id, "flagged", true);
+                                      if (flagReasonDraft.trim()) updatePinField(pin.id, "flagReason", flagReasonDraft.trim());
+                                      setFlagPopoverPinId(null);
+                                    }
+                                  }}
+                                  data-testid={`input-flag-reason-${index}`}
+                                  autoFocus
+                                />
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setFlagPopoverPinId(null)}
+                                    data-testid={`button-flag-cancel-${index}`}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      updatePinField(pin.id, "flagged", true);
+                                      if (flagReasonDraft.trim()) updatePinField(pin.id, "flagReason", flagReasonDraft.trim());
+                                      setFlagPopoverPinId(null);
+                                    }}
+                                    data-testid={`button-flag-confirm-${index}`}
+                                  >
+                                    <Flag className="h-3.5 w-3.5 mr-1" />
+                                    Flag
+                                  </Button>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2225,7 +2314,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 <Button
                   className="bg-[hsl(145_60%_28%)] text-white border-[hsl(145_60%_22%)]"
                   onClick={handleCommitClick}
-                  disabled={createEntries.isPending || !aisle}
+                  disabled={createEntries.isPending || !aisle || !effectiveCanEdit}
                   data-testid="button-create-entries-from-pins"
                 >
                   {createEntries.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}

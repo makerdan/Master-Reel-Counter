@@ -3,11 +3,14 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, ArrowUp, Camera, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2, LayoutGrid, ScanLine,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Share2, Trash2, LayoutGrid, ScanLine, ShieldCheck,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +31,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import type { Session, Entry, Photo, Pin } from "@shared/schema";
+import type { Session, Entry, Photo, Pin, LockedAisle } from "@shared/schema";
 import PhotoMode from "./session/PhotoMode";
 import TeamDialog from "./session/TeamDialog";
 import EntryTable from "./session/EntryTable";
@@ -226,6 +229,34 @@ function SessionWorkspace({
       toast({ title: isLocked ? "Session unlocked" : "Session locked" });
     },
   });
+
+  const { data: lockedAisles = [] } = useQuery<LockedAisle[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "locked-aisles"],
+    enabled: sessionId > 0,
+  });
+
+  const lockedAisleSet = new Set(lockedAisles.map(la => la.aisle));
+
+  const toggleAisleLock = useMutation({
+    mutationFn: async ({ aisle, lock }: { aisle: string; lock: boolean }) => {
+      if (lock) {
+        await apiRequest("POST", `/api/sessions/${sessionId}/lock-aisle`, { aisle });
+      } else {
+        await apiRequest("DELETE", `/api/sessions/${sessionId}/lock-aisle`, { aisle });
+      }
+    },
+    onSuccess: (_, { aisle, lock }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "locked-aisles"] });
+      toast({ title: lock ? `Aisle "${aisle}" locked` : `Aisle "${aisle}" unlocked` });
+    },
+    onError: () => {
+      toast({ title: "Failed to toggle aisle lock", variant: "destructive" });
+    },
+  });
+
+  const allAisles = Array.from(new Set(
+    [...entries.map(e => e.aisle), ...photos.map(p => p.aisle)].filter(Boolean) as string[]
+  )).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
@@ -620,6 +651,52 @@ function SessionWorkspace({
                 <TooltipContent>Manage team</TooltipContent>
               </Tooltip>
             )}
+            {isOwner && allAisles.length > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline" data-testid="button-lock-aisles" title="Lock individual aisles">
+                    <ShieldCheck className="h-4 w-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Lock Aisles</span>
+                    {lockedAisleSet.size > 0 && (
+                      <span className="ml-1 text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none">{lockedAisleSet.size}</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-3" data-testid="popover-lock-aisles">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Lock Aisles</h3>
+                    <p className="text-xs text-muted-foreground">Locked aisles prevent collaborators from editing entries or pins in that aisle.</p>
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                      {allAisles.map((aisleVal) => {
+                        const isAisleLocked = lockedAisleSet.has(aisleVal);
+                        return (
+                          <div
+                            key={aisleVal}
+                            className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover-elevate"
+                            data-testid={`aisle-lock-row-${aisleVal}`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {isAisleLocked ? <Lock className="h-3.5 w-3.5 text-amber-500 shrink-0" /> : <Unlock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                              <span className="text-sm font-mono truncate">{aisleVal}</span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant={isAisleLocked ? "destructive" : "outline"}
+                              className="h-7 text-xs px-2 shrink-0"
+                              onClick={() => toggleAisleLock.mutate({ aisle: aisleVal, lock: !isAisleLocked })}
+                              disabled={toggleAisleLock.isPending}
+                              data-testid={`button-toggle-aisle-lock-${aisleVal}`}
+                            >
+                              {isAisleLocked ? "Unlock" : "Lock"}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
@@ -688,6 +765,15 @@ function SessionWorkspace({
         </div>
       )}
 
+      {!isOwner && lockedAisleSet.size > 0 && !isLocked && (
+        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-1.5 text-center">
+          <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1 flex-wrap">
+            <Lock className="h-3 w-3 shrink-0" />
+            Locked aisles: {Array.from(lockedAisleSet).join(", ")}
+          </span>
+        </div>
+      )}
+
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-4 pb-[50vh] space-y-4">
         {captureMode ? (
           <MobileCaptureView
@@ -744,7 +830,7 @@ function SessionWorkspace({
               </TabsList>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} lockedAisles={lockedAisleSet} isOwner={isOwner} />
               </TabsContent>
 
               <TabsContent value="flagged">
@@ -820,6 +906,8 @@ function SessionWorkspace({
               onUndoableDelete={pushUndo}
               canEdit={canEditSession}
               forceExpandKey={tableExpandKey ?? undefined}
+              lockedAisles={lockedAisleSet}
+              isOwner={isOwner}
             />
           </>
         )}

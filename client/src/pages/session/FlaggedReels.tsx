@@ -22,6 +22,7 @@ interface FlaggedPin {
   vendorCode: string | null;
   footage: number | null;
   flagged: boolean;
+  flagReason: string | null;
   photoUrl?: string;
   photoFilename?: string;
   photoAisle?: string | null;
@@ -36,6 +37,7 @@ interface EditingState {
   vendorCode: string;
   footage: string;
   notes: string;
+  flagReason: string;
 }
 
 interface FlaggedReelsProps {
@@ -197,7 +199,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
-  const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "" });
+  const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "" });
   const [dupsOpen, setDupsOpen] = useState(true);
   const [disregardedKeys, setDisregardedKeys] = useState<Set<string>>(() => loadDisregardedKeys(sessionId));
   const [sortBy, setSortBy] = useState<"location" | "label" | "count">("location");
@@ -213,7 +215,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
 
   const unflagMutation = useMutation({
     mutationFn: async (pinId: number) => {
-      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false });
+      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: null });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
@@ -228,6 +230,10 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
         wireDetails: data.wireDetails || null,
         vendorCode: data.vendorCode || null,
         footage: parsedFootage && Number.isFinite(parsedFootage) ? parsedFootage : null,
+      });
+      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, {
+        flagged: true,
+        flagReason: data.flagReason.trim() || null,
       });
       if (entryId && data.notes !== undefined) {
         await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: data.notes || null });
@@ -252,6 +258,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       vendorCode: pin.vendorCode || "",
       footage: pin.footage ? String(pin.footage) : "",
       notes: pin.entryNotes || "",
+      flagReason: pin.flagReason || "",
     });
   }, []);
 
@@ -552,6 +559,12 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           {pin.vendorCode && <span>{pin.vendorCode}</span>}
                           {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
                         </div>
+                        {pin.flagReason && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" data-testid={`text-flag-reason-${pin.id}`}>
+                            <Flag className="h-3 w-3 inline mr-1" />
+                            {pin.flagReason}
+                          </p>
+                        )}
                       </div>
                       <div className="flex flex-col gap-2 shrink-0 [--button-outline:black]">
                         <Button
@@ -609,6 +622,15 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               data-testid={`input-footage-${pin.id}`}
                             />
                           </div>
+                        </div>
+                        <div className="mb-3">
+                          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Flag Reason</label>
+                          <Input
+                            value={editState.flagReason}
+                            onChange={(e) => setEditState(s => ({ ...s, flagReason: e.target.value }))}
+                            placeholder="Why was this flagged?"
+                            data-testid={`input-flag-reason-${pin.id}`}
+                          />
                         </div>
                         {pin.entryId && (
                           <div className="mb-3">
@@ -680,6 +702,12 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         {pin.vendorCode && <span>{pin.vendorCode}</span>}
                         {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
                       </div>
+                      {pin.flagReason && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 w-full" data-testid={`text-flag-reason-mobile-${pin.id}`}>
+                          <Flag className="h-3 w-3 inline mr-1" />
+                          {pin.flagReason}
+                        </p>
+                      )}
                       <div className="flex items-center justify-center gap-10 w-full py-2">
                         <Button
                           variant="ghost"
@@ -735,6 +763,15 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                 data-testid={`input-footage-mobile-${pin.id}`}
                               />
                             </div>
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Flag Reason</label>
+                            <Input
+                              value={editState.flagReason}
+                              onChange={(e) => setEditState(s => ({ ...s, flagReason: e.target.value }))}
+                              placeholder="Why was this flagged?"
+                              data-testid={`input-flag-reason-mobile-${pin.id}`}
+                            />
                           </div>
                           {pin.entryId && (
                             <div>

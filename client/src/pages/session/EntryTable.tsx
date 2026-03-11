@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, Fragment, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, ImageOff } from "lucide-react";
+import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, ImageOff, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Entry, Photo, Pin } from "@shared/schema";
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, lockedAisles, isOwner = false,
 }: {
   entries: Entry[];
   photos: Photo[];
@@ -28,6 +28,8 @@ function EntryTable({
   onUndoableDelete?: (action: any) => void;
   canEdit?: boolean;
   forceExpandKey?: string;
+  lockedAisles?: Set<string>;
+  isOwner?: boolean;
 }) {
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
@@ -202,6 +204,9 @@ function EntryTable({
                         <div className="flex items-center gap-2">
                           <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
                           <span className="font-semibold">{aisleLabel.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${aisleLabel}`} - {aisleLabel.toLowerCase() === "receiving" && sectionLabel === "000" ? "Section Unknown" : `Section ${sectionLabel}`}</span>
+                          {lockedAisles?.has(aisleLabel) && (
+                            <Lock className="h-3.5 w-3.5 text-amber-500 shrink-0" data-testid={`icon-aisle-locked-${aisleLabel}`} />
+                          )}
                           <span className="hidden sm:inline text-muted-foreground">({sectionEntries.length} {sectionEntries.length === 1 ? "entry" : "entries"}, {sectionFootage.toLocaleString()} ft. total)</span>
                         </div>
                       </td>
@@ -209,6 +214,7 @@ function EntryTable({
                     {isExpanded && sectionEntries.map((entry, idx) => {
                       const info = getReelInfo(entry);
                       const isUnpinned = !pinByEntryId.has(entry.id);
+                      const entryAisleLocked = !isOwner && !!lockedAisles?.has(entry.aisle);
                       return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
                         <td className={`mono ${isUnpinned ? "text-amber-500 border-l-2 border-amber-400" : "text-muted-foreground"}`} style={{ textAlign: "center" }}>{pinByEntryId.get(entry.id)?.label || String(idx + 1).padStart(3, "0")}</td>
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.aisle}</td>
@@ -293,11 +299,11 @@ function EntryTable({
                               size="icon"
                               variant="ghost"
                               onClick={() => onEdit(entry)}
-                              disabled={!canEdit}
-                              title="Edit Entry"
+                              disabled={!canEdit || entryAisleLocked}
+                              title={entryAisleLocked ? "Aisle is locked" : "Edit Entry"}
                               data-testid={`button-edit-entry-${entry.id}`}
                             >
-                              <Pencil className="h-3 w-3" />
+                              {entryAisleLocked ? <Lock className="h-3 w-3 text-amber-500" /> : <Pencil className="h-3 w-3" />}
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
@@ -305,8 +311,8 @@ function EntryTable({
                                   size="icon"
                                   variant="ghost"
                                   className="hidden sm:inline-flex"
-                                  disabled={!canEdit}
-                                  title="Delete Entry"
+                                  disabled={!canEdit || entryAisleLocked}
+                                  title={entryAisleLocked ? "Aisle is locked" : "Delete Entry"}
                                   data-testid={`button-delete-entry-${entry.id}`}
                                 >
                                   <Trash2 className="h-3 w-3" />

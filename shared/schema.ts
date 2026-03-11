@@ -94,6 +94,15 @@ export const pins = pgTable("pins", {
   vendorCode: text("vendor_code"),
   footage: integer("footage"),
   flagged: boolean("flagged").default(false),
+  flagReason: text("flag_reason"),
+});
+
+export const lockedAisles = pgTable("locked_aisles", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  aisle: text("aisle").notNull(),
+  lockedAt: timestamp("locked_at").defaultNow().notNull(),
+  lockedBy: varchar("locked_by"),
 });
 
 export const sessionCollaborators = pgTable("session_collaborators", {
@@ -192,6 +201,11 @@ export const insertPinSchema = createInsertSchema(pins).omit({
   id: true,
 });
 
+export const insertLockedAisleSchema = createInsertSchema(lockedAisles).omit({
+  id: true,
+  lockedAt: true,
+});
+
 export const insertCollaboratorSchema = createInsertSchema(sessionCollaborators).omit({
   id: true,
   addedAt: true,
@@ -212,6 +226,8 @@ export type InsertEntry = z.infer<typeof insertEntrySchema>;
 export type Entry = typeof entries.$inferSelect;
 export type InsertPin = z.infer<typeof insertPinSchema>;
 export type Pin = typeof pins.$inferSelect;
+export type InsertLockedAisle = z.infer<typeof insertLockedAisleSchema>;
+export type LockedAisle = typeof lockedAisles.$inferSelect;
 export type InsertCollaborator = z.infer<typeof insertCollaboratorSchema>;
 export type Collaborator = typeof sessionCollaborators.$inferSelect;
 export type InsertInviteLink = z.infer<typeof insertInviteLinkSchema>;

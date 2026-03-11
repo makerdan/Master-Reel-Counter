@@ -86,6 +86,15 @@ function checkLocked(session: any, role: string): string | null {
   return null;
 }
 
+async function checkAisleLocked(sessionId: number, aisle: string | null | undefined, role: string): Promise<string | null> {
+  if (!aisle || isOwner(role)) return null;
+  const locked = await storage.getLockedAisles(sessionId);
+  if (locked.some(la => la.aisle === aisle)) {
+    return `Aisle "${aisle}" is locked`;
+  }
+  return null;
+}
+
 async function getEncryptionKey(userId: string): Promise<Buffer | null> {
   const settings = await storage.getUserSettings(userId);
   if (!settings?.encodingEnabled || !settings.encryptionKey || !settings.encryptionSalt) return null;
@@ -342,6 +351,49 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Failed to toggle session lock:", error?.message || error);
       res.status(500).json({ message: "Failed to toggle session lock" });
+    }
+  });
+
+  app.get("/api/sessions/:id/locked-aisles", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const locked = await storage.getLockedAisles(access.session.id);
+      res.json(locked);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch locked aisles" });
+    }
+  });
+
+  app.post("/api/sessions/:id/lock-aisle", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can lock aisles" });
+      const { aisle } = req.body;
+      if (!aisle || typeof aisle !== "string") return res.status(400).json({ message: "aisle is required" });
+      const result = await storage.lockAisle(access.session.id, aisle, req.user.claims.sub);
+      await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "locked_aisle", "session", access.session.id, `Locked aisle: ${aisle}`);
+      broadcastToSession(access.session.id, { type: "aisle_lock", aisle, locked: true });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to lock aisle" });
+    }
+  });
+
+  app.delete("/api/sessions/:id/lock-aisle", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can unlock aisles" });
+      const { aisle } = req.body;
+      if (!aisle || typeof aisle !== "string") return res.status(400).json({ message: "aisle is required" });
+      await storage.unlockAisle(access.session.id, aisle);
+      await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "unlocked_aisle", "session", access.session.id, `Unlocked aisle: ${aisle}`);
+      broadcastToSession(access.session.id, { type: "aisle_lock", aisle, locked: false });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to unlock aisle" });
     }
   });
 
@@ -618,6 +670,8 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add photos" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      const aisleLockMsg = await checkAisleLocked(access.session.id, req.body.aisle, access.role);
+      if (aisleLockMsg) return res.status(403).json({ message: aisleLockMsg });
       const displayName = req.user.claims.first_name
         ? `${req.user.claims.first_name} ${req.user.claims.last_name || ""}`.trim()
         : req.user.claims.email || userId;
@@ -648,7 +702,13 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit photos" });
+      { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      { const alm = await checkAisleLocked(photo.sessionId, photo.aisle, access.role); if (alm) return res.status(403).json({ message: alm }); }
       const { aisle, section, rotation, notes, isDetailShot, parentPhotoId, pinScale } = req.body;
+      if (aisle !== undefined && aisle !== photo.aisle) {
+        const destAlm = await checkAisleLocked(photo.sessionId, aisle, access.role);
+        if (destAlm) return res.status(403).json({ message: destAlm });
+      }
       const safeUpdate: Record<string, any> = {};
       if (aisle !== undefined) safeUpdate.aisle = aisle;
       if (section !== undefined) safeUpdate.section = section;
@@ -790,6 +850,8 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete photos" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      const aisleLockMsg = await checkAisleLocked(photo.sessionId, photo.aisle, access.role);
+      if (aisleLockMsg) return res.status(403).json({ message: aisleLockMsg });
       try {
         const key = photo.objectStorageKey;
         const shared = await storage.isObjectKeyShared(key, photo.id);
@@ -844,6 +906,8 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      const aisleLockMsg = await checkAisleLocked(access.session.id, req.body.aisle, access.role);
+      if (aisleLockMsg) return res.status(403).json({ message: aisleLockMsg });
       let entryData = { ...req.body, sessionId: access.session.id, userId };
       const encKey = await getEncryptionKey(access.session.userId);
       if (encKey) entryData = encryptEntry(entryData, encKey) as any;
@@ -871,6 +935,12 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      const aisleLockMsg = await checkAisleLocked(entry.sessionId, entry.aisle, access.role);
+      if (aisleLockMsg) return res.status(403).json({ message: aisleLockMsg });
+      if (req.body.aisle && req.body.aisle !== entry.aisle) {
+        const destLockMsg = await checkAisleLocked(entry.sessionId, req.body.aisle, access.role);
+        if (destLockMsg) return res.status(403).json({ message: destLockMsg });
+      }
       const allowedEntryFields = ['aisle', 'section', 'position', 'palletId', 'reelTag', 'wireType', 'gauge', 'footage', 'reelCount', 'color', 'manufacturer', 'notes', 'conductors', 'photoId'];
       const safeBody: Record<string, any> = {};
       for (const key of allowedEntryFields) {
@@ -933,6 +1003,8 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      const aisleLockMsg = await checkAisleLocked(entry.sessionId, entry.aisle, access.role);
+      if (aisleLockMsg) return res.status(403).json({ message: aisleLockMsg });
       await storage.deleteEntry(entry.id);
       const username = req.user.claims.first_name || req.user.claims.email || userId;
       logActivity(entry.sessionId, userId, username, "entry_deleted", "entry", entry.id);
@@ -1018,8 +1090,13 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to flag pins" });
-      const { flagged } = req.body;
-      const updated = await storage.updatePin(pin.id, { flagged: !!flagged });
+      { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      { const alm = await checkAisleLocked(photo.sessionId, photo.aisle, access.role); if (alm) return res.status(403).json({ message: alm }); }
+      const { flagged, flagReason } = req.body;
+      const updated = await storage.updatePin(pin.id, {
+        flagged: !!flagged,
+        flagReason: flagged ? (flagReason || null) : null,
+      });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update pin flag" });
@@ -1049,6 +1126,7 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add pins" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      { const alm = await checkAisleLocked(photo.sessionId, photo.aisle, access.role); if (alm) return res.status(403).json({ message: alm }); }
       const data = insertPinSchema.parse({ ...req.body, photoId: photo.id });
       const pin = await storage.createPin(data);
       broadcastToSession(photo.sessionId, { type: "sync", entity: "pins", sessionId: photo.sessionId });
@@ -1068,6 +1146,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
+      { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      { const alm = await checkAisleLocked(photo.sessionId, photo.aisle, access.role); if (alm) return res.status(403).json({ message: alm }); }
       const allowedPinFields = ['xPercent', 'yPercent', 'label', 'reelCount', 'wireDetails', 'vendorCode', 'footage', 'entryId', 'flagged'];
       const safeUpdate: Record<string, any> = {};
       for (const key of allowedPinFields) {
@@ -1090,6 +1170,7 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      { const alm = await checkAisleLocked(photo.sessionId, photo.aisle, access.role); if (alm) return res.status(403).json({ message: alm }); }
       if (pin.entryId) {
         await storage.deleteEntry(pin.entryId);
         broadcastToSession(photo.sessionId, { type: "sync", entity: "entries", sessionId: photo.sessionId });
@@ -1109,6 +1190,7 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      { const alm = await checkAisleLocked(photo.sessionId, photo.aisle, access.role); if (alm) return res.status(403).json({ message: alm }); }
       const { pins: pinData } = req.body;
       if (!Array.isArray(pinData)) return res.status(400).json({ message: "pins must be an array" });
       const existing = await storage.getPhotoPins(photo.id);
@@ -1130,6 +1212,7 @@ export async function registerRoutes(
           vendorCode: p.vendorCode || null,
           footage: p.footage || null,
           flagged: p.flagged || false,
+          flagReason: p.flagReason || null,
         });
         saved.push(pin);
       }
