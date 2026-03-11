@@ -119,12 +119,17 @@ function EntryTable({
                     next[key] = affectedKeys.has(key);
                   }
                   setExpandedSections(next);
-                  const firstId = warningEntries[0]?.id;
-                  if (firstId) {
-                    setTimeout(() => {
-                      document.querySelector(`[data-testid="row-entry-${firstId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    }, 50);
-                  }
+                  const warnIds = new Set(warningEntries.map(e => e.id));
+                  setTimeout(() => {
+                    for (const key of sectionKeys) {
+                      for (const e of (grouped[key] || [])) {
+                        if (warnIds.has(e.id)) {
+                          document.querySelector(`[data-testid="row-entry-${e.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          return;
+                        }
+                      }
+                    }
+                  }, 50);
                 }}
                 data-testid="btn-validation-warnings"
               >
@@ -149,12 +154,17 @@ function EntryTable({
                     next[key] = affectedKeys.has(key);
                   }
                   setExpandedSections(next);
-                  const firstId = photolessEntries[0]?.id;
-                  if (firstId) {
-                    setTimeout(() => {
-                      document.querySelector(`[data-testid="row-entry-${firstId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    }, 50);
-                  }
+                  const photolessIds = new Set(photolessEntries.map(e => e.id));
+                  setTimeout(() => {
+                    for (const key of sectionKeys) {
+                      for (const e of (grouped[key] || [])) {
+                        if (photolessIds.has(e.id)) {
+                          document.querySelector(`[data-testid="row-entry-${e.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          return;
+                        }
+                      }
+                    }
+                  }, 50);
                 }}
                 data-testid="btn-photoless-warnings"
               >
