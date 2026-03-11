@@ -762,9 +762,11 @@ function SessionWorkspace({
                     setCaptureMode(true);
                     setMobileFlowKey(k => k + 1);
                   }}
-                  onViewInPhoto={(photoId) => {
+                  onViewInPhoto={(photoId, pinId) => {
                     setNavigateToPhotoId(photoId);
+                    if (pinId) setNavigateToPinId(pinId);
                     setMode("photo");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                 />
               </TabsContent>

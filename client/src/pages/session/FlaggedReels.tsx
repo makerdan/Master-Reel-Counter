@@ -44,7 +44,7 @@ interface FlaggedReelsProps {
   sessionId: number;
   onBack: () => void;
   onReshoot?: (aisle: string, section: string, parentPhotoId: number) => void;
-  onViewInPhoto?: (photoId: number) => void;
+  onViewInPhoto?: (photoId: number, pinId?: number) => void;
 }
 
 function photoUrl(key: string): string {
@@ -482,7 +482,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onViewInPhoto(group.photoId)}
+                      onClick={() => onViewInPhoto(group.photoId, group.pins[0]?.pinId)}
                       data-testid={`button-view-in-photo-group-${group.photoId}`}
                       title="Go to this photo in Section Photo"
                     >
