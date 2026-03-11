@@ -2672,6 +2672,12 @@ export async function registerRoutes(
             .text(`${pinLabel}  ⚑`, infoX, infoY, { width: infoW, lineBreak: false });
           infoY += lineH + 2;
 
+          if (item.pin.flagReason) {
+            doc.font('Helvetica-Oblique').fontSize(7).fillColor("#cc4400")
+              .text(`Reason: ${item.pin.flagReason}`, infoX, infoY, { width: infoW, lineBreak: true });
+            infoY += doc.heightOfString(`Reason: ${item.pin.flagReason}`, { width: infoW }) + 4;
+          }
+
           const infoLines: [string, string][] = [
             ["Category:", e.reelTag || "Unknown"],
             ["Vendor:", e.manufacturer || "Unknown"],
