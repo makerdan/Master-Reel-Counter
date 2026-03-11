@@ -321,7 +321,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       if (navigateToPinId) {
         setTimeout(() => {
           setHighlightedCommittedPinDbId(navigateToPinId);
-          setTimeout(() => setHighlightedCommittedPinDbId(null), 6000);
+          setTimeout(() => setHighlightedCommittedPinDbId(null), 9000);
         }, 200);
       }
       onNavigated?.();
