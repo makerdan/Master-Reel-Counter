@@ -1981,6 +1981,33 @@ export async function registerRoutes(
           doc.restore();
           doc.font('Helvetica');
         }
+
+        const flagFontSize = Math.max(3.5, 8 * sf);
+        const flagPadX = Math.max(1, 3 * sf);
+        const flagPadY = Math.max(0.5, 1 * sf);
+        const flagTabCornerR = Math.max(0.5, 3 * sf);
+        const flagLabelText = "[FLAGGED]";
+        doc.font('Helvetica-Bold').fontSize(flagFontSize);
+        const flagTextW = doc.widthOfString(flagLabelText);
+        const flagBadgeW = flagTextW + flagPadX * 2;
+        const flagBadgeH = flagFontSize + flagPadY * 2;
+        const flagBadgeX = pinCenterX - flagBadgeW / 2;
+        const flagBadgeY = py + ph - borderW / 2;
+
+        doc.save();
+        doc.moveTo(flagBadgeX, flagBadgeY)
+          .lineTo(flagBadgeX + flagBadgeW, flagBadgeY)
+          .lineTo(flagBadgeX + flagBadgeW, flagBadgeY + flagBadgeH - flagTabCornerR)
+          .quadraticCurveTo(flagBadgeX + flagBadgeW, flagBadgeY + flagBadgeH, flagBadgeX + flagBadgeW - flagTabCornerR, flagBadgeY + flagBadgeH)
+          .lineTo(flagBadgeX + flagTabCornerR, flagBadgeY + flagBadgeH)
+          .quadraticCurveTo(flagBadgeX, flagBadgeY + flagBadgeH, flagBadgeX, flagBadgeY + flagBadgeH - flagTabCornerR)
+          .lineTo(flagBadgeX, flagBadgeY)
+          .fill(flagColor);
+        doc.fillColor("#ffffff").fontSize(flagFontSize)
+          .text(flagLabelText, flagBadgeX + flagPadX, flagBadgeY + flagPadY, { lineBreak: false });
+        doc.restore();
+        doc.font('Helvetica');
+
         doc.restore();
       };
 
