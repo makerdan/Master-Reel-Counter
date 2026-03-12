@@ -646,8 +646,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const lastTouchPanRef = useRef(false);
   const handleContainerClick = (e: React.MouseEvent) => {
     if (isPanning || panMode) return;
+    if (lastTouchPanRef.current) { lastTouchPanRef.current = false; return; }
     if (!effectiveCanEdit) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -784,10 +786,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, []);
 
   const pinchRef = useRef<{ dist: number; midX: number; midY: number; scale: number } | null>(null);
+  const touchPanRef = useRef<{ x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       e.preventDefault();
+      touchPanRef.current = null;
       const dx = e.touches[1].clientX - e.touches[0].clientX;
       const dy = e.touches[1].clientY - e.touches[0].clientY;
       pinchRef.current = {
@@ -796,8 +800,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
         scale: scaleRef.current,
       };
+    } else if (e.touches.length === 1 && (panMode || scaleRef.current > 1)) {
+      if ((e.target as HTMLElement).closest(".pin-marker")) return;
+      touchPanRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        panX: panXRef.current,
+        panY: panYRef.current,
+        moved: false,
+      };
     }
-  }, []);
+  }, [panMode]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2 && pinchRef.current) {
@@ -810,11 +823,25 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       zoomAtPoint(midX, midY, newScale);
+    } else if (e.touches.length === 1 && touchPanRef.current) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - touchPanRef.current.x;
+      const dy = e.touches[0].clientY - touchPanRef.current.y;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) touchPanRef.current.moved = true;
+      const rawX = touchPanRef.current.panX + dx / scaleRef.current;
+      const rawY = touchPanRef.current.panY + dy / scaleRef.current;
+      const clamped = clampPan(rawX, rawY, scaleRef.current);
+      setPanX(clamped.x);
+      setPanY(clamped.y);
     }
-  }, [zoomAtPoint]);
+  }, [zoomAtPoint, clampPan]);
 
   const handleTouchEnd = useCallback(() => {
+    if (touchPanRef.current?.moved) {
+      lastTouchPanRef.current = true;
+    }
     pinchRef.current = null;
+    touchPanRef.current = null;
   }, []);
 
   const screenToImagePercent = useCallback((clientX: number, clientY: number) => {
