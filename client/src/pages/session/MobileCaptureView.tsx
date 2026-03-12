@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Camera, X, Loader2, AlertTriangle, Check,
   ImagePlus, RotateCw, ChevronLeft, Smartphone, Plus, Minus,
+  ListPlus, ChevronUp, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { saveToQueue, removeFromQueue, getQueuedPhotos, type QueuedPhoto } from "@/lib/offlineQueue";
+import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
 
 type UploadQueueItem = {
@@ -64,6 +66,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const [recentPhotos, setRecentPhotos] = useState<Array<{ id: number; objectPath: string; notes: string; aisle: string; section: string; isDetailShot: boolean }>>([]);
   const [captureNotes, setCaptureNotes] = useState("");
   const [onFloorChecked, setOnFloorChecked] = useState(false);
+  const [showQuickEntry, setShowQuickEntry] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -634,7 +637,51 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             >
               <ImagePlus className="h-5 w-5" />
             </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-[hsl(200_50%_40%/0.5)] text-[hsl(200_60%_50%)] dark:text-[hsl(200_60%_70%)] dark:border-[hsl(200_50%_40%/0.4)]"
+              onClick={() => setShowQuickEntry(prev => !prev)}
+              data-testid="button-mobile-quick-entry-toggle"
+            >
+              <ListPlus className="h-5 w-5" />
+            </Button>
           </div>
+          {showQuickEntry && (
+            <div className="p-3 rounded-md border border-[hsl(200_50%_40%/0.3)] bg-[hsl(25_10%_95%)] dark:bg-[hsl(25_10%_12%)]" data-testid="mobile-quick-entry-panel">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-[hsl(200_60%_35%)] dark:text-[hsl(200_60%_70%)] flex items-center gap-1.5">
+                  <ListPlus className="h-4 w-4" />
+                  Quick Entry (no pin)
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowQuickEntry(false)}
+                  data-testid="button-mobile-quick-entry-close"
+                >
+                  ×
+                </Button>
+              </div>
+              <SingleEntryMode
+                sessionId={sessionId}
+                editingEntry={null}
+                onDoneEditing={() => {}}
+                canEdit={true}
+                defaultAisle={aisle || ""}
+                defaultSection={section || ""}
+                getNextReceivingSection={() => {
+                  const allSections = photos
+                    .filter(p => (p.aisle || "").toLowerCase() === "receiving")
+                    .map(p => parseInt(p.section || "0", 10))
+                    .filter(n => !isNaN(n));
+                  const max = allSections.length > 0 ? Math.max(...allSections) : 0;
+                  return String(max + 1);
+                }}
+              />
+            </div>
+          )}
           <div className="space-y-1">
             <Label className="text-xs underline">Notes:</Label>
             <Textarea

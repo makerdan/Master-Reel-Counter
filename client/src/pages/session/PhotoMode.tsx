@@ -142,6 +142,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
   const [conflictDialog, setConflictDialog] = useState<{ conflicts: Array<{ label: string; entryId?: number; dbPinId?: number }>; pinsToCommit: LocalPin[] } | null>(null);
   const [showQuickEntry, setShowQuickEntry] = useState(false);
+  const [photoInputValue, setPhotoInputValue] = useState<string | null>(null);
   const [flagPopoverPinId, setFlagPopoverPinId] = useState<string | null>(null);
   const [flagReasonDraft, setFlagReasonDraft] = useState("");
   const [activeSuggestionPin, setActiveSuggestionPin] = useState<string | null>(null);
@@ -165,7 +166,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   useEffect(() => {
     if (!selectedPinId) return;
-    rowRefs.current.get(selectedPinId)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    rowRefs.current.get(selectedPinId)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedPinId]);
 
   useEffect(() => {
@@ -1366,7 +1367,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
       {uploadedPhotos.length > 0 && (
         <>
-          <div className="bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 space-y-1">
+          <div className="hidden sm:block bg-[hsl(25_15%_14%)] dark:bg-[hsl(25_8%_10%)] rounded-md px-3 py-2 space-y-1">
             <div className="flex items-center w-full">
               <div className="flex-1 flex items-center">
                 <Button
@@ -1423,8 +1424,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <ChevronRight className="h-5 w-5" />
                 </Button>
               </div>
-              <div className="flex-1 sm:hidden" />
-              <div className="hidden sm:flex flex-1 justify-end gap-2">
+              <div className="flex-1 justify-end gap-2 flex">
                 <div>
                   <label className="block text-xs font-bold text-white dark:text-white mb-1">Section:</label>
                   <Input
@@ -1472,7 +1472,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
 
           {viewingNearbyIdx !== null && viewingNearbyIdx !== currentPhotoIdx && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(18_85%_40%/0.15)] border border-[hsl(18_85%_40%/0.3)] rounded-md text-xs text-[hsl(30_40%_85%)]" data-testid="nearby-viewing-banner">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[hsl(18_85%_40%/0.15)] border border-[hsl(18_85%_40%/0.3)] rounded-md text-xs text-[hsl(30_40%_85%)]" data-testid="nearby-viewing-banner">
               <Eye className="h-3 w-3 flex-shrink-0" />
               <span>Viewing nearby photo {viewingNearbyIdx + 1} — pin table still shows photo {currentPhotoIdx + 1}</span>
               <Button
@@ -1491,7 +1491,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             <div className="flex items-stretch">
               {uploadedPhotos.length > 1 && (
                 <button
-                  className="w-7 min-w-[28px] flex items-center justify-center bg-transparent hover:bg-[hsl(18_85%_40%)] text-white/0 hover:text-white rounded-l-md transition-all shrink-0"
+                  className="hidden sm:flex w-7 min-w-[28px] items-center justify-center bg-transparent hover:bg-[hsl(18_85%_40%)] text-white/0 hover:text-white rounded-l-md transition-all shrink-0"
                   onClick={async (e) => { e.stopPropagation(); await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i - 1 + uploadedPhotos.length) % uploadedPhotos.length); resetView(); }}
                   data-testid="btn-photo-prev-edge"
                   title="Previous photo"
@@ -1763,7 +1763,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             </div>
               {uploadedPhotos.length > 1 && (
                 <button
-                  className="w-7 min-w-[28px] flex items-center justify-center bg-transparent hover:bg-[hsl(18_85%_40%)] text-white/0 hover:text-white rounded-r-md transition-all shrink-0"
+                  className="hidden sm:flex w-7 min-w-[28px] items-center justify-center bg-transparent hover:bg-[hsl(18_85%_40%)] text-white/0 hover:text-white rounded-r-md transition-all shrink-0"
                   onClick={async (e) => { e.stopPropagation(); await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i + 1) % uploadedPhotos.length); resetView(); }}
                   data-testid="btn-photo-next-edge"
                   title="Next photo"
@@ -1797,7 +1797,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-8 w-8 text-[hsl(30_40%_85%)] hover:bg-[hsl(18_60%_30%/0.4)]"
+                    className="hidden sm:inline-flex h-8 w-8 text-[hsl(30_40%_85%)] hover:bg-[hsl(18_60%_30%/0.4)]"
                     onClick={() => setPinsVisible(v => !v)}
                     title={pinsVisible ? "Hide pins" : "Show pins"}
                     data-testid="button-toggle-pins-visible-bottom"
@@ -1819,10 +1819,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     <input
                       type="text"
                       inputMode="numeric"
-                      className="w-8 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
-                      value={String(currentPhotoIdx + 1).padStart(2, "0")}
+                      className="w-10 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
+                      value={photoInputValue ?? String(currentPhotoIdx + 1)}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
+                        const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
+                        setPhotoInputValue(raw);
+                        const val = parseInt(raw, 10);
                         if (!isNaN(val) && val >= 1 && val <= uploadedPhotos.length) {
                           flushSavePins().then(() => {
                             skipAutoSave.current = true;
@@ -1833,10 +1835,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           });
                         }
                       }}
-                      onFocus={(e) => e.target.select()}
+                      onFocus={(e) => { setPhotoInputValue(String(currentPhotoIdx + 1)); e.target.select(); }}
+                      onBlur={() => setPhotoInputValue(null)}
                       data-testid="input-photo-number"
                     />
-                    <span>/ {String(uploadedPhotos.length).padStart(2, "0")}</span>
+                    <span>/ {uploadedPhotos.length}</span>
                   </div>
                   <Button
                     size="icon"
@@ -1923,6 +1926,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           )}
 
           {uploadedPhotos.length > 1 && (() => {
+            const isMobileView = window.innerWidth < 640;
+            if (isMobileView) return null;
             const sortedByLocation = uploadedPhotos
               .map((photo, origIdx) => ({ photo, origIdx }))
               .sort((a, b) => {
@@ -2024,7 +2029,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   </>
                 );
               })()}
-              <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Position</div>
+              <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Pin #</div>
               <div className="overflow-x-auto">
                 <table className="pin-entry-table" ref={pinTableRef} data-testid="pin-entry-table">
                   <thead>
@@ -2033,7 +2038,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       <th style={{ minWidth: 140 }}>Category:</th>
                       <th style={{ width: 80, textAlign: "center" }}>Vendor Code:</th>
                       <th style={{ width: 80 }}>Reel Footage:</th>
-                      <th style={{ width: 60, textAlign: "center" }}>Reels:</th>
+                      <th style={{ width: 60, textAlign: "center" }}># of Reels:</th>
                       <th style={{ width: 40 }}></th>
                     </tr>
                   </thead>
@@ -2046,7 +2051,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         className={`${selectedPinId === pin.id ? "ring-1 ring-primary/40" : ""} ${pin.flagged ? "flagged-row" : ""}`}
                       >
                         <td style={{ textAlign: "center" }}>
-                          <span className="pin-position-cell">{pin.label}</span>
+                          <span
+                            className="pin-position-cell cursor-pointer"
+                            onClick={() => {
+                              setSelectedPinId(pin.id);
+                              const pinEl = containerRef.current?.querySelector(`[data-pin-id="${pin.id}"]`);
+                              if (pinEl) pinEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }}
+                            data-testid={`pin-label-link-${pin.id}`}
+                          >{pin.label}</span>
                         </td>
                         <td className="relative">
                           <input

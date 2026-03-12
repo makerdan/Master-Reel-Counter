@@ -710,20 +710,20 @@ function SessionWorkspace({
               setMode(newMode);
             }}>
               <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
-                <TabsTrigger value="photo" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Section Photo">
-                  <Camera className="h-4 w-4 sm:mr-1" />
+                <TabsTrigger value="photo" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Section Photo">
+                  <Camera className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Section Photo</span>
                 </TabsTrigger>
-                <TabsTrigger value="flagged" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
-                  <Flag className="h-4 w-4 sm:mr-1" />
+                <TabsTrigger value="flagged" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
+                  <Flag className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Flagged</span>
                 </TabsTrigger>
-                <TabsTrigger value="strip" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(200_70%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photos Reel">
-                  <LayoutGrid className="h-4 w-4 sm:mr-1" />
+                <TabsTrigger value="strip" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(200_70%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photos Reel">
+                  <LayoutGrid className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Photos Reel</span>
                 </TabsTrigger>
-                <TabsTrigger value="scanner" className="flex-1 text-white/70 data-[state=active]:bg-[hsl(280_60%_35%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-scanner-mode" aria-label="AI Scanner">
-                  <ScanLine className="h-4 w-4 sm:mr-1" />
+                <TabsTrigger value="scanner" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(280_60%_35%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-scanner-mode" aria-label="AI Scanner">
+                  <ScanLine className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">AI Scanner</span>
                 </TabsTrigger>
               </TabsList>
