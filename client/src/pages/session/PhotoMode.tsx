@@ -1860,7 +1860,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     <input
                       type="text"
                       inputMode="numeric"
-                      className="w-7 sm:w-10 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-0.5 py-0.5 text-xs sm:text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
+                      className="w-8 sm:w-10 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-0.5 py-0.5 text-xs sm:text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
                       value={photoInputValue ?? String(currentPhotoIdx + 1)}
                       onChange={(e) => {
                         const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
