@@ -616,7 +616,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
 
-          <div className="flex gap-2 justify-start">
+          <div className="flex gap-2 sm:gap-3 justify-start">
             <Button
               className={captureSettings?.largerTouchTargets ? "min-h-[48px] text-sm" : "text-sm"}
               size="default"
