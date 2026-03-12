@@ -1607,18 +1607,13 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {selectedSessions.size > 0 && (
+      {selectedSessions.size > 0 && (() => {
+        const selectedList = (sessions || []).filter((s: any) => selectedSessions.has(s.id));
+        const hasActive = selectedList.some((s: any) => s.status === "active");
+        const hasCompleted = selectedList.some((s: any) => s.status === "completed");
+        return (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-background border border-primary rounded-lg shadow-lg px-4 py-3 flex items-center gap-2 flex-wrap justify-center max-w-[calc(100vw-2rem)]" data-testid="bulk-action-bar">
           <span className="text-sm font-medium">{selectedSessions.size} selected</span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setSelectedSessions(new Set())}
-            data-testid="button-bulk-clear"
-            title="Clear selection"
-          >
-            <X className="h-3 w-3 mr-1" /> Clear
-          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -1628,6 +1623,7 @@ export default function Dashboard() {
           >
             <FolderInput className="h-3 w-3 mr-1" /> Move
           </Button>
+          {hasActive && (
           <Button
             size="sm"
             variant="outline"
@@ -1638,6 +1634,8 @@ export default function Dashboard() {
           >
             <CheckCircle2 className="h-3 w-3 mr-1" /> Complete
           </Button>
+          )}
+          {hasCompleted && (
           <Button
             size="sm"
             variant="outline"
@@ -1648,6 +1646,7 @@ export default function Dashboard() {
           >
             <RotateCcw className="h-3 w-3 mr-1" /> Reopen
           </Button>
+          )}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button size="sm" variant="destructive" data-testid="button-bulk-delete" title="Delete selected sessions">
@@ -1673,7 +1672,8 @@ export default function Dashboard() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
