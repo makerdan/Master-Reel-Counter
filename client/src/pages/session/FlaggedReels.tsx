@@ -117,7 +117,7 @@ function DupPinTile({
 
   return (
     <div
-      className="flex-1 min-w-[180px] max-w-[280px] border border-black rounded overflow-hidden bg-card"
+      className="flex-1 min-w-[120px] max-w-[48%] sm:max-w-[280px] border border-black rounded overflow-hidden bg-card"
       data-testid={`dup-pin-${pin.pinId}`}
     >
       {pin.photoObjectStorageKey ? (
@@ -177,7 +177,7 @@ function DupPinTile({
               title="Keep this pin, delete others"
             >
               {keepMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 mr-0.5" />}
-              Keep This, Remove Duplicate(s)
+              Keep
             </Button>
           )}
           <Button
@@ -190,7 +190,7 @@ function DupPinTile({
             title="Delete this photo entirely"
           >
             {deletePhotoMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3 mr-0.5" />}
-            Delete This Photo & All Pins
+            Delete
           </Button>
         </div>
       </div>
@@ -431,13 +431,12 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="ml-auto h-6 text-[10px] px-2 text-muted-foreground hover:text-foreground gap-1"
+                      className="ml-auto h-7 w-7 p-0 rounded-full !border-red-500 border-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
                       onClick={() => handleDisregard(group)}
                       data-testid={`button-disregard-${groupKey}`}
                       title="Dismiss this duplicate warning"
                     >
-                      <EyeOff className="h-3 w-3" />
-                      Disregard
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                   <div className="flex gap-2 flex-wrap">
@@ -504,12 +503,13 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     <Button
                       variant="outline"
                       size="sm"
+                      className="hidden sm:flex"
                       onClick={() => onReshoot(group.photoAisle || "", group.photoSection || "", group.photoId)}
                       data-testid={`button-reshoot-group-${group.photoId}`}
                       title="Take a detail photo in Mobile Flow"
                     >
-                      <Camera className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">Re-shoot</span>
+                      <Camera className="h-4 w-4 mr-1" />
+                      Re-shoot
                     </Button>
                   )}
                 </div>
@@ -607,8 +607,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
                             <Input
                               value={editState.wireDetails}
-                              onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value }))}
-                              placeholder="e.g. THHN #12 Black"
+                              onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value.toUpperCase() }))}
+                              className="uppercase"
                               data-testid={`input-wire-details-${pin.id}`}
                             />
                           </div>
@@ -616,8 +616,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
                             <Input
                               value={editState.vendorCode}
-                              onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.slice(0, 3) }))}
-                              placeholder="e.g. SOU"
+                              onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
+                              className="uppercase"
                               maxLength={3}
                               data-testid={`input-vendor-code-${pin.id}`}
                             />
@@ -628,19 +628,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               type="number"
                               value={editState.footage}
                               onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
-                              placeholder="e.g. 1000"
                               data-testid={`input-footage-${pin.id}`}
                             />
                           </div>
-                        </div>
-                        <div className="mb-3">
-                          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Flag Reason</label>
-                          <Input
-                            value={editState.flagReason}
-                            onChange={(e) => setEditState(s => ({ ...s, flagReason: e.target.value }))}
-                            placeholder="Why was this flagged?"
-                            data-testid={`input-flag-reason-${pin.id}`}
-                          />
                         </div>
                         {pin.entryId && (
                           <div className="mb-3">
@@ -648,7 +638,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             <Textarea
                               value={editState.notes}
                               onChange={(e) => setEditState(s => ({ ...s, notes: e.target.value }))}
-                              placeholder="Add notes about this reel..."
                               rows={2}
                               data-testid={`input-notes-${pin.id}`}
                             />
@@ -724,8 +713,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           className="rounded-full border border-black w-14 h-14"
                           onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
                           data-testid={`button-edit-mobile-${pin.id}`}
-                          title="Edit details"
-                          aria-label="Edit details"
+                          title="Edit & Photo"
+                          aria-label="Edit & Photo"
                         >
                           <Pencil className="h-7 w-7" />
                         </Button>
@@ -743,12 +732,24 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       </div>
                       {editingPinId === pin.id && (
                         <div className="w-full border-t border-black pt-3 mt-1 space-y-3">
+                          {onReshoot && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => onReshoot(group.photoAisle || "", group.photoSection || "", group.photoId)}
+                              data-testid={`button-reshoot-mobile-${pin.id}`}
+                            >
+                              <Camera className="h-4 w-4 mr-1" />
+                              Take Detail Photo
+                            </Button>
+                          )}
                           <div>
                             <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
                             <Input
                               value={editState.wireDetails}
-                              onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value }))}
-                              placeholder="e.g. THHN #12 Black"
+                              onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value.toUpperCase() }))}
+                              className="uppercase"
                               data-testid={`input-wire-details-mobile-${pin.id}`}
                             />
                           </div>
@@ -757,8 +758,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
                               <Input
                                 value={editState.vendorCode}
-                                onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.slice(0, 3) }))}
-                                placeholder="e.g. SOU"
+                                onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
+                                className="uppercase"
                                 maxLength={3}
                                 data-testid={`input-vendor-code-mobile-${pin.id}`}
                               />
@@ -769,19 +770,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                 type="number"
                                 value={editState.footage}
                                 onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
-                                placeholder="e.g. 1000"
                                 data-testid={`input-footage-mobile-${pin.id}`}
                               />
                             </div>
-                          </div>
-                          <div>
-                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Flag Reason</label>
-                            <Input
-                              value={editState.flagReason}
-                              onChange={(e) => setEditState(s => ({ ...s, flagReason: e.target.value }))}
-                              placeholder="Why was this flagged?"
-                              data-testid={`input-flag-reason-mobile-${pin.id}`}
-                            />
                           </div>
                           {pin.entryId && (
                             <div>
@@ -789,7 +780,6 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               <Textarea
                                 value={editState.notes}
                                 onChange={(e) => setEditState(s => ({ ...s, notes: e.target.value }))}
-                                placeholder="Add notes about this reel..."
                                 rows={2}
                                 data-testid={`input-notes-mobile-${pin.id}`}
                               />

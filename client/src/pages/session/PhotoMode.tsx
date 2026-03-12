@@ -1681,7 +1681,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               </div>
               <div className="photo-overlay-controls right-strip">
                 <button
-                  className="photo-overlay-btn"
+                  className="photo-overlay-btn hidden sm:inline-flex"
                   onClick={(e) => { e.stopPropagation(); setScale((s) => Math.min(12, s + 0.5)); }}
                   title="Zoom in"
                   data-testid="button-zoom-in"
@@ -1689,7 +1689,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <ZoomIn className="h-4 w-4" />
                 </button>
                 <button
-                  className="photo-overlay-btn"
+                  className="photo-overlay-btn hidden sm:inline-flex"
                   onClick={(e) => { e.stopPropagation(); setScale((s) => Math.max(1, s - 0.5)); }}
                   title="Zoom out"
                   data-testid="button-zoom-out"
@@ -2390,7 +2390,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   disabled={createEntries.isPending}
                   data-testid="button-clear-pins"
                 >
-                  Clear All
+                  Clear All Details
                 </Button>
               </div>
 
