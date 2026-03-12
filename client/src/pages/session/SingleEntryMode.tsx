@@ -411,7 +411,6 @@ export default function SingleEntryMode({
               }
             }}
             onBlur={() => markTouched("aisle")}
-            placeholder="Aisle"
             enterKeyHint="next"
             className={touched.aisle && errors.aisle ? "border-destructive" : ""}
             data-testid="input-aisle"
@@ -426,7 +425,6 @@ export default function SingleEntryMode({
             value={form.section}
             onChange={(e) => update("section", e.target.value)}
             onBlur={() => markTouched("section")}
-            placeholder="Section"
             enterKeyHint="next"
             className={touched.section && errors.section ? "border-destructive" : ""}
             data-testid="input-section"
@@ -504,7 +502,6 @@ export default function SingleEntryMode({
               const match = getCatalogMatch(form.reelTag);
               if (match) applyCatalogMatch(match);
             }}
-            placeholder="Category"
             enterKeyHint="next"
             autoComplete="off"
             data-testid="input-reel-tag"
@@ -532,7 +529,7 @@ export default function SingleEntryMode({
         </div>
         <div className="space-y-1">
           <Label className="text-xs underline">Vendor Code:</Label>
-          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value.toUpperCase())} placeholder="Vendor Code" enterKeyHint="next" data-testid="input-manufacturer" />
+          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value.toUpperCase())} enterKeyHint="next" data-testid="input-manufacturer" />
         </div>
       </div>
 
@@ -545,7 +542,6 @@ export default function SingleEntryMode({
             onChange={(e) => update("reelCount", e.target.value)}
             min={1}
             inputMode="numeric"
-            placeholder="1"
             enterKeyHint="next"
             data-testid="input-reel-count"
           />
