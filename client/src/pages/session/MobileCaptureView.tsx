@@ -484,7 +484,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         </div>
       )}
       {!detailReviewPhoto && (
-      <Card className="!border-[hsl(18_60%_30%/0.3)]">
+      <Card className="!border-[hsl(18_60%_30%)]">
         <CardContent className="p-4 space-y-3">
           {!aisle.trim() && (
             <div className="px-3 py-2 text-sm text-muted-foreground text-center" data-testid="text-aisle-required">
