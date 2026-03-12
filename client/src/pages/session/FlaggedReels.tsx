@@ -9,6 +9,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Entry, Pin, Photo } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
+import { lookupCategory, type ParsedCatalogEntry, PARSED_CATALOG } from "@/lib/wireReference";
 
 interface FlaggedPin {
   id: number;
@@ -38,6 +39,7 @@ interface EditingState {
   footage: string;
   notes: string;
   flagReason: string;
+  reelCount: string;
 }
 
 interface FlaggedReelsProps {
@@ -117,7 +119,7 @@ function DupPinTile({
 
   return (
     <div
-      className="flex-1 min-w-[120px] max-w-[48%] sm:max-w-[280px] border border-black rounded overflow-hidden bg-card"
+      className="flex-1 min-w-0 max-w-[46%] sm:max-w-[280px] border border-black rounded overflow-hidden bg-card"
       data-testid={`dup-pin-${pin.pinId}`}
     >
       {pin.photoObjectStorageKey ? (
@@ -170,7 +172,7 @@ function DupPinTile({
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 h-6 text-[10px] px-1 text-green-600 border-green-600/40 hover:bg-green-50 dark:hover:bg-green-950/30"
+              className="flex-1 h-6 text-[10px] px-1 text-green-600 !border-black hover:bg-green-50 dark:hover:bg-green-950/30"
               onClick={() => keepMutation.mutate()}
               disabled={keepMutation.isPending || deletePhotoMutation.isPending}
               data-testid={`button-keep-${pin.pinId}`}
@@ -183,7 +185,7 @@ function DupPinTile({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 h-6 text-[10px] px-1 text-red-600 border-red-600/40 hover:bg-red-50 dark:hover:bg-red-950/30"
+            className="flex-1 h-6 text-[10px] px-1 text-red-600 !border-black hover:bg-red-50 dark:hover:bg-red-950/30"
             onClick={() => deletePhotoMutation.mutate()}
             disabled={keepMutation.isPending || deletePhotoMutation.isPending}
             data-testid={`button-delete-photo-${pin.pinId}`}
@@ -203,7 +205,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
-  const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "" });
+  const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
+  const [categorySuggestions, setCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const [dupsOpen, setDupsOpen] = useState(true);
   const [disregardedKeys, setDisregardedKeys] = useState<Set<string>>(() => loadDisregardedKeys(sessionId));
   const [sortBy, setSortBy] = useState<"location" | "label" | "count">("location");
@@ -230,10 +234,12 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const savePinMutation = useMutation({
     mutationFn: async ({ pinId, entryId, data }: { pinId: number; entryId: number | null; data: EditingState }) => {
       const parsedFootage = data.footage ? Number(data.footage) : null;
+      const parsedReelCount = data.reelCount ? parseInt(data.reelCount) : 1;
       await apiRequest("PATCH", `/api/pins/${pinId}`, {
         wireDetails: data.wireDetails || null,
         vendorCode: data.vendorCode || null,
         footage: parsedFootage && Number.isFinite(parsedFootage) ? parsedFootage : null,
+        reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
       });
       await apiRequest("PATCH", `/api/pins/${pinId}/flag`, {
         flagged: true,
@@ -263,7 +269,30 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       footage: pin.footage ? String(pin.footage) : "",
       notes: pin.entryNotes || "",
       flagReason: pin.flagReason || "",
+      reelCount: String(pin.reelCount || 1),
     });
+    setCategorySuggestions([]);
+    setShowCategorySuggestions(false);
+  }, []);
+
+  const getUniqueVendor = (catalog: string): string | null => {
+    const vendors = new Set(PARSED_CATALOG.filter(e => e.catalog === catalog).map(e => e.vendor));
+    return vendors.size === 1 ? [...vendors][0] : null;
+  };
+
+  const applyCatalogMatch = useCallback((match: ParsedCatalogEntry) => {
+    setEditState(s => {
+      const updates: Partial<EditingState> = { wireDetails: match.catalog };
+      const uniqueVendor = getUniqueVendor(match.catalog);
+      if (uniqueVendor && !s.vendorCode) updates.vendorCode = uniqueVendor;
+      if (match.footage) {
+        const rc = Math.max(1, parseInt(s.reelCount) || 1);
+        updates.footage = String(match.footage * rc);
+      }
+      return { ...s, ...updates };
+    });
+    setCategorySuggestions([]);
+    setShowCategorySuggestions(false);
   }, []);
 
   const { data: sessionEntries = [] } = useQuery<Entry[]>({
@@ -496,6 +525,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       title="Go to this photo in Section Photo"
                     >
                       <ScanSearch className="h-4 w-4 sm:mr-1" />
+                      <span className="sm:hidden text-xs">Go To Photo</span>
                       <span className="hidden sm:inline">View in Photo</span>
                     </Button>
                   )}
@@ -602,15 +632,52 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     </div>
                     {editingPinId === pin.id && (
                       <div className="hidden sm:block border-t border-black pt-3 mt-1">
-                        <div className="grid grid-cols-3 gap-3 mb-3">
-                          <div>
+                        <div className="grid grid-cols-4 gap-3 mb-3">
+                          <div className="relative">
                             <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
                             <Input
                               value={editState.wireDetails}
-                              onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value.toUpperCase() }))}
+                              onChange={(e) => {
+                                const val = e.target.value.toUpperCase();
+                                setEditState(s => ({ ...s, wireDetails: val }));
+                                if (val.length >= 2) {
+                                  const matches = lookupCategory(val);
+                                  setCategorySuggestions(matches);
+                                  setShowCategorySuggestions(matches.length > 0);
+                                } else {
+                                  setCategorySuggestions([]);
+                                  setShowCategorySuggestions(false);
+                                }
+                              }}
+                              onFocus={() => {
+                                if (editState.wireDetails.length >= 2) {
+                                  const matches = lookupCategory(editState.wireDetails);
+                                  setCategorySuggestions(matches);
+                                  setShowCategorySuggestions(matches.length > 0);
+                                }
+                              }}
+                              onBlur={() => setTimeout(() => setShowCategorySuggestions(false), 200)}
                               className="uppercase"
+                              autoComplete="off"
                               data-testid={`input-wire-details-${pin.id}`}
                             />
+                            {showCategorySuggestions && categorySuggestions.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="category-suggestions-desktop">
+                                {categorySuggestions.map((s) => (
+                                  <button
+                                    key={s.catalog}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                                    onMouseDown={(e) => { e.preventDefault(); applyCatalogMatch(s); }}
+                                    data-testid={`suggestion-desktop-${s.catalog}`}
+                                  >
+                                    <span className="font-mono font-semibold">{s.catalog}</span>
+                                    <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
+                                    {s.footage && <span className="text-orange-500 ml-1 text-xs">({s.footage}ft)</span>}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <div>
                             <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
@@ -629,6 +696,17 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               value={editState.footage}
                               onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
                               data-testid={`input-footage-${pin.id}`}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Number of Reels:</label>
+                            <Input
+                              type="number"
+                              value={editState.reelCount}
+                              onChange={(e) => setEditState(s => ({ ...s, reelCount: e.target.value }))}
+                              min={1}
+                              inputMode="numeric"
+                              data-testid={`input-reel-count-${pin.id}`}
                             />
                           </div>
                         </div>
@@ -696,10 +774,17 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           <MapPin className="h-5 w-5 text-muted-foreground" />
                         </div>
                       )}
-                      <div className="flex gap-3 text-xs text-muted-foreground font-mono w-full">
-                        {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}
-                        {pin.vendorCode && <span>{pin.vendorCode}</span>}
-                        {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
+                      <div className="text-xs text-muted-foreground font-mono w-full">
+                        {(group.photoAisle || group.photoSection) && (
+                          <p className="mb-0.5">
+                            {[group.photoAisle && `Aisle ${group.photoAisle}`, group.photoSection && `Section ${group.photoSection}`].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        <div className="flex gap-3">
+                          {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}
+                          {pin.vendorCode && <span>{pin.vendorCode}</span>}
+                          {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
+                        </div>
                       </div>
                       {pin.flagReason && (
                         <p className="text-xs text-amber-600 dark:text-amber-400 w-full" data-testid={`text-flag-reason-mobile-${pin.id}`}>
@@ -707,27 +792,27 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           {pin.flagReason}
                         </p>
                       )}
-                      <div className="flex items-center justify-center gap-10 w-full py-2">
+                      <div className="flex items-center justify-center gap-4 w-full py-2">
                         <Button
-                          variant="ghost"
-                          className="rounded-full border border-black w-14 h-14"
+                          variant="outline"
+                          size="sm"
+                          className="!border-black"
                           onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
                           data-testid={`button-edit-mobile-${pin.id}`}
-                          title="Edit & Photo"
-                          aria-label="Edit & Photo"
+                          title="Capture Details"
                         >
-                          <Pencil className="h-7 w-7" />
+                          Capture Details
                         </Button>
                         <Button
-                          variant="ghost"
-                          className="rounded-full border border-black w-14 h-14"
+                          variant="outline"
+                          size="sm"
+                          className="!border-black"
                           onClick={() => unflagMutation.mutate(pin.id)}
                           disabled={unflagMutation.isPending}
                           data-testid={`button-resolve-mobile-${pin.id}`}
                           title="Un-Flag"
-                          aria-label="Un-Flag"
                         >
-                          <Check className="h-7 w-7" />
+                          Un-Flag
                         </Button>
                       </div>
                       {editingPinId === pin.id && (
@@ -744,16 +829,53 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               Take Detail Photo
                             </Button>
                           )}
-                          <div>
+                          <div className="relative">
                             <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
                             <Input
                               value={editState.wireDetails}
-                              onChange={(e) => setEditState(s => ({ ...s, wireDetails: e.target.value.toUpperCase() }))}
+                              onChange={(e) => {
+                                const val = e.target.value.toUpperCase();
+                                setEditState(s => ({ ...s, wireDetails: val }));
+                                if (val.length >= 2) {
+                                  const matches = lookupCategory(val);
+                                  setCategorySuggestions(matches);
+                                  setShowCategorySuggestions(matches.length > 0);
+                                } else {
+                                  setCategorySuggestions([]);
+                                  setShowCategorySuggestions(false);
+                                }
+                              }}
+                              onFocus={() => {
+                                if (editState.wireDetails.length >= 2) {
+                                  const matches = lookupCategory(editState.wireDetails);
+                                  setCategorySuggestions(matches);
+                                  setShowCategorySuggestions(matches.length > 0);
+                                }
+                              }}
+                              onBlur={() => setTimeout(() => setShowCategorySuggestions(false), 200)}
                               className="uppercase"
+                              autoComplete="off"
                               data-testid={`input-wire-details-mobile-${pin.id}`}
                             />
+                            {showCategorySuggestions && categorySuggestions.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="category-suggestions-mobile">
+                                {categorySuggestions.map((s) => (
+                                  <button
+                                    key={s.catalog}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                                    onMouseDown={(e) => { e.preventDefault(); applyCatalogMatch(s); }}
+                                    data-testid={`suggestion-mobile-${s.catalog}`}
+                                  >
+                                    <span className="font-mono font-semibold">{s.catalog}</span>
+                                    <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
+                                    {s.footage && <span className="text-orange-500 ml-1 text-xs">({s.footage}ft)</span>}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-3 gap-3">
                             <div>
                               <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
                               <Input
@@ -771,6 +893,17 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                 value={editState.footage}
                                 onChange={(e) => setEditState(s => ({ ...s, footage: e.target.value }))}
                                 data-testid={`input-footage-mobile-${pin.id}`}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Number of Reels:</label>
+                              <Input
+                                type="number"
+                                value={editState.reelCount}
+                                onChange={(e) => setEditState(s => ({ ...s, reelCount: e.target.value }))}
+                                min={1}
+                                inputMode="numeric"
+                                data-testid={`input-reel-count-mobile-${pin.id}`}
                               />
                             </div>
                           </div>
