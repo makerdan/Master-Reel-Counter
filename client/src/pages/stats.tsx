@@ -101,7 +101,8 @@ export default function StatsPage() {
     );
   }
 
-  const hasNoData = stats.totalSessions === 0 && stats.totalEntries === 0;
+  const hasNoPersonalData = stats.totalSessions === 0 && stats.totalEntries === 0;
+  const hasNoData = hasNoPersonalData && stats.sharedPerformance.length === 0;
 
   const maxWeeklyEntries = Math.max(...stats.weeklyStats.map(w => w.entries), 1);
   const maxCatCount = Math.max(...stats.topCategories.map(c => c.count), 1);
@@ -132,119 +133,123 @@ export default function StatsPage() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Total Sessions:" value={stats.totalSessions} testId="stat-total-sessions" />
-              <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Completed:" value={stats.completedSessions} testId="stat-completed" />
-              <StatCard icon={<Package className="h-4 w-4" />} label="Total Reels:" value={stats.totalReels.toLocaleString()} testId="stat-total-reels" />
-              <StatCard icon={<Ruler className="h-4 w-4" />} label="Total Footage:" value={`${stats.totalFootage.toLocaleString()} ft`} testId="stat-total-footage" />
-              <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Total Entries:" value={stats.totalEntries.toLocaleString()} testId="stat-total-entries" />
-              <StatCard icon={<Camera className="h-4 w-4" />} label="Total Photos:" value={stats.totalPhotos.toLocaleString()} testId="stat-total-photos" />
-              <StatCard icon={<Clock className="h-4 w-4" />} label="Active Sessions:" value={stats.activeSessions} testId="stat-active" />
-              <StatCard
-                icon={<Ruler className="h-4 w-4" />}
-                label="Avg Footage/Session:"
-                value={stats.totalSessions > 0 ? `${Math.round(stats.totalFootage / stats.totalSessions).toLocaleString()} ft` : "0 ft"}
-                testId="stat-avg-footage"
-              />
-            </div>
+            {!hasNoPersonalData && (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Total Sessions:" value={stats.totalSessions} testId="stat-total-sessions" />
+                  <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Completed:" value={stats.completedSessions} testId="stat-completed" />
+                  <StatCard icon={<Package className="h-4 w-4" />} label="Total Reels:" value={stats.totalReels.toLocaleString()} testId="stat-total-reels" />
+                  <StatCard icon={<Ruler className="h-4 w-4" />} label="Total Footage:" value={`${stats.totalFootage.toLocaleString()} ft`} testId="stat-total-footage" />
+                  <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Total Entries:" value={stats.totalEntries.toLocaleString()} testId="stat-total-entries" />
+                  <StatCard icon={<Camera className="h-4 w-4" />} label="Total Photos:" value={stats.totalPhotos.toLocaleString()} testId="stat-total-photos" />
+                  <StatCard icon={<Clock className="h-4 w-4" />} label="Active Sessions:" value={stats.activeSessions} testId="stat-active" />
+                  <StatCard
+                    icon={<Ruler className="h-4 w-4" />}
+                    label="Avg Footage/Session:"
+                    value={stats.totalSessions > 0 ? `${Math.round(stats.totalFootage / stats.totalSessions).toLocaleString()} ft` : "0 ft"}
+                    testId="stat-avg-footage"
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <StatCard icon={<Target className="h-4 w-4" />} label="Avg Entries/Session:" value={avgEntriesPerSession} testId="stat-avg-entries" />
-              <StatCard icon={<Package className="h-4 w-4" />} label="Avg Reels/Entry:" value={avgReelsPerEntry} testId="stat-avg-reels" />
-              <StatCard icon={<Trophy className="h-4 w-4" />} label="Best Session:" value={`${stats.bestSessionFootage.toLocaleString()} ft`} testId="stat-best-session" />
-              <StatCard icon={<Flame className="h-4 w-4" />} label="Current Streak:" value={`${stats.currentStreak} day${stats.currentStreak !== 1 ? "s" : ""}`} testId="stat-current-streak" />
-              <StatCard icon={<Flame className="h-4 w-4" />} label="Longest Streak:" value={`${stats.longestStreak} day${stats.longestStreak !== 1 ? "s" : ""}`} testId="stat-longest-streak" />
-              <StatCard icon={<Calendar className="h-4 w-4" />} label="Busiest Day:" value={stats.busiestDay || "—"} testId="stat-busiest-day" />
-            </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <StatCard icon={<Target className="h-4 w-4" />} label="Avg Entries/Session:" value={avgEntriesPerSession} testId="stat-avg-entries" />
+                  <StatCard icon={<Package className="h-4 w-4" />} label="Avg Reels/Entry:" value={avgReelsPerEntry} testId="stat-avg-reels" />
+                  <StatCard icon={<Trophy className="h-4 w-4" />} label="Best Session:" value={`${stats.bestSessionFootage.toLocaleString()} ft`} testId="stat-best-session" />
+                  <StatCard icon={<Flame className="h-4 w-4" />} label="Current Streak:" value={`${stats.currentStreak} day${stats.currentStreak !== 1 ? "s" : ""}`} testId="stat-current-streak" />
+                  <StatCard icon={<Flame className="h-4 w-4" />} label="Longest Streak:" value={`${stats.longestStreak} day${stats.longestStreak !== 1 ? "s" : ""}`} testId="stat-longest-streak" />
+                  <StatCard icon={<Calendar className="h-4 w-4" />} label="Busiest Day:" value={stats.busiestDay || "—"} testId="stat-busiest-day" />
+                </div>
 
-            {stats.weeklyStats.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Weekly Activity:</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1">
-                    {stats.weeklyStats.map((w) => {
-                      const weekDate = new Date(w.week);
-                      const label = weekDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                      return (
-                        <div key={w.week} className="flex items-center gap-2 text-xs" data-testid={`stat-week-${w.week}`}>
-                          <span className="w-16 text-muted-foreground mono shrink-0">{label}</span>
-                          <div className="flex-1 flex items-center gap-1">
-                            <div
-                              className="h-4 bg-primary/80 rounded-sm"
-                              style={{ width: `${(w.entries / maxWeeklyEntries) * 100}%`, minWidth: w.entries > 0 ? 4 : 0 }}
-                            />
-                            <span className="mono text-muted-foreground shrink-0">{w.entries} entries</span>
-                          </div>
-                          <span className="mono text-muted-foreground shrink-0 w-20 text-right">{w.footage.toLocaleString()} ft</span>
+                {stats.weeklyStats.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Weekly Activity:</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {stats.weeklyStats.map((w) => {
+                          const weekDate = new Date(w.week);
+                          const label = weekDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                          return (
+                            <div key={w.week} className="flex items-center gap-2 text-xs" data-testid={`stat-week-${w.week}`}>
+                              <span className="w-16 text-muted-foreground mono shrink-0">{label}</span>
+                              <div className="flex-1 flex items-center gap-1">
+                                <div
+                                  className="h-4 bg-primary/80 rounded-sm"
+                                  style={{ width: `${(w.entries / maxWeeklyEntries) * 100}%`, minWidth: w.entries > 0 ? 4 : 0 }}
+                                />
+                                <span className="mono text-muted-foreground shrink-0">{w.entries} entries</span>
+                              </div>
+                              <span className="mono text-muted-foreground shrink-0 w-20 text-right">{w.footage.toLocaleString()} ft</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  {stats.topCategories.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold">Top Categories:</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {stats.topCategories.map((c, i) => (
+                            <div key={c.category} className="flex items-center gap-2" data-testid={`stat-category-${i}`}>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="text-xs mono truncate">{c.category}</span>
+                                  <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{c.count} ({c.footage.toLocaleString()} ft)</span>
+                                </div>
+                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-full bg-primary/70 rounded-full" style={{ width: `${(c.count / maxCatCount) * 100}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                      </CardContent>
+                    </Card>
+                  )}
 
-            <div className="grid md:grid-cols-2 gap-4">
-              {stats.topCategories.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">Top Categories:</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {stats.topCategories.map((c, i) => (
-                        <div key={c.category} className="flex items-center gap-2" data-testid={`stat-category-${i}`}>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className="text-xs mono truncate">{c.category}</span>
-                              <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{c.count} ({c.footage.toLocaleString()} ft)</span>
+                  {stats.topManufacturers.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold">Top Vendor Codes:</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {stats.topManufacturers.map((m, i) => (
+                            <div key={m.manufacturer} className="flex items-center gap-2" data-testid={`stat-manufacturer-${i}`}>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="text-xs mono truncate">{m.manufacturer}</span>
+                                  <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{m.count}</span>
+                                </div>
+                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-full bg-orange-500/70 rounded-full" style={{ width: `${(m.count / maxMfgCount) * 100}%` }} />
+                                </div>
+                              </div>
                             </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-primary/70 rounded-full" style={{ width: `${(c.count / maxCatCount) * 100}%` }} />
-                            </div>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
 
-              {stats.topManufacturers.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">Top Vendor Codes:</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {stats.topManufacturers.map((m, i) => (
-                        <div key={m.manufacturer} className="flex items-center gap-2" data-testid={`stat-manufacturer-${i}`}>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <span className="text-xs mono truncate">{m.manufacturer}</span>
-                              <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{m.count}</span>
-                            </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-orange-500/70 rounded-full" style={{ width: `${(m.count / maxMfgCount) * 100}%` }} />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {stats.topCategories.length === 0 && stats.topManufacturers.length === 0 && stats.weeklyStats.length === 0 && (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <BarChart3 className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Start counting reels to see detailed breakdowns here.</p>
-                </CardContent>
-              </Card>
+                {stats.topCategories.length === 0 && stats.topManufacturers.length === 0 && stats.weeklyStats.length === 0 && (
+                  <Card>
+                    <CardContent className="py-8 text-center">
+                      <BarChart3 className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Start counting reels to see detailed breakdowns here.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
 
             <div className="space-y-4">
