@@ -395,7 +395,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <Textarea
                 value={detailNotes}
                 onChange={(e) => setDetailNotes(e.target.value)}
-                placeholder="Add notes about this detail shot..."
+
                 rows={3}
                 className="text-sm"
                 data-testid="input-detail-review-notes"
@@ -498,7 +498,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 ref={aisleInputRef}
                 value={aisle}
                 onChange={(e) => setAisle(e.target.value)}
-                placeholder="Aisle"
+
                 className={!aisle.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
                 disabled={isReceiving}
                 tabIndex={1}
@@ -570,7 +570,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 ref={sectionInputRef}
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
-                placeholder={isReceiving ? "Optional" : "Section"}
+
                 className={!isReceiving && !section.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
                 tabIndex={2}
                 enterKeyHint="done"
@@ -640,7 +640,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             <Textarea
               value={captureNotes}
               onChange={(e) => setCaptureNotes(e.target.value)}
-              placeholder="Photo notes (applied to captured photos)..."
+
               rows={2}
               data-testid="input-mobile-capture-notes"
             />
