@@ -119,7 +119,7 @@ function DupPinTile({
 
   return (
     <div
-      className="flex-1 min-w-0 max-w-[46%] sm:max-w-[280px] border border-black rounded overflow-hidden bg-card"
+      className="flex-1 min-w-0 max-w-[47%] sm:max-w-[280px] border border-black rounded overflow-hidden bg-card"
       data-testid={`dup-pin-${pin.pinId}`}
     >
       {pin.photoObjectStorageKey ? (
@@ -439,20 +439,20 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                 return (
                 <div
                   key={groupKey}
-                  className={`border border-black rounded-lg p-3 ${isSameReel ? "bg-violet-50/40 dark:bg-violet-950/15" : group.isDefiniteDoubleCount ? "bg-orange-50/50 dark:bg-orange-950/20" : "bg-amber-50/30 dark:bg-amber-950/10"}`}
+                  className={`border border-black rounded-lg p-2 sm:p-3 overflow-hidden ${isSameReel ? "bg-violet-50/40 dark:bg-violet-950/15" : group.isDefiniteDoubleCount ? "bg-orange-50/50 dark:bg-orange-950/20" : "bg-amber-50/30 dark:bg-amber-950/10"}`}
                   data-testid={`dup-group-${groupKey}`}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-mono text-sm font-semibold" data-testid={`text-dup-label-${groupKey}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-2 flex-wrap">
+                    <span className="font-mono text-xs sm:text-sm font-semibold" data-testid={`text-dup-label-${groupKey}`}>
                       {isSameReel ? group.label : `Reel #${group.label}`}
                     </span>
                     {(group.aisle || group.section) && (
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {[group.aisle && `Aisle ${group.aisle}`, group.section && `Section ${group.section}`].filter(Boolean).join(" · ")}
+                      <span className="text-[10px] sm:text-xs text-muted-foreground font-mono">
+                        {[group.aisle && `A${group.aisle}`, group.section && `S${group.section}`].filter(Boolean).join("·")}
                       </span>
                     )}
                     <Badge
-                      className={`text-[10px] ${isSameReel ? "bg-violet-900/50 text-violet-300 border-violet-700/40" : group.isDefiniteDoubleCount ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : "bg-amber-900/50 text-amber-300 border-amber-700/40"}`}
+                      className={`text-[9px] sm:text-[10px] px-1 ${isSameReel ? "bg-violet-900/50 text-violet-300 border-violet-700/40" : group.isDefiniteDoubleCount ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : "bg-amber-900/50 text-amber-300 border-amber-700/40"}`}
                       data-testid={`badge-dup-type-${groupKey}`}
                     >
                       {isSameReel ? "Same Reel?" : group.isDefiniteDoubleCount ? "Double Count" : "Check Needed"}
@@ -468,7 +468,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-1.5 sm:gap-2 flex-wrap">
                     {group.pins.map((pin) => (
                       <DupPinTile
                         key={pin.pinId}
