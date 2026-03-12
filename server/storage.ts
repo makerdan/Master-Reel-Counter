@@ -128,7 +128,24 @@ export interface IStorage {
     topCategories: { category: string; count: number; footage: number }[];
     topManufacturers: { manufacturer: string; count: number }[];
     weeklyStats: { week: string; entries: number; footage: number }[];
+    bestSessionFootage: number;
+    currentStreak: number;
+    longestStreak: number;
+    busiestDay: string | null;
   }>;
+
+  getSharedSessionPerformance(userId: string): Promise<{
+    sessionId: number;
+    sessionName: string;
+    contributors: {
+      userId: string;
+      username: string;
+      entryCount: number;
+      photoCount: number;
+      reelCount: number;
+      footage: number;
+    }[];
+  }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -817,6 +834,10 @@ export class DatabaseStorage implements IStorage {
     topCategories: { category: string; count: number; footage: number }[];
     topManufacturers: { manufacturer: string; count: number }[];
     weeklyStats: { week: string; entries: number; footage: number }[];
+    bestSessionFootage: number;
+    currentStreak: number;
+    longestStreak: number;
+    busiestDay: string | null;
   }> {
     const userSessions = await db.select({ id: countingSessions.id, status: countingSessions.status })
       .from(countingSessions)
@@ -832,6 +853,7 @@ export class DatabaseStorage implements IStorage {
         totalSessions: 0, activeSessions: 0, completedSessions: 0,
         totalEntries: 0, totalReels: 0, totalFootage: 0, totalPhotos: 0,
         topCategories: [], topManufacturers: [], weeklyStats: [],
+        bestSessionFootage: 0, currentStreak: 0, longestStreak: 0, busiestDay: null,
       };
     }
 
@@ -874,6 +896,70 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`date_trunc('week', ${entries.createdAt})`)
       .limit(12);
 
+    const bestSessionRows = await db.select({
+      totalFootage: sum(entries.footage),
+    }).from(entries)
+      .where(inArray(entries.sessionId, sessionIds))
+      .groupBy(entries.sessionId)
+      .orderBy(desc(sum(entries.footage)))
+      .limit(1);
+    const bestSessionFootage = bestSessionRows.length > 0 ? Number(bestSessionRows[0].totalFootage) || 0 : 0;
+
+    const entryDatesRaw = await db.select({
+      day: sql<string>`to_char(${entries.createdAt}::date, 'YYYY-MM-DD')`,
+    }).from(entries)
+      .where(inArray(entries.sessionId, sessionIds))
+      .groupBy(sql`${entries.createdAt}::date`)
+      .orderBy(desc(sql`${entries.createdAt}::date`));
+
+    let currentStreak = 0;
+    let longestStreak = 0;
+    if (entryDatesRaw.length > 0) {
+      const dates = entryDatesRaw.map(d => d.day);
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10);
+      const yesterdayStr = new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
+
+      let streak = 0;
+      let isCurrent = true;
+      let prevDate: Date | null = null;
+      for (const dateStr of dates) {
+        const d = new Date(dateStr + "T00:00:00Z");
+        if (prevDate === null) {
+          if (dateStr === todayStr || dateStr === yesterdayStr) {
+            streak = 1;
+          } else {
+            isCurrent = false;
+            streak = 1;
+          }
+        } else {
+          const diff = (prevDate.getTime() - d.getTime()) / 86400000;
+          if (diff === 1) {
+            streak++;
+          } else {
+            if (isCurrent) currentStreak = streak;
+            longestStreak = Math.max(longestStreak, streak);
+            isCurrent = false;
+            streak = 1;
+          }
+        }
+        prevDate = d;
+      }
+      if (isCurrent) currentStreak = streak;
+      longestStreak = Math.max(longestStreak, streak);
+    }
+
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const busiestDayRaw = await db.select({
+      dow: sql<number>`EXTRACT(dow FROM ${entries.createdAt})`,
+      cnt: count(),
+    }).from(entries)
+      .where(inArray(entries.sessionId, sessionIds))
+      .groupBy(sql`EXTRACT(dow FROM ${entries.createdAt})`)
+      .orderBy(desc(count()))
+      .limit(1);
+    const busiestDay = busiestDayRaw.length > 0 ? dayNames[Number(busiestDayRaw[0].dow)] || null : null;
+
     return {
       totalSessions,
       activeSessions,
@@ -896,7 +982,153 @@ export class DatabaseStorage implements IStorage {
         entries: Number(w.entries),
         footage: Number(w.footage) || 0,
       })),
+      bestSessionFootage,
+      currentStreak,
+      longestStreak,
+      busiestDay,
     };
+  }
+
+  async getSharedSessionPerformance(userId: string): Promise<{
+    sessionId: number;
+    sessionName: string;
+    contributors: {
+      userId: string;
+      username: string;
+      entryCount: number;
+      photoCount: number;
+      reelCount: number;
+      footage: number;
+    }[];
+  }[]> {
+    const ownedSessions = await db.select({ id: countingSessions.id, name: countingSessions.name, ownerId: countingSessions.userId })
+      .from(countingSessions)
+      .where(eq(countingSessions.userId, userId));
+
+    const collabRows = await db.select({
+      sessionId: sessionCollaborators.sessionId,
+    }).from(sessionCollaborators)
+      .where(eq(sessionCollaborators.userId, userId));
+
+    const collabSessionIds = collabRows.map(c => c.sessionId);
+    let collabSessions: { id: number; name: string; ownerId: string }[] = [];
+    if (collabSessionIds.length > 0) {
+      const rows = await db.select({ id: countingSessions.id, name: countingSessions.name, ownerId: countingSessions.userId })
+        .from(countingSessions)
+        .where(inArray(countingSessions.id, collabSessionIds));
+      collabSessions = rows;
+    }
+
+    const allSessionMap = new Map<number, { id: number; name: string; ownerId: string }>();
+    for (const s of ownedSessions) allSessionMap.set(s.id, s);
+    for (const s of collabSessions) allSessionMap.set(s.id, s);
+
+    const allSessionIds = Array.from(allSessionMap.keys());
+    if (allSessionIds.length === 0) return [];
+
+    const collabCountRows = await db.select({
+      sessionId: sessionCollaborators.sessionId,
+      cnt: count(),
+    }).from(sessionCollaborators)
+      .where(inArray(sessionCollaborators.sessionId, allSessionIds))
+      .groupBy(sessionCollaborators.sessionId);
+
+    const sharedSessionIds = collabCountRows
+      .filter(r => Number(r.cnt) > 0)
+      .map(r => r.sessionId);
+
+    if (sharedSessionIds.length === 0) return [];
+
+    const allCollabs = await db.select().from(sessionCollaborators)
+      .where(inArray(sessionCollaborators.sessionId, sharedSessionIds));
+
+    const usernameMap = new Map<string, string>();
+    for (const c of allCollabs) {
+      if (c.username && !usernameMap.has(c.userId)) {
+        usernameMap.set(c.userId, c.username);
+      }
+    }
+
+    const entryContribs = await db.select({
+      sessionId: entries.sessionId,
+      eUserId: entries.userId,
+      entryCount: count(),
+      reelCount: sum(entries.reelCount),
+      footage: sum(entries.footage),
+    }).from(entries)
+      .where(inArray(entries.sessionId, sharedSessionIds))
+      .groupBy(entries.sessionId, entries.userId);
+
+    const photoContribs = await db.select({
+      sessionId: photos.sessionId,
+      pUserId: photos.userId,
+      photoCount: count(),
+    }).from(photos)
+      .where(inArray(photos.sessionId, sharedSessionIds))
+      .groupBy(photos.sessionId, photos.userId);
+
+    const results: {
+      sessionId: number;
+      sessionName: string;
+      contributors: {
+        userId: string;
+        username: string;
+        entryCount: number;
+        photoCount: number;
+        reelCount: number;
+        footage: number;
+      }[];
+    }[] = [];
+
+    for (const sId of sharedSessionIds) {
+      const session = allSessionMap.get(sId);
+      if (!session) continue;
+
+      const contribMap = new Map<string, { userId: string; entryCount: number; photoCount: number; reelCount: number; footage: number }>();
+
+      const addUser = (uid: string) => {
+        if (!contribMap.has(uid)) {
+          contribMap.set(uid, { userId: uid, entryCount: 0, photoCount: 0, reelCount: 0, footage: 0 });
+        }
+        return contribMap.get(uid)!;
+      };
+
+      addUser(session.ownerId);
+      for (const c of allCollabs) {
+        if (c.sessionId === sId) addUser(c.userId);
+      }
+
+      for (const e of entryContribs) {
+        if (e.sessionId === sId) {
+          const u = addUser(e.eUserId);
+          u.entryCount = Number(e.entryCount);
+          u.reelCount = Number(e.reelCount) || 0;
+          u.footage = Number(e.footage) || 0;
+        }
+      }
+
+      for (const p of photoContribs) {
+        if (p.sessionId === sId) {
+          const u = addUser(p.pUserId);
+          u.photoCount = Number(p.photoCount);
+        }
+      }
+
+      const contributors = Array.from(contribMap.values())
+        .map(c => ({
+          ...c,
+          username: usernameMap.get(c.userId) || c.userId.slice(0, 8),
+        }))
+        .sort((a, b) => b.entryCount - a.entryCount || b.footage - a.footage);
+
+      results.push({
+        sessionId: sId,
+        sessionName: session.name,
+        contributors,
+      });
+    }
+
+    return results;
   }
 
   async createFeedback(data: InsertFeedback): Promise<Feedback> {

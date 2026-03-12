@@ -1,10 +1,28 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, BarChart3, Package, Ruler, Camera, CheckCircle, Clock, TrendingUp } from "lucide-react";
+import {
+  ArrowLeft, BarChart3, Package, Ruler, Camera, CheckCircle, Clock, TrendingUp,
+  Flame, Trophy, Calendar, Target, Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
+
+interface SharedContributor {
+  userId: string;
+  username: string;
+  entryCount: number;
+  photoCount: number;
+  reelCount: number;
+  footage: number;
+}
+
+interface SharedSession {
+  sessionId: number;
+  sessionName: string;
+  contributors: SharedContributor[];
+}
 
 interface UserStats {
   totalSessions: number;
@@ -17,6 +35,12 @@ interface UserStats {
   topCategories: { category: string; count: number; footage: number }[];
   topManufacturers: { manufacturer: string; count: number }[];
   weeklyStats: { week: string; entries: number; footage: number }[];
+  bestSessionFootage: number;
+  currentStreak: number;
+  longestStreak: number;
+  busiestDay: string | null;
+  sharedPerformance: SharedSession[];
+  currentUserId: string;
 }
 
 export default function StatsPage() {
@@ -79,10 +103,12 @@ export default function StatsPage() {
 
   const hasNoData = stats.totalSessions === 0 && stats.totalEntries === 0;
 
-  const maxWeeklyFootage = Math.max(...stats.weeklyStats.map(w => w.footage), 1);
   const maxWeeklyEntries = Math.max(...stats.weeklyStats.map(w => w.entries), 1);
   const maxCatCount = Math.max(...stats.topCategories.map(c => c.count), 1);
   const maxMfgCount = Math.max(...stats.topManufacturers.map(m => m.count), 1);
+
+  const avgEntriesPerSession = stats.totalSessions > 0 ? Math.round(stats.totalEntries / stats.totalSessions) : 0;
+  const avgReelsPerEntry = stats.totalEntries > 0 ? (stats.totalReels / stats.totalEntries).toFixed(1) : "0";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -120,6 +146,15 @@ export default function StatsPage() {
                 value={stats.totalSessions > 0 ? `${Math.round(stats.totalFootage / stats.totalSessions).toLocaleString()} ft` : "0 ft"}
                 testId="stat-avg-footage"
               />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <StatCard icon={<Target className="h-4 w-4" />} label="Avg Entries/Session:" value={avgEntriesPerSession} testId="stat-avg-entries" />
+              <StatCard icon={<Package className="h-4 w-4" />} label="Avg Reels/Entry:" value={avgReelsPerEntry} testId="stat-avg-reels" />
+              <StatCard icon={<Trophy className="h-4 w-4" />} label="Best Session:" value={`${stats.bestSessionFootage.toLocaleString()} ft`} testId="stat-best-session" />
+              <StatCard icon={<Flame className="h-4 w-4" />} label="Current Streak:" value={`${stats.currentStreak} day${stats.currentStreak !== 1 ? "s" : ""}`} testId="stat-current-streak" />
+              <StatCard icon={<Flame className="h-4 w-4" />} label="Longest Streak:" value={`${stats.longestStreak} day${stats.longestStreak !== 1 ? "s" : ""}`} testId="stat-longest-streak" />
+              <StatCard icon={<Calendar className="h-4 w-4" />} label="Busiest Day:" value={stats.busiestDay || "—"} testId="stat-busiest-day" />
             </div>
 
             {stats.weeklyStats.length > 0 && (
@@ -211,6 +246,67 @@ export default function StatsPage() {
                 </CardContent>
               </Card>
             )}
+
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold flex items-center gap-2" data-testid="text-shared-performance-title">
+                <Users className="h-4 w-4" />
+                Shared Session Performance
+              </h2>
+
+              {stats.sharedPerformance.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No shared sessions yet. Invite teammates to a session to see performance comparisons.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                stats.sharedPerformance.map((session) => {
+                  const maxEntries = Math.max(...session.contributors.map(c => c.entryCount), 1);
+                  return (
+                    <Card key={session.sessionId} data-testid={`shared-session-${session.sessionId}`}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold truncate">{session.sessionName}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {session.contributors.map((c) => {
+                            const isCurrentUser = c.userId === stats.currentUserId;
+                            return (
+                              <div
+                                key={c.userId}
+                                className={`rounded-md p-2 ${isCurrentUser ? "bg-primary/10 ring-1 ring-primary/20" : "bg-muted/30"}`}
+                                data-testid={`contributor-${session.sessionId}-${c.userId}`}
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className={`text-xs font-medium truncate ${isCurrentUser ? "text-primary" : ""}`}>
+                                    {c.username}{isCurrentUser ? " (you)" : ""}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground mono shrink-0 ml-2">
+                                    {c.footage.toLocaleString()} ft
+                                  </span>
+                                </div>
+                                <div className="h-2 bg-muted rounded-full overflow-hidden mb-1.5">
+                                  <div
+                                    className={`h-full rounded-full ${isCurrentUser ? "bg-primary/80" : "bg-muted-foreground/40"}`}
+                                    style={{ width: `${(c.entryCount / maxEntries) * 100}%`, minWidth: c.entryCount > 0 ? 4 : 0 }}
+                                  />
+                                </div>
+                                <div className="flex gap-3 text-[10px] text-muted-foreground mono">
+                                  <span data-testid={`contrib-entries-${session.sessionId}-${c.userId}`}>{c.entryCount} entries</span>
+                                  <span data-testid={`contrib-photos-${session.sessionId}-${c.userId}`}>{c.photoCount} photos</span>
+                                  <span data-testid={`contrib-reels-${session.sessionId}-${c.userId}`}>{c.reelCount} reels</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
           </>
         )}
       </div>

@@ -3756,8 +3756,11 @@ export async function registerRoutes(
   app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const stats = await storage.getUserStats(userId);
-      res.json(stats);
+      const [stats, sharedPerformance] = await Promise.all([
+        storage.getUserStats(userId),
+        storage.getSharedSessionPerformance(userId),
+      ]);
+      res.json({ ...stats, sharedPerformance, currentUserId: userId });
     } catch (error) {
       res.status(500).json({ message: "Failed to get stats" });
     }
