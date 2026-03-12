@@ -616,35 +616,35 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-start">
             <Button
-              className={`flex-1 ${captureSettings?.largerTouchTargets ? "min-h-[56px] text-base" : ""}`}
-              size="lg"
+              className={captureSettings?.largerTouchTargets ? "min-h-[48px] text-sm" : "text-sm"}
+              size="default"
               onClick={() => cameraInputRef.current?.click()}
               disabled={!aisle.trim()}
               data-testid="button-mobile-camera"
             >
-              <Camera className="h-5 w-5 mr-2" />
+              <Camera className="h-4 w-4 mr-1.5" />
               Take Photo
             </Button>
             <Button
               variant="outline"
-              size="lg"
-              className={captureSettings?.largerTouchTargets ? "min-h-[56px]" : ""}
+              size="default"
+              className={captureSettings?.largerTouchTargets ? "min-h-[48px]" : ""}
               onClick={() => fileInputRef.current?.click()}
               disabled={!aisle.trim()}
               data-testid="button-mobile-upload"
             >
-              <ImagePlus className="h-5 w-5" />
+              <ImagePlus className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
-              size="lg"
+              size="default"
               className="border-[hsl(200_50%_40%/0.5)] text-[hsl(200_60%_50%)] dark:text-[hsl(200_60%_70%)] dark:border-[hsl(200_50%_40%/0.4)]"
               onClick={() => setShowQuickEntry(prev => !prev)}
               data-testid="button-mobile-quick-entry-toggle"
             >
-              <ListPlus className="h-5 w-5" />
+              <ListPlus className="h-4 w-4" />
             </Button>
           </div>
           {showQuickEntry && (
