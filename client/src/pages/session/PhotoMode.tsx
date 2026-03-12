@@ -787,62 +787,79 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   const pinchRef = useRef<{ dist: number; midX: number; midY: number; scale: number } | null>(null);
   const touchPanRef = useRef<{ x: number; y: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const panModeRef = useRef(panMode);
+  panModeRef.current = panMode;
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        touchPanRef.current = null;
+        const dx = e.touches[1].clientX - e.touches[0].clientX;
+        const dy = e.touches[1].clientY - e.touches[0].clientY;
+        pinchRef.current = {
+          dist: Math.hypot(dx, dy),
+          midX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+          scale: scaleRef.current,
+        };
+      } else if (e.touches.length === 1 && (panModeRef.current || scaleRef.current > 1)) {
+        if ((e.target as HTMLElement).closest(".pin-marker")) return;
+        e.preventDefault();
+        touchPanRef.current = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+          panX: panXRef.current,
+          panY: panYRef.current,
+          moved: false,
+        };
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchRef.current) {
+        e.preventDefault();
+        const dx = e.touches[1].clientX - e.touches[0].clientX;
+        const dy = e.touches[1].clientY - e.touches[0].clientY;
+        const dist = Math.hypot(dx, dy);
+        const ratio = dist / pinchRef.current.dist;
+        const newScale = Math.min(12, Math.max(1, pinchRef.current.scale * ratio));
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        zoomAtPoint(midX, midY, newScale);
+      } else if (e.touches.length === 1 && touchPanRef.current) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - touchPanRef.current.x;
+        const dy = e.touches[0].clientY - touchPanRef.current.y;
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) touchPanRef.current.moved = true;
+        const rawX = touchPanRef.current.panX + dx / scaleRef.current;
+        const rawY = touchPanRef.current.panY + dy / scaleRef.current;
+        const clamped = clampPan(rawX, rawY, scaleRef.current);
+        setPanX(clamped.x);
+        setPanY(clamped.y);
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (touchPanRef.current?.moved) {
+        lastTouchPanRef.current = true;
+      }
+      pinchRef.current = null;
       touchPanRef.current = null;
-      const dx = e.touches[1].clientX - e.touches[0].clientX;
-      const dy = e.touches[1].clientY - e.touches[0].clientY;
-      pinchRef.current = {
-        dist: Math.hypot(dx, dy),
-        midX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-        scale: scaleRef.current,
-      };
-    } else if (e.touches.length === 1 && (panMode || scaleRef.current > 1)) {
-      if ((e.target as HTMLElement).closest(".pin-marker")) return;
-      touchPanRef.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-        panX: panXRef.current,
-        panY: panYRef.current,
-        moved: false,
-      };
-    }
-  }, [panMode]);
+    };
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2 && pinchRef.current) {
-      e.preventDefault();
-      const dx = e.touches[1].clientX - e.touches[0].clientX;
-      const dy = e.touches[1].clientY - e.touches[0].clientY;
-      const dist = Math.hypot(dx, dy);
-      const ratio = dist / pinchRef.current.dist;
-      const newScale = Math.min(12, Math.max(1, pinchRef.current.scale * ratio));
-      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      zoomAtPoint(midX, midY, newScale);
-    } else if (e.touches.length === 1 && touchPanRef.current) {
-      e.preventDefault();
-      const dx = e.touches[0].clientX - touchPanRef.current.x;
-      const dy = e.touches[0].clientY - touchPanRef.current.y;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) touchPanRef.current.moved = true;
-      const rawX = touchPanRef.current.panX + dx / scaleRef.current;
-      const rawY = touchPanRef.current.panY + dy / scaleRef.current;
-      const clamped = clampPan(rawX, rawY, scaleRef.current);
-      setPanX(clamped.x);
-      setPanY(clamped.y);
-    }
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
   }, [zoomAtPoint, clampPan]);
-
-  const handleTouchEnd = useCallback(() => {
-    if (touchPanRef.current?.moved) {
-      lastTouchPanRef.current = true;
-    }
-    pinchRef.current = null;
-    touchPanRef.current = null;
-  }, []);
 
   const screenToImagePercent = useCallback((clientX: number, clientY: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -1532,9 +1549,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               style={{ cursor: panMode ? "grab" : effectiveCanEdit ? "crosshair" : "not-allowed" }}
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
               data-testid="photo-viewer"
             >
               <div className="photo-scroll-strip left" onWheel={(e) => e.stopPropagation()} />
