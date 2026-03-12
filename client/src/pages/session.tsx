@@ -536,12 +536,12 @@ function SessionWorkspace({
 
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-x-hidden">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b !border-b-[hsl(18_60%_30%)] bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-4 py-2">
           <div className="flex items-center gap-2 min-w-0">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back">
+                <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back" className="!border !border-[hsl(18_60%_30%)]">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -602,7 +602,7 @@ function SessionWorkspace({
             {isOwner && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team">
+                  <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team" className="!border-[hsl(18_60%_30%)]">
                     <Users className="h-4 w-4 sm:mr-1" />
                     <span className="hidden sm:inline">Team</span>
                   </Button>
@@ -612,7 +612,7 @@ function SessionWorkspace({
             )}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile">
+                <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" className="!border-[hsl(18_60%_30%)]">
                   {captureMode ? <Monitor className="h-4 w-4 sm:mr-1" /> : <Smartphone className="h-4 w-4 sm:mr-1" />}
                   <span className="hidden sm:inline">{captureMode ? "Full Mode" : "Mobile Flow"}</span>
                 </Button>
@@ -621,7 +621,7 @@ function SessionWorkspace({
             </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data" disabled={isPdfExporting}>
+                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data" disabled={isPdfExporting} className="!border-[hsl(18_60%_30%)]">
                   {isPdfExporting ? <Loader2 className="h-4 w-4 sm:mr-1 animate-spin text-orange-600" /> : <Share2 className="h-4 w-4 sm:mr-1" />}
                   <span className={`hidden sm:inline${isPdfExporting ? " text-orange-600 animate-pulse [animation-duration:1.8s]" : ""}`}>{isPdfExporting ? "Exporting…" : "Export"}</span>
                 </Button>
