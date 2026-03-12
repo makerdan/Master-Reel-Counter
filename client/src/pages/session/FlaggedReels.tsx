@@ -137,7 +137,7 @@ function DupPinTile({
               transform: "translate(-50%, -50%)",
             }}
           >
-            <div className="w-5 h-5 rounded-full bg-amber-400 border-2 border-white shadow-md" />
+            <div className="w-2.5 h-2.5 sm:w-5 sm:h-5 rounded-full bg-amber-400 border sm:border-2 border-white shadow-md" />
           </div>
         </div>
       ) : (
@@ -145,7 +145,7 @@ function DupPinTile({
           <MapPin className="h-4 w-4 text-muted-foreground" />
         </div>
       )}
-      <div className="p-1.5 space-y-1">
+      <div className="hidden sm:block p-1.5 space-y-1">
         {pin.wireDetails && (
           <p className="text-[10px] font-mono font-semibold truncate" data-testid={`text-dup-wire-${pin.pinId}`}>
             {pin.wireDetails}
@@ -196,6 +196,32 @@ function DupPinTile({
           </Button>
         </div>
       </div>
+      <div className="sm:hidden flex gap-1 p-1">
+        {siblingPinIds.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 h-7 px-0 text-green-600 !border-black hover:bg-green-50 dark:hover:bg-green-950/30"
+            onClick={() => keepMutation.mutate()}
+            disabled={keepMutation.isPending || deletePhotoMutation.isPending}
+            data-testid={`button-keep-mobile-${pin.pinId}`}
+            title="Keep this pin, delete others"
+          >
+            {keepMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          className="flex-1 h-7 px-0 text-red-600 !border-black hover:bg-red-50 dark:hover:bg-red-950/30"
+          onClick={() => deletePhotoMutation.mutate()}
+          disabled={keepMutation.isPending || deletePhotoMutation.isPending}
+          data-testid={`button-delete-photo-mobile-${pin.pinId}`}
+          title="Delete this photo entirely"
+        >
+          {deletePhotoMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -208,6 +234,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
   const [categorySuggestions, setCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const [pendingUnflag, setPendingUnflag] = useState<{ pinId: number } | null>(null);
   const [dupsOpen, setDupsOpen] = useState(true);
   const [disregardedKeys, setDisregardedKeys] = useState<Set<string>>(() => loadDisregardedKeys(sessionId));
   const [sortBy, setSortBy] = useState<"location" | "label" | "count">("location");
@@ -249,12 +276,13 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
         await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: data.notes || null });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       setEditingPinId(null);
       toast({ title: "Saved", description: "Pin details updated." });
+      setPendingUnflag({ pinId: variables.pinId });
     },
     onError: () => {
       toast({ title: "Save failed", variant: "destructive" });
@@ -875,9 +903,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               </div>
                             )}
                           </div>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-3 gap-2">
                             <div>
-                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor</label>
                               <Input
                                 value={editState.vendorCode}
                                 onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
@@ -896,7 +924,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               />
                             </div>
                             <div>
-                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Number of Reels:</label>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block"># Reels</label>
                               <Input
                                 type="number"
                                 value={editState.reelCount}
@@ -1013,6 +1041,45 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             <div className="mt-2 text-white text-sm text-center">
               <span className="font-mono">Pin {previewPin.label}</span>
               {previewPin.wireDetails && <span className="ml-2">&mdash; {previewPin.wireDetails}</span>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingUnflag && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setPendingUnflag(null)}
+          data-testid="modal-unflag-prompt"
+        >
+          <div
+            className="bg-card border !border-black rounded-lg p-5 max-w-sm w-full shadow-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-medium text-center">
+              Details saved. Remove the flag from this pin?
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                className="!border-black"
+                onClick={() => setPendingUnflag(null)}
+                data-testid="button-keep-flagged"
+              >
+                Keep Flagged
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  unflagMutation.mutate(pendingUnflag.pinId);
+                  setPendingUnflag(null);
+                }}
+                data-testid="button-unflag-after-save"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Un-Flag
+              </Button>
             </div>
           </div>
         </div>
