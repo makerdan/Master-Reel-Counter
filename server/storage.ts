@@ -286,7 +286,6 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           inArray(pins.photoId, photoIds),
-          sql`(${pins.wireDetails} IS NULL OR ${pins.wireDetails} = '')`,
           sql`${pins.entryId} IS NULL`
         )
       )
