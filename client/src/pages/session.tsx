@@ -614,10 +614,10 @@ function SessionWorkspace({
               <TooltipTrigger asChild>
                 <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" className={`!border-[hsl(18_60%_30%)] ${captureMode ? "bg-[hsl(18_85%_32%/0.2)] sm:bg-transparent" : ""}`}>
                   {captureMode ? <Monitor className="h-4 w-4 sm:mr-1" /> : <Smartphone className="h-4 w-4 sm:mr-1" />}
-                  <span className="hidden sm:inline">{captureMode ? "Full Mode" : "Mobile Flow"}</span>
+                  <span className="hidden sm:inline">{captureMode ? "Section Photo" : "Mobile Flow"}</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{captureMode ? "Switch to full mode" : "Switch to mobile capture mode"}</TooltipContent>
+              <TooltipContent>{captureMode ? "Switch to Section Photo" : "Switch to mobile capture mode"}</TooltipContent>
             </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

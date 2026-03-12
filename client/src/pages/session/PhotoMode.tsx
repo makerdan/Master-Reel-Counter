@@ -1262,7 +1262,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         className="hidden"
         onChange={handleFileUpload}
       />
-      <h2 className="sm:hidden text-lg font-semibold underline text-center mb-2">Full Mode</h2>
+      <h2 className="sm:hidden text-lg font-semibold underline text-center mb-2">Section Photo</h2>
       <div className="space-y-2 sm:space-y-0">
         <div className="flex items-end gap-2 flex-wrap justify-center sm:justify-start">
           <div>
@@ -1846,21 +1846,21 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     {pinsVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                   </Button>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 sm:gap-3">
                   <Button
                     size="icon"
-                    className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                    className="h-7 w-7 sm:h-9 sm:w-9 bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                     disabled={uploadedPhotos.length <= 1}
                     onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i - 1 + uploadedPhotos.length) % uploadedPhotos.length); resetView(); }}
                     data-testid="button-prev-photo-bottom"
                   >
-                    <ChevronLeft className="h-5 w-5" />
+                    <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
-                  <div className="flex items-center gap-1 text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter-bottom">
+                  <div className="flex items-center gap-0.5 sm:gap-1 text-xs sm:text-sm mono text-[hsl(30_40%_85%)]" data-testid="text-photo-counter-bottom">
                     <input
                       type="text"
                       inputMode="numeric"
-                      className="w-10 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
+                      className="w-7 sm:w-10 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-0.5 py-0.5 text-xs sm:text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
                       value={photoInputValue ?? String(currentPhotoIdx + 1)}
                       onChange={(e) => {
                         const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
@@ -1884,15 +1884,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   </div>
                   <Button
                     size="icon"
-                    className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                    className="h-7 w-7 sm:h-9 sm:w-9 bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
                     disabled={uploadedPhotos.length <= 1}
                     onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i + 1) % uploadedPhotos.length); resetView(); }}
                     data-testid="button-next-photo-bottom"
                   >
-                    <ChevronRight className="h-5 w-5" />
+                    <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
                 </div>
-                <div className="flex-1 flex justify-end">
+                <div className="flex-1 flex justify-end ml-2">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
