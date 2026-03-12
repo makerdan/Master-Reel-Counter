@@ -1049,6 +1049,23 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    const ownerIds = Array.from(allSessionMap.values())
+      .filter(s => sharedSessionIds.includes(s.id))
+      .map(s => s.ownerId)
+      .filter(uid => !usernameMap.has(uid));
+    if (ownerIds.length > 0) {
+      const uniqueOwnerIds = [...new Set(ownerIds)];
+      const ownerPhotos = await db.select({ userId: photos.userId, uploadedBy: photos.uploadedBy })
+        .from(photos)
+        .where(and(inArray(photos.userId, uniqueOwnerIds), sql`${photos.uploadedBy} IS NOT NULL AND ${photos.uploadedBy} != ''`))
+        .limit(uniqueOwnerIds.length);
+      for (const p of ownerPhotos) {
+        if (p.uploadedBy && !usernameMap.has(p.userId)) {
+          usernameMap.set(p.userId, p.uploadedBy);
+        }
+      }
+    }
+
     const entryContribs = await db.select({
       sessionId: entries.sessionId,
       eUserId: entries.userId,
