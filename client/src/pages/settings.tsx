@@ -445,7 +445,7 @@ export default function SettingsPage() {
                 className="w-full"
                 data-testid="slider-photo-quality"
               />
-              <div className="relative w-full h-4 mt-0.5 px-[10px]">
+              <div className="relative w-full h-4 mt-0.5">
                 {[30, 40, 50, 60, 70, 80, 85, 90, 95, 100].map((tick) => {
                   const pct = ((tick - 30) / 70) * 100;
                   const isSelected = (localPhotoQuality ?? settings?.photoQuality ?? 85) === tick;
@@ -453,7 +453,7 @@ export default function SettingsPage() {
                     <div
                       key={tick}
                       className="absolute flex flex-col items-center"
-                      style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
+                      style={{ left: `calc(10px + (100% - 20px) * ${pct / 100})`, transform: "translateX(-50%)" }}
                     >
                       <div className={`w-px h-1.5 ${isSelected ? "bg-primary" : "bg-muted-foreground/40"}`} />
                       <span className={`text-[9px] tabular-nums ${isSelected ? "text-primary font-semibold" : "text-muted-foreground/60"}`}>
@@ -493,7 +493,7 @@ export default function SettingsPage() {
                     className="w-full"
                     data-testid="slider-receiving-quality"
                   />
-                  <div className="relative w-full h-4 mt-0.5 px-[10px]">
+                  <div className="relative w-full h-4 mt-0.5">
                     {[30, 40, 50, 60, 70, 80, 90, 100].map((tick) => {
                       const pct = ((tick - 30) / 70) * 100;
                       const isSelected = (localReceivingQuality ?? settings?.receivingPhotoQuality ?? 50) === tick;
@@ -501,7 +501,7 @@ export default function SettingsPage() {
                         <div
                           key={tick}
                           className="absolute flex flex-col items-center"
-                          style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
+                          style={{ left: `calc(10px + (100% - 20px) * ${pct / 100})`, transform: "translateX(-50%)" }}
                         >
                           <div className={`w-px h-1.5 ${isSelected ? "bg-primary" : "bg-muted-foreground/40"}`} />
                           <span className={`text-[9px] tabular-nums ${isSelected ? "text-primary font-semibold" : "text-muted-foreground/60"}`}>
