@@ -37,6 +37,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWireCategories } from "@/hooks/use-wire-categories";
 import { CATALOG } from "@/lib/wireReference";
+import * as XLSX from "xlsx";
 import type { UserWireCategory } from "@shared/schema";
 
 interface UserSettingsResponse {
@@ -371,6 +372,51 @@ export default function SettingsPage() {
       setBulkError(`${errors.length} row(s) skipped: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "..." : ""}`);
     }
     setBulkPreview(rows);
+  };
+
+  const parseExcelForImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const csv = XLSX.utils.sheet_to_csv(sheet);
+        setBulkCsvText(csv);
+        parseCsvForImport(csv);
+      } catch {
+        setBulkError("Failed to parse Excel file. Make sure it's a valid .xlsx or .xls file.");
+        setBulkPreview(null);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const exportWireCategories = (format: "csv" | "xlsx") => {
+    const headers = ["Catalog", "Vendor", "Reel Length", "Description", "Color", "Jacket Type", "Conductors", "Ground Size", "Source"];
+    const builtInRows = CATALOG.map(c => [c.catalog, c.vendor, "", c.description, "", "", "", "", "Built-in"]);
+    const customRows = wireCategories.map(c => [
+      c.catalog, c.vendor, String(c.reelLength), c.description || "", c.color || "",
+      c.jacketType || "", c.conductors || "", c.groundSize || "", "Custom",
+    ]);
+    const allRows = [headers, ...builtInRows, ...customRows];
+
+    if (format === "csv") {
+      const csvContent = allRows.map(row => row.map(cell => `"${(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "wire-categories.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const ws = XLSX.utils.aoa_to_sheet(allRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Wire Categories");
+      XLSX.writeFile(wb, "wire-categories.xlsx");
+    }
+    toast({ title: `Exported ${CATALOG.length + wireCategories.length} categories as ${format.toUpperCase()}` });
   };
 
   const encodingEnabled = settings?.encodingEnabled ?? false;
@@ -758,7 +804,7 @@ export default function SettingsPage() {
               Add custom wire categories that appear in autocomplete alongside the built-in catalog.
             </p>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => { setShowAddCategoryForm(!showAddCategoryForm); setShowBulkImport(false); }} data-testid="button-toggle-add-category">
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Add Category
@@ -766,6 +812,14 @@ export default function SettingsPage() {
               <Button size="sm" variant="outline" onClick={() => { setShowBulkImport(!showBulkImport); setShowAddCategoryForm(false); setBulkPreview(null); setBulkError(null); setBulkCsvText(""); }} data-testid="button-toggle-bulk-import">
                 <FileUp className="h-3.5 w-3.5 mr-1" />
                 Bulk Import
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => exportWireCategories("csv")} data-testid="button-export-csv">
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Export CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => exportWireCategories("xlsx")} data-testid="button-export-xlsx">
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Export Excel
               </Button>
             </div>
 
@@ -842,7 +896,7 @@ export default function SettingsPage() {
             {showBulkImport && (
               <div className="border rounded-md p-3 space-y-3 bg-muted/20">
                 <p className="text-xs text-muted-foreground">
-                  Paste CSV or upload a file. Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size.
+                  Paste CSV or upload a file (CSV, TSV, or Excel). Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size.
                 </p>
                 <Textarea
                   placeholder={"Catalog,Vendor,Reel Length,Description\nTHHN10BK500,COP,500,#10 THHN Black\nXHHW4RD1000,ALU,1000,#4 XHHW Red"}
@@ -855,23 +909,28 @@ export default function SettingsPage() {
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => csvFileInputRef.current?.click()} data-testid="button-upload-csv">
                     <Upload className="h-3 w-3 mr-1" />
-                    Upload CSV
+                    Upload File
                   </Button>
                   <input
                     ref={csvFileInputRef}
                     type="file"
-                    accept=".csv,.tsv,.txt"
+                    accept=".csv,.tsv,.txt,.xlsx,.xls"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        const text = ev.target?.result as string;
-                        setBulkCsvText(text);
-                        parseCsvForImport(text);
-                      };
-                      reader.readAsText(file);
+                      const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+                      if (isExcel) {
+                        parseExcelForImport(file);
+                      } else {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          const text = ev.target?.result as string;
+                          setBulkCsvText(text);
+                          parseCsvForImport(text);
+                        };
+                        reader.readAsText(file);
+                      }
                       if (csvFileInputRef.current) csvFileInputRef.current.value = "";
                     }}
                     data-testid="input-csv-file"
