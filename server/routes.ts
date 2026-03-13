@@ -778,6 +778,7 @@ export async function registerRoutes(
         isDetailShot:     original.isDetailShot ?? false,
         parentPhotoId:    original.parentPhotoId,
         pinScale:         original.pinScale ?? 1,
+        fileSize:         original.fileSize,
         createdAt:        original.createdAt,
       }).returning();
       res.json(newPhoto);
