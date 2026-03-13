@@ -36,6 +36,7 @@ import { useTheme } from "@/lib/theme-provider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWireCategories } from "@/hooks/use-wire-categories";
+import { CATALOG } from "@/lib/wireReference";
 import type { UserWireCategory } from "@shared/schema";
 
 interface UserSettingsResponse {
@@ -277,6 +278,8 @@ export default function SettingsPage() {
   const [wireCatSearch, setWireCatSearch] = useState("");
   const [showAddCategoryForm, setShowAddCategoryForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showBuiltInCatalog, setShowBuiltInCatalog] = useState(false);
+  const [builtInSearch, setBuiltInSearch] = useState("");
   const [bulkCsvText, setBulkCsvText] = useState("");
   const [bulkPreview, setBulkPreview] = useState<Omit<UserWireCategory, "id" | "userId">[] | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
@@ -295,6 +298,16 @@ export default function SettingsPage() {
       (c.description || "").toLowerCase().includes(q)
     );
   }, [wireCategories, wireCatSearch]);
+
+  const filteredBuiltIn = useMemo(() => {
+    if (!builtInSearch.trim()) return CATALOG;
+    const q = builtInSearch.toLowerCase();
+    return CATALOG.filter(c =>
+      c.catalog.toLowerCase().includes(q) ||
+      c.vendor.toLowerCase().includes(q) ||
+      c.description.toLowerCase().includes(q)
+    );
+  }, [builtInSearch]);
 
   const parseCsvForImport = (text: string) => {
     setBulkError(null);
@@ -987,6 +1000,63 @@ export default function SettingsPage() {
                 No custom categories yet. Add categories individually or import them in bulk.
               </p>
             )}
+
+            <div className="border-t pt-3 mt-2">
+              <button
+                className="flex items-center gap-2 w-full text-left text-sm font-medium"
+                onClick={() => setShowBuiltInCatalog(!showBuiltInCatalog)}
+                data-testid="button-toggle-built-in-catalog"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${showBuiltInCatalog ? "" : "-rotate-90"}`} />
+                Built-in Catalog
+                <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate ml-1">
+                  {CATALOG.length}
+                </Badge>
+              </button>
+              {showBuiltInCatalog && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    These are the default wire entries included with the app. They are always available in autocomplete.
+                  </p>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Search built-in catalog..."
+                      value={builtInSearch}
+                      onChange={(e) => setBuiltInSearch(e.target.value)}
+                      className="h-8 text-sm pl-8"
+                      data-testid="input-search-built-in-catalog"
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto border rounded-md">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50 sticky top-0">
+                        <tr>
+                          <th className="text-left p-1.5 font-medium">Catalog</th>
+                          <th className="text-left p-1.5 font-medium">Vendor</th>
+                          <th className="text-left p-1.5 font-medium">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredBuiltIn.map((entry, idx) => (
+                          <tr key={idx} className="hover:bg-muted/30" data-testid={`row-built-in-${idx}`}>
+                            <td className="p-1.5 font-mono font-medium">{entry.catalog}</td>
+                            <td className="p-1.5">{entry.vendor}</td>
+                            <td className="p-1.5 truncate max-w-[180px]" title={entry.description}>{entry.description}</td>
+                          </tr>
+                        ))}
+                        {filteredBuiltIn.length === 0 && (
+                          <tr><td colSpan={3} className="p-3 text-center text-muted-foreground">No matching entries found.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Showing {filteredBuiltIn.length} of {CATALOG.length} entries
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
