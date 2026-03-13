@@ -311,8 +311,17 @@ export default function LabelScannerTab({
   const [phase, setPhase] = useState<"preview" | "results">("preview");
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
-  const [batchMode, setBatchMode] = useState(false);
-  const batchModeInitRef = useRef(false);
+  const [batchMode, setBatchModeRaw] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(`scanner-batch-${sessionId}`);
+      return saved === "true";
+    } catch { return false; }
+  });
+  const setBatchMode = useCallback((v: boolean) => {
+    setBatchModeRaw(v);
+    try { sessionStorage.setItem(`scanner-batch-${sessionId}`, String(v)); } catch {}
+  }, [sessionId]);
+  const batchModeInitRef = useRef(batchMode || sessionStorage.getItem(`scanner-batch-${sessionId}`) !== null);
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
       lastInitialPhotoIdRef.current = initialPhotoId;
