@@ -891,6 +891,22 @@ export async function registerRoutes(
       const updated = await storage.updateEntry(entry.id, updateData);
       const result = encKey && updated ? decryptEntry(updated, encKey) : updated;
 
+      {
+        const allSessionPins = await storage.getSessionPins(entry.sessionId);
+        const linkedPin = allSessionPins.find(p => p.entryId === entry.id);
+
+        if (linkedPin) {
+          const pinSync: Record<string, any> = {};
+          if (safeBody.reelTag !== undefined) pinSync.wireDetails = safeBody.reelTag;
+          if (safeBody.footage !== undefined) pinSync.footage = safeBody.footage;
+          if (safeBody.reelCount !== undefined) pinSync.reelCount = safeBody.reelCount;
+          if (Object.keys(pinSync).length > 0) {
+            await storage.updatePin(linkedPin.id, pinSync);
+            broadcastToSession(entry.sessionId, { type: "sync", entity: "pins", sessionId: entry.sessionId });
+          }
+        }
+      }
+
       if (safeBody.section !== undefined || safeBody.aisle !== undefined) {
         const allSessionPins = await storage.getSessionPins(entry.sessionId);
         const linkedPin = allSessionPins.find(p => p.entryId === entry.id);
