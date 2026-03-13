@@ -619,6 +619,16 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
           <div className="flex gap-2 sm:gap-3 justify-start">
             <Button
+              variant="outline"
+              size="default"
+              className={`!border-[hsl(18_85%_32%/0.5)] text-[hsl(18_85%_32%)] dark:text-[hsl(18_85%_50%)] dark:!border-[hsl(18_85%_32%/0.4)] ${captureSettings?.largerTouchTargets ? "min-h-[48px]" : ""}`}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!aisle.trim()}
+              data-testid="button-mobile-upload"
+            >
+              <ImagePlus className="h-4 w-4" />
+            </Button>
+            <Button
               className={captureSettings?.largerTouchTargets ? "min-h-[48px] text-sm" : "text-sm"}
               size="default"
               onClick={() => cameraInputRef.current?.click()}
@@ -631,17 +641,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             <Button
               variant="outline"
               size="default"
-              className={captureSettings?.largerTouchTargets ? "min-h-[48px]" : ""}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!aisle.trim()}
-              data-testid="button-mobile-upload"
-            >
-              <ImagePlus className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="default"
-              className="border-[hsl(200_50%_40%/0.5)] text-[hsl(200_60%_50%)] dark:text-[hsl(200_60%_70%)] dark:border-[hsl(200_50%_40%/0.4)]"
+              className="!border-[hsl(18_85%_32%/0.5)] text-[hsl(18_85%_32%)] dark:text-[hsl(18_85%_50%)] dark:!border-[hsl(18_85%_32%/0.4)]"
               onClick={() => setShowQuickEntry(prev => !prev)}
               data-testid="button-mobile-quick-entry-toggle"
             >

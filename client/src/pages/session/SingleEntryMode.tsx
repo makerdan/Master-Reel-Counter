@@ -377,22 +377,22 @@ export default function SingleEntryMode({
           ) : (
             <>
               <div className="hidden sm:flex gap-3">
-                <Button type="button" size="lg" className="flex-1 bg-[hsl(18_85%_48%)] hover:bg-[hsl(18_85%_40%)] text-white font-semibold text-base py-3" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload">
-                  <ImagePlus className="h-5 w-5 mr-2" />
-                  Upload Photo
-                </Button>
                 <Button type="button" size="lg" className="flex-1 bg-[hsl(18_85%_48%)] hover:bg-[hsl(18_85%_40%)] text-white font-semibold text-base py-3" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera">
                   <Camera className="h-5 w-5 mr-2" />
                   Take Photo
                 </Button>
+                <Button type="button" size="lg" className="flex-1 bg-[hsl(18_85%_48%)] hover:bg-[hsl(18_85%_40%)] text-white font-semibold text-base py-3" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload">
+                  <ImagePlus className="h-5 w-5 mr-2" />
+                  Upload Photo
+                </Button>
                 {isUploading && <Loader2 className="h-5 w-5 animate-spin self-center" />}
               </div>
               <div className="flex sm:hidden items-center justify-center gap-4">
-                <Button type="button" className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload-mobile" title="Upload Photo">
-                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                </Button>
                 <Button type="button" className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera-mobile" title="Take Photo">
                   {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                </Button>
+                <Button type="button" className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload-mobile" title="Upload Photo">
+                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
                 </Button>
               </div>
             </>
