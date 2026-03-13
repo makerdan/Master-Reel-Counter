@@ -91,7 +91,6 @@ function PhotoCard({
   const [section, setSection] = useState(photo.section || "");
   const [notes, setNotes] = useState(photo.notes || "");
   const [notesOpen, setNotesOpen] = useState(false);
-  const [isDetail, setIsDetail] = useState(photo.isDetailShot ?? false);
   const [parentId, setParentId] = useState<number | null>(photo.parentPhotoId ?? null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -122,21 +121,12 @@ function PhotoCard({
     onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
   });
 
-  const detailMutation = useMutation({
-    mutationFn: async (val: boolean) => {
-      await apiRequest("PATCH", `/api/photos/${photo.id}`, { isDetailShot: val });
-    },
-    onSuccess: (_data, val) => { setIsDetail(val); invalidatePhotos(); },
-    onError: () => toast({ title: "Failed to update Detail status", variant: "destructive" }),
-  });
-
   const unlinkMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("PATCH", `/api/photos/${photo.id}`, { parentPhotoId: null, isDetailShot: false });
     },
     onSuccess: () => {
       setParentId(null);
-      setIsDetail(false);
       invalidatePhotos();
       invalidateEntries();
     },
@@ -149,7 +139,6 @@ function PhotoCard({
     },
     onSuccess: (_data, selectedId) => {
       setParentId(selectedId);
-      setIsDetail(true);
       setLinkPickerOpen(false);
       invalidatePhotos();
       invalidateEntries();
@@ -204,7 +193,7 @@ function PhotoCard({
     onError: () => toast({ title: "Failed to delete photo", variant: "destructive" }),
   });
 
-  const isSaving = locationMutation.isPending || notesMutation.isPending || detailMutation.isPending || unlinkMutation.isPending || linkMutation.isPending;
+  const isSaving = locationMutation.isPending || notesMutation.isPending || unlinkMutation.isPending || linkMutation.isPending;
   const hasNotes = notes.trim().length > 0;
 
   const parentPhoto = parentId !== null ? allPhotos.find(p => p.id === parentId) : null;
@@ -301,29 +290,7 @@ function PhotoCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 flex-wrap">
-          {canEdit ? (
-            <button
-              className={`inline-flex items-center rounded px-1 py-0 h-4 text-[10px] font-medium border transition-colors ${
-                isDetail
-                  ? "bg-blue-500/15 text-blue-500 border-blue-500/30 hover:bg-blue-500/25"
-                  : "text-muted-foreground border-dashed border-muted-foreground/40 hover:border-blue-400 hover:text-blue-400"
-              }`}
-              onClick={() => detailMutation.mutate(!isDetail)}
-              disabled={detailMutation.isPending}
-              title={isDetail ? "Remove Detail mark" : "Mark as Detail shot"}
-              data-testid={`button-strip-detail-${photo.id}`}
-            >
-              {isDetail ? "Detail" : "+ Detail"}
-            </button>
-          ) : (
-            isDetail && (
-              <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 no-default-hover-elevate no-default-active-elevate bg-blue-500/15 text-blue-500 border-blue-500/30">
-                Detail
-              </Badge>
-            )
-          )}
-
+        <div className="flex items-center gap-1.5 flex-wrap">
           {parentId !== null ? (
             <span className="inline-flex items-center gap-0.5">
               <Badge
@@ -353,7 +320,7 @@ function PhotoCard({
                 title="Link to a parent photo"
                 data-testid={`button-strip-link-${photo.id}`}
               >
-                <Link2 className="h-3 w-3" />
+                <Link2 className="h-3.5 w-3.5" />
               </button>
             )
           )}
@@ -367,8 +334,8 @@ function PhotoCard({
               data-testid={`button-strip-duplicate-${photo.id}`}
             >
               {duplicateMutation.isPending
-                ? <Loader2 className="h-3 w-3 animate-spin" />
-                : <Copy className="h-3 w-3" />}
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Copy className="h-3.5 w-3.5" />}
             </button>
           )}
 
@@ -393,7 +360,7 @@ function PhotoCard({
                 title="Delete this photo"
                 data-testid={`button-strip-delete-${photo.id}`}
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             )
           )}
