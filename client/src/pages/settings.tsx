@@ -445,7 +445,7 @@ export default function SettingsPage() {
                 className="w-full"
                 data-testid="slider-photo-quality"
               />
-              <div className="relative w-full h-4 mt-0.5">
+              <div className="relative w-full h-4 mt-0.5 px-[10px]">
                 {[30, 40, 50, 60, 70, 80, 85, 90, 95, 100].map((tick) => {
                   const pct = ((tick - 30) / 70) * 100;
                   const isSelected = (localPhotoQuality ?? settings?.photoQuality ?? 85) === tick;
@@ -493,7 +493,7 @@ export default function SettingsPage() {
                     className="w-full"
                     data-testid="slider-receiving-quality"
                   />
-                  <div className="relative w-full h-4 mt-0.5">
+                  <div className="relative w-full h-4 mt-0.5 px-[10px]">
                     {[30, 40, 50, 60, 70, 80, 90, 100].map((tick) => {
                       const pct = ((tick - 30) / 70) * 100;
                       const isSelected = (localReceivingQuality ?? settings?.receivingPhotoQuality ?? 50) === tick;
