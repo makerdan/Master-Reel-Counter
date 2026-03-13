@@ -320,12 +320,12 @@
 
 @keyframes border-pulse {
   0%, 100% {
-    border-color: hsl(0 70% 35%);
-    box-shadow: 0 0 4px 0 hsl(0 70% 35% / 0.3);
+    border-color: hsl(18 80% 40%);
+    box-shadow: 0 0 4px 0 hsl(18 80% 40% / 0.3);
   }
   50% {
-    border-color: hsl(0 75% 50%);
-    box-shadow: 0 0 10px 2px hsl(0 70% 45% / 0.5);
+    border-color: hsl(18 80% 55%);
+    box-shadow: 0 0 10px 2px hsl(18 80% 50% / 0.5);
   }
 }
 
@@ -335,7 +335,7 @@
 
 .input-filled {
   animation: none;
-  border-color: hsl(145 55% 38%) !important;
+  border-color: hsl(18 80% 40%) !important;
   box-shadow: none !important;
 }
 
