@@ -500,7 +500,18 @@ export default function SettingsPage() {
                     <Globe className="h-5 w-5 text-primary" />
                     <CardTitle className="text-base">App-Wide Storage</CardTitle>
                   </div>
-                  <Badge variant="secondary" data-testid="badge-owner">Owner</Badge>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/storage/global-usage"] })}
+                      data-testid="button-refresh-global-storage"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                    <Badge variant="secondary" data-testid="badge-owner">Owner</Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
