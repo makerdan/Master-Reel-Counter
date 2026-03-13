@@ -518,7 +518,7 @@ export default function PhotoStrip({
                 <div key={sectionGroup.section} className="sm:border-0 border border-[hsl(18_85%_32%/0.5)] rounded-md p-1.5 sm:p-0">
                   <div className="flex items-center gap-2 mb-2 border-l-2 border-muted-foreground/20 pl-2">
                     <button
-                      className="text-[11px] font-medium text-muted-foreground/80 hover:text-primary hover:underline transition-colors cursor-pointer"
+                      className="text-xs font-medium text-muted-foreground/80 underline hover:text-primary transition-colors cursor-pointer"
                       onClick={() => onJumpToPhoto(sectionGroup.photos[0].id)}
                       data-testid={`link-strip-section-${aisleGroup.aisle || "none"}-${sectionGroup.section || "none"}`}
                     >
