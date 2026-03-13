@@ -290,7 +290,7 @@ function PhotoCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           {parentId !== null ? (
             <span className="inline-flex items-center gap-0.5">
               <Badge
