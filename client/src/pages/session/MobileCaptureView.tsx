@@ -568,7 +568,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               </div>
             </div>
             <div className="space-y-1">
-              <Label className={`text-xs underline${!isReceiving && !section.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Section:{!isReceiving && <span className="text-destructive"> *</span>}</Label>
+              <Label className={`text-xs underline${!isReceiving && !section.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Section:</Label>
               <Input
                 ref={sectionInputRef}
                 value={section}

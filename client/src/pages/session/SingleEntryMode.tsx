@@ -420,7 +420,7 @@ export default function SingleEntryMode({
           )}
         </div>
         <div className="space-y-1">
-          <Label className="text-xs underline">Section: <span className="text-destructive">*</span></Label>
+          <Label className="text-xs underline">Section:</Label>
           <Input
             value={form.section}
             onChange={(e) => update("section", e.target.value)}
