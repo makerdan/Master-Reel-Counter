@@ -177,6 +177,7 @@ export default function SettingsPage() {
     userBytes: number;
     userPhotoCount: number;
     userSessionCount: number;
+    unknownSizeCount: number;
   }>({
     queryKey: ["/api/storage/usage"],
   });
@@ -322,7 +323,7 @@ export default function SettingsPage() {
                 if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(2)} MB`;
                 return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
               };
-              const hasUnknown = storageUsage.userPhotoCount > 0 && storageUsage.userBytes === 0;
+              const hasUnknown = storageUsage.unknownSizeCount > 0;
               return (
                 <>
                   <div>
@@ -343,7 +344,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2 bg-muted/50 rounded-md p-2.5">
                       <Info className="h-4 w-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 text-xs text-muted-foreground">
-                        File sizes are unknown for existing photos.
+                        {storageUsage.unknownSizeCount} photo{storageUsage.unknownSizeCount !== 1 ? "s" : ""} missing file size data.
                       </div>
                       <Button
                         variant="outline"

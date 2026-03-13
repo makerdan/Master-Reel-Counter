@@ -120,6 +120,7 @@ export interface IStorage {
     userBytes: number;
     userPhotoCount: number;
     userSessionCount: number;
+    unknownSizeCount: number;
   }>;
 
 
@@ -1199,6 +1200,7 @@ export class DatabaseStorage implements IStorage {
     userBytes: number;
     userPhotoCount: number;
     userSessionCount: number;
+    unknownSizeCount: number;
   }> {
     const userSessionRows = await db.select({ id: countingSessions.id })
       .from(countingSessions)
@@ -1207,21 +1209,25 @@ export class DatabaseStorage implements IStorage {
 
     let userBytes = 0;
     let userPhotoCount = 0;
+    let unknownSizeCount = 0;
     if (userSessionIds.length > 0) {
       const userResult = await db.select({
         totalSize: sql<string>`coalesce(sum(${photos.fileSize}), 0)`,
         photoCount: sql<string>`count(*)`,
+        unknownCount: sql<string>`count(*) filter (where ${photos.fileSize} is null)`,
       })
         .from(photos)
         .where(inArray(photos.sessionId, userSessionIds));
       userBytes = parseInt(userResult[0]?.totalSize || "0", 10);
       userPhotoCount = parseInt(userResult[0]?.photoCount || "0", 10);
+      unknownSizeCount = parseInt(userResult[0]?.unknownCount || "0", 10);
     }
 
     return {
       userBytes,
       userPhotoCount,
       userSessionCount: userSessionIds.length,
+      unknownSizeCount,
     };
   }
 
