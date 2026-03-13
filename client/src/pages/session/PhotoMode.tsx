@@ -1470,7 +1470,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               </div>
               <div className="flex-1 justify-end gap-2 flex">
                 <div>
-                  <label className="block text-xs font-bold text-white dark:text-white mb-1">Section:</label>
+                  <label className="block text-sm font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Section:</label>
                   <Input
                     value={currentPhoto?.section || ""}
                     onChange={(e) => {
@@ -1489,7 +1489,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       }
                     }}
                     placeholder="Section..."
-                    className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
+                    className={`w-24 border-2 !border-[hsl(18_80%_40%)] dark:!border-[hsl(18_80%_60%)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
                     enterKeyHint="done"
                     data-testid="input-photo-section"
                   />
