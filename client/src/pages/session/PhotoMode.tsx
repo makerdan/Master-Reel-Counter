@@ -29,6 +29,7 @@ import type { Photo, Pin, Entry } from "@shared/schema";
 import ReelCropPreview from "./ReelCropPreview";
 import type { LocalPin } from "./types";
 import { deriveVendorCode } from "./utils";
+import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 import SingleEntryMode from "./SingleEntryMode";
@@ -37,6 +38,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
+  const { allCodes: vendorCodes, addCustomCode } = useVendorCodes();
+  const [customCodeInput, setCustomCodeInput] = useState("");
+  const [customCodePinId, setCustomCodePinId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
@@ -2228,17 +2232,61 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         </td>
                         <td style={{ textAlign: "center" }}>
                           <select
-                            value={pin.vendorCode || ""}
-                            onChange={(e) => updatePinField(pin.id, "vendorCode", e.target.value)}
+                            value={customCodePinId === pin.id ? "__custom__" : (pin.vendorCode || "")}
+                            onChange={(e) => {
+                              if (e.target.value === "__custom__") {
+                                setCustomCodeInput("");
+                                setCustomCodePinId(pin.id);
+                              } else {
+                                updatePinField(pin.id, "vendorCode", e.target.value);
+                              }
+                            }}
                             onFocus={() => setSelectedPinId(pin.id)}
                             data-testid={`select-vendor-code-${index}`}
                           >
                             <option value="">--</option>
-                            <option value="COP">COP</option>
-                            <option value="ALU">ALU</option>
-                            <option value="COR">COR</option>
-                            <option value="ALF">ALF</option>
+                            {vendorCodes.map(code => (
+                              <option key={code} value={code}>{code}</option>
+                            ))}
+                            <option value="__custom__">Custom...</option>
                           </select>
+                          {customCodePinId === pin.id && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <input
+                                type="text"
+                                value={customCodeInput}
+                                onChange={(e) => setCustomCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3))}
+                                maxLength={3}
+                                placeholder="ABC"
+                                className="w-14 text-center uppercase border rounded px-1"
+                                autoFocus
+                                data-testid={`input-custom-vendor-${index}`}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && customCodeInput.length === 3) {
+                                    addCustomCode(customCodeInput);
+                                    updatePinField(pin.id, "vendorCode", customCodeInput);
+                                    setCustomCodePinId(null);
+                                    setCustomCodeInput("");
+                                  } else if (e.key === "Escape") {
+                                    setCustomCodePinId(null);
+                                    setCustomCodeInput("");
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={() => {
+                                  if (customCodeInput.length === 3) {
+                                    addCustomCode(customCodeInput);
+                                    updatePinField(pin.id, "vendorCode", customCodeInput);
+                                    setCustomCodePinId(null);
+                                    setCustomCodeInput("");
+                                  }
+                                }}
+                                className="text-xs px-1 border rounded"
+                                data-testid={`button-save-custom-vendor-${index}`}
+                              >OK</button>
+                            </div>
+                          )}
                         </td>
                         <td>
                           <input

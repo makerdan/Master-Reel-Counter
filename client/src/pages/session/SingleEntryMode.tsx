@@ -11,6 +11,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import type { Entry, Pin } from "@shared/schema";
 
 export default function SingleEntryMode({
@@ -28,6 +29,7 @@ export default function SingleEntryMode({
 }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
+  const { allCodes: vendorCodes } = useVendorCodes();
   const singleFileRef = useRef<HTMLInputElement>(null);
   const singleCameraRef = useRef<HTMLInputElement>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<{ url: string; objectPath: string; photoId: number } | null>(null);
@@ -529,7 +531,12 @@ export default function SingleEntryMode({
         </div>
         <div className="space-y-1">
           <Label className="text-xs underline">Vendor Code:</Label>
-          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value.toUpperCase())} enterKeyHint="next" data-testid="input-manufacturer" />
+          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value.toUpperCase())} enterKeyHint="next" list="vendor-code-suggestions-single" data-testid="input-manufacturer" />
+          <datalist id="vendor-code-suggestions-single">
+            {vendorCodes.map(code => (
+              <option key={code} value={code} />
+            ))}
+          </datalist>
         </div>
       </div>
 

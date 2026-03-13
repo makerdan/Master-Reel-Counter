@@ -13,6 +13,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { matchLabelText, type LabelMatchResult } from "@/lib/labelMatcher";
 import type { Photo, Pin } from "@shared/schema";
 
@@ -305,6 +306,7 @@ export default function LabelScannerTab({
   onPhotoChange?: (photoId: number | null) => void;
 }) {
   const { toast } = useToast();
+  const { allCodes: vendorCodes } = useVendorCodes();
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
   const lastInitialPhotoIdRef = useRef(initialPhotoId);
   const [cards, setCards] = useState<PinCard[]>([]);
@@ -1418,6 +1420,7 @@ export default function LabelScannerTab({
                       value={card.editVendor}
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       maxLength={3}
+                      list="vendor-code-suggestions-scanner"
                       className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-${card.pin.id}`}
@@ -1448,6 +1451,7 @@ export default function LabelScannerTab({
                       value={card.editVendor}
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       maxLength={3}
+                      list="vendor-code-suggestions-scanner"
                       className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-manual-${card.pin.id}`}
@@ -1524,6 +1528,11 @@ export default function LabelScannerTab({
           </>
         )}
       </div>
+      <datalist id="vendor-code-suggestions-scanner">
+        {vendorCodes.map(code => (
+          <option key={code} value={code} />
+        ))}
+      </datalist>
     </div>
   );
 }

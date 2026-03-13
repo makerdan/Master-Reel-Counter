@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Entry, Pin, Photo } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
 import { lookupCategory, type ParsedCatalogEntry, PARSED_CATALOG } from "@/lib/wireReference";
+import { useVendorCodes } from "@/hooks/use-vendor-codes";
 
 interface FlaggedPin {
   id: number;
@@ -228,6 +229,7 @@ function DupPinTile({
 
 export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPhoto }: FlaggedReelsProps) {
   const { toast } = useToast();
+  const { allCodes: vendorCodes } = useVendorCodes();
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
@@ -714,6 +716,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
                               className="uppercase"
                               maxLength={3}
+                              list="vendor-code-suggestions"
                               data-testid={`input-vendor-code-${pin.id}`}
                             />
                           </div>
@@ -911,6 +914,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                 onChange={(e) => setEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
                                 className="uppercase"
                                 maxLength={3}
+                                list="vendor-code-suggestions"
                                 data-testid={`input-vendor-code-mobile-${pin.id}`}
                               />
                             </div>
@@ -1084,6 +1088,11 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           </div>
         </div>
       )}
+      <datalist id="vendor-code-suggestions">
+        {vendorCodes.map(code => (
+          <option key={code} value={code} />
+        ))}
+      </datalist>
     </div>
   );
 }

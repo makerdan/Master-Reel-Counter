@@ -16,6 +16,7 @@ export const VENDOR_CODE_MAP: Record<string, string[]> = {
   ALU: ["XHHW", "URD", "TRIPLEX", "MHF"],
   COR: ["SEOOW", "SJEOO", "SJEW"],
   ALF: ["ALF", "SGF", "LT", "LTNM"],
+  PRI: ["PRI"],
 };
 
 export function deriveVendorCode(wireDetails: string): string | undefined {

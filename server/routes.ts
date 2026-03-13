@@ -3717,6 +3717,7 @@ export async function registerRoutes(
         thumbnailSize: "medium",
         largerTouchTargets: false,
         textSize: "default",
+        customVendorCodes: [],
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch settings" });
@@ -3731,12 +3732,26 @@ export async function registerRoutes(
         "photoQuality", "useReceivingQuality", "receivingPhotoQuality",
         "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
         "defaultTheme", "thumbnailSize", "largerTouchTargets", "textSize", "timezone",
+        "customVendorCodes",
       ];
       const updates: Record<string, any> = {};
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
           updates[field] = req.body[field];
         }
+      }
+      if (updates.customVendorCodes) {
+        if (!Array.isArray(updates.customVendorCodes)) {
+          return res.status(400).json({ message: "customVendorCodes must be an array" });
+        }
+        const rawCodes = updates.customVendorCodes as unknown[];
+        const incomingCodes = rawCodes
+          .filter((c): c is string => typeof c === "string" && c.trim().length > 0)
+          .map((c) => c.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3))
+          .filter((c) => c.length === 3);
+        const existing = await storage.getUserSettings(userId);
+        const existingCodes = existing?.customVendorCodes ?? [];
+        updates.customVendorCodes = [...new Set([...existingCodes, ...incomingCodes])];
       }
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ message: "No valid fields to update" });

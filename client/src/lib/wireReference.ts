@@ -24,7 +24,7 @@ export const WIRE_COLORS: Record<string, string> = {
 
 export const COLOR_CODES = Object.keys(WIRE_COLORS);
 
-export const VENDOR_CODES = ["ALU", "COP", "ALF"] as const;
+export const VENDOR_CODES = ["ALU", "COP", "COR", "ALF", "PRI"] as const;
 
 export interface CatalogEntry {
   vendor: string;

@@ -139,6 +139,7 @@ export const userSettings = pgTable("user_settings", {
   largerTouchTargets: boolean("larger_touch_targets").notNull().default(false),
   textSize: varchar("text_size", { length: 20 }).notNull().default("default"),
   timezone: varchar("timezone", { length: 50 }).notNull().default("America/Chicago"),
+  customVendorCodes: text("custom_vendor_codes").array().notNull().default(sql`'{}'::text[]`),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
