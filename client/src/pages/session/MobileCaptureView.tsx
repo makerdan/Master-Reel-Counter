@@ -209,6 +209,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           objectStorageKey: uploadResult.objectPath,
           originalFilename: nextItem.file.name,
           mimeType: nextItem.file.type,
+          fileSize: uploadResult.metadata?.size || nextItem.file.size,
           aisle: nextItem.aisle,
           section: nextItem.section,
           notes: nextItem.notes || undefined,

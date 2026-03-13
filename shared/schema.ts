@@ -57,6 +57,7 @@ export const photos = pgTable("photos", {
   isDetailShot: boolean("is_detail_shot").default(false),
   parentPhotoId: integer("parent_photo_id"),
   pinScale: real("pin_scale").default(1),
+  fileSize: integer("file_size"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

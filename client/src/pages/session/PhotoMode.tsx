@@ -619,6 +619,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           objectStorageKey: result.objectPath,
           originalFilename: file.name,
           mimeType: file.type,
+          fileSize: result.metadata?.size || file.size,
           aisle,
           section: sectionVal,
         });

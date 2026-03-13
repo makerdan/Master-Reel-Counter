@@ -210,6 +210,7 @@ export default function SingleEntryMode({
         objectStorageKey: result.objectPath,
         originalFilename: file.name,
         mimeType: file.type,
+        fileSize: result.metadata?.size || file.size,
         aisle: form.aisle,
         section: form.section,
       });

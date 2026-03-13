@@ -6,6 +6,7 @@ import {
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
   Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
   ChevronDown, Ruler, Building2, FileText, Globe, Upload, Trash2,
+  HardDrive, RefreshCw, Users,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { ThemeToggle } from "@/components/theme-toggle";
 import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
@@ -171,6 +173,34 @@ export default function SettingsPage() {
     queryKey: ["/api/settings"],
   });
 
+  const [storageBreakdownOpen, setStorageBreakdownOpen] = useState(false);
+
+  const { data: storageUsage, isLoading: storageLoading } = useQuery<{
+    userBytes: number;
+    userPhotoCount: number;
+    userSessionCount: number;
+    totalBytes: number;
+    totalPhotoCount: number;
+    totalSessionCount: number;
+    byUser: { userId: string; username: string; bytes: number; photoCount: number }[];
+  }>({
+    queryKey: ["/api/storage/usage"],
+  });
+
+  const backfillSizes = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/storage/backfill-sizes");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/storage/usage"] });
+      toast({ title: "Backfill complete", description: `Updated ${data.updated} of ${data.total} photos${data.failed ? ` (${data.failed} failed)` : ""}` });
+    },
+    onError: () => {
+      toast({ title: "Backfill failed", variant: "destructive" });
+    },
+  });
+
   const toggleEncoding = useMutation({
     mutationFn: async ({ enabled }: { enabled: boolean }) => {
       const res = await apiRequest("POST", "/api/settings/encoding", { enabled });
@@ -263,6 +293,132 @@ export default function SettingsPage() {
             Manage your account preferences, display, and data options.
           </p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Storage Usage</CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/storage/usage"] });
+                }}
+                data-testid="button-refresh-storage"
+              >
+                <RefreshCw className={`h-4 w-4 ${storageLoading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {storageLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="storage-loading">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading storage info...
+              </div>
+            ) : storageUsage ? (() => {
+              const STORAGE_LIMIT = 10 * 1024 * 1024 * 1024;
+              const pct = Math.min((storageUsage.userBytes / STORAGE_LIMIT) * 100, 100);
+              const formatBytes = (b: number) => {
+                if (b === 0) return "0 B";
+                if (b < 1024) return `${b} B`;
+                if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+                if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+                return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+              };
+              const hasUnknown = storageUsage.totalPhotoCount > 0 &&
+                storageUsage.byUser.every(u => u.bytes === 0);
+              return (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1.5">
+                      <span className="font-medium" data-testid="text-storage-used">
+                        {formatBytes(storageUsage.userBytes)} used
+                      </span>
+                      <span className="text-muted-foreground" data-testid="text-storage-limit">
+                        {formatBytes(STORAGE_LIMIT)} limit
+                      </span>
+                    </div>
+                    <Progress value={pct} className="h-2.5" data-testid="progress-storage" />
+                    <p className="text-xs text-muted-foreground mt-1.5" data-testid="text-storage-details">
+                      {storageUsage.userPhotoCount} photo{storageUsage.userPhotoCount !== 1 ? "s" : ""} across {storageUsage.userSessionCount} session{storageUsage.userSessionCount !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  {hasUnknown && (
+                    <div className="flex items-center gap-2 bg-muted/50 rounded-md p-2.5">
+                      <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 text-xs text-muted-foreground">
+                        File sizes are unknown for existing photos.
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => backfillSizes.mutate()}
+                        disabled={backfillSizes.isPending}
+                        data-testid="button-backfill-sizes"
+                      >
+                        {backfillSizes.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                        )}
+                        Calculate
+                      </Button>
+                    </div>
+                  )}
+                  {storageUsage.byUser.length > 1 && (
+                    <Collapsible open={storageBreakdownOpen} onOpenChange={setStorageBreakdownOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-full justify-between text-xs" data-testid="button-toggle-breakdown">
+                          <span className="flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5" />
+                            All Users ({storageUsage.byUser.length})
+                          </span>
+                          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${storageBreakdownOpen ? "rotate-180" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="border rounded-md mt-2 overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-muted/50">
+                                <th className="text-left p-2 font-medium">User</th>
+                                <th className="text-right p-2 font-medium">Photos</th>
+                                <th className="text-right p-2 font-medium">Size</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {storageUsage.byUser
+                                .sort((a, b) => b.bytes - a.bytes)
+                                .map((u, i) => (
+                                  <tr key={u.userId} className={i % 2 === 0 ? "" : "bg-muted/20"} data-testid={`row-user-storage-${i}`}>
+                                    <td className="p-2 truncate max-w-[140px]">{u.username}</td>
+                                    <td className="p-2 text-right tabular-nums">{u.photoCount}</td>
+                                    <td className="p-2 text-right tabular-nums">{formatBytes(u.bytes)}</td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t font-medium">
+                                <td className="p-2">Total</td>
+                                <td className="p-2 text-right tabular-nums">{storageUsage.totalPhotoCount}</td>
+                                <td className="p-2 text-right tabular-nums">{formatBytes(storageUsage.totalBytes)}</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+                </>
+              );
+            })() : (
+              <p className="text-sm text-muted-foreground" data-testid="text-storage-unavailable">Storage data unavailable.</p>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

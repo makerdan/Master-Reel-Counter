@@ -7,6 +7,7 @@ import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema } from "@shared/schema";
+import { eq, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
@@ -3692,6 +3693,53 @@ export async function registerRoutes(
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to remove logo" });
+    }
+  });
+
+  app.get("/api/storage/usage", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const usage = await storage.getStorageUsage(userId);
+      res.json(usage);
+    } catch (error) {
+      console.error("Error getting storage usage:", error);
+      res.status(500).json({ message: "Failed to get storage usage" });
+    }
+  });
+
+  app.post("/api/storage/backfill-sizes", isAuthenticated, async (req: any, res) => {
+    try {
+      const photosWithoutSize = await db.select({ id: photos.id, objectStorageKey: photos.objectStorageKey })
+        .from(photos)
+        .where(isNull(photos.fileSize));
+
+      let updated = 0;
+      let failed = 0;
+      for (const photo of photosWithoutSize) {
+        try {
+          const objectName = toStorageObjectName(photo.objectStorageKey);
+          const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(objectName);
+          const [metadata] = await gcsFile.getMetadata();
+          const size = parseInt(String(metadata.size || "0"), 10);
+          if (size > 0) {
+            await db.update(photos).set({ fileSize: size }).where(eq(photos.id, photo.id));
+            updated++;
+          }
+        } catch {
+          const localPath = path.join(UPLOADS_DIR, path.basename(photo.objectStorageKey));
+          try {
+            const stat = await fs.stat(localPath);
+            await db.update(photos).set({ fileSize: Math.round(stat.size) }).where(eq(photos.id, photo.id));
+            updated++;
+          } catch {
+            failed++;
+          }
+        }
+      }
+      res.json({ total: photosWithoutSize.length, updated, failed });
+    } catch (error) {
+      console.error("Error backfilling photo sizes:", error);
+      res.status(500).json({ message: "Failed to backfill photo sizes" });
     }
   });
 
