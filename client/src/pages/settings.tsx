@@ -6,7 +6,7 @@ import {
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
   Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
   ChevronDown, Ruler, Building2, FileText, Globe, Upload, Trash2,
-  HardDrive, RefreshCw, Users,
+  HardDrive, RefreshCw,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -173,16 +173,10 @@ export default function SettingsPage() {
     queryKey: ["/api/settings"],
   });
 
-  const [storageBreakdownOpen, setStorageBreakdownOpen] = useState(false);
-
   const { data: storageUsage, isLoading: storageLoading } = useQuery<{
     userBytes: number;
     userPhotoCount: number;
     userSessionCount: number;
-    totalBytes?: number;
-    totalPhotoCount?: number;
-    totalSessionCount?: number;
-    byUser?: { userId: string; username: string; bytes: number; photoCount: number }[];
   }>({
     queryKey: ["/api/storage/usage"],
   });
@@ -328,8 +322,7 @@ export default function SettingsPage() {
                 if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(2)} MB`;
                 return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
               };
-              const hasUnknown = (storageUsage.totalPhotoCount ?? storageUsage.userPhotoCount) > 0 &&
-                storageUsage.userBytes === 0 && (storageUsage.byUser || []).every(u => u.bytes === 0);
+              const hasUnknown = storageUsage.userPhotoCount > 0 && storageUsage.userBytes === 0;
               return (
                 <>
                   <div>
@@ -367,50 +360,6 @@ export default function SettingsPage() {
                         Calculate
                       </Button>
                     </div>
-                  )}
-                  {storageUsage.byUser && storageUsage.byUser.length > 1 && (
-                    <Collapsible open={storageBreakdownOpen} onOpenChange={setStorageBreakdownOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-full justify-between text-xs" data-testid="button-toggle-breakdown">
-                          <span className="flex items-center gap-1.5">
-                            <Users className="h-3.5 w-3.5" />
-                            All Users ({storageUsage.byUser.length})
-                          </span>
-                          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${storageBreakdownOpen ? "rotate-180" : ""}`} />
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="border rounded-md mt-2 overflow-hidden">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="bg-muted/50">
-                                <th className="text-left p-2 font-medium">User</th>
-                                <th className="text-right p-2 font-medium">Photos</th>
-                                <th className="text-right p-2 font-medium">Size</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {storageUsage.byUser
-                                .sort((a, b) => b.bytes - a.bytes)
-                                .map((u, i) => (
-                                  <tr key={u.userId} className={i % 2 === 0 ? "" : "bg-muted/20"} data-testid={`row-user-storage-${i}`}>
-                                    <td className="p-2 truncate max-w-[140px]">{u.username}</td>
-                                    <td className="p-2 text-right tabular-nums">{u.photoCount}</td>
-                                    <td className="p-2 text-right tabular-nums">{formatBytes(u.bytes)}</td>
-                                  </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                              <tr className="border-t font-medium">
-                                <td className="p-2">Total</td>
-                                <td className="p-2 text-right tabular-nums">{storageUsage.totalPhotoCount ?? 0}</td>
-                                <td className="p-2 text-right tabular-nums">{formatBytes(storageUsage.totalBytes ?? 0)}</td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
                   )}
                 </>
               );

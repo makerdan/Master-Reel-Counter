@@ -7,7 +7,7 @@ import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema } from "@shared/schema";
-import { eq, isNull } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
@@ -3699,24 +3699,8 @@ export async function registerRoutes(
   app.get("/api/storage/usage", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const usage = await storage.getStorageUsage(userId);
-      const userSessions = await storage.getUserSessions(userId);
-      const isMultiUser = userSessions.length > 0;
-
-      let hasCollaborators = false;
-      if (isMultiUser) {
-        for (const s of userSessions) {
-          const collabs = await storage.getSessionCollaborators(s.id);
-          if (collabs.length > 0) { hasCollaborators = true; break; }
-        }
-      }
-
-      if (hasCollaborators) {
-        res.json(usage);
-      } else {
-        const { byUser, totalBytes, totalPhotoCount, totalSessionCount, ...userOnly } = usage;
-        res.json(userOnly);
-      }
+      const usage = await storage.getStorageUsageForUser(userId);
+      res.json(usage);
     } catch (error) {
       console.error("Error getting storage usage:", error);
       res.status(500).json({ message: "Failed to get storage usage" });
@@ -3725,9 +3709,15 @@ export async function registerRoutes(
 
   app.post("/api/storage/backfill-sizes", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const userSessions = await storage.getUserSessions(userId);
+      const userSessionIds = userSessions.map(s => s.id);
+      if (userSessionIds.length === 0) {
+        return res.json({ total: 0, updated: 0, failed: 0 });
+      }
       const photosWithoutSize = await db.select({ id: photos.id, objectStorageKey: photos.objectStorageKey })
         .from(photos)
-        .where(isNull(photos.fileSize));
+        .where(sql`${photos.fileSize} IS NULL AND ${photos.sessionId} IN (${sql.join(userSessionIds.map(id => sql`${id}`), sql`, `)})`);
 
       let updated = 0;
       let failed = 0;

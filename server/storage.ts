@@ -116,14 +116,10 @@ export interface IStorage {
   getSessionScanResults(sessionId: number): Promise<ScanResult[]>;
   deleteSessionScanResults(sessionId: number): Promise<void>;
 
-  getStorageUsage(userId: string): Promise<{
+  getStorageUsageForUser(userId: string): Promise<{
     userBytes: number;
     userPhotoCount: number;
     userSessionCount: number;
-    totalBytes: number;
-    totalPhotoCount: number;
-    totalSessionCount: number;
-    byUser: { userId: string; username: string; bytes: number; photoCount: number }[];
   }>;
 
 
@@ -1199,14 +1195,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(scanResults).where(eq(scanResults.sessionId, sessionId));
   }
 
-  async getStorageUsage(userId: string): Promise<{
+  async getStorageUsageForUser(userId: string): Promise<{
     userBytes: number;
     userPhotoCount: number;
     userSessionCount: number;
-    totalBytes: number;
-    totalPhotoCount: number;
-    totalSessionCount: number;
-    byUser: { userId: string; username: string; bytes: number; photoCount: number }[];
   }> {
     const userSessionRows = await db.select({ id: countingSessions.id })
       .from(countingSessions)
@@ -1226,43 +1218,10 @@ export class DatabaseStorage implements IStorage {
       userPhotoCount = parseInt(userResult[0]?.photoCount || "0", 10);
     }
 
-    const totalResult = await db.select({
-      totalSize: sql<string>`coalesce(sum(${photos.fileSize}), 0)`,
-      photoCount: sql<string>`count(*)`,
-    }).from(photos);
-    const totalBytes = parseInt(totalResult[0]?.totalSize || "0", 10);
-    const totalPhotoCount = parseInt(totalResult[0]?.photoCount || "0", 10);
-
-    const totalSessionResult = await db.select({
-      sessionCount: sql<string>`count(distinct ${countingSessions.id})`,
-    }).from(countingSessions);
-    const totalSessionCount = parseInt(totalSessionResult[0]?.sessionCount || "0", 10);
-
-    const byUserResult = await db.select({
-      odataUserId: countingSessions.userId,
-      bytes: sql<string>`coalesce(sum(${photos.fileSize}), 0)`,
-      photoCount: sql<string>`count(${photos.id})`,
-      displayName: sql<string>`max(${photos.uploadedBy})`,
-    })
-      .from(countingSessions)
-      .leftJoin(photos, eq(photos.sessionId, countingSessions.id))
-      .groupBy(countingSessions.userId);
-
-    const byUser = byUserResult.map(r => ({
-      userId: r.odataUserId,
-      username: r.displayName || r.odataUserId,
-      bytes: parseInt(r.bytes || "0", 10),
-      photoCount: parseInt(r.photoCount || "0", 10),
-    }));
-
     return {
       userBytes,
       userPhotoCount,
       userSessionCount: userSessionIds.length,
-      totalBytes,
-      totalPhotoCount,
-      totalSessionCount,
-      byUser,
     };
   }
 
