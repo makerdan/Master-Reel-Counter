@@ -357,14 +357,18 @@ export default function LabelScannerTab({
       setSelectedPhotoId(availablePhotos[0].id);
     } else if (currentPhotoId && availablePhotos.length > 0 && !availablePhotos.some((p) => p.id === currentPhotoId)) {
       setSelectedPhotoId(availablePhotos[0].id);
-      setPhase("preview");
-      setCards([]);
+      if (!batchMode) {
+        setPhase("preview");
+        setCards([]);
+      }
     } else if (currentPhotoId && availablePhotos.length === 0) {
       setSelectedPhotoId(null);
-      setPhase("preview");
-      setCards([]);
+      if (!batchMode) {
+        setPhase("preview");
+        setCards([]);
+      }
     }
-  }, [availablePhotos, currentPhotoId]);
+  }, [availablePhotos, currentPhotoId, batchMode]);
 
 
   const { data: committedPins = [], isLoading: pinsLoading } = useQuery<Pin[]>({
@@ -1266,9 +1270,10 @@ export default function LabelScannerTab({
         {displayCards.map((card) => {
           const hasFilled = !!(card.pin.wireDetails && card.pin.footage);
           const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
-          const cardPhotoObj = isFromOtherPhoto ? photos.find((p) => p.id === card.pin.photoId) : photo;
-          const batchPhotoObj = batchMode ? photos.find((p) => p.id === card.pin.photoId) || photo : null;
-          const cardPhotoUrl = (batchMode || isFromOtherPhoto) ? getPhotoUrl(batchPhotoObj || cardPhotoObj) : photoUrl;
+          const pinPhotoObj = photos.find((p) => p.id === card.pin.photoId) ?? null;
+          const cardPhotoObj = isFromOtherPhoto ? pinPhotoObj : photo;
+          const batchPhotoObj = batchMode ? pinPhotoObj || photo : null;
+          const cardPhotoUrl = (batchMode || isFromOtherPhoto) ? getPhotoUrl(batchPhotoObj || cardPhotoObj || pinPhotoObj) : photoUrl;
           const isBatch = batchMode && phase === "preview";
           return (
             <div
