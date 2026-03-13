@@ -1610,12 +1610,45 @@ export async function registerRoutes(
       const footerText = typeof req.query.footerText === "string" ? req.query.footerText : null;
       const exportQuality = req.query.quality === "full" ? "full" : "standard";
 
+      const userSettingsForPdf = await storage.getUserSettings(userId);
+      let logoBuffer: Buffer | null = null;
+      if (userSettingsForPdf?.companyLogoKey) {
+        try {
+          logoBuffer = await loadPhotoBuffer(userSettingsForPdf.companyLogoKey);
+        } catch (e) {
+          console.warn("Failed to load company logo for PDF:", e);
+        }
+      }
+
       const accentHex = "#ea580c";
       const headerBg = "#f5f0eb";
       const borderColor = "#cccccc";
 
       let titleY = 36;
-      if (companyName) {
+      let logoRightEdge = 36;
+      if (logoBuffer) {
+        try {
+          const meta = await sharp(logoBuffer).metadata();
+          const maxW = 80;
+          const maxH = 40;
+          let w = meta.width || maxW;
+          let h = meta.height || maxH;
+          const scale = Math.min(maxW / w, maxH / h, 1);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+          doc.image(logoBuffer, 36, titleY, { width: w, height: h });
+          logoRightEdge = 36 + w + 10;
+          if (companyName) {
+            const nameY = titleY + Math.max(0, (h - 14) / 2);
+            doc.fontSize(12).fillColor("#999999").text(companyName, logoRightEdge, nameY);
+          }
+          titleY += h + 6;
+        } catch (imgErr) {
+          console.warn("Failed to render logo in PDF:", imgErr);
+          logoBuffer = null;
+        }
+      }
+      if (!logoBuffer && companyName) {
         doc.fontSize(12).fillColor("#999999").text(companyName, 36, titleY);
         titleY += 20;
       }
@@ -3600,6 +3633,52 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/settings/logo", isAuthenticated, upload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file provided" });
+      const userId = req.user.claims.sub;
+      const existing = await storage.getUserSettings(userId);
+      if (existing?.companyLogoKey) {
+        const oldObj = toStorageObjectName(existing.companyLogoKey);
+        await objectStorageClient.bucket(BUCKET_NAME).file(oldObj).delete({ ignoreNotFound: true }).catch(() => {});
+        const oldFilename = existing.companyLogoKey.startsWith("/uploads/") ? existing.companyLogoKey.slice("/uploads/".length) : existing.companyLogoKey;
+        await fs.unlink(path.join(UPLOADS_DIR, oldFilename)).catch(() => {});
+      }
+      const resizedBuffer = await sharp(req.file.buffer)
+        .rotate()
+        .resize(300, 80, { fit: "inside", withoutEnlargement: true })
+        .png()
+        .toBuffer();
+      const filename = `logo-${randomUUID()}.png`;
+      const logoKey = `/uploads/${filename}`;
+      const objName = toStorageObjectName(logoKey);
+      const localFallback = path.join(UPLOADS_DIR, filename);
+      await putToObjectStorage(BUCKET_NAME, objName, resizedBuffer, "image/png", localFallback);
+      const result = await storage.upsertUserSettings(userId, { companyLogoKey: logoKey });
+      res.json(result);
+    } catch (error) {
+      console.error("Logo upload error:", error);
+      res.status(500).json({ message: "Failed to upload logo" });
+    }
+  });
+
+  app.delete("/api/settings/logo", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const existing = await storage.getUserSettings(userId);
+      if (existing?.companyLogoKey) {
+        const objName = toStorageObjectName(existing.companyLogoKey);
+        await objectStorageClient.bucket(BUCKET_NAME).file(objName).delete({ ignoreNotFound: true }).catch(() => {});
+        const oldFilename = existing.companyLogoKey.startsWith("/uploads/") ? existing.companyLogoKey.slice("/uploads/".length) : existing.companyLogoKey;
+        await fs.unlink(path.join(UPLOADS_DIR, oldFilename)).catch(() => {});
+      }
+      const result = await storage.upsertUserSettings(userId, { companyLogoKey: null });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove logo" });
+    }
+  });
+
   // User Settings
   app.get("/api/settings", isAuthenticated, async (req: any, res) => {
     try {
@@ -3632,7 +3711,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const allowedFields = [
-        "defaultExportFormat", "companyName", "companyLogoKey", "exportFooterText",
+        "defaultExportFormat", "companyName", "exportFooterText",
         "photoQuality", "useReceivingQuality", "receivingPhotoQuality",
         "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
         "defaultTheme", "thumbnailSize", "largerTouchTargets", "textSize", "timezone",

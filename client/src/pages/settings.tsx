@@ -71,6 +71,7 @@ export default function SettingsPage() {
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [localPhotoQuality, setLocalPhotoQuality] = useState<number | null>(null);
   const [localReceivingQuality, setLocalReceivingQuality] = useState<number | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -127,6 +128,42 @@ export default function SettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to remove photo", variant: "destructive" });
+    },
+  });
+
+  const uploadLogo = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/settings/logo", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({ title: "Logo uploaded" });
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    },
+    onError: () => {
+      toast({ title: "Failed to upload logo", variant: "destructive" });
+    },
+  });
+
+  const removeLogo = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/settings/logo");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({ title: "Logo removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove logo", variant: "destructive" });
     },
   });
 
@@ -553,6 +590,66 @@ export default function SettingsPage() {
                 value={settings?.companyName || ""}
                 onChange={(e) => saveSetting("companyName", e.target.value || null)}
                 data-testid="input-company-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Company Logo</Label>
+              <p className="text-xs text-muted-foreground">Displayed alongside company name in PDF headers. Images are resized to fit (max 300x80px).</p>
+              {settings?.companyLogoKey ? (
+                <div className="flex items-center gap-3">
+                  <div className="border rounded-md p-2 bg-muted/30 flex items-center justify-center" style={{ minWidth: 80, minHeight: 40 }}>
+                    <img
+                      src={settings.companyLogoKey}
+                      alt="Company logo"
+                      className="max-w-[150px] max-h-[40px] object-contain"
+                      data-testid="img-company-logo"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={uploadLogo.isPending}
+                      data-testid="button-change-logo"
+                    >
+                      {uploadLogo.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      <span className="ml-1">Change</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeLogo.mutate()}
+                      disabled={removeLogo.isPending}
+                      data-testid="button-remove-logo"
+                    >
+                      {removeLogo.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                      <span className="ml-1">Remove</span>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadLogo.isPending}
+                  data-testid="button-upload-logo"
+                >
+                  {uploadLogo.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
+                  Upload Logo
+                </Button>
+              )}
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadLogo.mutate(file);
+                }}
+                data-testid="input-logo-file"
               />
             </div>
             <Separator />
