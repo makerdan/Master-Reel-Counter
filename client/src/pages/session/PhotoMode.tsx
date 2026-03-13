@@ -1266,7 +1266,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       <div className="space-y-2 sm:space-y-0">
         <div className="flex items-end gap-2 flex-wrap justify-center sm:justify-start">
           <div>
-            <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Aisle:</label>
+            <label className="block text-sm font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Aisle:</label>
             <Input
               value={aisle}
               onChange={(e) => {
@@ -1285,13 +1285,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 }
               }}
               placeholder="Aisle..."
-              className={`w-24 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
+              className={`w-24 border-2 !border-[hsl(18_80%_40%)] dark:!border-[hsl(18_80%_60%)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
               enterKeyHint="next"
               data-testid="input-photo-aisle"
             />
           </div>
           <div className="sm:hidden">
-            <label className="block text-xs font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Section:</label>
+            <label className="block text-sm font-bold text-[hsl(18_80%_40%)] dark:text-[hsl(18_80%_60%)] mb-1">Section:</label>
             <Input
               value={currentPhoto?.section || ""}
               onChange={(e) => {
@@ -1310,7 +1310,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 }
               }}
               placeholder="Sec..."
-              className={`w-14 border-2 focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
+              className={`w-14 border-2 !border-[hsl(18_80%_40%)] dark:!border-[hsl(18_80%_60%)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
               enterKeyHint="done"
               data-testid="input-photo-section-top"
             />
