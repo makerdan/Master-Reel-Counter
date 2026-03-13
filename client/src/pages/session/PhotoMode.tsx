@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
@@ -24,7 +24,8 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { lookupCategory, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { lookupCategory, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { useWireCategories } from "@/hooks/use-wire-categories";
 import type { Photo, Pin, Entry } from "@shared/schema";
 import ReelCropPreview from "./ReelCropPreview";
 import type { LocalPin } from "./types";
@@ -39,6 +40,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const { allCodes: vendorCodes, addCustomCode } = useVendorCodes();
+  const { categories: userCategories } = useWireCategories();
+  const userParsedCatalog = useMemo(
+    () => userCategories.map(userWireCategoryToParsedEntry),
+    [userCategories]
+  );
   const [customCodeInput, setCustomCodeInput] = useState("");
   const [customCodePinId, setCustomCodePinId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1027,7 +1033,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const pin = localPinsRef.current.find(p => p.id === pinId);
     if (!pin?.wireDetails) return;
     const normalized = pin.wireDetails.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const matches = lookupCategory(pin.wireDetails);
+    const matches = lookupCategory(pin.wireDetails, userParsedCatalog);
     if (matches.length === 0) return;
     const exactMatch = matches.find(m => m.catalog === normalized);
     const match = exactMatch || (matches.length === 1 ? matches[0] : null);
@@ -1035,7 +1041,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     updatePinField(pinId, "wireDetails", match.catalog);
     if (!pin.vendorCode && match.vendor) updatePinField(pinId, "vendorCode", match.vendor);
     if (!pin.footage && match.footage) updatePinField(pinId, "footage", match.footage);
-  }, [updatePinField]);
+  }, [updatePinField, userParsedCatalog]);
 
   const clearRow = useCallback((pinId: string) => {
     setLocalPins((prev) =>
@@ -2115,7 +2121,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             onChange={(e) => {
                               const val = e.target.value.toUpperCase();
                               updatePinField(pin.id, "wireDetails", val);
-                              const matches = lookupCategory(val);
+                              const matches = lookupCategory(val, userParsedCatalog);
                               setSuggestions(matches);
                               setSuggestionIndex(-1);
                               if (matches.length > 0) {
@@ -2131,7 +2137,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               setSelectedPinId(pin.id);
                               setSuggestionIndex(-1);
                               if (pin.wireDetails) {
-                                const matches = lookupCategory(pin.wireDetails);
+                                const matches = lookupCategory(pin.wireDetails, userParsedCatalog);
                                 setSuggestions(matches);
                                 if (matches.length > 0) {
                                   const rect = e.currentTarget.getBoundingClientRect();

@@ -427,20 +427,50 @@ function dedup(entries: ParsedCatalogEntry[]): ParsedCatalogEntry[] {
   });
 }
 
-export function lookupCategory(query: string): ParsedCatalogEntry[] {
+export function lookupCategory(query: string, userCatalog?: ParsedCatalogEntry[]): ParsedCatalogEntry[] {
   if (!query || query.length < 2) return [];
   const upper = query.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-  const exact = PARSED_CATALOG.filter(e => e.catalog === upper);
+  const combined = userCatalog && userCatalog.length > 0
+    ? [...userCatalog, ...PARSED_CATALOG]
+    : PARSED_CATALOG;
+
+  const exact = combined.filter(e => e.catalog === upper);
   if (exact.length > 0) return dedup(exact);
 
-  const prefix = PARSED_CATALOG.filter(e => e.catalog.startsWith(upper));
+  const prefix = combined.filter(e => e.catalog.startsWith(upper));
   if (prefix.length > 0) return dedup(prefix).slice(0, 15);
 
-  const contains = PARSED_CATALOG.filter(e =>
+  const contains = combined.filter(e =>
     e.catalog.includes(upper) || e.description.toUpperCase().includes(upper)
   );
   return dedup(contains).slice(0, 15);
+}
+
+export function userWireCategoryToParsedEntry(cat: {
+  catalog: string;
+  vendor: string;
+  reelLength: number;
+  description?: string | null;
+  color?: string | null;
+  jacketType?: string | null;
+  conductors?: string | null;
+  groundSize?: string | null;
+}): ParsedCatalogEntry {
+  const parts: string[] = [];
+  if (cat.description) parts.push(cat.description);
+  if (cat.jacketType) parts.push(cat.jacketType);
+  if (cat.groundSize) parts.push(`GND ${cat.groundSize}`);
+  parts.push(`${cat.reelLength}'`);
+  const description = parts.join(" ");
+  return {
+    vendor: cat.vendor.toUpperCase(),
+    catalog: cat.catalog.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+    description,
+    footage: cat.reelLength,
+    color: cat.color || undefined,
+    conductors: cat.conductors || undefined,
+  };
 }
 
 const CATALOG_CODES = CATALOG.map(c => c.catalog);

@@ -36,6 +36,9 @@ import {
   scanResults,
   type ScanResult,
   type InsertScanResult,
+  userWireCategories,
+  type UserWireCategory,
+  type InsertUserWireCategory,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -115,6 +118,11 @@ export interface IStorage {
   upsertScanResults(results: InsertScanResult[]): Promise<ScanResult[]>;
   getSessionScanResults(sessionId: number): Promise<ScanResult[]>;
   deleteSessionScanResults(sessionId: number): Promise<void>;
+
+  createUserWireCategory(data: InsertUserWireCategory): Promise<UserWireCategory>;
+  createUserWireCategoriesBulk(data: InsertUserWireCategory[]): Promise<UserWireCategory[]>;
+  getUserWireCategories(userId: string): Promise<UserWireCategory[]>;
+  deleteUserWireCategory(id: number, userId: string): Promise<void>;
 
   getStorageUsageForUser(userId: string): Promise<{
     userBytes: number;
@@ -1256,6 +1264,23 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  async createUserWireCategory(data: InsertUserWireCategory): Promise<UserWireCategory> {
+    const [result] = await db.insert(userWireCategories).values(data).returning();
+    return result;
+  }
+
+  async createUserWireCategoriesBulk(data: InsertUserWireCategory[]): Promise<UserWireCategory[]> {
+    if (data.length === 0) return [];
+    return db.insert(userWireCategories).values(data).returning();
+  }
+
+  async getUserWireCategories(userId: string): Promise<UserWireCategory[]> {
+    return db.select().from(userWireCategories).where(eq(userWireCategories.userId, userId));
+  }
+
+  async deleteUserWireCategory(id: number, userId: string): Promise<void> {
+    await db.delete(userWireCategories).where(and(eq(userWireCategories.id, id), eq(userWireCategories.userId, userId)));
+  }
 }
 
 export const storage = new DatabaseStorage();

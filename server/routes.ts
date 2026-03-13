@@ -6,7 +6,7 @@ import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCategorySchema } from "@shared/schema";
 import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
@@ -4048,6 +4048,76 @@ export async function registerRoutes(
   });
 
   // Feedback
+  app.get("/api/wire-categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const categories = await storage.getUserWireCategories(userId);
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching wire categories:", error);
+      res.status(500).json({ message: "Failed to fetch wire categories" });
+    }
+  });
+
+  app.post("/api/wire-categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertUserWireCategorySchema.safeParse({ ...req.body, userId });
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid wire category data", details: parsed.error.flatten() });
+      }
+      const category = await storage.createUserWireCategory(parsed.data);
+      res.status(201).json(category);
+    } catch (error) {
+      console.error("Error creating wire category:", error);
+      res.status(500).json({ message: "Failed to create wire category" });
+    }
+  });
+
+  app.post("/api/wire-categories/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { categories } = req.body;
+      if (!Array.isArray(categories) || categories.length === 0) {
+        return res.status(400).json({ error: "categories must be a non-empty array" });
+      }
+      if (categories.length > 500) {
+        return res.status(400).json({ error: "Maximum 500 categories per import" });
+      }
+      const validated: any[] = [];
+      const errors: { index: number; errors: any }[] = [];
+      for (let i = 0; i < categories.length; i++) {
+        const parsed = insertUserWireCategorySchema.safeParse({ ...categories[i], userId });
+        if (parsed.success) {
+          validated.push(parsed.data);
+        } else {
+          errors.push({ index: i, errors: parsed.error.flatten() });
+        }
+      }
+      if (errors.length > 0) {
+        return res.status(400).json({ error: "Some categories failed validation", errors, validCount: validated.length });
+      }
+      const results = await storage.createUserWireCategoriesBulk(validated);
+      res.status(201).json(results);
+    } catch (error) {
+      console.error("Error bulk creating wire categories:", error);
+      res.status(500).json({ message: "Failed to bulk import wire categories" });
+    }
+  });
+
+  app.delete("/api/wire-categories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+      const userId = req.user.claims.sub;
+      await storage.deleteUserWireCategory(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting wire category:", error);
+      res.status(500).json({ message: "Failed to delete wire category" });
+    }
+  });
+
   app.post("/api/feedback", isAuthenticated, async (req: any, res) => {
     try {
       const parsed = insertFeedbackSchema.safeParse({ ...req.body, userId: req.user.id });

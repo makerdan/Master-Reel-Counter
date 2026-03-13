@@ -9,8 +9,9 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Entry, Pin, Photo } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
-import { lookupCategory, type ParsedCatalogEntry, PARSED_CATALOG } from "@/lib/wireReference";
+import { lookupCategory, type ParsedCatalogEntry, PARSED_CATALOG, userWireCategoryToParsedEntry } from "@/lib/wireReference";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
+import { useWireCategories } from "@/hooks/use-wire-categories";
 
 interface FlaggedPin {
   id: number;
@@ -230,6 +231,11 @@ function DupPinTile({
 export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPhoto }: FlaggedReelsProps) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
+  const { categories: userCategories } = useWireCategories();
+  const userParsedCatalog = useMemo(
+    () => userCategories.map(userWireCategoryToParsedEntry),
+    [userCategories]
+  );
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
@@ -671,7 +677,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                 const val = e.target.value.toUpperCase();
                                 setEditState(s => ({ ...s, wireDetails: val }));
                                 if (val.length >= 2) {
-                                  const matches = lookupCategory(val);
+                                  const matches = lookupCategory(val, userParsedCatalog);
                                   setCategorySuggestions(matches);
                                   setShowCategorySuggestions(matches.length > 0);
                                 } else {
@@ -681,7 +687,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               }}
                               onFocus={() => {
                                 if (editState.wireDetails.length >= 2) {
-                                  const matches = lookupCategory(editState.wireDetails);
+                                  const matches = lookupCategory(editState.wireDetails, userParsedCatalog);
                                   setCategorySuggestions(matches);
                                   setShowCategorySuggestions(matches.length > 0);
                                 }
@@ -868,7 +874,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                 const val = e.target.value.toUpperCase();
                                 setEditState(s => ({ ...s, wireDetails: val }));
                                 if (val.length >= 2) {
-                                  const matches = lookupCategory(val);
+                                  const matches = lookupCategory(val, userParsedCatalog);
                                   setCategorySuggestions(matches);
                                   setShowCategorySuggestions(matches.length > 0);
                                 } else {
@@ -878,7 +884,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               }}
                               onFocus={() => {
                                 if (editState.wireDetails.length >= 2) {
-                                  const matches = lookupCategory(editState.wireDetails);
+                                  const matches = lookupCategory(editState.wireDetails, userParsedCatalog);
                                   setCategorySuggestions(matches);
                                   setShowCategorySuggestions(matches.length > 0);
                                 }

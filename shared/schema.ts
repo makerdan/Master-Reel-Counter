@@ -280,3 +280,23 @@ export const insertScanResultSchema = createInsertSchema(scanResults).omit({
 
 export type ScanResult = typeof scanResults.$inferSelect;
 export type InsertScanResult = z.infer<typeof insertScanResultSchema>;
+
+export const userWireCategories = pgTable("user_wire_categories", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  catalog: text("catalog").notNull(),
+  vendor: text("vendor").notNull(),
+  reelLength: integer("reel_length").notNull(),
+  description: text("description"),
+  color: text("color"),
+  jacketType: text("jacket_type"),
+  conductors: text("conductors"),
+  groundSize: text("ground_size"),
+});
+
+export const insertUserWireCategorySchema = createInsertSchema(userWireCategories).omit({
+  id: true,
+});
+
+export type UserWireCategory = typeof userWireCategories.$inferSelect;
+export type InsertUserWireCategory = z.infer<typeof insertUserWireCategorySchema>;

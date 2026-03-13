@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -6,7 +6,7 @@ import {
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
   Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
   ChevronDown, Ruler, Building2, FileText, Globe, Upload, Trash2,
-  HardDrive, RefreshCw,
+  HardDrive, RefreshCw, Plus, Search, FileUp,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/lib/theme-provider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useWireCategories } from "@/hooks/use-wire-categories";
+import type { UserWireCategory } from "@shared/schema";
 
 interface UserSettingsResponse {
   userId: string;
@@ -261,6 +263,102 @@ export default function SettingsPage() {
       toast({ title: "Failed to send feedback", variant: "destructive" });
     },
   });
+
+  const {
+    categories: wireCategories,
+    isLoading: wireCategoriesLoading,
+    addCategory,
+    isAdding: isAddingCategory,
+    bulkAddCategories,
+    isBulkAdding,
+    deleteCategory,
+  } = useWireCategories();
+
+  const [wireCatSearch, setWireCatSearch] = useState("");
+  const [showAddCategoryForm, setShowAddCategoryForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkCsvText, setBulkCsvText] = useState("");
+  const [bulkPreview, setBulkPreview] = useState<Omit<UserWireCategory, "id" | "userId">[] | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
+  const [newCat, setNewCat] = useState({
+    catalog: "", vendor: "", reelLength: "", description: "",
+    color: "", jacketType: "", conductors: "", groundSize: "",
+  });
+
+  const filteredWireCategories = useMemo(() => {
+    if (!wireCatSearch.trim()) return wireCategories;
+    const q = wireCatSearch.toLowerCase();
+    return wireCategories.filter(c =>
+      c.catalog.toLowerCase().includes(q) ||
+      c.vendor.toLowerCase().includes(q) ||
+      (c.description || "").toLowerCase().includes(q)
+    );
+  }, [wireCategories, wireCatSearch]);
+
+  const parseCsvForImport = (text: string) => {
+    setBulkError(null);
+    const lines = text.trim().split("\n").filter(l => l.trim());
+    if (lines.length < 2) {
+      setBulkError("CSV must have a header row and at least one data row.");
+      setBulkPreview(null);
+      return;
+    }
+    const headerLine = lines[0];
+    const sep = headerLine.includes("\t") ? "\t" : ",";
+    const headers = headerLine.split(sep).map(h => h.trim().toLowerCase().replace(/[^a-z_\s]/g, ""));
+    const colMap: Record<string, number> = {};
+    const aliases: Record<string, string[]> = {
+      catalog: ["catalog", "category", "sku", "code", "catalog code", "category code"],
+      vendor: ["vendor", "vendor code"],
+      reelLength: ["reel length", "reellength", "footage", "length", "reel_length", "feet"],
+      description: ["description", "notes", "desc"],
+      color: ["color", "colour"],
+      jacketType: ["jacket type", "jackettype", "jacket_type", "jacket"],
+      conductors: ["conductors", "number of conductors", "conductor count", "num conductors"],
+      groundSize: ["ground size", "groundsize", "ground_size", "ground"],
+    };
+    for (const [field, fieldAliases] of Object.entries(aliases)) {
+      const idx = headers.findIndex(h => fieldAliases.includes(h));
+      if (idx >= 0) colMap[field] = idx;
+    }
+    if (!("catalog" in colMap) || !("vendor" in colMap) || !("reelLength" in colMap)) {
+      setBulkError("CSV must have columns for: Catalog (or SKU/Code), Vendor, and Reel Length (or Footage).");
+      setBulkPreview(null);
+      return;
+    }
+    const rows: Omit<UserWireCategory, "id" | "userId">[] = [];
+    const errors: string[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(sep).map(c => c.trim().replace(/^["']|["']$/g, ""));
+      const catalog = cols[colMap.catalog] || "";
+      const vendor = cols[colMap.vendor] || "";
+      const reelLengthStr = cols[colMap.reelLength] || "";
+      const reelLength = parseInt(reelLengthStr);
+      if (!catalog) { errors.push(`Row ${i + 1}: missing catalog code`); continue; }
+      if (!vendor) { errors.push(`Row ${i + 1}: missing vendor`); continue; }
+      if (isNaN(reelLength) || reelLength <= 0) { errors.push(`Row ${i + 1}: invalid reel length "${reelLengthStr}"`); continue; }
+      rows.push({
+        catalog,
+        vendor,
+        reelLength,
+        description: colMap.description !== undefined ? (cols[colMap.description] || null) : null,
+        color: colMap.color !== undefined ? (cols[colMap.color] || null) : null,
+        jacketType: colMap.jacketType !== undefined ? (cols[colMap.jacketType] || null) : null,
+        conductors: colMap.conductors !== undefined ? (cols[colMap.conductors] || null) : null,
+        groundSize: colMap.groundSize !== undefined ? (cols[colMap.groundSize] || null) : null,
+      });
+    }
+    if (errors.length > 0 && rows.length === 0) {
+      setBulkError(errors.join("; "));
+      setBulkPreview(null);
+      return;
+    }
+    if (errors.length > 0) {
+      setBulkError(`${errors.length} row(s) skipped: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "..." : ""}`);
+    }
+    setBulkPreview(rows);
+  };
 
   const encodingEnabled = settings?.encodingEnabled ?? false;
 
@@ -614,6 +712,270 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Cable className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Wire Categories</CardTitle>
+                {wireCategories.length > 0 && (
+                  <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-wire-category-count">
+                    {wireCategories.length}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Add custom wire categories that appear in autocomplete alongside the built-in catalog.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setShowAddCategoryForm(!showAddCategoryForm); setShowBulkImport(false); }} data-testid="button-toggle-add-category">
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add Category
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setShowBulkImport(!showBulkImport); setShowAddCategoryForm(false); setBulkPreview(null); setBulkError(null); setBulkCsvText(""); }} data-testid="button-toggle-bulk-import">
+                <FileUp className="h-3.5 w-3.5 mr-1" />
+                Bulk Import
+              </Button>
+            </div>
+
+            {showAddCategoryForm && (
+              <div className="border rounded-md p-3 space-y-3 bg-muted/20">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Catalog Code *</Label>
+                    <Input value={newCat.catalog} onChange={(e) => setNewCat(s => ({ ...s, catalog: e.target.value }))} placeholder="e.g. THHN10BK500" className="h-8 text-sm" data-testid="input-new-cat-catalog" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Vendor *</Label>
+                    <Input value={newCat.vendor} onChange={(e) => setNewCat(s => ({ ...s, vendor: e.target.value }))} placeholder="e.g. COP" className="h-8 text-sm" data-testid="input-new-cat-vendor" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Reel Length (ft) *</Label>
+                    <Input type="number" value={newCat.reelLength} onChange={(e) => setNewCat(s => ({ ...s, reelLength: e.target.value }))} placeholder="e.g. 1000" className="h-8 text-sm" data-testid="input-new-cat-reel-length" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Description</Label>
+                    <Input value={newCat.description} onChange={(e) => setNewCat(s => ({ ...s, description: e.target.value }))} placeholder="Optional notes" className="h-8 text-sm" data-testid="input-new-cat-description" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Color</Label>
+                    <Input value={newCat.color} onChange={(e) => setNewCat(s => ({ ...s, color: e.target.value }))} placeholder="e.g. BK" className="h-8 text-sm" data-testid="input-new-cat-color" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Jacket Type</Label>
+                    <Input value={newCat.jacketType} onChange={(e) => setNewCat(s => ({ ...s, jacketType: e.target.value }))} placeholder="e.g. THHN" className="h-8 text-sm" data-testid="input-new-cat-jacket" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Conductors</Label>
+                    <Input value={newCat.conductors} onChange={(e) => setNewCat(s => ({ ...s, conductors: e.target.value }))} placeholder="e.g. 3" className="h-8 text-sm" data-testid="input-new-cat-conductors" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Ground Size</Label>
+                    <Input value={newCat.groundSize} onChange={(e) => setNewCat(s => ({ ...s, groundSize: e.target.value }))} placeholder="e.g. 10" className="h-8 text-sm" data-testid="input-new-cat-ground" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={!newCat.catalog.trim() || !newCat.vendor.trim() || !newCat.reelLength || isAddingCategory}
+                    onClick={async () => {
+                      try {
+                        await addCategory({
+                          catalog: newCat.catalog.trim(),
+                          vendor: newCat.vendor.trim(),
+                          reelLength: parseInt(newCat.reelLength),
+                          description: newCat.description.trim() || null,
+                          color: newCat.color.trim() || null,
+                          jacketType: newCat.jacketType.trim() || null,
+                          conductors: newCat.conductors.trim() || null,
+                          groundSize: newCat.groundSize.trim() || null,
+                        });
+                        setNewCat({ catalog: "", vendor: "", reelLength: "", description: "", color: "", jacketType: "", conductors: "", groundSize: "" });
+                        toast({ title: "Category added" });
+                      } catch {
+                        toast({ title: "Failed to add category", variant: "destructive" });
+                      }
+                    }}
+                    data-testid="button-save-category"
+                  >
+                    {isAddingCategory ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                    Save
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowAddCategoryForm(false)} data-testid="button-cancel-add-category">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {showBulkImport && (
+              <div className="border rounded-md p-3 space-y-3 bg-muted/20">
+                <p className="text-xs text-muted-foreground">
+                  Paste CSV or upload a file. Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size.
+                </p>
+                <Textarea
+                  placeholder={"Catalog,Vendor,Reel Length,Description\nTHHN10BK500,COP,500,#10 THHN Black\nXHHW4RD1000,ALU,1000,#4 XHHW Red"}
+                  value={bulkCsvText}
+                  onChange={(e) => { setBulkCsvText(e.target.value); setBulkPreview(null); setBulkError(null); }}
+                  rows={5}
+                  className="text-xs font-mono"
+                  data-testid="textarea-bulk-csv"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => csvFileInputRef.current?.click()} data-testid="button-upload-csv">
+                    <Upload className="h-3 w-3 mr-1" />
+                    Upload CSV
+                  </Button>
+                  <input
+                    ref={csvFileInputRef}
+                    type="file"
+                    accept=".csv,.tsv,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const text = ev.target?.result as string;
+                        setBulkCsvText(text);
+                        parseCsvForImport(text);
+                      };
+                      reader.readAsText(file);
+                      if (csvFileInputRef.current) csvFileInputRef.current.value = "";
+                    }}
+                    data-testid="input-csv-file"
+                  />
+                  <Button size="sm" onClick={() => parseCsvForImport(bulkCsvText)} disabled={!bulkCsvText.trim()} data-testid="button-preview-csv">
+                    Preview
+                  </Button>
+                </div>
+                {bulkError && (
+                  <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 rounded p-2" data-testid="text-bulk-error">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    {bulkError}
+                  </div>
+                )}
+                {bulkPreview && bulkPreview.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium">{bulkPreview.length} categories ready to import:</p>
+                    <div className="max-h-40 overflow-y-auto border rounded">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/50 sticky top-0">
+                          <tr>
+                            <th className="text-left p-1.5 font-medium">Catalog</th>
+                            <th className="text-left p-1.5 font-medium">Vendor</th>
+                            <th className="text-right p-1.5 font-medium">Length</th>
+                            <th className="text-left p-1.5 font-medium">Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bulkPreview.slice(0, 20).map((row, i) => (
+                            <tr key={i} className={i % 2 === 0 ? "" : "bg-muted/20"} data-testid={`row-bulk-preview-${i}`}>
+                              <td className="p-1.5 font-mono">{row.catalog}</td>
+                              <td className="p-1.5">{row.vendor}</td>
+                              <td className="p-1.5 text-right tabular-nums">{row.reelLength}'</td>
+                              <td className="p-1.5 truncate max-w-[120px]">{row.description || "—"}</td>
+                            </tr>
+                          ))}
+                          {bulkPreview.length > 20 && (
+                            <tr><td colSpan={4} className="p-1.5 text-center text-muted-foreground">...and {bulkPreview.length - 20} more</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={isBulkAdding}
+                      onClick={async () => {
+                        try {
+                          await bulkAddCategories(bulkPreview);
+                          toast({ title: `${bulkPreview.length} categories imported` });
+                          setBulkPreview(null);
+                          setBulkCsvText("");
+                          setBulkError(null);
+                          setShowBulkImport(false);
+                        } catch {
+                          toast({ title: "Failed to import categories", variant: "destructive" });
+                        }
+                      }}
+                      data-testid="button-confirm-bulk-import"
+                    >
+                      {isBulkAdding ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                      Import {bulkPreview.length} Categories
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {wireCategories.length > 0 && (
+              <>
+                {wireCategories.length > 5 && (
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Search categories..."
+                      value={wireCatSearch}
+                      onChange={(e) => setWireCatSearch(e.target.value)}
+                      className="h-8 text-sm pl-8"
+                      data-testid="input-search-wire-categories"
+                    />
+                  </div>
+                )}
+                <div className="max-h-60 overflow-y-auto border rounded-md">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        <th className="text-left p-1.5 font-medium">Catalog</th>
+                        <th className="text-left p-1.5 font-medium">Vendor</th>
+                        <th className="text-right p-1.5 font-medium">Length</th>
+                        <th className="text-left p-1.5 font-medium">Description</th>
+                        <th className="w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredWireCategories.map((cat) => (
+                        <tr key={cat.id} className="hover:bg-muted/30" data-testid={`row-wire-category-${cat.id}`}>
+                          <td className="p-1.5 font-mono font-medium">{cat.catalog}</td>
+                          <td className="p-1.5">{cat.vendor}</td>
+                          <td className="p-1.5 text-right tabular-nums">{cat.reelLength}'</td>
+                          <td className="p-1.5 truncate max-w-[120px]" title={[cat.description, cat.color, cat.jacketType, cat.conductors ? `${cat.conductors} cond` : null, cat.groundSize ? `GND ${cat.groundSize}` : null].filter(Boolean).join(" | ")}>
+                            {cat.description || "—"}
+                          </td>
+                          <td className="p-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              onClick={() => deleteCategory(cat.id)}
+                              data-testid={`button-delete-category-${cat.id}`}
+                            >
+                              <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredWireCategories.length === 0 && (
+                        <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">No matching categories found.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {wireCategories.length === 0 && !wireCategoriesLoading && !showAddCategoryForm && !showBulkImport && (
+              <p className="text-xs text-muted-foreground italic" data-testid="text-no-wire-categories">
+                No custom categories yet. Add categories individually or import them in bulk.
+              </p>
+            )}
           </CardContent>
         </Card>
 

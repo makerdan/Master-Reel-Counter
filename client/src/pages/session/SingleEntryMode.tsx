@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Camera, Save, X, Loader2, ImagePlus, Flag } from "lucide-react";
 
@@ -10,8 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { lookupCategory, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { lookupCategory, PARSED_CATALOG, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
+import { useWireCategories } from "@/hooks/use-wire-categories";
 import type { Entry, Pin } from "@shared/schema";
 
 export default function SingleEntryMode({
@@ -35,6 +36,12 @@ export default function SingleEntryMode({
   const [capturedPhoto, setCapturedPhoto] = useState<{ url: string; objectPath: string; photoId: number } | null>(null);
   const [keepLocation, setKeepLocation] = useState(false);
   const prevDefaultsRef = useRef({ aisle: defaultAisle || "", section: defaultSection || "" });
+
+  const { categories: userCategories } = useWireCategories();
+  const userParsedCatalog = useMemo(
+    () => userCategories.map(userWireCategoryToParsedEntry),
+    [userCategories]
+  );
 
   const { data: entrySettings } = useQuery<{
     defaultAislePrefix: string | null;
@@ -148,7 +155,7 @@ export default function SingleEntryMode({
 
   const getCatalogMatch = (reelTag: string): ParsedCatalogEntry | null => {
     if (!reelTag || reelTag.length < 2) return null;
-    const matches = lookupCategory(reelTag);
+    const matches = lookupCategory(reelTag, userParsedCatalog);
     const normalized = reelTag.toUpperCase().replace(/[^A-Z0-9]/g, "");
     const exact = matches.find(m => m.catalog === normalized);
     return exact || (matches.length === 1 ? matches[0] : null);
@@ -485,7 +492,7 @@ export default function SingleEntryMode({
               const val = e.target.value.toUpperCase();
               update("reelTag", val);
               if (val.length >= 2) {
-                const matches = lookupCategory(val);
+                const matches = lookupCategory(val, userParsedCatalog);
                 setCategorySuggestions(matches);
                 setShowCategorySuggestions(matches.length > 0);
               } else {
@@ -495,7 +502,7 @@ export default function SingleEntryMode({
             }}
             onFocus={() => {
               if (form.reelTag && form.reelTag.length >= 2) {
-                const matches = lookupCategory(form.reelTag);
+                const matches = lookupCategory(form.reelTag, userParsedCatalog);
                 setCategorySuggestions(matches);
                 setShowCategorySuggestions(matches.length > 0);
               }
