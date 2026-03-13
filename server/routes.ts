@@ -3708,6 +3708,21 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/storage/global-usage", isAuthenticated, async (req: any, res) => {
+    try {
+      const replOwner = process.env.REPL_OWNER;
+      const username = req.user.claims.username;
+      if (!replOwner || username !== replOwner) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const usage = await storage.getGlobalStorageUsage();
+      res.json(usage);
+    } catch (error) {
+      console.error("Error getting global storage usage:", error);
+      res.status(500).json({ message: "Failed to get global storage usage" });
+    }
+  });
+
   app.post("/api/storage/backfill-sizes", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

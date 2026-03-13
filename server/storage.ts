@@ -123,6 +123,11 @@ export interface IStorage {
     unknownSizeCount: number;
   }>;
 
+  getGlobalStorageUsage(): Promise<{
+    totalBytes: number;
+    totalPhotoCount: number;
+    distinctUserCount: number;
+  }>;
 
   getUserStats(userId: string): Promise<{
     totalSessions: number;
@@ -1228,6 +1233,26 @@ export class DatabaseStorage implements IStorage {
       userPhotoCount,
       userSessionCount: userSessionIds.length,
       unknownSizeCount,
+    };
+  }
+
+  async getGlobalStorageUsage(): Promise<{
+    totalBytes: number;
+    totalPhotoCount: number;
+    distinctUserCount: number;
+  }> {
+    const result = await db.select({
+      totalSize: sql<string>`coalesce(sum(${photos.fileSize}), 0)`,
+      photoCount: sql<string>`count(*)`,
+      userCount: sql<string>`count(distinct ${countingSessions.userId})`,
+    })
+      .from(photos)
+      .innerJoin(countingSessions, eq(photos.sessionId, countingSessions.id));
+
+    return {
+      totalBytes: parseInt(result[0]?.totalSize || "0", 10),
+      totalPhotoCount: parseInt(result[0]?.photoCount || "0", 10),
+      distinctUserCount: parseInt(result[0]?.userCount || "0", 10),
     };
   }
 

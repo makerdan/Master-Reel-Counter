@@ -182,6 +182,20 @@ export default function SettingsPage() {
     queryKey: ["/api/storage/usage"],
   });
 
+  const { data: globalUsage } = useQuery<{
+    totalBytes: number;
+    totalPhotoCount: number;
+    distinctUserCount: number;
+  }>({
+    queryKey: ["/api/storage/global-usage"],
+    queryFn: async () => {
+      const res = await fetch("/api/storage/global-usage", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    retry: false,
+  });
+
   const backfillSizes = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/storage/backfill-sizes");
@@ -369,6 +383,47 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {globalUsage && (() => {
+          const STORAGE_LIMIT = 10 * 1024 * 1024 * 1024;
+          const pct = Math.min((globalUsage.totalBytes / STORAGE_LIMIT) * 100, 100);
+          const formatBytes = (b: number) => {
+            if (b === 0) return "0 B";
+            if (b < 1024) return `${b} B`;
+            if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+            if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+            return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+          };
+          return (
+            <Card data-testid="card-global-storage">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base">App-Wide Storage</CardTitle>
+                  </div>
+                  <Badge variant="secondary" data-testid="badge-owner">Owner</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1.5">
+                    <span className="font-medium" data-testid="text-global-storage-used">
+                      {formatBytes(globalUsage.totalBytes)} used
+                    </span>
+                    <span className="text-muted-foreground" data-testid="text-global-storage-limit">
+                      {formatBytes(STORAGE_LIMIT)} limit
+                    </span>
+                  </div>
+                  <Progress value={pct} className="h-2.5" data-testid="progress-global-storage" />
+                  <p className="text-xs text-muted-foreground mt-1.5" data-testid="text-global-storage-details">
+                    {globalUsage.totalPhotoCount} photo{globalUsage.totalPhotoCount !== 1 ? "s" : ""} across {globalUsage.distinctUserCount} user{globalUsage.distinctUserCount !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         <Card>
           <CardHeader>
