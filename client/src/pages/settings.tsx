@@ -69,6 +69,8 @@ export default function SettingsPage() {
   const [feedbackTopic, setFeedbackTopic] = useState("BUG_REPORT");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [localPhotoQuality, setLocalPhotoQuality] = useState<number | null>(null);
+  const [localReceivingQuality, setLocalReceivingQuality] = useState<number | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -431,11 +433,12 @@ export default function SettingsPage() {
                   <Label className="text-sm font-medium">Photo Quality</Label>
                   <p className="text-xs text-muted-foreground">Lower quality saves bandwidth but may reduce zoom clarity on reel labels. Higher quality preserves detail for accurate reading.</p>
                 </div>
-                <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-photo-quality-value">{settings?.photoQuality ?? 85}%</span>
+                <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-photo-quality-value">{localPhotoQuality ?? settings?.photoQuality ?? 85}%</span>
               </div>
               <Slider
-                value={[settings?.photoQuality ?? 85]}
-                onValueCommit={(val) => saveSetting("photoQuality", val[0])}
+                value={[localPhotoQuality ?? settings?.photoQuality ?? 85]}
+                onValueChange={(val) => setLocalPhotoQuality(val[0])}
+                onValueCommit={(val) => { saveSetting("photoQuality", val[0]); setLocalPhotoQuality(null); }}
                 min={30}
                 max={100}
                 step={5}
@@ -445,7 +448,7 @@ export default function SettingsPage() {
               <div className="relative w-full h-4 mt-0.5">
                 {[30, 40, 50, 60, 70, 80, 85, 90, 95, 100].map((tick) => {
                   const pct = ((tick - 30) / 70) * 100;
-                  const isSelected = (settings?.photoQuality ?? 85) === tick;
+                  const isSelected = (localPhotoQuality ?? settings?.photoQuality ?? 85) === tick;
                   return (
                     <div
                       key={tick}
@@ -478,11 +481,12 @@ export default function SettingsPage() {
                 <div className="pl-2 border-l-2 border-primary/20 ml-1 mt-2 space-y-1">
                   <div className="flex items-center justify-between gap-4">
                     <Label className="text-xs text-muted-foreground">Receiving photo quality</Label>
-                    <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-receiving-quality-value">{settings?.receivingPhotoQuality ?? 50}%</span>
+                    <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-receiving-quality-value">{localReceivingQuality ?? settings?.receivingPhotoQuality ?? 50}%</span>
                   </div>
                   <Slider
-                    value={[settings?.receivingPhotoQuality ?? 50]}
-                    onValueCommit={(val) => saveSetting("receivingPhotoQuality", val[0])}
+                    value={[localReceivingQuality ?? settings?.receivingPhotoQuality ?? 50]}
+                    onValueChange={(val) => setLocalReceivingQuality(val[0])}
+                    onValueCommit={(val) => { saveSetting("receivingPhotoQuality", val[0]); setLocalReceivingQuality(null); }}
                     min={30}
                     max={100}
                     step={5}
@@ -492,7 +496,7 @@ export default function SettingsPage() {
                   <div className="relative w-full h-4 mt-0.5">
                     {[30, 40, 50, 60, 70, 80, 90, 100].map((tick) => {
                       const pct = ((tick - 30) / 70) * 100;
-                      const isSelected = (settings?.receivingPhotoQuality ?? 50) === tick;
+                      const isSelected = (localReceivingQuality ?? settings?.receivingPhotoQuality ?? 50) === tick;
                       return (
                         <div
                           key={tick}
