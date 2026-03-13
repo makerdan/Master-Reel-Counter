@@ -3700,7 +3700,23 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const usage = await storage.getStorageUsage(userId);
-      res.json(usage);
+      const userSessions = await storage.getUserSessions(userId);
+      const isMultiUser = userSessions.length > 0;
+
+      let hasCollaborators = false;
+      if (isMultiUser) {
+        for (const s of userSessions) {
+          const collabs = await storage.getSessionCollaborators(s.id);
+          if (collabs.length > 0) { hasCollaborators = true; break; }
+        }
+      }
+
+      if (hasCollaborators) {
+        res.json(usage);
+      } else {
+        const { byUser, totalBytes, totalPhotoCount, totalSessionCount, ...userOnly } = usage;
+        res.json(userOnly);
+      }
     } catch (error) {
       console.error("Error getting storage usage:", error);
       res.status(500).json({ message: "Failed to get storage usage" });

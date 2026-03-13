@@ -1239,17 +1239,18 @@ export class DatabaseStorage implements IStorage {
     const totalSessionCount = parseInt(totalSessionResult[0]?.sessionCount || "0", 10);
 
     const byUserResult = await db.select({
-      userId: countingSessions.userId,
+      odataUserId: countingSessions.userId,
       bytes: sql<string>`coalesce(sum(${photos.fileSize}), 0)`,
       photoCount: sql<string>`count(${photos.id})`,
+      displayName: sql<string>`max(${photos.uploadedBy})`,
     })
       .from(countingSessions)
       .leftJoin(photos, eq(photos.sessionId, countingSessions.id))
       .groupBy(countingSessions.userId);
 
     const byUser = byUserResult.map(r => ({
-      userId: r.userId,
-      username: r.userId,
+      userId: r.odataUserId,
+      username: r.displayName || r.odataUserId,
       bytes: parseInt(r.bytes || "0", 10),
       photoCount: parseInt(r.photoCount || "0", 10),
     }));

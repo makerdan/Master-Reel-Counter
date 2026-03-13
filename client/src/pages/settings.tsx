@@ -179,10 +179,10 @@ export default function SettingsPage() {
     userBytes: number;
     userPhotoCount: number;
     userSessionCount: number;
-    totalBytes: number;
-    totalPhotoCount: number;
-    totalSessionCount: number;
-    byUser: { userId: string; username: string; bytes: number; photoCount: number }[];
+    totalBytes?: number;
+    totalPhotoCount?: number;
+    totalSessionCount?: number;
+    byUser?: { userId: string; username: string; bytes: number; photoCount: number }[];
   }>({
     queryKey: ["/api/storage/usage"],
   });
@@ -328,8 +328,8 @@ export default function SettingsPage() {
                 if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(2)} MB`;
                 return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
               };
-              const hasUnknown = storageUsage.totalPhotoCount > 0 &&
-                storageUsage.byUser.every(u => u.bytes === 0);
+              const hasUnknown = (storageUsage.totalPhotoCount ?? storageUsage.userPhotoCount) > 0 &&
+                storageUsage.userBytes === 0 && (storageUsage.byUser || []).every(u => u.bytes === 0);
               return (
                 <>
                   <div>
@@ -368,7 +368,7 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                   )}
-                  {storageUsage.byUser.length > 1 && (
+                  {storageUsage.byUser && storageUsage.byUser.length > 1 && (
                     <Collapsible open={storageBreakdownOpen} onOpenChange={setStorageBreakdownOpen}>
                       <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm" className="w-full justify-between text-xs" data-testid="button-toggle-breakdown">
@@ -403,8 +403,8 @@ export default function SettingsPage() {
                             <tfoot>
                               <tr className="border-t font-medium">
                                 <td className="p-2">Total</td>
-                                <td className="p-2 text-right tabular-nums">{storageUsage.totalPhotoCount}</td>
-                                <td className="p-2 text-right tabular-nums">{formatBytes(storageUsage.totalBytes)}</td>
+                                <td className="p-2 text-right tabular-nums">{storageUsage.totalPhotoCount ?? 0}</td>
+                                <td className="p-2 text-right tabular-nums">{formatBytes(storageUsage.totalBytes ?? 0)}</td>
                               </tr>
                             </tfoot>
                           </table>
