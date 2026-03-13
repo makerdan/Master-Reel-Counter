@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 
 function FeedbackDialog({ page }: { page: string }) {
@@ -1010,6 +1011,245 @@ export function MobileFlowSections() {
   );
 }
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+const helpChatState: { messages: ChatMessage[] } = {
+  messages: [],
+};
+
+function AskAIChat() {
+  const [messages, setMessagesRaw] = useState<ChatMessage[]>(helpChatState.messages);
+  const [input, setInput] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const setMessages = useCallback((updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+    setMessagesRaw(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      helpChatState.messages = next;
+      return next;
+    });
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  const sendMessage = useCallback(async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isStreaming) return;
+
+    const userMsg: ChatMessage = { role: "user", content: trimmed };
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setInput("");
+    setIsStreaming(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await fetch("/api/help-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ messages: updatedMessages }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) throw new Error("Failed to get response");
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let assistantContent = "";
+      let buffer = "";
+
+      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+
+        for (const event of events) {
+          for (const line of event.split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.done) continue;
+              if (data.error) throw new Error(data.error);
+              if (data.content) {
+                assistantContent += data.content;
+                const captured = assistantContent;
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { role: "assistant", content: captured };
+                  return updated;
+                });
+              }
+            } catch (parseErr) {
+              if (parseErr instanceof SyntaxError) continue;
+              throw parseErr;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setMessages(prev => {
+        if (prev.length > 0 && prev[prev.length - 1].role === "assistant" && prev[prev.length - 1].content === "") {
+          return [...prev.slice(0, -1), { role: "assistant", content: "Sorry, I couldn't get a response. Please try again." }];
+        }
+        return [...prev, { role: "assistant", content: "Sorry, I couldn't get a response. Please try again." }];
+      });
+    } finally {
+      abortRef.current = null;
+      setIsStreaming(false);
+    }
+  }, [input, isStreaming, messages, setMessages]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }, [sendMessage]);
+
+  const clearChat = useCallback(() => {
+    setMessages([]);
+    setInput("");
+  }, [setMessages]);
+
+  const renderMarkdown = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\n)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={i}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith("`") && part.endsWith("`")) {
+        return <code key={i} className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">{part.slice(1, -1)}</code>;
+      }
+      if (part === "\n") {
+        return <br key={i} />;
+      }
+      return part;
+    });
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center py-8">
+            <Bot className="h-8 w-8 text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">Ask me anything about the app</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">I know about all features, workflows, and tips</p>
+            <div className="flex flex-wrap gap-1.5 mt-4 justify-center max-w-[280px]">
+              {["How do I place pins?", "What is Mobile Flow?", "How to export data?"].map((q) => (
+                <button
+                  key={q}
+                  className="text-[10px] px-2 py-1 rounded-full border border-border bg-muted/50 text-muted-foreground hover:bg-muted transition-colors"
+                  onClick={() => { setInput(q); inputRef.current?.focus(); }}
+                  data-testid={`button-suggestion-${q.replace(/\s+/g, "-").toLowerCase()}`}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`} data-testid={`chat-message-${msg.role}-${i}`}>
+            {msg.role === "assistant" && (
+              <div className="shrink-0 mt-0.5">
+                <div className="h-5 w-5 rounded-full bg-[hsl(18_70%_50%)] flex items-center justify-center">
+                  <Bot className="h-3 w-3 text-white" />
+                </div>
+              </div>
+            )}
+            <div className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
+              msg.role === "user"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-foreground"
+            }`}>
+              {msg.role === "assistant" ? renderMarkdown(msg.content) : msg.content}
+              {msg.role === "assistant" && isStreaming && i === messages.length - 1 && (
+                <span className="inline-block w-1.5 h-3 bg-foreground/50 animate-pulse ml-0.5 align-middle" />
+              )}
+            </div>
+            {msg.role === "user" && (
+              <div className="shrink-0 mt-0.5">
+                <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center">
+                  <User className="h-3 w-3 text-muted-foreground" />
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="shrink-0 border-t p-3 space-y-2">
+        {messages.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full h-7 text-xs text-muted-foreground gap-1.5"
+            onClick={clearChat}
+            disabled={isStreaming}
+            data-testid="button-clear-chat"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Clear chat
+          </Button>
+        )}
+        <div className="flex gap-2">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask a question..."
+            rows={1}
+            className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            disabled={isStreaming}
+            data-testid="input-help-chat"
+          />
+          <Button
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={sendMessage}
+            disabled={!input.trim() || isStreaming}
+            data-testid="button-send-help-chat"
+          >
+            {isStreaming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" | "dashboard" }) {
   const [open, setOpen] = useState(false);
   const [, setLocation] = useLocation();
@@ -1043,29 +1283,48 @@ export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" |
             {description}
           </SheetDescription>
         </SheetHeader>
-        <ScrollArea className="flex-1 px-4">
-          <Accordion type="multiple" className="w-full">
-            <OverviewHelp />
-            {mode === "dashboard" && <DashboardSections />}
-            {mode === "full" && <SessionSections />}
-            {mode === "mobile" && <MobileFlowSections />}
-          </Accordion>
-          <Separator className="my-3" />
-          <Button
-            variant="outline"
-            className="w-full mb-2 gap-2 text-xs"
-            onClick={() => {
-              setOpen(false);
-              setLocation("/help");
-            }}
-            data-testid="button-full-help-guide"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            View Full Help Guide
-          </Button>
-          <FeedbackDialog page={mode} />
-          <div className="h-4" />
-        </ScrollArea>
+        <Tabs defaultValue="guide" className="flex flex-col flex-1 min-h-0">
+          <TabsList className="mx-4 mt-2 shrink-0">
+            <TabsTrigger value="guide" className="flex-1 text-xs gap-1.5" data-testid="tab-help-guide">
+              <HelpCircle className="h-3.5 w-3.5" />
+              Guide
+            </TabsTrigger>
+            <TabsTrigger value="ask-ai" className="flex-1 text-xs gap-1.5" data-testid="tab-help-ask-ai">
+              <Sparkles className="h-3.5 w-3.5" />
+              Ask AI
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="guide" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+            <ScrollArea className="flex-1">
+              <div className="px-4">
+                <Accordion type="multiple" className="w-full">
+                  <OverviewHelp />
+                  {mode === "dashboard" && <DashboardSections />}
+                  {mode === "full" && <SessionSections />}
+                  {mode === "mobile" && <MobileFlowSections />}
+                </Accordion>
+                <Separator className="my-3" />
+                <Button
+                  variant="outline"
+                  className="w-full mb-2 gap-2 text-xs"
+                  onClick={() => {
+                    setOpen(false);
+                    setLocation("/help");
+                  }}
+                  data-testid="button-full-help-guide"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  View Full Help Guide
+                </Button>
+                <FeedbackDialog page={mode} />
+                <div className="h-4" />
+              </div>
+            </ScrollArea>
+          </TabsContent>
+          <TabsContent value="ask-ai" forceMount className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col data-[state=inactive]:hidden">
+            <AskAIChat />
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );

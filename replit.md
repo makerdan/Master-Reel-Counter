@@ -27,6 +27,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Undo/Redo:** Functionality for entry and pin modifications.
 - **Summary Statistics:** Dashboard for key metrics and activity logs.
 - **Security:** Ownership verification on all CRUD routes and optional AES-256-GCM data encryption for sensitive entry fields.
+- **AI Help Chatbot:** The Help menu includes a tabbed layout with "Guide" (existing accordion docs) and "Ask AI" tabs. The AI chatbot uses OpenAI (gpt-4o-mini) with a comprehensive system prompt covering all app features. Supports streaming responses, conversation history within the session, clear chat, and basic markdown rendering.
 - **In-App Feedback:** Users can submit structured feedback (bug reports, feature requests) directly from the application.
 - **Flagged Reels Workflow:** Pins can be flagged for re-shoot/review with notes, and a dedicated tab allows viewing and resolving flagged pins.
 - **Duplicate Detection:** Identifies potential duplicate pins based on label matching (same label in same aisle/section) and same-reel detection (multiple pins on the same photo for the same physical reel).

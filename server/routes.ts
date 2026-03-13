@@ -4005,6 +4005,113 @@ export async function registerRoutes(
     }
   });
 
+  const HELP_SYSTEM_PROMPT = `You are a helpful assistant for "Master Reel Counter," a warehouse wire reel counting application. Answer questions clearly and concisely based on the following app knowledge. If you don't know, say so honestly.
+
+## App Overview
+Master Reel Counter helps users photograph pallet sections in warehouses, annotate reels with pins, enter wire catalog details (category, vendor code, footage), and export professional inventory reports (CSV, PDF, email).
+
+## Dashboard
+- **Sessions**: Create, rename, duplicate, lock/unlock, mark complete/reopen, delete sessions. Each card shows name, location, reel count, total footage, photo count, and thumbnail.
+- **Folders**: Organize sessions into folders. Folders can be nested. Deleting a folder moves sessions back to root (sessions are never deleted).
+- **Sorting & Search**: Sort by date, name, reels, or footage. Search filters by name or location across owned and shared sessions.
+- **Shared Sessions**: Sessions shared by others appear in a separate section showing owner name and your role (Editor or Viewer).
+- **Header Bar**: Theme toggle (dark/light), Help, Stats page, Settings (profile avatar, display name, encryption keys, preferences), Sign Out.
+
+## Session — Full Mode (Desktop)
+- **Session Header**: Back arrow, editable name/location/description, lock/unlock, undo/redo, online user avatars, Team button (invite by username/link/email, set roles), Activity Log, Export, dark/light toggle, auto-save indicator.
+- **Section Photo Tab**: Upload/capture photos tagged with aisle & section. Navigate photos with prev/next or type a number. "Next Reel" button jumps to photos with incomplete pins. Zoom (up to 5x), pan, reset, pin placement mode.
+- **Pins**: Click photo in pin mode to place numbered pins. Drag to reposition. Delete with × button. Committed pins show "P" prefix. Draft pins auto-save.
+- **Reel Crop Preview**: Tap a pin to see zoomed crop. Toggle close-up vs wide crop.
+- **Entry Details Table**: Category input searches ~186 catalog entries (arrow keys + Enter to select, auto-fills vendor & footage). Vendor code dropdown (COP, ALU, COR, ALF). Footage field. Clear row, flag for re-shoot, commit pins as entries.
+- **Photo Notes & Detail Shots**: Add notes to photos (auto-save). Mark as detail/close-up shot linked to parent photo.
+- **Nearby Photo Strip**: Horizontal strip of photos sorted by location. Orange badge shows incomplete pin count.
+- **Quick Entry Panel**: Create entries without pins. Auto-fills aisle/section from current photo. Catalog autocomplete. "On Floor / In Front Of" checkbox. Receiving mode auto-increments sections.
+- **Flagged Tab**: Shows all flagged reels with reason. Photo preview with orange pulsing ring. Re-shoot captures detail shot. Un-flag to remove. Shareable link. "Entries Without Photos" issues section.
+- **Photos Reel Tab**: Visual grid of all photos grouped by aisle/section. Sequence badge, duplicate, delete, jump-to-photo buttons. Back to Top button.
+- **AI Scanner Tab**: AI vision reads wire reel labels from photo crops. Select photos, preview crops, batch analyze (up to 20 per request), review raw text + matched catalog results, apply to entries. All Photos mode vs Single Photo mode. Receiving pooling for batch efficiency. Real-time sync via WebSocket.
+- **Table View**: All committed entries grouped by aisle/section. Clickable pin # jumps to photo. Collapsible sections. Photo viewer with pin highlight. Edit/delete entries. Validation warnings for missing data. Total footage footer.
+- **Collaboration**: Invite by username, share link (7-day auto-expiry with join count tracking), or email. Editor/Viewer roles. Real-time presence with green dots. Session locking freezes all edits.
+- **Export**: CSV (spreadsheet with all fields), PDF (full quality or standard, parallel generation), email sharing.
+
+## Session — Mobile Flow
+- **Capturing**: Set aisle & section (aisle required), section stepper +/- buttons, take photo or upload from gallery, Receiving checkbox auto-increments sections.
+- **Upload Queue & Offline**: Background upload with counter. Failed uploads show retry/dismiss. Offline mode saves to IndexedDB, auto-syncs on reconnect.
+- **Photo Review**: Navigate with prev/next. Sort by aisle or latest. Add notes, mark as detail shot, delete photos. Location labels shown.
+
+## Tips
+- Type a few letters of wire category + arrow down + Enter for rapid data entry.
+- Use "Next Reel" button to jump through incomplete photos.
+- Type "rec" in aisle to auto-fill "Receiving".
+- Flag reels you can't read and share the Flagged tab link with someone who can re-photograph.
+- All entry creates/edits/deletes can be undone with undo/redo.
+- Mobile: Set aisle, rapidly tap "Take Photo" — uploads happen in background.
+- Mobile is for capturing; switch to Full Mode on desktop for detailed work.`;
+
+  app.post("/api/help-chat", isAuthenticated, async (req: any, res) => {
+    try {
+      const { messages } = req.body;
+      if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
+        return res.status(400).json({ error: "messages must be a non-empty array (max 50)" });
+      }
+
+      const validRoles = new Set(["user", "assistant"]);
+      const sanitized: { role: "user" | "assistant"; content: string }[] = [];
+      for (const m of messages) {
+        if (!m || typeof m.content !== "string" || !validRoles.has(m.role)) {
+          return res.status(400).json({ error: "Each message must have role (user/assistant) and content (string)" });
+        }
+        const content = m.content.trim().slice(0, 2000);
+        if (!content) {
+          return res.status(400).json({ error: "Message content cannot be empty" });
+        }
+        sanitized.push({ role: m.role as "user" | "assistant", content });
+      }
+
+      const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
+        { role: "system", content: HELP_SYSTEM_PROMPT },
+        ...sanitized,
+      ];
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      let aborted = false;
+      req.on("close", () => { aborted = true; });
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: chatMessages,
+        stream: true,
+        max_completion_tokens: 1024,
+      });
+
+      for await (const chunk of stream) {
+        if (aborted) {
+          stream.controller.abort();
+          break;
+        }
+        const content = chunk.choices[0]?.delta?.content || "";
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+      }
+    } catch (error) {
+      console.error("Error in help chat:", error);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: "Failed to get response" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: "Failed to get response" });
+      }
+    }
+  });
+
   // WebSocket
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
