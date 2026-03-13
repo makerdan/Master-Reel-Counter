@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw, HardDrive, Globe } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -182,7 +182,7 @@ export function DashboardSections() {
           <FeatureRow
             icon={<HelpIcon icon={Settings} />}
             label="Settings"
-            description="Opens your profile and app settings. Upload a custom profile avatar, edit your display name, manage encryption keys, and configure preferences for display, accessibility, data entry, photo capture, and export."
+            description="Opens your profile and app settings. Upload a custom profile avatar, edit your display name, manage encryption keys, configure preferences for display, accessibility, data entry, photo capture, and export. Also manage custom wire categories (add individually or bulk import CSV), browse the built-in wire catalog, and view your storage usage dashboard with backfill tools."
           />
           <FeatureRow
             icon={<HelpIcon icon={LogOut} />}
@@ -350,6 +350,46 @@ export function DashboardSections() {
             icon={<span className="inline-block w-3 h-3 rounded-sm bg-primary/20 border border-primary/30" />}
             label="Thumbnail"
             description="A small preview of the first photo in the session appears on the card for visual identification."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="dash-settings">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Settings className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Settings</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Configure your profile, preferences, wire categories, and monitor storage usage.</p>
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Wire Categories</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Cable} />}
+            label="Custom Categories"
+            description="Add your own wire categories that appear in autocomplete alongside the built-in catalog. Add them one at a time with the Add Category form, or use Bulk Import to paste or upload a CSV file with multiple entries at once."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Search} />}
+            label="Built-in Catalog Viewer"
+            description="Expand the Built-in Catalog section to browse all ~300 default wire entries. Use the search bar to filter by catalog code, vendor, or description. These entries are always available in autocomplete throughout the app."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Delete Custom Categories"
+            description="Remove individual custom categories using the trash icon on each row. Built-in catalog entries cannot be deleted."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Storage Usage</p>
+          <FeatureRow
+            icon={<HelpIcon icon={HardDrive} />}
+            label="Your Storage"
+            description="View how much storage your photos are using, including total bytes, photo count, and session count. A progress bar shows usage against the 10 GB limit. Use the Backfill Sizes button to calculate sizes for older photos that were uploaded before size tracking was added."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Globe} />}
+            label="App-Wide Storage (Owner)"
+            description="Session owners see an additional card showing total storage usage across all users, with a count of distinct users and total photos. Use the refresh button to re-fetch the latest numbers."
           />
         </AccordionContent>
       </AccordionItem>
@@ -529,7 +569,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
             label="Category Input (Wire Details)"
-            description="Type a wire category and the system searches ~186 catalog entries. Use arrow keys to navigate suggestions and Enter to select. Selecting a category auto-fills the vendor code and footage fields. The suggestion dropdown scrolls when there are many matches."
+            description="Type a wire category and the system searches the built-in catalog (~300 entries) plus any custom categories you've added in Settings. Use arrow keys to navigate suggestions and Enter to select. Selecting a category auto-fills the vendor code and footage fields. The suggestion dropdown scrolls when there are many matches."
           />
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">VND</span>}
@@ -593,7 +633,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
             label="Catalog Autocomplete"
-            description="The category field searches the same ~186 wire catalog entries. Selecting a match auto-fills the vendor code and footage fields."
+            description="The category field searches the built-in catalog (~300 entries) plus your custom categories from Settings. Selecting a match auto-fills the vendor code and footage fields."
           />
           <FeatureRow
             icon={<HelpIcon icon={Check} />}
@@ -744,7 +784,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
             label="Matched Results"
-            description="The raw text is automatically matched against the ~186 wire catalog entries. The best match fills in the category, vendor code, and footage fields. You can edit any field to correct the AI before applying."
+            description="The raw text is automatically matched against the built-in catalog (~300 entries) plus your custom categories. The best match fills in the category, vendor code, and footage fields. You can edit any field to correct the AI before applying."
           />
           <FeatureRow
             icon={<HelpIcon icon={Check} />}
@@ -913,6 +953,11 @@ export function MobileFlowSections() {
             icon={<HelpIcon icon={ImagePlus} />}
             label="Upload from Gallery"
             description="Select one or more existing photos from your gallery. Supports multi-select for batch uploading."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Quick Entry"
+            description="Create entries without taking a photo. Enter wire details (category, vendor, footage, reel count) with the current aisle and section. Useful for quick manual counts."
           />
           <div className="flex items-start gap-2.5 py-1.5">
             <div className="mt-0.5"><Check className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" /></div>
