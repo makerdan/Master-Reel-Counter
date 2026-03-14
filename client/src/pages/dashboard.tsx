@@ -40,6 +40,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatTimestamp } from "@/lib/timezone";
 import type { Session, Folder as FolderType } from "@shared/schema";
+import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
+import type { UnitType } from "@/lib/unit-conversion";
 
 type SessionWithStats = Session & {
   entryCount: number;
@@ -62,6 +64,12 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const tz = useTimezone();
+  const { data: dashSettings } = useQuery<{ defaultUnit: string }>({
+    queryKey: ["/api/settings"],
+    select: (data: any) => ({ defaultUnit: data?.defaultUnit ?? "feet" }),
+  });
+  const currentUnit: UnitType = (dashSettings?.defaultUnit as UnitType) || "feet";
+  const uLabel = unitLabel(currentUnit);
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [sessionName, setSessionName] = useState("");
   const [sessionLocation, setSessionLocation] = useState("");
@@ -562,7 +570,7 @@ export default function Dashboard() {
     location: "Matched Location",
     status: "Matched Status",
     date: "Matched Date",
-    footage: "Matched Footage",
+    footage: `Matched Footage (${uLabel})`,
     reels: "Matched Reels",
     collaborator: "Matched Collaborator",
     entries: "Matched Entry Content",
@@ -683,7 +691,7 @@ export default function Dashboard() {
                 {session.totalFootage > 0 && (
                   <span className="flex items-center gap-1 mono" data-testid={`text-${prefix}session-footage-${session.id}`}>
                     <Ruler className="h-3 w-3 shrink-0" />
-                    {session.totalFootage.toLocaleString()} ft
+                    {toDisplayUnit(session.totalFootage, currentUnit).toLocaleString()} {uLabel}
                   </span>
                 )}
               </div>

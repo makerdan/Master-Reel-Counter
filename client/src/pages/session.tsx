@@ -5,6 +5,8 @@ import {
   ArrowLeft, ArrowUp, Camera, Download, FileText, Mail, Undo2, Redo2, History,
   Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Trash2, LayoutGrid, ScanLine,
 } from "lucide-react";
+import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
+import type { UnitType } from "@/lib/unit-conversion";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -261,7 +263,10 @@ function SessionWorkspace({
     return () => window.removeEventListener("keydown", handler);
   }, [undoWithSignal, redoWithSignal]);
 
+  const currentUnit: UnitType = (userSettings?.defaultUnit as UnitType) || "feet";
+  const uLabel = unitLabel(currentUnit);
   const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
+  const displayTotalFootage = toDisplayUnit(totalFootage, currentUnit);
 
   const updateSession = useMutation({
     mutationFn: async ({ name, location, description }: { name: string; location: string; description?: string }) => {
@@ -319,7 +324,7 @@ function SessionWorkspace({
     lines.push(`Session: ${session.name}`);
     if (session.location) lines.push(`Location: ${session.location}`);
     lines.push(`Entries: ${entries.length}`);
-    lines.push(`Total Footage: ${totalFootage.toLocaleString()} ft`);
+    lines.push(`Total Footage: ${displayTotalFootage.toLocaleString()} ${uLabel}`);
     lines.push(`Photos: ${photos.length}`);
     if (session.firstPhotoAt) {
       lines.push(`Time: ${formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz)}`);
@@ -336,7 +341,7 @@ function SessionWorkspace({
     for (const [loc, group] of grouped) {
       lines.push(`--- ${loc} ---`);
       for (const e of group) {
-        const parts = [e.reelTag || "Unknown", e.wireType, e.gauge, e.footage ? `${e.footage}ft` : "", e.color, e.manufacturer].filter(Boolean);
+        const parts = [e.reelTag || "Unknown", e.wireType, e.gauge, e.footage ? `${toDisplayUnit(e.footage, currentUnit)}${uLabel}` : "", e.color, e.manufacturer].filter(Boolean);
         lines.push(`  ${parts.join(" | ")}${e.reelCount && e.reelCount > 1 ? ` (x${e.reelCount})` : ""}`);
       }
       lines.push("");
@@ -803,7 +808,9 @@ function SessionWorkspace({
               photos={photos}
               onEdit={(entry) => { setEditingEntry(entry); }}
               sessionId={sessionId}
-              totalFootage={totalFootage}
+              totalFootage={displayTotalFootage}
+              unitLabel={uLabel}
+              currentUnit={currentUnit}
               onUndoableDelete={pushUndo}
               canEdit={canEditSession}
               forceExpandKey={tableExpandKey ?? undefined}

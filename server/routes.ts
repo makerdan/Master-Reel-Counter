@@ -12,6 +12,7 @@ import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
 import PDFDocument from "pdfkit";
+import { toDisplayUnit, unitLabel, unitLabelFull, type UnitType } from "./unit-conversion";
 import sharp from "sharp";
 import { randomUUID, randomBytes } from "crypto";
 import path from "path";
@@ -1549,6 +1550,11 @@ export async function registerRoutes(
       const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
       const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
       const generatedAt = new Date().toISOString();
+      const userSettings = await storage.getUserSettings(userId);
+      const pdfUnit: UnitType = (userSettings?.defaultUnit as UnitType) || "feet";
+      const pdfULabel = unitLabel(pdfUnit);
+      const pdfUFull = unitLabelFull(pdfUnit);
+      const fmtFootage = (ft: number) => toDisplayUnit(ft, pdfUnit).toLocaleString();
       const photoStats = await storage.getSessionPhotoStats([session.id]);
       const pt = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
       const sessionPhotos = await storage.getSessionPhotos(session.id);
@@ -1690,8 +1696,8 @@ export async function registerRoutes(
         ["Location:", session.location || "N/A"],
         ["Status:", (session.status.charAt(0).toUpperCase() + session.status.slice(1))],
         ["Total Reels:", totalReels.toLocaleString()],
-        ["Total Footage:", `${activeTotalFootage.toLocaleString()} ft`],
-        ...(flaggedEntryIds.size > 0 ? [["Flagged (excl.):", `${flaggedReelCount} reels / ${flaggedFootage.toLocaleString()} ft`] as [string, string]] : []),
+        ["Total Footage:", `${fmtFootage(activeTotalFootage)} ${pdfULabel}`],
+        ...(flaggedEntryIds.size > 0 ? [["Flagged (excl.):", `${flaggedReelCount} reels / ${fmtFootage(flaggedFootage)} ${pdfULabel}`] as [string, string]] : []),
         ["Photos:", pt.photoCount.toLocaleString()],
       ];
       for (const [label, value] of coverRows) {
@@ -1829,7 +1835,7 @@ export async function registerRoutes(
           }
           const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
           const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
-          const tocLabel = `Aisle ${sec.aisle || "—"} / Section ${sec.section || "—"} — ${sec.entries.length} entries, ${secReels} reels, ${secFootage.toLocaleString()} ft`;
+          const tocLabel = `Aisle ${sec.aisle || "—"} / Section ${sec.section || "—"} — ${sec.entries.length} entries, ${secReels} reels, ${fmtFootage(secFootage)} ${pdfULabel}`;
           const destName = `sec-${si}`;
 
           doc.font('Helvetica').fontSize(tocFontSize).fillColor("#1a6bc4")
@@ -1846,7 +1852,7 @@ export async function registerRoutes(
         { header: "Category:", width: 110 },
         { header: "Vendor:", width: 70 },
         { header: "# of Reels:", width: 45, centered: true },
-        { header: "Total Footage:", width: 65, centered: true },
+        { header: `Total (${pdfULabel}):`, width: 65, centered: true },
         { header: "Notes:", width: 110 },
       ];
 
@@ -2211,7 +2217,7 @@ export async function registerRoutes(
           const details: string[] = [];
           if (e.manufacturer) details.push(`Vendor: ${e.manufacturer}`);
           if (e.reelCount && e.reelCount > 1) details.push(`Reels: ${e.reelCount}`);
-          if (e.footage) details.push(`Footage: ${e.footage.toLocaleString()} ft`);
+          if (e.footage) details.push(`Footage: ${fmtFootage(e.footage)} ${pdfULabel}`);
           if (e.gauge) details.push(`Gauge: ${e.gauge}`);
           if (e.color) details.push(`Color: ${e.color}`);
           if (e.conductors) details.push(`Conductors: ${e.conductors}`);
@@ -2251,7 +2257,7 @@ export async function registerRoutes(
           tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
         );
         doc.fontSize(7).fillColor("#666666").text(
-          `${entryCount} entries  |  ${reelCount} reels  |  ${footage.toLocaleString()} ft`,
+          `${entryCount} entries  |  ${reelCount} reels  |  ${fmtFootage(footage)} ${pdfULabel}`,
           tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
         );
         doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
@@ -2288,7 +2294,7 @@ export async function registerRoutes(
             e.reelTag || "",
             e.manufacturer || "",
             String(e.reelCount || 1),
-            e.footage ? `${e.footage.toLocaleString()} ft` : "",
+            e.footage ? `${fmtFootage(e.footage)} ${pdfULabel}` : "",
             notesText,
           ];
           const vals = pinMap
@@ -2661,7 +2667,7 @@ export async function registerRoutes(
             tableLeft + 6, currentY + 4, { width: pageWidth - 100, lineBreak: false }
           );
           doc.fontSize(7).fillColor("#666666").text(
-            `${ums.entries.length} entries  |  ${unmatchedReels} reels  |  ${unmatchedFootage.toLocaleString()} ft`,
+            `${ums.entries.length} entries  |  ${unmatchedReels} reels  |  ${fmtFootage(unmatchedFootage)} ${pdfULabel}`,
             tableLeft + pageWidth - 220, currentY + 6, { width: 210, align: "right", lineBreak: false }
           );
           doc.rect(tableLeft, currentY, pageWidth, 22).stroke(borderColor);
@@ -2781,7 +2787,7 @@ export async function registerRoutes(
             ["Category:", e.reelTag || "Unknown"],
             ["Vendor:", e.manufacturer || "Unknown"],
             ["Reels:", String(e.reelCount || 1)],
-            ["Footage:", e.footage ? `${e.footage.toLocaleString()} ft` : "0 ft"],
+            ["Footage:", e.footage ? `${fmtFootage(e.footage)} ${pdfULabel}` : `0 ${pdfULabel}`],
           ];
           if (e.notes) infoLines.push(["Notes:", e.notes]);
 
@@ -2803,10 +2809,10 @@ export async function registerRoutes(
 
       doc.fontSize(18).fillColor(accentHex).text("Summary Totals", 36, currentY);
       currentY += 24;
-      doc.fontSize(9).fillColor("#666666").text(`${session.name}  |  ${session.location || "N/A"}  |  ${activeEntries.length} entries  |  ${activeTotalFootage.toLocaleString()} ft total`, 36, currentY);
+      doc.fontSize(9).fillColor("#666666").text(`${session.name}  |  ${session.location || "N/A"}  |  ${activeEntries.length} entries  |  ${fmtFootage(activeTotalFootage)} ${pdfULabel} total`, 36, currentY);
       currentY += 14;
       if (flaggedEntryIds.size > 0) {
-        doc.fontSize(8).fillColor("#cc4400").text(`Note: ${flaggedEntryIds.size} flagged reel(s) with ${flaggedFootage.toLocaleString()} ft excluded from this summary — see Flagged Reels section.`, 36, currentY);
+        doc.fontSize(8).fillColor("#cc4400").text(`Note: ${flaggedEntryIds.size} flagged reel(s) with ${fmtFootage(flaggedFootage)} ${pdfULabel} excluded from this summary — see Flagged Reels section.`, 36, currentY);
         currentY += 14;
       }
       currentY += 6;
@@ -2896,7 +2902,7 @@ export async function registerRoutes(
         { header: "Category:", width: 140, align: "left" as const },
         { header: "Vendor Code:", width: 100, align: "center" as const },
         { header: "# of Reels:", width: 50, align: "center" as const },
-        { header: "Total Footage:", width: 80, align: "center" as const },
+        { header: `Total (${pdfULabel}):`, width: 80, align: "center" as const },
         { header: "Reel Location(s):", width: 330, align: "left" as const },
       ];
       const sumTotalW = sumCols.reduce((s, c) => s + c.width, 0);
@@ -2967,7 +2973,7 @@ export async function registerRoutes(
           `    ${cat.category}`,
           cat.vendorCode,
           String(cat.reelCount),
-          `${cat.totalFootage.toLocaleString()} ft`,
+          `${fmtFootage(cat.totalFootage)} ${pdfULabel}`,
           locText,
         ];
         const aligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
@@ -2993,7 +2999,7 @@ export async function registerRoutes(
       doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill(headerBg);
       doc.font('Helvetica-Bold').fontSize(7).fillColor("#333333");
       let tx = tableLeft;
-      const totalVals = ["GRAND TOTAL", "", `${sortedCategories.reduce((s, c) => s + c.reelCount, 0)} reels`, `${activeTotalFootage.toLocaleString()} total ft`, `${sortedCategories.length} total categories`];
+      const totalVals = ["GRAND TOTAL", "", `${sortedCategories.reduce((s, c) => s + c.reelCount, 0)} reels`, `${fmtFootage(activeTotalFootage)} total ${pdfULabel}`, `${sortedCategories.length} total categories`];
       const totalAligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
       for (let j = 0; j < sumScaled.length; j++) {
         doc.text(totalVals[j], tx + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false, align: totalAligns[j] });
@@ -3116,6 +3122,9 @@ export async function registerRoutes(
 
       const userSettingsData = await storage.getUserSettings(userId);
       const userTz = userSettingsData?.timezone || "America/Chicago";
+      const xlUnit: UnitType = (userSettingsData?.defaultUnit as UnitType) || "feet";
+      const xlULabel = unitLabel(xlUnit);
+      const xlFmt = (ft: number) => toDisplayUnit(ft, xlUnit);
       const companyName = typeof req.query.companyName === "string" ? req.query.companyName : null;
 
       const TZ_ABBR: Record<string, string> = {
@@ -3219,10 +3228,10 @@ export async function registerRoutes(
         ["Location:", session.location || "N/A"],
         ["Status:", session.status.charAt(0).toUpperCase() + session.status.slice(1)],
         ["Total Reels:", totalReels.toLocaleString()],
-        ["Total Footage:", `${activeTotalFootage.toLocaleString()} ft`],
+        ["Total Footage:", `${xlFmt(activeTotalFootage).toLocaleString()} ${xlULabel}`],
       ];
       if (flaggedEntryIds.size > 0) {
-        coverData.push(["Flagged (excl.):", `${flaggedReelCount} reels / ${flaggedFootage.toLocaleString()} ft`]);
+        coverData.push(["Flagged (excl.):", `${flaggedReelCount} reels / ${xlFmt(flaggedFootage).toLocaleString()} ${xlULabel}`]);
       }
       coverData.push(["Photos:", pt.photoCount.toLocaleString()]);
       if (pt.firstPhotoAt) {
@@ -3272,7 +3281,7 @@ export async function registerRoutes(
         });
       };
 
-      const entryHeaders = ["Pin", "Aisle", "Section", "Category", "Vendor", "# Reels", "Footage", "Gauge", "Color", "Conductors", "Notes", "Flagged", "Flag Reason"];
+      const entryHeaders = ["Pin", "Aisle", "Section", "Category", "Vendor", "# Reels", `Footage (${xlULabel})`, "Gauge", "Color", "Conductors", "Notes", "Flagged", "Flag Reason"];
       const headerRow = ws.getRow(row);
       entryHeaders.forEach((h, i) => {
         const cell = headerRow.getCell(i + 1);
@@ -3293,7 +3302,7 @@ export async function registerRoutes(
         const vals = [
           pinLabel, safeStr(e.aisle), safeStr(e.section),
           safeStr(e.reelTag), safeStr(e.manufacturer),
-          e.reelCount || 1, e.footage || 0,
+          e.reelCount || 1, xlFmt(e.footage || 0),
           safeStr(e.gauge), safeStr(e.color), safeStr(e.conductors),
           safeStr(e.notes),
           isFlagged ? "Yes" : "",
@@ -3309,7 +3318,7 @@ export async function registerRoutes(
           cell.alignment = { vertical: "middle", wrapText: i === 10 };
           if (i === 0 && pinLabel) cell.font = { size: 8.5, bold: true, color: { argb: accentHex } };
           if (i === 5 || i === 6) cell.alignment = { vertical: "middle", horizontal: "center" };
-          if (i === 6 && typeof v === "number" && v > 0) cell.numFmt = '#,##0" ft"';
+          if (i === 6 && typeof v === "number" && v > 0) cell.numFmt = `#,##0" ${xlULabel}"`;
           if (isFlagged) {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: flaggedRowBg } };
           } else if (altShade) {
@@ -3321,7 +3330,7 @@ export async function registerRoutes(
 
       const writeSectionBand = (aisle: string, section: string, entryCount: number, reelCount: number, footage: number) => {
         const r = ws.getRow(row);
-        const label = `Aisle ${aisle || "—"}  /  Section ${section || "—"}  —  ${entryCount} entries, ${reelCount} reels, ${footage.toLocaleString()} ft`;
+        const label = `Aisle ${aisle || "—"}  /  Section ${section || "—"}  —  ${entryCount} entries, ${reelCount} reels, ${xlFmt(footage).toLocaleString()} ${xlULabel}`;
         r.getCell(1).value = label;
         r.getCell(1).font = { size: 9.5, bold: true, color: { argb: accentHex } };
         ws.mergeCells(row, 1, row, 13);
@@ -3376,20 +3385,20 @@ export async function registerRoutes(
       sumTitleRow.getCell(1).font = { size: 14, bold: true, color: { argb: accentHex } };
       row++;
       const sumSubRow = ws.getRow(row);
-      sumSubRow.getCell(1).value = `${session.name}  |  ${session.location || "N/A"}  |  ${activeEntries.length} entries  |  ${activeTotalFootage.toLocaleString()} ft total`;
+      sumSubRow.getCell(1).value = `${session.name}  |  ${session.location || "N/A"}  |  ${activeEntries.length} entries  |  ${xlFmt(activeTotalFootage).toLocaleString()} ${xlULabel} total`;
       sumSubRow.getCell(1).font = { size: 8.5, color: { argb: "666666" } };
       ws.mergeCells(row, 1, row, 8);
       row++;
       if (flaggedEntryIds.size > 0) {
         const noteRow = ws.getRow(row);
-        noteRow.getCell(1).value = `Note: ${flaggedEntryIds.size} flagged reel(s) with ${flaggedFootage.toLocaleString()} ft excluded from this summary — see Flagged Reels above.`;
+        noteRow.getCell(1).value = `Note: ${flaggedEntryIds.size} flagged reel(s) with ${xlFmt(flaggedFootage).toLocaleString()} ${xlULabel} excluded from this summary — see Flagged Reels above.`;
         noteRow.getCell(1).font = { size: 8, color: { argb: "CC4400" } };
         ws.mergeCells(row, 1, row, 10);
         row++;
       }
       row++;
 
-      const sumHeaders = ["Category", "Vendor Code", "# Reels", "Total Footage", "Reel Location(s)"];
+      const sumHeaders = ["Category", "Vendor Code", "# Reels", `Total Footage (${xlULabel})`, "Reel Location(s)"];
       const sumHeaderRow = ws.getRow(row);
       sumHeaders.forEach((h, i) => {
         const cell = sumHeaderRow.getCell(i + 1);
@@ -3485,7 +3494,7 @@ export async function registerRoutes(
         }
 
         const r = ws.getRow(row);
-        const catVals: any[] = [safeStr(cat.category), safeStr(cat.vendorCode), cat.reelCount, cat.totalFootage, safeStr(cat.locations.join(", "))];
+        const catVals: any[] = [safeStr(cat.category), safeStr(cat.vendorCode), cat.reelCount, xlFmt(cat.totalFootage), safeStr(cat.locations.join(", "))];
         catVals.forEach((v, i) => {
           const cell = r.getCell(i + 1);
           cell.value = v;
@@ -3493,7 +3502,7 @@ export async function registerRoutes(
           if (i === 3) cell.font = { size: 8.5, bold: true, color: { argb: "333333" } };
           cell.border = thinBorder;
           if (i === 2 || i === 3) cell.alignment = { horizontal: "center" };
-          if (i === 3 && typeof v === "number") cell.numFmt = '#,##0" ft"';
+          if (i === 3 && typeof v === "number") cell.numFmt = `#,##0" ${xlULabel}"`;
           if (i === 4) cell.alignment = { wrapText: true };
           if (sumAltIdx % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altRowBg } };
         });
@@ -3502,7 +3511,7 @@ export async function registerRoutes(
       }
 
       const grandRow = ws.getRow(row);
-      const grandVals = ["GRAND TOTAL", "", allCategories.reduce((s, c) => s + c.reelCount, 0), activeTotalFootage, `${allCategories.length} categories`];
+      const grandVals = ["GRAND TOTAL", "", allCategories.reduce((s, c) => s + c.reelCount, 0), xlFmt(activeTotalFootage), `${allCategories.length} categories`];
       const thickBorder: Partial<ExcelJS.Borders> = {
         top: { style: "medium", color: { argb: "000000" } },
         bottom: { style: "medium", color: { argb: "000000" } },
@@ -3516,7 +3525,7 @@ export async function registerRoutes(
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerBg } };
         cell.border = thickBorder;
         if (i === 2 || i === 3) cell.alignment = { horizontal: "center" };
-        if (i === 3 && typeof v === "number") cell.numFmt = '#,##0" ft"';
+        if (i === 3 && typeof v === "number") cell.numFmt = `#,##0" ${xlULabel}"`;
         if (i === 2 && typeof v === "number") cell.numFmt = '#,##0" reels"';
       });
       grandRow.height = 20;

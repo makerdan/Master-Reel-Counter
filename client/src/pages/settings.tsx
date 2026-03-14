@@ -36,7 +36,9 @@ import { useTheme } from "@/lib/theme-provider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWireCategories } from "@/hooks/use-wire-categories";
-import { CATALOG } from "@/lib/wireReference";
+import { CATALOG, parseCatalogEntry } from "@/lib/wireReference";
+import { toDisplayUnit, toBaseFeet, unitLabel, unitLabelFull } from "@/lib/unit-conversion";
+import type { UnitType } from "@/lib/unit-conversion";
 import * as XLSX from "xlsx";
 import type { UserWireCategory } from "@shared/schema";
 
@@ -331,6 +333,7 @@ export default function SettingsPage() {
       jacketType: ["jacket type", "jackettype", "jacket_type", "jacket"],
       conductors: ["conductors", "number of conductors", "conductor count", "num conductors"],
       groundSize: ["ground size", "groundsize", "ground_size", "ground"],
+      unit: ["unit", "units", "unit of measure", "uom"],
     };
     for (const [field, fieldAliases] of Object.entries(aliases)) {
       const idx = headers.findIndex(h => fieldAliases.includes(h));
@@ -348,10 +351,13 @@ export default function SettingsPage() {
       const catalog = cols[colMap.catalog] || "";
       const vendor = cols[colMap.vendor] || "";
       const reelLengthStr = cols[colMap.reelLength] || "";
-      const reelLength = parseInt(reelLengthStr);
+      const rawReelLength = parseInt(reelLengthStr);
       if (!catalog) { errors.push(`Row ${i + 1}: missing catalog code`); continue; }
       if (!vendor) { errors.push(`Row ${i + 1}: missing vendor`); continue; }
-      if (isNaN(reelLength) || reelLength <= 0) { errors.push(`Row ${i + 1}: invalid reel length "${reelLengthStr}"`); continue; }
+      if (isNaN(rawReelLength) || rawReelLength <= 0) { errors.push(`Row ${i + 1}: invalid reel length "${reelLengthStr}"`); continue; }
+      const rowUnitStr = colMap.unit !== undefined ? (cols[colMap.unit] || "").toLowerCase().trim() : "";
+      const rowUnit: UnitType = rowUnitStr === "meters" || rowUnitStr === "m" ? "meters" : rowUnitStr === "feet" || rowUnitStr === "ft" ? "feet" : currentUnit;
+      const reelLength = toBaseFeet(rawReelLength, rowUnit);
       rows.push({
         catalog,
         vendor,
@@ -393,10 +399,13 @@ export default function SettingsPage() {
   };
 
   const exportWireCategories = (format: "csv" | "xlsx") => {
-    const headers = ["Catalog", "Vendor", "Reel Length", "Description", "Color", "Jacket Type", "Conductors", "Ground Size", "Source"];
-    const builtInRows = CATALOG.map(c => [c.catalog, c.vendor, "", c.description, "", "", "", "", "Built-in"]);
+    const headers = ["Catalog", "Vendor", `Reel Length (${unitLabelFull(currentUnit)})`, "Description", "Color", "Jacket Type", "Conductors", "Ground Size", "Source"];
+    const builtInRows = CATALOG.map(c => {
+      const parsed = parseCatalogEntry(c);
+      return [c.catalog, c.vendor, parsed.footage ? String(toDisplayUnit(parsed.footage, currentUnit)) : "", c.description, "", "", "", "", "Built-in"];
+    });
     const customRows = wireCategories.map(c => [
-      c.catalog, c.vendor, String(c.reelLength), c.description || "", c.color || "",
+      c.catalog, c.vendor, String(toDisplayUnit(c.reelLength, currentUnit)), c.description || "", c.color || "",
       c.jacketType || "", c.conductors || "", c.groundSize || "", "Custom",
     ]);
     const allRows = [headers, ...builtInRows, ...customRows];
@@ -418,6 +427,9 @@ export default function SettingsPage() {
     }
     toast({ title: `Exported ${CATALOG.length + wireCategories.length} categories as ${format.toUpperCase()}` });
   };
+
+  const currentUnit: UnitType = (settings?.defaultUnit as UnitType) || "feet";
+  const uLabel = unitLabel(currentUnit);
 
   const encodingEnabled = settings?.encodingEnabled ?? false;
 
@@ -766,7 +778,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <Label className="text-sm font-medium">Default Unit of Measurement</Label>
-                <p className="text-xs text-muted-foreground">Unit used for footage values across the app.</p>
+                <p className="text-xs text-muted-foreground">Unit used for entering and displaying footage values. Changing this does not convert previously stored data — values are always stored internally in feet and converted for display.</p>
               </div>
               <Select
                 value={settings?.defaultUnit || "feet"}
@@ -835,8 +847,8 @@ export default function SettingsPage() {
                     <Input value={newCat.vendor} onChange={(e) => setNewCat(s => ({ ...s, vendor: e.target.value }))} placeholder="e.g. COP" className="h-8 text-sm" data-testid="input-new-cat-vendor" />
                   </div>
                   <div>
-                    <Label className="text-xs">Reel Length (ft) *</Label>
-                    <Input type="number" value={newCat.reelLength} onChange={(e) => setNewCat(s => ({ ...s, reelLength: e.target.value }))} placeholder="e.g. 1000" className="h-8 text-sm" data-testid="input-new-cat-reel-length" />
+                    <Label className="text-xs">Reel Length ({uLabel}) *</Label>
+                    <Input type="number" value={newCat.reelLength} onChange={(e) => setNewCat(s => ({ ...s, reelLength: e.target.value }))} placeholder={currentUnit === "meters" ? "e.g. 305" : "e.g. 1000"} className="h-8 text-sm" data-testid="input-new-cat-reel-length" />
                   </div>
                   <div>
                     <Label className="text-xs">Description</Label>
@@ -868,7 +880,7 @@ export default function SettingsPage() {
                         await addCategory({
                           catalog: newCat.catalog.trim(),
                           vendor: newCat.vendor.trim(),
-                          reelLength: parseInt(newCat.reelLength),
+                          reelLength: toBaseFeet(parseInt(newCat.reelLength), currentUnit),
                           description: newCat.description.trim() || null,
                           color: newCat.color.trim() || null,
                           jacketType: newCat.jacketType.trim() || null,
@@ -896,7 +908,8 @@ export default function SettingsPage() {
             {showBulkImport && (
               <div className="border rounded-md p-3 space-y-3 bg-muted/20">
                 <p className="text-xs text-muted-foreground">
-                  Paste CSV or upload a file (CSV, TSV, or Excel). Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size.
+                  Paste CSV or upload a file (CSV, TSV, or Excel). Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size, Unit.
+                  Reel lengths are assumed to be in {unitLabelFull(currentUnit)} (your current setting) unless a <strong>Unit</strong> column specifies "ft" or "m" per row.
                 </p>
                 <Textarea
                   placeholder={"Catalog,Vendor,Reel Length,Description\nTHHN10BK500,COP,500,#10 AWG THHN Black\nXHHW350RD1000,ALU,1000,350 KCMIL XHHW Red"}
@@ -963,7 +976,7 @@ export default function SettingsPage() {
                             <tr key={i} className={i % 2 === 0 ? "" : "bg-muted/20"} data-testid={`row-bulk-preview-${i}`}>
                               <td className="p-1.5 font-mono">{row.catalog}</td>
                               <td className="p-1.5">{row.vendor}</td>
-                              <td className="p-1.5 text-right tabular-nums">{row.reelLength}'</td>
+                              <td className="p-1.5 text-right tabular-nums">{toDisplayUnit(row.reelLength, currentUnit)} {uLabel}</td>
                               <td className="p-1.5 truncate max-w-[120px]">{row.description || "—"}</td>
                             </tr>
                           ))}
@@ -1028,7 +1041,7 @@ export default function SettingsPage() {
                         <tr key={cat.id} className="hover:bg-muted/30" data-testid={`row-wire-category-${cat.id}`}>
                           <td className="p-1.5 font-mono font-medium">{cat.catalog}</td>
                           <td className="p-1.5">{cat.vendor}</td>
-                          <td className="p-1.5 text-right tabular-nums">{cat.reelLength}'</td>
+                          <td className="p-1.5 text-right tabular-nums">{toDisplayUnit(cat.reelLength, currentUnit)} {uLabel}</td>
                           <td className="p-1.5 truncate max-w-[120px]" title={[cat.description, cat.color, cat.jacketType, cat.conductors ? `${cat.conductors} cond` : null, cat.groundSize ? `GND ${cat.groundSize}` : null].filter(Boolean).join(" | ")}>
                             {cat.description || "—"}
                           </td>

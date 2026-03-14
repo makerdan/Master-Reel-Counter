@@ -15,6 +15,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { matchLabelText, type LabelMatchResult } from "@/lib/labelMatcher";
+import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
+import type { UnitType } from "@/lib/unit-conversion";
 import type { Photo, Pin } from "@shared/schema";
 
 const ZOOM_MIN = 0.005;
@@ -307,6 +309,12 @@ export default function LabelScannerTab({
 }) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
+  const { data: scannerSettings } = useQuery<{ defaultUnit: string }>({
+    queryKey: ["/api/settings"],
+    select: (data: any) => ({ defaultUnit: data?.defaultUnit ?? "feet" }),
+  });
+  const currentUnit: UnitType = (scannerSettings?.defaultUnit as UnitType) || "feet";
+  const uLabel = unitLabel(currentUnit);
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
   const lastInitialPhotoIdRef = useRef(initialPhotoId);
   const [cards, setCards] = useState<PinCard[]>([]);
@@ -565,7 +573,7 @@ export default function LabelScannerTab({
           result: { pinId: pin.id, pinLabel: sr.pinLabel || pin.label || "", rawText: sr.rawText, readable: !!sr.readable } as AnalysisResult,
           matchResult,
           editCatalog: catalogCode,
-          editFootage: parsed?.footage ? String(parsed.footage) : "",
+          editFootage: parsed?.footage ? String(toDisplayUnit(parsed.footage, currentUnit)) : "",
           editVendor: vendor,
         };
       }
@@ -607,7 +615,7 @@ export default function LabelScannerTab({
       return builtHasResults ? sortCardsByCatalog(built) : built;
     });
     if (builtHasResults) setPhase("results");
-  }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving, batchMode, serverScanResultsKey]);
+  }, [effectivePins.map((p) => p.id).join(","), currentPhotoId, isReceiving, batchMode, serverScanResultsKey, currentUnit]);
 
   useEffect(() => {
     if (cachedResults?.results && phase === "preview" && useCachedResults) {
@@ -647,7 +655,7 @@ export default function LabelScannerTab({
           result,
           matchResult,
           editCatalog: catalogCode,
-          editFootage: parsed?.footage ? String(parsed.footage) : "",
+          editFootage: parsed?.footage ? String(toDisplayUnit(parsed.footage, currentUnit)) : "",
           editVendor: vendor,
           included: false,
         };
@@ -851,7 +859,8 @@ export default function LabelScannerTab({
             const cardPhoto = photos.find((p) => p.id === card.pin.photoId);
             const aisle = cardPhoto?.aisle || "";
             const section = cardPhoto?.section || "";
-            const footage = card.editFootage ? (parseInt(card.editFootage) || null) : null;
+            const displayFootage = card.editFootage ? (parseInt(card.editFootage) || null) : null;
+            const footage = displayFootage != null ? toBaseFeet(displayFootage, currentUnit) : null;
             const reelCount = card.pin.reelCount ?? 1;
             const computedFootage = footage && reelCount > 1 ? footage * reelCount : footage;
 
@@ -899,7 +908,10 @@ export default function LabelScannerTab({
             const updates: Record<string, any> = {};
             if (card.editCatalog) updates.wireDetails = card.editCatalog.toUpperCase();
             if (card.editVendor) updates.vendorCode = card.editVendor.toUpperCase();
-            if (card.editFootage) updates.footage = parseInt(card.editFootage) || null;
+            if (card.editFootage) {
+              const df = parseInt(card.editFootage) || null;
+              updates.footage = df != null ? toBaseFeet(df, currentUnit) : null;
+            }
 
             if (Object.keys(updates).length > 0) {
               await retryRequest("PATCH", `/api/pins/${card.pin.id}`, updates);
@@ -908,7 +920,10 @@ export default function LabelScannerTab({
                 const entryUpdates: Record<string, any> = {};
                 if (card.editCatalog) entryUpdates.reelTag = card.editCatalog.toUpperCase();
                 if (card.editVendor) entryUpdates.manufacturer = card.editVendor.toUpperCase();
-                if (card.editFootage) entryUpdates.footage = parseInt(card.editFootage) || null;
+                if (card.editFootage) {
+                  const df2 = parseInt(card.editFootage) || null;
+                  entryUpdates.footage = df2 != null ? toBaseFeet(df2, currentUnit) : null;
+                }
                 entryUpdates.reelCount = card.pin.reelCount ?? 1;
                 if (card.matchResult?.match) {
                   if (card.matchResult.match.wireType) entryUpdates.wireType = card.matchResult.match.wireType;

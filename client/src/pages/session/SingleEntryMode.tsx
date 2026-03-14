@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Camera, Save, X, Loader2, ImagePlus, Flag } from "lucide-react";
+import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
+import type { UnitType } from "@/lib/unit-conversion";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +58,9 @@ export default function SingleEntryMode({
     }),
   });
 
+  const currentUnit: UnitType = (entrySettings?.defaultUnit as UnitType) || "feet";
+  const uLabel = unitLabel(currentUnit);
+
   const [form, setForm] = useState({
     aisle: editingEntry?.aisle || defaultAisle || "",
     section: editingEntry?.section || defaultSection || "",
@@ -63,7 +68,7 @@ export default function SingleEntryMode({
     reelTag: editingEntry?.reelTag || "",
     wireType: editingEntry?.wireType || "",
     gauge: editingEntry?.gauge || "",
-    footage: editingEntry?.footage?.toString() || "",
+    footage: editingEntry?.footage ? toDisplayUnit(editingEntry.footage, (entrySettings?.defaultUnit as UnitType) || "feet").toString() : "",
     color: editingEntry?.color || "",
     manufacturer: editingEntry?.manufacturer || "",
     notes: editingEntry?.notes || "",
@@ -111,7 +116,7 @@ export default function SingleEntryMode({
         reelTag: editingEntry.reelTag || "",
         wireType: editingEntry.wireType || "",
         gauge: editingEntry.gauge || "",
-        footage: editingEntry.footage && editingEntry.reelCount && editingEntry.reelCount > 1 ? Math.round(editingEntry.footage / editingEntry.reelCount).toString() : editingEntry.footage?.toString() || "",
+        footage: editingEntry.footage && editingEntry.reelCount && editingEntry.reelCount > 1 ? Math.round(toDisplayUnit(editingEntry.footage, currentUnit) / editingEntry.reelCount).toString() : editingEntry.footage ? toDisplayUnit(editingEntry.footage, currentUnit).toString() : "",
         color: editingEntry.color || "",
         manufacturer: editingEntry.manufacturer || "",
         notes: editingEntry.notes || "",
@@ -182,7 +187,7 @@ export default function SingleEntryMode({
           lastMatchedCatalog.current = matchCatalog;
           setFootageOverride(false);
           const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
-          setForm(f => ({ ...f, footage: (match.footage! * reelCount).toString() }));
+          setForm(f => ({ ...f, footage: (toDisplayUnit(match.footage!, currentUnit) * reelCount).toString() }));
         }
       } else {
         lastMatchedCatalog.current = match.catalog;
@@ -199,7 +204,7 @@ export default function SingleEntryMode({
       const match = getCatalogMatch(form.reelTag);
       if (match?.footage) {
         const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
-        setForm(f => ({ ...f, footage: (match.footage! * reelCount).toString() }));
+        setForm(f => ({ ...f, footage: (toDisplayUnit(match.footage!, currentUnit) * reelCount).toString() }));
       }
     }
   }, [form.reelCount, footageOverride]);
@@ -257,7 +262,7 @@ export default function SingleEntryMode({
       ...f,
       reelTag: match.catalog,
       manufacturer: f.manufacturer || (uniqueVendor ?? ""),
-      footage: match.footage ? (match.footage * reelCount).toString() : f.footage,
+      footage: match.footage ? (toDisplayUnit(match.footage, currentUnit) * reelCount).toString() : f.footage,
       conductors: f.conductors || match.conductors || "",
     }));
     setCategorySuggestions([]);
@@ -287,7 +292,8 @@ export default function SingleEntryMode({
   const saveEntry = useMutation({
     mutationFn: async () => {
       const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
-      const totalFootage = form.footage ? parseInt(form.footage) : null;
+      const displayFootage = form.footage ? parseInt(form.footage) : null;
+      const totalFootage = displayFootage !== null ? toBaseFeet(displayFootage, currentUnit) : null;
       const sectionValue = isReceiving && !form.section.trim() ? "000" : form.section;
       const body: Record<string, unknown> = {
         aisle: form.aisle,
@@ -531,7 +537,7 @@ export default function SingleEntryMode({
                 >
                   <span className="font-mono font-semibold">{s.catalog}</span>
                   <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
-                  {s.footage && <span className="text-orange-500 ml-1 text-xs">({s.footage}ft)</span>}
+                  {s.footage && <span className="text-orange-500 ml-1 text-xs">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
                 </button>
               ))}
             </div>
@@ -562,7 +568,7 @@ export default function SingleEntryMode({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs underline">Total Footage:</Label>
+          <Label className="text-xs underline">Total Footage ({uLabel}):</Label>
           <Input
             type="number"
             value={form.footage}

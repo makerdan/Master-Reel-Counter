@@ -25,6 +25,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { lookupCategory, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
+import type { UnitType } from "@/lib/unit-conversion";
 import { useWireCategories } from "@/hooks/use-wire-categories";
 import type { Photo, Pin, Entry } from "@shared/schema";
 import ReelCropPreview from "./ReelCropPreview";
@@ -45,6 +47,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     () => userCategories.map(userWireCategoryToParsedEntry),
     [userCategories]
   );
+  const { data: photoSettings } = useQuery<{ defaultUnit: string }>({
+    queryKey: ["/api/settings"],
+    select: (data: any) => ({ defaultUnit: data?.defaultUnit ?? "feet" }),
+  });
+  const currentUnit: UnitType = (photoSettings?.defaultUnit as UnitType) || "feet";
+  const uLabel = unitLabel(currentUnit);
   const [customCodeInput, setCustomCodeInput] = useState("");
   const [customCodePinId, setCustomCodePinId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2230,7 +2238,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                   >
                                     <span className="font-mono font-semibold">{s.catalog}</span>
                                     <span className="text-muted-foreground ml-2">{s.description}</span>
-                                    {s.footage && <span className="text-muted-foreground ml-1">({s.footage}')</span>}
+                                    {s.footage && <span className="text-muted-foreground ml-1">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
                                   </button>
                                 ))}
                               </div>
@@ -2301,12 +2309,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             inputMode="numeric"
                             value={
                               focusedFootagePinId === pin.id || pin.footage == null
-                                ? (pin.footage ?? "")
-                                : pin.footage.toLocaleString()
+                                ? (pin.footage != null ? toDisplayUnit(pin.footage, currentUnit) : "")
+                                : toDisplayUnit(pin.footage, currentUnit).toLocaleString()
                             }
                             onChange={(e) => {
                               const raw = e.target.value.replace(/,/g, "");
-                              updatePinField(pin.id, "footage", raw ? parseInt(raw) : undefined);
+                              updatePinField(pin.id, "footage", raw ? toBaseFeet(parseInt(raw), currentUnit) : undefined);
                             }}
                             onFocus={() => { setSelectedPinId(pin.id); setFocusedFootagePinId(pin.id); }}
                             onBlur={() => setFocusedFootagePinId(null)}

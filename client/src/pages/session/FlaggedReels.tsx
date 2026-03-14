@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Entry, Pin, Photo } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
 import { lookupCategory, type ParsedCatalogEntry, PARSED_CATALOG, userWireCategoryToParsedEntry } from "@/lib/wireReference";
+import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
+import type { UnitType } from "@/lib/unit-conversion";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useWireCategories } from "@/hooks/use-wire-categories";
 
@@ -81,10 +83,14 @@ function DupPinTile({
   pin,
   siblingPinIds,
   sessionId,
+  currentUnit,
+  uLabel,
 }: {
   pin: DuplicatePinInfo;
   siblingPinIds: number[];
   sessionId: number;
+  currentUnit: UnitType;
+  uLabel: string;
 }) {
   const { toast } = useToast();
 
@@ -164,7 +170,7 @@ function DupPinTile({
           </p>
         )}
         <p className="text-[10px] text-muted-foreground font-mono">
-          {[pin.vendorCode, pin.footage ? `${pin.footage.toLocaleString()} ft` : null].filter(Boolean).join(" · ")}
+          {[pin.vendorCode, pin.footage ? `${toDisplayUnit(pin.footage, currentUnit).toLocaleString()} ${uLabel}` : null].filter(Boolean).join(" · ")}
         </p>
         <p className="text-[10px] text-muted-foreground">
           {pin.entryId ? `Entry #${pin.entryId}` : "No entry"}
@@ -236,6 +242,12 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     () => userCategories.map(userWireCategoryToParsedEntry),
     [userCategories]
   );
+  const { data: flagSettings } = useQuery<{ defaultUnit: string }>({
+    queryKey: ["/api/settings"],
+    select: (data: any) => ({ defaultUnit: data?.defaultUnit ?? "feet" }),
+  });
+  const currentUnit: UnitType = (flagSettings?.defaultUnit as UnitType) || "feet";
+  const uLabel = unitLabel(currentUnit);
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
   const [copied, setCopied] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
@@ -268,12 +280,13 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
 
   const savePinMutation = useMutation({
     mutationFn: async ({ pinId, entryId, data }: { pinId: number; entryId: number | null; data: EditingState }) => {
-      const parsedFootage = data.footage ? Number(data.footage) : null;
+      const displayFootage = data.footage ? Number(data.footage) : null;
+      const parsedFootage = displayFootage !== null && Number.isFinite(displayFootage) ? toBaseFeet(displayFootage, currentUnit) : null;
       const parsedReelCount = data.reelCount ? parseInt(data.reelCount) : 1;
       await apiRequest("PATCH", `/api/pins/${pinId}`, {
         wireDetails: data.wireDetails || null,
         vendorCode: data.vendorCode || null,
-        footage: parsedFootage && Number.isFinite(parsedFootage) ? parsedFootage : null,
+        footage: parsedFootage,
         reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
       });
       await apiRequest("PATCH", `/api/pins/${pinId}/flag`, {
@@ -302,14 +315,14 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     setEditState({
       wireDetails: pin.wireDetails || "",
       vendorCode: pin.vendorCode || "",
-      footage: pin.footage ? String(pin.footage) : "",
+      footage: pin.footage ? String(toDisplayUnit(pin.footage, currentUnit)) : "",
       notes: pin.entryNotes || "",
       flagReason: pin.flagReason || "",
       reelCount: String(pin.reelCount || 1),
     });
     setCategorySuggestions([]);
     setShowCategorySuggestions(false);
-  }, []);
+  }, [currentUnit]);
 
   const getUniqueVendor = (catalog: string): string | null => {
     const vendors = new Set(PARSED_CATALOG.filter(e => e.catalog === catalog).map(e => e.vendor));
@@ -323,13 +336,13 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       if (uniqueVendor && !s.vendorCode) updates.vendorCode = uniqueVendor;
       if (match.footage) {
         const rc = Math.max(1, parseInt(s.reelCount) || 1);
-        updates.footage = String(match.footage * rc);
+        updates.footage = String(toDisplayUnit(match.footage, currentUnit) * rc);
       }
       return { ...s, ...updates };
     });
     setCategorySuggestions([]);
     setShowCategorySuggestions(false);
-  }, []);
+  }, [currentUnit]);
 
   const { data: sessionEntries = [] } = useQuery<Entry[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "entries"],
@@ -511,6 +524,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         pin={pin}
                         siblingPinIds={group.pins.filter(p => p.pinId !== pin.pinId).map(p => p.pinId)}
                         sessionId={sessionId}
+                        currentUnit={currentUnit}
+                        uLabel={uLabel}
                       />
                     ))}
                   </div>
@@ -633,7 +648,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         <div className="flex gap-3 text-xs text-muted-foreground font-mono">
                           {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}
                           {pin.vendorCode && <span>{pin.vendorCode}</span>}
-                          {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
+                          {pin.footage && <span>{toDisplayUnit(pin.footage, currentUnit).toLocaleString()} {uLabel}</span>}
                         </div>
                         {pin.flagReason && (
                           <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" data-testid={`text-flag-reason-${pin.id}`}>
@@ -709,7 +724,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                   >
                                     <span className="font-mono font-semibold">{s.catalog}</span>
                                     <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
-                                    {s.footage && <span className="text-orange-500 ml-1 text-xs">({s.footage}ft)</span>}
+                                    {s.footage && <span className="text-orange-500 ml-1 text-xs">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
                                   </button>
                                 ))}
                               </div>
@@ -727,7 +742,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             />
                           </div>
                           <div>
-                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage</label>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage ({uLabel})</label>
                             <Input
                               type="number"
                               value={editState.footage}
@@ -820,7 +835,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         <div className="flex gap-3">
                           {pin.reelCount > 0 && <span>{pin.reelCount} reel{pin.reelCount !== 1 ? "s" : ""}</span>}
                           {pin.vendorCode && <span>{pin.vendorCode}</span>}
-                          {pin.footage && <span>{pin.footage.toLocaleString()} ft</span>}
+                          {pin.footage && <span>{toDisplayUnit(pin.footage, currentUnit).toLocaleString()} {uLabel}</span>}
                         </div>
                       </div>
                       {pin.flagReason && (
@@ -906,7 +921,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                   >
                                     <span className="font-mono font-semibold">{s.catalog}</span>
                                     <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
-                                    {s.footage && <span className="text-orange-500 ml-1 text-xs">({s.footage}ft)</span>}
+                                    {s.footage && <span className="text-orange-500 ml-1 text-xs">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
                                   </button>
                                 ))}
                               </div>
@@ -925,7 +940,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               />
                             </div>
                             <div>
-                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage</label>
+                              <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage ({uLabel})</label>
                               <Input
                                 type="number"
                                 value={editState.footage}

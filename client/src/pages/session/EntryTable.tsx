@@ -15,10 +15,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Cable } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { toDisplayUnit } from "@/lib/unit-conversion";
+import type { UnitType } from "@/lib/unit-conversion";
 import type { Entry, Photo, Pin } from "@shared/schema";
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, onJumpToPin,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, onJumpToPin, unitLabel: uLabel = "ft", currentUnit = "feet" as UnitType,
 }: {
   entries: Entry[];
   photos: Photo[];
@@ -29,6 +31,8 @@ function EntryTable({
   canEdit?: boolean;
   forceExpandKey?: string;
   onJumpToPin?: (photoId: number, pinId: number) => void;
+  unitLabel?: string;
+  currentUnit?: UnitType;
 }) {
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
@@ -60,10 +64,11 @@ function EntryTable({
   });
 
   const getReelInfo = (entry: Entry) => {
-    const totalFootage = entry.footage || 0;
+    const rawFootage = entry.footage || 0;
+    const displayFootage = toDisplayUnit(rawFootage, currentUnit);
     const reelCount = entry.reelCount || 1;
-    const perReel = reelCount > 0 ? Math.round(totalFootage / reelCount) : totalFootage;
-    return { reelCount, perReel, totalFootage };
+    const perReel = reelCount > 0 ? Math.round(displayFootage / reelCount) : displayFootage;
+    return { reelCount, perReel, totalFootage: displayFootage };
   };
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -193,10 +198,10 @@ function EntryTable({
                   <span className="sm:hidden">Rls:</span>
                   <span className="hidden sm:inline">Reels:</span>
                 </th>
-                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ft/Reel:</th>
+                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap" }}>{unitLabel}/Reel:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                   <span className="sm:hidden">Total:</span>
-                  <span className="hidden sm:inline">Total Ft:</span>
+                  <span className="hidden sm:inline">Total {unitLabel}:</span>
                 </th>
                 <th className="hidden sm:table-cell" style={{ width: 50, textAlign: "center" }}>Photo:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Edit:</th>
@@ -212,7 +217,7 @@ function EntryTable({
                   return (isNaN(numA) ? Infinity : numA) - (isNaN(numB) ? Infinity : numB);
                 });
                 const isExpanded = expandedSections[sectionKey] ?? false;
-                const sectionFootage = sectionEntries.reduce((s, e) => s + (e.footage || 0), 0);
+                const sectionFootage = toDisplayUnit(sectionEntries.reduce((s, e) => s + (e.footage || 0), 0), currentUnit);
                 const [aisleLabel, sectionLabel] = sectionKey.split("-");
                 return (
                   <Fragment key={sectionKey}>
@@ -225,7 +230,7 @@ function EntryTable({
                         <div className="flex items-center gap-2">
                           <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
                           <span className="font-semibold">{aisleLabel.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${aisleLabel}`} - {aisleLabel.toLowerCase() === "receiving" && sectionLabel === "000" ? "Section Unknown" : `Section ${sectionLabel}`}</span>
-                          <span className="hidden sm:inline text-muted-foreground">({sectionEntries.length} {sectionEntries.length === 1 ? "entry" : "entries"}, {sectionFootage.toLocaleString()} ft. total)</span>
+                          <span className="hidden sm:inline text-muted-foreground">({sectionEntries.length} {sectionEntries.length === 1 ? "entry" : "entries"}, {sectionFootage.toLocaleString()} {uLabel} total)</span>
                         </div>
                       </td>
                     </tr>
@@ -248,9 +253,9 @@ function EntryTable({
                         <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td className="hidden" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
                         <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
-                        <td className="hidden sm:table-cell mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()}'` : "-"}</td>
+                        <td className="hidden sm:table-cell mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()} ${uLabel}` : "-"}</td>
                         <td className="mono font-bold" style={{ textAlign: "center" }}>
-                          {info.totalFootage ? `${info.totalFootage.toLocaleString()}'` : "-"}
+                          {info.totalFootage ? `${info.totalFootage.toLocaleString()} ${uLabel}` : "-"}
                           {!info.totalFootage && (
                             <span className="inline-flex items-center ml-1" title="Zero footage">
                               <AlertTriangle className="h-3 w-3 text-amber-500" />
@@ -361,7 +366,7 @@ function EntryTable({
                   Total: {entries.length} entries
                 </td>
                 <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage">
-                  {totalFootage.toLocaleString()}'
+                  {totalFootage.toLocaleString()} {uLabel}
                 </td>
                 <td colSpan={3} />
               </tr>
@@ -370,7 +375,7 @@ function EntryTable({
                   Total: {entries.length} entries
                 </td>
                 <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage-mobile">
-                  {totalFootage.toLocaleString()}'
+                  {totalFootage.toLocaleString()} {uLabel}
                 </td>
                 <td />
               </tr>
