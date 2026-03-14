@@ -770,10 +770,10 @@ export default function SettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1 (01, 02, 03...)</SelectItem>
-                  <SelectItem value="2">2 (01, 03, 05...)</SelectItem>
-                  <SelectItem value="3">3 (01, 04, 07...)</SelectItem>
-                  <SelectItem value="5">5 (01, 06, 11...)</SelectItem>
+                  <SelectItem value="1">By 1 (001, 002, 003...)</SelectItem>
+                  <SelectItem value="2">By 2 (001, 003, 005...)</SelectItem>
+                  <SelectItem value="3">By 3 (001, 004, 007...)</SelectItem>
+                  <SelectItem value="5">By 5 (001, 006, 011...)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
