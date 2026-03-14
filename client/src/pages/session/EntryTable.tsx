@@ -198,10 +198,10 @@ function EntryTable({
                   <span className="sm:hidden">Rls:</span>
                   <span className="hidden sm:inline">Reels:</span>
                 </th>
-                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap" }}>{unitLabel}/Reel:</th>
+                <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap" }}>{uLabel}/Reel:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
                   <span className="sm:hidden">Total:</span>
-                  <span className="hidden sm:inline">Total {unitLabel}:</span>
+                  <span className="hidden sm:inline">Total {uLabel}:</span>
                 </th>
                 <th className="hidden sm:table-cell" style={{ width: 50, textAlign: "center" }}>Photo:</th>
                 <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Edit:</th>
