@@ -899,7 +899,7 @@ export default function SettingsPage() {
                   Paste CSV or upload a file (CSV, TSV, or Excel). Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size.
                 </p>
                 <Textarea
-                  placeholder={"Catalog,Vendor,Reel Length,Description\nTHHN10BK500,COP,500,#10 THHN Black\nXHHW4RD1000,ALU,1000,#4 XHHW Red"}
+                  placeholder={"Catalog,Vendor,Reel Length,Description\nTHHN10BK500,COP,500,#10 AWG THHN Black\nXHHW350RD1000,ALU,1000,350 KCMIL XHHW Red"}
                   value={bulkCsvText}
                   onChange={(e) => { setBulkCsvText(e.target.value); setBulkPreview(null); setBulkError(null); }}
                   rows={5}
