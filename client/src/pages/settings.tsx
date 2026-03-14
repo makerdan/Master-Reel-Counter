@@ -744,7 +744,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-5">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <Label className="text-sm font-medium">Default Aisle Prefix</Label>
+                <Label className="text-sm font-medium">Default Starting Aisle</Label>
                 <p className="text-xs text-muted-foreground">Auto-fill the aisle field with this value for new entries.</p>
               </div>
               <Input
