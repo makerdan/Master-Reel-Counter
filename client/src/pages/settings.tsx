@@ -289,7 +289,7 @@ export default function SettingsPage() {
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   const [newCat, setNewCat] = useState({
     catalog: "", vendor: "", reelLength: "", description: "",
-    color: "", jacketType: "", conductors: "", groundSize: "",
+    color: "", jacketType: "", conductors: "", groundSize: "", wireType: "",
   });
 
   const filteredWireCategories = useMemo(() => {
@@ -298,7 +298,8 @@ export default function SettingsPage() {
     return wireCategories.filter(c =>
       c.catalog.toLowerCase().includes(q) ||
       c.vendor.toLowerCase().includes(q) ||
-      (c.description || "").toLowerCase().includes(q)
+      (c.description || "").toLowerCase().includes(q) ||
+      (c.wireType || "").toLowerCase().includes(q)
     );
   }, [wireCategories, wireCatSearch]);
 
@@ -333,6 +334,7 @@ export default function SettingsPage() {
       jacketType: ["jacket type", "jackettype", "jacket_type", "jacket"],
       conductors: ["conductors", "number of conductors", "conductor count", "num conductors"],
       groundSize: ["ground size", "groundsize", "ground_size", "ground"],
+      wireType: ["wire type", "wiretype", "wire_type", "type"],
       unit: ["unit", "units", "unit of measure", "uom"],
     };
     for (const [field, fieldAliases] of Object.entries(aliases)) {
@@ -367,6 +369,7 @@ export default function SettingsPage() {
         jacketType: colMap.jacketType !== undefined ? (cols[colMap.jacketType] || null) : null,
         conductors: colMap.conductors !== undefined ? (cols[colMap.conductors] || null) : null,
         groundSize: colMap.groundSize !== undefined ? (cols[colMap.groundSize] || null) : null,
+        wireType: colMap.wireType !== undefined ? (cols[colMap.wireType] || null) : null,
       });
     }
     if (errors.length > 0 && rows.length === 0) {
@@ -399,14 +402,14 @@ export default function SettingsPage() {
   };
 
   const exportWireCategories = (format: "csv" | "xlsx") => {
-    const headers = ["Catalog", "Vendor", `Reel Length (${unitLabelFull(currentUnit)})`, "Description", "Color", "Jacket Type", "Conductors", "Ground Size", "Source"];
+    const headers = ["Catalog", "Vendor", `Reel Length (${unitLabelFull(currentUnit)})`, "Description", "Color", "Jacket Type", "Conductors", "Ground Size", "Wire Type", "Source"];
     const builtInRows = CATALOG.map(c => {
       const parsed = parseCatalogEntry(c);
-      return [c.catalog, c.vendor, parsed.footage ? String(toDisplayUnit(parsed.footage, currentUnit)) : "", c.description, "", "", "", "", "Built-in"];
+      return [c.catalog, c.vendor, parsed.footage ? String(toDisplayUnit(parsed.footage, currentUnit)) : "", c.description, "", "", "", "", parsed.wireType || "", "Built-in"];
     });
     const customRows = wireCategories.map(c => [
       c.catalog, c.vendor, String(toDisplayUnit(c.reelLength, currentUnit)), c.description || "", c.color || "",
-      c.jacketType || "", c.conductors || "", c.groundSize || "", "Custom",
+      c.jacketType || "", c.conductors || "", c.groundSize || "", c.wireType || "", "Custom",
     ]);
     const allRows = [headers, ...builtInRows, ...customRows];
 
@@ -870,6 +873,10 @@ export default function SettingsPage() {
                     <Label className="text-xs">Ground Size</Label>
                     <Input value={newCat.groundSize} onChange={(e) => setNewCat(s => ({ ...s, groundSize: e.target.value }))} placeholder="e.g. 10" className="h-8 text-sm" data-testid="input-new-cat-ground" />
                   </div>
+                  <div>
+                    <Label className="text-xs">Wire Type</Label>
+                    <Input value={newCat.wireType} onChange={(e) => setNewCat(s => ({ ...s, wireType: e.target.value }))} placeholder="e.g. THHN, SER, URD" className="h-8 text-sm" data-testid="input-new-cat-wire-type" />
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -886,8 +893,9 @@ export default function SettingsPage() {
                           jacketType: newCat.jacketType.trim() || null,
                           conductors: newCat.conductors.trim() || null,
                           groundSize: newCat.groundSize.trim() || null,
+                          wireType: newCat.wireType.trim() || null,
                         });
-                        setNewCat({ catalog: "", vendor: "", reelLength: "", description: "", color: "", jacketType: "", conductors: "", groundSize: "" });
+                        setNewCat({ catalog: "", vendor: "", reelLength: "", description: "", color: "", jacketType: "", conductors: "", groundSize: "", wireType: "" });
                         toast({ title: "Category added" });
                       } catch {
                         toast({ title: "Failed to add category", variant: "destructive" });
@@ -908,11 +916,11 @@ export default function SettingsPage() {
             {showBulkImport && (
               <div className="border rounded-md p-3 space-y-3 bg-muted/20">
                 <p className="text-xs text-muted-foreground">
-                  Paste CSV or upload a file (CSV, TSV, or Excel). Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size, Unit.
+                  Paste CSV or upload a file (CSV, TSV, or Excel). Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size, Wire Type, Unit.
                   Reel lengths are assumed to be in {unitLabelFull(currentUnit)} (your current setting) unless a <strong>Unit</strong> column specifies "ft" or "m" per row.
                 </p>
                 <Textarea
-                  placeholder={"Catalog,Vendor,Reel Length,Description\nTHHN10BK500,COP,500,#10 AWG THHN Black\nXHHW350RD1000,ALU,1000,350 KCMIL XHHW Red"}
+                  placeholder={"Catalog,Vendor,Reel Length,Description,Wire Type\nTHHN10BK500,COP,500,#10 AWG THHN Black,THHN\nSER224500,COP,500,2/0-2/0-4 SER Cable,SER"}
                   value={bulkCsvText}
                   onChange={(e) => { setBulkCsvText(e.target.value); setBulkPreview(null); setBulkError(null); }}
                   rows={5}
@@ -968,6 +976,7 @@ export default function SettingsPage() {
                             <th className="text-left p-1.5 font-medium">Catalog</th>
                             <th className="text-left p-1.5 font-medium">Vendor</th>
                             <th className="text-right p-1.5 font-medium">Length</th>
+                            <th className="text-left p-1.5 font-medium">Wire Type</th>
                             <th className="text-left p-1.5 font-medium">Description</th>
                           </tr>
                         </thead>
@@ -977,11 +986,12 @@ export default function SettingsPage() {
                               <td className="p-1.5 font-mono">{row.catalog}</td>
                               <td className="p-1.5">{row.vendor}</td>
                               <td className="p-1.5 text-right tabular-nums">{toDisplayUnit(row.reelLength, currentUnit)} {uLabel}</td>
+                              <td className="p-1.5">{row.wireType || "—"}</td>
                               <td className="p-1.5 truncate max-w-[120px]">{row.description || "—"}</td>
                             </tr>
                           ))}
                           {bulkPreview.length > 20 && (
-                            <tr><td colSpan={4} className="p-1.5 text-center text-muted-foreground">...and {bulkPreview.length - 20} more</td></tr>
+                            <tr><td colSpan={5} className="p-1.5 text-center text-muted-foreground">...and {bulkPreview.length - 20} more</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -1032,6 +1042,7 @@ export default function SettingsPage() {
                         <th className="text-left p-1.5 font-medium">Catalog</th>
                         <th className="text-left p-1.5 font-medium">Vendor</th>
                         <th className="text-right p-1.5 font-medium">Length</th>
+                        <th className="text-left p-1.5 font-medium">Wire Type</th>
                         <th className="text-left p-1.5 font-medium">Description</th>
                         <th className="w-8"></th>
                       </tr>
@@ -1042,6 +1053,7 @@ export default function SettingsPage() {
                           <td className="p-1.5 font-mono font-medium">{cat.catalog}</td>
                           <td className="p-1.5">{cat.vendor}</td>
                           <td className="p-1.5 text-right tabular-nums">{toDisplayUnit(cat.reelLength, currentUnit)} {uLabel}</td>
+                          <td className="p-1.5">{cat.wireType || "—"}</td>
                           <td className="p-1.5 truncate max-w-[120px]" title={[cat.description, cat.color, cat.jacketType, cat.conductors ? `${cat.conductors} cond` : null, cat.groundSize ? `GND ${cat.groundSize}` : null].filter(Boolean).join(" | ")}>
                             {cat.description || "—"}
                           </td>
@@ -1059,7 +1071,7 @@ export default function SettingsPage() {
                         </tr>
                       ))}
                       {filteredWireCategories.length === 0 && (
-                        <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">No matching categories found.</td></tr>
+                        <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">No matching categories found.</td></tr>
                       )}
                     </tbody>
                   </table>

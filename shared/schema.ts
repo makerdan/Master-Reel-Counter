@@ -292,6 +292,7 @@ export const userWireCategories = pgTable("user_wire_categories", {
   jacketType: text("jacket_type"),
   conductors: text("conductors"),
   groundSize: text("ground_size"),
+  wireType: text("wire_type"),
 });
 
 export const insertUserWireCategorySchema = createInsertSchema(userWireCategories).omit({

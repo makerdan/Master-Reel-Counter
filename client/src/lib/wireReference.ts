@@ -456,6 +456,7 @@ export function userWireCategoryToParsedEntry(cat: {
   jacketType?: string | null;
   conductors?: string | null;
   groundSize?: string | null;
+  wireType?: string | null;
 }): ParsedCatalogEntry {
   const parts: string[] = [];
   if (cat.description) parts.push(cat.description);
@@ -470,6 +471,7 @@ export function userWireCategoryToParsedEntry(cat: {
     footage: cat.reelLength,
     color: cat.color || undefined,
     conductors: cat.conductors || undefined,
+    wireType: cat.wireType || undefined,
   };
 }
 
