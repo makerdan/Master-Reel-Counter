@@ -815,6 +815,14 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             />
                           </div>
                         )}
+                        <div className="mb-3">
+                          <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Flag Reason:</label>
+                          <Input
+                            value={editState.flagReason}
+                            onChange={(e) => setEditState(s => ({ ...s, flagReason: e.target.value }))}
+                            data-testid={`input-flag-reason-${pin.id}`}
+                          />
+                        </div>
                         <div className="flex justify-end">
                           <Button
                             size="sm"
@@ -1013,6 +1021,14 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               />
                             </div>
                           )}
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Flag Reason:</label>
+                            <Input
+                              value={editState.flagReason}
+                              onChange={(e) => setEditState(s => ({ ...s, flagReason: e.target.value }))}
+                              data-testid={`input-flag-reason-mobile-${pin.id}`}
+                            />
+                          </div>
                           <div className="flex justify-end">
                             <Button
                               size="sm"
