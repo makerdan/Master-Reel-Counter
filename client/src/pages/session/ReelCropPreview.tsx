@@ -162,114 +162,127 @@ export default function ReelCropPreview({
   const isWide = Math.abs(zoomLevel - PRESET_WIDE) < 0.01;
 
   return (
-    <div className="space-y-1" data-testid="reel-crop-preview">
-      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 flex-wrap">
+    <div className="inline-block" data-testid="reel-crop-preview">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1 mb-1">
         <Focus className="h-3 w-3" />
         Reel Preview — {label}
-        <div className="flex items-center gap-1 ml-auto">
+      </div>
+      <div className="flex items-start gap-1.5">
+        <div className="rounded-md border border-black overflow-hidden bg-black flex-shrink-0">
+          <canvas
+            ref={canvasRef}
+            className="block touch-none select-none"
+            style={{
+              width: DISPLAY_SIZE,
+              height: DISPLAY_SIZE,
+              cursor: isDragging ? "grabbing" : "grab",
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            data-testid="reel-crop-canvas"
+          />
+        </div>
+        <div className="flex flex-col gap-1 pt-0.5">
           {isPanned && (
             <button
               type="button"
-              className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors bg-amber-600/20 text-amber-400 hover:bg-amber-600/30"
+              className="p-1 rounded text-amber-400 bg-amber-600/20 hover:bg-amber-600/30 transition-colors"
               onClick={resetPan}
               data-testid="button-recenter"
               title="Re-center on pin"
+              aria-label="Re-center on pin"
             >
-              <Crosshair className="h-3 w-3 inline mr-0.5" />
-              Re-center
+              <Crosshair className="h-3.5 w-3.5" />
             </button>
           )}
           <button
             type="button"
-            className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors ${
+            className={`px-1.5 py-1 rounded text-[9px] font-bold uppercase leading-none transition-colors ${
               isCloseup
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover-elevate"
             }`}
             onClick={() => { onZoomChange(PRESET_CLOSEUP); resetPan(); }}
             data-testid="button-crop-closeup"
+            title="Close-up view"
           >
-            Close-up
+            Close
           </button>
           <button
             type="button"
-            className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase transition-colors ${
+            className={`px-1.5 py-1 rounded text-[9px] font-bold uppercase leading-none transition-colors ${
               isWide
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover-elevate"
             }`}
             onClick={() => { onZoomChange(PRESET_WIDE); resetPan(); }}
             data-testid="button-crop-wide"
+            title="Wide view"
           >
             Wide
           </button>
-          <div className="w-px h-3.5 bg-border mx-0.5" />
+          <div className="h-px w-full bg-border" />
           <button
             type="button"
-            className="p-0.5 rounded text-muted-foreground hover-elevate disabled:opacity-30 disabled:pointer-events-none"
+            className="p-1 rounded text-muted-foreground hover-elevate disabled:opacity-30 disabled:pointer-events-none"
             onClick={() => onZoomChange(clamp(zoomLevel - ZOOM_STEP))}
             disabled={zoomLevel <= ZOOM_MIN + 0.005}
             data-testid="button-zoom-in"
             title="Zoom in"
+            aria-label="Zoom in"
           >
             <ZoomIn className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
-            className="p-0.5 rounded text-muted-foreground hover-elevate disabled:opacity-30 disabled:pointer-events-none"
+            className="p-1 rounded text-muted-foreground hover-elevate disabled:opacity-30 disabled:pointer-events-none"
             onClick={() => onZoomChange(clamp(zoomLevel + ZOOM_STEP))}
             disabled={zoomLevel >= ZOOM_MAX - 0.005}
             data-testid="button-zoom-out"
             title="Zoom out"
+            aria-label="Zoom out"
           >
             <ZoomOut className="h-3.5 w-3.5" />
           </button>
-          <div className="w-px h-3.5 bg-border mx-0.5" />
+          <div className="h-px w-full bg-border" />
           <button
             type="button"
-            className="p-0.5 rounded text-muted-foreground hover-elevate"
+            className="p-1 rounded text-muted-foreground hover-elevate"
             onClick={rotateCcw}
             data-testid="button-rotate-ccw"
             title="Rotate counterclockwise"
+            aria-label="Rotate counterclockwise"
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
-            className="p-0.5 rounded text-muted-foreground hover-elevate"
+            className="p-1 rounded text-muted-foreground hover-elevate"
             onClick={rotateCw}
             data-testid="button-rotate-cw"
             title="Rotate clockwise"
+            aria-label="Rotate clockwise"
           >
             <RotateCw className="h-3.5 w-3.5" />
           </button>
           {onClose && (
-            <button
-              type="button"
-              className="ml-1 p-0.5 rounded text-muted-foreground hover-elevate"
-              onClick={onClose}
-              data-testid="button-close-preview"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            <>
+              <div className="h-px w-full bg-border" />
+              <button
+                type="button"
+                className="p-1 rounded text-muted-foreground hover-elevate"
+                onClick={onClose}
+                data-testid="button-close-preview"
+                title="Close preview"
+                aria-label="Close preview"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </>
           )}
         </div>
-      </div>
-      <div className="rounded-md border border-black overflow-hidden bg-black inline-block">
-        <canvas
-          ref={canvasRef}
-          className="block touch-none select-none"
-          style={{
-            width: DISPLAY_SIZE,
-            height: DISPLAY_SIZE,
-            cursor: isDragging ? "grabbing" : "grab",
-          }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          data-testid="reel-crop-canvas"
-        />
       </div>
     </div>
   );
