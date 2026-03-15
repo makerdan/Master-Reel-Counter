@@ -4375,23 +4375,24 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 - **Folders**: Organize sessions into folders. Folders can be nested. Deleting a folder moves sessions back to root (sessions are never deleted).
 - **Sorting & Search**: Sort by date, name, reels, or footage. Search filters by name or location across owned and shared sessions.
 - **Shared Sessions**: Sessions shared by others appear in a separate section showing owner name and your role (Editor or Viewer).
-- **Header Bar**: Theme toggle (dark/light), Help, Stats page, Settings (profile avatar, display name, encryption keys, preferences), Sign Out.
+- **Header Bar**: Theme toggle (dark/light), Help, Summary Stats page (key metrics, role-based comparison charts with bar and pie graphs), Settings (profile avatar, display name, encryption keys, preferences), Sign Out.
 
 ## Session — Full Mode (Desktop)
 - **Session Header**: Back arrow, editable name/location/description, lock/unlock, undo/redo, online user avatars, Team button (invite by username/link/email, set roles), Activity Log, Export, dark/light toggle, auto-save indicator.
 - **Section Photo Tab**: Upload/capture photos tagged with aisle & section. Navigate photos with prev/next or type a number. "Next Reel" button jumps to photos with incomplete pins. Zoom (up to 5x), pan, reset, pin placement mode.
 - **Pins**: Click photo in pin mode to place numbered pins. Drag to reposition. Delete with × button. Committed pins show "P" prefix. Draft pins auto-save.
-- **Reel Crop Preview**: Tap a pin to see zoomed crop. Toggle close-up vs wide crop.
-- **Entry Details Table**: Category input searches ~186 catalog entries (arrow keys + Enter to select, auto-fills vendor & footage). Vendor code dropdown (COP, ALU, COR, ALF). Footage field. Clear row, flag for re-shoot, commit pins as entries.
+- **Reel Crop Preview**: Tap a pin to see zoomed crop. Image on the left with vertical button column on the right (Close-up, Wide, Zoom +/-, Rotate, Close). Toggle close-up vs wide view.
+- **Entry Details Table**: Category input searches ~300 catalog entries (arrow keys + Enter to select, auto-fills vendor & footage). Vendor code dropdown (COP, ALU, COR, ALF). Footage field. Clear row, flag for re-shoot (with optional reason), commit pins as entries.
 - **Photo Notes & Detail Shots**: Add notes to photos (auto-save). Mark as detail/close-up shot linked to parent photo.
 - **Nearby Photo Strip**: Horizontal strip of photos sorted by location. Orange badge shows incomplete pin count.
 - **Quick Entry Panel**: Create entries without pins. Auto-fills aisle/section from current photo. Catalog autocomplete. "On Floor / In Front Of" checkbox. Receiving mode auto-increments sections.
-- **Flagged Tab**: Shows all flagged reels with reason. Photo preview with orange pulsing ring. Re-shoot captures detail shot. Un-flag to remove. Shareable link. "Entries Without Photos" issues section.
+- **Flagged Tab**: Shows all flagged reels with reason. Photo preview with orange pulsing ring. Re-shoot captures detail shot. Edit inline (wire details, notes, flag reason). Un-flag to remove. Shareable link. Duplicate detection highlights entries with matching details — dismiss false positives (persisted across browsers/devices). "Entries Without Photos" issues section.
 - **Photos Reel Tab**: Visual grid of all photos grouped by aisle/section. Sequence badge, duplicate, delete, jump-to-photo buttons. Back to Top button.
 - **AI Scanner Tab**: AI vision reads wire reel labels from photo crops. Select photos, preview crops, batch analyze (up to 20 per request), review raw text + matched catalog results, apply to entries. All Photos mode vs Single Photo mode. Receiving pooling for batch efficiency. Real-time sync via WebSocket.
 - **Table View**: All committed entries grouped by aisle/section. Clickable pin # jumps to photo. Collapsible sections. Photo viewer with pin highlight. Edit/delete entries. Validation warnings for missing data. Total footage footer.
-- **Collaboration**: Invite by username, share link (7-day auto-expiry with join count tracking), or email. Editor/Viewer roles. Real-time presence with green dots. Session locking freezes all edits.
-- **Export**: CSV (spreadsheet with all fields), PDF (full quality or standard, parallel generation), email sharing.
+- **Activity Log**: Timestamped feed of all session changes with user filter dropdown and close button. Tracks entries created/edited/deleted, photos uploaded/deleted/duplicated, pins flagged/unflagged/deleted, collaborators added/removed/role changes, invite links, exports, session lock/unlock.
+- **Collaboration**: Invite by username, share link (7-day auto-expiry with join count tracking), or email. Editor/Viewer roles. Testers get Editor access (not Owner). Real-time presence with green dots. Session locking freezes all edits.
+- **Export**: CSV (spreadsheet), Excel (.xlsx with formatted metadata, grouped entries, indented pins, centered columns), PDF (full quality or standard, parallel generation), email sharing.
 
 ## Session — Mobile Flow
 - **Capturing**: Set aisle & section (aisle required), section stepper +/- buttons, take photo or upload from gallery, Receiving checkbox auto-increments sections.

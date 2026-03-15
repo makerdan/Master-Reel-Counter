@@ -176,8 +176,8 @@ export function DashboardSections() {
           />
           <FeatureRow
             icon={<HelpIcon icon={BarChart3} />}
-            label="Stats"
-            description="Opens the summary statistics page showing key metrics across all your sessions — total reels, footage, sessions, and activity charts."
+            label="Summary Stats"
+            description="Opens the Summary Stats page showing key metrics across all your sessions — total reels, footage, sessions, entries, and photos. Includes role-based comparison charts (bar and pie graphs) showing reel counts, footage, and entry counts broken down by user role. Averages per session are also displayed."
           />
           <FeatureRow
             icon={<HelpIcon icon={Settings} />}
@@ -291,7 +291,7 @@ export function DashboardSections() {
           <FeatureRow
             icon={<HelpIcon icon={History} />}
             label="Activity Log"
-            description="View a timestamped log of all changes — entries created, photos uploaded, collaborators joining, etc. You can copy all entries to clipboard."
+            description="View a timestamped log of all changes — entries created/edited/deleted, photos uploaded/deleted/duplicated, pins flagged/unflagged, collaborators added/removed, exports generated, and more. Filter by user with the dropdown. Copy all entries to clipboard."
           />
           <FeatureRow
             icon={<HelpIcon icon={Trash2} />}
@@ -438,7 +438,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={History} />}
             label="Activity Log"
-            description="Toggle the activity log showing a timestamped feed of all session changes — entries created, photos uploaded, collaborators joining, etc."
+            description="Toggle the activity log panel showing a timestamped feed of all session changes — entries created/edited/deleted, photos uploaded/deleted/duplicated, pins flagged/unflagged/deleted, collaborators added/removed/role changes, invite links created/deactivated, exports generated, and session lock/unlock. Filter by user with the dropdown at the top. Close the panel with the X button."
           />
           <FeatureRow
             icon={<HelpIcon icon={Download} />}
@@ -561,7 +561,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={Focus} />}
             label="Pin Selection Preview"
-            description="Tap a pin or its row in the entry table to see a zoomed crop of the area around that pin. Toggle between close-up and wide crop modes for different detail levels. This sticks to the top of the screen as you scroll."
+            description="Tap a pin or its row in the entry table to see a zoomed crop of the area around that pin. The image appears on the left with a vertical button column on the right for Close-up, Wide, Zoom +/-, Rotate, and Close controls. This sticks to the top of the screen as you scroll."
           />
 
           <Separator className="my-2" />
@@ -688,6 +688,16 @@ export function SessionSections() {
             icon={<HelpIcon icon={Share2} />}
             label="Shareable Link"
             description="Copy a direct link to the Flagged tab to share with team members. The link opens the session directly to this view."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Edit Flagged Reel"
+            description="Tap the pencil icon on a flagged card to open an inline edit form. Edit wire details (category, vendor, footage, reel count), notes, and the flag reason. Changes save when you tap Save."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Copy} />}
+            label="Duplicate Detection"
+            description="The Flagged tab automatically detects potential duplicate entries — reels with the same aisle, section, category, vendor code, footage, and reel count. Duplicate groups are highlighted with an amber warning. You can dismiss false positives, and dismissals are saved to the server so they persist across browsers and devices."
           />
           <FeatureRow
             icon={<AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
@@ -865,7 +875,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-bold text-[hsl(18_70%_50%)]">R</span>}
             label="Role-Based Permissions"
-            description="Editors can add, edit, and delete entries and photos. Viewers can only view data. The owner can toggle roles and transfer ownership."
+            description="Editors can add, edit, and delete entries and photos. Viewers can only view data. The owner can toggle roles and transfer ownership. Testers who log in via the tester password receive Editor access to the owner's sessions (they cannot lock/unlock, delete sessions, or manage collaborators)."
           />
           <FeatureRow
             icon={<span className="inline-block w-2 h-2 rounded-full bg-green-500" />}
@@ -894,6 +904,11 @@ export function SessionSections() {
             icon={<HelpIcon icon={FileText} />}
             label="CSV Export"
             description="Downloads all entries as a CSV spreadsheet. Includes columns for aisle, section, position, pallet ID, reel tag, wire type, gauge, footage, reel count, conductors, color, manufacturer, notes, photo filename, photo notes, detail shot status, and parent photo."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={FileText} />}
+            label="Excel Export"
+            description="Downloads a professionally formatted .xlsx workbook with session metadata in two side-by-side columns at the top, entries grouped by aisle/section with indented pin rows, centered data columns, and column headers with black underline styling. Grand totals for reels and footage appear at the bottom."
           />
           <FeatureRow
             icon={<HelpIcon icon={FileText} />}
