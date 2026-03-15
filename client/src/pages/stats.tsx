@@ -128,7 +128,7 @@ export default function StatsPage() {
   const avgReelsPerEntry = stats.totalEntries > 0 ? (stats.totalReels / stats.totalEntries).toFixed(1) : "0";
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col dashboard-theme">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-4 py-2">
           <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back-stats">
