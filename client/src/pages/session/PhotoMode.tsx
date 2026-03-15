@@ -1458,7 +1458,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <input
                     type="text"
                     inputMode="numeric"
-                    className="w-8 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
+                    className="w-10 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
                     value={photoInputValue ?? String(currentPhotoIdx + 1).padStart(2, "0")}
                     onChange={(e) => {
                       const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
