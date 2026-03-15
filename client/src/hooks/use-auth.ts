@@ -34,7 +34,7 @@ export function useAuth() {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       queryClient.clear();
-      await logout((user as any)?.isTester);
+      await logout(user?.isTester);
     },
   });
 
