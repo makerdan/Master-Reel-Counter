@@ -3243,12 +3243,24 @@ export async function registerRoutes(
         }
       }
 
-      for (const [label, value] of coverData) {
+      const mid = Math.ceil(coverData.length / 2);
+      const leftCol = coverData.slice(0, mid);
+      const rightCol = coverData.slice(mid);
+      const coverRows = Math.max(leftCol.length, rightCol.length);
+      for (let ci = 0; ci < coverRows; ci++) {
         const r = ws.getRow(row);
-        r.getCell(1).value = label;
-        r.getCell(1).font = { size: 9, bold: true, color: { argb: "000000" } };
-        r.getCell(2).value = value;
-        r.getCell(2).font = { size: 9, color: { argb: "222222" } };
+        if (ci < leftCol.length) {
+          r.getCell(1).value = leftCol[ci][0];
+          r.getCell(1).font = { size: 9, bold: true, color: { argb: "000000" } };
+          r.getCell(2).value = leftCol[ci][1];
+          r.getCell(2).font = { size: 9, color: { argb: "222222" } };
+        }
+        if (ci < rightCol.length) {
+          r.getCell(5).value = rightCol[ci][0];
+          r.getCell(5).font = { size: 9, bold: true, color: { argb: "000000" } };
+          r.getCell(6).value = rightCol[ci][1];
+          r.getCell(6).font = { size: 9, color: { argb: "222222" } };
+        }
         row++;
       }
 
