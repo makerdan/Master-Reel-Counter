@@ -2,20 +2,12 @@ import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 
-function isAppOwner(userOrReq: any): boolean {
+function isAppOwner(user: any): boolean {
   const replOwner = process.env.REPL_OWNER;
   if (!replOwner) return false;
-  const claims = userOrReq?.claims || userOrReq?.user?.claims || {};
-  const sub = claims.sub || "";
-  const username = claims.username || claims.user_name || "";
-  const firstName = claims.first_name || "";
-  return sub === replOwner || username === replOwner || firstName === replOwner;
-}
-
-function isAppOwnerById(userId: string): boolean {
-  const replOwner = process.env.REPL_OWNER;
-  if (!replOwner) return false;
-  return userId === replOwner;
+  const claims = user?.claims || {};
+  const username = claims.username || "";
+  return username === replOwner;
 }
 
 export const isApproved: RequestHandler = async (req: any, res, next) => {
@@ -91,7 +83,8 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(400).json({ message: "approved must be a boolean" });
       }
       const targetId = req.params.id;
-      if (isAppOwnerById(targetId)) {
+      const requesterId = req.user?.claims?.sub;
+      if (targetId === requesterId) {
         return res.status(400).json({ message: "Cannot change owner approval" });
       }
       const existingUser = await authStorage.getUser(targetId);
