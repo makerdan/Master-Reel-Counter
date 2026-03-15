@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes } from "./replit_integrations/auth/routes";
+import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCategorySchema } from "@shared/schema";
@@ -70,7 +71,7 @@ async function verifySessionAccess(sessionId: number, userId: string, testerOwne
   const session = await storage.getSession(sessionId);
   if (!session) return null;
   if (session.userId === userId) return { session, role: "owner" };
-  if (testerOwnerUserId && session.userId === testerOwnerUserId) return { session, role: "editor" };
+  if (testerOwnerUserId && session.userId === testerOwnerUserId) return { session, role: "owner" };
   const collab = await storage.getCollaborator(sessionId, userId);
   if (collab) return { session, role: collab.role as "editor" | "viewer" };
   return null;
@@ -164,6 +165,13 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid tester password" });
       }
       const testerId = `tester-${createHash("sha256").update(`${ownerSettings.userId}:${displayName.trim().toLowerCase()}`).digest("hex").slice(0, 16)}`;
+      await authStorage.upsertUser({
+        id: testerId,
+        email: null,
+        firstName: displayName.trim(),
+        lastName: null,
+        profileImageUrl: null,
+      });
       const testerUser = {
         claims: {
           sub: testerId,
