@@ -3191,7 +3191,6 @@ export async function registerRoutes(
         { key: "reels", width: 10 },
         { key: "footage", width: 14 },
         { key: "color", width: 12 },
-        { key: "conductors", width: 12 },
         { key: "notes", width: 28 },
         { key: "flagged", width: 10 },
         { key: "flagReason", width: 22 },
@@ -3292,9 +3291,9 @@ export async function registerRoutes(
         });
       };
 
-      const entryHeaders = ["Pin:", "Aisle:", "Section:", "Category:", "Vendor:", "# Reels:", `Footage (${xlULabel}):`, "Color:", "Conductors:", "Notes:", "Flagged:", "Flag Reason:"];
+      const entryHeaders = ["Pin:", "Aisle:", "Section:", "Category:", "Vendor:", "# Reels:", `Footage (${xlULabel}):`, "Color:", "Notes:", "Flagged:", "Flag Reason:"];
       const headerRow = ws.getRow(row);
-      const centeredHeaderCols = new Set([1, 2, 4, 5, 6, 7, 10]);
+      const centeredHeaderCols = new Set([1, 2, 4, 5, 6, 7, 9]);
       entryHeaders.forEach((h, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = h;
@@ -3314,20 +3313,20 @@ export async function registerRoutes(
           pinLabel, safeStr(e.aisle), safeStr(e.section),
           safeStr(e.reelTag), safeStr(e.manufacturer),
           e.reelCount || 1, xlFmt(e.footage || 0),
-          safeStr(e.color), safeStr(e.conductors),
+          safeStr(e.color),
           safeStr(e.notes),
           isFlagged ? "Yes" : "",
           safeStr(flagPin?.flagReason),
         ];
         const r = ws.getRow(row);
         r.height = 16;
-        const centeredCols = new Set([1, 2, 4, 5, 6, 7, 10]);
+        const centeredCols = new Set([1, 2, 4, 5, 6, 7, 9]);
         vals.forEach((v, i) => {
           const cell = r.getCell(i + 1);
           cell.value = v;
           cell.font = { size: 8.5, color: { argb: isFlagged ? "CC4400" : "333333" } };
           cell.border = thinBorder;
-          cell.alignment = { vertical: "middle", wrapText: i === 9, horizontal: centeredCols.has(i) ? "center" : undefined, indent: i === 0 ? 2 : undefined };
+          cell.alignment = { vertical: "middle", wrapText: i === 8, horizontal: centeredCols.has(i) ? "center" : undefined, indent: i === 0 ? 2 : undefined };
           if (i === 0 && pinLabel) cell.font = { size: 8.5, bold: true, color: { argb: accentHex } };
           if (i === 6 && typeof v === "number" && v > 0) cell.numFmt = `#,##0" ${xlULabel}"`;
           if (isFlagged) {
@@ -3344,9 +3343,9 @@ export async function registerRoutes(
         const label = `Aisle ${aisle || "—"}  /  Section ${section || "—"}  —  ${entryCount} entries, ${reelCount} reels, ${xlFmt(footage).toLocaleString()} ${xlULabel}`;
         r.getCell(1).value = label;
         r.getCell(1).font = { size: 9.5, bold: true, color: { argb: accentHex } };
-        ws.mergeCells(row, 1, row, 12);
+        ws.mergeCells(row, 1, row, 11);
         r.height = 22;
-        for (let c = 1; c <= 12; c++) {
+        for (let c = 1; c <= 11; c++) {
           r.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionBandBg } };
           r.getCell(c).border = thinBorder;
         }
@@ -3375,9 +3374,9 @@ export async function registerRoutes(
         const flagBandRow = ws.getRow(row);
         flagBandRow.getCell(1).value = `Flagged Reels (${flaggedEntries.length}) — excluded from totals`;
         flagBandRow.getCell(1).font = { size: 9.5, bold: true, color: { argb: "CC4400" } };
-        ws.mergeCells(row, 1, row, 12);
+        ws.mergeCells(row, 1, row, 11);
         flagBandRow.height = 22;
-        for (let c = 1; c <= 12; c++) {
+        for (let c = 1; c <= 11; c++) {
           flagBandRow.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: flaggedBandBg } };
           flagBandRow.getCell(c).border = thinBorder;
         }
