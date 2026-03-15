@@ -3283,16 +3283,16 @@ export async function registerRoutes(
 
       const entryHeaders = ["Pin", "Aisle", "Section", "Category", "Vendor", "# Reels", `Footage (${xlULabel})`, "Gauge", "Color", "Conductors", "Notes", "Flagged", "Flag Reason"];
       const headerRow = ws.getRow(row);
+      const centeredHeaderCols = new Set([1, 2, 4, 5, 6, 7, 8, 11]);
       entryHeaders.forEach((h, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = h;
         cell.font = { size: 9, bold: true, color: { argb: "333333" } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerBg } };
         cell.border = thinBorder;
-        cell.alignment = { vertical: "middle" };
+        cell.alignment = { vertical: "middle", horizontal: centeredHeaderCols.has(i) ? "center" : undefined };
       });
       headerRow.height = 20;
-      ws.views = [{ state: "frozen", ySplit: row, xSplit: 0 }];
       row++;
 
       const writeEntryRow = (e: any, isFlagged: boolean, altShade: boolean) => {
@@ -3310,14 +3310,14 @@ export async function registerRoutes(
         ];
         const r = ws.getRow(row);
         r.height = 16;
+        const centeredCols = new Set([1, 2, 4, 5, 6, 7, 8, 11]);
         vals.forEach((v, i) => {
           const cell = r.getCell(i + 1);
           cell.value = v;
           cell.font = { size: 8.5, color: { argb: isFlagged ? "CC4400" : "333333" } };
           cell.border = thinBorder;
-          cell.alignment = { vertical: "middle", wrapText: i === 10 };
+          cell.alignment = { vertical: "middle", wrapText: i === 10, horizontal: centeredCols.has(i) ? "center" : undefined, indent: i === 0 ? 2 : undefined };
           if (i === 0 && pinLabel) cell.font = { size: 8.5, bold: true, color: { argb: accentHex } };
-          if (i === 5 || i === 6) cell.alignment = { vertical: "middle", horizontal: "center" };
           if (i === 6 && typeof v === "number" && v > 0) cell.numFmt = `#,##0" ${xlULabel}"`;
           if (isFlagged) {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: flaggedRowBg } };
