@@ -859,7 +859,7 @@ export default function Dashboard() {
         key={folder.id}
         open={!isCollapsed}
       >
-        <div className="border border-red-500/60 rounded-md p-3">
+        <div className="rounded-md p-3" style={{ backgroundColor: 'hsl(var(--folder-bg))', border: '1px solid hsl(var(--folder-border))' }}>
         <div className="flex items-start gap-2 group" data-testid={`folder-header-${folder.id}`}>
           <Button variant="ghost" size="sm" className="gap-2 px-2 items-start h-auto touch-manipulation" data-testid={`button-toggle-folder-${folder.id}`} title="Toggle folder" onPointerDown={(e) => { e.preventDefault(); toggleFolderCollapse(folder.id); }}>
               {isCollapsed ? <Folder className="h-4 w-4 text-primary shrink-0 mt-0.5" /> : <FolderOpen className="h-4 w-4 text-primary shrink-0 mt-0.5" />}
@@ -960,7 +960,7 @@ export default function Dashboard() {
   const unfiledSessions = folderedSessions.get(null) || [];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background dashboard-theme">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-4 py-3 max-w-5xl mx-auto">
           <div className="flex items-center gap-2">

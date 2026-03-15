@@ -17,6 +17,8 @@
   --card: 40 15% 96%;
   --card-foreground: 25 10% 12%;
   --card-border: 25 12% 80%;
+  --folder-bg: 28 25% 92%;
+  --folder-border: 28 20% 78%;
   --sidebar: 40 12% 94%;
   --sidebar-foreground: 25 10% 15%;
   --sidebar-border: 40 10% 86%;
@@ -101,6 +103,8 @@
   --card: 25 8% 13%;
   --card-foreground: 40 5% 96%;
   --card-border: 25 6% 18%;
+  --folder-bg: 25 10% 12%;
+  --folder-border: 25 6% 20%;
   --sidebar: 25 8% 15%;
   --sidebar-foreground: 40 5% 92%;
   --sidebar-border: 25 6% 22%;
@@ -175,6 +179,20 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+}
+
+.dashboard-theme {
+  --background: 35 10% 85%;
+  --card: 33 40% 95%;
+  --card-border: 30 25% 80%;
+  --border: 25 12% 75%;
+}
+
+.dark .dashboard-theme {
+  --background: 25 10% 8%;
+  --card: 25 12% 14%;
+  --card-border: 25 8% 22%;
+  --border: 25 6% 18%;
 }
 
 [cmdk-item][data-selected="true"],
