@@ -71,7 +71,7 @@ async function verifySessionAccess(sessionId: number, userId: string, testerOwne
   const session = await storage.getSession(sessionId);
   if (!session) return null;
   if (session.userId === userId) return { session, role: "owner" };
-  if (testerOwnerUserId && session.userId === testerOwnerUserId) return { session, role: "owner" };
+  if (testerOwnerUserId && session.userId === testerOwnerUserId) return { session, role: "editor" };
   const collab = await storage.getCollaborator(sessionId, userId);
   if (collab) return { session, role: collab.role as "editor" | "viewer" };
   return null;
