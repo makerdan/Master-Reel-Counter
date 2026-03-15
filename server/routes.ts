@@ -3293,13 +3293,13 @@ export async function registerRoutes(
         });
       };
 
-      const entryHeaders = ["Pin", "Aisle", "Section", "Category", "Vendor", "# Reels", `Footage (${xlULabel})`, "Gauge", "Color", "Conductors", "Notes", "Flagged", "Flag Reason"];
+      const entryHeaders = ["Pin:", "Aisle:", "Section:", "Category:", "Vendor:", "# Reels:", `Footage (${xlULabel}):`, "Gauge:", "Color:", "Conductors:", "Notes:", "Flagged:", "Flag Reason:"];
       const headerRow = ws.getRow(row);
       const centeredHeaderCols = new Set([1, 2, 4, 5, 6, 7, 8, 11]);
       entryHeaders.forEach((h, i) => {
         const cell = headerRow.getCell(i + 1);
         cell.value = h;
-        cell.font = { size: 9, bold: true, color: { argb: "333333" } };
+        cell.font = { size: 9, bold: true, underline: true, color: { argb: "000000" } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerBg } };
         cell.border = thinBorder;
         cell.alignment = { vertical: "middle", horizontal: centeredHeaderCols.has(i) ? "center" : undefined };
