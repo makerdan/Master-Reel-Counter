@@ -255,7 +255,7 @@ export default function ReelCropPreview({
           )}
         </div>
       </div>
-      <div className="rounded-md border border-border/50 overflow-hidden bg-black inline-block">
+      <div className="rounded-md border border-black overflow-hidden bg-black inline-block">
         <canvas
           ref={canvasRef}
           className="block touch-none select-none"
