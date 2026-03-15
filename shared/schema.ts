@@ -282,6 +282,15 @@ export const insertScanResultSchema = createInsertSchema(scanResults).omit({
 export type ScanResult = typeof scanResults.$inferSelect;
 export type InsertScanResult = z.infer<typeof insertScanResultSchema>;
 
+export const dismissedDuplicates = pgTable("dismissed_duplicates", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  key: text("key").notNull(),
+  dismissedAt: timestamp("dismissed_at").defaultNow().notNull(),
+});
+
+export type DismissedDuplicate = typeof dismissedDuplicates.$inferSelect;
+
 export const userWireCategories = pgTable("user_wire_categories", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull(),

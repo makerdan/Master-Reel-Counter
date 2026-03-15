@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,25 +51,13 @@ interface FlaggedReelsProps {
   onBack: () => void;
   onReshoot?: (aisle: string, section: string, parentPhotoId: number) => void;
   onViewInPhoto?: (photoId: number, pinId?: number) => void;
+  pushUndo?: (action: { type: string; sessionId: number; entityId: number; data: any; previousData?: any }) => void;
 }
 
 function photoUrl(key: string): string {
   return key.startsWith("/uploads/") ? key : `/uploads/${key}`;
 }
 
-function loadDisregardedKeys(sessionId: number): Set<string> {
-  try {
-    const raw = localStorage.getItem(`disregarded-dups-${sessionId}`);
-    if (!raw) return new Set();
-    return new Set(JSON.parse(raw));
-  } catch {
-    return new Set();
-  }
-}
-
-function saveDisregardedKeys(sessionId: number, keys: Set<string>) {
-  localStorage.setItem(`disregarded-dups-${sessionId}`, JSON.stringify([...keys]));
-}
 
 function dupGroupKey(group: DuplicateGroup): string {
   if (group.groupType === "same-reel") {
@@ -234,7 +222,7 @@ function DupPinTile({
   );
 }
 
-export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPhoto }: FlaggedReelsProps) {
+export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPhoto, pushUndo }: FlaggedReelsProps) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
   const { categories: userCategories } = useWireCategories();
@@ -256,7 +244,21 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const [pendingUnflag, setPendingUnflag] = useState<{ pinId: number } | null>(null);
   const [dupsOpen, setDupsOpen] = useState(true);
-  const [disregardedKeys, setDisregardedKeys] = useState<Set<string>>(() => loadDisregardedKeys(sessionId));
+  const { data: dismissedKeysFromDb = [] } = useQuery<string[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "dismissed-duplicates"],
+  });
+  const [localDismissed, setLocalDismissed] = useState<Set<string>>(new Set());
+  const [migrated, setMigrated] = useState(false);
+
+  useEffect(() => {
+    setLocalDismissed(new Set());
+  }, [dismissedKeysFromDb]);
+
+  const disregardedKeys = useMemo(() => {
+    const merged = new Set(dismissedKeysFromDb);
+    for (const k of localDismissed) merged.add(k);
+    return merged;
+  }, [dismissedKeysFromDb, localDismissed]);
   const [sortBy, setSortBy] = useState<"location" | "label" | "count">("location");
 
   const { data: flaggedPins = [], isLoading } = useQuery<FlaggedPin[]>({
@@ -369,12 +371,52 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     [duplicateGroups, disregardedKeys],
   );
 
+  useEffect(() => {
+    setMigrated(false);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (migrated) return;
+    const lsKey = `disregarded-dups-${sessionId}`;
+    try {
+      const raw = localStorage.getItem(lsKey);
+      if (!raw) { setMigrated(true); return; }
+      const keys: string[] = JSON.parse(raw);
+      if (!keys.length) { localStorage.removeItem(lsKey); setMigrated(true); return; }
+      apiRequest("POST", `/api/sessions/${sessionId}/dismissed-duplicates`, { keys })
+        .then(() => {
+          localStorage.removeItem(lsKey);
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "dismissed-duplicates"] });
+        })
+        .finally(() => setMigrated(true));
+    } catch {
+      setMigrated(true);
+    }
+  }, [sessionId, migrated]);
+
   function handleDisregard(group: DuplicateGroup) {
     const key = dupGroupKey(group);
-    const next = new Set(disregardedKeys);
-    next.add(key);
-    saveDisregardedKeys(sessionId, next);
-    setDisregardedKeys(next);
+    setLocalDismissed(prev => new Set(prev).add(key));
+    apiRequest("POST", `/api/sessions/${sessionId}/dismissed-duplicates`, { key })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "dismissed-duplicates"] });
+        if (pushUndo) {
+          pushUndo({
+            type: "dismiss-duplicate",
+            sessionId,
+            entityId: 0,
+            data: { key },
+          });
+        }
+      })
+      .catch(() => {
+        setLocalDismissed(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        toast({ title: "Failed to save dismissal", variant: "destructive" });
+      });
   }
 
   const photoGroups = useMemo(() => {

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins";
+type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate";
 
 interface UndoAction {
   type: ActionType;
@@ -21,6 +21,7 @@ export function useUndoRedo(sessionId: number) {
   const invalidateSession = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "dismissed-duplicates"] });
   }, [sessionId]);
 
   const pushUndo = useCallback((action: UndoAction) => {
@@ -64,6 +65,14 @@ export function useUndoRedo(sessionId: number) {
       case "restore-draft-pins": {
         await apiRequest("PUT", `/api/photos/${action.previousData.photoId}/draft-pins`, { pins: action.previousData.pins });
         return { type: "restore-draft-pins", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
+      }
+      case "dismiss-duplicate": {
+        await apiRequest("DELETE", `/api/sessions/${action.sessionId}/dismissed-duplicates`, { key: action.data.key });
+        return { type: "undismiss-duplicate", sessionId: action.sessionId, entityId: 0, data: action.data, previousData: action.data };
+      }
+      case "undismiss-duplicate": {
+        await apiRequest("POST", `/api/sessions/${action.sessionId}/dismissed-duplicates`, { key: action.data.key });
+        return { type: "dismiss-duplicate", sessionId: action.sessionId, entityId: 0, data: action.data, previousData: action.data };
       }
     }
   }, []);

@@ -741,6 +741,7 @@ function SessionWorkspace({
                 <FlaggedReels
                   sessionId={sessionId}
                   onBack={() => setMode("photo")}
+                  pushUndo={pushUndo}
                   onReshoot={(aisleVal, sectionVal, parentPhotoId) => {
                     setMobileFlowInitialAisle(aisleVal);
                     setMobileFlowInitialSection(sectionVal);

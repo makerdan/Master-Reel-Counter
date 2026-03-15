@@ -1168,6 +1168,53 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sessions/:id/dismissed-duplicates", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const keys = await storage.getDismissedDuplicates(access.session.id);
+      res.json(keys);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch dismissed duplicates" });
+    }
+  });
+
+  app.post("/api/sessions/:id/dismissed-duplicates", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission" });
+      { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      const { key, keys } = req.body;
+      if (keys && Array.isArray(keys)) {
+        await storage.addDismissedDuplicatesBulk(access.session.id, keys);
+        res.json({ success: true });
+      } else if (key && typeof key === "string") {
+        await storage.addDismissedDuplicate(access.session.id, key);
+        res.json({ success: true });
+      } else {
+        return res.status(400).json({ message: "key or keys required" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to dismiss duplicate" });
+    }
+  });
+
+  app.delete("/api/sessions/:id/dismissed-duplicates", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission" });
+      { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+      const { key } = req.body;
+      if (!key || typeof key !== "string") return res.status(400).json({ message: "key required" });
+      await storage.removeDismissedDuplicate(access.session.id, key);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove dismissed duplicate" });
+    }
+  });
+
   // Pins - verify access through photo -> session chain
   app.get("/api/photos/:photoId/pins", isAuthenticated, async (req: any, res) => {
     try {

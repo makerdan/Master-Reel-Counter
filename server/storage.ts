@@ -36,6 +36,8 @@ import {
   scanResults,
   type ScanResult,
   type InsertScanResult,
+  dismissedDuplicates,
+  type DismissedDuplicate,
   userWireCategories,
   type UserWireCategory,
   type InsertUserWireCategory,
@@ -126,6 +128,11 @@ export interface IStorage {
   getUserWireCategories(userId: string): Promise<UserWireCategory[]>;
   deleteUserWireCategory(id: number, userId: string): Promise<void>;
 
+  getDismissedDuplicates(sessionId: number): Promise<string[]>;
+  addDismissedDuplicate(sessionId: number, key: string): Promise<DismissedDuplicate>;
+  addDismissedDuplicatesBulk(sessionId: number, keys: string[]): Promise<void>;
+  removeDismissedDuplicate(sessionId: number, key: string): Promise<void>;
+
   getStorageUsageForUser(userId: string): Promise<{
     userBytes: number;
     userPhotoCount: number;
@@ -208,6 +215,7 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(sessionInviteLinks).where(eq(sessionInviteLinks.sessionId, id));
       await tx.delete(activityLogs).where(eq(activityLogs.sessionId, id));
       await tx.delete(comments).where(eq(comments.sessionId, id));
+      await tx.delete(dismissedDuplicates).where(eq(dismissedDuplicates.sessionId, id));
       await tx.delete(countingSessions).where(eq(countingSessions.id, id));
     });
   }
@@ -1293,6 +1301,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUserWireCategory(id: number, userId: string): Promise<void> {
     await db.delete(userWireCategories).where(and(eq(userWireCategories.id, id), eq(userWireCategories.userId, userId)));
+  }
+
+  async getDismissedDuplicates(sessionId: number): Promise<string[]> {
+    const rows = await db.select({ key: dismissedDuplicates.key })
+      .from(dismissedDuplicates)
+      .where(eq(dismissedDuplicates.sessionId, sessionId));
+    return rows.map(r => r.key);
+  }
+
+  async addDismissedDuplicate(sessionId: number, key: string): Promise<DismissedDuplicate> {
+    const existing = await db.select().from(dismissedDuplicates)
+      .where(and(eq(dismissedDuplicates.sessionId, sessionId), eq(dismissedDuplicates.key, key)));
+    if (existing.length > 0) return existing[0];
+    const [result] = await db.insert(dismissedDuplicates).values({ sessionId, key }).returning();
+    return result;
+  }
+
+  async addDismissedDuplicatesBulk(sessionId: number, keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    const existing = await db.select({ key: dismissedDuplicates.key })
+      .from(dismissedDuplicates)
+      .where(and(eq(dismissedDuplicates.sessionId, sessionId), inArray(dismissedDuplicates.key, keys)));
+    const existingSet = new Set(existing.map(r => r.key));
+    const newKeys = keys.filter(k => !existingSet.has(k));
+    if (newKeys.length === 0) return;
+    await db.insert(dismissedDuplicates).values(newKeys.map(key => ({ sessionId, key })));
+  }
+
+  async removeDismissedDuplicate(sessionId: number, key: string): Promise<void> {
+    await db.delete(dismissedDuplicates)
+      .where(and(eq(dismissedDuplicates.sessionId, sessionId), eq(dismissedDuplicates.key, key)));
   }
 }
 
