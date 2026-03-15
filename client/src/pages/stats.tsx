@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, BarChart3, Package, Ruler, Camera, CheckCircle, Clock, TrendingUp,
-  Flame, Trophy, Calendar, Target, Users, Shield,
+  Flame, Trophy, Calendar, Target, Users, Shield, Activity, Award, Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,7 +139,7 @@ export default function StatsPage() {
         </div>
       </header>
 
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-4 pb-[50vh] space-y-6">
+      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-4 pb-[50vh] space-y-8">
         {hasNoData ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -151,112 +151,128 @@ export default function StatsPage() {
           <>
             {!hasNoPersonalData && (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <section data-testid="section-overview">
+                  <SectionHeading icon={<BarChart3 className="h-4 w-4" />} title="Overview" testId="heading-overview" />
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Total Sessions:" value={stats.totalSessions} testId="stat-total-sessions" />
+                    <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Completed:" value={stats.completedSessions} testId="stat-completed" />
+                    <StatCard icon={<Clock className="h-4 w-4" />} label="Active Sessions:" value={stats.activeSessions} testId="stat-active" />
+                    <StatCard icon={<Package className="h-4 w-4" />} label="Total Reels:" value={stats.totalReels.toLocaleString()} testId="stat-total-reels" />
+                    <StatCard icon={<Ruler className="h-4 w-4" />} label="Total Footage:" value={`${stats.totalFootage.toLocaleString()} ft`} testId="stat-total-footage" />
+                    <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Total Entries:" value={stats.totalEntries.toLocaleString()} testId="stat-total-entries" />
+                    <StatCard icon={<Camera className="h-4 w-4" />} label="Total Photos:" value={stats.totalPhotos.toLocaleString()} testId="stat-total-photos" />
+                  </div>
+                </section>
 
-                  <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Total Sessions:" value={stats.totalSessions} testId="stat-total-sessions" />
-                  <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Completed:" value={stats.completedSessions} testId="stat-completed" />
-                  <StatCard icon={<Package className="h-4 w-4" />} label="Total Reels:" value={stats.totalReels.toLocaleString()} testId="stat-total-reels" />
-                  <StatCard icon={<Ruler className="h-4 w-4" />} label="Total Footage:" value={`${stats.totalFootage.toLocaleString()} ft`} testId="stat-total-footage" />
-                  <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Total Entries:" value={stats.totalEntries.toLocaleString()} testId="stat-total-entries" />
-                  <StatCard icon={<Camera className="h-4 w-4" />} label="Total Photos:" value={stats.totalPhotos.toLocaleString()} testId="stat-total-photos" />
-                  <StatCard icon={<Clock className="h-4 w-4" />} label="Active Sessions:" value={stats.activeSessions} testId="stat-active" />
-                  <StatCard
-                    icon={<Ruler className="h-4 w-4" />}
-                    label="Avg Footage/Session:"
-                    value={stats.totalSessions > 0 ? `${Math.round(stats.totalFootage / stats.totalSessions).toLocaleString()} ft` : "0 ft"}
-                    testId="stat-avg-footage"
-                  />
-                </div>
+                <section data-testid="section-averages-records">
+                  <SectionHeading icon={<Award className="h-4 w-4" />} title="Averages & Records" testId="heading-averages-records" />
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <StatCard
+                      icon={<Ruler className="h-4 w-4" />}
+                      label="Avg Footage/Session:"
+                      value={stats.totalSessions > 0 ? `${Math.round(stats.totalFootage / stats.totalSessions).toLocaleString()} ft` : "0 ft"}
+                      testId="stat-avg-footage"
+                    />
+                    <StatCard icon={<Target className="h-4 w-4" />} label="Avg Entries/Session:" value={avgEntriesPerSession} testId="stat-avg-entries" />
+                    <StatCard icon={<Package className="h-4 w-4" />} label="Avg Reels/Entry:" value={avgReelsPerEntry} testId="stat-avg-reels" />
+                    <StatCard icon={<Trophy className="h-4 w-4" />} label="Best Session:" value={`${stats.bestSessionFootage.toLocaleString()} ft`} testId="stat-best-session" />
+                  </div>
+                </section>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <StatCard icon={<Target className="h-4 w-4" />} label="Avg Entries/Session:" value={avgEntriesPerSession} testId="stat-avg-entries" />
-                  <StatCard icon={<Package className="h-4 w-4" />} label="Avg Reels/Entry:" value={avgReelsPerEntry} testId="stat-avg-reels" />
-                  <StatCard icon={<Trophy className="h-4 w-4" />} label="Best Session:" value={`${stats.bestSessionFootage.toLocaleString()} ft`} testId="stat-best-session" />
-                  <StatCard icon={<Flame className="h-4 w-4" />} label="Current Streak:" value={`${stats.currentStreak} day${stats.currentStreak !== 1 ? "s" : ""}`} testId="stat-current-streak" />
-                  <StatCard icon={<Flame className="h-4 w-4" />} label="Longest Streak:" value={`${stats.longestStreak} day${stats.longestStreak !== 1 ? "s" : ""}`} testId="stat-longest-streak" />
-                  <StatCard icon={<Calendar className="h-4 w-4" />} label="Busiest Day:" value={stats.busiestDay || "—"} testId="stat-busiest-day" />
-                </div>
+                <section data-testid="section-streaks-activity">
+                  <SectionHeading icon={<Flame className="h-4 w-4" />} title="Streaks & Activity" testId="heading-streaks-activity" />
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <StatCard icon={<Flame className="h-4 w-4" />} label="Current Streak:" value={`${stats.currentStreak} day${stats.currentStreak !== 1 ? "s" : ""}`} testId="stat-current-streak" />
+                    <StatCard icon={<Flame className="h-4 w-4" />} label="Longest Streak:" value={`${stats.longestStreak} day${stats.longestStreak !== 1 ? "s" : ""}`} testId="stat-longest-streak" />
+                    <StatCard icon={<Calendar className="h-4 w-4" />} label="Busiest Day:" value={stats.busiestDay || "—"} testId="stat-busiest-day" />
+                  </div>
+                </section>
 
                 {stats.weeklyStats.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold">Weekly Activity:</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-1">
-                        {stats.weeklyStats.map((w) => {
-                          const weekDate = new Date(w.week);
-                          const label = weekDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                          return (
-                            <div key={w.week} className="flex items-center gap-2 text-xs" data-testid={`stat-week-${w.week}`}>
-                              <span className="w-16 text-muted-foreground mono shrink-0">{label}</span>
-                              <div className="flex-1 flex items-center gap-1">
-                                <div
-                                  className="h-4 bg-primary/80 rounded-sm"
-                                  style={{ width: `${(w.entries / maxWeeklyEntries) * 100}%`, minWidth: w.entries > 0 ? 4 : 0 }}
-                                />
-                                <span className="mono text-muted-foreground shrink-0">{w.entries} entries</span>
+                  <section data-testid="section-weekly-activity">
+                    <SectionHeading icon={<Activity className="h-4 w-4" />} title="Weekly Activity" testId="heading-weekly-activity" />
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="space-y-1">
+                          {stats.weeklyStats.map((w) => {
+                            const weekDate = new Date(w.week);
+                            const label = weekDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                            return (
+                              <div key={w.week} className="flex items-center gap-2 text-xs" data-testid={`stat-week-${w.week}`}>
+                                <span className="w-16 text-muted-foreground mono shrink-0">{label}</span>
+                                <div className="flex-1 flex items-center gap-1">
+                                  <div
+                                    className="h-4 bg-primary/80 rounded-sm"
+                                    style={{ width: `${(w.entries / maxWeeklyEntries) * 100}%`, minWidth: w.entries > 0 ? 4 : 0 }}
+                                  />
+                                  <span className="mono text-muted-foreground shrink-0">{w.entries} entries</span>
+                                </div>
+                                <span className="mono text-muted-foreground shrink-0 w-20 text-right">{w.footage.toLocaleString()} ft</span>
                               </div>
-                              <span className="mono text-muted-foreground shrink-0 w-20 text-right">{w.footage.toLocaleString()} ft</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </section>
                 )}
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  {stats.topCategories.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold">Top Categories:</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {stats.topCategories.map((c, i) => (
-                            <div key={c.category} className="flex items-center gap-2" data-testid={`stat-category-${i}`}>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-0.5">
-                                  <span className="text-xs mono truncate">{c.category}</span>
-                                  <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{c.count} ({c.footage.toLocaleString()} ft)</span>
+                {(stats.topCategories.length > 0 || stats.topManufacturers.length > 0) && (
+                  <section data-testid="section-top-categories-vendors">
+                    <SectionHeading icon={<Layers className="h-4 w-4" />} title="Top Categories & Vendors" testId="heading-categories-vendors" />
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {stats.topCategories.length > 0 && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold">Top Categories:</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {stats.topCategories.map((c, i) => (
+                                <div key={c.category} className="flex items-center gap-2" data-testid={`stat-category-${i}`}>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <span className="text-xs mono truncate">{c.category}</span>
+                                      <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{c.count} ({c.footage.toLocaleString()} ft)</span>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                      <div className="h-full bg-primary/70 rounded-full" style={{ width: `${(c.count / maxCatCount) * 100}%` }} />
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                  <div className="h-full bg-primary/70 rounded-full" style={{ width: `${(c.count / maxCatCount) * 100}%` }} />
-                                </div>
-                              </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                          </CardContent>
+                        </Card>
+                      )}
 
-                  {stats.topManufacturers.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold">Top Vendor Codes:</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {stats.topManufacturers.map((m, i) => (
-                            <div key={m.manufacturer} className="flex items-center gap-2" data-testid={`stat-manufacturer-${i}`}>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-0.5">
-                                  <span className="text-xs mono truncate">{m.manufacturer}</span>
-                                  <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{m.count}</span>
+                      {stats.topManufacturers.length > 0 && (
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold">Top Vendor Codes:</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {stats.topManufacturers.map((m, i) => (
+                                <div key={m.manufacturer} className="flex items-center gap-2" data-testid={`stat-manufacturer-${i}`}>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between mb-0.5">
+                                      <span className="text-xs mono truncate">{m.manufacturer}</span>
+                                      <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{m.count}</span>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                      <div className="h-full bg-orange-500/70 rounded-full" style={{ width: `${(m.count / maxMfgCount) * 100}%` }} />
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                  <div className="h-full bg-orange-500/70 rounded-full" style={{ width: `${(m.count / maxMfgCount) * 100}%` }} />
-                                </div>
-                              </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </section>
+                )}
 
                 {stats.topCategories.length === 0 && stats.topManufacturers.length === 0 && stats.weeklyStats.length === 0 && (
                   <Card>
@@ -269,11 +285,8 @@ export default function StatsPage() {
               </>
             )}
 
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2" data-testid="text-shared-performance-title">
-                <Users className="h-4 w-4" />
-                Shared Session Performance
-              </h2>
+            <section data-testid="section-shared-performance">
+              <SectionHeading icon={<Users className="h-4 w-4" />} title="Shared Session Performance" testId="text-shared-performance-title" />
 
               {stats.sharedPerformance.length === 0 ? (
                 <Card>
@@ -283,52 +296,54 @@ export default function StatsPage() {
                   </CardContent>
                 </Card>
               ) : (
-                stats.sharedPerformance.map((session) => {
-                  const maxEntries = Math.max(...session.contributors.map(c => c.entryCount), 1);
-                  return (
-                    <Card key={session.sessionId} data-testid={`shared-session-${session.sessionId}`}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold truncate">{session.sessionName}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {session.contributors.map((c) => {
-                            const isCurrentUser = c.userId === stats.currentUserId;
-                            return (
-                              <div
-                                key={c.userId}
-                                className={`rounded-md p-2 ${isCurrentUser ? "bg-primary/10 ring-1 ring-primary/20" : "bg-muted/30"}`}
-                                data-testid={`contributor-${session.sessionId}-${c.userId}`}
-                              >
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className={`text-xs font-medium truncate ${isCurrentUser ? "text-primary" : ""}`}>
-                                    {c.username}{isCurrentUser ? " (you)" : ""}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground mono shrink-0 ml-2">
-                                    {c.footage.toLocaleString()} ft
-                                  </span>
+                <div className="space-y-4">
+                  {stats.sharedPerformance.map((session) => {
+                    const maxEntries = Math.max(...session.contributors.map(c => c.entryCount), 1);
+                    return (
+                      <Card key={session.sessionId} data-testid={`shared-session-${session.sessionId}`}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-semibold truncate">{session.sessionName}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            {session.contributors.map((c) => {
+                              const isCurrentUser = c.userId === stats.currentUserId;
+                              return (
+                                <div
+                                  key={c.userId}
+                                  className={`rounded-md p-2 ${isCurrentUser ? "bg-primary/10 ring-1 ring-primary/20" : "bg-muted/30"}`}
+                                  data-testid={`contributor-${session.sessionId}-${c.userId}`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className={`text-xs font-medium truncate ${isCurrentUser ? "text-primary" : ""}`}>
+                                      {c.username}{isCurrentUser ? " (you)" : ""}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground mono shrink-0 ml-2">
+                                      {c.footage.toLocaleString()} ft
+                                    </span>
+                                  </div>
+                                  <div className="h-2 bg-muted rounded-full overflow-hidden mb-1.5">
+                                    <div
+                                      className={`h-full rounded-full ${isCurrentUser ? "bg-primary/80" : "bg-muted-foreground/40"}`}
+                                      style={{ width: `${(c.entryCount / maxEntries) * 100}%`, minWidth: c.entryCount > 0 ? 4 : 0 }}
+                                    />
+                                  </div>
+                                  <div className="flex gap-3 text-[10px] text-muted-foreground mono">
+                                    <span data-testid={`contrib-entries-${session.sessionId}-${c.userId}`}>{c.entryCount} entries</span>
+                                    <span data-testid={`contrib-photos-${session.sessionId}-${c.userId}`}>{c.photoCount} photos</span>
+                                    <span data-testid={`contrib-reels-${session.sessionId}-${c.userId}`}>{c.reelCount} reels</span>
+                                  </div>
                                 </div>
-                                <div className="h-2 bg-muted rounded-full overflow-hidden mb-1.5">
-                                  <div
-                                    className={`h-full rounded-full ${isCurrentUser ? "bg-primary/80" : "bg-muted-foreground/40"}`}
-                                    style={{ width: `${(c.entryCount / maxEntries) * 100}%`, minWidth: c.entryCount > 0 ? 4 : 0 }}
-                                  />
-                                </div>
-                                <div className="flex gap-3 text-[10px] text-muted-foreground mono">
-                                  <span data-testid={`contrib-entries-${session.sessionId}-${c.userId}`}>{c.entryCount} entries</span>
-                                  <span data-testid={`contrib-photos-${session.sessionId}-${c.userId}`}>{c.photoCount} photos</span>
-                                  <span data-testid={`contrib-reels-${session.sessionId}-${c.userId}`}>{c.reelCount} reels</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               )}
-            </div>
+            </section>
           </>
         )}
 
@@ -359,11 +374,8 @@ function RoleComparisonSection({ roleComparison }: { roleComparison: RoleCompari
   const isCurrentUserRole = (role: string) => currentUserRoles.includes(role);
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-sm font-semibold flex items-center gap-2" data-testid="text-role-comparison-title">
-        <Shield className="h-4 w-4" />
-        Role Comparison
-      </h2>
+    <section className="space-y-4" data-testid="section-role-comparison">
+      <SectionHeading icon={<Shield className="h-4 w-4" />} title="Role Comparison" testId="text-role-comparison-title" />
 
       <div className="flex flex-wrap gap-2 mb-2">
         {ROLE_ORDER.map((role) => {
@@ -407,17 +419,15 @@ function RoleComparisonSection({ roleComparison }: { roleComparison: RoleCompari
                       <span className={`w-14 text-xs font-medium shrink-0 ${isYou ? "text-primary font-semibold" : hasValue ? colors.text : "text-muted-foreground"}`}>
                         {role}
                       </span>
-                      <div className="flex-1 flex items-center gap-2">
-                        <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
-                          <div
-                            className={`h-full rounded ${isYou ? `${colors.bar} ring-1 ring-primary/30` : colors.bar} transition-all duration-300`}
-                            style={{ width: `${(value / maxVal) * 100}%`, minWidth: hasValue ? 4 : 0 }}
-                          />
-                        </div>
-                        <span className={`text-xs mono shrink-0 w-16 text-right ${isYou ? "text-primary font-semibold" : "text-muted-foreground"}`} data-testid={`role-value-${metric.key}-${role.toLowerCase()}`}>
-                          {metric.format(value)}
-                        </span>
+                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${hasValue ? colors.bar : "bg-muted-foreground/20"}`}
+                          style={{ width: `${(value / maxVal) * 100}%`, minWidth: hasValue ? 4 : 0 }}
+                        />
                       </div>
+                      <span className={`text-xs mono shrink-0 w-16 text-right ${isYou ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+                        {metric.format(value)}
+                      </span>
                     </div>
                   );
                 })}
@@ -426,6 +436,16 @@ function RoleComparisonSection({ roleComparison }: { roleComparison: RoleCompari
           </Card>
         );
       })}
+    </section>
+  );
+}
+
+function SectionHeading({ icon, title, testId }: { icon: React.ReactNode; title: string; testId: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-3" data-testid={testId}>
+      <div className="text-primary">{icon}</div>
+      <h2 className="text-sm font-semibold tracking-wide">{title}</h2>
+      <div className="flex-1 h-px bg-border ml-2" />
     </div>
   );
 }
