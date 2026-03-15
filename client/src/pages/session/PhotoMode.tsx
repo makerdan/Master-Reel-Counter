@@ -1459,9 +1459,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     type="text"
                     inputMode="numeric"
                     className="w-8 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
-                    value={String(currentPhotoIdx + 1).padStart(2, "0")}
+                    value={photoInputValue ?? String(currentPhotoIdx + 1).padStart(2, "0")}
                     onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
+                      const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
+                      setPhotoInputValue(raw);
+                      const val = parseInt(raw, 10);
                       if (!isNaN(val) && val >= 1 && val <= uploadedPhotos.length) {
                         flushSavePins().then(() => {
                           skipAutoSave.current = true;
@@ -1472,7 +1474,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         });
                       }
                     }}
-                    onFocus={(e) => e.target.select()}
+                    onFocus={(e) => { setPhotoInputValue(String(currentPhotoIdx + 1)); e.target.select(); }}
+                    onBlur={() => setPhotoInputValue(null)}
                     data-testid="input-photo-number-top"
                   />
                   <span>/ {String(uploadedPhotos.length).padStart(2, "0")}</span>
