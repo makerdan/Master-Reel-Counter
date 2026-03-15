@@ -6,7 +6,7 @@ import {
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
   Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
   ChevronDown, Ruler, Building2, FileText, Globe, Upload, Trash2,
-  HardDrive, RefreshCw, Plus, Search, FileUp,
+  HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ interface UserSettingsResponse {
   largerTouchTargets: boolean;
   textSize: string;
   timezone: string;
+  testerPassword: string | null;
 }
 
 export default function SettingsPage() {
@@ -80,6 +81,9 @@ export default function SettingsPage() {
   const [localPhotoQuality, setLocalPhotoQuality] = useState<number | null>(null);
   const [localReceivingQuality, setLocalReceivingQuality] = useState<number | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [testerPassword, setTesterPassword] = useState("");
+  const [showTesterPassword, setShowTesterPassword] = useState(false);
+  const [testerPasswordLoaded, setTesterPasswordLoaded] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -213,6 +217,29 @@ export default function SettingsPage() {
     },
     onError: () => {
       toast({ title: "Backfill failed", variant: "destructive" });
+    },
+  });
+
+  const hasTesterPassword = settings?.testerPassword === "********";
+
+  useEffect(() => {
+    if (settings && !testerPasswordLoaded) {
+      setTesterPassword("");
+      setTesterPasswordLoaded(true);
+    }
+  }, [settings, testerPasswordLoaded]);
+
+  const saveTesterPassword = useMutation({
+    mutationFn: async (pw: string) => {
+      const res = await apiRequest("PATCH", "/api/settings", { testerPassword: pw || null });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({ title: "Tester password saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save tester password", variant: "destructive" });
     },
   });
 
@@ -1516,6 +1543,85 @@ export default function SettingsPage() {
                 </div>
               </CollapsibleContent>
             </Collapsible>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Tester Access</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Set a password so testers can log in and view your sessions without a Replit account.
+            </p>
+            {hasTesterPassword && (
+              <Badge variant="outline" className="text-green-600 border-green-300 w-fit">Password Set</Badge>
+            )}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Input
+                  data-testid="input-tester-password-settings"
+                  type={showTesterPassword ? "text" : "password"}
+                  placeholder={hasTesterPassword ? "Enter new password to change" : "Enter tester password"}
+                  value={testerPassword}
+                  onChange={(e) => setTesterPassword(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setShowTesterPassword(!showTesterPassword)}
+                  data-testid="button-toggle-tester-password"
+                >
+                  {showTesterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => saveTesterPassword.mutate(testerPassword)}
+                disabled={saveTesterPassword.isPending || !testerPassword.trim()}
+                data-testid="button-save-tester-password"
+              >
+                {saveTesterPassword.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+              </Button>
+            </div>
+            {hasTesterPassword && (
+              <>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Tester login URL:</span>
+                  <code className="bg-muted px-2 py-0.5 rounded text-xs">/tester-login</code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    data-testid="button-copy-tester-url"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/tester-login`);
+                      toast({ title: "Copied to clipboard" });
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive w-fit"
+                  data-testid="button-remove-tester-password"
+                  onClick={() => {
+                    saveTesterPassword.mutate("");
+                    setTesterPassword("");
+                  }}
+                  disabled={saveTesterPassword.isPending}
+                >
+                  Remove Tester Password
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
 

@@ -115,6 +115,11 @@ export default function Landing() {
                   Sign in with Replit
                 </Button>
               </a>
+              <a href="/tester-login">
+                <Button size="lg" variant="outline" data-testid="button-tester-login" className="border-amber-500/40 text-amber-100 backdrop-blur-sm bg-white/5">
+                  Tester Login
+                </Button>
+              </a>
               <a href="#features">
                 <Button size="lg" variant="outline" data-testid="button-learn-more" className="border-amber-500/40 text-amber-100 backdrop-blur-sm bg-white/5">
                   See Features

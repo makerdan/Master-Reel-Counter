@@ -15,6 +15,7 @@ import SettingsPage from "@/pages/settings";
 import StatsPage from "@/pages/stats";
 import JoinPage from "@/pages/join";
 import HelpPage from "@/pages/help";
+import TesterLoginPage from "@/pages/tester-login";
 import NotFound from "@/pages/not-found";
 
 const TEXT_SIZE_MAP: Record<string, string> = {
@@ -68,6 +69,9 @@ function AuthRouter() {
     <Switch>
       <Route path="/">
         {user ? <Dashboard /> : <Landing />}
+      </Route>
+      <Route path="/tester-login">
+        {user ? <Dashboard /> : <TesterLoginPage />}
       </Route>
       <Route path="/session/:id">
         {user ? <SessionPage /> : <Landing />}

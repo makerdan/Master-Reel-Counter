@@ -31,7 +31,8 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **In-App Feedback:** Users can submit structured feedback (bug reports, feature requests) directly from the application.
 - **Flagged Reels Workflow:** Pins can be flagged for re-shoot/review with notes, and a dedicated tab allows viewing and resolving flagged pins.
 - **Duplicate Detection:** Identifies potential duplicate pins based on label matching (same label in same aisle/section) and same-reel detection (multiple pins on the same photo for the same physical reel).
-- **User Settings:** Comprehensive settings for display (theme, thumbnail size), accessibility, data entry (aisle prefix, section advance), photo capture quality, export defaults, data encryption, and storage usage dashboard.
+- **Tester Password Login:** Account owners can set a tester password in Settings to allow testers to log in without a Replit account via `/tester-login`. Passwords are bcrypt-hashed. Testers see the owner's sessions as editors but cannot modify settings. Logout redirects to `/api/auth/tester-logout`.
+- **User Settings:** Comprehensive settings for display (theme, thumbnail size), accessibility, data entry (aisle prefix, section advance), photo capture quality, export defaults, data encryption, tester access password, and storage usage dashboard.
 - **Storage Usage Dashboard:** Settings page shows per-user cloud storage consumption with a visual progress bar (10 GB limit), photo/session counts, and a collapsible all-users breakdown table. Photo file sizes are stored in the `photos.fileSize` DB column and populated on upload. A backfill endpoint (`POST /api/storage/backfill-sizes`) fetches GCS metadata for existing photos missing sizes.
 - **User Profile Avatar:** Users can upload custom profile photos stored in Replit Object Storage.
 

@@ -141,6 +141,7 @@ export const userSettings = pgTable("user_settings", {
   textSize: varchar("text_size", { length: 20 }).notNull().default("default"),
   timezone: varchar("timezone", { length: 50 }).notNull().default("America/Chicago"),
   customVendorCodes: text("custom_vendor_codes").array().notNull().default(sql`'{}'::text[]`),
+  testerPassword: text("tester_password"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

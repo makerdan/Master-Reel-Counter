@@ -17,8 +17,8 @@ async function fetchUser(): Promise<User | null> {
   return response.json();
 }
 
-async function logout(): Promise<void> {
-  window.location.href = "/api/logout";
+async function logout(isTester?: boolean): Promise<void> {
+  window.location.href = isTester ? "/api/auth/tester-logout" : "/api/logout";
 }
 
 export function useAuth() {
@@ -34,7 +34,7 @@ export function useAuth() {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       queryClient.clear();
-      await logout();
+      await logout((user as any)?.isTester);
     },
   });
 
