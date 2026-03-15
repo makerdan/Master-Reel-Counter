@@ -89,6 +89,22 @@ function checkLocked(session: any, role: string): string | null {
   return null;
 }
 
+function correctEntryFootage(entries: any[]): any[] {
+  return entries.map(e => {
+    const reelTag = e.reelTag || "";
+    const reelCount = e.reelCount || 1;
+    const trailingNum = reelTag.match(/(\d+)\s*$/);
+    if (trailingNum) {
+      const reelLength = parseInt(trailingNum[1]);
+      if (reelLength > 0) {
+        const corrected = reelLength * reelCount;
+        return { ...e, footage: corrected };
+      }
+    }
+    return e;
+  });
+}
+
 
 async function getEncryptionKey(userId: string): Promise<Buffer | null> {
   const settings = await storage.getUserSettings(userId);
@@ -1547,7 +1563,7 @@ export async function registerRoutes(
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
-      const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
+      const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries);
       const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
       const generatedAt = new Date().toISOString();
       const userSettings = await storage.getUserSettings(userId);
@@ -3110,7 +3126,7 @@ export async function registerRoutes(
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
-      const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
+      const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries);
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       const photoMap = new Map(sessionPhotos.map((p: any) => [p.id, p]));
       const allFlaggedPins = await storage.getSessionFlaggedPins(session.id);
