@@ -2,7 +2,17 @@ import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 
-function isAppOwner(userId: string): boolean {
+function isAppOwner(userOrReq: any): boolean {
+  const replOwner = process.env.REPL_OWNER;
+  if (!replOwner) return false;
+  const claims = userOrReq?.claims || userOrReq?.user?.claims || {};
+  const sub = claims.sub || "";
+  const username = claims.username || claims.user_name || "";
+  const firstName = claims.first_name || "";
+  return sub === replOwner || username === replOwner || firstName === replOwner;
+}
+
+function isAppOwnerById(userId: string): boolean {
   const replOwner = process.env.REPL_OWNER;
   if (!replOwner) return false;
   return userId === replOwner;
@@ -15,7 +25,7 @@ export const isApproved: RequestHandler = async (req: any, res, next) => {
   const userId = user?.claims?.sub;
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  if (isAppOwner(userId)) return next();
+  if (isAppOwner(user)) return next();
 
   const dbUser = await authStorage.getUser(userId);
   if (!dbUser || !dbUser.approved) {
@@ -46,7 +56,7 @@ export function registerAuthRoutes(app: Express): void {
       const userId = req.user.claims.sub;
       const dbUser = await authStorage.getUser(userId);
 
-      if (dbUser && isAppOwner(userId) && !dbUser.approved) {
+      if (dbUser && isAppOwner(req.user) && !dbUser.approved) {
         const updatedUser = await authStorage.setUserApproved(userId, true);
         return res.json(updatedUser);
       }
@@ -60,8 +70,7 @@ export function registerAuthRoutes(app: Express): void {
 
   app.get("/api/admin/users", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
-      if (!userId || !isAppOwner(userId)) {
+      if (!isAppOwner(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const allUsers = await authStorage.getAllUsers();
@@ -74,8 +83,7 @@ export function registerAuthRoutes(app: Express): void {
 
   app.patch("/api/admin/users/:id/approval", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
-      if (!userId || !isAppOwner(userId)) {
+      if (!isAppOwner(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const { approved } = req.body;
@@ -83,7 +91,7 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(400).json({ message: "approved must be a boolean" });
       }
       const targetId = req.params.id;
-      if (isAppOwner(targetId)) {
+      if (isAppOwnerById(targetId)) {
         return res.status(400).json({ message: "Cannot change owner approval" });
       }
       const existingUser = await authStorage.getUser(targetId);
