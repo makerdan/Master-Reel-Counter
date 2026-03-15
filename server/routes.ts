@@ -433,6 +433,10 @@ export async function registerRoutes(
       if (data.completedAt) data.completedAt = new Date(data.completedAt);
       else if (data.completedAt === null) data.completedAt = null;
       const updated = await storage.updateSession(access.session.id, data);
+      if (!isLastPhotoIndexOnly) {
+        const changedFields = Object.keys(data).filter(k => k !== "lastPhotoIndex").join(", ");
+        logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "session_updated", "session", access.session.id, changedFields);
+      }
       res.json(updated);
     } catch (error: any) {
       console.error("Failed to update session:", error?.message || error);
@@ -892,7 +896,7 @@ export async function registerRoutes(
       }).returning();
       res.json(newPhoto);
       broadcastToSession(original.sessionId, { type: "sync", entity: "photos", sessionId: original.sessionId });
-      logActivity(original.sessionId, userId, displayName, "photo_uploaded", "photo", newPhoto.id, (original.originalFilename || "") + " (duplicate)");
+      logActivity(original.sessionId, userId, displayName, "photo_duplicated", "photo", newPhoto.id, original.originalFilename || undefined);
     } catch (error) {
       res.status(500).json({ message: "Failed to duplicate photo" });
     }
@@ -921,6 +925,7 @@ export async function registerRoutes(
         console.warn("Could not delete uploaded file:", err);
       }
       await storage.deletePhoto(photo.id);
+      logActivity(photo.sessionId, req.user.claims.sub, req.user.claims.username, "photo_deleted", "photo", photo.id, photo.originalFilename || undefined);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete photo" });
@@ -1162,6 +1167,7 @@ export async function registerRoutes(
         flagged: !!flagged,
         flagReason: flagged ? (flagReason || null) : null,
       });
+      logActivity(photo.sessionId, req.user.claims.sub, req.user.claims.username, flagged ? "pin_flagged" : "pin_unflagged", "pin", pin.id, flagReason || undefined);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update pin flag" });
@@ -1288,6 +1294,7 @@ export async function registerRoutes(
         broadcastToSession(photo.sessionId, { type: "sync", entity: "entries", sessionId: photo.sessionId });
       }
       await storage.deletePin(pin.id);
+      logActivity(photo.sessionId, req.user.claims.sub, req.user.claims.username, "pin_deleted", "pin", pin.id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete pin" });
@@ -1553,6 +1560,7 @@ export async function registerRoutes(
         username,
         role,
       });
+      logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "collaborator_added", "collaborator", collaborator.id, `${username} as ${role}`);
       res.json(collaborator);
     } catch (error) {
       console.error("Error adding collaborator:", error);
@@ -1565,7 +1573,9 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can remove collaborators" });
-      await storage.removeCollaborator(parseInt(req.params.collabId));
+      const collabId = parseInt(req.params.collabId);
+      await storage.removeCollaborator(collabId);
+      logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "collaborator_removed", "collaborator", collabId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to remove collaborator" });
@@ -1612,7 +1622,10 @@ export async function registerRoutes(
     try {
       const userId = resolveUserId(req);
       const sessionId = parseInt(req.params.id);
+      const collab = await storage.getCollaborator(sessionId, userId);
+      if (!collab) return res.status(404).json({ message: "Not a collaborator of this session" });
       await storage.removeCollaboratorBySessionAndUser(sessionId, userId);
+      logActivity(sessionId, userId, req.user?.claims?.username, "collaborator_left", "session", sessionId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to leave session" });
@@ -1645,6 +1658,7 @@ export async function registerRoutes(
         isActive: true,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
+      logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "invite_created", "invite_link", link.id);
       res.json(link);
     } catch (error) {
       console.error("Error creating invite link:", error);
@@ -1659,6 +1673,7 @@ export async function registerRoutes(
       const access = await verifySessionAccess(link.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access || !isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can revoke invite links" });
       await storage.revokeInviteLink(link.id);
+      logActivity(link.sessionId, req.user.claims.sub, req.user.claims.username, "invite_deactivated", "invite_link", link.id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to revoke invite link" });
@@ -3233,6 +3248,7 @@ export async function registerRoutes(
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Length", pdfBuffer.length);
+      logActivity(session.id, userId, req.user?.claims?.username, "exported_pdf", "session", session.id);
       res.send(pdfBuffer);
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -3761,6 +3777,7 @@ export async function registerRoutes(
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Length", (buffer as Buffer).length);
+      logActivity(session.id, userId, req.user?.claims?.username, "exported_excel", "session", session.id);
       res.send(buffer);
     } catch (error) {
       console.error("Error generating Excel:", error);
@@ -4143,10 +4160,24 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Session not found" });
       const limit = parseInt(req.query.limit) || 50;
       const offset = parseInt(req.query.offset) || 0;
-      const logs = await storage.getSessionActivityLogs(sessionId, limit, offset);
+      const filterUserId = typeof req.query.userId === "string" ? req.query.userId : undefined;
+      const logs = await storage.getSessionActivityLogs(sessionId, limit, offset, filterUserId);
       res.json(logs);
     } catch (error) {
       res.status(500).json({ message: "Failed to get activity logs" });
+    }
+  });
+
+  app.get("/api/sessions/:id/activity-users", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = resolveUserId(req);
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const users = await storage.getSessionActivityUsers(sessionId);
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get activity users" });
     }
   });
 

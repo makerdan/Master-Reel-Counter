@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, FileText, Camera, MapPin, MessageSquare, User, AlertTriangle, Copy, Check } from "lucide-react";
+import {
+  Clock, FileText, Camera, MapPin, MessageSquare, User, AlertTriangle,
+  Copy, Check, Lock, Unlock, Shield, ArrowRightLeft, Download, Flag,
+  FlagOff, Settings, Link, Unlink, LogOut, Trash2, Files
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatDateOnly, formatTimestamp } from "@/lib/timezone";
 
@@ -24,12 +35,26 @@ const ACTION_CONFIG: Record<string, { icon: typeof FileText; label: string; colo
   entry_deleted: { icon: FileText, label: "Deleted entry", color: "text-red-500" },
   photo_uploaded: { icon: Camera, label: "Uploaded photo", color: "text-purple-500" },
   photo_deleted: { icon: Camera, label: "Deleted photo", color: "text-red-500" },
+  photo_duplicated: { icon: Files, label: "Duplicated photo", color: "text-purple-500" },
   pin_created: { icon: MapPin, label: "Placed pin", color: "text-orange-500" },
   pin_committed: { icon: MapPin, label: "Committed pin", color: "text-green-500" },
+  pin_deleted: { icon: Trash2, label: "Deleted pin", color: "text-red-500" },
+  pin_flagged: { icon: Flag, label: "Flagged pin", color: "text-amber-500" },
+  pin_unflagged: { icon: FlagOff, label: "Unflagged pin", color: "text-green-500" },
   comment_added: { icon: MessageSquare, label: "Commented", color: "text-blue-500" },
   status_changed: { icon: Clock, label: "Status changed", color: "text-yellow-500" },
   collaborator_added: { icon: User, label: "Added team member", color: "text-green-500" },
   collaborator_removed: { icon: User, label: "Removed team member", color: "text-red-500" },
+  collaborator_left: { icon: LogOut, label: "Left session", color: "text-orange-500" },
+  locked_session: { icon: Lock, label: "Locked session", color: "text-amber-600" },
+  unlocked_session: { icon: Unlock, label: "Unlocked session", color: "text-green-500" },
+  changed_role: { icon: Shield, label: "Changed role", color: "text-blue-500" },
+  transferred_ownership: { icon: ArrowRightLeft, label: "Transferred ownership", color: "text-purple-600" },
+  exported_pdf: { icon: Download, label: "Exported PDF", color: "text-blue-600" },
+  exported_excel: { icon: Download, label: "Exported Excel", color: "text-green-600" },
+  session_updated: { icon: Settings, label: "Updated session", color: "text-blue-500" },
+  invite_created: { icon: Link, label: "Created invite link", color: "text-green-500" },
+  invite_deactivated: { icon: Unlink, label: "Deactivated invite link", color: "text-red-500" },
 };
 
 function formatTimeAgo(dateStr: string, tz: string): string {
@@ -48,11 +73,28 @@ function formatTimeAgo(dateStr: string, tz: string): string {
 
 export default function ActivityLog({ sessionId }: { sessionId: number }) {
   const tz = useTimezone();
+  const [selectedUserId, setSelectedUserId] = useState<string>("all");
+  const [copied, setCopied] = useState(false);
+
+  const isFiltering = selectedUserId !== "all";
+
   const { data: logs = [], isLoading, isError: logsError } = useQuery<ActivityLogEntry[]>({
-    queryKey: ["/api/sessions", sessionId.toString(), "activity"],
+    queryKey: ["/api/sessions", sessionId.toString(), "activity", isFiltering ? selectedUserId : "all"],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (isFiltering) params.set("userId", selectedUserId);
+      const url = `/api/sessions/${sessionId}/activity${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
     refetchInterval: 30000,
   });
-  const [copied, setCopied] = useState(false);
+
+  const { data: users = [] } = useQuery<Array<{ userId: string; username: string | null }>>({
+    queryKey: ["/api/sessions", sessionId.toString(), "activity-users"],
+    refetchInterval: 60000,
+  });
 
   if (isLoading) {
     return (
@@ -71,7 +113,7 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
     );
   }
 
-  if (logs.length === 0) {
+  if (logs.length === 0 && !isFiltering) {
     return (
       <div className="p-4 text-center">
         <Clock className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
@@ -103,31 +145,48 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
 
   return (
     <div>
-      <div className="flex justify-end px-2 py-1">
+      <div className="flex items-center justify-between gap-2 px-2 py-1">
+        <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+          <SelectTrigger className="h-7 text-xs w-[140px]" data-testid="select-activity-user-filter">
+            <SelectValue placeholder="All users" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" data-testid="select-item-all-users">All users</SelectItem>
+            {users.map(u => (
+              <SelectItem key={u.userId} value={u.userId} data-testid={`select-item-user-${u.userId}`}>{u.username || "Unknown"}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button size="sm" variant="ghost" className="h-7 text-xs gap-1.5" onClick={copyAll} data-testid="button-copy-activity">
           {copied ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy All</>}
         </Button>
       </div>
-      <div className="space-y-0.5 max-h-[400px] overflow-y-auto" data-testid="activity-log-list">
-      {logs.map((log) => {
-        const config = ACTION_CONFIG[log.action] || { icon: Clock, label: log.action, color: "text-muted-foreground" };
-        const Icon = config.icon;
-        return (
-          <div key={log.id} className="flex items-start gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm" data-testid={`activity-${log.id}`}>
-            <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${config.color}`} />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs leading-tight">
-                <span className="font-medium">{log.username || "Unknown"}</span>
-                {" "}
-                <span className="text-muted-foreground">{config.label}</span>
-                {log.details && <span className="text-muted-foreground"> — {log.details}</span>}
-              </p>
-              <span className="text-[10px] text-muted-foreground mono">{formatTimeAgo(log.createdAt, tz)}</span>
-            </div>
-          </div>
-        );
-      })}
-      </div>
+      {logs.length === 0 && selectedUserId !== "all" ? (
+        <div className="p-4 text-center">
+          <p className="text-xs text-muted-foreground">No activity for this user</p>
+        </div>
+      ) : (
+        <div className="space-y-0.5 max-h-[400px] overflow-y-auto" data-testid="activity-log-list">
+          {logs.map((log) => {
+            const config = ACTION_CONFIG[log.action] || { icon: Clock, label: log.action, color: "text-muted-foreground" };
+            const Icon = config.icon;
+            return (
+              <div key={log.id} className="flex items-start gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm" data-testid={`activity-${log.id}`}>
+                <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${config.color}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs leading-tight">
+                    <span className="font-medium">{log.username || "Unknown"}</span>
+                    {" "}
+                    <span className="text-muted-foreground">{config.label}</span>
+                    {log.details && <span className="text-muted-foreground"> — {log.details}</span>}
+                  </p>
+                  <span className="text-[10px] text-muted-foreground mono">{formatTimeAgo(log.createdAt, tz)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -108,7 +108,8 @@ export interface IStorage {
   searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> }>;
 
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
-  getSessionActivityLogs(sessionId: number, limit?: number, offset?: number): Promise<ActivityLog[]>;
+  getSessionActivityLogs(sessionId: number, limit?: number, offset?: number, userId?: string): Promise<ActivityLog[]>;
+  getSessionActivityUsers(sessionId: number): Promise<Array<{ userId: string; username: string | null }>>;
 
   createComment(comment: InsertComment): Promise<Comment>;
   getSessionComments(sessionId: number): Promise<Comment[]>;
@@ -827,12 +828,24 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getSessionActivityLogs(sessionId: number, limit = 50, offset = 0): Promise<ActivityLog[]> {
+  async getSessionActivityLogs(sessionId: number, limit = 50, offset = 0, userId?: string): Promise<ActivityLog[]> {
+    const conditions = [eq(activityLogs.sessionId, sessionId)];
+    if (userId) conditions.push(eq(activityLogs.userId, userId));
     return db.select().from(activityLogs)
-      .where(eq(activityLogs.sessionId, sessionId))
+      .where(and(...conditions))
       .orderBy(desc(activityLogs.createdAt))
       .limit(limit)
       .offset(offset);
+  }
+
+  async getSessionActivityUsers(sessionId: number): Promise<Array<{ userId: string; username: string | null }>> {
+    const rows = await db.selectDistinctOn([activityLogs.userId], {
+      userId: activityLogs.userId,
+      username: activityLogs.username,
+    }).from(activityLogs)
+      .where(eq(activityLogs.sessionId, sessionId))
+      .orderBy(activityLogs.userId);
+    return rows;
   }
 
   async createComment(comment: InsertComment): Promise<Comment> {
