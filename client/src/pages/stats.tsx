@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   ArrowLeft, BarChart3, Package, Ruler, Camera, CheckCircle, Clock, TrendingUp,
-  Flame, Trophy, Calendar, Target, Users,
+  Flame, Trophy, Calendar, Target, Users, Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,21 @@ interface SharedSession {
   contributors: SharedContributor[];
 }
 
+interface RoleMetrics {
+  entries: number;
+  footage: number;
+  reels: number;
+  photos: number;
+}
+
+interface RoleComparison {
+  Owner: RoleMetrics;
+  Editor: RoleMetrics;
+  Tester: RoleMetrics;
+  Viewer: RoleMetrics;
+  currentUserRoles: string[];
+}
+
 interface UserStats {
   totalSessions: number;
   activeSessions: number;
@@ -40,6 +55,7 @@ interface UserStats {
   longestStreak: number;
   busiestDay: string | null;
   sharedPerformance: SharedSession[];
+  roleComparison: RoleComparison;
   currentUserId: string;
 }
 
@@ -136,6 +152,7 @@ export default function StatsPage() {
             {!hasNoPersonalData && (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
                   <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Total Sessions:" value={stats.totalSessions} testId="stat-total-sessions" />
                   <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Completed:" value={stats.completedSessions} testId="stat-completed" />
                   <StatCard icon={<Package className="h-4 w-4" />} label="Total Reels:" value={stats.totalReels.toLocaleString()} testId="stat-total-reels" />
@@ -314,7 +331,101 @@ export default function StatsPage() {
             </div>
           </>
         )}
+
+        {stats.roleComparison && <RoleComparisonSection roleComparison={stats.roleComparison} />}
       </div>
+    </div>
+  );
+}
+
+const ROLE_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
+  Owner: { bar: "bg-blue-500", text: "text-blue-700 dark:text-blue-400", bg: "bg-blue-500/10" },
+  Editor: { bar: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-500/10" },
+  Tester: { bar: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", bg: "bg-amber-500/10" },
+  Viewer: { bar: "bg-purple-500", text: "text-purple-700 dark:text-purple-400", bg: "bg-purple-500/10" },
+};
+
+const ROLE_ORDER: ("Owner" | "Editor" | "Tester" | "Viewer")[] = ["Owner", "Editor", "Tester", "Viewer"];
+
+function RoleComparisonSection({ roleComparison }: { roleComparison: RoleComparison }) {
+  const metrics: { key: keyof RoleMetrics; label: string; format: (v: number) => string }[] = [
+    { key: "entries", label: "Entries", format: (v) => v.toLocaleString() },
+    { key: "footage", label: "Footage (ft)", format: (v) => v.toLocaleString() },
+    { key: "reels", label: "Reels", format: (v) => v.toLocaleString() },
+    { key: "photos", label: "Photos", format: (v) => v.toLocaleString() },
+  ];
+
+  const currentUserRoles = roleComparison.currentUserRoles || [];
+  const isCurrentUserRole = (role: string) => currentUserRoles.includes(role);
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-semibold flex items-center gap-2" data-testid="text-role-comparison-title">
+        <Shield className="h-4 w-4" />
+        Role Comparison
+      </h2>
+
+      <div className="flex flex-wrap gap-2 mb-2">
+        {ROLE_ORDER.map((role) => {
+          const hasData = roleComparison[role].entries > 0 || roleComparison[role].footage > 0 ||
+            roleComparison[role].reels > 0 || roleComparison[role].photos > 0;
+          const colors = ROLE_COLORS[role];
+          const isYou = isCurrentUserRole(role);
+          return (
+            <span
+              key={role}
+              className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full ${isYou ? `ring-2 ring-primary/40 ${colors.bg} ${colors.text}` : hasData ? `${colors.bg} ${colors.text}` : "bg-muted text-muted-foreground opacity-50"}`}
+              data-testid={`role-badge-${role.toLowerCase()}`}
+            >
+              <span className={`w-2 h-2 rounded-full ${hasData ? colors.bar : "bg-muted-foreground/30"}`} />
+              {role}{isYou ? " (you)" : ""}
+            </span>
+          );
+        })}
+      </div>
+
+      {metrics.map((metric) => {
+        const maxVal = Math.max(...ROLE_ORDER.map((r) => roleComparison[r][metric.key]), 1);
+        return (
+          <Card key={metric.key} data-testid={`role-metric-card-${metric.key}`}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">{metric.label}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {ROLE_ORDER.map((role) => {
+                  const value = roleComparison[role][metric.key];
+                  const hasValue = value > 0;
+                  const colors = ROLE_COLORS[role];
+                  const isYou = isCurrentUserRole(role);
+                  return (
+                    <div
+                      key={role}
+                      className={`flex items-center gap-2 ${isYou ? "bg-primary/5 rounded-md px-1.5 py-0.5 ring-1 ring-primary/20" : ""} ${!hasValue && !isYou ? "opacity-40" : ""}`}
+                      data-testid={`role-bar-${metric.key}-${role.toLowerCase()}`}
+                    >
+                      <span className={`w-14 text-xs font-medium shrink-0 ${isYou ? "text-primary font-semibold" : hasValue ? colors.text : "text-muted-foreground"}`}>
+                        {role}
+                      </span>
+                      <div className="flex-1 flex items-center gap-2">
+                        <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
+                          <div
+                            className={`h-full rounded ${isYou ? `${colors.bar} ring-1 ring-primary/30` : colors.bar} transition-all duration-300`}
+                            style={{ width: `${(value / maxVal) * 100}%`, minWidth: hasValue ? 4 : 0 }}
+                          />
+                        </div>
+                        <span className={`text-xs mono shrink-0 w-16 text-right ${isYou ? "text-primary font-semibold" : "text-muted-foreground"}`} data-testid={`role-value-${metric.key}-${role.toLowerCase()}`}>
+                          {metric.format(value)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

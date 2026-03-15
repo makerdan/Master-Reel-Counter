@@ -134,6 +134,14 @@ export interface IStorage {
   addDismissedDuplicatesBulk(sessionId: number, keys: string[]): Promise<void>;
   removeDismissedDuplicate(sessionId: number, key: string): Promise<void>;
 
+  getRoleComparisonStats(userId: string): Promise<{
+    Owner: { entries: number; footage: number; reels: number; photos: number };
+    Editor: { entries: number; footage: number; reels: number; photos: number };
+    Tester: { entries: number; footage: number; reels: number; photos: number };
+    Viewer: { entries: number; footage: number; reels: number; photos: number };
+    currentUserRoles: string[];
+  }>;
+
   getStorageUsageForUser(userId: string): Promise<{
     userBytes: number;
     userPhotoCount: number;
@@ -1200,6 +1208,111 @@ export class DatabaseStorage implements IStorage {
     }
 
     return results;
+  }
+
+  async getRoleComparisonStats(userId: string): Promise<{
+    Owner: { entries: number; footage: number; reels: number; photos: number };
+    Editor: { entries: number; footage: number; reels: number; photos: number };
+    Tester: { entries: number; footage: number; reels: number; photos: number };
+    Viewer: { entries: number; footage: number; reels: number; photos: number };
+    currentUserRoles: string[];
+  }> {
+    const emptyResult = {
+      Owner: { entries: 0, footage: 0, reels: 0, photos: 0 },
+      Editor: { entries: 0, footage: 0, reels: 0, photos: 0 },
+      Tester: { entries: 0, footage: 0, reels: 0, photos: 0 },
+      Viewer: { entries: 0, footage: 0, reels: 0, photos: 0 },
+      currentUserRoles: [] as string[],
+    };
+
+    const ownedSessions = await db.select({ id: countingSessions.id, ownerId: countingSessions.userId })
+      .from(countingSessions)
+      .where(eq(countingSessions.userId, userId));
+
+    const collabRows = await db.select({ sessionId: sessionCollaborators.sessionId })
+      .from(sessionCollaborators)
+      .where(eq(sessionCollaborators.userId, userId));
+
+    const collabSessionIds = collabRows.map(c => c.sessionId);
+    let collabSessions: { id: number; ownerId: string }[] = [];
+    if (collabSessionIds.length > 0) {
+      collabSessions = await db.select({ id: countingSessions.id, ownerId: countingSessions.userId })
+        .from(countingSessions)
+        .where(inArray(countingSessions.id, collabSessionIds));
+    }
+
+    const allSessionMap = new Map<number, { id: number; ownerId: string }>();
+    for (const s of ownedSessions) allSessionMap.set(s.id, s);
+    for (const s of collabSessions) allSessionMap.set(s.id, s);
+
+    const allSessionIds = Array.from(allSessionMap.keys());
+    if (allSessionIds.length === 0) return emptyResult;
+
+    const allCollabs = await db.select({
+      sessionId: sessionCollaborators.sessionId,
+      odUserId: sessionCollaborators.userId,
+      role: sessionCollaborators.role,
+    }).from(sessionCollaborators)
+      .where(inArray(sessionCollaborators.sessionId, allSessionIds));
+
+    const collabRoleMap = new Map<string, string>();
+    for (const c of allCollabs) {
+      collabRoleMap.set(`${c.sessionId}:${c.odUserId}`, c.role);
+    }
+
+    const determineRole = (contributorUserId: string, sessionId: number): "Owner" | "Editor" | "Tester" | "Viewer" => {
+      const session = allSessionMap.get(sessionId);
+      if (session && contributorUserId === session.ownerId) return "Owner";
+      if (contributorUserId.startsWith("tester-")) return "Tester";
+      const collabRole = collabRoleMap.get(`${sessionId}:${contributorUserId}`);
+      if (collabRole === "viewer") return "Viewer";
+      return "Editor";
+    };
+
+    const currentUserRolesSet = new Set<string>();
+    for (const sId of allSessionIds) {
+      currentUserRolesSet.add(determineRole(userId, sId));
+    }
+
+    const result = {
+      Owner: { entries: 0, footage: 0, reels: 0, photos: 0 },
+      Editor: { entries: 0, footage: 0, reels: 0, photos: 0 },
+      Tester: { entries: 0, footage: 0, reels: 0, photos: 0 },
+      Viewer: { entries: 0, footage: 0, reels: 0, photos: 0 },
+      currentUserRoles: Array.from(currentUserRolesSet),
+    };
+
+    const entryAgg = await db.select({
+      sessionId: entries.sessionId,
+      eUserId: entries.userId,
+      entryCount: count(),
+      reelCount: sum(entries.reelCount),
+      footage: sum(entries.footage),
+    }).from(entries)
+      .where(inArray(entries.sessionId, allSessionIds))
+      .groupBy(entries.sessionId, entries.userId);
+
+    for (const e of entryAgg) {
+      const role = determineRole(e.eUserId, e.sessionId);
+      result[role].entries += Number(e.entryCount) || 0;
+      result[role].reels += Number(e.reelCount) || 0;
+      result[role].footage += Number(e.footage) || 0;
+    }
+
+    const photoAgg = await db.select({
+      sessionId: photos.sessionId,
+      pUserId: photos.userId,
+      photoCount: count(),
+    }).from(photos)
+      .where(inArray(photos.sessionId, allSessionIds))
+      .groupBy(photos.sessionId, photos.userId);
+
+    for (const p of photoAgg) {
+      const role = determineRole(p.pUserId, p.sessionId);
+      result[role].photos += Number(p.photoCount) || 0;
+    }
+
+    return result;
   }
 
   async createFeedback(data: InsertFeedback): Promise<Feedback> {
