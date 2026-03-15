@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, ArrowUp, Camera, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Trash2, LayoutGrid, ScanLine,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Trash2, LayoutGrid, ScanLine, X,
 } from "lucide-react";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
@@ -659,9 +659,18 @@ function SessionWorkspace({
         <div className="border-b bg-card">
           <div className="max-w-5xl mx-auto w-full px-4">
             <div className="flex items-center gap-2 py-2 border-b border-border/50">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-1">
                 Activity Log
               </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setShowActivity(false)}
+                data-testid="button-close-activity"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
             </div>
             <ActivityLog sessionId={sessionId} />
           </div>
