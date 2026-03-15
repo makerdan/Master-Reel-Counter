@@ -16,6 +16,7 @@ import StatsPage from "@/pages/stats";
 import JoinPage from "@/pages/join";
 import HelpPage from "@/pages/help";
 import TesterLoginPage from "@/pages/tester-login";
+import PendingApproval from "@/pages/pending-approval";
 import NotFound from "@/pages/not-found";
 
 const TEXT_SIZE_MAP: Record<string, string> = {
@@ -65,28 +66,30 @@ function AuthRouter() {
     );
   }
 
+  const isApproved = !user || user.approved || user.isTester;
+
   return (
     <Switch>
       <Route path="/">
-        {user ? <Dashboard /> : <Landing />}
+        {user ? (isApproved ? <Dashboard /> : <PendingApproval />) : <Landing />}
       </Route>
       <Route path="/tester-login">
-        {user ? <Dashboard /> : <TesterLoginPage />}
+        {user ? (isApproved ? <Dashboard /> : <PendingApproval />) : <TesterLoginPage />}
       </Route>
       <Route path="/session/:id">
-        {user ? <SessionPage /> : <Landing />}
+        {user ? (isApproved ? <SessionPage /> : <PendingApproval />) : <Landing />}
       </Route>
       <Route path="/settings">
-        {user ? <SettingsPage /> : <Landing />}
+        {user ? (isApproved ? <SettingsPage /> : <PendingApproval />) : <Landing />}
       </Route>
       <Route path="/stats">
-        {user ? <StatsPage /> : <Landing />}
+        {user ? (isApproved ? <StatsPage /> : <PendingApproval />) : <Landing />}
       </Route>
       <Route path="/join/:token">
-        {user ? <JoinPage /> : <Landing />}
+        {user ? (isApproved ? <JoinPage /> : <PendingApproval />) : <Landing />}
       </Route>
       <Route path="/help">
-        {user ? <HelpPage /> : <Landing />}
+        {user ? (isApproved ? <HelpPage /> : <PendingApproval />) : <Landing />}
       </Route>
       <Route component={NotFound} />
     </Switch>

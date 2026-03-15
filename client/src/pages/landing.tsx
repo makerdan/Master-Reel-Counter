@@ -1,4 +1,4 @@
-import { Cable, Camera, Search, FileText, ClipboardList, Users, Link2, Shield, ImagePlus, Download, Flag, ScanLine, GalleryHorizontalEnd, FileSpreadsheet, Layers } from "lucide-react";
+import { Cable, Camera, Search, FileText, ClipboardList, Users, Link2, Shield, ImagePlus, Download, Flag, ScanLine, GalleryHorizontalEnd, FileSpreadsheet, Layers, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -84,6 +84,13 @@ export default function Landing() {
       <div className="relative flex flex-col">
         <div className="absolute inset-0 bg-gradient-to-br from-neutral-900 via-stone-900 to-amber-950" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(180,100,30,0.15),_transparent_60%)]" />
+
+        <div className="relative z-10 bg-amber-500 text-black px-4 py-2.5 text-center" data-testid="banner-testing">
+          <div className="flex items-center justify-center gap-2 text-sm font-semibold">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>Undergoing Final Testing — This app is not open for general use yet.</span>
+          </div>
+        </div>
 
         <header className="relative z-10 flex items-center justify-between gap-2 p-4">
           <div className="flex items-center gap-2">

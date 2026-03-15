@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
-import { registerAuthRoutes } from "./replit_integrations/auth/routes";
+import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/routes";
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
@@ -146,6 +146,17 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
   registerObjectStorageRoutes(app);
+
+  app.use("/api", (req, res, next) => {
+    const skipPaths = [
+      "/api/login", "/api/callback", "/api/logout",
+      "/api/auth/user", "/api/auth/tester-login", "/api/auth/tester-logout",
+      "/api/admin/users",
+    ];
+    const matchesSkip = skipPaths.some(p => req.originalUrl === p || req.originalUrl.startsWith(p + "/") || req.originalUrl.startsWith(p + "?"));
+    if (matchesSkip) return next();
+    isApproved(req, res, next);
+  });
 
   app.post("/api/auth/tester-login", async (req: any, res) => {
     try {

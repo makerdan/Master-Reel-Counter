@@ -7,6 +7,7 @@ import {
   Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
   ChevronDown, Ruler, Building2, FileText, Globe, Upload, Trash2,
   HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
+  Users, UserCheck, UserX,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -204,6 +205,30 @@ export default function SettingsPage() {
       return res.json();
     },
     retry: false,
+  });
+
+  const { data: adminUsers, isLoading: adminUsersLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/users"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/users", { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const toggleApproval = useMutation({
+    mutationFn: async ({ userId, approved }: { userId: string; approved: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/approval`, { approved });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "User approval updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update approval", variant: "destructive" });
+    },
   });
 
   const backfillSizes = useMutation({
@@ -1846,6 +1871,104 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {adminUsers && Array.isArray(adminUsers) && (
+          <Card data-testid="card-manage-users">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Manage Users</CardTitle>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Approve or reject users who have signed in. Only approved users can access the app.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {adminUsersLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading users...
+                </div>
+              ) : adminUsers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No users registered yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {adminUsers.map((u: any) => {
+                    const isOwner = u.id === user?.id;
+                    return (
+                      <div
+                        key={u.id}
+                        className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card"
+                        data-testid={`row-user-${u.id}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar className="h-8 w-8">
+                            {u.profileImageUrl ? (
+                              <AvatarImage src={u.profileImageUrl} alt={u.firstName || u.id} />
+                            ) : null}
+                            <AvatarFallback className="text-xs">
+                              {(u.firstName || u.id).charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium truncate" data-testid={`text-username-${u.id}`}>
+                                {u.firstName || u.id}{u.lastName ? ` ${u.lastName}` : ""}
+                              </span>
+                              {isOwner && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Owner</Badge>
+                              )}
+                            </div>
+                            {u.email && (
+                              <span className="text-xs text-muted-foreground truncate block">{u.email}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isOwner ? (
+                            <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
+                          ) : u.approved ? (
+                            <>
+                              <Badge className="bg-green-600 text-white text-xs" data-testid={`badge-approved-${u.id}`}>
+                                Approved
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                                onClick={() => toggleApproval.mutate({ userId: u.id, approved: false })}
+                                disabled={toggleApproval.isPending}
+                                data-testid={`button-reject-${u.id}`}
+                              >
+                                <UserX className="h-3 w-3 mr-1" />
+                                Reject
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700" data-testid={`badge-pending-${u.id}`}>
+                                Pending
+                              </Badge>
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() => toggleApproval.mutate({ userId: u.id, approved: true })}
+                                disabled={toggleApproval.isPending}
+                                data-testid={`button-approve-${u.id}`}
+                              >
+                                <UserCheck className="h-3 w-3 mr-1" />
+                                Approve
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </main>
 
       <AlertDialog open={confirmEnableOpen} onOpenChange={setConfirmEnableOpen}>
