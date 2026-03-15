@@ -14,7 +14,7 @@ import multer from "multer";
 import PDFDocument from "pdfkit";
 import { toDisplayUnit, unitLabel, unitLabelFull, type UnitType } from "./unit-conversion";
 import sharp from "sharp";
-import { randomUUID, randomBytes } from "crypto";
+import { randomUUID, randomBytes, createHash } from "crypto";
 import bcrypt from "bcrypt";
 import path from "path";
 import fs from "fs/promises";
@@ -163,7 +163,7 @@ export async function registerRoutes(
       if (!ownerSettings) {
         return res.status(401).json({ message: "Invalid tester password" });
       }
-      const testerId = `tester-${randomBytes(8).toString("hex")}`;
+      const testerId = `tester-${createHash("sha256").update(`${ownerSettings.userId}:${displayName.trim().toLowerCase()}`).digest("hex").slice(0, 16)}`;
       const testerUser = {
         claims: {
           sub: testerId,
@@ -351,7 +351,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const data = insertSessionSchema.parse({ ...req.body, userId });
       if (data.folderId) {
         const folder = await storage.getFolder(data.folderId);
@@ -468,14 +468,14 @@ export async function registerRoutes(
 
   app.post("/api/sessions/bulk/status", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { ids, status } = req.body;
       if (!Array.isArray(ids) || !ids.length || !["active", "completed"].includes(status)) {
         return res.status(400).json({ message: "Invalid request" });
       }
       const results = [];
       for (const id of ids) {
-        const access = await verifySessionAccess(id, userId);
+        const access = await verifySessionAccess(id, userId, getTesterOwner(req));
         if (access && isOwner(access.role)) {
           const data: any = { status };
           if (status === "completed") data.completedAt = new Date();
@@ -492,7 +492,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/bulk/move", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { ids, folderId } = req.body;
       if (!Array.isArray(ids) || !ids.length) {
         return res.status(400).json({ message: "Invalid request" });
@@ -505,7 +505,7 @@ export async function registerRoutes(
       }
       const results = [];
       for (const id of ids) {
-        const access = await verifySessionAccess(id, userId);
+        const access = await verifySessionAccess(id, userId, getTesterOwner(req));
         if (access && isOwner(access.role)) {
           await storage.updateSession(id, { folderId: folderId ?? null });
           results.push(id);
@@ -519,14 +519,14 @@ export async function registerRoutes(
 
   app.post("/api/sessions/bulk/delete", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { ids } = req.body;
       if (!Array.isArray(ids) || !ids.length) {
         return res.status(400).json({ message: "Invalid request" });
       }
       const results = [];
       for (const id of ids) {
-        const access = await verifySessionAccess(id, userId);
+        const access = await verifySessionAccess(id, userId, getTesterOwner(req));
         if (access && isOwner(access.role)) {
           const sessionPhotos = await storage.getSessionPhotos(id);
           for (const photo of sessionPhotos) {
@@ -566,7 +566,7 @@ export async function registerRoutes(
 
   app.post("/api/folders", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { name } = req.body;
       if (!name || typeof name !== "string") return res.status(400).json({ message: "Name is required" });
       const existing = await storage.getUserFolders(userId);
@@ -580,7 +580,7 @@ export async function registerRoutes(
 
   app.patch("/api/folders/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
       const { name, sortOrder, parentFolderId } = req.body;
@@ -616,7 +616,7 @@ export async function registerRoutes(
 
   app.delete("/api/folders/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
       await storage.deleteFolder(folder.id);
@@ -628,7 +628,7 @@ export async function registerRoutes(
 
   app.post("/api/folders/reorder", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { folderIds } = req.body;
       if (!Array.isArray(folderIds)) return res.status(400).json({ message: "folderIds array required" });
       const userFolders = await storage.getUserFolders(userId);
@@ -646,7 +646,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/move", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const session = await storage.getSession(parseInt(req.params.id));
       if (!session || session.userId !== userId) return res.status(404).json({ message: "Session not found" });
       const { folderId } = req.body;
@@ -663,8 +663,8 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/duplicate", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const access = await verifySessionAccess(parseInt(req.params.id), userId);
+      const userId = resolveUserId(req);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const { folderId } = req.body || {};
       const targetFolderId = folderId ?? access.session.folderId ?? null;
@@ -681,7 +681,7 @@ export async function registerRoutes(
 
   app.get("/api/search/sessions", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const query = String(req.query.q || "");
       const searchInside = req.query.inside === "true";
       if (!query.trim()) return res.json({ ownedIds: [], sharedIds: [], reasons: {} });
@@ -706,7 +706,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:sessionId/photos", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add photos" });
@@ -740,7 +740,7 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.id));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit photos" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
@@ -813,10 +813,10 @@ export async function registerRoutes(
 
   app.post("/api/photos/:id/duplicate", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const original = await storage.getPhoto(parseInt(req.params.id));
       if (!original) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(original.sessionId, userId);
+      const access = await verifySessionAccess(original.sessionId, userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to duplicate photos" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -883,7 +883,7 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.id));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete photos" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -910,7 +910,7 @@ export async function registerRoutes(
 
   app.get("/api/sessions/:sessionId/pins", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const sessionPins = await storage.getSessionPins(access.session.id);
@@ -923,7 +923,7 @@ export async function registerRoutes(
   // Entries CRUD - all operations verify session access + encoding
   app.get("/api/sessions/:sessionId/entries", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const rawEntries = await storage.getSessionEntries(access.session.id);
@@ -937,7 +937,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:sessionId/entries", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add entries" });
@@ -963,10 +963,10 @@ export async function registerRoutes(
 
   app.patch("/api/entries/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const entry = await storage.getEntry(parseInt(req.params.id));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const access = await verifySessionAccess(entry.sessionId, userId);
+      const access = await verifySessionAccess(entry.sessionId, userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Entry not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -1044,8 +1044,8 @@ export async function registerRoutes(
     try {
       const entry = await storage.getEntry(parseInt(req.params.id));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const userId = req.user.claims.sub;
-      const access = await verifySessionAccess(entry.sessionId, userId);
+      const userId = resolveUserId(req);
+      const access = await verifySessionAccess(entry.sessionId, userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Entry not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete entries" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -1064,7 +1064,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/incomplete-pins", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const result = await storage.getSessionIncompletePins(sessionId);
       res.json(result);
@@ -1076,7 +1076,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/flagged-pins", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const flaggedPins = await storage.getSessionFlaggedPins(sessionId);
       const sessionPhotos = await storage.getSessionPhotos(sessionId);
@@ -1116,7 +1116,7 @@ export async function registerRoutes(
       const entryId = parseInt(req.params.entryId);
       const entry = await storage.getEntry(entryId);
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const access = await verifySessionAccess(entry.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(entry.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Entry not found" });
       const sessionPins = await storage.getSessionPins(entry.sessionId);
       const pin = sessionPins.find(p => p.entryId === entryId);
@@ -1133,7 +1133,7 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to flag pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
@@ -1154,7 +1154,7 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       const pins = await storage.getPhotoPins(photo.id);
       res.json(pins);
@@ -1167,7 +1167,7 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add pins" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -1189,7 +1189,7 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Pin not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
@@ -1212,7 +1212,7 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Pin not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
@@ -1232,7 +1232,7 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
@@ -1289,7 +1289,7 @@ export async function registerRoutes(
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to analyze labels" });
 
@@ -1395,7 +1395,7 @@ export async function registerRoutes(
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
 
       const cached = labelResultsCache.get(photoId);
@@ -1412,7 +1412,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/scan-results", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const results = await storage.getSessionScanResults(sessionId);
       res.json(results);
@@ -1424,7 +1424,7 @@ export async function registerRoutes(
   app.delete("/api/sessions/:id/scan-results", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "No permission" });
       await storage.deleteSessionScanResults(sessionId);
@@ -1441,7 +1441,7 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
@@ -1544,7 +1544,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/leave", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const sessionId = parseInt(req.params.id);
       await storage.removeCollaboratorBySessionAndUser(sessionId, userId);
       res.json({ success: true });
@@ -1590,7 +1590,7 @@ export async function registerRoutes(
     try {
       const link = await storage.getInviteLinkById(parseInt(req.params.id));
       if (!link) return res.status(404).json({ message: "Invite link not found" });
-      const access = await verifySessionAccess(link.sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(link.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access || !isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can revoke invite links" });
       await storage.revokeInviteLink(link.id);
       res.json({ success: true });
@@ -1602,7 +1602,7 @@ export async function registerRoutes(
   // Join via invite token
   app.post("/api/join/:token", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const username = req.user.claims.username || req.user.claims.first_name || userId;
       const link = await storage.getInviteLinkByToken(req.params.token);
       if (!link || !link.isActive) return res.status(404).json({ message: "Invalid or expired invite link" });
@@ -1630,8 +1630,8 @@ export async function registerRoutes(
 
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const access = await verifySessionAccess(parseInt(req.params.id), userId);
+      const userId = resolveUserId(req);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
@@ -3177,8 +3177,8 @@ export async function registerRoutes(
   // Export session data (authenticated, decrypted)
   app.get("/api/sessions/:id/export", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const access = await verifySessionAccess(parseInt(req.params.id), userId);
+      const userId = resolveUserId(req);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
@@ -3193,8 +3193,8 @@ export async function registerRoutes(
 
   app.get("/api/sessions/:id/export/excel", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const access = await verifySessionAccess(parseInt(req.params.id), userId);
+      const userId = resolveUserId(req);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
@@ -3705,7 +3705,7 @@ export async function registerRoutes(
   // Update user profile name
   app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { firstName, lastName } = req.body;
       if (typeof firstName !== "string" || typeof lastName !== "string") {
         return res.status(400).json({ message: "firstName and lastName are required strings" });
@@ -3722,7 +3722,7 @@ export async function registerRoutes(
   app.post("/api/user/profile/avatar", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No file provided" });
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const resizedBuffer = await sharp(req.file.buffer)
         .rotate()
         .resize(256, 256, { fit: "cover", position: "center" })
@@ -3745,7 +3745,7 @@ export async function registerRoutes(
   // Delete user avatar (revert to Replit avatar)
   app.delete("/api/user/profile/avatar", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const user = await authStorage.getUser(userId);
       if (user?.customAvatarKey) {
@@ -3762,7 +3762,7 @@ export async function registerRoutes(
   app.post("/api/settings/logo", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: "No file provided" });
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const existing = await storage.getUserSettings(userId);
       if (existing?.companyLogoKey) {
         const oldObj = toStorageObjectName(existing.companyLogoKey);
@@ -3790,7 +3790,7 @@ export async function registerRoutes(
 
   app.delete("/api/settings/logo", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const existing = await storage.getUserSettings(userId);
       if (existing?.companyLogoKey) {
         const objName = toStorageObjectName(existing.companyLogoKey);
@@ -3807,7 +3807,7 @@ export async function registerRoutes(
 
   app.get("/api/storage/usage", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const usage = await storage.getStorageUsageForUser(userId);
       res.json(usage);
     } catch (error) {
@@ -3833,7 +3833,7 @@ export async function registerRoutes(
 
   app.post("/api/storage/backfill-sizes", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const userSessions = await storage.getUserSessions(userId);
       const userSessionIds = userSessions.map(s => s.id);
       if (userSessionIds.length === 0) {
@@ -3911,7 +3911,7 @@ export async function registerRoutes(
       if (req.user?.isTester) {
         return res.status(403).json({ message: "Testers cannot modify settings" });
       }
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const allowedFields = [
         "defaultExportFormat", "companyName", "exportFooterText",
         "photoQuality", "useReceivingQuality", "receivingPhotoQuality",
@@ -3958,7 +3958,7 @@ export async function registerRoutes(
 
   app.post("/api/settings/encoding", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { enabled } = req.body;
       const { db: txDb } = await import("./db");
 
@@ -4057,7 +4057,7 @@ export async function registerRoutes(
   // Stats
   app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const [stats, sharedPerformance] = await Promise.all([
         storage.getUserStats(userId),
         storage.getSharedSessionPerformance(userId),
@@ -4071,9 +4071,9 @@ export async function registerRoutes(
   // Activity logs
   app.get("/api/sessions/:id/activity", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, userId);
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const limit = parseInt(req.query.limit) || 50;
       const offset = parseInt(req.query.offset) || 0;
@@ -4087,9 +4087,9 @@ export async function registerRoutes(
   // Comments
   app.get("/api/sessions/:id/comments", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, userId);
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const allComments = await storage.getSessionComments(sessionId);
       res.json(allComments);
@@ -4100,9 +4100,9 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/comments", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, userId);
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "View-only access" });
       const { text, entryId, photoId, parentCommentId } = req.body;
@@ -4125,7 +4125,7 @@ export async function registerRoutes(
 
   app.patch("/api/comments/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const commentId = parseInt(req.params.id);
       const comment = await storage.getComment(commentId);
       if (!comment) return res.status(404).json({ message: "Comment not found" });
@@ -4142,11 +4142,11 @@ export async function registerRoutes(
 
   app.delete("/api/comments/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const commentId = parseInt(req.params.id);
       const comment = await storage.getComment(commentId);
       if (!comment) return res.status(404).json({ message: "Comment not found" });
-      const access = await verifySessionAccess(comment.sessionId, userId);
+      const access = await verifySessionAccess(comment.sessionId, userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (comment.userId !== userId && !isOwner(access.role)) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteComment(commentId);
@@ -4160,7 +4160,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/online", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const users = getOnlineUsers(sessionId);
       res.json(users);
@@ -4183,7 +4183,7 @@ export async function registerRoutes(
 
   app.post("/api/wire-categories", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const parsed = insertUserWireCategorySchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid wire category data", details: parsed.error.flatten() });
@@ -4198,7 +4198,7 @@ export async function registerRoutes(
 
   app.post("/api/wire-categories/bulk", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       const { categories } = req.body;
       if (!Array.isArray(categories) || categories.length === 0) {
         return res.status(400).json({ error: "categories must be a non-empty array" });
@@ -4231,7 +4231,7 @@ export async function registerRoutes(
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-      const userId = req.user.claims.sub;
+      const userId = resolveUserId(req);
       await storage.deleteUserWireCategory(id, userId);
       res.json({ success: true });
     } catch (error) {
