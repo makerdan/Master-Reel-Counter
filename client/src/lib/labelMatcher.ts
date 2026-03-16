@@ -152,7 +152,7 @@ function extractPrimaryLine(rawText: string): string {
   if (lines.length <= 1) return rawText;
   for (const line of lines) {
     const upper = line.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (/^[A-Z]{2,}/.test(upper) && upper.length >= 6) return line;
+    if (/[A-Z]{2,}/.test(upper) && /\d/.test(upper) && upper.length >= 6) return line;
   }
   return lines[0];
 }
