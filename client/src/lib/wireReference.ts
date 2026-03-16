@@ -255,6 +255,7 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "COP", catalog: "TC1231000", description: "12/3 TRAY CABLE-1000'" },
   { vendor: "COP", catalog: "TC1241000", description: "12/4 TRAY CABLE-1000'" },
   { vendor: "COP", catalog: "TC1242500", description: "12/4 TRAY CABLE-2500'" },
+  { vendor: "COP", catalog: "TC1421000", description: "14/2 TRAY CABLE-1000'" },
   { vendor: "COP", catalog: "TC142WOG1000", description: "14/2 WOG TRAY CABLE-1000'" },
   { vendor: "COP", catalog: "TC1431000", description: "14/3 TRAY CABLE-1000'" },
   { vendor: "COP", catalog: "TC1441000", description: "14/4 TRAY CABLE-1000'" },
