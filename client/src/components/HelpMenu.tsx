@@ -763,7 +763,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={SquareCheck} />}
             label="Include / Exclude Cards"
-            description="Each card has a checkbox to include or exclude it from the analysis batch. Uncheck cards with unreadable or irrelevant labels to save processing time."
+            description="Each card has a checkbox to include or exclude it from the analysis batch. Uncheck cards with unreadable or irrelevant labels to save processing time. Your selections are saved automatically and restored if the page refreshes."
           />
 
           <Separator className="my-2" />
@@ -798,8 +798,8 @@ export function SessionSections() {
           />
           <FeatureRow
             icon={<HelpIcon icon={Check} />}
-            label="Apply to Entries"
-            description="Commits the scanned results as entries. Draft pins become committed entries with their wire details filled in. Incomplete committed pins get their existing entries updated with the scanned data."
+            label="Add Reels from Images"
+            description='Tap "Add Reels from X Images" to commit the scanned results as entries. Draft pins become committed entries with their wire details filled in. Incomplete committed pins get their existing entries updated with the scanned data.'
           />
 
           <Separator className="my-2" />
