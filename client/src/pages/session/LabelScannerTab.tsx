@@ -551,6 +551,7 @@ export default function LabelScannerTab({
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
       const savedZooms = loadSavedZooms(sessionId);
+      const savedSelections = loadSavedSelections(sessionId);
       const localResults = loadSavedResults(sessionId);
       const localResultsMap = new Map(localResults.map((r) => [r.pinId, r]));
       const pinCountByPhoto = new Map<number, number>();
@@ -593,15 +594,17 @@ export default function LabelScannerTab({
         }
         const savedZoom = savedZooms[String(pin.id)];
         const smartZoom = computeSmartZoom(pinCountByPhoto.get(pin.photoId) || 1);
-        const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: true, isDraft: !pin.entryId };
+        const hasSavedSelection = String(pin.id) in savedSelections;
+        const savedIncluded = hasSavedSelection ? savedSelections[String(pin.id)] : undefined;
+        const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: savedIncluded ?? true, isDraft: !pin.entryId };
         if (sr) {
-          return { ...base, included: false, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
+          return { ...base, included: savedIncluded ?? false, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
         }
         const local = localResultsMap.get(pin.id);
         if (local && local.rawText !== null) {
           return {
             ...base,
-            included: false,
+            included: savedIncluded ?? false,
             editCatalog: local.editCatalog ?? "",
             editFootage: local.editFootage ?? "",
             editVendor: local.editVendor ?? "",
@@ -609,7 +612,7 @@ export default function LabelScannerTab({
             matchResult: local.rawText ? matchLabelText(local.rawText) : undefined,
           };
         }
-        return { ...base, included: false, editCatalog: "", editFootage: "", editVendor: "" };
+        return { ...base, included: savedIncluded ?? false, editCatalog: "", editFootage: "", editVendor: "" };
       });
       builtHasResults = built.some((c) => c.result);
       return builtHasResults ? sortCardsByCatalog(built) : built;
