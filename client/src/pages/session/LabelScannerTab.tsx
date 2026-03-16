@@ -1429,7 +1429,7 @@ export default function LabelScannerTab({
                     </div>
                   )}
 
-                  <div className="w-20">
+                  <div className="w-24">
                     <label className="text-[10px] text-white/40">Vendor</label>
                     <Input
                       value={card.editVendor}
@@ -1460,7 +1460,7 @@ export default function LabelScannerTab({
                       data-testid={`input-catalog-manual-${card.pin.id}`}
                     />
                   </div>
-                  <div className="w-20">
+                  <div className="w-24">
                     <label className="text-[10px] text-white/40">Vendor</label>
                     <Input
                       value={card.editVendor}
