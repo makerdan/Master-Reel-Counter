@@ -1041,7 +1041,8 @@ export default function LabelScannerTab({
                 if (card.editVendor) entryUpdates.manufacturer = card.editVendor.toUpperCase();
                 if (card.editFootage) {
                   const df2 = parseInt(card.editFootage) || null;
-                  entryUpdates.footage = df2 != null ? toBaseFeet(df2, currentUnit) : null;
+                  const rc = card.pin.reelCount ?? 1;
+                  entryUpdates.footage = df2 != null ? toBaseFeet(df2, currentUnit) * rc : null;
                 }
                 entryUpdates.reelCount = card.pin.reelCount ?? 1;
                 if (card.matchResult?.match) {

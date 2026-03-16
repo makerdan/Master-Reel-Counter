@@ -109,19 +109,7 @@ function getTesterOwner(req: any): string | undefined {
 }
 
 function correctEntryFootage(entries: any[]): any[] {
-  return entries.map(e => {
-    const reelTag = e.reelTag || "";
-    const reelCount = e.reelCount || 1;
-    const trailingNum = reelTag.match(/(\d+)\s*$/);
-    if (trailingNum) {
-      const reelLength = parseInt(trailingNum[1]);
-      if (reelLength > 0) {
-        const corrected = reelLength * reelCount;
-        return { ...e, footage: corrected };
-      }
-    }
-    return e;
-  });
+  return entries;
 }
 
 
