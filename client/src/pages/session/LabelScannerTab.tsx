@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, Grid3X3, List, Flag,
+  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, Grid3X3, List, Flag, Users, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -290,6 +290,8 @@ function CropCanvas({
   );
 }
 
+type OnlineUser = { userId: string; username: string };
+
 export default function LabelScannerTab({
   sessionId,
   photos,
@@ -298,6 +300,7 @@ export default function LabelScannerTab({
   isAdmin = false,
   onPinDataChanged,
   onPhotoChange,
+  onlineUsers = [],
 }: {
   sessionId: number;
   photos: Photo[];
@@ -306,6 +309,7 @@ export default function LabelScannerTab({
   isAdmin?: boolean;
   onPinDataChanged?: () => void;
   onPhotoChange?: (photoId: number | null) => void;
+  onlineUsers?: OnlineUser[];
 }) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
@@ -631,12 +635,124 @@ export default function LabelScannerTab({
     return base.filter((c) => !c.pin.flagged);
   }, [cards, batchMode, isReceiving, currentPhotoId]);
 
+  const frozenPhotoAssignmentRef = useRef<{ photoToParticipant: Map<number, string>; participantIds: string[]; participantNames: Map<string, string> } | null>(null);
+  const [batchReadyStatus, setBatchReadyStatus] = useState<Record<string, boolean>>({});
+
+  const participantBatches = useMemo(() => {
+    if (!batchMode || displayCards.length === 0) {
+      frozenPhotoAssignmentRef.current = null;
+      return null;
+    }
+
+    if (onlineUsers.length === 0) {
+      if (frozenPhotoAssignmentRef.current) return null;
+      return null;
+    }
+
+    const displayPhotoIds = [...new Set(displayCards.map((c) => c.pin.photoId))];
+
+    const frozen = frozenPhotoAssignmentRef.current;
+    if (frozen) {
+      const nameMap = new Map(frozen.participantNames);
+      for (const u of onlineUsers) nameMap.set(u.userId, u.username);
+
+      const batchMap = new Map<string, PinCard[]>();
+      for (const uid of frozen.participantIds) batchMap.set(uid, []);
+
+      const photoCounts = new Map<string, number>();
+      for (const uid of frozen.participantIds) photoCounts.set(uid, 0);
+      for (const [, assignee] of frozen.photoToParticipant) {
+        if (photoCounts.has(assignee)) photoCounts.set(assignee, (photoCounts.get(assignee) ?? 0) + 1);
+      }
+
+      for (const card of displayCards) {
+        let assignee = frozen.photoToParticipant.get(card.pin.photoId);
+        if (!assignee || !batchMap.has(assignee)) {
+          const smallest = frozen.participantIds.reduce((a, b) =>
+            (photoCounts.get(a) ?? 0) <= (photoCounts.get(b) ?? 0) ? a : b
+          );
+          assignee = smallest;
+          frozen.photoToParticipant.set(card.pin.photoId, smallest);
+          photoCounts.set(smallest, (photoCounts.get(smallest) ?? 0) + 1);
+        }
+        batchMap.get(assignee)!.push(card);
+      }
+
+      const result = frozen.participantIds
+        .map((uid, i) => ({ name: nameMap.get(uid) || uid, userId: uid, cards: batchMap.get(uid) || [], index: i + 1 }))
+        .filter((b) => b.cards.length > 0);
+
+      if (result.length > 0) return result;
+    }
+
+    const participantIds = onlineUsers.map((u) => u.userId);
+    const participantNames = new Map(onlineUsers.map((u) => [u.userId, u.username]));
+
+    const photoOwners = new Map<number, string>();
+    for (const p of photos) {
+      if (p.userId) photoOwners.set(p.id, p.userId);
+    }
+
+    const uniqueOwnerIds = new Set<string>();
+    for (const pid of displayPhotoIds) {
+      const ownerId = photoOwners.get(pid);
+      if (ownerId) uniqueOwnerIds.add(ownerId);
+    }
+
+    const photoToParticipant = new Map<number, string>();
+
+    if (uniqueOwnerIds.size > 1) {
+      const photoCounts = new Map<string, number>();
+      for (const uid of participantIds) photoCounts.set(uid, 0);
+
+      for (const pid of displayPhotoIds) {
+        const ownerId = photoOwners.get(pid);
+        if (ownerId && photoCounts.has(ownerId)) {
+          photoToParticipant.set(pid, ownerId);
+          photoCounts.set(ownerId, (photoCounts.get(ownerId) ?? 0) + 1);
+        } else {
+          const smallest = participantIds.reduce((a, b) =>
+            (photoCounts.get(a) ?? 0) <= (photoCounts.get(b) ?? 0) ? a : b
+          );
+          photoToParticipant.set(pid, smallest);
+          photoCounts.set(smallest, (photoCounts.get(smallest) ?? 0) + 1);
+        }
+      }
+    } else {
+      displayPhotoIds.forEach((pid, i) => {
+        photoToParticipant.set(pid, participantIds[i % participantIds.length]);
+      });
+    }
+
+    frozenPhotoAssignmentRef.current = { photoToParticipant, participantIds, participantNames };
+
+    const batchMap = new Map<string, PinCard[]>();
+    for (const uid of participantIds) batchMap.set(uid, []);
+
+    for (const card of displayCards) {
+      const assignee = photoToParticipant.get(card.pin.photoId);
+      if (assignee && batchMap.has(assignee)) {
+        batchMap.get(assignee)!.push(card);
+      }
+    }
+
+    const result = participantIds
+      .map((uid, i) => ({ name: participantNames.get(uid) || uid, userId: uid, cards: batchMap.get(uid) || [], index: i + 1 }))
+      .filter((b) => b.cards.length > 0);
+
+    return result;
+  }, [batchMode, displayCards, onlineUsers, photos]);
+
   const cardsWithResults = displayCards.filter((c) => c.result).length;
   useEffect(() => {
     if (phase === "preview" && displayCards.length > 0 && cardsWithResults > 0) {
       setPhase("results");
     }
   }, [displayCards.length, cardsWithResults, phase]);
+
+  useEffect(() => {
+    setBatchReadyStatus({});
+  }, [phase]);
 
   function applyResults(results: AnalysisResult[]) {
     setCards((prev) =>
@@ -1287,15 +1403,239 @@ export default function LabelScannerTab({
       {batchMode && phase === "preview" && displayCards.length > 0 && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(25_12%_20%)] border border-[hsl(18_60%_30%/0.2)] rounded text-white/60 text-xs" data-testid="batch-summary-note">
           <Grid3X3 className="h-3.5 w-3.5 flex-shrink-0" />
-          <span>{displayCards.length} pin{displayCards.length !== 1 ? "s" : ""} across {new Set(displayCards.map((c) => c.pin.photoId)).size} photo{new Set(displayCards.map((c) => c.pin.photoId)).size !== 1 ? "s" : ""}</span>
+          <span>{displayCards.length} pin{displayCards.length !== 1 ? "s" : ""} across {new Set(displayCards.map((c) => c.pin.photoId)).size} photo{new Set(displayCards.map((c) => c.pin.photoId)).size !== 1 ? "s" : ""}{participantBatches ? ` · ${participantBatches.length} batch${participantBatches.length !== 1 ? "es" : ""}` : ""}</span>
         </div>
       )}
 
-      <div className={`grid gap-3 ${
-        batchMode && phase === "preview"
-          ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-      }`}>
+      {(batchMode && participantBatches) ? (
+        <>
+          {participantBatches.map((batch, batchIdx) => {
+            const batchPhotoCount = new Set(batch.cards.map((c) => c.pin.photoId)).size;
+            const batchPinCount = batch.cards.length;
+            return (
+              <div key={batch.userId} data-testid={`batch-section-${batchIdx}`}>
+                {batchIdx > 0 && (
+                  <div className="border-t border-[hsl(18_60%_30%/0.2)] my-4" />
+                )}
+                <div className={`sticky top-0 z-10 flex items-center gap-2 px-3 py-2 mb-3 border rounded-lg ${
+                  batchReadyStatus[batch.userId]
+                    ? "bg-green-900/30 border-green-700/40"
+                    : "bg-[hsl(25_15%_13%)] border-[hsl(18_60%_30%/0.25)]"
+                }`} data-testid={`batch-header-${batchIdx}`}>
+                  {batchReadyStatus[batch.userId] ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
+                  ) : (
+                    <Users className="h-3.5 w-3.5 text-[hsl(18_85%_55%)] flex-shrink-0" />
+                  )}
+                  <span className="text-sm font-semibold text-white">Batch {batch.index} — {batch.name}</span>
+                  {batchReadyStatus[batch.userId] && (
+                    <Badge className="text-[9px] bg-green-800/60 text-green-300 border-green-700/40 py-0 px-1.5" data-testid={`badge-batch-ready-${batchIdx}`}>
+                      {phase === "results" ? "Ready for Table Entry" : "Ready for Analysis"}
+                    </Badge>
+                  )}
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Badge className="text-[9px] bg-white/10 text-white/60 border-0 py-0 px-1.5">{batchPhotoCount} photo{batchPhotoCount !== 1 ? "s" : ""}</Badge>
+                    <Badge className="text-[9px] bg-white/10 text-white/60 border-0 py-0 px-1.5">{batchPinCount} pin{batchPinCount !== 1 ? "s" : ""}</Badge>
+                  </div>
+                </div>
+                <div className={`grid gap-3 ${
+                  phase === "preview"
+                    ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                }`}>
+                  {batch.cards.map((card) => {
+                    const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
+                    const pinPhotoObj = photos.find((p) => p.id === card.pin.photoId) ?? null;
+                    const cardPhotoObj = isFromOtherPhoto ? pinPhotoObj : photo;
+                    const batchPhotoObj = pinPhotoObj || photo;
+                    const cardPhotoUrl = getPhotoUrl(batchPhotoObj || cardPhotoObj || pinPhotoObj);
+                    const isBatch = phase === "preview";
+                    return (
+                      <div
+                        key={card.pin.id}
+                        className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors overflow-hidden ${
+                          card.included
+                            ? "bg-[hsl(25_12%_16%)] border-[hsl(18_60%_30%/0.3)]"
+                            : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)] opacity-60"
+                        }`}
+                        data-testid={`card-pin-${card.pin.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Checkbox
+                              checked={card.included}
+                              onCheckedChange={(v) => setCardIncluded(card.pin.id, !!v)}
+                              data-testid={`checkbox-pin-${card.pin.id}`}
+                            />
+                            <span className={`font-mono font-bold text-white ${isBatch ? "text-xs" : "text-sm"}`}>
+                              {card.pin.label || `#${card.pin.id}`}
+                            </span>
+                            <button
+                              onClick={() => toggleFlag(card.pin.id)}
+                              className={`p-0.5 rounded transition-colors ${
+                                card.pin.flagged
+                                  ? "text-amber-400 hover:text-amber-300"
+                                  : "text-white/20 hover:text-white/40"
+                              }`}
+                              title={card.pin.flagged ? "Remove flag" : "Flag for review"}
+                              data-testid={`btn-flag-${card.pin.id}`}
+                            >
+                              <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"} ${card.pin.flagged ? "fill-amber-400" : ""}`} />
+                            </button>
+                            {isBatch && batchPhotoObj && (
+                              <Badge className="text-[9px] bg-[hsl(25_30%_25%)] text-white/50 border-[hsl(18_30%_30%/0.3)] py-0 px-1" data-testid={`badge-batch-source-${card.pin.id}`}>
+                                {batchPhotoObj.aisle || "?"}{batchPhotoObj.section ? `/${batchPhotoObj.section}` : ""}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        {cardPhotoUrl && (
+                          <div className={isBatch ? "space-y-1" : "space-y-1.5"}>
+                            <div className="flex justify-center">
+                              <CropCanvas
+                                photoUrl={cardPhotoUrl}
+                                xPercent={card.pin.xPercent}
+                                yPercent={card.pin.yPercent}
+                                zoomLevel={card.zoomLevel}
+                                panX={card.panX}
+                                panY={card.panY}
+                                onPan={(px, py) => setCardPan(card.pin.id, px, py)}
+                                size={isBatch ? 200 : 180}
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5 px-1">
+                              <ZoomOut className={`${isBatch ? "h-4 w-4" : "h-6 w-6"} text-white/30 flex-shrink-0 cursor-pointer`} onClick={() => setCardZoom(card.pin.id, Math.min(ZOOM_MAX, card.zoomLevel + ZOOM_CLICK_STEP))} data-testid={`btn-zoom-out-${card.pin.id}`} />
+                              <Slider
+                                value={[ZOOM_MAX - card.zoomLevel + ZOOM_MIN]}
+                                min={ZOOM_MIN}
+                                max={ZOOM_MAX}
+                                step={ZOOM_STEP}
+                                onValueChange={([v]) => setCardZoom(card.pin.id, ZOOM_MAX - v + ZOOM_MIN)}
+                                className="flex-1"
+                                data-testid={`slider-zoom-${card.pin.id}`}
+                              />
+                              <ZoomIn className={`${isBatch ? "h-4 w-4" : "h-6 w-6"} text-white/30 flex-shrink-0 cursor-pointer`} onClick={() => setCardZoom(card.pin.id, Math.max(ZOOM_MIN, card.zoomLevel - ZOOM_CLICK_STEP))} data-testid={`btn-zoom-in-${card.pin.id}`} />
+                            </div>
+                          </div>
+                        )}
+                        {card.result && phase === "results" && (
+                          <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                            <div className="rounded bg-black/30 px-2 py-1" data-testid={`raw-text-${card.pin.id}`}>
+                              <span className="text-[10px] text-white/30 uppercase tracking-wider" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AI Raw</span>
+                              <p className="text-[11px] text-white/50 break-words whitespace-pre-wrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                                {card.result.rawText ? card.result.rawText : <em className="text-white/30">unreadable</em>}
+                              </p>
+                            </div>
+                            {card.matchResult && card.matchResult.confidence !== "none" ? (
+                              <div className={`rounded-md border px-2 py-1 ${
+                                card.matchResult.confidence === "high" ? "bg-green-900/50 border-green-700/40" : card.matchResult.confidence === "medium" ? "bg-amber-900/50 border-amber-700/40" : "bg-red-900/50 border-red-700/40"
+                              }`}>
+                                <Input
+                                  value={card.editCatalog}
+                                  onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
+                                  className={`border-0 bg-transparent uppercase p-0 h-auto ${
+                                    card.matchResult.confidence === "high" ? "text-green-300" : card.matchResult.confidence === "medium" ? "text-amber-300" : "text-red-300"
+                                  }`}
+                                  style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}
+                                  data-testid={`input-catalog-${card.pin.id}`}
+                                />
+                              </div>
+                            ) : (
+                              <div>
+                                <label className="text-[10px] text-white/40">Category</label>
+                                <Input
+                                  value={card.editCatalog}
+                                  onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
+                                  className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                                  style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                                  placeholder="Enter category..."
+                                  data-testid={`input-catalog-${card.pin.id}`}
+                                />
+                              </div>
+                            )}
+                            <div className="w-24">
+                              <label className="text-[10px] text-white/40">Vendor</label>
+                              <Input
+                                value={card.editVendor}
+                                onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
+                                maxLength={3}
+                                list="vendor-code-suggestions-scanner"
+                                className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                                data-testid={`input-vendor-${card.pin.id}`}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {!card.result && phase === "results" && (
+                          <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)] overflow-hidden" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                            <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
+                              Not analyzed — enter manually
+                            </Badge>
+                            <div>
+                              <label className="text-[10px] text-white/40">Category</label>
+                              <Input
+                                value={card.editCatalog}
+                                onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
+                                className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                                placeholder="Enter category..."
+                                data-testid={`input-catalog-manual-${card.pin.id}`}
+                              />
+                            </div>
+                            <div className="w-24">
+                              <label className="text-[10px] text-white/40">Vendor</label>
+                              <Input
+                                value={card.editVendor}
+                                onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
+                                maxLength={3}
+                                list="vendor-code-suggestions-scanner"
+                                className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                                data-testid={`input-vendor-manual-${card.pin.id}`}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-end mt-2">
+                  <Button
+                    size="sm"
+                    variant={batchReadyStatus[batch.userId] ? "outline" : "default"}
+                    onClick={() => setBatchReadyStatus((prev) => ({ ...prev, [batch.userId]: !prev[batch.userId] }))}
+                    className={`gap-2 text-xs ${
+                      batchReadyStatus[batch.userId]
+                        ? "border-green-700/40 text-green-400 hover:text-green-300 bg-green-900/20 hover:bg-green-900/30"
+                        : "bg-[hsl(18_85%_32%)] hover:bg-[hsl(18_85%_38%)] text-white"
+                    }`}
+                    data-testid={`btn-batch-ready-${batchIdx}`}
+                  >
+                    {batchReadyStatus[batch.userId] ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {phase === "results" ? "Marked Ready for Table Entry" : "Marked Ready for Analysis"}
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        {phase === "results" ? "Batch Ready for Table Entry" : "Batch Ready for AI Analysis"}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      ) : (
+        <div className={`grid gap-3 ${
+          batchMode && phase === "preview"
+            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+            : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+        }`}>
         {displayCards.map((card) => {
           const hasFilled = !!(card.pin.wireDetails && card.pin.footage);
           const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
@@ -1481,6 +1821,7 @@ export default function LabelScannerTab({
           );
         })}
       </div>
+      )}
 
       <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
         {(phase === "preview" || isAdmin) && (

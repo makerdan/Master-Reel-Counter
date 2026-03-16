@@ -788,6 +788,7 @@ function SessionWorkspace({
                   isAdmin={isOwner}
                   onPinDataChanged={triggerPinRefresh}
                   onPhotoChange={(photoId) => { syncedPhotoIdRef.current = photoId; }}
+                  onlineUsers={onlineUsers}
                 />
               </TabsContent>
             </Tabs>
