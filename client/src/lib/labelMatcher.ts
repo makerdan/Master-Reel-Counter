@@ -103,14 +103,18 @@ function tryFuzzyCatalogMatch(normalized: string): { entry: ParsedCatalogEntry; 
 
   let bestEntry: CatalogEntry | null = null;
   let bestDist = Infinity;
+  let bestIsPrefix = false;
   const maxDist = normalized.length >= 10 ? 3 : 2;
 
   for (const entry of CATALOG) {
     if (Math.abs(entry.catalog.length - normalized.length) > maxDist) continue;
     const dist = levenshtein(normalized, entry.catalog);
-    if (dist < bestDist) {
+    if (dist > maxDist) continue;
+    const isPrefix = entry.catalog.startsWith(normalized) || normalized.startsWith(entry.catalog);
+    if (dist < bestDist || (dist === bestDist && isPrefix && !bestIsPrefix)) {
       bestDist = dist;
       bestEntry = entry;
+      bestIsPrefix = isPrefix;
     }
   }
 
