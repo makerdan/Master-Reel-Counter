@@ -159,16 +159,33 @@ export function matchLabelText(rawText: string): LabelMatchResult {
   }
 
   const primaryLine = extractPrimaryLine(rawText);
-  let normalized = normalize(primaryLine);
+  const useFullText = primaryLine !== rawText;
+
+  const result = attemptMatch(primaryLine);
+  if (result.match) return result;
+
+  if (useFullText) {
+    const fallback = attemptMatch(rawText);
+    if (fallback.match) {
+      if (fallback.confidence === "high") fallback.confidence = "medium";
+      return fallback;
+    }
+  }
+
+  return { match: null, confidence: "none", normalizedInput: normalize(primaryLine), matchMethod: "none" };
+}
+
+function attemptMatch(text: string): LabelMatchResult {
+  let normalized = normalize(text);
   normalized = normalized.replace(/400R(\d)/g, "40OR$1").replace(/300R(\d)/g, "30OR$1");
-  const tokens = extractTokens(primaryLine);
+  const tokens = extractTokens(text);
 
   const exactMatch = tryExactCatalogMatch(normalized);
   if (exactMatch) {
     return { match: exactMatch, confidence: "high", normalizedInput: normalized, matchMethod: "exact" };
   }
 
-  const correctionResult = tryCorrectionMatch(rawText);
+  const correctionResult = tryCorrectionMatch(text);
   if (correctionResult) {
     return {
       match: correctionResult.entry,
