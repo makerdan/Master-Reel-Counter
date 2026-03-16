@@ -143,14 +143,25 @@ function trySubstringCatalogMatch(normalized: string): ParsedCatalogEntry | null
   return null;
 }
 
+function extractPrimaryLine(rawText: string): string {
+  const lines = rawText.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length <= 1) return rawText;
+  for (const line of lines) {
+    const upper = line.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (/^[A-Z]{2,}/.test(upper) && upper.length >= 6) return line;
+  }
+  return lines[0];
+}
+
 export function matchLabelText(rawText: string): LabelMatchResult {
   if (!rawText || rawText.trim().length === 0) {
     return { match: null, confidence: "none", normalizedInput: "", matchMethod: "none" };
   }
 
-  let normalized = normalize(rawText);
+  const primaryLine = extractPrimaryLine(rawText);
+  let normalized = normalize(primaryLine);
   normalized = normalized.replace(/400R(\d)/g, "40OR$1").replace(/300R(\d)/g, "30OR$1");
-  const tokens = extractTokens(rawText);
+  const tokens = extractTokens(primaryLine);
 
   const exactMatch = tryExactCatalogMatch(normalized);
   if (exactMatch) {
