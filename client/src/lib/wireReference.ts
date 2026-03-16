@@ -206,6 +206,8 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "ALU", catalog: "XHHW600YL2500", description: "XHHW 600 KCMIL STR YELLOW 2500'" },
   { vendor: "ALU", catalog: "XHHW6BK1000", description: "XHHW 6 AWG STR BLACK 1000'" },
   { vendor: "ALU", catalog: "XHHW7500R2500", description: "XHHW 750 KCMIL STR ORANGE 2500'" },
+  { vendor: "ALU", catalog: "XHHW750BK500", description: "AL XHHW 750 BLACK CABLE 500 FT" },
+  { vendor: "ALU", catalog: "XHHW750BK1000", description: "AL XHHW 750 BLACK CABLE 1000 FT" },
   { vendor: "ALU", catalog: "XHHW750BK2500", description: "XHHW 750 KCMIL STR BLACK 2500'" },
   { vendor: "ALU", catalog: "XHHW750BL2500", description: "XHHW 750 KCMIL STR BLUE 2500'" },
   { vendor: "ALU", catalog: "XHHW750BR500", description: "AL XHHW 750 BROWN CABLE 500 FT" },
@@ -1441,12 +1443,28 @@ export function correctWireDetails(rawDetails: string): CorrectionResult {
   };
 }
 
+function parseCodeParts(code: string): { type: string | null; gauge: string | null } {
+  const typeMatch = code.match(/^([A-Z]+)/);
+  if (!typeMatch) return { type: null, gauge: null };
+  const typePart = typeMatch[1];
+  const knownType = [...WIRE_TYPES].sort((a, b) => b.length - a.length).find(wt => typePart.startsWith(wt));
+  if (!knownType) return { type: typePart, gauge: null };
+  const afterType = code.slice(knownType.length);
+  const gaugeMatch = afterType.match(/^(\d+(?:\/\d+)?)/);
+  if (!gaugeMatch) return { type: knownType, gauge: null };
+  const rawGauge = gaugeMatch[1];
+  const knownGauge = (WIRE_GAUGES as readonly string[]).includes(rawGauge) ? rawGauge : null;
+  return { type: knownType, gauge: knownGauge };
+}
+
 function matchCatalog(input: string): { entry: CatalogEntry; confident: boolean } | null {
   for (const entry of CATALOG) {
     if (entry.catalog === input) {
       return { entry, confident: true };
     }
   }
+
+  const inputParsed = parseCodeParts(input);
 
   const maxDist = input.length >= 10 ? 2 : 1;
   let bestEntry: CatalogEntry | null = null;
@@ -1456,6 +1474,10 @@ function matchCatalog(input: string): { entry: CatalogEntry; confident: boolean 
     if (Math.abs(entry.catalog.length - input.length) > maxDist) continue;
     const dist = levenshtein(input, entry.catalog);
     if (dist > maxDist) continue;
+    if (inputParsed.gauge) {
+      const entryParsed = parseCodeParts(entry.catalog);
+      if (entryParsed.gauge && entryParsed.gauge !== inputParsed.gauge) continue;
+    }
     const isPrefix = entry.catalog.startsWith(input) || input.startsWith(entry.catalog);
     if (dist < bestDist || (dist === bestDist && isPrefix && !bestIsPrefix)) {
       bestDist = dist;
