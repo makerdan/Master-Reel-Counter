@@ -1411,6 +1411,111 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+
+        {!user?.isTester && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Tester Access</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Set a password so testers can log in and view your sessions without a Replit account.
+            </p>
+            {hasTesterPassword && (
+              <Badge variant="outline" className="text-green-600 border-green-300 w-fit">Password Set</Badge>
+            )}
+            <div className="space-y-2">
+              <div className="relative">
+                <Input
+                  data-testid="input-tester-password-settings"
+                  type={showTesterPassword ? "text" : "password"}
+                  placeholder={hasTesterPassword ? "Enter new password" : "Enter tester password"}
+                  value={testerPassword}
+                  onChange={(e) => setTesterPassword(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setShowTesterPassword(!showTesterPassword)}
+                  data-testid="button-toggle-tester-password"
+                >
+                  {showTesterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <div className="relative">
+                <Input
+                  data-testid="input-tester-password-confirm"
+                  type={showTesterPasswordConfirm ? "text" : "password"}
+                  placeholder="Confirm password"
+                  value={testerPasswordConfirm}
+                  onChange={(e) => setTesterPasswordConfirm(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setShowTesterPasswordConfirm(!showTesterPasswordConfirm)}
+                  data-testid="button-toggle-tester-password-confirm"
+                >
+                  {showTesterPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {testerPassword.trim() && testerPasswordConfirm.trim() && testerPassword !== testerPasswordConfirm && (
+                <p className="text-xs text-destructive" data-testid="text-password-mismatch">Passwords do not match</p>
+              )}
+              <Button
+                size="sm"
+                onClick={() => saveTesterPassword.mutate(testerPassword)}
+                disabled={saveTesterPassword.isPending || !testerPassword.trim() || !testerPasswordConfirm.trim() || testerPassword !== testerPasswordConfirm}
+                data-testid="button-save-tester-password"
+              >
+                {saveTesterPassword.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+              </Button>
+            </div>
+            {hasTesterPassword && (
+              <>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Tester login URL:</span>
+                  <code className="bg-muted px-2 py-0.5 rounded text-xs">/tester-login</code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    data-testid="button-copy-tester-url"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/tester-login`);
+                      toast({ title: "Copied to clipboard" });
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive w-fit"
+                  data-testid="button-remove-tester-password"
+                  onClick={() => {
+                    saveTesterPassword.mutate("");
+                    setTesterPassword("");
+                  }}
+                  disabled={saveTesterPassword.isPending}
+                >
+                  Remove Tester Password
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+        )}
+
+
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -1574,109 +1679,6 @@ export default function SettingsPage() {
             </Collapsible>
           </CardContent>
         </Card>
-
-        {!user?.isTester && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Key className="h-5 w-5 text-primary" />
-              <CardTitle className="text-base">Tester Access</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Set a password so testers can log in and view your sessions without a Replit account.
-            </p>
-            {hasTesterPassword && (
-              <Badge variant="outline" className="text-green-600 border-green-300 w-fit">Password Set</Badge>
-            )}
-            <div className="space-y-2">
-              <div className="relative">
-                <Input
-                  data-testid="input-tester-password-settings"
-                  type={showTesterPassword ? "text" : "password"}
-                  placeholder={hasTesterPassword ? "Enter new password" : "Enter tester password"}
-                  value={testerPassword}
-                  onChange={(e) => setTesterPassword(e.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                  onClick={() => setShowTesterPassword(!showTesterPassword)}
-                  data-testid="button-toggle-tester-password"
-                >
-                  {showTesterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-              <div className="relative">
-                <Input
-                  data-testid="input-tester-password-confirm"
-                  type={showTesterPasswordConfirm ? "text" : "password"}
-                  placeholder="Confirm password"
-                  value={testerPasswordConfirm}
-                  onChange={(e) => setTesterPasswordConfirm(e.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                  onClick={() => setShowTesterPasswordConfirm(!showTesterPasswordConfirm)}
-                  data-testid="button-toggle-tester-password-confirm"
-                >
-                  {showTesterPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-              {testerPassword.trim() && testerPasswordConfirm.trim() && testerPassword !== testerPasswordConfirm && (
-                <p className="text-xs text-destructive" data-testid="text-password-mismatch">Passwords do not match</p>
-              )}
-              <Button
-                size="sm"
-                onClick={() => saveTesterPassword.mutate(testerPassword)}
-                disabled={saveTesterPassword.isPending || !testerPassword.trim() || !testerPasswordConfirm.trim() || testerPassword !== testerPasswordConfirm}
-                data-testid="button-save-tester-password"
-              >
-                {saveTesterPassword.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-              </Button>
-            </div>
-            {hasTesterPassword && (
-              <>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Tester login URL:</span>
-                  <code className="bg-muted px-2 py-0.5 rounded text-xs">/tester-login</code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    data-testid="button-copy-tester-url"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/tester-login`);
-                      toast({ title: "Copied to clipboard" });
-                    }}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-destructive hover:text-destructive w-fit"
-                  data-testid="button-remove-tester-password"
-                  onClick={() => {
-                    saveTesterPassword.mutate("");
-                    setTesterPassword("");
-                  }}
-                  disabled={saveTesterPassword.isPending}
-                >
-                  Remove Tester Password
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        )}
 
         <Card>
           <CardHeader>
