@@ -477,7 +477,7 @@ export default function ReviewTab({
   // Reset photo-ready flag whenever we navigate to a new entry or reveal it
   useEffect(() => {
     setPhotoReady(false);
-  }, [currentEntry?.id, isRevealed]);
+  }, [currentIndex, revealedEntries]);
 
   const resetView = useCallback(() => {
     setPinZoom(0.12); setPinPanX(0); setPinPanY(0);
