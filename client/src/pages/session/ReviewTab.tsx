@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Check, Flag, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
-  ZoomIn, ZoomOut, RotateCw, RotateCcw, Move,
+  ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, CheckCircle2, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -387,6 +387,19 @@ export default function ReviewTab({
 
   const reviewedCount = useMemo(() => assignedEntries.filter(e => myResponses.has(e.id)).length, [assignedEntries, myResponses]);
 
+  // Per-reviewer completion — derived entirely from already-fetched reviewResponses
+  const allReviewerStatus = useMemo(() => {
+    if (sortedUsers.length === 0 || sortedEntries.length === 0) return [];
+    return sortedUsers.map((u, idx) => {
+      const assigned = sortedEntries.filter((_, i) => i % sortedUsers.length === idx);
+      const respondedIds = new Set(
+        reviewResponses.filter(r => r.userId === u.userId).map(r => r.entryId)
+      );
+      const done = assigned.filter(e => respondedIds.has(e.id)).length;
+      return { userId: u.userId, username: u.username, done, total: assigned.length, complete: done >= assigned.length && assigned.length > 0 };
+    });
+  }, [sortedUsers, sortedEntries, reviewResponses]);
+
   // ── Reveal timer state ─────────────────────────────────────────────────────
   const [currentIndex, setCurrentIndex] = useState(0);
   const [revealedEntries, setRevealedEntries] = useState<Set<number>>(new Set());
@@ -527,6 +540,55 @@ export default function ReviewTab({
       </div>
 
       <Progress value={progressPercent} className="h-2" data-testid="progress-review" />
+
+      {/* My completion banner */}
+      {reviewedCount >= assignedEntries.length && assignedEntries.length > 0 && (
+        <div
+          className="flex items-center gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3"
+          data-testid="banner-review-complete"
+        >
+          <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+              You've reviewed all your assigned entries!
+            </p>
+            {allReviewerStatus.some(s => s.userId !== currentUserId && !s.complete) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Waiting for other reviewers to finish…
+              </p>
+            )}
+            {allReviewerStatus.length > 0 && allReviewerStatus.every(s => s.complete) && (
+              <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-0.5">
+                All reviewers are done!
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Team progress — only shown when there are multiple reviewers */}
+      {sortedUsers.length > 1 && allReviewerStatus.length > 0 && (
+        <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2" data-testid="panel-team-progress">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Team Progress</p>
+          <div className="grid gap-1.5">
+            {allReviewerStatus.map(s => (
+              <div key={s.userId} className="flex items-center gap-2" data-testid={`reviewer-status-${s.userId}`}>
+                {s.complete ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                ) : (
+                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                )}
+                <span className={`text-sm flex-1 truncate ${s.userId === currentUserId ? "font-semibold" : ""}`}>
+                  {s.userId === currentUserId ? "You" : s.username}
+                </span>
+                <span className={`text-xs tabular-nums font-mono ${s.complete ? "text-green-500" : "text-muted-foreground"}`}>
+                  {s.done}/{s.total}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Entry card */}
       {currentEntry && (
