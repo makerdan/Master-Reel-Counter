@@ -83,7 +83,9 @@ export default function SettingsPage() {
   const [localReceivingQuality, setLocalReceivingQuality] = useState<number | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [testerPassword, setTesterPassword] = useState("");
+  const [testerPasswordConfirm, setTesterPasswordConfirm] = useState("");
   const [showTesterPassword, setShowTesterPassword] = useState(false);
+  const [showTesterPasswordConfirm, setShowTesterPasswordConfirm] = useState(false);
   const [testerPasswordLoaded, setTesterPasswordLoaded] = useState(false);
 
   useEffect(() => {
@@ -261,6 +263,8 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      setTesterPassword("");
+      setTesterPasswordConfirm("");
       toast({ title: "Tester password saved" });
     },
     onError: () => {
@@ -1585,12 +1589,12 @@ export default function SettingsPage() {
             {hasTesterPassword && (
               <Badge variant="outline" className="text-green-600 border-green-300 w-fit">Password Set</Badge>
             )}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
+            <div className="space-y-2">
+              <div className="relative">
                 <Input
                   data-testid="input-tester-password-settings"
                   type={showTesterPassword ? "text" : "password"}
-                  placeholder={hasTesterPassword ? "Enter new password to change" : "Enter tester password"}
+                  placeholder={hasTesterPassword ? "Enter new password" : "Enter tester password"}
                   value={testerPassword}
                   onChange={(e) => setTesterPassword(e.target.value)}
                 />
@@ -1605,10 +1609,32 @@ export default function SettingsPage() {
                   {showTesterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
+              <div className="relative">
+                <Input
+                  data-testid="input-tester-password-confirm"
+                  type={showTesterPasswordConfirm ? "text" : "password"}
+                  placeholder="Confirm password"
+                  value={testerPasswordConfirm}
+                  onChange={(e) => setTesterPasswordConfirm(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setShowTesterPasswordConfirm(!showTesterPasswordConfirm)}
+                  data-testid="button-toggle-tester-password-confirm"
+                >
+                  {showTesterPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {testerPassword.trim() && testerPasswordConfirm.trim() && testerPassword !== testerPasswordConfirm && (
+                <p className="text-xs text-destructive" data-testid="text-password-mismatch">Passwords do not match</p>
+              )}
               <Button
                 size="sm"
                 onClick={() => saveTesterPassword.mutate(testerPassword)}
-                disabled={saveTesterPassword.isPending || !testerPassword.trim()}
+                disabled={saveTesterPassword.isPending || !testerPassword.trim() || !testerPasswordConfirm.trim() || testerPassword !== testerPasswordConfirm}
                 data-testid="button-save-tester-password"
               >
                 {saveTesterPassword.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
