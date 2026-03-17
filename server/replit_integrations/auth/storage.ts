@@ -1,6 +1,6 @@
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 import { db } from "../../db";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -8,6 +8,7 @@ export interface IAuthStorage {
   updateUserAvatar(id: string, customAvatarKey: string | null): Promise<User>;
   getAllUsers(): Promise<User[]>;
   setUserApproved(id: string, approved: boolean): Promise<User>;
+  rejectUser(id: string): Promise<User>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -41,13 +42,22 @@ class AuthStorage implements IAuthStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(users.createdAt);
+    return await db.select().from(users).where(ne(users.rejected, true)).orderBy(users.createdAt);
   }
 
   async setUserApproved(id: string, approved: boolean): Promise<User> {
     const [user] = await db
       .update(users)
       .set({ approved, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async rejectUser(id: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ approved: false, rejected: true, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;

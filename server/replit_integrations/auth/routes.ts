@@ -73,6 +73,28 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
+  app.delete("/api/admin/users/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAppOwner(req.user)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const targetId = req.params.id;
+      const requesterId = req.user?.claims?.sub;
+      if (targetId === requesterId) {
+        return res.status(400).json({ message: "Cannot reject owner" });
+      }
+      const existingUser = await authStorage.getUser(targetId);
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      await authStorage.rejectUser(targetId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error rejecting user:", error);
+      res.status(500).json({ message: "Failed to reject user" });
+    }
+  });
+
   app.patch("/api/admin/users/:id/approval", isAuthenticated, async (req: any, res) => {
     try {
       if (!isAppOwner(req.user)) {

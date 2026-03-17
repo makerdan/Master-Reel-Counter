@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   customAvatarKey: varchar("custom_avatar_key"),
   approved: boolean("approved").default(false).notNull(),
+  rejected: boolean("rejected").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
