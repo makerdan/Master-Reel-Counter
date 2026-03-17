@@ -9,6 +9,7 @@ export interface IAuthStorage {
   getAllUsers(): Promise<User[]>;
   setUserApproved(id: string, approved: boolean): Promise<User>;
   rejectUser(id: string): Promise<User>;
+  clearAllRejected(): Promise<void>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -61,6 +62,13 @@ class AuthStorage implements IAuthStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  async clearAllRejected(): Promise<void> {
+    await db
+      .update(users)
+      .set({ rejected: false, updatedAt: new Date() })
+      .where(eq(users.rejected, true));
   }
 }
 

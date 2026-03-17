@@ -247,6 +247,20 @@ export default function SettingsPage() {
     },
   });
 
+  const clearRejected = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/users/clear-rejected");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Block list cleared", description: "Previously rejected users can now sign in again." });
+    },
+    onError: () => {
+      toast({ title: "Failed to clear block list", variant: "destructive" });
+    },
+  });
+
   const backfillSizes = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/storage/backfill-sizes");
@@ -1919,9 +1933,22 @@ export default function SettingsPage() {
         {!user?.isTester && adminUsers && Array.isArray(adminUsers) && (
           <Card data-testid="card-manage-users">
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Manage Users</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-base">Manage Users</CardTitle>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs shrink-0"
+                  onClick={() => clearRejected.mutate()}
+                  disabled={clearRejected.isPending}
+                  data-testid="button-clear-rejected"
+                >
+                  {clearRejected.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Clear Block List
+                </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Approve or reject users who have signed in. Only approved users can access the app.

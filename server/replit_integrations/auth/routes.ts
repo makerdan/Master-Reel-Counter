@@ -73,6 +73,19 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
+  app.post("/api/admin/users/clear-rejected", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!isAppOwner(req.user)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      await authStorage.clearAllRejected();
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error clearing rejected users:", error);
+      res.status(500).json({ message: "Failed to clear rejected users" });
+    }
+  });
+
   app.delete("/api/admin/users/:id", isAuthenticated, async (req: any, res) => {
     try {
       if (!isAppOwner(req.user)) {
