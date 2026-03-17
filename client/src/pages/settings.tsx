@@ -1902,7 +1902,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {adminUsers && Array.isArray(adminUsers) && (
+        {!user?.isTester && adminUsers && Array.isArray(adminUsers) && (
           <Card data-testid="card-manage-users">
             <CardHeader>
               <div className="flex items-center gap-2">
