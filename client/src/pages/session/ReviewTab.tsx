@@ -540,6 +540,16 @@ export default function ReviewTab({
               <span>{currentEntry.reelTag || "Unknown"}</span>
             </div>
 
+            {/* Final category — large, visibly colored */}
+            <div
+              className="text-xl font-bold text-[hsl(18_85%_55%)] leading-tight"
+              data-testid="text-review-category"
+            >
+              {[currentEntry.wireType, currentEntry.gauge].filter(Boolean).join(" ") || (
+                <span className="text-muted-foreground text-base font-normal italic">No category assigned</span>
+              )}
+            </div>
+
             {/* Photo / spinner area */}
             <div className="flex justify-center min-h-[200px] items-center">
               {!isRevealed ? (
