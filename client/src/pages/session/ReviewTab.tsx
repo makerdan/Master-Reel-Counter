@@ -7,7 +7,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -408,6 +407,8 @@ export default function ReviewTab({
   // ── Reveal timer state ─────────────────────────────────────────────────────
   const [currentIndex, setCurrentIndex] = useState(0);
   const hasAutoAdvanced = useRef(false);
+  const scrubBarRef = useRef<HTMLDivElement>(null);
+  const isScrubbing = useRef(false);
 
   // On first load, jump straight to the first unreviewed entry
   useEffect(() => {
@@ -543,6 +544,34 @@ export default function ReviewTab({
   }
 
   const progressPercent = assignedEntries.length > 0 ? (reviewedCount / assignedEntries.length) * 100 : 0;
+  const thumbPercent = assignedEntries.length > 1 ? (currentIndex / (assignedEntries.length - 1)) * 100 : 0;
+
+  const scrubTo = useCallback((clientX: number) => {
+    const bar = scrubBarRef.current;
+    if (!bar || assignedEntries.length === 0) return;
+    const rect = bar.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    setCurrentIndex(Math.round(ratio * (assignedEntries.length - 1)));
+  }, [assignedEntries.length]);
+
+  const handleScrubMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isScrubbing.current = true;
+    scrubTo(e.clientX);
+    const onMove = (me: MouseEvent) => { if (isScrubbing.current) scrubTo(me.clientX); };
+    const onUp = () => { isScrubbing.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [scrubTo]);
+
+  const handleScrubTouchStart = useCallback((e: React.TouchEvent) => {
+    isScrubbing.current = true;
+    scrubTo(e.touches[0].clientX);
+    const onMove = (te: TouchEvent) => { if (isScrubbing.current) scrubTo(te.touches[0].clientX); };
+    const onEnd = () => { isScrubbing.current = false; window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onEnd); };
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd);
+  }, [scrubTo]);
 
   return (
     <div className="space-y-4" data-testid="review-tab-container">
@@ -561,7 +590,33 @@ export default function ReviewTab({
         </div>
       </div>
 
-      <Progress value={progressPercent} className="h-2" data-testid="progress-review" />
+      {/* Scrub bar — click or drag to jump to any entry */}
+      <div
+        ref={scrubBarRef}
+        role="slider"
+        aria-label="Entry position"
+        aria-valuemin={0}
+        aria-valuemax={assignedEntries.length - 1}
+        aria-valuenow={currentIndex}
+        className="relative h-5 flex items-center cursor-pointer select-none"
+        data-testid="scrub-bar-review"
+        onMouseDown={handleScrubMouseDown}
+        onTouchStart={handleScrubTouchStart}
+      >
+        {/* Track */}
+        <div className="absolute inset-x-0 h-2 rounded-full bg-muted top-1/2 -translate-y-1/2" />
+        {/* Reviewed fill */}
+        <div
+          className="absolute left-0 h-2 rounded-full bg-primary/40 top-1/2 -translate-y-1/2 transition-[width] duration-150"
+          style={{ width: `${progressPercent}%` }}
+        />
+        {/* Thumb */}
+        <div
+          className="absolute w-4 h-4 rounded-full bg-primary border-2 border-background shadow -translate-x-1/2 top-1/2 -translate-y-1/2 transition-[left] duration-75"
+          style={{ left: `${thumbPercent}%` }}
+          data-testid="scrub-thumb-review"
+        />
+      </div>
 
       {/* My completion banner */}
       {reviewedCount >= assignedEntries.length && assignedEntries.length > 0 && (
