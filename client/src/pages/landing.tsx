@@ -1,4 +1,5 @@
-import { Cable, Camera, Search, FileText, ClipboardList, Users, Link2, Shield, ImagePlus, Download, Flag, ScanLine, GalleryHorizontalEnd, FileSpreadsheet, Layers, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { Cable, Camera, Search, FileText, ClipboardList, Users, Link2, Shield, ImagePlus, Download, Flag, ScanLine, GalleryHorizontalEnd, FileSpreadsheet, Layers, AlertTriangle, Mail, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -77,6 +78,92 @@ const steps = [
   { step: "3", title: "Review & Flag", detail: "Flag questionable reels, add notes, and browse all photos in the Photos Reel for a full overview." },
   { step: "4", title: "Export & Report", detail: "Download Excel spreadsheets or generate annotated PDF audit reports when the count is complete." },
 ];
+
+function ContactSection() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const body = `Name: ${encodeURIComponent(name)}%0AEmail: ${encodeURIComponent(email)}%0A%0A${encodeURIComponent(message)}`;
+    window.location.href = `mailto:makerdantheman@gmail.com?subject=${encodeURIComponent(`Contact from ${name}`)}&body=${body}`;
+  };
+
+  return (
+    <section id="contact" className="bg-muted/50 py-12 px-4 border-t">
+      <div className="max-w-xl mx-auto text-center space-y-6">
+        <h2 className="text-xl font-semibold text-foreground">Contact</h2>
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Mail className="h-4 w-4" />
+          <span data-testid="text-contact-name">Dan</span>
+          <span className="mx-1">—</span>
+          <a
+            href="mailto:makerdantheman@gmail.com"
+            className="text-amber-600 hover:underline"
+            data-testid="link-contact-email"
+          >
+            makerdantheman@gmail.com
+          </a>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+          <div>
+            <label htmlFor="contact-name" className="block text-sm font-medium text-foreground mb-1">
+              Name
+            </label>
+            <input
+              id="contact-name"
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+              placeholder="Your name"
+              data-testid="input-contact-name"
+            />
+          </div>
+          <div>
+            <label htmlFor="contact-email" className="block text-sm font-medium text-foreground mb-1">
+              Email
+            </label>
+            <input
+              id="contact-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+              placeholder="you@example.com"
+              data-testid="input-contact-email"
+            />
+          </div>
+          <div>
+            <label htmlFor="contact-message" className="block text-sm font-medium text-foreground mb-1">
+              Message
+            </label>
+            <textarea
+              id="contact-message"
+              required
+              rows={4}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none"
+              placeholder="How can we help?"
+              data-testid="input-contact-message"
+            />
+          </div>
+          <div className="flex justify-center">
+            <Button type="submit" className="bg-amber-600 border-amber-700 text-white" data-testid="button-contact-send">
+              <Send className="h-4 w-4 mr-2" />
+              Send
+            </Button>
+          </div>
+        </form>
+      </div>
+    </section>
+  );
+}
 
 export default function Landing() {
   return (
@@ -187,6 +274,8 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      <ContactSection />
 
       <footer className="bg-muted/50 border-t py-6 px-4">
         <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 text-xs text-muted-foreground">
