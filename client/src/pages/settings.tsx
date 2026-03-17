@@ -1575,6 +1575,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {!user?.isTester && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -1675,6 +1676,7 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
         <Card>
           <CardHeader>
