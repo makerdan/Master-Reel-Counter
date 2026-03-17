@@ -340,6 +340,8 @@ function getPhotoUrl(photo: Photo): string {
   return `/uploads/${key}`;
 }
 
+const lateJoinerQueueCache = new Map<string, number[]>();
+
 // ─── ReviewTab ────────────────────────────────────────────────────────────────
 
 export default function ReviewTab({
@@ -376,12 +378,84 @@ export default function ReviewTab({
     return [...onlineUsers].sort((a, b) => a.userId.localeCompare(b.userId));
   }, [onlineUsers, currentUserId, user]);
 
+  const reviewCohort = useMemo(() => {
+    const responderIds = Array.from(new Set(reviewResponses.map(r => r.userId))).sort();
+    if (responderIds.length === 0) return sortedUsers;
+    const cohortIds = responderIds.filter(
+      id => !lateJoinerQueueCache.has(`${sessionId}:${id}`)
+    );
+    if (cohortIds.length === 0) return sortedUsers;
+    const usernameMap = new Map(sortedUsers.map(u => [u.userId, u.username]));
+    for (const r of reviewResponses) {
+      if (!usernameMap.has(r.userId)) usernameMap.set(r.userId, r.userId);
+    }
+    return cohortIds.map(id => ({ userId: id, username: usernameMap.get(id) || id }));
+  }, [reviewResponses, sortedUsers, sessionId]);
+
+  const isLateJoiner = useMemo(() => {
+    const cacheKey = `${sessionId}:${currentUserId}`;
+    if (lateJoinerQueueCache.has(cacheKey)) return true;
+    if (reviewResponses.length === 0) return false;
+    const responderIds = new Set(reviewResponses.map(r => r.userId));
+    return !responderIds.has(currentUserId);
+  }, [reviewResponses, currentUserId, sessionId]);
+
   const assignedEntries = useMemo(() => {
-    if (sortedUsers.length === 0 || sortedEntries.length === 0) return [];
-    const userIndex = sortedUsers.findIndex(u => u.userId === currentUserId);
-    if (userIndex === -1) return [];
-    return sortedEntries.filter((_, i) => i % sortedUsers.length === userIndex);
-  }, [sortedEntries, sortedUsers, currentUserId]);
+    if (sortedEntries.length === 0) return [];
+
+    if (!isLateJoiner) {
+      if (reviewCohort.length === 0) return [];
+      const userIndex = reviewCohort.findIndex(u => u.userId === currentUserId);
+      if (userIndex === -1) return [];
+      return sortedEntries.filter((_, i) => i % reviewCohort.length === userIndex);
+    }
+
+    const cacheKey = `${sessionId}:${currentUserId}`;
+    const cached = lateJoinerQueueCache.get(cacheKey);
+    if (cached) {
+      const entryById = new Map(sortedEntries.map(e => [e.id, e]));
+      const result: Entry[] = [];
+      for (const id of cached) {
+        const entry = entryById.get(id);
+        if (entry) result.push(entry);
+      }
+      if (result.length === cached.length) return result;
+    }
+
+    const avgCount = Math.max(1, Math.floor(sortedEntries.length / reviewCohort.length));
+
+    let hash = 0;
+    for (let i = 0; i < currentUserId.length; i++) {
+      hash = ((hash << 5) - hash + currentUserId.charCodeAt(i)) | 0;
+    }
+    const userHash = Math.abs(hash);
+
+    const respondedEntryIds = new Set(reviewResponses.map(r => r.entryId));
+    const unreviewed = sortedEntries.filter(e => !respondedEntryIds.has(e.id));
+    const reviewed = sortedEntries.filter(e => respondedEntryIds.has(e.id));
+
+    const queue: Entry[] = [];
+
+    if (unreviewed.length <= avgCount) {
+      queue.push(...unreviewed);
+    } else {
+      const offset = userHash % unreviewed.length;
+      for (let i = 0; i < avgCount; i++) {
+        queue.push(unreviewed[(offset + i) % unreviewed.length]);
+      }
+    }
+
+    if (queue.length < avgCount && reviewed.length > 0) {
+      const offset = userHash % reviewed.length;
+      const remaining = avgCount - queue.length;
+      for (let i = 0; i < remaining; i++) {
+        queue.push(reviewed[(offset + i) % reviewed.length]);
+      }
+    }
+
+    lateJoinerQueueCache.set(cacheKey, queue.map(e => e.id));
+    return queue;
+  }, [sortedEntries, reviewCohort, currentUserId, isLateJoiner, reviewResponses, sessionId]);
 
   const myResponses = useMemo(() => {
     const map = new Map<number, ReviewResponse>();
@@ -391,18 +465,34 @@ export default function ReviewTab({
 
   const reviewedCount = useMemo(() => assignedEntries.filter(e => myResponses.has(e.id)).length, [assignedEntries, myResponses]);
 
-  // Per-reviewer completion — derived entirely from already-fetched reviewResponses
   const allReviewerStatus = useMemo(() => {
-    if (sortedUsers.length === 0 || sortedEntries.length === 0) return [];
-    return sortedUsers.map((u, idx) => {
-      const assigned = sortedEntries.filter((_, i) => i % sortedUsers.length === idx);
+    if (reviewCohort.length === 0 || sortedEntries.length === 0) return [];
+    const statuses = reviewCohort.map((u, idx) => {
+      const assigned = sortedEntries.filter((_, i) => i % reviewCohort.length === idx);
       const respondedIds = new Set(
         reviewResponses.filter(r => r.userId === u.userId).map(r => r.entryId)
       );
       const done = assigned.filter(e => respondedIds.has(e.id)).length;
       return { userId: u.userId, username: u.username, done, total: assigned.length, complete: done >= assigned.length && assigned.length > 0 };
     });
-  }, [sortedUsers, sortedEntries, reviewResponses]);
+
+    if (isLateJoiner && currentUserId) {
+      const myRespondedIds = new Set(
+        reviewResponses.filter(r => r.userId === currentUserId).map(r => r.entryId)
+      );
+      const done = assignedEntries.filter(e => myRespondedIds.has(e.id)).length;
+      const existing = sortedUsers.find(u => u.userId === currentUserId);
+      statuses.push({
+        userId: currentUserId,
+        username: existing?.username || user?.firstName || currentUserId,
+        done,
+        total: assignedEntries.length,
+        complete: done >= assignedEntries.length && assignedEntries.length > 0,
+      });
+    }
+
+    return statuses;
+  }, [reviewCohort, sortedEntries, reviewResponses, isLateJoiner, currentUserId, assignedEntries, sortedUsers, user]);
 
   // ── Reveal timer state ─────────────────────────────────────────────────────
   const [currentIndex, setCurrentIndex] = useState(0);
