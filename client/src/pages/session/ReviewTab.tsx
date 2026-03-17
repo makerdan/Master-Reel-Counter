@@ -402,6 +402,17 @@ export default function ReviewTab({
 
   // ── Reveal timer state ─────────────────────────────────────────────────────
   const [currentIndex, setCurrentIndex] = useState(0);
+  const hasAutoAdvanced = useRef(false);
+
+  // On first load, jump straight to the first unreviewed entry
+  useEffect(() => {
+    if (hasAutoAdvanced.current) return;
+    if (assignedEntries.length === 0 || responsesLoading) return;
+    const firstUnreviewed = assignedEntries.findIndex(e => !myResponses.has(e.id));
+    if (firstUnreviewed > 0) setCurrentIndex(firstUnreviewed);
+    hasAutoAdvanced.current = true;
+  }, [assignedEntries, myResponses, responsesLoading]);
+
   const [revealedEntries, setRevealedEntries] = useState<Set<number>>(new Set());
   const [timers, setTimers] = useState<Map<number, number>>(new Map());
   const timerRefs = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
