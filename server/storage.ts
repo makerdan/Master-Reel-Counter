@@ -41,6 +41,9 @@ import {
   userWireCategories,
   type UserWireCategory,
   type InsertUserWireCategory,
+  reviewResponses,
+  type ReviewResponse,
+  type InsertReviewResponse,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -134,6 +137,9 @@ export interface IStorage {
   addDismissedDuplicatesBulk(sessionId: number, keys: string[]): Promise<void>;
   removeDismissedDuplicate(sessionId: number, key: string): Promise<void>;
 
+  getSessionReviewResponses(sessionId: number): Promise<ReviewResponse[]>;
+  upsertReviewResponse(data: InsertReviewResponse): Promise<ReviewResponse>;
+
   getRoleComparisonStats(userId: string): Promise<{
     Owner: { entries: number; footage: number; reels: number; photos: number };
     Editor: { entries: number; footage: number; reels: number; photos: number };
@@ -225,6 +231,7 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(activityLogs).where(eq(activityLogs.sessionId, id));
       await tx.delete(comments).where(eq(comments.sessionId, id));
       await tx.delete(dismissedDuplicates).where(eq(dismissedDuplicates.sessionId, id));
+      await tx.delete(reviewResponses).where(eq(reviewResponses.sessionId, id));
       await tx.delete(countingSessions).where(eq(countingSessions.id, id));
     });
   }
@@ -1458,6 +1465,30 @@ export class DatabaseStorage implements IStorage {
   async removeDismissedDuplicate(sessionId: number, key: string): Promise<void> {
     await db.delete(dismissedDuplicates)
       .where(and(eq(dismissedDuplicates.sessionId, sessionId), eq(dismissedDuplicates.key, key)));
+  }
+
+  async getSessionReviewResponses(sessionId: number): Promise<ReviewResponse[]> {
+    return db.select().from(reviewResponses)
+      .where(eq(reviewResponses.sessionId, sessionId))
+      .orderBy(desc(reviewResponses.createdAt));
+  }
+
+  async upsertReviewResponse(data: InsertReviewResponse): Promise<ReviewResponse> {
+    const existing = await db.select().from(reviewResponses)
+      .where(and(
+        eq(reviewResponses.sessionId, data.sessionId),
+        eq(reviewResponses.entryId, data.entryId),
+        eq(reviewResponses.userId, data.userId),
+      ));
+    if (existing.length > 0) {
+      const [result] = await db.update(reviewResponses)
+        .set({ verdict: data.verdict, flagReason: data.flagReason ?? null, username: data.username ?? null })
+        .where(eq(reviewResponses.id, existing[0].id))
+        .returning();
+      return result;
+    }
+    const [result] = await db.insert(reviewResponses).values(data).returning();
+    return result;
   }
 }
 

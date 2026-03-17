@@ -1496,6 +1496,47 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sessions/:id/review-responses", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const responses = await storage.getSessionReviewResponses(sessionId);
+      res.json(responses);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch review responses" });
+    }
+  });
+
+  app.post("/api/sessions/:id/review-responses", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const { entryId, verdict, flagReason } = req.body;
+      if (!entryId || !verdict || !["approved", "flagged"].includes(verdict)) {
+        return res.status(400).json({ message: "entryId and verdict (approved|flagged) are required" });
+      }
+      const entry = await storage.getEntry(entryId);
+      if (!entry || entry.sessionId !== sessionId) {
+        return res.status(400).json({ message: "Entry does not belong to this session" });
+      }
+      const userId = req.user.claims.sub;
+      const username = req.user.claims.firstName || req.user.claims.username || userId;
+      const response = await storage.upsertReviewResponse({
+        sessionId,
+        entryId,
+        userId,
+        username,
+        verdict,
+        flagReason: verdict === "flagged" ? (flagReason || null) : null,
+      });
+      res.json(response);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to save review response" });
+    }
+  });
+
   app.delete("/api/pins/:pinId", isAuthenticated, async (req: any, res) => {
     try {
       const pin = await storage.getPin(parseInt(req.params.pinId));

@@ -10,6 +10,7 @@ import {
   timestamp,
   boolean,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -311,3 +312,24 @@ export const insertUserWireCategorySchema = createInsertSchema(userWireCategorie
 
 export type UserWireCategory = typeof userWireCategories.$inferSelect;
 export type InsertUserWireCategory = z.infer<typeof insertUserWireCategorySchema>;
+
+export const reviewResponses = pgTable("review_responses", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  entryId: integer("entry_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  username: text("username"),
+  verdict: text("verdict").notNull(),
+  flagReason: text("flag_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("review_responses_session_entry_user_idx").on(table.sessionId, table.entryId, table.userId),
+]);
+
+export const insertReviewResponseSchema = createInsertSchema(reviewResponses).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ReviewResponse = typeof reviewResponses.$inferSelect;
+export type InsertReviewResponse = z.infer<typeof insertReviewResponseSchema>;

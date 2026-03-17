@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, ArrowUp, Camera, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Trash2, LayoutGrid, ScanLine, X,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Trash2, LayoutGrid, ScanLine, X, ClipboardCheck,
 } from "lucide-react";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
@@ -41,6 +41,7 @@ import ActivityLog from "./session/ActivityLog";
 import FlaggedReels from "./session/FlaggedReels";
 import PhotoStrip from "./session/PhotoStrip";
 import LabelScannerTab from "./session/LabelScannerTab";
+import ReviewTab from "./session/ReviewTab";
 import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename } from "./session/utils";
 import { useTimezone } from "@/hooks/use-timezone";
@@ -162,7 +163,7 @@ function SessionWorkspace({
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
       if (tab === "single") return "photo";
-      if (tab && ["photo", "flagged", "scanner", "strip"].includes(tab)) return tab;
+      if (tab && ["photo", "flagged", "scanner", "strip", "review"].includes(tab)) return tab;
     } catch {}
     return "photo";
   })();
@@ -740,6 +741,10 @@ function SessionWorkspace({
                   <ScanLine className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">AI Scanner</span>
                 </TabsTrigger>
+                <TabsTrigger value="review" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(150_60%_30%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-review-mode" aria-label="Review">
+                  <ClipboardCheck className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Review</span>
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="photo">
@@ -788,6 +793,15 @@ function SessionWorkspace({
                   isAdmin={isOwner}
                   onPinDataChanged={triggerPinRefresh}
                   onPhotoChange={(photoId) => { syncedPhotoIdRef.current = photoId; }}
+                  onlineUsers={onlineUsers}
+                />
+              </TabsContent>
+
+              <TabsContent value="review">
+                <ReviewTab
+                  sessionId={sessionId}
+                  entries={entries}
+                  photos={photos}
                   onlineUsers={onlineUsers}
                 />
               </TabsContent>
