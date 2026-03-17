@@ -42,6 +42,8 @@ import { formatTimestamp } from "@/lib/timezone";
 import type { Session, Folder as FolderType } from "@shared/schema";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
+import { findFolderConflict, getNextAutoNumberedName } from "@/lib/folder-conflicts";
+import { FolderConflictDialog, type ConflictResolution } from "@/components/folder-conflict-dialog";
 
 type SessionWithStats = Session & {
   entryCount: number;
@@ -149,6 +151,14 @@ export default function Dashboard() {
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: number; name: string; sessionCount: number } | null>(null);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<{ id: number; name: string } | null>(null);
+
+  const [folderConflict, setFolderConflict] = useState<{
+    mode: "create" | "create-and-move";
+    proposedName: string;
+    autoNumberedName: string;
+    existingFolderId: number;
+    sessionId?: number;
+  } | null>(null);
 
   const { data: userSettings } = useQuery<{
     thumbnailSize: string;
@@ -362,8 +372,8 @@ export default function Dashboard() {
   });
 
   const createFolder = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/folders", { name: newFolderName });
+    mutationFn: async (nameOverride?: string) => {
+      const res = await apiRequest("POST", "/api/folders", { name: nameOverride || newFolderName });
       return res.json();
     },
     onSuccess: () => {
@@ -461,6 +471,65 @@ export default function Dashboard() {
       toast({ title: "Failed to create folder", variant: "destructive" });
     },
   });
+
+  const handleFolderConflictResolution = useCallback(
+    (resolution: ConflictResolution) => {
+      if (!folderConflict) return;
+      const { mode, proposedName, sessionId } = folderConflict;
+
+      switch (resolution.type) {
+        case "rename": {
+          const name = resolution.newName;
+          const reConflict = findFolderConflict(name, null, userFolders || []);
+          if (reConflict) {
+            setFolderConflict({
+              ...folderConflict,
+              proposedName: name,
+              autoNumberedName: getNextAutoNumberedName(name, null, userFolders || []),
+              existingFolderId: reConflict.id,
+            });
+            return;
+          }
+          setFolderConflict(null);
+          if (mode === "create") {
+            createFolder.mutate(name);
+          } else if (mode === "create-and-move" && sessionId) {
+            createFolderAndMove.mutate({ sessionId, folderName: name });
+          }
+          break;
+        }
+        case "auto-number": {
+          const name = resolution.newName;
+          setFolderConflict(null);
+          if (mode === "create") {
+            createFolder.mutate(name);
+          } else if (mode === "create-and-move" && sessionId) {
+            createFolderAndMove.mutate({ sessionId, folderName: name });
+          }
+          break;
+        }
+        case "merge":
+          setFolderConflict(null);
+          if (mode === "create-and-move" && sessionId) {
+            moveSession.mutate({ id: sessionId, folderId: resolution.existingFolderId });
+            setCreateFolderForSession(null);
+            setInlineFolderName("");
+          } else {
+            setNewFolderDialogOpen(false);
+            setNewFolderName("");
+            const targetFolder = (userFolders || []).find(
+              (f) => f.id === resolution.existingFolderId,
+            );
+            if (targetFolder) {
+              setOpenFolders((prev) => new Set([...prev, targetFolder.id]));
+              toast({ title: `Folder "${targetFolder.name}" already exists` });
+            }
+          }
+          break;
+      }
+    },
+    [folderConflict, userFolders, createFolder, createFolderAndMove, moveSession, toast],
+  );
 
   const duplicateSession = useMutation({
     mutationFn: async (id: number) => {
@@ -1070,7 +1139,18 @@ export default function Dashboard() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (newFolderName.trim()) createFolder.mutate();
+                    if (!newFolderName.trim()) return;
+                    const conflict = findFolderConflict(newFolderName.trim(), null, userFolders || []);
+                    if (conflict) {
+                      setFolderConflict({
+                        mode: "create",
+                        proposedName: newFolderName.trim(),
+                        autoNumberedName: getNextAutoNumberedName(newFolderName.trim(), null, userFolders || []),
+                        existingFolderId: conflict.id,
+                      });
+                      return;
+                    }
+                    createFolder.mutate();
                   }}
                   className="space-y-4"
                 >
@@ -1508,9 +1588,19 @@ export default function Dashboard() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (createFolderForSession && inlineFolderName.trim()) {
-                createFolderAndMove.mutate({ sessionId: createFolderForSession.id, folderName: inlineFolderName });
+              if (!createFolderForSession || !inlineFolderName.trim()) return;
+              const conflict = findFolderConflict(inlineFolderName.trim(), null, userFolders || []);
+              if (conflict) {
+                setFolderConflict({
+                  mode: "create-and-move",
+                  proposedName: inlineFolderName.trim(),
+                  autoNumberedName: getNextAutoNumberedName(inlineFolderName.trim(), null, userFolders || []),
+                  existingFolderId: conflict.id,
+                  sessionId: createFolderForSession.id,
+                });
+                return;
               }
+              createFolderAndMove.mutate({ sessionId: createFolderForSession.id, folderName: inlineFolderName });
             }}
             className="space-y-4"
           >
@@ -1535,6 +1625,17 @@ export default function Dashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <FolderConflictDialog
+        open={!!folderConflict}
+        onOpenChange={(o) => { if (!o) setFolderConflict(null); }}
+        conflictingName={folderConflict?.proposedName || ""}
+        autoNumberedName={folderConflict?.autoNumberedName || ""}
+        existingFolderId={folderConflict?.existingFolderId || 0}
+        onResolve={handleFolderConflictResolution}
+        isPending={createFolder.isPending || createFolderAndMove.isPending || moveSession.isPending}
+        mode={folderConflict?.mode || "create"}
+      />
 
       <Dialog open={bulkMoveOpen} onOpenChange={setBulkMoveOpen}>
         <DialogContent>
