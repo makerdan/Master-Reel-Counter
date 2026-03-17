@@ -537,18 +537,37 @@ export default function ReviewTab({
                 {currentEntry.aisle && `Aisle ${currentEntry.aisle}`}
                 {currentEntry.section && ` - Section ${currentEntry.section}`}
               </span>
-              <span>{currentEntry.reelTag || "Unknown"}</span>
+              {currentEntry.reelCount && currentEntry.reelCount > 1 && (
+                <span>{currentEntry.reelCount} reels</span>
+              )}
             </div>
 
             {/* Final category — large, visibly colored */}
-            <div
-              className="text-xl font-bold text-[hsl(18_85%_55%)] leading-tight"
-              data-testid="text-review-category"
-            >
-              {[currentEntry.wireType, currentEntry.gauge].filter(Boolean).join(" ") || (
-                <span className="text-muted-foreground text-base font-normal italic">No category assigned</span>
-              )}
-            </div>
+            {(() => {
+              const catalogCode = (currentEntry.reelTag || currentPin?.wireDetails)?.trim().toUpperCase() || null;
+              const vendorCode = (currentPin?.vendorCode || currentEntry.manufacturer)?.trim().toUpperCase() || null;
+              if (!catalogCode && !vendorCode) {
+                return (
+                  <p className="text-muted-foreground text-base italic" data-testid="text-review-category">
+                    No category assigned
+                  </p>
+                );
+              }
+              return (
+                <div className="flex items-baseline gap-3 flex-wrap" data-testid="text-review-category">
+                  {catalogCode && (
+                    <span className="text-xl font-bold text-[hsl(18_85%_55%)] leading-tight font-mono">
+                      {catalogCode}
+                    </span>
+                  )}
+                  {vendorCode && (
+                    <span className="text-base font-semibold text-[hsl(200_70%_55%)]">
+                      {vendorCode}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Photo / spinner area */}
             <div className="flex justify-center min-h-[200px] items-center">
