@@ -25,7 +25,7 @@ import ExcelJS from "exceljs";
 import { openai } from "./replit_integrations/image/client";
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
-const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null }>();
+const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null }>();
 
 function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSocket) {
   const room = sessionRooms.get(sessionId);
@@ -34,6 +34,20 @@ function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSock
   for (const ws of room) {
     if (ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
       ws.send(data);
+    }
+  }
+}
+
+function broadcastToSessionOwners(sessionId: number, message: any, excludeWs?: WebSocket) {
+  const room = sessionRooms.get(sessionId);
+  if (!room) return;
+  const data = JSON.stringify(message);
+  for (const ws of room) {
+    if (ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
+      const info = wsUserMap.get(ws);
+      if (info?.role === "owner") {
+        ws.send(data);
+      }
     }
   }
 }
@@ -1156,6 +1170,7 @@ export async function registerRoutes(
         flagReason: flagged ? (flagReason || null) : null,
       });
       logActivity(photo.sessionId, req.user.claims.sub, req.user.claims.username, flagged ? "pin_flagged" : "pin_unflagged", "pin", pin.id, flagReason || undefined);
+      broadcastToSessionOwners(photo.sessionId, { type: flagged ? "pin_flagged" : "pin_unflagged", pinId: pin.id, flagged: !!flagged, flagReason: flagged ? (flagReason || null) : null });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update pin flag" });
@@ -4506,18 +4521,20 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
   wss.on("connection", (ws) => {
-    wsUserMap.set(ws, { sessionId: null, userId: null, username: null });
+    wsUserMap.set(ws, { sessionId: null, userId: null, username: null, role: null });
 
     ws.on("message", async (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.type === "join" && typeof msg.sessionId === "number") {
+          let resolvedRole: string | null = null;
           if (msg.userId) {
             const access = await verifySessionAccess(msg.sessionId, msg.userId);
             if (!access) {
               ws.send(JSON.stringify({ type: "error", message: "Access denied" }));
               return;
             }
+            resolvedRole = access.role;
           }
           const info = wsUserMap.get(ws)!;
           const prevSessionId = info.sessionId;
@@ -4529,6 +4546,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           info.sessionId = msg.sessionId;
           info.userId = msg.userId || null;
           info.username = msg.username || null;
+          info.role = resolvedRole;
           if (!sessionRooms.has(msg.sessionId)) sessionRooms.set(msg.sessionId, new Set());
           sessionRooms.get(msg.sessionId)!.add(ws);
           ws.send(JSON.stringify({ type: "joined", sessionId: msg.sessionId }));
