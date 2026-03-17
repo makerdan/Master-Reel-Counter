@@ -1988,6 +1988,17 @@ export default function SettingsPage() {
                                 <UserCheck className="h-3 w-3 mr-1" />
                                 Approve
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                                onClick={() => toggleApproval.mutate({ userId: u.id, approved: false })}
+                                disabled={toggleApproval.isPending}
+                                data-testid={`button-reject-pending-${u.id}`}
+                              >
+                                <UserX className="h-3 w-3 mr-1" />
+                                Reject
+                              </Button>
                             </>
                           )}
                         </div>
