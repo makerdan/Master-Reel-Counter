@@ -41,15 +41,17 @@ function getOrLoadImage(url: string): HTMLImageElement {
 }
 
 function CropCanvas({
-  photoUrl, xPercent, yPercent, zoomLevel, panX = 0, panY = 0, onPan, size = 260,
+  photoUrl, xPercent, yPercent, zoomLevel, panX = 0, panY = 0, onPan, onReady, size = 260,
 }: {
   photoUrl: string; xPercent: number; yPercent: number;
   zoomLevel: number; panX?: number; panY?: number;
-  onPan?: (px: number, py: number) => void; size?: number;
+  onPan?: (px: number, py: number) => void; onReady?: () => void; size?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -71,6 +73,7 @@ function CropCanvas({
     canvas.width = size;
     canvas.height = size;
     ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, size, size);
+    onReadyRef.current?.();
   }, [xPercent, yPercent, zoomLevel, panX, panY, size]);
 
   useEffect(() => {
@@ -125,12 +128,13 @@ function CropCanvas({
 
 function ZoomablePhoto({
   photoUrl, scale, panX, panY, rotation, panMode,
-  onScale, onPan, onRotate, onPanMode,
+  onScale, onPan, onRotate, onPanMode, onReady,
 }: {
   photoUrl: string; scale: number; panX: number; panY: number;
   rotation: number; panMode: boolean;
   onScale: (s: number) => void; onPan: (x: number, y: number) => void;
   onRotate: (deg: number) => void; onPanMode: (m: boolean) => void;
+  onReady?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -277,6 +281,7 @@ function ZoomablePhoto({
             draggable={false}
             className="w-full select-none block"
             data-testid="img-review-photo"
+            onLoad={onReady}
           />
         </div>
       </div>
@@ -466,6 +471,12 @@ export default function ReviewTab({
   const [photoPanY, setPhotoPanY] = useState(0);
   const [photoRotation, setPhotoRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
+  const [photoReady, setPhotoReady] = useState(false);
+
+  // Reset photo-ready flag whenever we navigate to a new entry or reveal it
+  useEffect(() => {
+    setPhotoReady(false);
+  }, [currentEntry?.id, isRevealed]);
 
   const resetView = useCallback(() => {
     setPinZoom(0.12); setPinPanX(0); setPinPanY(0);
@@ -654,16 +665,26 @@ export default function ReviewTab({
               ) : isPinEntry && currentPhoto ? (
                 /* ── Pin / AI Scanner view ── */
                 <div className="w-full space-y-2">
-                  <CropCanvas
-                    photoUrl={getPhotoUrl(currentPhoto)}
-                    xPercent={currentPin!.xPercent}
-                    yPercent={currentPin!.yPercent}
-                    zoomLevel={pinZoom}
-                    panX={pinPanX}
-                    panY={pinPanY}
-                    onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
-                    size={260}
-                  />
+                  <div className="relative">
+                    <CropCanvas
+                      photoUrl={getPhotoUrl(currentPhoto)}
+                      xPercent={currentPin!.xPercent}
+                      yPercent={currentPin!.yPercent}
+                      zoomLevel={pinZoom}
+                      panX={pinPanX}
+                      panY={pinPanY}
+                      onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
+                      onReady={() => setPhotoReady(true)}
+                      size={260}
+                    />
+                    {!photoReady && (
+                      <div
+                        className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                        style={{ width: 260, height: 260 }}
+                        data-testid="photo-skeleton"
+                      />
+                    )}
+                  </div>
                   {/* Zoom controls — mirrors AI Scanner */}
                   <div className="flex items-center gap-1.5 px-1">
                     <ZoomOut
@@ -687,7 +708,7 @@ export default function ReviewTab({
                 </div>
               ) : currentPhoto ? (
                 /* ── Section Photo view ── */
-                <div className="w-full">
+                <div className="w-full relative">
                   <ZoomablePhoto
                     photoUrl={getPhotoUrl(currentPhoto)}
                     scale={photoScale}
@@ -699,7 +720,14 @@ export default function ReviewTab({
                     onPan={(x, y) => { setPhotoPanX(x); setPhotoPanY(y); }}
                     onRotate={setPhotoRotation}
                     onPanMode={setPanMode}
+                    onReady={() => setPhotoReady(true)}
                   />
+                  {!photoReady && (
+                    <div
+                      className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                      data-testid="photo-skeleton"
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
