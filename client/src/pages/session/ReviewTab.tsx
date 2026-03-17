@@ -153,47 +153,62 @@ export default function ReviewTab({
   const [flagReason, setFlagReason] = useState("");
   const [showFlagInput, setShowFlagInput] = useState(false);
 
+  // Start all timers concurrently when assigned entries load, based on entry.createdAt
   useEffect(() => {
-    const alreadyReviewed = new Set<number>();
-    for (const e of assignedEntries) {
-      if (myResponses.has(e.id)) alreadyReviewed.add(e.id);
+    const immediateReveal = new Set<number>();
+    const pending: { id: number; remainingMs: number }[] = [];
+
+    for (const entry of assignedEntries) {
+      // Already reviewed entries are always revealed
+      if (myResponses.has(entry.id)) {
+        immediateReveal.add(entry.id);
+        continue;
+      }
+      // Already revealed or timer running
+      if (revealedEntries.has(entry.id) || timerRefs.current.has(entry.id)) continue;
+
+      const createdAt = entry.createdAt ? new Date(entry.createdAt).getTime() : Date.now();
+      const elapsed = Date.now() - createdAt;
+      const remaining = REVEAL_DELAY_MS - elapsed;
+
+      if (remaining <= 0) {
+        immediateReveal.add(entry.id);
+      } else {
+        pending.push({ id: entry.id, remainingMs: remaining });
+      }
     }
-    if (alreadyReviewed.size > 0) {
+
+    if (immediateReveal.size > 0) {
       setRevealedEntries(prev => {
         const next = new Set(prev);
-        for (const id of alreadyReviewed) next.add(id);
+        for (const id of immediateReveal) next.add(id);
         return next;
       });
     }
-  }, [assignedEntries, myResponses]);
 
-  const startTimer = useCallback((entryId: number) => {
-    if (revealedEntries.has(entryId) || timerRefs.current.has(entryId)) return;
-    setTimers(prev => new Map(prev).set(entryId, REVEAL_DELAY_MS / 1000));
-    const interval = setInterval(() => {
-      setTimers(prev => {
-        const next = new Map(prev);
-        const current = (next.get(entryId) ?? REVEAL_DELAY_MS / 1000) - 1;
-        if (current <= 0) {
-          next.delete(entryId);
-          clearInterval(timerRefs.current.get(entryId));
-          timerRefs.current.delete(entryId);
-          setRevealedEntries(r => new Set(r).add(entryId));
+    for (const { id, remainingMs } of pending) {
+      const initialSeconds = Math.ceil(remainingMs / 1000);
+      setTimers(prev => new Map(prev).set(id, initialSeconds));
+
+      const interval = setInterval(() => {
+        setTimers(prev => {
+          const next = new Map(prev);
+          const current = (next.get(id) ?? 1) - 1;
+          if (current <= 0) {
+            next.delete(id);
+            clearInterval(timerRefs.current.get(id));
+            timerRefs.current.delete(id);
+            setRevealedEntries(r => new Set(r).add(id));
+            return next;
+          }
+          next.set(id, current);
           return next;
-        }
-        next.set(entryId, current);
-        return next;
-      });
-    }, 1000);
-    timerRefs.current.set(entryId, interval);
-  }, [revealedEntries]);
-
-  useEffect(() => {
-    if (assignedEntries.length > 0 && currentIndex < assignedEntries.length) {
-      const entry = assignedEntries[currentIndex];
-      startTimer(entry.id);
+        });
+      }, 1000);
+      timerRefs.current.set(id, interval);
     }
-  }, [currentIndex, assignedEntries, startTimer]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignedEntries, myResponses]);
 
   useEffect(() => {
     return () => {
