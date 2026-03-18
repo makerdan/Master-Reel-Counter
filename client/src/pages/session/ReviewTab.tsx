@@ -562,12 +562,7 @@ export default function ReviewTab({
   const [photoPanY, setPhotoPanY] = useState(0);
   const [photoRotation, setPhotoRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
-  const [photoReady, setPhotoReady] = useState(false);
-
-  // Reset photo-ready flag whenever we navigate to a new entry or reveal it
-  useEffect(() => {
-    setPhotoReady(false);
-  }, [currentIndex, revealedEntries]);
+  const [photoReadyForKey, setPhotoReadyForKey] = useState("");
 
   const resetView = useCallback(() => {
     setPinZoom(0.12); setPinPanX(0); setPinPanY(0);
@@ -608,6 +603,9 @@ export default function ReviewTab({
   const currentPin = currentEntry ? pinByEntryId.get(currentEntry.id) : null;
   const currentPhoto = currentEntry?.photoId ? photoMap.get(currentEntry.photoId) : null;
   const isRevealed = currentEntry ? revealedEntries.has(currentEntry.id) : false;
+  // Synchronous ready check — avoids the one-frame flash that a useEffect reset would cause
+  const photoReadyKey = `${currentIndex}-${isRevealed}`;
+  const photoReady = photoReadyForKey === photoReadyKey;
   const timerSeconds = currentEntry ? (timers.get(currentEntry.id) ?? null) : null;
   const existingResponse = currentEntry ? myResponses.get(currentEntry.id) : undefined;
   const isPinEntry = !!(currentPin && currentPin.xPercent !== undefined && currentPin.yPercent !== undefined);
@@ -825,7 +823,7 @@ export default function ReviewTab({
                       panX={pinPanX}
                       panY={pinPanY}
                       onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
-                      onReady={() => setPhotoReady(true)}
+                      onReady={() => setPhotoReadyForKey(photoReadyKey)}
                       size={260}
                     />
                     {!photoReady && (
@@ -871,7 +869,7 @@ export default function ReviewTab({
                     onPan={(x, y) => { setPhotoPanX(x); setPhotoPanY(y); }}
                     onRotate={setPhotoRotation}
                     onPanMode={setPanMode}
-                    onReady={() => setPhotoReady(true)}
+                    onReady={() => setPhotoReadyForKey(photoReadyKey)}
                   />
                   {!photoReady && (
                     <div
