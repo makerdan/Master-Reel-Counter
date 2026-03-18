@@ -59,6 +59,50 @@ function photoUrl(key: string): string {
 }
 
 
+function PinLocationPhoto({
+  photoUrl,
+  xPercent,
+  yPercent,
+  photoFilename,
+  onClick,
+  containerClass,
+  imgClass,
+  dotClass,
+  children,
+}: {
+  photoUrl: string;
+  xPercent: number;
+  yPercent: number;
+  photoFilename?: string;
+  onClick?: () => void;
+  containerClass?: string;
+  imgClass?: string;
+  dotClass?: string;
+  children?: React.ReactNode;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className={`relative ${containerClass ?? ""}`} onClick={onClick}>
+      <img
+        src={photoUrl}
+        alt={photoFilename || "Photo"}
+        className={imgClass ?? "w-full h-full object-cover"}
+        onLoad={() => setLoaded(true)}
+      />
+      {loaded && (
+        <div
+          className="absolute pointer-events-none"
+          style={{ left: `${xPercent}%`, top: `${yPercent}%`, transform: "translate(-50%, -50%)" }}
+        >
+          <div className={dotClass ?? "w-8 h-8 rounded-full animate-pulse"} style={{ border: "4px solid #f97316" }} />
+          <div className={`absolute inset-0 rounded-full border border-white ${dotClass ?? "w-8 h-8"}`} />
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
 function dupGroupKey(group: DuplicateGroup): string {
   if (group.groupType === "same-reel") {
     const sortedIds = group.pins.map(p => p.pinId).sort((a, b) => a - b);
@@ -81,6 +125,7 @@ function DupPinTile({
   uLabel: string;
 }) {
   const { toast } = useToast();
+  const [tileLoaded, setTileLoaded] = useState(false);
 
   const keepMutation = useMutation({
     mutationFn: async () => {
@@ -124,17 +169,20 @@ function DupPinTile({
             src={photoUrl(pin.photoObjectStorageKey)}
             alt={`Pin ${pin.pinId}`}
             className="w-full h-auto block"
+            onLoad={() => setTileLoaded(true)}
           />
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              left: `${pin.xPercent}%`,
-              top: `${pin.yPercent}%`,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <div className="w-2.5 h-2.5 sm:w-5 sm:h-5 rounded-full bg-amber-400 border sm:border-2 border-white shadow-md" />
-          </div>
+          {tileLoaded && (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: `${pin.xPercent}%`,
+                top: `${pin.yPercent}%`,
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <div className="w-2.5 h-2.5 sm:w-5 sm:h-5 rounded-full bg-amber-400 border sm:border-2 border-white shadow-md" />
+            </div>
+          )}
         </div>
       ) : (
         <div className="w-full h-32 bg-muted flex items-center justify-center">
@@ -237,6 +285,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const currentUnit: UnitType = (flagSettings?.defaultUnit as UnitType) || "feet";
   const uLabel = unitLabel(currentUnit);
   const [previewPin, setPreviewPin] = useState<FlaggedPin | null>(null);
+  const [previewImgLoaded, setPreviewImgLoaded] = useState(false);
+  useEffect(() => { setPreviewImgLoaded(false); }, [previewPin?.id]);
   const [copied, setCopied] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
@@ -647,30 +697,18 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     {/* Desktop layout */}
                     <div className="hidden sm:flex items-start gap-3">
                       {pin.photoUrl ? (
-                        <div
-                          className="relative w-20 h-20 rounded overflow-hidden border border-black shrink-0 cursor-pointer"
+                        <PinLocationPhoto
+                          photoUrl={pin.photoUrl}
+                          xPercent={pin.xPercent}
+                          yPercent={pin.yPercent}
+                          photoFilename={pin.photoFilename}
                           onClick={() => setPreviewPin(pin)}
+                          containerClass="w-20 h-20 rounded overflow-hidden border border-black shrink-0 cursor-pointer"
                         >
-                          <img
-                            src={pin.photoUrl}
-                            alt={pin.photoFilename || "Photo"}
-                            className="w-full h-full object-cover"
-                          />
-                          <div
-                            className="absolute pointer-events-none"
-                            style={{
-                              left: `${pin.xPercent}%`,
-                              top: `${pin.yPercent}%`,
-                              transform: "translate(-50%, -50%)",
-                            }}
-                          >
-                            <div className="w-8 h-8 rounded-full animate-pulse" style={{ border: "4px solid #f97316" }} />
-                            <div className="absolute inset-0 w-8 h-8 rounded-full border border-white" />
-                          </div>
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/30 transition-opacity">
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/30 transition-opacity pointer-events-none">
                             <Eye className="h-4 w-4 text-white" />
                           </div>
-                        </div>
+                        </PinLocationPhoto>
                       ) : (
                         <div className="w-20 h-20 rounded bg-muted flex items-center justify-center shrink-0">
                           <MapPin className="h-5 w-5 text-muted-foreground" />
@@ -850,27 +888,15 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         )}
                       </div>
                       {pin.photoUrl ? (
-                        <div
-                          className="relative w-full rounded overflow-hidden border border-black cursor-pointer"
+                        <PinLocationPhoto
+                          photoUrl={pin.photoUrl}
+                          xPercent={pin.xPercent}
+                          yPercent={pin.yPercent}
+                          photoFilename={pin.photoFilename}
                           onClick={() => setPreviewPin(pin)}
-                        >
-                          <img
-                            src={pin.photoUrl}
-                            alt={pin.photoFilename || "Photo"}
-                            className="w-full h-auto block"
-                          />
-                          <div
-                            className="absolute pointer-events-none"
-                            style={{
-                              left: `${pin.xPercent}%`,
-                              top: `${pin.yPercent}%`,
-                              transform: "translate(-50%, -50%)",
-                            }}
-                          >
-                            <div className="w-8 h-8 rounded-full animate-pulse" style={{ border: "4px solid #f97316" }} />
-                            <div className="absolute inset-0 w-8 h-8 rounded-full border border-white" />
-                          </div>
-                        </div>
+                          containerClass="w-full rounded overflow-hidden border border-black cursor-pointer"
+                          imgClass="w-full h-auto block"
+                        />
                       ) : (
                         <div className="w-full h-24 rounded bg-muted flex items-center justify-center">
                           <MapPin className="h-5 w-5 text-muted-foreground" />
@@ -1108,18 +1134,21 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                 src={previewPin.photoUrl}
                 alt="Flagged pin location"
                 className="max-w-full max-h-[75vh] rounded-lg"
+                onLoad={() => setPreviewImgLoaded(true)}
               />
-              <div
-                className="absolute pointer-events-none"
-                style={{
-                  left: `${previewPin.xPercent}%`,
-                  top: `${previewPin.yPercent}%`,
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
-                <div className="w-24 h-24 rounded-full animate-pulse opacity-100" style={{ border: "12px solid #f97316" }} />
-                <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-white opacity-100" />
-              </div>
+              {previewImgLoaded && (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${previewPin.xPercent}%`,
+                    top: `${previewPin.yPercent}%`,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  <div className="w-24 h-24 rounded-full animate-pulse opacity-100" style={{ border: "12px solid #f97316" }} />
+                  <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-white opacity-100" />
+                </div>
+              )}
             </div>
             <div className="mt-2 text-white text-sm text-center">
               <span className="font-mono">Pin {previewPin.label}</span>

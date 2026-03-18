@@ -133,6 +133,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [highlightedCommittedPinDbId, setHighlightedCommittedPinDbId] = useState<number | null>(null);
   const [pinsVisible, setPinsVisible] = useState(true);
+  const [photoLoadedKey, setPhotoLoadedKey] = useState("");
   const [previewHeight, setPreviewHeight] = useState(0);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
@@ -255,6 +256,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const nextReelCount = localPins.length + otherPhotosIncompleteCount;
   const displayedPhotoIdx = viewingNearbyIdx !== null ? viewingNearbyIdx : currentPhotoIdx;
   const displayedPhoto = uploadedPhotos[displayedPhotoIdx];
+  const photoSrc = displayedPhoto?.url || currentPhoto?.url || "";
+  const photoLoaded = photoLoadedKey === photoSrc;
 
   useEffect(() => {
     if (photos.length === 0) return;
@@ -1590,11 +1593,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 draggable={false}
                 className="w-full select-none"
                 style={{ display: "block" }}
-                onLoad={() => {}}
+                onLoad={() => setPhotoLoadedKey(displayedPhoto?.url || currentPhoto?.url || "")}
               />
               {viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx ? (
                 <>
-                  {pinsVisible && localPins.map((pin) => (
+                  {photoLoaded && pinsVisible && localPins.map((pin) => (
                     <div
                       key={pin.id}
                       className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""} ${pin.flagged ? "flagged" : ""}`}
@@ -1680,7 +1683,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       </div>
                     </div>
                   ))}
-                  {pinsVisible && committedPins.map((pin) => (
+                  {photoLoaded && pinsVisible && committedPins.map((pin) => (
                     <div
                       key={pin.id}
                       className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}${highlightedCommittedPinDbId && pin.dbId === highlightedCommittedPinDbId ? " pin-highlight-pulse" : ""}`}
@@ -1722,7 +1725,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 </>
               ) : (
                 <>
-                  {pinsVisible && nearbyCommittedPins.map((pin) => (
+                  {photoLoaded && pinsVisible && nearbyCommittedPins.map((pin) => (
                     <div
                       key={pin.id}
                       className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}`}

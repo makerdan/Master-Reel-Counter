@@ -19,6 +19,42 @@ import { toDisplayUnit } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import type { Entry, Photo, Pin } from "@shared/schema";
 
+function EntryPhotoDialogContent({ src, entryId, pin }: {
+  src: string;
+  entryId: number;
+  pin: { xPercent: number; yPercent: number } | undefined;
+}) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  return (
+    <div className="relative inline-block w-full">
+      <img
+        src={src}
+        alt="Entry photo"
+        className="w-full rounded-md"
+        style={{ display: "block" }}
+        data-testid={`img-entry-photo-${entryId}`}
+        onLoad={() => setImgLoaded(true)}
+      />
+      {imgLoaded && pin && (
+        <div
+          className="absolute pointer-events-none"
+          style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
+          data-testid={`pin-highlight-${entryId}`}
+          ref={(el) => {
+            if (el && !el.dataset.scrolled) {
+              el.dataset.scrolled = "1";
+              setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+            }
+          }}
+        >
+          <div className="w-24 h-24 rounded-full animate-pulse opacity-100" style={{ border: "12px solid #f97316" }} />
+          <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-white opacity-100" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EntryTable({
   entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, onJumpToPin, unitLabel: uLabel = "ft", currentUnit = "feet" as UnitType,
 }: {
@@ -275,35 +311,11 @@ function EntryTable({
                                   <DialogTitle>Photo - {photoMap.get(entry.photoId)?.originalFilename || "Photo"}</DialogTitle>
                                 </DialogHeader>
                                 <div className="flex-1 min-h-0 overflow-auto px-4 pb-4">
-                                  <div className="relative inline-block w-full">
-                                    <img
-                                      src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
-                                      alt="Entry photo"
-                                      className="w-full rounded-md"
-                                      style={{ display: "block" }}
-                                      data-testid={`img-entry-photo-${entry.id}`}
-                                    />
-                                    {(() => {
-                                      const pin = pinByEntryId.get(entry.id);
-                                      if (!pin) return null;
-                                      return (
-                                        <div
-                                          className="absolute pointer-events-none"
-                                          style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
-                                          data-testid={`pin-highlight-${entry.id}`}
-                                          ref={(el) => {
-                                            if (el && !el.dataset.scrolled) {
-                                              el.dataset.scrolled = "1";
-                                              setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
-                                            }
-                                          }}
-                                        >
-                                          <div className="w-24 h-24 rounded-full animate-pulse opacity-100" style={{ border: "12px solid #f97316" }} />
-                                          <div className="absolute inset-0 w-24 h-24 rounded-full border-2 border-white opacity-100" />
-                                        </div>
-                                      );
-                                    })()}
-                                  </div>
+                                  <EntryPhotoDialogContent
+                                    src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
+                                    entryId={entry.id}
+                                    pin={pinByEntryId.get(entry.id)}
+                                  />
                                 </div>
                               </DialogContent>
                             </Dialog>

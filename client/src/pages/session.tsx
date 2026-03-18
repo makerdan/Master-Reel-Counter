@@ -169,6 +169,8 @@ function SessionWorkspace({
   })();
   const [mode, setMode] = useState<string>(initialTab);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const [editPhotoLoaded, setEditPhotoLoaded] = useState(false);
+  useEffect(() => { setEditPhotoLoaded(false); }, [editingEntry?.id]);
   const [pinRefreshSignal, setPinRefreshSignal] = useState(0);
   const triggerPinRefresh = useCallback(() => setPinRefreshSignal((s) => s + 1), []);
   const [editSessionOpen, setEditSessionOpen] = useState(false);
@@ -867,8 +869,8 @@ function SessionWorkspace({
                   style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
                 >
                   <div className="relative inline-block w-full">
-                    <img src={imgSrc} alt="Entry photo" className="w-full" style={{ display: "block" }} data-testid="img-edit-entry-photo" />
-                    {pin && (
+                    <img src={imgSrc} alt="Entry photo" className="w-full" style={{ display: "block" }} data-testid="img-edit-entry-photo" onLoad={() => setEditPhotoLoaded(true)} />
+                    {editPhotoLoaded && pin && (
                       <div
                         className="absolute pointer-events-none"
                         style={{ left: `${pin.xPercent}%`, top: `${pin.yPercent}%`, transform: "translate(-50%, -50%)" }}
