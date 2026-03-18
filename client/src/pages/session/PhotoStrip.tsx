@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid } from "lucide-react";
+import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +75,7 @@ function PhotoCard({
   allPhotos,
   pins,
   onJumpToPhoto,
+  onLightbox,
   onClearUndoHistory,
 }: {
   photo: Photo;
@@ -83,6 +84,7 @@ function PhotoCard({
   allPhotos: Photo[];
   pins: Pin[];
   onJumpToPhoto: (id: number) => void;
+  onLightbox: (url: string, label: string) => void;
   onClearUndoHistory?: () => void;
 }) {
   const { toast } = useToast();
@@ -209,13 +211,21 @@ function PhotoCard({
         <img
           src={photoUrl(photo.objectStorageKey)}
           alt={`Photo ${photo.id}`}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover cursor-zoom-in"
           loading="lazy"
+          onClick={() => {
+            const label = [photo.aisle, photo.section].filter(Boolean).join(" / ") || `Photo #${photo.id}`;
+            onLightbox(photoUrl(photo.objectStorageKey), label);
+          }}
           onLoad={(e) => {
             const img = e.currentTarget;
             setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
           }}
+          data-testid={`img-strip-thumb-${photo.id}`}
         />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none flex items-center justify-center">
+          <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow pointer-events-none" />
+        </div>
         {pins.map((pin) => {
           let displayX = pin.xPercent;
           let displayY = pin.yPercent;
@@ -420,6 +430,44 @@ function PhotoCard({
   );
 }
 
+function Lightbox({ url, label, onClose }: { url: string; label: string; onClose: () => void }) {
+  const handleKey = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [handleKey]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90"
+      onClick={onClose}
+      data-testid="lightbox-overlay"
+    >
+      <div className="absolute top-3 right-3 flex items-center gap-2">
+        <span className="text-white/70 text-sm truncate max-w-[200px]">{label}</span>
+        <button
+          className="text-white/80 hover:text-white bg-black/40 rounded-full p-1.5 transition-colors"
+          onClick={onClose}
+          data-testid="button-lightbox-close"
+          title="Close (Esc)"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+      <img
+        src={url}
+        alt={label}
+        className="max-w-[95vw] max-h-[90vh] object-contain rounded shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        data-testid="img-lightbox-full"
+      />
+    </div>
+  );
+}
+
 export default function PhotoStrip({
   sessionId,
   canEdit,
@@ -431,6 +479,8 @@ export default function PhotoStrip({
   onJumpToPhoto: (photoId: number) => void;
   onClearUndoHistory?: () => void;
 }) {
+  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
+
   const { data: photos = [], isLoading } = useQuery<Photo[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "photos"],
     enabled: sessionId > 0,
@@ -544,6 +594,7 @@ export default function PhotoStrip({
                         allPhotos={photos}
                         pins={pinsByPhoto.get(photo.id) ?? []}
                         onJumpToPhoto={onJumpToPhoto}
+                        onLightbox={(url, label) => setLightbox({ url, label })}
                         onClearUndoHistory={onClearUndoHistory}
                       />
                     ))}
@@ -555,6 +606,13 @@ export default function PhotoStrip({
         );
       })}
 
+      {lightbox && (
+        <Lightbox
+          url={lightbox.url}
+          label={lightbox.label}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   );
 }
