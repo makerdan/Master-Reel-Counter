@@ -701,7 +701,7 @@ export default function ReviewTab({
           return (
             <div
               key={entry.id}
-              className="absolute w-2 h-2 rounded-full bg-primary/70 -translate-x-1/2 top-1/2 -translate-y-1/2 pointer-events-none"
+              className="absolute w-0.5 h-3 rounded-sm bg-primary/70 -translate-x-1/2 top-1/2 -translate-y-1/2 pointer-events-none"
               style={{ left: `${pct}%` }}
             />
           );
