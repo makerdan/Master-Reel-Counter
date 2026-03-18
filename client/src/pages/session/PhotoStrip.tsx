@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn } from "lucide-react";
+import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -430,10 +430,32 @@ function PhotoCard({
   );
 }
 
-function Lightbox({ url, label, onClose }: { url: string; label: string; onClose: () => void }) {
+type LightboxPhoto = { url: string; label: string };
+
+function Lightbox({
+  photos,
+  index,
+  onClose,
+  onNavigate,
+}: {
+  photos: LightboxPhoto[];
+  index: number;
+  onClose: () => void;
+  onNavigate: (i: number) => void;
+}) {
+  const total = photos.length;
+  const current = photos[index];
+  const hasPrev = index > 0;
+  const hasNext = index < total - 1;
+
+  const prev = useCallback(() => { if (hasPrev) onNavigate(index - 1); }, [hasPrev, index, onNavigate]);
+  const next = useCallback(() => { if (hasNext) onNavigate(index + 1); }, [hasNext, index, onNavigate]);
+
   const handleKey = useCallback((e: KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-  }, [onClose]);
+    if (e.key === "Escape") { onClose(); return; }
+    if (e.key === "ArrowLeft") { prev(); return; }
+    if (e.key === "ArrowRight") { next(); }
+  }, [onClose, prev, next]);
 
   useEffect(() => {
     document.addEventListener("keydown", handleKey);
@@ -447,7 +469,7 @@ function Lightbox({ url, label, onClose }: { url: string; label: string; onClose
       data-testid="lightbox-overlay"
     >
       <div className="absolute top-3 right-3 flex items-center gap-2">
-        <span className="text-white/70 text-sm truncate max-w-[200px]">{label}</span>
+        <span className="text-white/70 text-sm truncate max-w-[200px]">{current.label}</span>
         <button
           className="text-white/80 hover:text-white bg-black/40 rounded-full p-1.5 transition-colors"
           onClick={onClose}
@@ -457,13 +479,49 @@ function Lightbox({ url, label, onClose }: { url: string; label: string; onClose
           <X className="h-5 w-5" />
         </button>
       </div>
+
+      {hasPrev && (
+        <button
+          className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white bg-black/40 hover:bg-black/70 rounded-full p-2 transition-colors"
+          onClick={(e) => { e.stopPropagation(); prev(); }}
+          data-testid="button-lightbox-prev"
+          title="Previous (←)"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+      )}
+
       <img
-        src={url}
-        alt={label}
-        className="max-w-[95vw] max-h-[90vh] object-contain rounded shadow-2xl"
+        src={current.url}
+        alt={current.label}
+        className="max-w-[85vw] max-h-[88vh] object-contain rounded shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         data-testid="img-lightbox-full"
       />
+
+      {hasNext && (
+        <button
+          className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white bg-black/40 hover:bg-black/70 rounded-full p-2 transition-colors"
+          onClick={(e) => { e.stopPropagation(); next(); }}
+          data-testid="button-lightbox-next"
+          title="Next (→)"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+      )}
+
+      {total > 1 && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {photos.map((_, i) => (
+            <button
+              key={i}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === index ? "bg-white" : "bg-white/30 hover:bg-white/60"}`}
+              onClick={(e) => { e.stopPropagation(); onNavigate(i); }}
+              data-testid={`button-lightbox-dot-${i}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -479,7 +537,7 @@ export default function PhotoStrip({
   onJumpToPhoto: (photoId: number) => void;
   onClearUndoHistory?: () => void;
 }) {
-  const [lightbox, setLightbox] = useState<{ url: string; label: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ photos: LightboxPhoto[]; index: number } | null>(null);
 
   const { data: photos = [], isLoading } = useQuery<Photo[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "photos"],
@@ -594,7 +652,14 @@ export default function PhotoStrip({
                         allPhotos={photos}
                         pins={pinsByPhoto.get(photo.id) ?? []}
                         onJumpToPhoto={onJumpToPhoto}
-                        onLightbox={(url, label) => setLightbox({ url, label })}
+                        onLightbox={() => {
+                          const sectionPhotos: LightboxPhoto[] = sectionGroup.photos.map(p => ({
+                            url: photoUrl(p.objectStorageKey),
+                            label: [p.aisle, p.section].filter(Boolean).join(" / ") || `Photo #${p.id}`,
+                          }));
+                          const idx = sectionGroup.photos.findIndex(p => p.id === photo.id);
+                          setLightbox({ photos: sectionPhotos, index: idx >= 0 ? idx : 0 });
+                        }}
                         onClearUndoHistory={onClearUndoHistory}
                       />
                     ))}
@@ -608,9 +673,10 @@ export default function PhotoStrip({
 
       {lightbox && (
         <Lightbox
-          url={lightbox.url}
-          label={lightbox.label}
+          photos={lightbox.photos}
+          index={lightbox.index}
           onClose={() => setLightbox(null)}
+          onNavigate={(i) => setLightbox((prev) => prev ? { ...prev, index: i } : null)}
         />
       )}
     </div>
