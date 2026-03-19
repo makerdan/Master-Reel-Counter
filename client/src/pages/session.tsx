@@ -825,7 +825,7 @@ function SessionWorkspace({
           </div>
         )}
 
-        {mobileFlowDetailParentPhotoId == null && (
+        {!captureMode && mobileFlowDetailParentPhotoId == null && (
           <>
             <Separator />
 

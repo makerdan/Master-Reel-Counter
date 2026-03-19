@@ -368,7 +368,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   }, [aisle, section]);
 
   return (
-    <div className="space-y-4 bg-red-500/[0.07] dark:bg-red-900/[0.15] rounded-xl -mx-1 px-1 pt-2 pb-2">
+    <div className="space-y-4 bg-[hsl(18_90%_93%)] dark:bg-[hsl(18_55%_9%)] rounded-xl -mx-1 px-1 pt-2 pb-2">
       <div className="flex items-center justify-center gap-2 px-1" data-testid="header-mobile-flow">
         <Smartphone className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold underline">Mobile Flow</h2>
