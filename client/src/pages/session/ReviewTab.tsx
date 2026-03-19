@@ -960,6 +960,7 @@ export default function ReviewTab({
           onClick={() => setCurrentIndex(i => Math.max(0, i - 1))}
           disabled={currentIndex === 0}
           data-testid="button-review-prev"
+          className="border-primary text-primary"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
           Previous
@@ -969,6 +970,7 @@ export default function ReviewTab({
           onClick={() => setCurrentIndex(i => Math.min(assignedEntries.length - 1, i + 1))}
           disabled={currentIndex >= assignedEntries.length - 1}
           data-testid="button-review-next"
+          className="border-primary text-primary"
         >
           Next
           <ChevronRight className="h-4 w-4 ml-1" />
