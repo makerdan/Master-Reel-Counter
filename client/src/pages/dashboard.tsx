@@ -1031,19 +1031,19 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background dashboard-theme">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="relative flex items-center justify-between gap-2 px-4 py-3 max-w-5xl mx-auto">
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-sm font-semibold tracking-wide text-black dark:text-white underline" data-testid="text-app-title">
-              Master Reel Counter
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Cable className="h-5 w-5 text-primary" />
-            <span className="font-semibold text-sm" data-testid="text-user-name">
+        <div className="flex items-center gap-2 px-4 py-3 max-w-5xl mx-auto">
+          <div className="flex items-center gap-2 shrink-0 min-w-0">
+            <Cable className="h-5 w-5 text-primary shrink-0" />
+            <span className="font-semibold text-sm truncate max-w-[80px] sm:max-w-none" data-testid="text-user-name">
               {user?.firstName || "User"}
             </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex-1 flex items-center justify-center min-w-0 pointer-events-none">
+            <span className="text-sm font-semibold tracking-wide text-black dark:text-white underline truncate" data-testid="text-app-title">
+              Master Reel Counter
+            </span>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
             <ThemeToggle />
             <HelpMenu mode="dashboard" />
             <Tooltip>

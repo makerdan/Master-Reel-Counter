@@ -181,22 +181,41 @@ export default function TeamDialog({
             </DialogTitle>
           </DialogHeader>
 
-          {onlineUsers.length > 0 && (
-            <div className="flex items-center gap-2 px-1 py-1.5 rounded-md bg-muted/50" data-testid="online-users-section">
-              <span className="text-xs text-muted-foreground font-medium shrink-0">Online:</span>
-              <div className="flex items-center gap-1 flex-wrap">
-                {onlineUsers.map((u) => (
-                  <div key={u.userId} className="flex items-center gap-1 text-xs" data-testid={`online-user-${u.userId}`}>
-                    <div className="relative w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[9px] font-bold uppercase border border-background">
-                      {u.username.charAt(0)}
-                      <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 border border-background" />
-                    </div>
-                    <span className="text-foreground">{u.username}</span>
-                  </div>
-                ))}
+          {(() => {
+            const onlineSet = new Set(onlineUsers.map((u) => u.userId));
+            const ownerUserId = collaboratorsData?.owner?.userId;
+            const roleMap = new Map<string, string>();
+            if (ownerUserId) roleMap.set(ownerUserId, "owner");
+            collaborators.forEach((c) => roleMap.set(c.userId, c.role));
+            const allMembers = [
+              ...(ownerUserId ? [{ userId: ownerUserId, username: onlineUsers.find(u => u.userId === ownerUserId)?.username || (ownerUserId === collaboratorsData?.owner?.userId ? "Owner" : ownerUserId), role: "owner" }] : []),
+              ...collaborators.map((c) => ({ userId: c.userId, username: c.username || c.userId, role: c.role })),
+            ];
+            const uniqueMembers = Array.from(new Map(allMembers.map(m => [m.userId, m])).values());
+            const onlineMembers = onlineUsers.filter(u => !uniqueMembers.find(m => m.userId === u.userId));
+            const displayList = [
+              ...uniqueMembers,
+              ...onlineMembers.map(u => ({ userId: u.userId, username: u.username, role: roleMap.get(u.userId) || "viewer" })),
+            ];
+            if (displayList.length === 0) return null;
+            return (
+              <div className="border border-border rounded-md px-3 py-2 space-y-1.5" data-testid="online-users-section">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Who's Online</p>
+                <div className="flex flex-wrap gap-2">
+                  {displayList.map((m) => {
+                    const isOnline = onlineSet.has(m.userId);
+                    return (
+                      <div key={m.userId} className={`flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border ${isOnline ? "border-green-500/40 bg-green-500/10" : "border-border bg-muted/40 opacity-60"}`} data-testid={`online-user-${m.userId}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOnline ? "bg-green-500" : "bg-muted-foreground/40"}`} />
+                        <span className="font-medium">{m.username}</span>
+                        <span className="text-muted-foreground capitalize">{m.role}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <Tabs defaultValue="username" className="w-full">
             <TabsList className="w-full" data-testid="tabs-invite-method">

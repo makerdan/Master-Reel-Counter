@@ -1326,8 +1326,8 @@ export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" |
       <Tooltip>
         <TooltipTrigger asChild>
           <SheetTrigger asChild>
-            <Button size="icon" variant="ghost" data-testid="button-help-menu">
-              <HelpCircle className="h-4 w-4" />
+            <Button size="icon" variant="ghost" data-testid="button-help-menu" className="h-10 w-10">
+              <HelpCircle className="h-8 w-8" />
             </Button>
           </SheetTrigger>
         </TooltipTrigger>

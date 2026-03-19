@@ -368,7 +368,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   }, [aisle, section]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-red-500/[0.07] dark:bg-red-900/[0.15] rounded-xl -mx-1 px-1 pt-2 pb-2">
       <div className="flex items-center justify-center gap-2 px-1" data-testid="header-mobile-flow">
         <Smartphone className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold underline">Mobile Flow</h2>
@@ -503,7 +503,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 value={aisle}
                 onChange={(e) => setAisle(e.target.value)}
 
-                className={!aisle.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
+                className="border-red-500"
                 disabled={isReceiving}
                 tabIndex={1}
                 enterKeyHint="next"
@@ -575,7 +575,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
 
-                className={!isReceiving && !section.trim() ? "border-[hsl(18_85%_40%/0.5)] ring-1 ring-[hsl(18_85%_40%/0.3)]" : ""}
+                className={isReceiving ? "" : "border-red-500"}
                 tabIndex={2}
                 enterKeyHint="done"
                 data-testid="input-mobile-section"
