@@ -17,7 +17,7 @@ interface TallyRow {
   vendorCode: string;
   totalReels: number;
   totalFootage: number;
-  locations: { aisle: string; section: string; reelCount: number; footage: number | null }[];
+  locations: { aisle: string; section: string; reelCount: number; footage: number | null; pinLabel?: string }[];
 }
 
 interface InventoryRow {
@@ -99,7 +99,7 @@ function LocationList({ locations, currentUnit }: {
             return secA.localeCompare(secB);
           }).map((loc, i) => (
             <li key={i} className="text-xs text-muted-foreground font-mono">
-              Aisle {loc.aisle} / Sec {loc.section}
+              {loc.pinLabel ? `${loc.pinLabel} — ` : ""}Aisle {loc.aisle} / Sec {loc.section}
               {loc.reelCount > 1 ? ` ×${loc.reelCount}` : ""}
               {loc.footage != null ? ` — ${toDisplayUnit(loc.footage, currentUnit).toLocaleString()} ${uLabel}` : ""}
             </li>
@@ -231,7 +231,8 @@ export default function FinalResultsTab({
       const row = map.get(key)!;
       row.totalReels += reelCount;
       row.totalFootage += (footage != null ? footage * reelCount : 0);
-      row.locations.push({ aisle, section, reelCount, footage });
+      const pinLabel = category === "(uncategorized)" && pin.label ? `Pin ${pin.label}` : undefined;
+      row.locations.push({ aisle, section, reelCount, footage, ...(pinLabel !== undefined ? { pinLabel } : {}) });
     }
 
     return Array.from(map.values()).sort((a, b) => {
