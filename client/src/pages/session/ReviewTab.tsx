@@ -662,6 +662,7 @@ export default function ReviewTab({
 
   return (
     <div className="space-y-4" data-testid="review-tab-container">
+      <h2 className="text-lg font-bold underline text-center" data-testid="heading-review">Review</h2>
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">

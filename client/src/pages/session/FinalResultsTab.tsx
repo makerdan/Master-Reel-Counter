@@ -17,7 +17,7 @@ interface TallyRow {
   vendorCode: string;
   totalReels: number;
   totalFootage: number;
-  locations: { aisle: string; section: string; reelCount: number; footage: number | null; pinLabel?: string }[];
+  locations: { aisle: string; section: string; reelCount: number; footage: number | null; pinLabel?: string; photoId?: number; pinId?: number }[];
 }
 
 interface InventoryRow {
@@ -70,9 +70,10 @@ function parseInventorySheet(rows: any[][]): InventoryRow[] {
 
 // ─── LocationList (collapsible) ──────────────────────────────────────────────
 
-function LocationList({ locations, currentUnit }: {
+function LocationList({ locations, currentUnit, onPinClick }: {
   locations: TallyRow["locations"];
   currentUnit: UnitType;
+  onPinClick?: (photoId: number, pinId: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const uLabel = unitLabel(currentUnit);
@@ -97,13 +98,25 @@ function LocationList({ locations, currentUnit }: {
             const secA = isNaN(Number(a.section)) ? a.section : String(Number(a.section)).padStart(10, "0");
             const secB = isNaN(Number(b.section)) ? b.section : String(Number(b.section)).padStart(10, "0");
             return secA.localeCompare(secB);
-          }).map((loc, i) => (
-            <li key={i} className="text-xs text-muted-foreground font-mono">
-              {loc.pinLabel ? `${loc.pinLabel} — ` : ""}Aisle {loc.aisle} / Sec {loc.section}
-              {loc.reelCount > 1 ? ` ×${loc.reelCount}` : ""}
-              {loc.footage != null ? ` — ${toDisplayUnit(loc.footage, currentUnit).toLocaleString()} ${uLabel}` : ""}
-            </li>
-          ))}
+          }).map((loc, i) => {
+            const label = `${loc.pinLabel ? `${loc.pinLabel} — ` : ""}Aisle ${loc.aisle} / Sec ${loc.section}${loc.reelCount > 1 ? ` ×${loc.reelCount}` : ""}${loc.footage != null ? ` — ${toDisplayUnit(loc.footage, currentUnit).toLocaleString()} ${uLabel}` : ""}`;
+            const canLink = onPinClick && loc.photoId != null && loc.pinId != null;
+            return (
+              <li key={i} className="text-xs font-mono">
+                {canLink ? (
+                  <button
+                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-left"
+                    onClick={() => onPinClick!(loc.photoId!, loc.pinId!)}
+                    data-testid={`link-uncategorized-location-${i}`}
+                  >
+                    {label}
+                  </button>
+                ) : (
+                  <span className="text-muted-foreground">{label}</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -178,11 +191,12 @@ function DropZone({ onFile }: { onFile: (file: File) => void }) {
 // ─── FinalResultsTab ─────────────────────────────────────────────────────────
 
 export default function FinalResultsTab({
-  sessionId, entries, photos,
+  sessionId, entries, photos, onJumpToPin,
 }: {
   sessionId: number;
   entries: Entry[];
   photos: Photo[];
+  onJumpToPin?: (photoId: number, pinId: number) => void;
 }) {
   const { toast } = useToast();
 
@@ -232,7 +246,8 @@ export default function FinalResultsTab({
       row.totalReels += reelCount;
       row.totalFootage += (footage != null ? footage * reelCount : 0);
       const pinLabel = category === "(uncategorized)" && pin.label ? `Pin ${pin.label}` : undefined;
-      row.locations.push({ aisle, section, reelCount, footage, ...(pinLabel !== undefined ? { pinLabel } : {}) });
+      const locExtra = category === "(uncategorized)" ? { photoId: pin.photoId, pinId: pin.id } : {};
+      row.locations.push({ aisle, section, reelCount, footage, ...(pinLabel !== undefined ? { pinLabel } : {}), ...locExtra });
     }
 
     return Array.from(map.values()).sort((a, b) => {
@@ -337,22 +352,23 @@ export default function FinalResultsTab({
 
   return (
     <div className="p-3 sm:p-4 space-y-6" data-testid="final-results-tab">
+      <h2 className="text-lg font-bold underline text-center" data-testid="heading-final-results">Final Results</h2>
 
       {/* ── Review Status Banner ─────────────────────────────────────────── */}
       {reviewStats.total > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-md border border-[hsl(25_20%_28%)] bg-[hsl(25_12%_15%)] px-4 py-2.5" data-testid="final-results-review-banner">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-sm text-muted-foreground">Not yet reviewed:</span>
+            <CheckCircle2 className="h-4 w-4 text-white/70 shrink-0" />
+            <span className="text-sm text-white">Not yet reviewed:</span>
             <span className={`text-sm font-semibold tabular-nums ${reviewStats.notReviewed > 0 ? "text-amber-400" : "text-green-400"}`} data-testid="stat-not-reviewed">
               {reviewStats.notReviewed}
             </span>
-            <span className="text-sm text-muted-foreground">/ {reviewStats.total}</span>
+            <span className="text-sm text-white/80">/ {reviewStats.total}</span>
           </div>
           <div className="w-px h-4 bg-[hsl(25_20%_28%)] hidden sm:block" />
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-sm text-muted-foreground">Still flagged:</span>
+            <AlertTriangle className="h-4 w-4 text-white/70 shrink-0" />
+            <span className="text-sm text-white">Still flagged:</span>
             <span className={`text-sm font-semibold tabular-nums ${reviewStats.flagged > 0 ? "text-red-400" : "text-green-400"}`} data-testid="stat-flagged">
               {reviewStats.flagged}
             </span>
@@ -429,7 +445,11 @@ export default function FinalResultsTab({
                     )}
                     <td className="p-2">
                       {row.locations.length > 0 ? (
-                        <LocationList locations={row.locations} currentUnit={currentUnit} />
+                        <LocationList
+                          locations={row.locations}
+                          currentUnit={currentUnit}
+                          onPinClick={row.category === "(uncategorized)" ? onJumpToPin : undefined}
+                        />
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
