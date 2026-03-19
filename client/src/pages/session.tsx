@@ -83,6 +83,7 @@ export default function SessionPage() {
     companyName: string | null;
     exportFooterText: string | null;
     defaultUnit: string;
+    testerPassword: string | null;
   }>({
     queryKey: ["/api/settings"],
   });
@@ -153,7 +154,7 @@ function SessionWorkspace({
   entriesLoading: boolean;
   photos: Photo[];
   sessionId: number;
-  userSettings?: { defaultExportFormat: string; companyName: string | null; exportFooterText: string | null; defaultUnit: string };
+  userSettings?: { defaultExportFormat: string; companyName: string | null; exportFooterText: string | null; defaultUnit: string; testerPassword?: string | null };
 }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -977,6 +978,7 @@ function SessionWorkspace({
         sessionName={session.name}
         isOwner={(session as any).role === "owner"}
         onlineUsers={onlineUsers}
+        hasTesterPassword={userSettings?.testerPassword === "********"}
       />
 
       <AlertDialog open={exportWarningOpen} onOpenChange={(open) => { setExportWarningOpen(open); if (!open) setPendingExportType(null); }}>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Cable, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,25 @@ export default function TesterLoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const search = useSearch();
+  const displayNameRef = useRef<HTMLInputElement>(null);
+
+  const prefillPassword = (() => {
+    try {
+      const params = new URLSearchParams(search);
+      return params.get("pw") || "";
+    } catch { return ""; }
+  })();
+
   const [displayName, setDisplayName] = useState("");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(prefillPassword);
+
+  useEffect(() => {
+    if (prefillPassword) {
+      window.history.replaceState({}, "", window.location.pathname);
+      displayNameRef.current?.focus();
+    }
+  }, []);
 
   const loginMutation = useMutation({
     mutationFn: async () => {
@@ -67,6 +84,7 @@ export default function TesterLoginPage() {
               <Label htmlFor="displayName">Your Name</Label>
               <Input
                 id="displayName"
+                ref={displayNameRef}
                 data-testid="input-display-name"
                 placeholder="e.g. John"
                 value={displayName}

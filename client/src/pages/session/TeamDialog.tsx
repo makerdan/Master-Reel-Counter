@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  Users, Copy, Link, Mail, UserPlus, UserMinus, X, Loader2, Clock, ArrowRightLeft,
+  Users, Copy, Link, Mail, UserPlus, UserMinus, X, Loader2, Clock, ArrowRightLeft, Eye, EyeOff, KeyRound,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -27,7 +27,7 @@ import type { Collaborator, InviteLink } from "@shared/schema";
 type OnlineUser = { userId: string; username: string };
 
 export default function TeamDialog({
-  open, onOpenChange, sessionId, sessionName, isOwner, onlineUsers = [],
+  open, onOpenChange, sessionId, sessionName, isOwner, onlineUsers = [], hasTesterPassword = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,11 +35,14 @@ export default function TeamDialog({
   sessionName: string;
   isOwner: boolean;
   onlineUsers?: OnlineUser[];
+  hasTesterPassword?: boolean;
 }) {
   const { toast } = useToast();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [transferTarget, setTransferTarget] = useState<{ id: number; username: string } | null>(null);
+  const [testerLinkPassword, setTesterLinkPassword] = useState("");
+  const [showTesterLinkPassword, setShowTesterLinkPassword] = useState(false);
 
   const { data: collaboratorsData } = useQuery<{ collaborators: Collaborator[]; owner: { userId: string } }>({
     queryKey: ["/api/sessions", sessionId.toString(), "collaborators"],
@@ -231,6 +234,12 @@ export default function TeamDialog({
                 <Mail className="h-3 w-3 mr-1" />
                 Email
               </TabsTrigger>
+              {isOwner && (
+                <TabsTrigger value="testerlink" className="flex-1 border border-white/20" data-testid="tab-tester-link">
+                  <KeyRound className="h-3 w-3 mr-1" />
+                  Tester Link
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="username" className="space-y-3 mt-3">
@@ -347,6 +356,55 @@ export default function TeamDialog({
                 </Button>
               </form>
             </TabsContent>
+
+            {isOwner && (
+              <TabsContent value="testerlink" className="space-y-3 mt-3">
+                <p className="text-xs text-muted-foreground">
+                  Generate a link that pre-fills the tester password. Recipients only need to enter their display name to sign in.
+                </p>
+                {!hasTesterPassword ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400" data-testid="text-no-tester-password-warning">
+                    No tester password is set. Go to Settings to set one first.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="relative flex items-center">
+                      <Input
+                        type={showTesterLinkPassword ? "text" : "password"}
+                        placeholder="Enter your tester password"
+                        value={testerLinkPassword}
+                        onChange={(e) => setTesterLinkPassword(e.target.value)}
+                        className="pr-9"
+                        data-testid="input-tester-link-password"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-2 text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowTesterLinkPassword((v) => !v)}
+                        tabIndex={-1}
+                        data-testid="button-toggle-tester-link-password-visibility"
+                      >
+                        {showTesterLinkPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="[border-color:hsl(var(--input))]"
+                      disabled={!testerLinkPassword.trim()}
+                      onClick={() => {
+                        const url = `${window.location.origin}/tester-login?pw=${encodeURIComponent(testerLinkPassword)}`;
+                        copyToClipboard(url);
+                      }}
+                      data-testid="button-copy-tester-link"
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Tester Link
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+            )}
           </Tabs>
 
           {collaborators.length > 0 && (
