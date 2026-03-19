@@ -627,7 +627,7 @@ function SessionWorkspace({
             )}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); window.scrollTo({ top: 0, behavior: "instant" }); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" className="!border-blue-600 !bg-blue-600 !text-white hover:!bg-blue-700 hover:!border-blue-700">
+                <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); window.scrollTo({ top: 0, behavior: "instant" }); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" className="!border-red-600 !bg-red-600/80 !text-white hover:!bg-red-700 hover:!border-red-700">
                   {captureMode ? <Monitor className="h-4 w-4 sm:mr-1" /> : <TabletSmartphone className="h-4 w-4 sm:mr-1" />}
                   <span className="hidden sm:inline">{captureMode ? "Reel IDs" : "Mobile Flow"}</span>
                 </Button>
