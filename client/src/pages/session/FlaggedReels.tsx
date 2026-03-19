@@ -665,7 +665,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       size="sm"
                       onClick={() => onViewInPhoto(group.photoId, group.pins[0]?.pinId)}
                       data-testid={`button-view-in-photo-group-${group.photoId}`}
-                      title="Go to this photo in Section Photo"
+                      title="Go to this photo in Reel IDs"
                     >
                       <ScanSearch className="h-4 w-4 sm:mr-1" />
                       <span className="sm:hidden text-xs">Go To Photo</span>

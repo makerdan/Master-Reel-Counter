@@ -10,6 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -350,6 +353,8 @@ export default function LabelScannerTab({
   }, [selectedPhotoId]);
 
   const [useCachedResults, setUseCachedResults] = useState(true);
+  const [flagPopoverPinId, setFlagPopoverPinId] = useState<number | null>(null);
+  const [flagReasonDraft, setFlagReasonDraft] = useState("");
   const currentPhotoId = selectedPhotoId;
   const photo = photos.find((p) => p.id === currentPhotoId) ?? null;
   const photoUrl = photo?.objectStorageKey
@@ -832,22 +837,25 @@ export default function LabelScannerTab({
   const allChecked = displayCards.length > 0 && displayCards.every((c) => c.included);
   const someChecked = displayCards.some((c) => c.included);
 
-  const toggleFlag = useCallback(async (pinId: number) => {
+  const toggleFlag = useCallback(async (pinId: number, reason?: string) => {
     const card = cards.find((c) => c.pin.id === pinId);
     if (!card) return;
     const newFlagged = !card.pin.flagged;
     setCards((prev) =>
-      prev.map((c) => (c.pin.id === pinId ? { ...c, pin: { ...c.pin, flagged: newFlagged } } : c))
+      prev.map((c) => (c.pin.id === pinId ? { ...c, pin: { ...c.pin, flagged: newFlagged, flagReason: newFlagged && reason ? reason : c.pin.flagReason } } : c))
     );
     try {
-      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: newFlagged });
+      const body: Record<string, unknown> = { flagged: newFlagged };
+      if (newFlagged && reason) body.flagReason = reason;
+      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, body);
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
+      onPinDataChanged?.();
     } catch {
       setCards((prev) =>
         prev.map((c) => (c.pin.id === pinId ? { ...c, pin: { ...c.pin, flagged: !newFlagged } } : c))
       );
     }
-  }, [cards, sessionId]);
+  }, [cards, sessionId, onPinDataChanged]);
 
   function sortCardsByCatalog(cardsToSort: PinCard[]): PinCard[] {
     const freq = new Map<string, number>();
@@ -1160,7 +1168,7 @@ export default function LabelScannerTab({
         {photoSelector}
         <div className="p-6 text-center text-muted-foreground">
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p>{photos.length > 0 ? "All photos have been fully scanned and applied." : "No photos in this session yet. Upload photos in the Section Photo tab first."}</p>
+          <p>{photos.length > 0 ? "All photos have been fully scanned and applied." : "No photos in this session yet. Upload photos in the Reel IDs tab first."}</p>
         </div>
       </div>
     );
@@ -1198,7 +1206,7 @@ export default function LabelScannerTab({
         {photoSelector}
         <div className="p-6 text-center text-muted-foreground">
           <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p>No active pins on this photo. Place pins in the Section Photo tab to use the AI scanner.</p>
+          <p>No active pins on this photo. Place pins in the Reel IDs tab to use the AI scanner.</p>
           {next && (
             <Button
               size="sm"
@@ -1471,18 +1479,56 @@ export default function LabelScannerTab({
                             <span className={`font-mono font-bold text-white ${isBatch ? "text-xs" : "text-sm"}`}>
                               {card.pin.label || `#${card.pin.id}`}
                             </span>
-                            <button
-                              onClick={() => toggleFlag(card.pin.id)}
-                              className={`p-0.5 rounded transition-colors ${
-                                card.pin.flagged
-                                  ? "text-amber-400 hover:text-amber-300"
-                                  : "text-white/20 hover:text-white/40"
-                              }`}
-                              title={card.pin.flagged ? "Remove flag" : "Flag for review"}
-                              data-testid={`btn-flag-${card.pin.id}`}
-                            >
-                              <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"} ${card.pin.flagged ? "fill-amber-400" : ""}`} />
-                            </button>
+                            {card.pin.flagged ? (
+                              <button
+                                onClick={() => toggleFlag(card.pin.id)}
+                                className="p-0.5 rounded transition-colors text-amber-400 hover:text-amber-300"
+                                title="Remove flag"
+                                data-testid={`btn-flag-${card.pin.id}`}
+                              >
+                                <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"} fill-amber-400`} />
+                              </button>
+                            ) : (
+                              <Popover
+                                open={flagPopoverPinId === card.pin.id}
+                                onOpenChange={(open) => {
+                                  if (open) { setFlagPopoverPinId(card.pin.id); setFlagReasonDraft(""); }
+                                  else setFlagPopoverPinId(null);
+                                }}
+                              >
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="p-0.5 rounded transition-colors text-white/20 hover:text-white/40"
+                                    title="Flag for re-shoot"
+                                    data-testid={`btn-flag-${card.pin.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"}`} />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-3 space-y-2" onClick={(e) => e.stopPropagation()} data-testid={`popover-flag-${card.pin.id}`}>
+                                  <p className="text-xs font-medium">Flag for re-shoot</p>
+                                  <Input
+                                    placeholder="Reason (optional)"
+                                    value={flagReasonDraft}
+                                    onChange={(e) => setFlagReasonDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") { toggleFlag(card.pin.id, flagReasonDraft.trim() || undefined); setFlagPopoverPinId(null); }
+                                    }}
+                                    autoFocus
+                                    data-testid={`input-flag-reason-${card.pin.id}`}
+                                  />
+                                  <div className="flex justify-end gap-1">
+                                    <Button size="sm" variant="ghost" onClick={() => setFlagPopoverPinId(null)}>Cancel</Button>
+                                    <Button size="sm" onClick={() => { toggleFlag(card.pin.id, flagReasonDraft.trim() || undefined); setFlagPopoverPinId(null); }} data-testid={`btn-flag-confirm-${card.pin.id}`}>
+                                      <Flag className="h-3.5 w-3.5 mr-1" />
+                                      Flag
+                                    </Button>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            )}
                             {isBatch && batchPhotoObj && (
                               <Badge className="text-[9px] bg-[hsl(25_30%_25%)] text-white/50 border-[hsl(18_30%_30%/0.3)] py-0 px-1" data-testid={`badge-batch-source-${card.pin.id}`}>
                                 {batchPhotoObj.aisle || "?"}{batchPhotoObj.section ? `/${batchPhotoObj.section}` : ""}
@@ -1665,18 +1711,56 @@ export default function LabelScannerTab({
                   <span className={`font-mono font-bold text-white ${isBatch ? "text-xs" : "text-sm"}`}>
                     {card.pin.label || `#${card.pin.id}`}
                   </span>
-                  <button
-                    onClick={() => toggleFlag(card.pin.id)}
-                    className={`p-0.5 rounded transition-colors ${
-                      card.pin.flagged
-                        ? "text-amber-400 hover:text-amber-300"
-                        : "text-white/20 hover:text-white/40"
-                    }`}
-                    title={card.pin.flagged ? "Remove flag" : "Flag for review"}
-                    data-testid={`btn-flag-${card.pin.id}`}
-                  >
-                    <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"} ${card.pin.flagged ? "fill-amber-400" : ""}`} />
-                  </button>
+                  {card.pin.flagged ? (
+                    <button
+                      onClick={() => toggleFlag(card.pin.id)}
+                      className="p-0.5 rounded transition-colors text-amber-400 hover:text-amber-300"
+                      title="Remove flag"
+                      data-testid={`btn-flag-${card.pin.id}`}
+                    >
+                      <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"} fill-amber-400`} />
+                    </button>
+                  ) : (
+                    <Popover
+                      open={flagPopoverPinId === card.pin.id}
+                      onOpenChange={(open) => {
+                        if (open) { setFlagPopoverPinId(card.pin.id); setFlagReasonDraft(""); }
+                        else setFlagPopoverPinId(null);
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="p-0.5 rounded transition-colors text-white/20 hover:text-white/40"
+                          title="Flag for re-shoot"
+                          data-testid={`btn-flag-${card.pin.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"}`} />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-3 space-y-2" onClick={(e) => e.stopPropagation()} data-testid={`popover-flag-${card.pin.id}`}>
+                        <p className="text-xs font-medium">Flag for re-shoot</p>
+                        <Input
+                          placeholder="Reason (optional)"
+                          value={flagReasonDraft}
+                          onChange={(e) => setFlagReasonDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { toggleFlag(card.pin.id, flagReasonDraft.trim() || undefined); setFlagPopoverPinId(null); }
+                          }}
+                          autoFocus
+                          data-testid={`input-flag-reason-${card.pin.id}`}
+                        />
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => setFlagPopoverPinId(null)}>Cancel</Button>
+                          <Button size="sm" onClick={() => { toggleFlag(card.pin.id, flagReasonDraft.trim() || undefined); setFlagPopoverPinId(null); }} data-testid={`btn-flag-confirm-${card.pin.id}`}>
+                            <Flag className="h-3.5 w-3.5 mr-1" />
+                            Flag
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   {!isBatch && card.isDraft && (
                     <Badge className="text-[10px] bg-blue-900/50 text-blue-300 border-blue-700/40" data-testid={`badge-draft-${card.pin.id}`}>
                       Draft

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
   ArrowLeft, ArrowUp, Camera, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Trash2, LayoutGrid, ScanLine, X, ClipboardCheck, BarChart2,
+  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, Smartphone, Monitor, Trash2, LayoutGrid, X, ClipboardCheck, BarChart2,
 } from "lucide-react";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
@@ -40,7 +40,6 @@ import MobileCaptureView from "./session/MobileCaptureView";
 import ActivityLog from "./session/ActivityLog";
 import FlaggedReels from "./session/FlaggedReels";
 import PhotoStrip from "./session/PhotoStrip";
-import LabelScannerTab from "./session/LabelScannerTab";
 import ReviewTab from "./session/ReviewTab";
 import FinalResultsTab from "./session/FinalResultsTab";
 import HelpMenu from "@/components/HelpMenu";
@@ -164,9 +163,16 @@ function SessionWorkspace({
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
       if (tab === "single") return "photo";
-      if (tab && ["photo", "flagged", "scanner", "strip", "review", "results"].includes(tab)) return tab;
+      if (tab === "scanner") return "photo";
+      if (tab && ["photo", "flagged", "strip", "review", "results"].includes(tab)) return tab;
     } catch {}
     return "strip";
+  })();
+  const initialScanPanelOpen = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("tab") === "scanner";
+    } catch { return false; }
   })();
   const [mode, setMode] = useState<string>(initialTab);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
@@ -623,10 +629,10 @@ function SessionWorkspace({
               <TooltipTrigger asChild>
                 <Button size="sm" variant="outline" onClick={() => { if (!captureMode) { setMobileFlowKey(k => k + 1); } setCaptureMode(!captureMode); }} data-testid="button-toggle-mobile" className={`!border-[hsl(18_60%_30%)] ${captureMode ? "bg-[hsl(18_85%_32%/0.2)] sm:bg-transparent" : ""}`}>
                   {captureMode ? <Monitor className="h-4 w-4 sm:mr-1" /> : <Smartphone className="h-4 w-4 sm:mr-1" />}
-                  <span className="hidden sm:inline">{captureMode ? "Section Photo" : "Mobile Flow"}</span>
+                  <span className="hidden sm:inline">{captureMode ? "Reel IDs" : "Mobile Flow"}</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{captureMode ? "Switch to Section Photo" : "Switch to mobile capture mode"}</TooltipContent>
+              <TooltipContent>{captureMode ? "Switch to Reel IDs" : "Switch to mobile capture mode"}</TooltipContent>
             </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -722,9 +728,6 @@ function SessionWorkspace({
                 setNavigateAisle("");
                 setNavigateSection("");
               }
-              if (newMode === "scanner" && lastPhotoModePhotoIdRef.current) {
-                syncedPhotoIdRef.current = lastPhotoModePhotoIdRef.current;
-              }
               setMode(newMode);
             }}>
               <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
@@ -732,13 +735,9 @@ function SessionWorkspace({
                   <LayoutGrid className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Photos Reel</span>
                 </TabsTrigger>
-                <TabsTrigger value="photo" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Section Photo">
+                <TabsTrigger value="photo" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Reel IDs">
                   <Camera className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Section Photo</span>
-                </TabsTrigger>
-                <TabsTrigger value="scanner" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(280_60%_35%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-scanner-mode" aria-label="AI Scanner">
-                  <ScanLine className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">AI Scanner</span>
+                  <span className="hidden sm:inline">Reel IDs</span>
                 </TabsTrigger>
                 <TabsTrigger value="flagged" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
                   <Flag className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
@@ -767,20 +766,7 @@ function SessionWorkspace({
               </TabsContent>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} />
-              </TabsContent>
-
-              <TabsContent value="scanner">
-                <LabelScannerTab
-                  sessionId={sessionId}
-                  photos={photos}
-                  currentPhotoId={syncedPhotoIdRef.current ?? photos[session.lastPhotoIndex ?? 0]?.id ?? null}
-                  canEdit={canEditSession}
-                  isAdmin={isOwner}
-                  onPinDataChanged={triggerPinRefresh}
-                  onPhotoChange={(photoId) => { syncedPhotoIdRef.current = photoId; }}
-                  onlineUsers={onlineUsers}
-                />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} />
               </TabsContent>
 
               <TabsContent value="flagged">

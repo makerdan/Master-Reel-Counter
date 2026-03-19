@@ -226,7 +226,7 @@ function PhotoCard({
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none flex items-center justify-center">
           <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow pointer-events-none" />
         </div>
-        {pins.map((pin) => {
+        {imgNaturalSize && pins.map((pin) => {
           let displayX = pin.xPercent;
           let displayY = pin.yPercent;
           if (imgNaturalSize) {
@@ -260,7 +260,7 @@ function PhotoCard({
           className="absolute top-1 right-1 h-6 w-6 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
           onPointerDown={(e) => { e.preventDefault(); onJumpToPhoto(photo.id); }}
           data-testid={`button-strip-jump-${photo.id}`}
-          title="Open in Section Photo"
+          title="Open in Reel IDs"
         >
           <ExternalLink className="h-3 w-3" />
         </Button>
@@ -568,7 +568,7 @@ export default function PhotoStrip({
   if (photos.length === 0) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground text-sm" data-testid="strip-empty">
-        No photos yet — use Mobile Flow or Section Photo to capture images.
+        No photos yet — use Mobile Flow or Reel IDs to capture images.
       </div>
     );
   }

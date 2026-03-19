@@ -856,7 +856,7 @@ export default function ReviewTab({
                   </div>
                 </div>
               ) : currentPhoto ? (
-                /* ── Section Photo view ── */
+                /* ── Reel IDs view ── */
                 <div className="w-full relative">
                   <ZoomablePhoto
                     photoUrl={getPhotoUrl(currentPhoto)}

@@ -150,7 +150,7 @@ export function OverviewHelp() {
       </AccordionTrigger>
       <AccordionContent className="text-2xl text-muted-foreground leading-relaxed space-y-2 pb-4">
         <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
-        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow with Section Photo, Flagged, Photos Reel, and AI Scanner tabs. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience.</p>
+        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow with Reel IDs, Flagged, Photos Reel, and Review tabs. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience.</p>
       </AccordionContent>
     </AccordionItem>
   );
@@ -462,7 +462,7 @@ export function SessionSections() {
 
       <AccordionItem value="session-photo-mode">
         <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Camera className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Section Photo Tab</span>
+          <span className="flex items-center gap-2"><Camera className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Reel IDs Tab</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
           <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">The primary workflow. Upload photos of pallet sections, place pins on each reel, then fill in wire details below.</p>
@@ -731,7 +731,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={ExternalLink} />}
             label="Jump to Photo"
-            description="Tap the external-link icon to jump directly to that photo in the Section Photo tab, ready for pinning."
+            description="Tap the external-link icon to jump directly to that photo in the Reel IDs tab, ready for pinning."
           />
           <FeatureRow
             icon={<HelpIcon icon={ArrowUp} />}
@@ -826,7 +826,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={MapPin} />}
             label="Clickable Pin #"
-            description="Tap any Pin # in the table to jump directly to that pin's photo in Section Photo mode. The target pin flashes with a yellow glow for a few seconds so you can spot it immediately — useful for zooming in on a label you need to verify."
+            description="Tap any Pin # in the table to jump directly to that pin's photo in Reel IDs mode. The target pin flashes with a yellow glow for a few seconds so you can spot it immediately — useful for zooming in on a label you need to verify."
           />
           <FeatureRow
             icon={<HelpIcon icon={ChevronLeft} />}

@@ -4,6 +4,7 @@ import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye, EyeOff,
   AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp, Lock,
+  ScanLine, X as PanelCloseX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Sheet, SheetContent,
+} from "@/components/ui/sheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
@@ -36,8 +40,15 @@ import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 import SingleEntryMode from "./SingleEntryMode";
+import LabelScannerTab from "./LabelScannerTab";
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void }) {
+function getScanPanelStorageKey(sessionId: number) {
+  return `scan-panel-open-${sessionId}`;
+}
+
+type OnlineUser = { userId: string; username: string };
+
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -197,6 +208,31 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       }, 0);
       globalMaxPinRef.current = Math.max(globalMaxPinRef.current, max);
     }).catch(() => {});
+  }, [sessionId]);
+
+  const [scanPanelOpen, setScanPanelOpen] = useState(() => {
+    if (initialScanPanelOpen) return true;
+    try {
+      return localStorage.getItem(getScanPanelStorageKey(sessionId)) === "true";
+    } catch { return false; }
+  });
+  const [scanPanelCurrentPhotoId, setScanPanelCurrentPhotoId] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    setIsMobile(mq.matches);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  const toggleScanPanel = useCallback(() => {
+    setScanPanelOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(getScanPanelStorageKey(sessionId), String(next)); } catch {}
+      return next;
+    });
   }, [sessionId]);
 
   const [scale, setScale] = useState(1);
@@ -360,7 +396,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   useEffect(() => {
     const photo = uploadedPhotos[currentPhotoIdx];
-    onCurrentPhotoChange?.(photo?.dbId ?? null);
+    const photoId = photo?.dbId ?? null;
+    onCurrentPhotoChange?.(photoId);
+    setScanPanelCurrentPhotoId(photoId);
   }, [currentPhotoIdx, uploadedPhotos]);
 
   const photoIdxSaveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -1267,7 +1305,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
   return (
-    <div className="space-y-4 rounded-md border-2 border-[hsl(18_85%_32%)] sm:border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4">
+    <div className={`rounded-md border-2 border-[hsl(18_85%_32%)] sm:border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4 overflow-hidden ${scanPanelOpen ? "sm:grid sm:grid-cols-[minmax(0,1fr)_320px] sm:gap-4 sm:items-start" : ""}`}>
+      <div className="space-y-4 min-w-0">
       <input
         ref={fileInputRef}
         type="file"
@@ -1284,7 +1323,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         className="hidden"
         onChange={handleFileUpload}
       />
-      <h2 className="sm:hidden text-lg font-semibold underline text-center mb-2">Section Photo</h2>
+      <h2 className="sm:hidden text-lg font-semibold underline text-center mb-2">Reel IDs</h2>
       <div className="space-y-2 sm:space-y-0">
         <div className="flex items-end gap-2 flex-wrap justify-center sm:justify-start">
           <div>
@@ -1368,6 +1407,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               Quick Entry
               {showQuickEntry ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
             </Button>
+            <Button
+              variant={scanPanelOpen ? "default" : "outline"}
+              className={scanPanelOpen ? "bg-[hsl(280_60%_35%)] text-white border-[hsl(280_60%_25%)]" : "border-[hsl(280_50%_40%/0.5)] text-[hsl(280_60%_50%)] dark:text-[hsl(280_60%_70%)] dark:border-[hsl(280_50%_40%/0.4)]"}
+              onClick={toggleScanPanel}
+              data-testid="button-scan-panel-toggle"
+              title={scanPanelOpen ? "Close Scan Panel" : "Open Scan Panel"}
+            >
+              <ScanLine className="h-4 w-4 mr-1" />
+              Scan
+              {scanPanelOpen ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
+            </Button>
           </div>
         </div>
         <div className="flex sm:hidden items-center justify-center gap-4">
@@ -1397,6 +1447,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             title="Quick Entry"
           >
             <ListPlus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={scanPanelOpen ? "default" : "outline"}
+            className={scanPanelOpen ? "bg-[hsl(280_60%_35%)] text-white border-[hsl(280_60%_25%)]" : "border-[hsl(280_50%_40%/0.5)] text-[hsl(280_60%_50%)] dark:text-[hsl(280_60%_70%)] dark:border-[hsl(280_50%_40%/0.4)]"}
+            onClick={toggleScanPanel}
+            data-testid="button-scan-panel-toggle-mobile"
+            title="Scan"
+          >
+            <ScanLine className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -2581,6 +2640,66 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      </div>
+
+      {scanPanelOpen && (
+        <div className="hidden sm:flex flex-col gap-0 min-w-0 border-l border-[hsl(280_50%_30%/0.4)] pl-4 self-stretch max-h-[85vh] overflow-y-auto" data-testid="scan-panel-desktop">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <ScanLine className="h-4 w-4 text-[hsl(280_60%_55%)]" />
+              <span className="text-sm font-semibold text-[hsl(280_60%_70%)]">Scan Panel</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={toggleScanPanel}
+              data-testid="button-scan-panel-close-desktop"
+            >
+              <PanelCloseX className="h-4 w-4" />
+            </Button>
+          </div>
+          <LabelScannerTab
+            sessionId={sessionId}
+            photos={photos}
+            currentPhotoId={scanPanelCurrentPhotoId}
+            canEdit={canEdit}
+            isAdmin={isAdmin}
+            onPinDataChanged={onPinDataChanged}
+            onlineUsers={onlineUsers}
+          />
+        </div>
+      )}
+
+      {isMobile && (
+        <Sheet open={scanPanelOpen} onOpenChange={(open) => {
+          if (!open) {
+            setScanPanelOpen(false);
+            try { localStorage.setItem(getScanPanelStorageKey(sessionId), "false"); } catch {}
+          }
+        }}>
+          <SheetContent
+            side="bottom"
+            className="h-[65vh] bg-[hsl(25_12%_12%)] border-t border-[hsl(280_50%_30%/0.4)] p-4 overflow-y-auto"
+            data-testid="scan-panel-mobile-sheet"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <ScanLine className="h-4 w-4 text-[hsl(280_60%_55%)]" />
+              <span className="text-sm font-semibold text-[hsl(280_60%_70%)]">Scan Panel</span>
+            </div>
+            <LabelScannerTab
+              sessionId={sessionId}
+              photos={photos}
+              currentPhotoId={scanPanelCurrentPhotoId}
+              canEdit={canEdit}
+              isAdmin={isAdmin}
+              onPinDataChanged={onPinDataChanged}
+              onlineUsers={onlineUsers}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }
