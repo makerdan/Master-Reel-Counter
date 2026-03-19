@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  BarChart2, ChevronDown, ChevronUp, X, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet,
+  BarChart2, ChevronDown, ChevronUp, X, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -393,7 +393,19 @@ export default function FinalResultsTab({
                     className={`border-b border-border last:border-0 ${rowBg(row.status)}`}
                     data-testid={`row-tally-${i}`}
                   >
-                    <td className="p-2 font-mono font-medium" data-testid={`text-category-${i}`}>{row.category}</td>
+                    <td className="p-2 font-mono font-medium" data-testid={`text-category-${i}`}>
+                      {row.category === "(uncategorized)" ? (
+                        <span className="flex items-center gap-1">
+                          <span className="text-muted-foreground italic">(uncategorized)</span>
+                          <span
+                            title="Reels where the Wire Details field was left blank during counting"
+                            className="inline-flex items-center text-muted-foreground/60 hover:text-muted-foreground cursor-help"
+                          >
+                            <Info className="h-3 w-3" />
+                          </span>
+                        </span>
+                      ) : row.category}
+                    </td>
                     <td className="p-2 font-mono text-muted-foreground" data-testid={`text-vendor-${i}`}>{row.vendorCode || "—"}</td>
                     <td className="p-2 text-right font-mono" data-testid={`text-reels-${i}`}>{row.totalReels > 0 ? row.totalReels : "—"}</td>
                     <td className="p-2 text-right font-mono" data-testid={`text-footage-${i}`}>
