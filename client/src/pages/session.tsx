@@ -657,8 +657,10 @@ function SessionWorkspace({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <ThemeToggle />
-            <HelpMenu mode={captureMode ? "mobile" : "full"} />
+            <div className="hidden sm:flex items-center gap-1">
+              <ThemeToggle />
+              <HelpMenu mode={captureMode ? "mobile" : "full"} />
+            </div>
           </div>
         </div>
         <div className="sm:hidden border-t border-border/50 px-4 py-1 flex items-center justify-center gap-1" data-testid="header-mobile-date">
