@@ -399,7 +399,7 @@ export default function FinalResultsTab({
                           <span className="text-muted-foreground italic">(uncategorized)</span>
                           <span
                             title="Reels where the Wire Details field was left blank during counting"
-                            className="inline-flex items-center text-muted-foreground/60 hover:text-muted-foreground cursor-help"
+                            className="inline-flex items-center text-muted-foreground/60 hover:text-muted-foreground"
                           >
                             <Info className="h-3 w-3" />
                           </span>
