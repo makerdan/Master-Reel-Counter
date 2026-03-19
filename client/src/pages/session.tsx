@@ -166,7 +166,7 @@ function SessionWorkspace({
       if (tab === "single") return "photo";
       if (tab && ["photo", "flagged", "scanner", "strip", "review", "results"].includes(tab)) return tab;
     } catch {}
-    return "photo";
+    return "strip";
   })();
   const [mode, setMode] = useState<string>(initialTab);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
@@ -188,7 +188,7 @@ function SessionWorkspace({
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (mode === "photo") {
+    if (mode === "strip") {
       url.searchParams.delete("tab");
     } else {
       url.searchParams.set("tab", mode);
@@ -728,21 +728,21 @@ function SessionWorkspace({
               setMode(newMode);
             }}>
               <TabsList className="w-full bg-[hsl(25_12%_18%)] dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
-                <TabsTrigger value="photo" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Section Photo">
-                  <Camera className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Section Photo</span>
-                </TabsTrigger>
-                <TabsTrigger value="flagged" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
-                  <Flag className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Flagged</span>
-                </TabsTrigger>
                 <TabsTrigger value="strip" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(200_70%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photos Reel">
                   <LayoutGrid className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Photos Reel</span>
                 </TabsTrigger>
+                <TabsTrigger value="photo" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(18_85%_32%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Section Photo">
+                  <Camera className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Section Photo</span>
+                </TabsTrigger>
                 <TabsTrigger value="scanner" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(280_60%_35%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-scanner-mode" aria-label="AI Scanner">
                   <ScanLine className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">AI Scanner</span>
+                </TabsTrigger>
+                <TabsTrigger value="flagged" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(45_85%_40%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
+                  <Flag className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Flagged</span>
                 </TabsTrigger>
                 <TabsTrigger value="review" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-[hsl(150_60%_30%)] data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-review-mode" aria-label="Review">
                   <ClipboardCheck className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
@@ -754,8 +754,33 @@ function SessionWorkspace({
                 </TabsTrigger>
               </TabsList>
 
+              <TabsContent value="strip">
+                <PhotoStrip
+                  sessionId={sessionId}
+                  canEdit={canEditSession}
+                  onJumpToPhoto={(photoId) => {
+                    setNavigateToPhotoId(photoId);
+                    setMode("photo");
+                  }}
+                  onClearUndoHistory={clearHistory}
+                />
+              </TabsContent>
+
               <TabsContent value="photo">
                 <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} />
+              </TabsContent>
+
+              <TabsContent value="scanner">
+                <LabelScannerTab
+                  sessionId={sessionId}
+                  photos={photos}
+                  currentPhotoId={syncedPhotoIdRef.current ?? photos[session.lastPhotoIndex ?? 0]?.id ?? null}
+                  canEdit={canEditSession}
+                  isAdmin={isOwner}
+                  onPinDataChanged={triggerPinRefresh}
+                  onPhotoChange={(photoId) => { syncedPhotoIdRef.current = photoId; }}
+                  onlineUsers={onlineUsers}
+                />
               </TabsContent>
 
               <TabsContent value="flagged">
@@ -776,31 +801,6 @@ function SessionWorkspace({
                     setMode("photo");
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
-                />
-              </TabsContent>
-
-              <TabsContent value="strip">
-                <PhotoStrip
-                  sessionId={sessionId}
-                  canEdit={canEditSession}
-                  onJumpToPhoto={(photoId) => {
-                    setNavigateToPhotoId(photoId);
-                    setMode("photo");
-                  }}
-                  onClearUndoHistory={clearHistory}
-                />
-              </TabsContent>
-
-              <TabsContent value="scanner">
-                <LabelScannerTab
-                  sessionId={sessionId}
-                  photos={photos}
-                  currentPhotoId={syncedPhotoIdRef.current ?? photos[session.lastPhotoIndex ?? 0]?.id ?? null}
-                  canEdit={canEditSession}
-                  isAdmin={isOwner}
-                  onPinDataChanged={triggerPinRefresh}
-                  onPhotoChange={(photoId) => { syncedPhotoIdRef.current = photoId; }}
-                  onlineUsers={onlineUsers}
                 />
               </TabsContent>
 
