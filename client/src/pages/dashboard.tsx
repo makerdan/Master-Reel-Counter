@@ -1033,7 +1033,7 @@ export default function Dashboard() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="relative flex items-center justify-between gap-2 px-4 py-3 max-w-5xl mx-auto">
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-sm font-semibold tracking-wide text-foreground/70" data-testid="text-app-title">
+            <span className="text-sm font-semibold tracking-wide text-black dark:text-white underline" data-testid="text-app-title">
               Master Reel Counter
             </span>
           </div>
