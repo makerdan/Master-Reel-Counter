@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Clock, FileText, Camera, MapPin, MessageSquare, User, AlertTriangle,
   Copy, Check, Lock, Unlock, Shield, ArrowRightLeft, Download, Flag,
-  FlagOff, Settings, Link, Unlink, LogOut, Trash2, Files
+  FlagOff, Settings, Link, Unlink, LogOut, Trash2, Files, Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -16,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatDateOnly, formatTimestamp } from "@/lib/timezone";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface ActivityLogEntry {
   id: number;
@@ -27,7 +30,20 @@ interface ActivityLogEntry {
   entityId: number | null;
   details: string | null;
   createdAt: string;
+  _type: "activity";
 }
+
+interface SessionNote {
+  id: number;
+  sessionId: number;
+  userId: string;
+  username: string | null;
+  text: string;
+  createdAt: string;
+  _type: "note";
+}
+
+type TimelineItem = ActivityLogEntry | SessionNote;
 
 const ACTION_CONFIG: Record<string, { icon: typeof FileText; label: string; color: string }> = {
   entry_created: { icon: FileText, label: "Added entry", color: "text-green-500" },
@@ -71,14 +87,25 @@ function formatTimeAgo(dateStr: string, tz: string): string {
   return formatDateOnly(date, tz);
 }
 
-export default function ActivityLog({ sessionId }: { sessionId: number }) {
+export default function ActivityLog({
+  sessionId,
+  currentUserId,
+  isOwner,
+}: {
+  sessionId: number;
+  currentUserId?: string;
+  isOwner?: boolean;
+}) {
   const tz = useTimezone();
+  const { toast } = useToast();
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
   const [copied, setCopied] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const listEndRef = useRef<HTMLDivElement>(null);
 
   const isFiltering = selectedUserId !== "all";
 
-  const { data: logs = [], isLoading, isError: logsError } = useQuery<ActivityLogEntry[]>({
+  const { data: logs = [], isLoading: logsLoading, isError: logsError } = useQuery<ActivityLogEntry[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "activity", isFiltering ? selectedUserId : "all"],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -91,10 +118,91 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
     refetchInterval: 30000,
   });
 
+  const { data: rawComments = [] } = useQuery<Array<{
+    id: number;
+    sessionId: number;
+    userId: string;
+    username: string | null;
+    text: string;
+    createdAt: string;
+    entryId: number | null;
+    photoId: number | null;
+    parentCommentId: number | null;
+  }>>({
+    queryKey: ["/api/sessions", sessionId.toString(), "comments"],
+    queryFn: async () => {
+      const res = await fetch(`/api/sessions/${sessionId}/comments`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch comments");
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
   const { data: users = [] } = useQuery<Array<{ userId: string; username: string | null }>>({
     queryKey: ["/api/sessions", sessionId.toString(), "activity-users"],
     refetchInterval: 60000,
   });
+
+  const postNote = useMutation({
+    mutationFn: async (text: string) => {
+      const res = await apiRequest("POST", `/api/sessions/${sessionId}/comments`, { text });
+      return res.json();
+    },
+    onSuccess: () => {
+      setNoteText("");
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "activity"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to post note", variant: "destructive" });
+    },
+  });
+
+  const deleteNote = useMutation({
+    mutationFn: async (commentId: number) => {
+      const res = await apiRequest("DELETE", `/api/comments/${commentId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete note", variant: "destructive" });
+    },
+  });
+
+  const isLoading = logsLoading;
+
+  const sessionNotes: SessionNote[] = rawComments
+    .filter(c => c.entryId === null && c.photoId === null && c.parentCommentId === null)
+    .map(c => ({ ...c, _type: "note" as const }));
+
+  const sessionNoteIds = new Set(sessionNotes.map(n => n.id));
+
+  const activityItems: ActivityLogEntry[] = logs
+    .filter(l => !(l.action === "comment_added" && l.entityType === "comment" && l.entityId !== null && sessionNoteIds.has(l.entityId)))
+    .map(l => ({ ...l, _type: "activity" as const }));
+
+  const filteredNotes = isFiltering
+    ? sessionNotes.filter(n => n.userId === selectedUserId)
+    : sessionNotes;
+
+  const timeline: TimelineItem[] = [...activityItems, ...filteredNotes].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
+  const handlePostNote = () => {
+    const trimmed = noteText.trim();
+    if (!trimmed) return;
+    postNote.mutate(trimmed);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handlePostNote();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -113,17 +221,16 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
     );
   }
 
-  if (logs.length === 0 && !isFiltering) {
-    return (
-      <div className="p-4 text-center">
-        <Clock className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">No activity yet</p>
-      </div>
-    );
-  }
-
   const copyAll = () => {
-    const lines = logs.map((log) => {
+    const lines = timeline.map((item) => {
+      if (item._type === "note") {
+        const timestamp = formatTimestamp(item.createdAt, tz, {
+          month: "short", day: "numeric", year: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        });
+        return [item.username || "Unknown", "Note", item.text, timestamp].filter(Boolean).join(" | ");
+      }
+      const log = item as ActivityLogEntry;
       const config = ACTION_CONFIG[log.action] || { label: log.action };
       const timestamp = formatTimestamp(log.createdAt, tz, {
         month: "short", day: "numeric", year: "numeric",
@@ -144,7 +251,7 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
   };
 
   return (
-    <div>
+    <div className="flex flex-col">
       <div className="flex items-center justify-between gap-2 px-2 py-1">
         <Select value={selectedUserId} onValueChange={setSelectedUserId}>
           <SelectTrigger className="h-7 text-xs w-[140px]" data-testid="select-activity-user-filter">
@@ -161,17 +268,59 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
           {copied ? <><Check className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy All</>}
         </Button>
       </div>
-      {logs.length === 0 && selectedUserId !== "all" ? (
+
+      {timeline.length === 0 && !isFiltering ? (
+        <div className="p-4 text-center">
+          <Clock className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground">No activity yet</p>
+        </div>
+      ) : timeline.length === 0 && isFiltering ? (
         <div className="p-4 text-center">
           <p className="text-xs text-muted-foreground">No activity for this user</p>
         </div>
       ) : (
-        <div className="space-y-0.5 max-h-[400px] overflow-y-auto" data-testid="activity-log-list">
-          {logs.map((log) => {
+        <div className="space-y-0.5 max-h-[320px] overflow-y-auto" data-testid="activity-log-list">
+          {timeline.map((item) => {
+            if (item._type === "note") {
+              const note = item as SessionNote;
+              const canDelete = currentUserId === note.userId || isOwner;
+              return (
+                <div
+                  key={`note-${note.id}`}
+                  className="flex items-start gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm group bg-blue-50/30 dark:bg-blue-950/20 border-l-2 border-blue-400/50"
+                  data-testid={`note-${note.id}`}
+                >
+                  <MessageSquare className="h-3.5 w-3.5 mt-0.5 shrink-0 text-blue-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs leading-tight">
+                      <span className="font-medium">{note.username || "Unknown"}</span>
+                      {" "}
+                      <span className="text-muted-foreground italic">{note.text}</span>
+                    </p>
+                    <span className="text-[10px] text-muted-foreground mono">{formatTimeAgo(note.createdAt, tz)}</span>
+                  </div>
+                  {canDelete && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      onClick={() => deleteNote.mutate(note.id)}
+                      disabled={deleteNote.isPending}
+                      data-testid={`button-delete-note-${note.id}`}
+                      title="Delete note"
+                    >
+                      <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                    </Button>
+                  )}
+                </div>
+              );
+            }
+
+            const log = item as ActivityLogEntry;
             const config = ACTION_CONFIG[log.action] || { icon: Clock, label: log.action, color: "text-muted-foreground" };
             const Icon = config.icon;
             return (
-              <div key={log.id} className="flex items-start gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm" data-testid={`activity-${log.id}`}>
+              <div key={`activity-${log.id}`} className="flex items-start gap-2 px-2 py-1.5 hover:bg-muted/50 rounded-sm" data-testid={`activity-${log.id}`}>
                 <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${config.color}`} />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs leading-tight">
@@ -185,8 +334,36 @@ export default function ActivityLog({ sessionId }: { sessionId: number }) {
               </div>
             );
           })}
+          <div ref={listEndRef} />
         </div>
       )}
+
+      <div className="px-2 py-2 border-t border-border/50 mt-1">
+        <div className="flex gap-2 items-end">
+          <Textarea
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Add a session note... (Ctrl+Enter to post)"
+            className="text-xs resize-none min-h-[60px] flex-1"
+            data-testid="input-session-note"
+            disabled={postNote.isPending}
+          />
+          <Button
+            size="sm"
+            className="h-[60px] px-3 shrink-0"
+            onClick={handlePostNote}
+            disabled={!noteText.trim() || postNote.isPending}
+            data-testid="button-post-note"
+          >
+            {postNote.isPending ? (
+              <span className="text-xs">Posting...</span>
+            ) : (
+              <><Send className="h-3.5 w-3.5" /><span className="text-xs ml-1">Post Note</span></>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
