@@ -25,6 +25,7 @@ function EntryPhotoDialogContent({ src, entryId, pin }: {
   pin: { xPercent: number; yPercent: number } | undefined;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  useEffect(() => { setImgLoaded(false); }, [src]);
   return (
     <div className="relative inline-block w-full">
       <img
