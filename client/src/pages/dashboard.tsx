@@ -1031,7 +1031,12 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background dashboard-theme">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="flex items-center justify-between gap-2 px-4 py-3 max-w-5xl mx-auto">
+        <div className="relative flex items-center justify-between gap-2 px-4 py-3 max-w-5xl mx-auto">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-sm font-semibold tracking-wide text-foreground/70" data-testid="text-app-title">
+              Master Reel Counter
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <Cable className="h-5 w-5 text-primary" />
             <span className="font-semibold text-sm" data-testid="text-user-name">
@@ -1087,7 +1092,7 @@ export default function Dashboard() {
       <main className="max-w-5xl mx-auto px-4 py-6 pb-[50vh]">
         <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
           <h1 className="text-2xl font-bold" data-testid="text-dashboard-title">
-            Master Reel Counter
+            Sessions Dashboard
           </h1>
           <div className="flex items-center gap-2">
             <DropdownMenu>
