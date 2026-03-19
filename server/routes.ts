@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/routes";
@@ -8,6 +9,7 @@ import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCategorySchema } from "@shared/schema";
+import { z } from "zod";
 import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
@@ -134,6 +136,26 @@ async function getEncryptionKey(userId: string): Promise<Buffer | null> {
   return unwrapKey(settings.encryptionKey, kek);
 }
 
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many login attempts, please try again later." },
+  skipSuccessfulRequests: false,
+});
+
+const patchSessionSchema = z.object({
+  name: z.string().min(1).max(500).optional(),
+  description: z.string().max(5000).nullable().optional(),
+  location: z.string().max(500).nullable().optional(),
+  status: z.enum(["active", "completed"]).optional(),
+  isLocked: z.boolean().optional(),
+  completedAt: z.union([z.string().datetime(), z.null()]).optional(),
+  lastPhotoIndex: z.number().int().min(0).optional(),
+  folderId: z.number().int().nullable().optional(),
+}).strict();
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -160,7 +182,7 @@ export async function registerRoutes(
     isApproved(req, res, next);
   });
 
-  app.post("/api/auth/tester-login", async (req: any, res) => {
+  app.post("/api/auth/tester-login", authRateLimiter, async (req: any, res) => {
     try {
       const { displayName, password } = req.body;
       if (!displayName || !password) {
@@ -306,6 +328,29 @@ export async function registerRoutes(
       if (filename.includes("..") || filename.includes("/")) {
         return res.status(400).json({ error: "Invalid filename" });
       }
+
+      const storageKey = `/uploads/${filename}`;
+      const requestingUserId = req.user.claims.sub;
+      const photo = await storage.getPhotoByStorageKey(storageKey);
+      if (photo) {
+        const testerOwner = getTesterOwner(req);
+        const access = await verifySessionAccess(photo.sessionId, requestingUserId, testerOwner);
+        if (!access) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      } else {
+        const ownerUserId = getTesterOwner(req) ?? requestingUserId;
+        const [userRecord, userSettingsRecord] = await Promise.all([
+          authStorage.getUser(ownerUserId),
+          storage.getUserSettings(ownerUserId),
+        ]);
+        const isOwnAvatar = userRecord?.customAvatarKey === storageKey;
+        const isOwnLogo = userSettingsRecord?.companyLogoKey === storageKey;
+        if (!isOwnAvatar && !isOwnLogo) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
       const ext = path.extname(filename).toLowerCase();
       const mimeTypes: Record<string, string> = {
         ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
@@ -427,9 +472,13 @@ export async function registerRoutes(
 
   app.patch("/api/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const parsed = patchSessionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
+      }
       const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      const data: any = { ...req.body };
+      const data: any = { ...parsed.data };
       const isLastPhotoIndexOnly = Object.keys(data).length === 1 && "lastPhotoIndex" in data;
       if (!isLastPhotoIndexOnly && !isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can edit session details" });
       if (data.completedAt) data.completedAt = new Date(data.completedAt);

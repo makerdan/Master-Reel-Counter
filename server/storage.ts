@@ -55,6 +55,7 @@ export interface IStorage {
 
   createPhoto(photo: InsertPhoto): Promise<Photo>;
   getPhoto(id: number): Promise<Photo | undefined>;
+  getPhotoByStorageKey(key: string): Promise<Photo | undefined>;
   getSessionPhotos(sessionId: number): Promise<Photo[]>;
   updatePhoto(id: number, data: Partial<Photo>): Promise<Photo | undefined>;
   deletePhoto(id: number): Promise<void>;
@@ -243,6 +244,11 @@ export class DatabaseStorage implements IStorage {
 
   async getPhoto(id: number): Promise<Photo | undefined> {
     const [result] = await db.select().from(photos).where(eq(photos.id, id));
+    return result;
+  }
+
+  async getPhotoByStorageKey(key: string): Promise<Photo | undefined> {
+    const [result] = await db.select().from(photos).where(eq(photos.objectStorageKey, key));
     return result;
   }
 
