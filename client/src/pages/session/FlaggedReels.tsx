@@ -81,6 +81,7 @@ function PinLocationPhoto({
   children?: React.ReactNode;
 }) {
   const [loaded, setLoaded] = useState(false);
+  useEffect(() => { setLoaded(false); }, [photoUrl]);
   return (
     <div className={`relative ${containerClass ?? ""}`} onClick={onClick}>
       <img
@@ -126,6 +127,7 @@ function DupPinTile({
 }) {
   const { toast } = useToast();
   const [tileLoaded, setTileLoaded] = useState(false);
+  useEffect(() => { setTileLoaded(false); }, [pin.photoObjectStorageKey]);
 
   const keepMutation = useMutation({
     mutationFn: async () => {
