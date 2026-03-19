@@ -1995,7 +1995,11 @@ export default function SettingsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          {isOwner ? (
+                          {u.isTester ? (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-700" data-testid={`badge-tester-${u.id}`}>
+                              Tester
+                            </Badge>
+                          ) : isOwner ? (
                             <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
                           ) : u.approved ? (
                             <>

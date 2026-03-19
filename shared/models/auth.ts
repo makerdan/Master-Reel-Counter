@@ -24,12 +24,12 @@ export const users = pgTable("users", {
   customAvatarKey: varchar("custom_avatar_key"),
   approved: boolean("approved").default(false).notNull(),
   rejected: boolean("rejected").default(false).notNull(),
+  isTester: boolean("is_tester").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect & {
-  isTester?: boolean;
   testerOwnerUserId?: string;
 };

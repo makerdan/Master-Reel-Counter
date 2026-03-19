@@ -206,6 +206,7 @@ export async function registerRoutes(
         firstName: displayName.trim(),
         lastName: null,
         profileImageUrl: null,
+        isTester: true,
       });
       const testerUser = {
         claims: {
