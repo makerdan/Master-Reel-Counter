@@ -402,13 +402,15 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     queryKey: ["/api/sessions", sessionId.toString(), "entries"],
   });
 
-  const { data: sessionPins = [] } = useQuery<Pin[]>({
+  const { data: sessionPins = [], isSuccess: pinsLoaded } = useQuery<Pin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "pins"],
   });
 
-  const { data: sessionPhotos = [] } = useQuery<Photo[]>({
+  const { data: sessionPhotos = [], isSuccess: photosLoaded } = useQuery<Photo[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "photos"],
   });
+
+  const dupDataLoaded = pinsLoaded && photosLoaded;
 
   const duplicateGroups = useMemo<DuplicateGroup[]>(() => {
     if (!sessionPins.length || !sessionPhotos.length) return [];
@@ -561,20 +563,41 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
         </div>
       )}
 
-      {visibleDupGroups.length > 0 && (
-        <div className="space-y-2" data-testid="section-duplicates">
-          <button
-            className="flex items-center gap-2 w-full pt-2 border-t border-black text-left"
-            onClick={() => setDupsOpen((o) => !o)}
-            data-testid="button-toggle-duplicates"
-          >
-            <Copy className="h-4 w-4 text-orange-500 shrink-0" />
-            <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400 flex-1">
-              Possible Duplicates ({visibleDupGroups.length})
-            </h3>
-            {dupsOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </button>
-          {dupsOpen && (
+      <div className="space-y-2" data-testid="section-duplicates">
+          {visibleDupGroups.length > 0 ? (
+            <button
+              className="flex items-center gap-2 w-full pt-2 border-t border-black text-left"
+              onClick={() => setDupsOpen((o) => !o)}
+              data-testid="button-toggle-duplicates"
+            >
+              <Copy className="h-4 w-4 text-orange-500 shrink-0" />
+              <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400 flex-1">
+                Possible Duplicates ({visibleDupGroups.length})
+              </h3>
+              {dupsOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 w-full pt-2 border-t border-black" data-testid="header-duplicates-cleared">
+              <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+              <h3 className="text-sm font-semibold text-muted-foreground flex-1">Possible Duplicates</h3>
+            </div>
+          )}
+          {visibleDupGroups.length === 0 && dupDataLoaded && (
+            <div
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm ${
+                duplicateGroups.length > 0
+                  ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+                  : "bg-muted/50 text-muted-foreground"
+              }`}
+              data-testid="status-duplicates-cleared"
+            >
+              <Check className={`h-4 w-4 shrink-0 ${duplicateGroups.length > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} />
+              <span>
+                {duplicateGroups.length > 0 ? "All duplicates cleared" : "No duplicates detected"}
+              </span>
+            </div>
+          )}
+          {dupsOpen && visibleDupGroups.length > 0 && (
             <div className="grid gap-2">
               {visibleDupGroups.map((group) => {
                 const isSameReel = group.groupType === "same-reel";
@@ -628,9 +651,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
               })}
             </div>
           )}
-        </div>
-      )}
-
+      </div>
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
