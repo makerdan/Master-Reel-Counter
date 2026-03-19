@@ -607,7 +607,7 @@ export default function PhotoStrip({
       {aisleGroups.map((aisleGroup) => {
         const totalPhotos = aisleGroup.sections.reduce((n, s) => n + s.photos.length, 0);
         return (
-          <div key={aisleGroup.aisle} className="border !border-black rounded-lg p-2">
+          <div key={aisleGroup.aisle} className="border border-blue-500 sm:!border-black rounded-lg p-2">
             <div className="mb-3 pb-1 border-b">
               <button
                 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary hover:underline transition-colors cursor-pointer"
@@ -623,7 +623,7 @@ export default function PhotoStrip({
 
             <div className="space-y-4">
               {aisleGroup.sections.map((sectionGroup) => (
-                <div key={sectionGroup.section} className="sm:border-0 border border-[hsl(18_85%_32%/0.5)] rounded-md p-1.5 sm:p-0">
+                <div key={sectionGroup.section} className="sm:border-0 border border-blue-400 rounded-md p-1.5 sm:p-0">
                   <div className="flex items-center gap-2 mb-2 border-l-2 border-muted-foreground/20 pl-2">
                     <button
                       className="text-xs font-medium text-muted-foreground/80 underline hover:text-primary transition-colors cursor-pointer"

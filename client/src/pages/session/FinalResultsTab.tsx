@@ -356,7 +356,7 @@ export default function FinalResultsTab({
 
       {/* ── Review Status Banner ─────────────────────────────────────────── */}
       {reviewStats.total > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-[hsl(25_20%_28%)] bg-[hsl(25_12%_15%)] px-4 py-2.5" data-testid="final-results-review-banner">
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-[hsl(25_20%_28%)] bg-blue-600 dark:bg-[hsl(25_12%_15%)] sm:bg-[hsl(25_12%_15%)] px-4 py-2.5" data-testid="final-results-review-banner">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-white/70 shrink-0" />
             <span className="text-sm text-white">Not yet reviewed:</span>
@@ -389,18 +389,21 @@ export default function FinalResultsTab({
             No pins recorded in this session yet.
           </div>
         ) : (
-          <div className="border border-border rounded-lg overflow-x-auto">
+          <div className="border border-blue-500 sm:border-border rounded-lg overflow-x-auto">
             <table className="w-full text-xs" data-testid="table-tally">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left p-2 font-medium">Category</th>
-                  <th className="text-left p-2 font-medium">Vendor</th>
-                  <th className="text-right p-2 font-medium">Reels</th>
-                  <th className="text-right p-2 font-medium whitespace-nowrap">Footage ({uLabel})</th>
-                  {inventoryRows && <th className="text-right p-2 font-medium">Inv. Reels</th>}
-                  {inventoryRows && <th className="text-right p-2 font-medium whitespace-nowrap">Inv. Footage</th>}
-                  {inventoryRows && <th className="p-2 font-medium">Status</th>}
-                  <th className="text-left p-2 font-medium">Locations</th>
+                  <th className="text-left p-2 font-medium underline sm:no-underline after:content-[':'] sm:after:content-['']">Category</th>
+                  <th className="hidden sm:table-cell text-left p-2 font-medium">Vendor</th>
+                  <th className="hidden sm:table-cell text-right p-2 font-medium">Reels</th>
+                  <th className="text-right p-2 font-medium whitespace-nowrap underline sm:no-underline">
+                    <span className="sm:hidden">Total Footage:</span>
+                    <span className="hidden sm:inline">Footage ({uLabel})</span>
+                  </th>
+                  {inventoryRows && <th className="text-right p-2 font-medium underline sm:no-underline after:content-[':'] sm:after:content-['']">Inv. Reels</th>}
+                  {inventoryRows && <th className="text-right p-2 font-medium whitespace-nowrap underline sm:no-underline after:content-[':'] sm:after:content-['']">Inv. Footage</th>}
+                  {inventoryRows && <th className="p-2 font-medium underline sm:no-underline after:content-[':'] sm:after:content-['']">Status</th>}
+                  <th className="text-left p-2 font-medium underline sm:no-underline after:content-[':'] sm:after:content-['']">Locations</th>
                 </tr>
               </thead>
               <tbody>
@@ -421,10 +424,15 @@ export default function FinalResultsTab({
                             <Info className="h-3 w-3" />
                           </span>
                         </span>
-                      ) : row.category}
+                      ) : (
+                        <>
+                          <span className="sm:hidden">{row.category}{row.vendorCode ? `-${row.vendorCode}` : ""}</span>
+                          <span className="hidden sm:inline">{row.category}</span>
+                        </>
+                      )}
                     </td>
-                    <td className="p-2 font-mono text-muted-foreground" data-testid={`text-vendor-${i}`}>{row.vendorCode || "—"}</td>
-                    <td className="p-2 text-right font-mono" data-testid={`text-reels-${i}`}>{row.totalReels > 0 ? row.totalReels : "—"}</td>
+                    <td className="hidden sm:table-cell p-2 font-mono text-muted-foreground" data-testid={`text-vendor-${i}`}>{row.vendorCode || "—"}</td>
+                    <td className="hidden sm:table-cell p-2 text-right font-mono" data-testid={`text-reels-${i}`}>{row.totalReels > 0 ? row.totalReels : "—"}</td>
                     <td className="p-2 text-right font-mono" data-testid={`text-footage-${i}`}>
                       {row.totalFootage > 0 ? toDisplayUnit(row.totalFootage, currentUnit).toLocaleString() : "—"}
                     </td>
