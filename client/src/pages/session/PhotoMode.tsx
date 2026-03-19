@@ -1305,7 +1305,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
   return (
-    <div className={`rounded-md border-2 border-[hsl(18_85%_32%)] sm:border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4 overflow-hidden ${scanPanelOpen ? "sm:grid sm:grid-cols-[minmax(0,1fr)_320px] sm:gap-4 sm:items-start" : ""}`}>
+    <div className="rounded-md border-2 border-[hsl(18_85%_32%)] sm:border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4 overflow-hidden">
       <div className="space-y-4 min-w-0">
       <input
         ref={fileInputRef}
@@ -1616,7 +1616,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           )}
 
           {currentPhoto && (
-            <div className="flex items-stretch">
+            <div className="relative flex items-stretch">
               {uploadedPhotos.length > 1 && (
                 <button
                   className="hidden sm:flex w-7 min-w-[28px] items-center justify-center bg-transparent hover:bg-[hsl(18_85%_40%)] text-white/0 hover:text-white rounded-l-md transition-all shrink-0"
@@ -1904,6 +1904,34 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 >
                   <ChevronRight className="h-5 w-5" />
                 </button>
+              )}
+              {scanPanelOpen && (
+                <div className="hidden sm:flex flex-col gap-0 absolute top-0 right-0 w-1/2 h-full z-[25] overflow-y-auto bg-[hsl(25_8%_13%)] border-l border-[hsl(280_50%_30%/0.4)] p-4" data-testid="scan-panel-desktop">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <ScanLine className="h-4 w-4 text-[hsl(280_60%_55%)]" />
+                      <span className="text-sm font-semibold text-[hsl(280_60%_70%)]">Scan Panel</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={toggleScanPanel}
+                      data-testid="button-scan-panel-close-desktop"
+                    >
+                      <PanelCloseX className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <LabelScannerTab
+                    sessionId={sessionId}
+                    photos={photos}
+                    currentPhotoId={scanPanelCurrentPhotoId}
+                    canEdit={canEdit}
+                    isAdmin={isAdmin}
+                    onPinDataChanged={onPinDataChanged}
+                    onlineUsers={onlineUsers}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -2642,35 +2670,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       </AlertDialog>
 
       </div>
-
-      {scanPanelOpen && (
-        <div className="hidden sm:flex flex-col gap-0 min-w-0 border-l border-[hsl(280_50%_30%/0.4)] pl-4 self-stretch max-h-[85vh] overflow-y-auto" data-testid="scan-panel-desktop">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <ScanLine className="h-4 w-4 text-[hsl(280_60%_55%)]" />
-              <span className="text-sm font-semibold text-[hsl(280_60%_70%)]">Scan Panel</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
-              onClick={toggleScanPanel}
-              data-testid="button-scan-panel-close-desktop"
-            >
-              <PanelCloseX className="h-4 w-4" />
-            </Button>
-          </div>
-          <LabelScannerTab
-            sessionId={sessionId}
-            photos={photos}
-            currentPhotoId={scanPanelCurrentPhotoId}
-            canEdit={canEdit}
-            isAdmin={isAdmin}
-            onPinDataChanged={onPinDataChanged}
-            onlineUsers={onlineUsers}
-          />
-        </div>
-      )}
 
       {isMobile && (
         <Sheet open={scanPanelOpen} onOpenChange={(open) => {
