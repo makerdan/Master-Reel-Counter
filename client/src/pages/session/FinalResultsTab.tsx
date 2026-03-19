@@ -6,7 +6,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { Entry, Photo, Pin } from "@shared/schema";
+import type { Entry, Photo, Pin, ReviewResponse } from "@shared/schema";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 
@@ -190,6 +190,19 @@ export default function FinalResultsTab({
     enabled: sessionId > 0,
   });
 
+  const { data: reviewResponses = [] } = useQuery<ReviewResponse[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "review-responses"],
+    enabled: sessionId > 0,
+  });
+
+  const reviewStats = useMemo(() => {
+    const total = entries.length;
+    const reviewedIds = new Set(reviewResponses.map(r => r.entryId));
+    const notReviewed = entries.filter(e => !reviewedIds.has(e.id)).length;
+    const flagged = entries.filter(e => e.flagged).length;
+    return { total, notReviewed, flagged };
+  }, [entries, reviewResponses]);
+
   const photoMap = useMemo(() => new Map(photos.map(p => [p.id, p])), [photos]);
 
   const tallyRows = useMemo<TallyRow[]>(() => {
@@ -315,6 +328,28 @@ export default function FinalResultsTab({
 
   return (
     <div className="p-3 sm:p-4 space-y-6" data-testid="final-results-tab">
+
+      {/* ── Review Status Banner ─────────────────────────────────────────── */}
+      {reviewStats.total > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-[hsl(25_20%_28%)] bg-[hsl(25_12%_15%)] px-4 py-2.5" data-testid="final-results-review-banner">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm text-muted-foreground">Not yet reviewed:</span>
+            <span className={`text-sm font-semibold tabular-nums ${reviewStats.notReviewed > 0 ? "text-amber-400" : "text-green-400"}`} data-testid="stat-not-reviewed">
+              {reviewStats.notReviewed}
+            </span>
+            <span className="text-sm text-muted-foreground">/ {reviewStats.total}</span>
+          </div>
+          <div className="w-px h-4 bg-[hsl(25_20%_28%)] hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm text-muted-foreground">Still flagged:</span>
+            <span className={`text-sm font-semibold tabular-nums ${reviewStats.flagged > 0 ? "text-red-400" : "text-green-400"}`} data-testid="stat-flagged">
+              {reviewStats.flagged}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Tally Table ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
