@@ -1747,6 +1747,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               </div>
               <div className="photo-overlay-controls right-strip">
                 <button
+                  className={`photo-overlay-btn ${!pinsVisible ? "photo-overlay-btn-active" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); setPinsVisible((v) => !v); }}
+                  title={pinsVisible ? "Hide pins" : "Show pins"}
+                  data-testid="button-overlay-hide-pins"
+                >
+                  {pinsVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </button>
+                <div className="photo-overlay-divider" />
+                <button
                   className="photo-overlay-btn"
                   onClick={(e) => { e.stopPropagation(); setScale((s) => Math.min(12, s + 0.5)); }}
                   title="Zoom in"
