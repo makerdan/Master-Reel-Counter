@@ -89,7 +89,15 @@ function LocationList({ locations, currentUnit }: {
       </button>
       {open && (
         <ul className="mt-1 space-y-0.5 pl-1">
-          {locations.map((loc, i) => (
+          {[...locations].sort((a, b) => {
+            const aisleA = isNaN(Number(a.aisle)) ? a.aisle : String(Number(a.aisle)).padStart(10, "0");
+            const aisleB = isNaN(Number(b.aisle)) ? b.aisle : String(Number(b.aisle)).padStart(10, "0");
+            const ac = aisleA.localeCompare(aisleB);
+            if (ac !== 0) return ac;
+            const secA = isNaN(Number(a.section)) ? a.section : String(Number(a.section)).padStart(10, "0");
+            const secB = isNaN(Number(b.section)) ? b.section : String(Number(b.section)).padStart(10, "0");
+            return secA.localeCompare(secB);
+          }).map((loc, i) => (
             <li key={i} className="text-xs text-muted-foreground font-mono">
               Aisle {loc.aisle} / Sec {loc.section}
               {loc.reelCount > 1 ? ` ×${loc.reelCount}` : ""}
