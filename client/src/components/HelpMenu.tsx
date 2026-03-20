@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw, HardDrive, Globe } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw, HardDrive, Globe, FileSpreadsheet, Clock } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -150,7 +150,7 @@ export function OverviewHelp() {
       </AccordionTrigger>
       <AccordionContent className="text-2xl text-muted-foreground leading-relaxed space-y-2 pb-4">
         <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
-        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow with Reel IDs, Flagged, Photos Reel, and Review tabs. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience.</p>
+        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow across five tabs: Photos Reel, Reel IDs, Flagged, Review, and Final Results. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience — tap the red button in the session header to enter it.</p>
       </AccordionContent>
     </AccordionItem>
   );
@@ -445,6 +445,11 @@ export function SessionSections() {
             label="Export"
             description="Export session data as CSV (spreadsheet), PDF (formatted report), or share via email. The export includes all entries grouped by aisle/section."
           />
+          <FeatureRow
+            icon={<span className="inline-block w-3.5 h-3.5 rounded bg-red-600/80" />}
+            label="Mobile Flow Toggle"
+            description="The red button (phone icon) in the header switches to Mobile Flow — a phone-optimized capture screen. Once inside Mobile Flow, the button turns blue (monitor icon) and reads 'Reel IDs' — tap it to return to the full desktop tabs."
+          />
           <div className="flex items-start gap-2.5 py-1.5">
             <div className="mt-0.5"><span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-[hsl(18_70%_50%)]" /></div>
             <div>
@@ -707,6 +712,74 @@ export function SessionSections() {
         </AccordionContent>
       </AccordionItem>
 
+      <AccordionItem value="session-review">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Review Tab</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A structured one-by-one review queue that lets your team verify every reel entry. Each entry shows a zoomed crop of its pin location alongside the full photo. Responses are tracked per user and synced in real time.</p>
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Review Queue</p>
+          <FeatureRow
+            icon={<HelpIcon icon={ChevronLeft} />}
+            label="Navigation"
+            description="Use Prev / Next buttons to move through your assigned entries. The counter shows your position (e.g. 3 / 18). On load, the view automatically jumps to your first unreviewed entry."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Clock} />}
+            label="Reveal Timer"
+            description="Entries created in the last 60 seconds show a countdown before the wire details are revealed. This encourages independent verification rather than copying a freshly entered value. Entries older than 60 seconds are revealed immediately."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={CheckCircle2} />}
+            label="Looks Good (Approve)"
+            description='Tap "Looks Good" to mark the entry as reviewed and correct. The queue automatically advances to your next unreviewed entry. Approved entries are tracked with a green checkmark.'
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Flag} className="text-yellow-500" />}
+            label="Flag for Re-check"
+            description='Tap "Flag" to flag the entry for further attention. Optionally enter a reason before confirming. Flagged entries appear in the Flagged tab and count toward the "Still flagged" stat in Final Results.'
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Viewing Controls</p>
+          <FeatureRow
+            icon={<HelpIcon icon={ZoomIn} />}
+            label="Pin Crop View"
+            description="A zoomed canvas crop centered on the pin position appears at the top. Drag to pan the crop window. Use the zoom slider to adjust magnification — zoom in to read fine label text."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Eye} />}
+            label="Full Photo View"
+            description="The complete photo is shown below the crop. Scroll-wheel or pinch to zoom, drag to pan when zoomed in."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={RotateCw} />}
+            label="Rotate"
+            description="Rotate the full photo view clockwise or counter-clockwise within the review session."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Move} />}
+            label="Pan Mode"
+            description="Toggle pan mode on the full photo to drag it when zoomed in, rather than accidentally triggering other controls."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Collaborative Review</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Users} />}
+            label="Cohort Distribution"
+            description="When multiple users open the Review tab at the same time, entries are automatically divided among them — each reviewer gets a non-overlapping slice of the queue. A progress bar shows each reviewer's completion status."
+          />
+          <FeatureRow
+            icon={<span className="inline-block w-2 h-2 rounded-full bg-green-500" />}
+            label="Real-Time Sync"
+            description="Review responses are saved to the server and synced instantly. When a collaborator marks an entry, your queue and progress totals update live."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
       <AccordionItem value="session-photos-reel">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(200_70%_45%)]" /> Photos Reel Tab</span>
@@ -857,6 +930,64 @@ export function SessionSections() {
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
             label="Total Footage"
             description="The Table View footer shows the total footage across all entries for quick reference."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="session-final-results">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Final Results Tab</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A summary view showing review status, a category-level count tally for the entire session, and an optional comparison against a pre-loaded inventory spreadsheet.</p>
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Review Status Banner</p>
+          <FeatureRow
+            icon={<HelpIcon icon={CheckCircle2} />}
+            label="Not Yet Reviewed"
+            description='Shows how many entries still need a review response out of the total. When all entries are reviewed the count turns green. On mobile in light mode, this banner has a blue background.'
+          />
+          <FeatureRow
+            icon={<AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
+            label="Still Flagged"
+            description="Shows how many entries are currently flagged. Unflag them in the Flagged tab to clear this count."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Session Count Tally</p>
+          <FeatureRow
+            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
+            label="Category Rows"
+            description="Every unique wire category in the session appears as its own row with vendor code, reel count, and total footage. On desktop, Category and Vendor are separate columns. On mobile, they are combined into a single 'Category-Vendor' value (e.g. RX43WG2500-COP) and the Reels column is hidden to save space."
+          />
+          <FeatureRow
+            icon={<span className="text-muted-foreground italic text-[11px]">(uncategorized)</span>}
+            label="Uncategorized Pins"
+            description="Pins without any wire details entered appear in a special row. On mobile, tap a location link to jump directly to that pin's photo in the Reel IDs tab so you can fill in the missing data."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={MapPin} />}
+            label="Locations"
+            description="Expand the Locations column for any category row to see which aisle/section combinations contain that wire type and how many reels are at each location."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Inventory Comparison</p>
+          <FeatureRow
+            icon={<HelpIcon icon={FileSpreadsheet} />}
+            label="Upload Inventory"
+            description="Drag-and-drop or tap to upload a CSV or Excel spreadsheet of expected inventory. The file should have columns for wire category, vendor code, reel count, and footage."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={CheckCircle2} />}
+            label="Match / Mismatch Badges"
+            description="Each tally row gets a status badge after an inventory file is loaded — Match (counts agree), Discrepancy (counts differ), or Unmatched (category not in inventory). Rows are color-coded for quick scanning."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Clear Inventory"
+            description="Remove the loaded inventory file with the Clear button to return to the plain tally view."
           />
         </AccordionContent>
       </AccordionItem>
