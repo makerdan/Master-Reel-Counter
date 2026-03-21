@@ -875,18 +875,19 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           </p>
                         )}
                         {pin.photoId && (detailPhotosByParent.get(pin.photoId) || []).length > 0 && (
-                          <div className="flex gap-1 mt-1 flex-wrap" data-testid={`detail-photos-desktop-${pin.id}`}>
+                          <div className="flex gap-2 mt-2 flex-wrap items-start" data-testid={`detail-photos-desktop-${pin.id}`}>
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 self-center"><ImageIcon className="h-3 w-3" /> Linked:</span>
                             {(detailPhotosByParent.get(pin.photoId) || []).map((dp) => (
                               <button
                                 key={dp.id}
                                 type="button"
-                                className="relative w-10 h-10 rounded overflow-hidden border border-blue-400 cursor-pointer hover:border-blue-600 shrink-0"
+                                className="relative w-16 h-16 rounded overflow-hidden border-2 border-blue-400 cursor-pointer hover:border-blue-300 hover:shadow-lg shrink-0 transition-all"
                                 onClick={() => setPreviewPhotoUrl(`/api/photos/${dp.id}/image`)}
                                 data-testid={`detail-thumb-desktop-${dp.id}`}
-                                title="View detail photo"
+                                title={`${dp.linkReason || "Detail"} — click to enlarge`}
                               >
                                 <img src={`/api/photos/${dp.id}/image`} alt="detail" className="w-full h-full object-cover" />
-                                <span className="absolute bottom-0 left-0 right-0 bg-blue-600/80 text-white text-[8px] text-center leading-3 py-px">Detail</span>
+                                <span className="absolute bottom-0 left-0 right-0 bg-blue-600/90 text-white text-[7px] text-center leading-3 py-px truncate px-0.5">{dp.linkReason || "Detail"}</span>
                               </button>
                             ))}
                           </div>
@@ -1102,21 +1103,21 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         </p>
                       )}
                       {pin.photoId && (detailPhotosByParent.get(pin.photoId) || []).length > 0 && (
-                        <div className="flex gap-1.5 w-full flex-wrap" data-testid={`detail-photos-mobile-${pin.id}`}>
+                        <div className="flex gap-2 w-full flex-wrap items-start" data-testid={`detail-photos-mobile-${pin.id}`}>
                           <p className="w-full text-[10px] text-muted-foreground flex items-center gap-1">
-                            <ImageIcon className="h-3 w-3" /> Detail photos:
+                            <ImageIcon className="h-3 w-3" /> Linked photos — tap to enlarge:
                           </p>
                           {(detailPhotosByParent.get(pin.photoId) || []).map((dp) => (
                             <button
                               key={dp.id}
                               type="button"
-                              className="relative w-14 h-14 rounded overflow-hidden border border-blue-400 cursor-pointer hover:border-blue-600 shrink-0"
+                              className="relative w-16 h-16 rounded overflow-hidden border-2 border-blue-400 cursor-pointer active:border-blue-300 shrink-0"
                               onClick={() => setPreviewPhotoUrl(`/api/photos/${dp.id}/image`)}
                               data-testid={`detail-thumb-mobile-${dp.id}`}
-                              title="View detail photo"
+                              title={`${dp.linkReason || "Detail"} — tap to enlarge`}
                             >
                               <img src={`/api/photos/${dp.id}/image`} alt="detail" className="w-full h-full object-cover" />
-                              <span className="absolute bottom-0 left-0 right-0 bg-blue-600/80 text-white text-[8px] text-center leading-3 py-px">Detail</span>
+                              <span className="absolute bottom-0 left-0 right-0 bg-blue-600/90 text-white text-[7px] text-center leading-3 py-px truncate px-0.5">{dp.linkReason || "Detail"}</span>
                             </button>
                           ))}
                         </div>
