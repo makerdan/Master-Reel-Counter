@@ -712,11 +712,11 @@ export default function ReviewTab({
         <div className="absolute inset-x-0 h-3 rounded-full overflow-hidden top-1/2 -translate-y-1/2 flex">
           {assignedEntries.map((entry, idx) => {
             const response = myResponses.get(entry.id);
-            const approved = response && response.verdict !== "flagged";
+            const bandColor = !response ? "bg-muted" : response.verdict === "flagged" ? "bg-orange-500" : "bg-red-500";
             return (
               <div
                 key={entry.id}
-                className={`flex-1 ${approved ? "bg-red-500" : "bg-muted"} ${idx === 0 ? "rounded-l-full" : ""} ${idx === assignedEntries.length - 1 ? "rounded-r-full" : ""}`}
+                className={`flex-1 ${bandColor} ${idx === 0 ? "rounded-l-full" : ""} ${idx === assignedEntries.length - 1 ? "rounded-r-full" : ""}`}
                 style={{ minWidth: 0 }}
               />
             );
