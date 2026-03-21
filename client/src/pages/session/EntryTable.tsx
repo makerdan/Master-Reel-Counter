@@ -263,7 +263,7 @@ function EntryTable({
                       onClick={() => toggleSection(sectionKey)}
                       data-testid={`section-toggle-${sectionKey}`}
                     >
-                      <td colSpan={10}>
+                      <td colSpan={11}>
                         <div className="flex items-center gap-2">
                           <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
                           <span className="font-semibold">{aisleLabel.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${aisleLabel}`} - {aisleLabel.toLowerCase() === "receiving" && sectionLabel === "000" ? "Section Unknown" : `Section ${sectionLabel}`}</span>
@@ -375,22 +375,22 @@ function EntryTable({
             </tbody>
             <tfoot>
               <tr className="hidden sm:table-row">
-                <td colSpan={6} className="font-semibold">
+                <td colSpan={8} className="font-semibold">
                   Total: {entries.length} entries
                 </td>
                 <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage">
                   {totalFootage.toLocaleString()} {uLabel}
                 </td>
-                <td colSpan={3} />
+                <td colSpan={2} />
               </tr>
               <tr className="sm:hidden">
-                <td colSpan={3} className="font-semibold">
+                <td colSpan={8} className="font-semibold">
                   Total: {entries.length} entries
                 </td>
                 <td className="font-semibold mono" style={{ textAlign: "center" }} data-testid="text-total-footage-mobile">
                   {totalFootage.toLocaleString()} {uLabel}
                 </td>
-                <td />
+                <td colSpan={2} />
               </tr>
             </tfoot>
           </table>
