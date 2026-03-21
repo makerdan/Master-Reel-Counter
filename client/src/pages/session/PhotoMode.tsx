@@ -1404,7 +1404,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               data-testid="button-quick-entry-toggle"
             >
               <ListPlus className="h-4 w-4 mr-1" />
-              Quick Entry
+              <span className="font-bold">Quick Entry</span>
               {showQuickEntry ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
             </Button>
             <Button
@@ -1415,7 +1415,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               title={scanPanelOpen ? "Close Scan Panel" : "Open Scan Panel"}
             >
               <ScanLine className="h-4 w-4 mr-1" />
-              Scan
+              <span className="font-bold">Scan</span>
               {scanPanelOpen ? <ChevronUp className="h-3.5 w-3.5 ml-1" /> : <ChevronDown className="h-3.5 w-3.5 ml-1" />}
             </Button>
           </div>
