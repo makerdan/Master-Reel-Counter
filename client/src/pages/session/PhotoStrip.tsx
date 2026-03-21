@@ -99,6 +99,16 @@ function PhotoCard({
   const aisleRef = useRef(aisle);
   const sectionRef = useRef(section);
   const notesRef = useRef(notes);
+  const thumbContainerRef = useRef<HTMLDivElement>(null);
+  const [isLgScreen, setIsLgScreen] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 1024px)');
+    setIsLgScreen(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsLgScreen(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
 
   const invalidatePhotos = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
@@ -207,11 +217,11 @@ function PhotoCard({
 
   return (
     <div className="rounded-md border border-border bg-card overflow-hidden group relative flex flex-col" data-testid={`strip-card-${photo.id}`}>
-      <div className="relative aspect-square bg-muted overflow-hidden">
+      <div ref={thumbContainerRef} className="relative aspect-square lg:aspect-video bg-muted overflow-hidden">
         <img
           src={photoUrl(photo.objectStorageKey)}
           alt={`Photo ${photo.id}`}
-          className="w-full h-full object-cover cursor-zoom-in"
+          className="w-full h-full object-cover lg:object-contain cursor-zoom-in"
           loading="lazy"
           onClick={() => {
             const label = [photo.aisle, photo.section].filter(Boolean).join(" / ") || `Photo #${photo.id}`;
@@ -231,12 +241,25 @@ function PhotoCard({
           let displayY = pin.yPercent;
           if (imgNaturalSize) {
             const { w: iw, h: ih } = imgNaturalSize;
-            if (iw > ih) {
-              const ratio = iw / ih;
-              displayX = pin.xPercent * ratio - (ratio - 1) * 50;
-            } else if (ih > iw) {
-              const ratio = ih / iw;
-              displayY = pin.yPercent * ratio - (ratio - 1) * 50;
+            const el = thumbContainerRef.current;
+            const contAspect = el ? el.clientWidth / el.clientHeight : 1;
+            const imgAspect = iw / ih;
+            if (isLgScreen) {
+              if (imgAspect > contAspect) {
+                const scale = contAspect / imgAspect;
+                displayY = pin.yPercent * scale + (1 - scale) * 50;
+              } else if (imgAspect < contAspect) {
+                const scale = imgAspect / contAspect;
+                displayX = pin.xPercent * scale + (1 - scale) * 50;
+              }
+            } else {
+              if (imgAspect > contAspect) {
+                const ratio = imgAspect / contAspect;
+                displayX = pin.xPercent * ratio - (ratio - 1) * 50;
+              } else if (imgAspect < contAspect) {
+                const ratio = contAspect / imgAspect;
+                displayY = pin.yPercent * ratio - (ratio - 1) * 50;
+              }
             }
           }
           return (
@@ -572,9 +595,9 @@ export default function PhotoStrip({
 
   if (isLoading) {
     return (
-      <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" data-testid="strip-loading">
+      <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3" data-testid="strip-loading">
         {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-square rounded-md" />
+          <Skeleton key={i} className="aspect-square lg:aspect-video rounded-md" />
         ))}
       </div>
     );
@@ -657,7 +680,7 @@ export default function PhotoStrip({
                       </span>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3">
                     {sectionGroup.photos.map((photo) => (
                       <PhotoCard
                         key={photo.id}
