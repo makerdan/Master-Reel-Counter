@@ -346,27 +346,49 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   }, [reviewResponses, allEntries]);
 
   const unflagMutation = useMutation({
-    mutationFn: async ({ pinId, flagReason }: { pinId: number; flagReason: string | null }) => {
+    mutationFn: async ({ pinId, flagReason, entryId, existingNotes }: { pinId: number; flagReason: string | null; entryId: number | null; existingNotes: string | null }) => {
       await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: null });
+      if (entryId) {
+        const marker = flagReason ? `[Resolved from flag: ${flagReason}]` : "[Resolved from flag]";
+        const updatedNotes = existingNotes ? `${existingNotes}\n${marker}` : marker;
+        await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: updatedNotes });
+      }
       return { pinId, flagReason };
     },
     onSuccess: ({ pinId, flagReason }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason } });
     },
   });
 
   const unflagGroupMutation = useMutation({
-    mutationFn: async (pinIds: number[]) => {
-      for (const id of pinIds) {
-        await apiRequest("PATCH", `/api/pins/${id}/flag`, { flagged: false, flagReason: null });
+    mutationFn: async (pins: { id: number; entryId: number | null; flagReason: string | null; entryNotes: string | null }[]) => {
+      for (const pin of pins) {
+        await apiRequest("PATCH", `/api/pins/${pin.id}/flag`, { flagged: false, flagReason: null });
+      }
+      const entryUpdates = new Map<number, { baseNotes: string | null; markers: string[] }>();
+      for (const pin of pins) {
+        if (pin.entryId) {
+          if (!entryUpdates.has(pin.entryId)) {
+            entryUpdates.set(pin.entryId, { baseNotes: pin.entryNotes || null, markers: [] });
+          }
+          const marker = pin.flagReason ? `[Resolved from flag: ${pin.flagReason}]` : "[Resolved from flag]";
+          entryUpdates.get(pin.entryId)!.markers.push(marker);
+        }
+      }
+      for (const [entryId, { baseNotes, markers }] of entryUpdates) {
+        const combined = markers.join("\n");
+        const updatedNotes = baseNotes ? `${baseNotes}\n${combined}` : combined;
+        await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: updatedNotes });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
     },
     onError: () => {
       toast({ title: "Un-flag failed", variant: "destructive" });
@@ -392,9 +414,12 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
 
       let resolvedEntryId = entryId;
       if (resolving) {
-        await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: data.flagReason.trim() || null });
+        const flagReasonText = data.flagReason.trim() || null;
+        const resolvedMarker = flagReasonText ? `[Resolved from flag: ${flagReasonText}]` : "[Resolved from flag]";
+        await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: flagReasonText });
         if (!resolvedEntryId) {
           const totalFootage = parsedFootage ? parsedFootage * (parsedReelCount > 0 ? parsedReelCount : 1) : undefined;
+          const notesWithMarker = data.notes ? `${data.notes}\n${resolvedMarker}` : resolvedMarker;
           const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
             aisle: photoAisle || "",
             section: photoSection || "",
@@ -404,17 +429,19 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             footage: totalFootage,
             reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
             photoId,
+            notes: notesWithMarker,
           });
           const newEntry = await res.json();
           resolvedEntryId = newEntry.id;
           await apiRequest("PATCH", `/api/pins/${pinId}`, { entryId: resolvedEntryId });
         } else {
+          const notesWithMarker = data.notes ? `${data.notes}\n${resolvedMarker}` : resolvedMarker;
           await apiRequest("PATCH", `/api/entries/${resolvedEntryId}`, {
             wireType: data.wireDetails || undefined,
             manufacturer: data.vendorCode || undefined,
             footage: parsedFootage ? parsedFootage * (parsedReelCount > 0 ? parsedReelCount : 1) : undefined,
             reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
-            notes: data.notes || null,
+            notes: notesWithMarker,
           });
         }
       } else {
@@ -788,7 +815,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     variant="outline"
                     size="sm"
                     className="hidden sm:flex"
-                    onClick={() => unflagGroupMutation.mutate(group.pins.map(p => p.id))}
+                    onClick={() => unflagGroupMutation.mutate(group.pins.map(p => ({ id: p.id, entryId: p.entryId, flagReason: p.flagReason, entryNotes: p.entryNotes || null })))}
                     disabled={unflagGroupMutation.isPending}
                     data-testid={`button-unflag-group-${group.photoId}`}
                     title="Remove flag from all pins in this group"
@@ -1109,7 +1136,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           variant="outline"
                           size="sm"
                           className="!border-blue-600/50"
-                          onClick={() => unflagMutation.mutate({ pinId: pin.id, flagReason: pin.flagReason })}
+                          onClick={() => unflagMutation.mutate({ pinId: pin.id, flagReason: pin.flagReason, entryId: pin.entryId, existingNotes: pin.entryNotes || null })}
                           disabled={unflagMutation.isPending}
                           data-testid={`button-resolve-mobile-${pin.id}`}
                           title="Un-Flag"

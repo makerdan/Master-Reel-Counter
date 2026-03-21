@@ -371,7 +371,23 @@ export default function ReviewTab({
 
   const photoMap = useMemo(() => new Map(photos.map(p => [p.id, p])), [photos]);
 
-  const sortedEntries = useMemo(() => [...entries].sort((a, b) => a.id - b.id), [entries]);
+  const flaggedEntryIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const p of sessionPins) {
+      if (p.entryId && p.flagged) ids.add(p.entryId);
+    }
+    return ids;
+  }, [sessionPins]);
+
+  const sortedEntries = useMemo(() => {
+    return [...entries]
+      .filter(entry => {
+        if (flaggedEntryIds.has(entry.id)) return false;
+        if (entry.notes && entry.notes.includes("[Resolved from flag")) return false;
+        return true;
+      })
+      .sort((a, b) => a.id - b.id);
+  }, [entries, flaggedEntryIds]);
 
   const sortedUsers = useMemo(() => {
     if (onlineUsers.length === 0 && currentUserId) return [{ userId: currentUserId, username: user?.firstName || currentUserId }];
