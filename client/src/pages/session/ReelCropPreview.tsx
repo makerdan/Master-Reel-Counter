@@ -168,7 +168,7 @@ export default function ReelCropPreview({
         Reel Preview — {label}
       </div>
       <div className="flex items-start gap-1.5">
-        <div className="rounded-md border border-black overflow-hidden bg-black flex-shrink-0">
+        <div className="rounded-md border border-blue-600/50 overflow-hidden bg-black flex-shrink-0">
           <canvas
             ref={canvasRef}
             className="block touch-none select-none"

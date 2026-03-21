@@ -622,7 +622,7 @@ export default function PhotoStrip({
       {aisleGroups.map((aisleGroup) => {
         const totalPhotos = aisleGroup.sections.reduce((n, s) => n + s.photos.length, 0);
         return (
-          <div key={aisleGroup.aisle} className="border border-blue-500 sm:!border-black rounded-lg p-2">
+          <div key={aisleGroup.aisle} className="border border-blue-500 sm:!border-blue-600/50 rounded-lg p-2">
             <div className="mb-3 pb-1 border-b">
               <button
                 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary hover:underline transition-colors cursor-pointer"

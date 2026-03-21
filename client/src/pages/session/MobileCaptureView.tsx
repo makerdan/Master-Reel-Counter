@@ -488,7 +488,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         </div>
       )}
       {!detailReviewPhoto && (
-      <Card className="!border-[hsl(18_60%_30%)]">
+      <Card className="!border-[hsl(215_40%_35%)]">
         <CardContent className="p-4 space-y-3">
           {!aisle.trim() && (
             <div className="px-3 py-2 text-sm text-muted-foreground text-center" data-testid="text-aisle-required">
@@ -514,7 +514,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`flex-1 rounded-sm !border-black dark:!border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
+                  className={`flex-1 rounded-sm !border-blue-600/50 dark:!border-blue-400/50${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-aisle-decrement"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -529,7 +529,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`flex-1 rounded-sm !border-black dark:!border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
+                  className={`flex-1 rounded-sm !border-blue-600/50 dark:!border-blue-400/50${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-aisle-increment"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -585,7 +585,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`flex-1 rounded-sm !border-black dark:!border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
+                  className={`flex-1 rounded-sm !border-blue-600/50 dark:!border-blue-400/50${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-section-decrement"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -599,7 +599,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`flex-1 rounded-sm !border-black dark:!border-white${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
+                  className={`flex-1 rounded-sm !border-blue-600/50 dark:!border-blue-400/50${captureSettings?.largerTouchTargets ? " min-h-[40px]" : ""}`}
                   data-testid="button-section-increment"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -631,7 +631,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             <Button
               variant="outline"
               size="default"
-              className={`!border-[hsl(18_85%_32%/0.5)] text-[hsl(18_85%_32%)] dark:text-[hsl(18_85%_50%)] dark:!border-[hsl(18_85%_32%/0.4)] ${captureSettings?.largerTouchTargets ? "min-h-[48px]" : ""}`}
+              className={`!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)] ${captureSettings?.largerTouchTargets ? "min-h-[48px]" : ""}`}
               onClick={() => fileInputRef.current?.click()}
               disabled={!aisle.trim()}
               data-testid="button-mobile-upload"
@@ -641,7 +641,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             <Button
               variant="outline"
               size="default"
-              className="!border-[hsl(18_85%_32%/0.5)] text-[hsl(18_85%_32%)] dark:text-[hsl(18_85%_50%)] dark:!border-[hsl(18_85%_32%/0.4)]"
+              className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)]"
               onClick={() => setShowQuickEntry(prev => !prev)}
               data-testid="button-mobile-quick-entry-toggle"
             >

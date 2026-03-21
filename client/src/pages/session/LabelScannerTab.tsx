@@ -278,7 +278,7 @@ function CropCanvas({
       ref={canvasRef}
       width={size}
       height={size}
-      className="rounded border border-[hsl(18_60%_30%/0.3)] bg-black"
+      className="rounded border border-blue-600/30 bg-black"
       style={{ width: size, height: size, cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
       onMouseDown={handlePointerDown}
       onMouseMove={handlePointerMove}
@@ -1145,7 +1145,7 @@ export default function LabelScannerTab({
   });
 
   const photoSelector = (
-    <div className="flex items-center gap-2 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(18_60%_30%/0.2)]">
+    <div className="flex items-center gap-2 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(215_30%_50%/0.25)]">
       <ScanLine className="h-5 w-5 text-[hsl(18_85%_55%)]" />
       <span className="font-semibold text-white text-sm">AI Scanner</span>
       {!batchMode && (
@@ -1157,7 +1157,7 @@ export default function LabelScannerTab({
             setCards([]);
           }}
         >
-          <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
+          <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.3)] text-white" data-testid="select-scanner-photo">
             <SelectValue placeholder="Select a photo..." />
           </SelectTrigger>
           <SelectContent>
@@ -1251,7 +1251,7 @@ export default function LabelScannerTab({
 
   return (
     <div className="space-y-4" data-testid="label-scanner-tab">
-      <div className="bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(18_60%_30%/0.2)] space-y-2">
+      <div className="bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(215_30%_50%/0.25)] space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <ScanLine className="h-5 w-5 text-[hsl(18_85%_55%)]" />
@@ -1267,7 +1267,7 @@ export default function LabelScannerTab({
                   setCards([]);
                 }}
               >
-                <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.3)] text-white" data-testid="select-scanner-photo">
+                <SelectTrigger className="w-[300px] h-7 text-xs bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.3)] text-white" data-testid="select-scanner-photo">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1279,7 +1279,7 @@ export default function LabelScannerTab({
                 </SelectContent>
               </Select>
             )}
-            <Badge variant="outline" className="text-xs border-[hsl(18_60%_30%/0.4)] text-white/70">
+            <Badge variant="outline" className="text-xs border-[hsl(215_30%_50%/0.4)] text-white/70">
               {effectivePins.length} active pin{effectivePins.length !== 1 ? "s" : ""}
             </Badge>
             {isReceiving && effectivePins.length > activePinsForPhoto.length && (
@@ -1381,7 +1381,7 @@ export default function LabelScannerTab({
       </div>
 
       <div className="flex items-center gap-2" data-testid="batch-mode-toggle-row">
-        <div className="flex rounded-md border border-[hsl(18_60%_30%/0.3)] overflow-hidden">
+        <div className="flex rounded-md border border-[hsl(215_30%_50%/0.3)] overflow-hidden">
           <button
             onClick={() => setBatchMode(false)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -1413,14 +1413,14 @@ export default function LabelScannerTab({
       </div>
 
       {includedCards.length > 20 && phase === "preview" && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-[hsl(0_0%_5%)] border border-[hsl(18_60%_30%/0.4)] rounded text-[hsl(18_85%_55%)] text-xs" data-testid="warning-batch-split">
+        <div className="flex items-center gap-2 px-3 py-2 bg-[hsl(0_0%_5%)] border border-[hsl(215_30%_50%/0.4)] rounded text-[hsl(18_85%_55%)] text-xs" data-testid="warning-batch-split">
           <AlertTriangle className="h-4 w-4 flex-shrink-0" />
           <span>{includedCards.length} pins selected — analysis will be split into {Math.ceil(includedCards.length / 20)} batches.</span>
         </div>
       )}
 
       {batchMode && phase === "preview" && displayCards.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(25_12%_20%)] border border-[hsl(18_60%_30%/0.2)] rounded text-white/60 text-xs" data-testid="batch-summary-note">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[hsl(25_12%_20%)] border border-[hsl(215_30%_50%/0.25)] rounded text-white/60 text-xs" data-testid="batch-summary-note">
           <Grid3X3 className="h-3.5 w-3.5 flex-shrink-0" />
           <span>{displayCards.length} pin{displayCards.length !== 1 ? "s" : ""} across {new Set(displayCards.map((c) => c.pin.photoId)).size} photo{new Set(displayCards.map((c) => c.pin.photoId)).size !== 1 ? "s" : ""}{participantBatches ? ` · ${participantBatches.length} batch${participantBatches.length !== 1 ? "es" : ""}` : ""}</span>
         </div>
@@ -1434,12 +1434,12 @@ export default function LabelScannerTab({
             return (
               <div key={batch.userId} data-testid={`batch-section-${batchIdx}`}>
                 {batchIdx > 0 && (
-                  <div className="border-t border-[hsl(18_60%_30%/0.2)] my-4" />
+                  <div className="border-t border-[hsl(215_30%_50%/0.25)] my-4" />
                 )}
                 <div className={`sticky top-0 z-10 flex items-center gap-2 px-3 py-2 mb-3 border rounded-lg ${
                   batchReadyStatus[batch.userId]
                     ? "bg-green-900/30 border-green-700/40"
-                    : "bg-[hsl(25_15%_13%)] border-[hsl(18_60%_30%/0.25)]"
+                    : "bg-[hsl(25_15%_13%)] border-[hsl(215_30%_50%/0.25)]"
                 }`} data-testid={`batch-header-${batchIdx}`}>
                   {batchReadyStatus[batch.userId] ? (
                     <CheckCircle2 className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
@@ -1474,7 +1474,7 @@ export default function LabelScannerTab({
                         key={card.pin.id}
                         className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors overflow-hidden ${
                           card.included
-                            ? "bg-[hsl(25_12%_16%)] border-[hsl(18_60%_30%/0.3)]"
+                            ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)]"
                             : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)] opacity-60"
                         }`}
                         data-testid={`card-pin-${card.pin.id}`}
@@ -1540,7 +1540,7 @@ export default function LabelScannerTab({
                               </Popover>
                             )}
                             {isBatch && batchPhotoObj && (
-                              <Badge className="text-[9px] bg-[hsl(25_30%_25%)] text-white/50 border-[hsl(18_30%_30%/0.3)] py-0 px-1" data-testid={`badge-batch-source-${card.pin.id}`}>
+                              <Badge className="text-[9px] bg-[hsl(25_30%_25%)] text-white/50 border-[hsl(215_25%_40%/0.3)] py-0 px-1" data-testid={`badge-batch-source-${card.pin.id}`}>
                                 {batchPhotoObj.aisle || "?"}{batchPhotoObj.section ? `/${batchPhotoObj.section}` : ""}
                               </Badge>
                             )}
@@ -1576,7 +1576,7 @@ export default function LabelScannerTab({
                           </div>
                         )}
                         {card.result && phase === "results" && (
-                          <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
                             <div className="rounded bg-black/30 px-2 py-1" data-testid={`raw-text-${card.pin.id}`}>
                               <span className="text-[10px] text-white/30 uppercase tracking-wider" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AI Raw</span>
                               <p className="text-[11px] text-white/50 break-words whitespace-pre-wrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
@@ -1603,7 +1603,7 @@ export default function LabelScannerTab({
                                 <Input
                                   value={card.editCatalog}
                                   onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                                  className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                                  className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
                                   style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                                   placeholder="Enter category..."
                                   data-testid={`input-catalog-${card.pin.id}`}
@@ -1617,7 +1617,7 @@ export default function LabelScannerTab({
                                 onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                                 maxLength={3}
                                 list="vendor-code-suggestions-scanner"
-                                className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                                className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
                                 style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                                 data-testid={`input-vendor-${card.pin.id}`}
                               />
@@ -1625,7 +1625,7 @@ export default function LabelScannerTab({
                           </div>
                         )}
                         {!card.result && phase === "results" && (
-                          <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)] overflow-hidden" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)] overflow-hidden" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
                             <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
                               Not analyzed — enter manually
                             </Badge>
@@ -1634,7 +1634,7 @@ export default function LabelScannerTab({
                               <Input
                                 value={card.editCatalog}
                                 onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                                className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                                className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
                                 style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                                 placeholder="Enter category..."
                                 data-testid={`input-catalog-manual-${card.pin.id}`}
@@ -1647,7 +1647,7 @@ export default function LabelScannerTab({
                                 onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                                 maxLength={3}
                                 list="vendor-code-suggestions-scanner"
-                                className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                                className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
                                 style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                                 data-testid={`input-vendor-manual-${card.pin.id}`}
                               />
@@ -1706,7 +1706,7 @@ export default function LabelScannerTab({
               key={card.pin.id}
               className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors overflow-hidden ${
                 card.included
-                  ? "bg-[hsl(25_12%_16%)] border-[hsl(18_60%_30%/0.3)]"
+                  ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)]"
                   : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)] opacity-60"
               }`}
               data-testid={`card-pin-${card.pin.id}`}
@@ -1787,7 +1787,7 @@ export default function LabelScannerTab({
                     </Badge>
                   )}
                   {isBatch && batchPhotoObj && (
-                    <Badge className="text-[9px] bg-[hsl(25_30%_25%)] text-white/50 border-[hsl(18_30%_30%/0.3)] py-0 px-1" data-testid={`badge-batch-source-${card.pin.id}`}>
+                    <Badge className="text-[9px] bg-[hsl(25_30%_25%)] text-white/50 border-[hsl(215_25%_40%/0.3)] py-0 px-1" data-testid={`badge-batch-source-${card.pin.id}`}>
                       {batchPhotoObj.aisle || "?"}{batchPhotoObj.section ? `/${batchPhotoObj.section}` : ""}
                     </Badge>
                   )}
@@ -1825,7 +1825,7 @@ export default function LabelScannerTab({
               )}
 
               {card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
                   <div className="rounded bg-black/30 px-2 py-1" data-testid={`raw-text-${card.pin.id}`}>
                     <span className="text-[10px] text-white/30 uppercase tracking-wider" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AI Raw</span>
                     <p
@@ -1859,7 +1859,7 @@ export default function LabelScannerTab({
                       <Input
                         value={card.editCatalog}
                         onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                        className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                        className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
                         style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                         placeholder="Enter category..."
                         data-testid={`input-catalog-${card.pin.id}`}
@@ -1874,7 +1874,7 @@ export default function LabelScannerTab({
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       maxLength={3}
                       list="vendor-code-suggestions-scanner"
-                      className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                      className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-${card.pin.id}`}
                     />
@@ -1883,7 +1883,7 @@ export default function LabelScannerTab({
               )}
 
               {!card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(18_60%_30%/0.15)] overflow-hidden" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)] overflow-hidden" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
                   <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
                     Not analyzed — enter manually
                   </Badge>
@@ -1892,7 +1892,7 @@ export default function LabelScannerTab({
                     <Input
                       value={card.editCatalog}
                       onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                      className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                      className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       placeholder="Enter category..."
                       data-testid={`input-catalog-manual-${card.pin.id}`}
@@ -1905,7 +1905,7 @@ export default function LabelScannerTab({
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       maxLength={3}
                       list="vendor-code-suggestions-scanner"
-                      className="bg-[hsl(25_12%_20%)] border-[hsl(18_60%_30%/0.2)] text-white uppercase"
+                      className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
                       style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-manual-${card.pin.id}`}
                     />
@@ -1954,7 +1954,7 @@ export default function LabelScannerTab({
                   setUseCachedResults(false);
                   setCards((prev) => prev.map((c) => ({ ...c, result: undefined, matchResult: undefined, editCatalog: "", editFootage: "", editVendor: "" })));
                 }}
-                className="gap-2 border-[hsl(18_60%_30%/0.3)] text-white/70 hover:text-white"
+                className="gap-2 border-[hsl(215_30%_50%/0.3)] text-white/70 hover:text-white"
                 data-testid="btn-back-to-preview"
               >
                 <X className="h-4 w-4" />

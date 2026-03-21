@@ -409,10 +409,10 @@ export default function SingleEntryMode({
                 {isUploading && <Loader2 className="h-5 w-5 animate-spin self-center" />}
               </div>
               <div className="flex sm:hidden items-center justify-center gap-4">
-                <Button type="button" className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera-mobile" title="Take Photo">
+                <Button type="button" className="bg-blue-700 text-white border-blue-800" onClick={() => singleCameraRef.current?.click()} disabled={isUploading} data-testid="button-single-camera-mobile" title="Take Photo">
                   {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
                 </Button>
-                <Button type="button" className="bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)]" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload-mobile" title="Upload Photo">
+                <Button type="button" className="bg-blue-700 text-white border-blue-800" onClick={() => singleFileRef.current?.click()} disabled={isUploading} data-testid="button-single-upload-mobile" title="Upload Photo">
                   {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
                 </Button>
               </div>

@@ -162,7 +162,7 @@ function DupPinTile({
 
   return (
     <div
-      className="flex-1 min-w-0 max-w-[47%] sm:max-w-[280px] border border-black rounded overflow-hidden bg-card"
+      className="flex-1 min-w-0 max-w-[47%] sm:max-w-[280px] border border-blue-600/50 rounded overflow-hidden bg-card"
       data-testid={`dup-pin-${pin.pinId}`}
     >
       {pin.photoObjectStorageKey ? (
@@ -218,7 +218,7 @@ function DupPinTile({
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 h-6 text-[10px] px-1 text-green-600 !border-black hover:bg-green-50 dark:hover:bg-green-950/30"
+              className="flex-1 h-6 text-[10px] px-1 text-green-600 !border-blue-600/50 hover:bg-green-50 dark:hover:bg-green-950/30"
               onClick={() => keepMutation.mutate()}
               disabled={keepMutation.isPending || deletePhotoMutation.isPending}
               data-testid={`button-keep-${pin.pinId}`}
@@ -231,7 +231,7 @@ function DupPinTile({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 h-6 text-[10px] px-1 text-red-600 !border-black hover:bg-red-50 dark:hover:bg-red-950/30"
+            className="flex-1 h-6 text-[10px] px-1 text-red-600 !border-blue-600/50 hover:bg-red-50 dark:hover:bg-red-950/30"
             onClick={() => deletePhotoMutation.mutate()}
             disabled={keepMutation.isPending || deletePhotoMutation.isPending}
             data-testid={`button-delete-photo-${pin.pinId}`}
@@ -247,7 +247,7 @@ function DupPinTile({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 h-7 px-0 text-green-600 !border-black hover:bg-green-50 dark:hover:bg-green-950/30"
+            className="flex-1 h-7 px-0 text-green-600 !border-blue-600/50 hover:bg-green-50 dark:hover:bg-green-950/30"
             onClick={() => keepMutation.mutate()}
             disabled={keepMutation.isPending || deletePhotoMutation.isPending}
             data-testid={`button-keep-mobile-${pin.pinId}`}
@@ -259,7 +259,7 @@ function DupPinTile({
         <Button
           size="sm"
           variant="outline"
-          className="flex-1 h-7 px-0 text-red-600 !border-black hover:bg-red-50 dark:hover:bg-red-950/30"
+          className="flex-1 h-7 px-0 text-red-600 !border-blue-600/50 hover:bg-red-50 dark:hover:bg-red-950/30"
           onClick={() => deletePhotoMutation.mutate()}
           disabled={keepMutation.isPending || deletePhotoMutation.isPending}
           data-testid={`button-delete-photo-mobile-${pin.pinId}`}
@@ -618,7 +618,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="text-xs border !border-black rounded px-2 py-1 bg-card text-foreground"
+              className="text-xs border !border-blue-600/50 rounded px-2 py-1 bg-card text-foreground"
               data-testid="select-sort"
             >
               <option value="location">Aisle / Section</option>
@@ -632,7 +632,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       <div className="space-y-2" data-testid="section-duplicates">
           {visibleDupGroups.length > 0 ? (
             <button
-              className="flex items-center gap-2 w-full pt-2 border-t border-black text-left"
+              className="flex items-center gap-2 w-full pt-2 border-t border-blue-600/50 text-left"
               onClick={() => setDupsOpen((o) => !o)}
               data-testid="button-toggle-duplicates"
             >
@@ -643,7 +643,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
               {dupsOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
             </button>
           ) : (
-            <div className="flex items-center gap-2 w-full pt-2 border-t border-black" data-testid="header-duplicates-cleared">
+            <div className="flex items-center gap-2 w-full pt-2 border-t border-blue-600/50" data-testid="header-duplicates-cleared">
               <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
               <h3 className="text-sm font-semibold text-muted-foreground flex-1">Possible Duplicates</h3>
             </div>
@@ -671,7 +671,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                 return (
                 <div
                   key={groupKey}
-                  className={`border border-black rounded-lg p-2 sm:p-3 overflow-hidden ${isSameReel ? "bg-violet-50/40 dark:bg-violet-950/15" : group.isDefiniteDoubleCount ? "bg-orange-50/50 dark:bg-orange-950/20" : "bg-amber-50/30 dark:bg-amber-950/10"}`}
+                  className={`border border-blue-600/50 rounded-lg p-2 sm:p-3 overflow-hidden ${isSameReel ? "bg-violet-50/40 dark:bg-violet-950/15" : group.isDefiniteDoubleCount ? "bg-orange-50/50 dark:bg-orange-950/20" : "bg-amber-50/30 dark:bg-amber-950/10"}`}
                   data-testid={`dup-group-${groupKey}`}
                 >
                   <div className="flex items-center gap-1.5 sm:gap-2 mb-2 flex-wrap">
@@ -733,10 +733,10 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           {photoGroups.map((group) => (
             <div
               key={group.photoId}
-              className="border !border-black rounded-lg overflow-hidden bg-card"
+              className="border !border-blue-600/50 rounded-lg overflow-hidden bg-card"
               data-testid={`flagged-group-${group.photoId}`}
             >
-              <div className="bg-muted/50 px-3 py-2 flex items-center gap-2 border-b !border-black flex-wrap" data-testid={`flagged-group-header-${group.photoId}`}>
+              <div className="bg-muted/50 px-3 py-2 flex items-center gap-2 border-b !border-blue-600/50 flex-wrap" data-testid={`flagged-group-header-${group.photoId}`}>
                 <MapPin className="h-4 w-4 text-orange-500 shrink-0" />
                 <span className="font-mono text-sm font-semibold">
                   {[group.photoAisle && `Aisle ${group.photoAisle}`, group.photoSection && `Section ${group.photoSection}`].filter(Boolean).join(" · ") || "No location"}
@@ -779,7 +779,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                 {group.pins.map((pin) => (
                   <div
                     key={pin.id}
-                    className="border !border-black rounded-lg p-3 hover:bg-accent/5 transition-colors"
+                    className="border !border-blue-600/50 rounded-lg p-3 hover:bg-accent/5 transition-colors"
                     data-testid={`flagged-pin-card-${pin.id}`}
                   >
                     {/* Desktop layout */}
@@ -791,7 +791,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           yPercent={pin.yPercent}
                           photoFilename={pin.photoFilename}
                           onClick={() => setPreviewPin(pin)}
-                          containerClass="w-20 h-20 rounded overflow-hidden border border-black shrink-0 cursor-pointer"
+                          containerClass="w-20 h-20 rounded overflow-hidden border border-blue-600/50 shrink-0 cursor-pointer"
                         >
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/30 transition-opacity pointer-events-none">
                             <Eye className="h-4 w-4 text-white" />
@@ -867,7 +867,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       </div>
                     </div>
                     {editingPinId === pin.id && (
-                      <div className="hidden sm:block border-t border-black pt-3 mt-1">
+                      <div className="hidden sm:block border-t border-blue-600/50 pt-3 mt-1">
                         {onReshoot && (
                           <div className="mb-3">
                             <Button
@@ -1025,7 +1025,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           yPercent={pin.yPercent}
                           photoFilename={pin.photoFilename}
                           onClick={() => setPreviewPin(pin)}
-                          containerClass="w-full rounded overflow-hidden border border-black cursor-pointer"
+                          containerClass="w-full rounded overflow-hidden border border-blue-600/50 cursor-pointer"
                           imgClass="w-full h-auto block"
                         />
                       ) : (
@@ -1075,7 +1075,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         <Button
                           variant="outline"
                           size="sm"
-                          className="!border-black"
+                          className="!border-blue-600/50"
                           onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
                           data-testid={`button-edit-mobile-${pin.id}`}
                           title="Edit Reel Data"
@@ -1085,7 +1085,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         <Button
                           variant="outline"
                           size="sm"
-                          className="!border-black"
+                          className="!border-blue-600/50"
                           onClick={() => unflagMutation.mutate({ pinId: pin.id, flagReason: pin.flagReason })}
                           disabled={unflagMutation.isPending}
                           data-testid={`button-resolve-mobile-${pin.id}`}
@@ -1095,7 +1095,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         </Button>
                       </div>
                       {editingPinId === pin.id && (
-                        <div className="w-full border-t border-black pt-3 mt-1 space-y-3">
+                        <div className="w-full border-t border-blue-600/50 pt-3 mt-1 space-y-3">
                           {onReshoot && (
                             <Button
                               variant="outline"
@@ -1242,7 +1242,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
 
       {unpinnedEntries.length > 0 && (
         <div className="space-y-2" data-testid="section-issues">
-          <div className="flex items-center gap-2 pt-2 border-t border-black">
+          <div className="flex items-center gap-2 pt-2 border-t border-blue-600/50">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
             <h3 className="text-sm font-semibold text-amber-600 dark:text-amber-400">
               Entries Without Photos ({unpinnedEntries.length})
@@ -1253,7 +1253,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             {unpinnedEntries.map((e) => (
               <div
                 key={e.id}
-                className="border border-black rounded-lg p-3 bg-amber-50/50 dark:bg-amber-950/20"
+                className="border border-blue-600/50 rounded-lg p-3 bg-amber-50/50 dark:bg-amber-950/20"
                 data-testid={`issue-entry-card-${e.id}`}
               >
                 <div className="flex items-start justify-between gap-2">
