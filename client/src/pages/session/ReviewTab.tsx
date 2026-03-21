@@ -708,20 +708,19 @@ export default function ReviewTab({
         onMouseDown={handleScrubMouseDown}
         onTouchStart={handleScrubTouchStart}
       >
-        {/* Track */}
-        <div className="absolute inset-x-0 h-2 rounded-full bg-muted top-1/2 -translate-y-1/2" />
-        {/* Per-entry reviewed dots */}
-        {assignedEntries.map((entry, idx) => {
-          if (!myResponses.has(entry.id)) return null;
-          const pct = assignedEntries.length > 1 ? (idx / (assignedEntries.length - 1)) * 100 : 0;
-          return (
-            <div
-              key={entry.id}
-              className="absolute w-0.5 h-3 rounded-sm bg-primary/70 -translate-x-1/2 top-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ left: `${pct}%` }}
-            />
-          );
-        })}
+        {/* Track — contiguous bands per entry */}
+        <div className="absolute inset-x-0 h-3 rounded-full overflow-hidden top-1/2 -translate-y-1/2 flex">
+          {assignedEntries.map((entry, idx) => {
+            const reviewed = myResponses.has(entry.id);
+            return (
+              <div
+                key={entry.id}
+                className={`flex-1 ${reviewed ? "bg-red-500" : "bg-muted"} ${idx === 0 ? "rounded-l-full" : ""} ${idx === assignedEntries.length - 1 ? "rounded-r-full" : ""}`}
+                style={{ minWidth: 0 }}
+              />
+            );
+          })}
+        </div>
         {/* Thumb */}
         <div
           className="absolute w-4 h-4 rounded-full bg-primary border-2 border-background shadow -translate-x-1/2 top-1/2 -translate-y-1/2 transition-[left] duration-75"
