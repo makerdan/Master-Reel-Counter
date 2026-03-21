@@ -731,24 +731,24 @@ function SessionWorkspace({
               }
               setMode(newMode);
             }}>
-              <TabsList className="w-full bg-blue-600 sm:bg-[hsl(25_12%_18%)] sm:dark:bg-[hsl(25_8%_15%)] border border-[hsl(18_60%_30%/0.3)]">
-                <TabsTrigger value="strip" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 sm:data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photos Reel">
+              <TabsList className="w-full bg-blue-600 border border-blue-700/40">
+                <TabsTrigger value="strip" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photos Reel">
                   <LayoutGrid className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Photos Reel</span>
                 </TabsTrigger>
-                <TabsTrigger value="photo" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 sm:data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Reel IDs">
+                <TabsTrigger value="photo" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Reel IDs">
                   <Camera className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Reel IDs</span>
                 </TabsTrigger>
-                <TabsTrigger value="flagged" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 sm:data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
+                <TabsTrigger value="flagged" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
                   <Flag className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Flagged</span>
                 </TabsTrigger>
-                <TabsTrigger value="review" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 sm:data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-review-mode" aria-label="Review">
+                <TabsTrigger value="review" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-review-mode" aria-label="Review">
                   <ClipboardCheck className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Review</span>
                 </TabsTrigger>
-                <TabsTrigger value="results" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 sm:data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-results-mode" aria-label="Final Results">
+                <TabsTrigger value="results" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-results-mode" aria-label="Final Results">
                   <BarChart2 className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Final Results</span>
                 </TabsTrigger>
