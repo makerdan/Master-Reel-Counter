@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch, ArrowUpDown } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch, ArrowUpDown, CheckCircle2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -294,7 +294,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
   const [categorySuggestions, setCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
-  const [pendingUnflag, setPendingUnflag] = useState<{ pinId: number } | null>(null);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [dupsOpen, setDupsOpen] = useState(true);
   const { data: dismissedKeysFromDb = [] } = useQuery<string[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "dismissed-duplicates"],
@@ -332,32 +332,84 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     },
   });
 
+  const unflagGroupMutation = useMutation({
+    mutationFn: async (pinIds: number[]) => {
+      for (const id of pinIds) {
+        await apiRequest("PATCH", `/api/pins/${id}/flag`, { flagged: false, flagReason: null });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+    },
+    onError: () => {
+      toast({ title: "Un-flag failed", variant: "destructive" });
+    },
+  });
+
   const savePinMutation = useMutation({
-    mutationFn: async ({ pinId, entryId, data }: { pinId: number; entryId: number | null; data: EditingState }) => {
+    mutationFn: async ({ pinId, entryId, photoId, photoAisle, photoSection, data }: {
+      pinId: number; entryId: number | null; photoId: number;
+      photoAisle: string | null; photoSection: string | null; data: EditingState;
+    }) => {
       const displayFootage = data.footage ? Number(data.footage) : null;
       const parsedFootage = displayFootage !== null && Number.isFinite(displayFootage) ? toBaseFeet(displayFootage, currentUnit) : null;
       const parsedReelCount = data.reelCount ? parseInt(data.reelCount) : 1;
+      const resolving = data.wireDetails.trim().length > 0;
+
       await apiRequest("PATCH", `/api/pins/${pinId}`, {
         wireDetails: data.wireDetails || null,
         vendorCode: data.vendorCode || null,
         footage: parsedFootage,
         reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
       });
-      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, {
-        flagged: true,
-        flagReason: data.flagReason.trim() || null,
-      });
-      if (entryId && data.notes !== undefined) {
-        await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: data.notes || null });
+
+      let resolvedEntryId = entryId;
+      if (resolving) {
+        await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: data.flagReason.trim() || null });
+        if (!resolvedEntryId) {
+          const totalFootage = parsedFootage ? parsedFootage * (parsedReelCount > 0 ? parsedReelCount : 1) : undefined;
+          const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
+            aisle: photoAisle || "",
+            section: photoSection || "",
+            position: "",
+            reelTag: data.wireDetails.trim(),
+            manufacturer: data.vendorCode || undefined,
+            footage: totalFootage,
+            reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
+            photoId,
+          });
+          const newEntry = await res.json();
+          resolvedEntryId = newEntry.id;
+          await apiRequest("PATCH", `/api/pins/${pinId}`, { entryId: resolvedEntryId });
+        } else {
+          await apiRequest("PATCH", `/api/entries/${resolvedEntryId}`, {
+            wireType: data.wireDetails || undefined,
+            manufacturer: data.vendorCode || undefined,
+            footage: parsedFootage ? parsedFootage * (parsedReelCount > 0 ? parsedReelCount : 1) : undefined,
+            reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
+            notes: data.notes || null,
+          });
+        }
+      } else {
+        await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: true, flagReason: data.flagReason.trim() || null });
+        if (entryId && data.notes !== undefined) {
+          await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: data.notes || null });
+        }
       }
+      return { resolved: resolving };
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: ({ resolved }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       setEditingPinId(null);
-      toast({ title: "Saved", description: "Pin details updated." });
-      setPendingUnflag({ pinId: variables.pinId });
+      if (resolved) {
+        toast({ title: "Resolved", description: "Reel details saved and flag removed." });
+      } else {
+        toast({ title: "Details saved", description: "Fill in wire category to fully resolve." });
+      }
     },
     onError: () => {
       toast({ title: "Save failed", variant: "destructive" });
@@ -411,6 +463,18 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   });
 
   const dupDataLoaded = pinsLoaded && photosLoaded;
+
+  const detailPhotosByParent = useMemo(() => {
+    const map = new Map<number, Photo[]>();
+    for (const p of sessionPhotos) {
+      if (p.parentPhotoId) {
+        const arr = map.get(p.parentPhotoId) || [];
+        arr.push(p);
+        map.set(p.parentPhotoId, arr);
+      }
+    }
+    return map;
+  }, [sessionPhotos]);
 
   const duplicateGroups = useMemo<DuplicateGroup[]>(() => {
     if (!sessionPins.length || !sessionPhotos.length) return [];
@@ -686,7 +750,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => onViewInPhoto(group.photoId, group.pins[0]?.pinId)}
+                      onClick={() => onViewInPhoto(group.photoId, group.pins[0]?.id)}
                       data-testid={`button-view-in-photo-group-${group.photoId}`}
                       title="Go to this photo in Reel IDs"
                     >
@@ -695,19 +759,18 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       <span className="hidden sm:inline">View Reel ID Photo</span>
                     </Button>
                   )}
-                  {onReshoot && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="hidden sm:flex"
-                      onClick={() => onReshoot(group.photoAisle || "", group.photoSection || "", group.photoId)}
-                      data-testid={`button-reshoot-group-${group.photoId}`}
-                      title="Take a detail photo in Mobile Flow"
-                    >
-                      <Camera className="h-4 w-4 mr-1" />
-                      Take Detail Photo
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden sm:flex"
+                    onClick={() => unflagGroupMutation.mutate(group.pins.map(p => p.id))}
+                    disabled={unflagGroupMutation.isPending}
+                    data-testid={`button-unflag-group-${group.photoId}`}
+                    title="Remove flag from all pins in this group"
+                  >
+                    {unflagGroupMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+                    {group.pins.length > 1 ? "Un-Flag All" : "Un-Flag"}
+                  </Button>
                 </div>
               </div>
               <div className="grid gap-2 p-3">
@@ -759,6 +822,23 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             {pin.flagReason}
                           </p>
                         )}
+                        {pin.photoId && (detailPhotosByParent.get(pin.photoId) || []).length > 0 && (
+                          <div className="flex gap-1 mt-1 flex-wrap" data-testid={`detail-photos-desktop-${pin.id}`}>
+                            {(detailPhotosByParent.get(pin.photoId) || []).map((dp) => (
+                              <button
+                                key={dp.id}
+                                type="button"
+                                className="relative w-10 h-10 rounded overflow-hidden border border-blue-400 cursor-pointer hover:border-blue-600 shrink-0"
+                                onClick={() => setPreviewPhotoUrl(`/api/photos/${dp.id}/image`)}
+                                data-testid={`detail-thumb-desktop-${dp.id}`}
+                                title="View detail photo"
+                              >
+                                <img src={`/api/photos/${dp.id}/image`} alt="detail" className="w-full h-full object-cover" />
+                                <span className="absolute bottom-0 left-0 right-0 bg-blue-600/80 text-white text-[8px] text-center leading-3 py-px">Detail</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-col gap-2 shrink-0 [--button-outline:black]">
                         <Button
@@ -786,6 +866,20 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     </div>
                     {editingPinId === pin.id && (
                       <div className="hidden sm:block border-t border-black pt-3 mt-1">
+                        {onReshoot && (
+                          <div className="mb-3">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => onReshoot(group.photoAisle || "", group.photoSection || "", group.photoId)}
+                              data-testid={`button-detail-photo-desktop-${pin.id}`}
+                            >
+                              <Camera className="h-4 w-4 mr-1" />
+                              Take Detail Photo
+                            </Button>
+                          </div>
+                        )}
                         <div className="grid grid-cols-4 gap-3 mb-3">
                           <div className="relative">
                             <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
@@ -887,12 +981,24 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         <div className="flex justify-end">
                           <Button
                             size="sm"
-                            onClick={() => savePinMutation.mutate({ pinId: pin.id, entryId: pin.entryId, data: editState })}
+                            onClick={() => savePinMutation.mutate({
+                              pinId: pin.id,
+                              entryId: pin.entryId,
+                              photoId: group.photoId,
+                              photoAisle: group.photoAisle,
+                              photoSection: group.photoSection,
+                              data: editState,
+                            })}
                             disabled={savePinMutation.isPending}
                             data-testid={`button-save-edit-${pin.id}`}
                           >
-                            {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                            Save
+                            {savePinMutation.isPending
+                              ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              : editState.wireDetails.trim()
+                                ? <CheckCircle2 className="h-4 w-4 mr-1" />
+                                : <Save className="h-4 w-4 mr-1" />
+                            }
+                            {editState.wireDetails.trim() ? "Save & Resolve" : "Save Details"}
                           </Button>
                         </div>
                       </div>
@@ -942,6 +1048,26 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           <Flag className="h-3 w-3 inline mr-1" />
                           {pin.flagReason}
                         </p>
+                      )}
+                      {pin.photoId && (detailPhotosByParent.get(pin.photoId) || []).length > 0 && (
+                        <div className="flex gap-1.5 w-full flex-wrap" data-testid={`detail-photos-mobile-${pin.id}`}>
+                          <p className="w-full text-[10px] text-muted-foreground flex items-center gap-1">
+                            <ImageIcon className="h-3 w-3" /> Detail photos:
+                          </p>
+                          {(detailPhotosByParent.get(pin.photoId) || []).map((dp) => (
+                            <button
+                              key={dp.id}
+                              type="button"
+                              className="relative w-14 h-14 rounded overflow-hidden border border-blue-400 cursor-pointer hover:border-blue-600 shrink-0"
+                              onClick={() => setPreviewPhotoUrl(`/api/photos/${dp.id}/image`)}
+                              data-testid={`detail-thumb-mobile-${dp.id}`}
+                              title="View detail photo"
+                            >
+                              <img src={`/api/photos/${dp.id}/image`} alt="detail" className="w-full h-full object-cover" />
+                              <span className="absolute bottom-0 left-0 right-0 bg-blue-600/80 text-white text-[8px] text-center leading-3 py-px">Detail</span>
+                            </button>
+                          ))}
+                        </div>
                       )}
                       <div className="flex items-center justify-center gap-4 w-full py-2">
                         <Button
@@ -1081,12 +1207,24 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           <div className="flex justify-end">
                             <Button
                               size="sm"
-                              onClick={() => savePinMutation.mutate({ pinId: pin.id, entryId: pin.entryId, data: editState })}
+                              onClick={() => savePinMutation.mutate({
+                                pinId: pin.id,
+                                entryId: pin.entryId,
+                                photoId: group.photoId,
+                                photoAisle: group.photoAisle,
+                                photoSection: group.photoSection,
+                                data: editState,
+                              })}
                               disabled={savePinMutation.isPending}
                               data-testid={`button-save-edit-mobile-${pin.id}`}
                             >
-                              {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                              Save
+                              {savePinMutation.isPending
+                                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                : editState.wireDetails.trim()
+                                  ? <CheckCircle2 className="h-4 w-4 mr-1" />
+                                  : <Save className="h-4 w-4 mr-1" />
+                              }
+                              {editState.wireDetails.trim() ? "Save & Resolve" : "Save Details"}
                             </Button>
                           </div>
                         </div>
@@ -1181,41 +1319,27 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
         </div>
       )}
 
-      {pendingUnflag && (
+      {previewPhotoUrl && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-          onClick={() => setPendingUnflag(null)}
-          data-testid="modal-unflag-prompt"
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setPreviewPhotoUrl(null)}
+          data-testid="modal-detail-photo-preview"
         >
-          <div
-            className="bg-card border !border-black rounded-lg p-5 max-w-sm w-full shadow-xl space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-sm font-medium text-center">
-              Details saved. Remove the flag from this pin?
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                className="!border-black"
-                onClick={() => setPendingUnflag(null)}
-                data-testid="button-keep-flagged"
-              >
-                Keep Flagged
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  unflagMutation.mutate(pendingUnflag.pinId);
-                  setPendingUnflag(null);
-                }}
-                data-testid="button-unflag-after-save"
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Un-Flag
-              </Button>
-            </div>
+          <div className="relative max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={previewPhotoUrl}
+              alt="Detail photo"
+              className="w-full h-auto rounded-lg shadow-2xl border border-blue-400"
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              className="absolute top-2 right-2"
+              onClick={() => setPreviewPhotoUrl(null)}
+              data-testid="button-close-detail-preview"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}
