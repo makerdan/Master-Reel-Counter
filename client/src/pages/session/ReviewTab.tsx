@@ -781,8 +781,7 @@ export default function ReviewTab({
 
       {/* Entry card */}
       {currentEntry && (
-        <Card className="border-blue-600/50" data-testid={`card-review-entry-${currentEntry.id}`}>
-          <CardContent className="p-4 space-y-4">
+        <div className="border border-blue-500 sm:!border-blue-600/50 rounded-lg p-4 space-y-4" data-testid={`card-review-entry-${currentEntry.id}`}>
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
                 {currentEntry.aisle && `Aisle ${currentEntry.aisle}`}
@@ -966,8 +965,7 @@ export default function ReviewTab({
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
       )}
 
       {/* Navigation */}
