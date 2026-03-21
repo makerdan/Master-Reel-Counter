@@ -712,7 +712,7 @@ export default function ReviewTab({
         <div className="absolute inset-x-0 h-3 rounded-full overflow-hidden top-1/2 -translate-y-1/2 flex">
           {assignedEntries.map((entry, idx) => {
             const response = myResponses.get(entry.id);
-            const bandColor = !response ? "bg-muted" : response.verdict === "flagged" ? "bg-orange-500" : "bg-red-500";
+            const bandColor = !response ? "bg-muted" : response.verdict === "flagged" ? "bg-yellow-600" : "bg-red-500";
             return (
               <div
                 key={entry.id}
