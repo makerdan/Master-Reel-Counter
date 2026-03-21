@@ -304,6 +304,7 @@ export default function LabelScannerTab({
   onPinDataChanged,
   onPhotoChange,
   onlineUsers = [],
+  pushUndo,
 }: {
   sessionId: number;
   photos: Photo[];
@@ -313,6 +314,7 @@ export default function LabelScannerTab({
   onPinDataChanged?: () => void;
   onPhotoChange?: (photoId: number | null) => void;
   onlineUsers?: OnlineUser[];
+  pushUndo?: (action: { type: string; sessionId: number; entityId: number; data: any; previousData?: any }) => void;
 }) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
@@ -840,22 +842,30 @@ export default function LabelScannerTab({
   const toggleFlag = useCallback(async (pinId: number, reason?: string) => {
     const card = cards.find((c) => c.pin.id === pinId);
     if (!card) return;
-    const newFlagged = !card.pin.flagged;
+    const prevFlagged = card.pin.flagged;
+    const prevFlagReason = card.pin.flagReason ?? null;
+    const newFlagged = !prevFlagged;
     setCards((prev) =>
       prev.map((c) => (c.pin.id === pinId ? { ...c, pin: { ...c.pin, flagged: newFlagged, flagReason: newFlagged && reason ? reason : c.pin.flagReason } } : c))
     );
     try {
       const body: Record<string, unknown> = { flagged: newFlagged };
       if (newFlagged && reason) body.flagReason = reason;
+      if (!newFlagged) body.flagReason = null;
       await apiRequest("PATCH", `/api/pins/${pinId}/flag`, body);
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
       onPinDataChanged?.();
+      if (newFlagged) {
+        pushUndo?.({ type: "flag-pin", sessionId, entityId: pinId, data: { flagged: true, flagReason: reason ?? null }, previousData: { flagged: prevFlagged, flagReason: prevFlagReason } });
+      } else {
+        pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason: prevFlagReason } });
+      }
     } catch {
       setCards((prev) =>
         prev.map((c) => (c.pin.id === pinId ? { ...c, pin: { ...c.pin, flagged: !newFlagged } } : c))
       );
     }
-  }, [cards, sessionId, onPinDataChanged]);
+  }, [cards, sessionId, onPinDataChanged, pushUndo]);
 
   function sortCardsByCatalog(cardsToSort: PinCard[]): PinCard[] {
     const freq = new Map<string, number>();

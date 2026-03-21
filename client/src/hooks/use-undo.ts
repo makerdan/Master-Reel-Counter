@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate";
+type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin";
 
 interface UndoAction {
   type: ActionType;
@@ -22,6 +22,7 @@ export function useUndoRedo(sessionId: number) {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "dismissed-duplicates"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
   }, [sessionId]);
 
   const pushUndo = useCallback((action: UndoAction) => {
@@ -73,6 +74,14 @@ export function useUndoRedo(sessionId: number) {
       case "undismiss-duplicate": {
         await apiRequest("POST", `/api/sessions/${action.sessionId}/dismissed-duplicates`, { key: action.data.key });
         return { type: "dismiss-duplicate", sessionId: action.sessionId, entityId: 0, data: action.data, previousData: action.data };
+      }
+      case "flag-pin": {
+        await apiRequest("PATCH", `/api/pins/${action.entityId}/flag`, { flagged: false, flagReason: null });
+        return { type: "unflag-pin", sessionId: action.sessionId, entityId: action.entityId, data: { flagged: false, flagReason: null }, previousData: action.data };
+      }
+      case "unflag-pin": {
+        await apiRequest("PATCH", `/api/pins/${action.entityId}/flag`, { flagged: true, flagReason: action.previousData?.flagReason ?? null });
+        return { type: "flag-pin", sessionId: action.sessionId, entityId: action.entityId, data: { flagged: true, flagReason: action.previousData?.flagReason ?? null }, previousData: { flagged: false, flagReason: null } };
       }
     }
   }, []);

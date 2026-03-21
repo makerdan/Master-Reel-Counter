@@ -98,12 +98,20 @@ export default function SingleEntryMode({
   });
 
   const flagMutation = useMutation({
-    mutationFn: async ({ pinId, flagged }: { pinId: number; flagged: boolean }) => {
-      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged });
+    mutationFn: async ({ pinId, flagged, prevFlagged, prevFlagReason }: { pinId: number; flagged: boolean; prevFlagged: boolean; prevFlagReason: string | null }) => {
+      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged, flagReason: flagged ? undefined : null });
+      return { pinId, flagged, prevFlagged, prevFlagReason };
     },
-    onSuccess: () => {
+    onSuccess: ({ pinId, flagged, prevFlagged, prevFlagReason }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/entries", editingEntry?.id?.toString(), "pin"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
+      if (onUndoableSave) {
+        if (flagged) {
+          onUndoableSave({ type: "flag-pin", sessionId, entityId: pinId, data: { flagged: true, flagReason: null }, previousData: { flagged: prevFlagged, flagReason: prevFlagReason } });
+        } else {
+          onUndoableSave({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason: prevFlagReason } });
+        }
+      }
     },
   });
 
@@ -616,7 +624,7 @@ export default function SingleEntryMode({
             size="sm"
             className={linkedPin.flagged ? "bg-[hsl(45_90%_45%)] hover:bg-[hsl(45_90%_35%)] text-black" : ""}
             disabled={flagMutation.isPending}
-            onClick={() => flagMutation.mutate({ pinId: linkedPin.id, flagged: !linkedPin.flagged })}
+            onClick={() => flagMutation.mutate({ pinId: linkedPin.id, flagged: !linkedPin.flagged, prevFlagged: !!linkedPin.flagged, prevFlagReason: (linkedPin as any).flagReason ?? null })}
             data-testid="button-toggle-flag-edit"
           >
             <Flag className="h-3.5 w-3.5 mr-1" />

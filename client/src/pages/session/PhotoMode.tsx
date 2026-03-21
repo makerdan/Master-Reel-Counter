@@ -1930,6 +1930,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     isAdmin={isAdmin}
                     onPinDataChanged={onPinDataChanged}
                     onlineUsers={onlineUsers}
+                    pushUndo={onPushUndo}
                   />
                 </div>
               )}
@@ -2695,6 +2696,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               isAdmin={isAdmin}
               onPinDataChanged={onPinDataChanged}
               onlineUsers={onlineUsers}
+              pushUndo={onPushUndo}
             />
           </SheetContent>
         </Sheet>

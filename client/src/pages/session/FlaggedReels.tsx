@@ -323,12 +323,14 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   });
 
   const unflagMutation = useMutation({
-    mutationFn: async (pinId: number) => {
+    mutationFn: async ({ pinId, flagReason }: { pinId: number; flagReason: string | null }) => {
       await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: null });
+      return { pinId, flagReason };
     },
-    onSuccess: () => {
+    onSuccess: ({ pinId, flagReason }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+      pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason } });
     },
   });
 
@@ -854,7 +856,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => unflagMutation.mutate(pin.id)}
+                          onClick={() => unflagMutation.mutate({ pinId: pin.id, flagReason: pin.flagReason })}
                           disabled={unflagMutation.isPending}
                           data-testid={`button-resolve-${pin.id}`}
                           title="Mark as resolved"
@@ -1084,7 +1086,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           variant="outline"
                           size="sm"
                           className="!border-black"
-                          onClick={() => unflagMutation.mutate(pin.id)}
+                          onClick={() => unflagMutation.mutate({ pinId: pin.id, flagReason: pin.flagReason })}
                           disabled={unflagMutation.isPending}
                           data-testid={`button-resolve-mobile-${pin.id}`}
                           title="Un-Flag"
