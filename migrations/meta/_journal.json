@@ -43,6 +43,13 @@
       "when": 1742340000000,
       "tag": "0005_add_is_tester",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1742590000000,
+      "tag": "0006_add_link_reason_fields",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,2 @@
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS link_reason TEXT;
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS linked_pin_label TEXT;

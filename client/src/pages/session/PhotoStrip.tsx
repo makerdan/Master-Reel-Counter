@@ -74,6 +74,7 @@ function PhotoCard({
   canEdit,
   allPhotos,
   pins,
+  allPins,
   onJumpToPhoto,
   onLightbox,
   onClearUndoHistory,
@@ -83,6 +84,7 @@ function PhotoCard({
   canEdit: boolean;
   allPhotos: Photo[];
   pins: Pin[];
+  allPins: Pin[];
   onJumpToPhoto: (id: number) => void;
   onLightbox: (url: string, label: string) => void;
   onClearUndoHistory?: () => void;
@@ -95,6 +97,11 @@ function PhotoCard({
   const [notesOpen, setNotesOpen] = useState(false);
   const [parentId, setParentId] = useState<number | null>(photo.parentPhotoId ?? null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+  const [linkReason, setLinkReason] = useState(photo.linkReason || "");
+  const [linkedPinLabel, setLinkedPinLabel] = useState(photo.linkedPinLabel || "");
+  const [selectedParentForLink, setSelectedParentForLink] = useState<number | null>(null);
+  const [customReasonOpen, setCustomReasonOpen] = useState(false);
+  const [customReasonText, setCustomReasonText] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const aisleRef = useRef(aisle);
   const sectionRef = useRef(section);
@@ -135,10 +142,12 @@ function PhotoCard({
 
   const unlinkMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("PATCH", `/api/photos/${photo.id}`, { parentPhotoId: null, isDetailShot: false });
+      await apiRequest("PATCH", `/api/photos/${photo.id}`, { parentPhotoId: null, isDetailShot: false, linkReason: null, linkedPinLabel: null });
     },
     onSuccess: () => {
       setParentId(null);
+      setLinkReason("");
+      setLinkedPinLabel("");
       invalidatePhotos();
       invalidateEntries();
     },
@@ -146,12 +155,22 @@ function PhotoCard({
   });
 
   const linkMutation = useMutation({
-    mutationFn: async (selectedId: number) => {
-      await apiRequest("PATCH", `/api/photos/${photo.id}`, { parentPhotoId: selectedId, isDetailShot: true });
+    mutationFn: async (params: { parentId: number; reason: string; pinLabel: string }) => {
+      await apiRequest("PATCH", `/api/photos/${photo.id}`, {
+        parentPhotoId: params.parentId,
+        isDetailShot: true,
+        linkReason: params.reason || null,
+        linkedPinLabel: params.pinLabel || null,
+      });
     },
-    onSuccess: (_data, selectedId) => {
-      setParentId(selectedId);
+    onSuccess: (_data, params) => {
+      setParentId(params.parentId);
+      setLinkReason(params.reason);
+      setLinkedPinLabel(params.pinLabel);
       setLinkPickerOpen(false);
+      setSelectedParentForLink(null);
+      setCustomReasonOpen(false);
+      setCustomReasonText("");
       invalidatePhotos();
       invalidateEntries();
     },
@@ -213,10 +232,36 @@ function PhotoCard({
     ? `${parentPhoto.aisle || "—"} / ${parentPhoto.section || "—"}`
     : "Linked";
 
+  const linkBadgeText = (() => {
+    const pinRef = linkedPinLabel ? `P${String(linkedPinLabel).padStart(3, "0")}` : "";
+    if (linkReason === "Close-up" && pinRef) return `Close-up of ${pinRef}`;
+    if (linkReason === "Close-up") return "Close-up";
+    if (linkReason === "Re-shoot for flag" && pinRef) return `Re-shoot for Flag · ${pinRef}`;
+    if (linkReason === "Re-shoot for flag") return "Re-shoot for flag";
+    if (linkReason === "Better tag visibility" && pinRef) return `Tag visibility · ${pinRef}`;
+    if (linkReason === "Better tag visibility") return "Better tag visibility";
+    if (linkReason && pinRef) return `${linkReason} · ${pinRef}`;
+    if (linkReason) return linkReason;
+    if (pinRef) return `Detail of ${pinRef}`;
+    return parentLabel;
+  })();
+
+  const linkBadgeColor = (() => {
+    if (linkReason === "Close-up") return "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30";
+    if (linkReason === "Re-shoot for flag") return "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30";
+    return "bg-muted text-muted-foreground border-border";
+  })();
+
   const candidateParents = sortPhotos(allPhotos.filter(p => !p.isDetailShot && p.id !== photo.id));
 
+  const parentPinsForLink = selectedParentForLink
+    ? allPins.filter(p => p.photoId === selectedParentForLink && p.label)
+    : [];
+
+  const isDetail = photo.isDetailShot && parentId !== null;
+
   return (
-    <div className="rounded-md border border-border bg-card overflow-hidden group relative flex flex-col" data-testid={`strip-card-${photo.id}`}>
+    <div className={`rounded-md border bg-card overflow-hidden group relative flex flex-col ${isDetail ? "border-l-[3px] border-l-blue-400 dark:border-l-blue-500 border-t border-r border-b border-t-border border-r-border border-b-border ml-3" : "border-border"}`} data-testid={`strip-card-${photo.id}`}>
       <div ref={thumbContainerRef} className="relative aspect-square lg:aspect-video bg-muted overflow-hidden">
         <img
           src={photoUrl(photo.objectStorageKey)}
@@ -326,13 +371,14 @@ function PhotoCard({
         <div className="flex items-center gap-3 flex-wrap">
           {parentId !== null ? (
             <span className="inline-flex items-center gap-0.5">
-              <Badge
-                variant="secondary"
-                className="text-[10px] px-1 py-0 h-4 no-default-hover-elevate no-default-active-elevate"
-                title={`Linked to: ${parentLabel}`}
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0 h-4 rounded border font-medium ${linkBadgeColor}`}
+                title={`Linked to: ${parentLabel}${linkReason ? ` (${linkReason})` : ""}${linkedPinLabel ? ` · Pin ${linkedPinLabel}` : ""}`}
+                data-testid={`badge-link-info-${photo.id}`}
               >
-                → {parentLabel}
-              </Badge>
+                <Link2 className="h-2.5 w-2.5" />
+                {linkBadgeText}
+              </span>
               {canEdit && (
                 <button
                   className="text-muted-foreground hover:text-destructive transition-colors"
@@ -409,16 +455,18 @@ function PhotoCard({
         </div>
 
         {linkPickerOpen && canEdit && parentId === null && (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Link to parent photo</label>
             <select
               className="w-full text-xs rounded border border-border bg-background text-foreground px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-              defaultValue=""
+              value={selectedParentForLink?.toString() || ""}
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
-                if (!isNaN(val)) linkMutation.mutate(val);
+                if (!isNaN(val)) {
+                  setSelectedParentForLink(val);
+                  setLinkedPinLabel("");
+                }
               }}
-              disabled={linkMutation.isPending}
               data-testid={`select-strip-link-${photo.id}`}
             >
               <option value="" disabled>Select a photo…</option>
@@ -428,12 +476,102 @@ function PhotoCard({
                 </option>
               ))}
             </select>
-            <button
-              className="text-[10px] text-muted-foreground hover:text-foreground self-end"
-              onClick={() => setLinkPickerOpen(false)}
-            >
-              Cancel
-            </button>
+
+            {selectedParentForLink && (
+              <>
+                {parentPinsForLink.length > 0 && (
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Pin (optional)</label>
+                    <select
+                      className="w-full text-xs rounded border border-border bg-background text-foreground px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary mt-0.5"
+                      value={linkedPinLabel}
+                      onChange={(e) => setLinkedPinLabel(e.target.value)}
+                      data-testid={`select-strip-pin-${photo.id}`}
+                    >
+                      <option value="">No specific pin</option>
+                      {parentPinsForLink.map((pin) => (
+                        <option key={pin.id} value={pin.label!}>
+                          P{String(pin.label).padStart(3, "0")}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Reason</label>
+                  <select
+                    className="w-full text-xs rounded border border-border bg-background text-foreground px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary mt-0.5"
+                    value={customReasonOpen ? "__custom__" : linkReason}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "__custom__") {
+                        setCustomReasonOpen(true);
+                        setLinkReason("");
+                      } else {
+                        setCustomReasonOpen(false);
+                        setCustomReasonText("");
+                        setLinkReason(v);
+                      }
+                    }}
+                    data-testid={`select-strip-reason-${photo.id}`}
+                  >
+                    <option value="">No reason</option>
+                    <option value="Close-up">Close-up</option>
+                    <option value="Re-shoot for flag">Re-shoot for flag</option>
+                    <option value="Better tag visibility">Better tag visibility</option>
+                    <option value="__custom__">Custom…</option>
+                  </select>
+                </div>
+
+                {customReasonOpen && (
+                  <input
+                    type="text"
+                    className="w-full text-xs rounded border border-border bg-background text-foreground px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="Enter custom reason…"
+                    value={customReasonText}
+                    onChange={(e) => {
+                      setCustomReasonText(e.target.value);
+                      setLinkReason(e.target.value);
+                    }}
+                    data-testid={`input-strip-custom-reason-${photo.id}`}
+                  />
+                )}
+
+                <div className="flex items-center justify-between mt-0.5">
+                  <button
+                    className="text-[10px] text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setLinkPickerOpen(false);
+                      setSelectedParentForLink(null);
+                      setCustomReasonOpen(false);
+                      setCustomReasonText("");
+                      setLinkReason("");
+                      setLinkedPinLabel("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="text-[10px] font-medium text-primary hover:text-primary/80 disabled:opacity-50"
+                    onClick={() => linkMutation.mutate({ parentId: selectedParentForLink, reason: linkReason, pinLabel: linkedPinLabel })}
+                    disabled={linkMutation.isPending}
+                    data-testid={`button-strip-confirm-link-${photo.id}`}
+                  >
+                    {linkMutation.isPending ? "Linking…" : "Link"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {!selectedParentForLink && (
+              <button
+                className="text-[10px] text-muted-foreground hover:text-foreground self-end"
+                onClick={() => setLinkPickerOpen(false)}
+              >
+                Cancel
+              </button>
+            )}
           </div>
         )}
 
@@ -688,6 +826,7 @@ export default function PhotoStrip({
                         canEdit={canEdit}
                         allPhotos={photos}
                         pins={pinsByPhoto.get(photo.id) ?? []}
+                        allPins={allPins}
                         onJumpToPhoto={onJumpToPhoto}
                         onLightbox={() => {
                           const sectionPhotos: LightboxPhoto[] = sectionGroup.photos.map(p => ({

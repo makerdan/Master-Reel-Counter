@@ -820,7 +820,7 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit photos" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
 
-      const { aisle, section, rotation, notes, isDetailShot, parentPhotoId, pinScale } = req.body;
+      const { aisle, section, rotation, notes, isDetailShot, parentPhotoId, pinScale, linkReason, linkedPinLabel } = req.body;
       const safeUpdate: Record<string, any> = {};
       if (aisle !== undefined) safeUpdate.aisle = aisle;
       if (section !== undefined) safeUpdate.section = section;
@@ -828,6 +828,8 @@ export async function registerRoutes(
       if (notes !== undefined) safeUpdate.notes = notes;
       if (isDetailShot !== undefined) safeUpdate.isDetailShot = isDetailShot;
       if (parentPhotoId !== undefined) safeUpdate.parentPhotoId = parentPhotoId;
+      if (linkReason !== undefined) safeUpdate.linkReason = linkReason;
+      if (linkedPinLabel !== undefined) safeUpdate.linkedPinLabel = linkedPinLabel;
       if (pinScale !== undefined && typeof pinScale === "number" && !isNaN(pinScale)) safeUpdate.pinScale = Math.max(0.5, Math.min(5, pinScale));
       if (Object.keys(safeUpdate).length === 0) return res.status(400).json({ message: "No valid fields to update" });
       const updated = await storage.updatePhoto(photo.id, safeUpdate);
@@ -2719,7 +2721,8 @@ export async function registerRoutes(
 
         const renderDetailShotColumnList = (pl: PhotoLayout, photoEntries: any[], x: number, y: number, maxW: number, maxH: number) => {
           const imgW = Math.min(maxW * 0.38, 220);
-          const captionH = 10;
+          const hasDetailLabel = pl.photo.isDetailShot && pl.photo.parentPhotoId;
+          const captionH = hasDetailLabel ? 17 : 10;
           const aspect = pl.origW / pl.origH;
           let w = imgW;
           let h = imgW / aspect;
@@ -2743,8 +2746,26 @@ export async function registerRoutes(
           const capParts: string[] = [photoName];
           capParts.push(`${reelTotal} reel${reelTotal !== 1 ? "s" : ""}`);
           if (pl.photo.createdAt) capParts.push(formatCT(new Date(pl.photo.createdAt)));
+
+          let detailLabel = "";
+          if (pl.photo.isDetailShot && pl.photo.parentPhotoId) {
+            const parentPh = allPhotosFlat.find((p: any) => p.id === pl.photo.parentPhotoId);
+            const parentName = parentPh?.originalFilename || `Photo ${pl.photo.parentPhotoId}`;
+            const reason = pl.photo.linkReason || "Detail";
+            const pinRef = pl.photo.linkedPinLabel ? `P${String(pl.photo.linkedPinLabel).padStart(3, "0")}` : "";
+            const reasonParts = [reason];
+            if (pinRef) reasonParts.push(`of ${pinRef}`);
+            detailLabel = `Detail: ${reasonParts.join(" ")} (from ${parentName})`;
+          }
+
+          let captionY = y + h + 1;
+          if (detailLabel) {
+            doc.font('Helvetica-Bold').fontSize(5).fillColor("#3B82F6")
+              .text(detailLabel, x, captionY, { width: w, align: "center", lineBreak: false });
+            captionY += 7;
+          }
           doc.font('Helvetica').fontSize(5.5).fillColor("#666666")
-            .text(capParts.join("  |  "), x, y + h + 1, { width: w, align: "center", lineBreak: false });
+            .text(capParts.join("  |  "), x, captionY, { width: w, align: "center", lineBreak: false });
 
           const tblX = x + w + 10;
           const tblW = maxW - w - 10;
@@ -3459,6 +3480,7 @@ export async function registerRoutes(
         { key: "notes", width: 28 },
         { key: "flagged", width: 10 },
         { key: "flagReason", width: 22 },
+        { key: "detailOf", width: 22 },
       ];
 
       const thinBorder: Partial<ExcelJS.Borders> = {
@@ -3556,7 +3578,16 @@ export async function registerRoutes(
         });
       };
 
-      const entryHeaders = ["Pin:", "Aisle:", "Section:", "Category:", "Vendor:", "# Reels:", `Footage (${xlULabel}):`, "Color:", "Notes:", "Flagged:", "Flag Reason:"];
+      const detailPhotoMap = new Map<number, { reason: string; pinLabel: string }>();
+      for (const p of sessionPhotos) {
+        if (p.isDetailShot && p.parentPhotoId) {
+          const reason = p.linkReason || "";
+          const pinLabel = p.linkedPinLabel || "";
+          detailPhotoMap.set(p.id, { reason, pinLabel });
+        }
+      }
+
+      const entryHeaders = ["Pin:", "Aisle:", "Section:", "Category:", "Vendor:", "# Reels:", `Footage (${xlULabel}):`, "Color:", "Notes:", "Flagged:", "Flag Reason:", "Detail Of:"];
       const headerRow = ws.getRow(row);
       const centeredHeaderCols = new Set([1, 2, 4, 5, 6, 7, 9]);
       entryHeaders.forEach((h, i) => {
@@ -3574,6 +3605,16 @@ export async function registerRoutes(
         const pin = entryPinMap.get(e.id);
         const pinLabel = pin?.label ? `P${String(pin.label).padStart(3, "0")}` : "";
         const flagPin = isFlagged ? allFlaggedPins.find((fp: any) => fp.entryId === e.id) : null;
+        let detailOfText = "";
+        if (e.photoId) {
+          const detailInfo = detailPhotoMap.get(e.photoId);
+          if (detailInfo) {
+            const parts: string[] = [];
+            if (detailInfo.reason) parts.push(detailInfo.reason);
+            if (detailInfo.pinLabel) parts.push(`of P${String(detailInfo.pinLabel).padStart(3, "0")}`);
+            detailOfText = parts.length > 0 ? parts.join(" ") : "Detail shot";
+          }
+        }
         const vals = [
           pinLabel, safeStr(e.aisle), safeStr(e.section),
           safeStr(e.reelTag), safeStr(e.manufacturer),
@@ -3582,6 +3623,7 @@ export async function registerRoutes(
           safeStr(e.notes),
           isFlagged ? "Yes" : "",
           safeStr(flagPin?.flagReason),
+          detailOfText,
         ];
         const r = ws.getRow(row);
         r.height = 16;
@@ -3608,9 +3650,9 @@ export async function registerRoutes(
         const label = `Aisle ${aisle || "—"}  /  Section ${section || "—"}  —  ${entryCount} entries, ${reelCount} reels, ${xlFmt(footage).toLocaleString()} ${xlULabel}`;
         r.getCell(1).value = label;
         r.getCell(1).font = { size: 9.5, bold: true, color: { argb: accentHex } };
-        ws.mergeCells(row, 1, row, 11);
+        ws.mergeCells(row, 1, row, 12);
         r.height = 22;
-        for (let c = 1; c <= 11; c++) {
+        for (let c = 1; c <= 12; c++) {
           r.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: sectionBandBg } };
           r.getCell(c).border = thinBorder;
         }
@@ -3639,9 +3681,9 @@ export async function registerRoutes(
         const flagBandRow = ws.getRow(row);
         flagBandRow.getCell(1).value = `Flagged Reels (${flaggedEntries.length}) — excluded from totals`;
         flagBandRow.getCell(1).font = { size: 9.5, bold: true, color: { argb: "CC4400" } };
-        ws.mergeCells(row, 1, row, 11);
+        ws.mergeCells(row, 1, row, 12);
         flagBandRow.height = 22;
-        for (let c = 1; c <= 11; c++) {
+        for (let c = 1; c <= 12; c++) {
           flagBandRow.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: flaggedBandBg } };
           flagBandRow.getCell(c).border = thinBorder;
         }
