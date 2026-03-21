@@ -356,7 +356,7 @@ export default function FinalResultsTab({
 
       {/* ── Review Status Banner ─────────────────────────────────────────── */}
       {reviewStats.total > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-[hsl(25_20%_28%)] bg-blue-600 dark:bg-[hsl(25_12%_15%)] sm:bg-[hsl(25_12%_15%)] px-4 py-2.5" data-testid="final-results-review-banner">
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-blue-700/40 bg-blue-600 dark:bg-blue-900/30 sm:bg-blue-900/30 px-4 py-2.5" data-testid="final-results-review-banner">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-white/70 shrink-0" />
             <span className="text-sm text-white">Not yet reviewed:</span>

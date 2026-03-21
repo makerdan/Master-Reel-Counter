@@ -552,12 +552,12 @@ function SessionWorkspace({
 
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-x-hidden">
-      <header className="sticky top-0 z-50 border-b !border-b-[hsl(18_60%_30%)] bg-background/95 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b !border-b-[hsl(215_40%_35%)] bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-4 py-2">
           <div className="flex items-center gap-2 min-w-0">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back" className="!border !border-[hsl(18_60%_30%)]">
+                <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back" className="!border !border-[hsl(215_40%_35%)]">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -618,7 +618,7 @@ function SessionWorkspace({
             {isOwner && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team" className="!border-[hsl(18_60%_30%)]">
+                  <Button size="sm" variant="outline" onClick={() => setTeamDialogOpen(true)} data-testid="button-team" className="!border-[hsl(215_40%_35%)]">
                     <Users className="h-4 w-4 sm:mr-1" />
                     <span className="hidden sm:inline">Team</span>
                   </Button>
@@ -637,7 +637,7 @@ function SessionWorkspace({
             </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data" disabled={isPdfExporting} className="!border-[hsl(18_60%_30%)]">
+                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data" disabled={isPdfExporting} className="!border-[hsl(215_40%_35%)]">
                   {isPdfExporting ? <Loader2 className="h-4 w-4 sm:mr-1 animate-spin text-orange-600" /> : <Download className="h-4 w-4 sm:mr-1" />}
                   <span className={`hidden sm:inline${isPdfExporting ? " text-orange-600 animate-pulse [animation-duration:1.8s]" : ""}`}>{isPdfExporting ? "Exporting…" : "Export"}</span>
                 </Button>

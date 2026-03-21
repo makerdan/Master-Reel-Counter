@@ -13,15 +13,15 @@
   --elevate-2: rgba(0,0,0, .08);
   --background: 40 15% 98%;
   --foreground: 25 10% 12%;
-  --border: 25 12% 82%;
+  --border: 215 20% 82%;
   --card: 40 15% 96%;
   --card-foreground: 25 10% 12%;
-  --card-border: 25 12% 80%;
+  --card-border: 215 20% 78%;
   --folder-bg: 28 25% 92%;
-  --folder-border: 28 20% 78%;
+  --folder-border: 215 20% 75%;
   --sidebar: 40 12% 94%;
   --sidebar-foreground: 25 10% 15%;
-  --sidebar-border: 40 10% 86%;
+  --sidebar-border: 215 15% 86%;
   --sidebar-primary: 18 85% 48%;
   --sidebar-primary-foreground: 0 0% 98%;
   --sidebar-accent: 40 8% 82%;
@@ -29,7 +29,7 @@
   --sidebar-ring: 18 85% 48%;
   --popover: 40 12% 92%;
   --popover-foreground: 25 10% 15%;
-  --popover-border: 40 10% 84%;
+  --popover-border: 215 15% 84%;
   --primary: 18 85% 32%;
   --primary-foreground: 0 0% 98%;
   --secondary: 40 8% 80%;
@@ -99,15 +99,15 @@
   --elevate-2: rgba(255,255,255, .09);
   --background: 25 8% 11%;
   --foreground: 40 5% 96%;
-  --border: 25 6% 20%;
+  --border: 215 15% 25%;
   --card: 25 8% 13%;
   --card-foreground: 40 5% 96%;
-  --card-border: 25 6% 18%;
+  --card-border: 215 15% 22%;
   --folder-bg: 25 10% 12%;
-  --folder-border: 25 6% 20%;
+  --folder-border: 215 15% 25%;
   --sidebar: 25 8% 15%;
   --sidebar-foreground: 40 5% 92%;
-  --sidebar-border: 25 6% 22%;
+  --sidebar-border: 215 15% 22%;
   --sidebar-primary: 18 85% 48%;
   --sidebar-primary-foreground: 0 0% 98%;
   --sidebar-accent: 25 8% 22%;
@@ -115,7 +115,7 @@
   --sidebar-ring: 18 85% 48%;
   --popover: 25 8% 18%;
   --popover-foreground: 40 5% 92%;
-  --popover-border: 25 6% 25%;
+  --popover-border: 215 15% 25%;
   --primary: 18 85% 32%;
   --primary-foreground: 0 0% 98%;
   --secondary: 25 8% 24%;
@@ -184,15 +184,15 @@
 .dashboard-theme {
   --background: 35 10% 85%;
   --card: 33 40% 95%;
-  --card-border: 30 25% 80%;
-  --border: 25 12% 75%;
+  --card-border: 215 20% 78%;
+  --border: 215 20% 75%;
 }
 
 .dark .dashboard-theme {
   --background: 25 10% 8%;
   --card: 25 12% 14%;
-  --card-border: 25 8% 22%;
-  --border: 25 6% 18%;
+  --card-border: 215 15% 22%;
+  --border: 215 15% 20%;
 }
 
 [cmdk-item][data-selected="true"],
@@ -338,12 +338,12 @@
 
 @keyframes border-pulse {
   0%, 100% {
-    border-color: hsl(18 80% 40%);
-    box-shadow: 0 0 4px 0 hsl(18 80% 40% / 0.3);
+    border-color: hsl(215 70% 45%);
+    box-shadow: 0 0 4px 0 hsl(215 70% 45% / 0.3);
   }
   50% {
-    border-color: hsl(18 80% 55%);
-    box-shadow: 0 0 10px 2px hsl(18 80% 50% / 0.5);
+    border-color: hsl(215 70% 60%);
+    box-shadow: 0 0 10px 2px hsl(215 70% 55% / 0.5);
   }
 }
 
@@ -353,7 +353,7 @@
 
 .input-filled {
   animation: none;
-  border-color: hsl(18 80% 40%) !important;
+  border-color: hsl(215 70% 45%) !important;
   box-shadow: none !important;
 }
 
@@ -650,27 +650,27 @@
 .pin-entry-table th,
 .pin-entry-table td {
   padding: 8px;
-  border: 1px solid hsl(18 40% 50% / 0.2);
+  border: 1px solid hsl(215 30% 50% / 0.25);
   text-align: left;
   font-size: 14px;
 }
 .pin-entry-table th {
-  background: hsl(25 15% 14%);
+  background: hsl(215 15% 14%);
   font-weight: 600;
-  color: hsl(25 60% 70%);
+  color: hsl(215 50% 70%);
   text-decoration: underline;
   text-transform: uppercase;
   font-size: 12px;
   letter-spacing: 0.05em;
 }
 .pin-entry-table tr:hover {
-  background: hsl(18 60% 30% / 0.08);
+  background: hsl(215 40% 30% / 0.08);
 }
 .pin-entry-table input,
 .pin-entry-table select {
   width: 100%;
   background: white;
-  border: 1px solid hsl(18 40% 50% / 0.4);
+  border: 1px solid hsl(215 30% 50% / 0.4);
   color: hsl(var(--foreground));
   border-radius: 4px;
   padding: 6px 8px;
@@ -679,14 +679,14 @@
 }
 .dark .pin-entry-table input,
 .dark .pin-entry-table select {
-  background: hsl(25 10% 10%);
-  border-color: hsl(18 40% 50% / 0.4);
+  background: hsl(215 10% 10%);
+  border-color: hsl(215 30% 50% / 0.4);
 }
 .pin-entry-table input:focus,
 .pin-entry-table select:focus {
   outline: none;
-  border-color: #ea580c;
-  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
 }
 .pin-entry-table input::placeholder {
   color: hsl(var(--muted-foreground));
@@ -701,19 +701,19 @@
 .pin-position-cell {
   display: inline-block;
   padding: 4px 8px;
-  border: 1px solid hsl(18 85% 32% / 0.5);
+  border: 1px solid hsl(215 70% 50% / 0.5);
   border-radius: 4px;
-  background: hsl(18 85% 32% / 0.12);
+  background: hsl(215 70% 50% / 0.12);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-family: var(--font-mono);
   font-weight: 700;
-  color: #ea580c;
+  color: #2563eb;
 }
 .dark .pin-position-cell {
-  background: hsl(18 85% 32% / 0.2);
-  border-color: hsl(18 85% 48% / 0.4);
+  background: hsl(215 70% 50% / 0.2);
+  border-color: hsl(215 70% 50% / 0.4);
 }
 .pin-entry-table .low-confidence {
   border: 2px solid #f59e0b !important;
@@ -723,9 +723,9 @@
   width: 28px;
   height: 28px;
   border-radius: 4px;
-  background: hsl(25 12% 18%);
-  border: 1px solid hsl(18 40% 50% / 0.3);
-  color: hsl(25 60% 70%);
+  background: hsl(215 15% 18%);
+  border: 1px solid hsl(215 30% 50% / 0.3);
+  color: hsl(215 50% 70%);
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
@@ -748,14 +748,14 @@
   width: 28px;
   height: 28px;
   border-radius: 4px;
-  background: hsl(25 12% 18%);
-  border: 1px solid hsl(18 40% 50% / 0.3);
+  background: hsl(215 15% 18%);
+  border: 1px solid hsl(215 30% 50% / 0.3);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   vertical-align: middle;
   margin-left: 4px;
-  color: hsl(18 30% 60%);
+  color: hsl(215 30% 60%);
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -770,9 +770,9 @@
   border-color: hsl(45 80% 35%);
 }
 :root:not(.dark) .flag-btn {
-  background: hsl(25 15% 90%);
-  border-color: hsl(18 30% 70%);
-  color: hsl(18 20% 50%);
+  background: hsl(215 15% 90%);
+  border-color: hsl(215 30% 70%);
+  color: hsl(215 20% 50%);
 }
 :root:not(.dark) .flag-btn:hover {
   background: hsl(45 90% 50%);
@@ -850,13 +850,13 @@
 }
 
 :root:not(.dark) header.sticky {
-  border-bottom-color: hsl(25 12% 82%);
+  border-bottom-color: hsl(215 20% 82%);
 }
 :root:not(.dark) .border-b {
-  border-bottom-color: hsl(25 12% 85%);
+  border-bottom-color: hsl(215 20% 85%);
 }
 :root:not(.dark) [class*="bg-card"] {
-  border-color: hsl(25 12% 85%);
+  border-color: hsl(215 20% 85%);
 }
 
 .entries-table {
@@ -866,13 +866,13 @@
 }
 .entries-table th,
 .entries-table td {
-  border: 1px solid #000;
+  border: 1px solid hsl(215 30% 50% / 0.3);
   padding: 6px 8px;
   text-align: left;
 }
 .dark .entries-table th,
 .dark .entries-table td {
-  border-color: #fff;
+  border-color: hsl(215 30% 50% / 0.35);
 }
 .entries-table thead th {
   background: hsl(var(--muted));
