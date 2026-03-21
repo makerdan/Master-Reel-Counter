@@ -107,15 +107,6 @@ function PhotoCard({
   const sectionRef = useRef(section);
   const notesRef = useRef(notes);
   const thumbContainerRef = useRef<HTMLDivElement>(null);
-  const [isLgScreen, setIsLgScreen] = useState(false);
-
-  useEffect(() => {
-    const mql = window.matchMedia('(min-width: 1024px)');
-    setIsLgScreen(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setIsLgScreen(e.matches);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, []);
 
   const invalidatePhotos = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
@@ -266,7 +257,7 @@ function PhotoCard({
         <img
           src={photoUrl(photo.objectStorageKey)}
           alt={`Photo ${photo.id}`}
-          className="w-full h-full object-cover lg:object-contain cursor-zoom-in"
+          className="w-full h-full object-contain cursor-zoom-in"
           loading="lazy"
           onClick={() => {
             const label = [photo.aisle, photo.section].filter(Boolean).join(" / ") || `Photo #${photo.id}`;
@@ -289,22 +280,12 @@ function PhotoCard({
             const el = thumbContainerRef.current;
             const contAspect = el ? el.clientWidth / el.clientHeight : 1;
             const imgAspect = iw / ih;
-            if (isLgScreen) {
-              if (imgAspect > contAspect) {
-                const scale = contAspect / imgAspect;
-                displayY = pin.yPercent * scale + (1 - scale) * 50;
-              } else if (imgAspect < contAspect) {
-                const scale = imgAspect / contAspect;
-                displayX = pin.xPercent * scale + (1 - scale) * 50;
-              }
-            } else {
-              if (imgAspect > contAspect) {
-                const ratio = imgAspect / contAspect;
-                displayX = pin.xPercent * ratio - (ratio - 1) * 50;
-              } else if (imgAspect < contAspect) {
-                const ratio = contAspect / imgAspect;
-                displayY = pin.yPercent * ratio - (ratio - 1) * 50;
-              }
+            if (imgAspect > contAspect) {
+              const scale = contAspect / imgAspect;
+              displayY = pin.yPercent * scale + (1 - scale) * 50;
+            } else if (imgAspect < contAspect) {
+              const scale = imgAspect / contAspect;
+              displayX = pin.xPercent * scale + (1 - scale) * 50;
             }
           }
           return (
@@ -318,7 +299,13 @@ function PhotoCard({
               }}
               title={pin.label || "Pin"}
             >
-              <div className="w-3 h-3 rounded-full bg-orange-400 border-2 border-white shadow-md" />
+              {(pin.reelCount ?? 1) >= 2 ? (
+                <div className="w-5 h-5 rounded-full bg-orange-400 border-2 border-white shadow-md flex items-center justify-center">
+                  <span className="text-[9px] font-bold leading-none text-black">{pin.reelCount}</span>
+                </div>
+              ) : (
+                <div className="w-3 h-3 rounded-full bg-orange-400 border-2 border-white shadow-md" />
+              )}
             </div>
           );
         })}
@@ -669,7 +656,13 @@ function Lightbox({
               transform: "translate(-50%, -50%)",
             }}
           >
-            <div className="w-5 h-5 rounded-full bg-orange-500 border-[3px] border-orange-300 shadow-[0_0_0_3px_rgba(251,146,60,0.5)]" />
+            {(pin.reelCount ?? 1) >= 2 ? (
+              <div className="w-8 h-8 rounded-full bg-orange-500 border-[3px] border-orange-300 shadow-[0_0_0_3px_rgba(251,146,60,0.5)] flex items-center justify-center">
+                <span className="text-sm font-bold leading-none text-black">{pin.reelCount}</span>
+              </div>
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-orange-500 border-[3px] border-orange-300 shadow-[0_0_0_3px_rgba(251,146,60,0.5)]" />
+            )}
           </div>
         ))}
       </div>
