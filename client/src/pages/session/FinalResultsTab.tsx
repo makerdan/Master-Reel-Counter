@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  BarChart2, ChevronDown, ChevronUp, X, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Info,
+  BarChart2, ChevronDown, ChevronUp, X, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, Info, Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -221,11 +221,9 @@ export default function FinalResultsTab({
     const total = entries.length;
     const reviewedIds = new Set(reviewResponses.map(r => r.entryId));
     const notReviewed = entries.filter(e => !reviewedIds.has(e.id)).length;
-    const pinFlaggedEntryIds = new Set(sessionPins.filter(p => p.flagged).map(p => p.entryId).filter(Boolean));
-    const reviewFlaggedEntryIds = new Set(reviewResponses.filter(r => r.verdict === "flagged").map(r => r.entryId));
-    const allFlaggedIds = new Set([...pinFlaggedEntryIds, ...reviewFlaggedEntryIds]);
-    const flagged = allFlaggedIds.size;
-    return { total, notReviewed, flagged };
+    const pinFlagged = sessionPins.filter(p => p.flagged).length;
+    const reviewFlagged = reviewResponses.filter(r => r.verdict === "flagged").length;
+    return { total, notReviewed, pinFlagged, reviewFlagged };
   }, [entries, reviewResponses, sessionPins]);
 
   const photoMap = useMemo(() => new Map(photos.map(p => [p.id, p])), [photos]);
@@ -371,9 +369,17 @@ export default function FinalResultsTab({
           <div className="w-px h-4 bg-blue-300 dark:bg-blue-700/40 hidden sm:block" />
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-white/70 shrink-0" />
-            <span className="text-sm text-blue-900 dark:text-white">Still flagged:</span>
-            <span className={`text-sm font-semibold tabular-nums ${reviewStats.flagged > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-flagged">
-              {reviewStats.flagged}
+            <span className="text-sm text-blue-900 dark:text-white">Flagged (pins):</span>
+            <span className={`text-sm font-semibold tabular-nums ${reviewStats.pinFlagged > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-flagged">
+              {reviewStats.pinFlagged}
+            </span>
+          </div>
+          <div className="w-px h-4 bg-blue-300 dark:bg-blue-700/40 hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <Flag className="h-4 w-4 text-blue-600 dark:text-white/70 shrink-0" />
+            <span className="text-sm text-blue-900 dark:text-white">Flagged (review):</span>
+            <span className={`text-sm font-semibold tabular-nums ${reviewStats.reviewFlagged > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-review-flagged">
+              {reviewStats.reviewFlagged}
             </span>
           </div>
         </div>
