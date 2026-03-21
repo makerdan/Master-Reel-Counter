@@ -529,10 +529,9 @@ function Lightbox({
               left: `${pin.xPercent}%`,
               top: `${pin.yPercent}%`,
               transform: "translate(-50%, -50%)",
-              opacity: 0.2,
             }}
           >
-            <div className="w-4 h-4 rounded-full bg-orange-400 border-2 border-white shadow-md" />
+            <div className="w-5 h-5 rounded-full bg-orange-500 border-[3px] border-orange-300 shadow-[0_0_0_3px_rgba(251,146,60,0.5)]" />
           </div>
         ))}
       </div>
