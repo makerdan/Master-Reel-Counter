@@ -187,6 +187,7 @@ function SessionWorkspace({
   const [navigateAisle, setNavigateAisle] = useState<string>("");
   const [navigateSection, setNavigateSection] = useState<string>("");
   const [navigateToPinId, setNavigateToPinId] = useState<number | null>(null);
+  const [stripScrollToPhotoId, setStripScrollToPhotoId] = useState<number | null>(null);
   const syncedPhotoIdRef = useRef<number | null>(null);
   const lastPhotoModePhotoIdRef = useRef<number | null>(null);
   const [editName, setEditName] = useState(session.name);
@@ -763,11 +764,13 @@ function SessionWorkspace({
                     setMode("photo");
                   }}
                   onClearUndoHistory={clearHistory}
+                  scrollToPhotoId={stripScrollToPhotoId}
+                  onScrolled={() => setStripScrollToPhotoId(null)}
                 />
               </TabsContent>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} onJumpToStripPhoto={(photoId) => { setStripScrollToPhotoId(photoId); setMode("strip"); }} />
               </TabsContent>
 
               <TabsContent value="flagged">

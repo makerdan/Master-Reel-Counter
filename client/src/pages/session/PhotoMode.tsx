@@ -48,7 +48,7 @@ function getScanPanelStorageKey(sessionId: number) {
 
 type OnlineUser = { userId: string; username: string };
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -1584,11 +1584,28 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               <div className="hidden sm:flex items-center justify-center gap-3 text-xs mono text-[hsl(25_40%_60%)]" data-testid="text-photo-info">
                 {currentPhoto.filename && <span className="truncate max-w-[200px]" title={currentPhoto.filename}>{currentPhoto.filename}</span>}
                 {currentPhoto.timestamp && <span className="whitespace-nowrap">{currentPhoto.timestamp}</span>}
-                {currentPhoto.isDetailShot && (
-                  <span className="inline-flex items-center gap-1 text-[hsl(200_70%_55%)]" title="Detail Shot">
-                    <Focus className="h-3 w-3" />
-                  </span>
-                )}
+                {currentPhoto.isDetailShot && (() => {
+                  const parentPhoto = currentPhoto.parentPhotoId
+                    ? uploadedPhotos.find(p => p.dbId === currentPhoto.parentPhotoId)
+                    : undefined;
+                  const parentFilename = parentPhoto?.filename || (parentPhoto?.dbId ? `S${sessionId}_P${String(parentPhoto.dbId).padStart(4, "0")}.jpg` : null);
+                  return (
+                    <span className="inline-flex items-center gap-1 text-[hsl(200_70%_55%)]">
+                      <Focus className="h-3 w-3" title="Detail Shot" />
+                      {parentFilename && onJumpToStripPhoto && parentPhoto?.dbId ? (
+                        <button
+                          className="text-[hsl(200_70%_55%)] hover:text-[hsl(200_70%_65%)] underline transition-colors cursor-pointer"
+                          onClick={() => onJumpToStripPhoto(parentPhoto.dbId!)}
+                          data-testid="link-detail-shot-parent"
+                        >
+                          Detail shot of photo {parentFilename}
+                        </button>
+                      ) : (
+                        <span title="Detail Shot">Detail shot</span>
+                      )}
+                    </span>
+                  );
+                })()}
                 {currentPhoto.notes && (
                   <span className="inline-flex items-center gap-1 text-[hsl(18_70%_55%)]" title={currentPhoto.notes}>
                     <StickyNote className="h-3 w-3" />

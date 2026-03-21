@@ -551,7 +551,7 @@ function PhotoCard({
                     Cancel
                   </button>
                   <button
-                    className="text-[10px] font-medium text-primary hover:text-primary/80 disabled:opacity-50"
+                    className="text-sm font-semibold text-white bg-primary hover:bg-primary/80 disabled:opacity-50 rounded px-4 py-1.5"
                     onClick={() => linkMutation.mutate({ parentId: selectedParentForLink, reason: linkReason, pinLabel: linkedPinLabel })}
                     disabled={linkMutation.isPending}
                     data-testid={`button-strip-confirm-link-${photo.id}`}
@@ -710,13 +710,31 @@ export default function PhotoStrip({
   canEdit,
   onJumpToPhoto,
   onClearUndoHistory,
+  scrollToPhotoId,
+  onScrolled,
 }: {
   sessionId: number;
   canEdit: boolean;
   onJumpToPhoto: (photoId: number) => void;
   onClearUndoHistory?: () => void;
+  scrollToPhotoId?: number | null;
+  onScrolled?: () => void;
 }) {
   const [lightbox, setLightbox] = useState<{ photos: LightboxPhoto[]; index: number } | null>(null);
+
+  useEffect(() => {
+    if (!scrollToPhotoId) return;
+    const timer = setTimeout(() => {
+      const el = document.querySelector(`[data-testid="strip-card-${scrollToPhotoId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-blue-400");
+        setTimeout(() => el.classList.remove("ring-2", "ring-blue-400"), 2000);
+      }
+      onScrolled?.();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [scrollToPhotoId, onScrolled]);
 
   const { data: photos = [], isLoading } = useQuery<Photo[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "photos"],
@@ -789,7 +807,7 @@ export default function PhotoStrip({
           <div key={aisleGroup.aisle} className="border border-blue-500 sm:!border-blue-600/50 rounded-lg p-2">
             <div className="mb-3 pb-1 border-b">
               <button
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary hover:underline transition-colors cursor-pointer"
+                className="text-xs font-semibold uppercase tracking-wider text-orange-500 hover:text-orange-400 hover:underline transition-colors cursor-pointer"
                 onClick={() => onJumpToPhoto(aisleGroup.sections[0].photos[0].id)}
                 data-testid={`link-strip-aisle-${aisleGroup.aisle || "none"}`}
               >
@@ -805,7 +823,7 @@ export default function PhotoStrip({
                 <div key={sectionGroup.section} className="sm:border-0 border border-blue-400 rounded-md p-1.5 sm:p-0">
                   <div className="flex items-center gap-2 mb-2 border-l-2 border-muted-foreground/20 pl-2">
                     <button
-                      className="text-xs font-medium text-muted-foreground/80 underline hover:text-primary transition-colors cursor-pointer"
+                      className="text-xs font-medium text-orange-500 underline hover:text-orange-400 transition-colors cursor-pointer"
                       onClick={() => onJumpToPhoto(sectionGroup.photos[0].id)}
                       data-testid={`link-strip-section-${aisleGroup.aisle || "none"}-${sectionGroup.section || "none"}`}
                     >
