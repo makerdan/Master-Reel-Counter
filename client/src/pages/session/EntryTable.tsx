@@ -313,7 +313,7 @@ function EntryTable({
                                 </DialogHeader>
                                 <div className="flex-1 min-h-0 overflow-auto px-4 pb-4">
                                   <EntryPhotoDialogContent
-                                    src={(() => { const p = photoMap.get(entry.photoId!); const key = p?.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
+                                    src={(() => { const p = photoMap.get(entry.photoId!); if (!p) return ""; const key = p.objectStorageKey || ""; return key.startsWith("/uploads/") ? key : `/uploads/${key}`; })()}
                                     entryId={entry.id}
                                     pin={pinByEntryId.get(entry.id)}
                                   />

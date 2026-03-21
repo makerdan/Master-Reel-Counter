@@ -60,10 +60,4 @@ function makeQueryClient() {
   });
 }
 
-export let queryClient = makeQueryClient();
-
-export function resetQueryClient() {
-  queryClient.clear();
-  queryClient = makeQueryClient();
-  return queryClient;
-}
+export const queryClient = makeQueryClient();

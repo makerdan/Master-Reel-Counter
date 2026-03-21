@@ -332,6 +332,10 @@ export default function SingleEntryMode({
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      if (editingEntry?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/entries", editingEntry.id.toString(), "pin"] });
+      }
       if (onUndoableSave && result) {
         if (result.type === "create") {
           onUndoableSave({ type: "create-entry", sessionId, entityId: result.id, data: result.body });

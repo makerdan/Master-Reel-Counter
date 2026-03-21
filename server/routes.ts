@@ -80,7 +80,7 @@ async function logActivity(sessionId: number, userId: string, username: string |
   try {
     await storage.createActivityLog({ sessionId, userId, username: username || null, action, entityType: entityType || null, entityId: entityId || null, details: details || null });
     broadcastToSession(sessionId, { type: "activity", action, entityType, entityId, userId, username });
-  } catch {}
+  } catch (err) { console.error("logActivity failed:", err); }
 }
 
 async function verifySessionAccess(sessionId: number, userId: string, testerOwnerUserId?: string): Promise<{ session: any; role: "owner" | "editor" | "viewer" } | null> {
@@ -368,7 +368,7 @@ export async function registerRoutes(
         const [existsInGcs] = await gcsFile.exists();
         if (existsInGcs) {
           res.set(headers);
-          gcsFile.createReadStream().pipe(res);
+          gcsFile.createReadStream().on("error", (err) => { console.error("GCS stream error:", err); if (!res.headersSent) res.status(500).json({ error: "Stream failed" }); }).pipe(res);
           servedFromGcs = true;
         }
       } catch {
@@ -383,7 +383,7 @@ export async function registerRoutes(
       }
       res.set(headers);
       const { createReadStream } = await import("fs");
-      createReadStream(filePath).pipe(res);
+      createReadStream(filePath).on("error", (err) => { console.error("File stream error:", err); if (!res.headersSent) res.status(500).json({ error: "Stream failed" }); }).pipe(res);
     } catch (error) {
       console.error("Error serving file:", error);
       res.status(500).json({ error: "Failed to serve file" });
