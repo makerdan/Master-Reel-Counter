@@ -264,7 +264,7 @@ function PhotoCard({
   const isDetail = photo.isDetailShot && parentId !== null;
 
   return (
-    <div className={`rounded-md border bg-card overflow-hidden group relative flex flex-col ${isDetail ? "border-l-[3px] border-l-blue-400 dark:border-l-blue-500 border-t border-r border-b border-t-border border-r-border border-b-border ml-3" : "border-border"}`} data-testid={`strip-card-${photo.id}`}>
+    <div className={`rounded-md border bg-card overflow-hidden group relative flex flex-col ${isDetail ? "border-blue-400 dark:border-blue-500 ml-3" : "border-border"}`} data-testid={`strip-card-${photo.id}`}>
       <div ref={thumbContainerRef} className="relative aspect-square lg:aspect-video bg-muted overflow-hidden">
         <img
           src={photoUrl(photo.objectStorageKey)}
