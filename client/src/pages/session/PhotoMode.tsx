@@ -383,6 +383,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           setTimeout(() => setHighlightedCommittedPinDbId(null), 9000);
         }, 200);
       }
+      setTimeout(() => {
+        const photoEl = document.querySelector('[data-testid="text-photo-info"], [data-testid="bottom-photo-nav"]');
+        if (photoEl) photoEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        else window.scrollTo({ top: 0, behavior: "smooth" });
+      }, 100);
       onNavigated?.();
     }
   }, [navigateToPhotoId, uploadedPhotos]);
