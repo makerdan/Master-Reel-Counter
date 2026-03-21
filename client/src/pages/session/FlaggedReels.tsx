@@ -779,7 +779,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           <p className="text-xs mt-1">Use the flag button on pins in Photo Mode to mark reels for re-shoot.</p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4" data-testid="flagged-pins-section">
           {photoGroups.map((group) => (
             <div
               key={group.photoId}

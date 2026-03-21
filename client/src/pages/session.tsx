@@ -811,6 +811,14 @@ function SessionWorkspace({
                     setMode("photo");
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
+                  onSwitchToFlagged={(section) => {
+                    setMode("flagged");
+                    setTimeout(() => {
+                      const anchor = section === "pins" ? "flagged-pins-section" : "section-review-flagged";
+                      const el = document.querySelector(`[data-testid="${anchor}"]`) || document.getElementById(anchor);
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 150);
+                  }}
                 />
               </TabsContent>
             </Tabs>

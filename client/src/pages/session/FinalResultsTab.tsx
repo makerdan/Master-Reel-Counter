@@ -191,12 +191,13 @@ function DropZone({ onFile }: { onFile: (file: File) => void }) {
 // ─── FinalResultsTab ─────────────────────────────────────────────────────────
 
 export default function FinalResultsTab({
-  sessionId, entries, photos, onJumpToPin,
+  sessionId, entries, photos, onJumpToPin, onSwitchToFlagged,
 }: {
   sessionId: number;
   entries: Entry[];
   photos: Photo[];
   onJumpToPin?: (photoId: number, pinId: number) => void;
+  onSwitchToFlagged?: (section: "pins" | "review") => void;
 }) {
   const { toast } = useToast();
 
@@ -370,17 +371,37 @@ export default function FinalResultsTab({
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-white/70 shrink-0" />
             <span className="text-sm text-blue-900 dark:text-white">Flagged (pins):</span>
-            <span className={`text-sm font-semibold tabular-nums ${reviewStats.pinFlagged > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-flagged">
-              {reviewStats.pinFlagged}
-            </span>
+            {reviewStats.pinFlagged > 0 && onSwitchToFlagged ? (
+              <button
+                onClick={() => onSwitchToFlagged("pins")}
+                className="text-sm font-semibold tabular-nums text-red-600 dark:text-red-400 underline hover:text-red-700 dark:hover:text-red-300 cursor-pointer"
+                data-testid="stat-flagged"
+              >
+                {reviewStats.pinFlagged}
+              </button>
+            ) : (
+              <span className={`text-sm font-semibold tabular-nums ${reviewStats.pinFlagged > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-flagged">
+                {reviewStats.pinFlagged}
+              </span>
+            )}
           </div>
           <div className="w-px h-4 bg-blue-300 dark:bg-blue-700/40 hidden sm:block" />
           <div className="flex items-center gap-2">
             <Flag className="h-4 w-4 text-blue-600 dark:text-white/70 shrink-0" />
             <span className="text-sm text-blue-900 dark:text-white">Flagged (review):</span>
-            <span className={`text-sm font-semibold tabular-nums ${reviewStats.reviewFlagged > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-review-flagged">
-              {reviewStats.reviewFlagged}
-            </span>
+            {reviewStats.reviewFlagged > 0 && onSwitchToFlagged ? (
+              <button
+                onClick={() => onSwitchToFlagged("review")}
+                className="text-sm font-semibold tabular-nums text-yellow-600 dark:text-yellow-400 underline hover:text-yellow-700 dark:hover:text-yellow-300 cursor-pointer"
+                data-testid="stat-review-flagged"
+              >
+                {reviewStats.reviewFlagged}
+              </button>
+            ) : (
+              <span className={`text-sm font-semibold tabular-nums ${reviewStats.reviewFlagged > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-review-flagged">
+                {reviewStats.reviewFlagged}
+              </span>
+            )}
           </div>
         </div>
       )}
