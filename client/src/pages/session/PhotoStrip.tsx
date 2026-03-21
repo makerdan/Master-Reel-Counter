@@ -107,6 +107,18 @@ function PhotoCard({
   const sectionRef = useRef(section);
   const notesRef = useRef(notes);
   const thumbContainerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const el = thumbContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setContainerSize({ w: entry.contentRect.width, h: entry.contentRect.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const invalidatePhotos = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
@@ -272,13 +284,12 @@ function PhotoCard({
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none flex items-center justify-center">
           <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow pointer-events-none" />
         </div>
-        {imgNaturalSize && pins.map((pin) => {
+        {imgNaturalSize && containerSize && pins.map((pin) => {
           let displayX = pin.xPercent;
           let displayY = pin.yPercent;
-          if (imgNaturalSize) {
+          if (imgNaturalSize && containerSize) {
             const { w: iw, h: ih } = imgNaturalSize;
-            const el = thumbContainerRef.current;
-            const contAspect = el ? el.clientWidth / el.clientHeight : 1;
+            const contAspect = containerSize.w / containerSize.h;
             const imgAspect = iw / ih;
             if (imgAspect > contAspect) {
               const scale = contAspect / imgAspect;
