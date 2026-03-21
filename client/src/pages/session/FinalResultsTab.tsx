@@ -221,9 +221,12 @@ export default function FinalResultsTab({
     const total = entries.length;
     const reviewedIds = new Set(reviewResponses.map(r => r.entryId));
     const notReviewed = entries.filter(e => !reviewedIds.has(e.id)).length;
-    const flagged = entries.filter(e => e.flagged).length;
+    const pinFlaggedEntryIds = new Set(sessionPins.filter(p => p.flagged).map(p => p.entryId).filter(Boolean));
+    const reviewFlaggedEntryIds = new Set(reviewResponses.filter(r => r.verdict === "flagged").map(r => r.entryId));
+    const allFlaggedIds = new Set([...pinFlaggedEntryIds, ...reviewFlaggedEntryIds]);
+    const flagged = allFlaggedIds.size;
     return { total, notReviewed, flagged };
-  }, [entries, reviewResponses]);
+  }, [entries, reviewResponses, sessionPins]);
 
   const photoMap = useMemo(() => new Map(photos.map(p => [p.id, p])), [photos]);
 
