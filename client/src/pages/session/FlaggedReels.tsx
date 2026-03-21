@@ -593,7 +593,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             >
               <Check className={`h-4 w-4 shrink-0 ${duplicateGroups.length > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} />
               <span>
-                {duplicateGroups.length > 0 ? "All duplicates cleared" : "No duplicates detected"}
+                {duplicateGroups.length > 0 ? "No duplicates remaining." : "No duplicates detected"}
               </span>
             </div>
           )}
@@ -692,7 +692,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                     >
                       <ScanSearch className="h-4 w-4 sm:mr-1" />
                       <span className="sm:hidden text-xs">Go To Photo</span>
-                      <span className="hidden sm:inline">View in Photo</span>
+                      <span className="hidden sm:inline">View Reel ID Photo</span>
                     </Button>
                   )}
                   {onReshoot && (
@@ -705,7 +705,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       title="Take a detail photo in Mobile Flow"
                     >
                       <Camera className="h-4 w-4 mr-1" />
-                      Re-shoot
+                      Take Detail Photo
                     </Button>
                   )}
                 </div>
@@ -769,7 +769,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           title="Edit details"
                         >
                           <Pencil className="h-4 w-4 mr-1" />
-                          {editingPinId === pin.id ? "Close" : "Edit"}
+                          {editingPinId === pin.id ? "Close" : "Edit Reel Data"}
                         </Button>
                         <Button
                           variant="outline"
@@ -950,9 +950,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           className="!border-black"
                           onClick={() => editingPinId === pin.id ? setEditingPinId(null) : openEditor(pin)}
                           data-testid={`button-edit-mobile-${pin.id}`}
-                          title="Capture Details"
+                          title="Edit Reel Data"
                         >
-                          Capture Details
+                          Edit Reel Data
                         </Button>
                         <Button
                           variant="outline"

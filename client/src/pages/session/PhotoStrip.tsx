@@ -430,7 +430,7 @@ function PhotoCard({
   );
 }
 
-type LightboxPhoto = { url: string; label: string };
+type LightboxPhoto = { url: string; label: string; pins?: Pin[] };
 
 function Lightbox({
   photos,
@@ -491,13 +491,28 @@ function Lightbox({
         </button>
       )}
 
-      <img
-        src={current.url}
-        alt={current.label}
-        className="max-w-[85vw] max-h-[88vh] object-contain rounded shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="img-lightbox-full"
-      />
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <img
+          src={current.url}
+          alt={current.label}
+          className="max-w-[85vw] max-h-[88vh] object-contain rounded shadow-2xl block"
+          data-testid="img-lightbox-full"
+        />
+        {current.pins && current.pins.map((pin) => (
+          <div
+            key={pin.id}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${pin.xPercent}%`,
+              top: `${pin.yPercent}%`,
+              transform: "translate(-50%, -50%)",
+              opacity: 0.2,
+            }}
+          >
+            <div className="w-4 h-4 rounded-full bg-orange-400 border-2 border-white shadow-md" />
+          </div>
+        ))}
+      </div>
 
       {hasNext && (
         <button
@@ -656,6 +671,7 @@ export default function PhotoStrip({
                           const sectionPhotos: LightboxPhoto[] = sectionGroup.photos.map(p => ({
                             url: photoUrl(p.objectStorageKey),
                             label: [p.aisle, p.section].filter(Boolean).join(" / ") || `Photo #${p.id}`,
+                            pins: pinsByPhoto.get(p.id) ?? [],
                           }));
                           const idx = sectionGroup.photos.findIndex(p => p.id === photo.id);
                           setLightbox({ photos: sectionPhotos, index: idx >= 0 ? idx : 0 });

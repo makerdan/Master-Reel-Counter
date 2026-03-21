@@ -586,14 +586,22 @@ export default function ReviewTab({
   };
 
   // ── Mutation ───────────────────────────────────────────────────────────────
+  const [showFlagBanner, setShowFlagBanner] = useState(false);
+  const flagBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const submitReview = useMutation({
     mutationFn: async ({ entryId, verdict, reason }: { entryId: number; verdict: string; reason?: string }) => {
       const res = await apiRequest("POST", `/api/sessions/${sessionId}/review-responses`, { entryId, verdict, flagReason: reason || null });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "review-responses"] });
       setShowFlagInput(false); setFlagReason("");
+      if (variables.verdict === "flagged") {
+        setShowFlagBanner(true);
+        if (flagBannerTimerRef.current) clearTimeout(flagBannerTimerRef.current);
+        flagBannerTimerRef.current = setTimeout(() => setShowFlagBanner(false), 5000);
+      }
     },
     onError: () => { toast({ title: "Failed to save review", variant: "destructive" }); },
   });
@@ -663,6 +671,15 @@ export default function ReviewTab({
   return (
     <div className="space-y-4" data-testid="review-tab-container">
       <h2 className="text-lg font-bold underline text-center" data-testid="heading-review">Review</h2>
+      {showFlagBanner && (
+        <div
+          className="flex items-center gap-2 rounded-md bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-400 dark:border-yellow-700 px-4 py-2.5 text-sm text-yellow-800 dark:text-yellow-300"
+          data-testid="banner-flag-moved"
+        >
+          <Flag className="h-4 w-4 shrink-0 text-yellow-500" />
+          <span>Reel moved to Flagged tab for further review.</span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
