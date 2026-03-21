@@ -222,7 +222,7 @@ export default function FinalResultsTab({
     const reviewedIds = new Set(reviewResponses.map(r => r.entryId));
     const notReviewed = entries.filter(e => !reviewedIds.has(e.id)).length;
     const pinFlagged = sessionPins.filter(p => p.flagged).length;
-    const reviewFlagged = reviewResponses.filter(r => r.verdict === "flagged").length;
+    const reviewFlagged = new Set(reviewResponses.filter(r => r.verdict === "flagged").map(r => r.entryId)).size;
     return { total, notReviewed, pinFlagged, reviewFlagged };
   }, [entries, reviewResponses, sessionPins]);
 

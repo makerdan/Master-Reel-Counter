@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Entry, Pin, Photo } from "@shared/schema";
+import type { Entry, Pin, Photo, ReviewResponse } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
 import { lookupCategory, type ParsedCatalogEntry, PARSED_CATALOG, userWireCategoryToParsedEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
@@ -322,6 +322,29 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     },
   });
 
+  const { data: reviewResponses = [] } = useQuery<ReviewResponse[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "review-responses"],
+    enabled: sessionId > 0,
+  });
+
+  const { data: allEntries = [], isLoading: entriesLoading } = useQuery<Entry[]>({
+    queryKey: ["/api/sessions", sessionId.toString(), "entries"],
+  });
+
+  const reviewFlaggedItems = useMemo(() => {
+    const entryMap = new Map(allEntries.map(e => [e.id, e]));
+    const seen = new Set<number>();
+    return reviewResponses
+      .filter(r => r.verdict === "flagged")
+      .filter(r => {
+        if (seen.has(r.entryId)) return false;
+        seen.add(r.entryId);
+        return true;
+      })
+      .map(r => ({ response: r, entry: entryMap.get(r.entryId) }))
+      .filter(item => item.entry);
+  }, [reviewResponses, allEntries]);
+
   const unflagMutation = useMutation({
     mutationFn: async ({ pinId, flagReason }: { pinId: number; flagReason: string | null }) => {
       await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: null });
@@ -585,7 +608,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           <Flag className="h-5 w-5 text-yellow-500" />
           <span className="sm:hidden">Flagged</span>
           <span className="hidden sm:inline">Flagged Reels</span>
-          <Badge variant="secondary" data-testid="badge-flagged-count">{flaggedPins.length}</Badge>
+          <Badge variant="secondary" data-testid="badge-flagged-count">{flaggedPins.length + reviewFlaggedItems.length}</Badge>
         </h2>
         <div className="flex justify-center">
           <Button
@@ -718,11 +741,11 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             </div>
           )}
       </div>
-      {isLoading ? (
+      {(isLoading || entriesLoading) ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : flaggedPins.length === 0 ? (
+      ) : flaggedPins.length === 0 && reviewFlaggedItems.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground" data-testid="text-no-flagged">
           <Flag className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="text-sm">No flagged reels in this session.</p>
@@ -1317,6 +1340,58 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
               <span className="font-mono">Pin {previewPin.label}</span>
               {previewPin.wireDetails && <span className="ml-2">&mdash; {previewPin.wireDetails}</span>}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Review-Flagged Entries ───────────────────────────────────── */}
+      {reviewFlaggedItems.length > 0 && (
+        <div className="border !border-yellow-600/50 rounded-lg overflow-hidden bg-card" data-testid="section-review-flagged">
+          <div className="bg-yellow-500/10 px-3 py-2 flex items-center gap-2 border-b !border-yellow-600/50">
+            <Flag className="h-4 w-4 text-yellow-600 shrink-0" />
+            <span className="font-semibold text-sm">Flagged During Review</span>
+            <Badge variant="secondary" className="text-[10px]" data-testid="badge-review-flagged-count">
+              {reviewFlaggedItems.length}
+            </Badge>
+          </div>
+          <div className="divide-y divide-yellow-600/20">
+            {reviewFlaggedItems.map(({ response, entry }) => (
+              <div key={response.id} className="px-3 py-2.5 flex items-center gap-3 flex-wrap" data-testid={`review-flagged-entry-${response.entryId}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-sm font-semibold">
+                      {[entry!.aisle && `Aisle ${entry!.aisle}`, entry!.section && `Section ${entry!.section}`].filter(Boolean).join(" · ") || "No location"}
+                    </span>
+                    {entry!.reelTag && (
+                      <Badge variant="outline" className="text-[10px] font-mono">{entry!.reelTag}</Badge>
+                    )}
+                    {entry!.manufacturer && (
+                      <Badge variant="outline" className="text-[10px]">{entry!.manufacturer}</Badge>
+                    )}
+                  </div>
+                  {response.flagReason && (
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
+                      <AlertTriangle className="h-3 w-3 inline mr-1" />
+                      {response.flagReason}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Flagged by {response.username || "unknown"} during review
+                  </p>
+                </div>
+                {onViewInPhoto && entry!.photoId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onViewInPhoto(entry!.photoId!, undefined)}
+                    data-testid={`button-view-review-flagged-${response.entryId}`}
+                  >
+                    <Eye className="h-4 w-4 sm:mr-1" />
+                    <span className="hidden sm:inline">View</span>
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
