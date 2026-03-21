@@ -1305,7 +1305,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
   return (
-    <div className="rounded-md border-2 border-blue-600 sm:border-blue-600/40 bg-[hsl(210_10%_96%)] dark:bg-[hsl(215_10%_13%)] p-4 overflow-hidden">
+    <div className="rounded-lg border border-blue-500 sm:!border-blue-600/50 bg-[hsl(210_10%_96%)] dark:bg-[hsl(215_10%_13%)] p-4 overflow-hidden">
       <div className="space-y-4 min-w-0">
       <input
         ref={fileInputRef}

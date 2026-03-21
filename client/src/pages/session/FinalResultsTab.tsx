@@ -389,7 +389,7 @@ export default function FinalResultsTab({
             No pins recorded in this session yet.
           </div>
         ) : (
-          <div className="border border-blue-500 sm:border-border rounded-lg overflow-x-auto">
+          <div className="border border-blue-500 sm:border-blue-600/50 rounded-lg overflow-x-auto">
             <table className="w-full text-xs" data-testid="table-tally">
               <thead>
                 <tr className="border-b border-border bg-muted/50">

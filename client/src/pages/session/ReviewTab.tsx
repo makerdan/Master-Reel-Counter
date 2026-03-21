@@ -781,7 +781,7 @@ export default function ReviewTab({
 
       {/* Entry card */}
       {currentEntry && (
-        <Card data-testid={`card-review-entry-${currentEntry.id}`}>
+        <Card className="border-blue-600/50" data-testid={`card-review-entry-${currentEntry.id}`}>
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>

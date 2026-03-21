@@ -851,18 +851,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                           title="Edit details"
                         >
                           <Pencil className="h-4 w-4 mr-1" />
-                          {editingPinId === pin.id ? "Close" : "Edit Reel Data"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => unflagMutation.mutate({ pinId: pin.id, flagReason: pin.flagReason })}
-                          disabled={unflagMutation.isPending}
-                          data-testid={`button-resolve-${pin.id}`}
-                          title="Mark as resolved"
-                        >
-                          <Check className="h-4 w-4 mr-1" />
-                          Un-Flag
+                          {editingPinId === pin.id ? "Close w/o Saving" : "Edit Reel Data"}
                         </Button>
                       </div>
                     </div>
@@ -960,6 +949,17 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               data-testid={`input-reel-count-${pin.id}`}
                             />
                           </div>
+                        </div>
+                        <div className="mb-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditState(s => ({ ...s, wireDetails: "", vendorCode: "", footage: "", reelCount: "1" }))}
+                            data-testid={`button-clear-details-${pin.id}`}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Clear Reel Details
+                          </Button>
                         </div>
                         {pin.entryId && (
                           <div className="mb-3">
