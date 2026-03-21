@@ -356,20 +356,20 @@ export default function FinalResultsTab({
 
       {/* ── Review Status Banner ─────────────────────────────────────────── */}
       {reviewStats.total > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-blue-700/40 bg-blue-600 dark:bg-blue-900/30 sm:bg-blue-900/30 px-4 py-2.5" data-testid="final-results-review-banner">
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-blue-300 dark:border-blue-700/40 bg-blue-50 dark:bg-blue-900/30 px-4 py-2.5" data-testid="final-results-review-banner">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-white/70 shrink-0" />
-            <span className="text-sm text-white">Not yet reviewed:</span>
-            <span className={`text-sm font-semibold tabular-nums ${reviewStats.notReviewed > 0 ? "text-amber-400" : "text-green-400"}`} data-testid="stat-not-reviewed">
+            <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-white/70 shrink-0" />
+            <span className="text-sm text-blue-900 dark:text-white">Not yet reviewed:</span>
+            <span className={`text-sm font-semibold tabular-nums ${reviewStats.notReviewed > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-not-reviewed">
               {reviewStats.notReviewed}
             </span>
-            <span className="text-sm text-white/80">/ {reviewStats.total}</span>
+            <span className="text-sm text-blue-800/80 dark:text-white/80">/ {reviewStats.total}</span>
           </div>
-          <div className="w-px h-4 bg-[hsl(25_20%_28%)] hidden sm:block" />
+          <div className="w-px h-4 bg-blue-300 dark:bg-blue-700/40 hidden sm:block" />
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-white/70 shrink-0" />
-            <span className="text-sm text-white">Still flagged:</span>
-            <span className={`text-sm font-semibold tabular-nums ${reviewStats.flagged > 0 ? "text-red-400" : "text-green-400"}`} data-testid="stat-flagged">
+            <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-white/70 shrink-0" />
+            <span className="text-sm text-blue-900 dark:text-white">Still flagged:</span>
+            <span className={`text-sm font-semibold tabular-nums ${reviewStats.flagged > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-flagged">
               {reviewStats.flagged}
             </span>
           </div>

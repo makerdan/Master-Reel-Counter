@@ -1305,7 +1305,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
   return (
-    <div className="rounded-md border-2 border-[hsl(18_85%_32%)] sm:border-[hsl(18_60%_30%/0.35)] bg-[hsl(30_10%_96%)] dark:bg-[hsl(25_8%_13%)] p-4 overflow-hidden">
+    <div className="rounded-md border-2 border-blue-600 sm:border-blue-600/40 bg-[hsl(210_10%_96%)] dark:bg-[hsl(215_10%_13%)] p-4 overflow-hidden">
       <div className="space-y-4 min-w-0">
       <input
         ref={fileInputRef}
@@ -1346,7 +1346,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 }
               }}
               placeholder="Aisle..."
-              className={`w-24 border-2 !border-[hsl(18_80%_40%)] dark:!border-[hsl(18_80%_60%)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
+              className={`w-24 border-2 !border-blue-600 dark:!border-blue-400 focus-visible:ring-blue-500 bg-white dark:bg-[hsl(215_10%_10%)] placeholder:text-blue-700 placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
               enterKeyHint="next"
               data-testid="input-photo-aisle"
             />
@@ -1371,14 +1371,14 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 }
               }}
               placeholder="Sec..."
-              className={`w-14 border-2 !border-[hsl(18_80%_40%)] dark:!border-[hsl(18_80%_60%)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
+              className={`w-14 border-2 !border-blue-600 dark:!border-blue-400 focus-visible:ring-blue-500 bg-white dark:bg-[hsl(215_10%_10%)] placeholder:text-blue-700 placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
               enterKeyHint="done"
               data-testid="input-photo-section-top"
             />
           </div>
           <div className="hidden sm:flex items-center gap-2">
             <Button
-              className={`bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)] transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
+              className={`bg-blue-700 text-white border-blue-800 transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || !canEdit || showQuickEntry}
               data-testid="button-upload-photos"
@@ -1388,7 +1388,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               Upload Photos
             </Button>
             <Button
-              className={`bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)] transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
+              className={`bg-blue-700 text-white border-blue-800 transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
               onClick={() => cameraInputRef.current?.click()}
               disabled={isUploading || !canEdit || showQuickEntry}
               data-testid="button-take-photo"
@@ -1422,7 +1422,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         </div>
         <div className="flex sm:hidden items-center justify-center gap-4">
           <Button
-            className={`bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)] transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
+            className={`bg-blue-700 text-white border-blue-800 transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading || !canEdit || showQuickEntry}
             data-testid="button-upload-photos-mobile"
@@ -1431,7 +1431,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
           </Button>
           <Button
-            className={`bg-[hsl(18_85%_32%)] text-white border-[hsl(18_85%_26%)] transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
+            className={`bg-blue-700 text-white border-blue-800 transition-opacity ${showQuickEntry ? "opacity-30 pointer-events-none" : ""}`}
             onClick={() => cameraInputRef.current?.click()}
             disabled={isUploading || !canEdit || showQuickEntry}
             data-testid="button-take-photo-mobile"
@@ -1509,7 +1509,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               <div className="flex items-center gap-3">
                 <Button
                   size="icon"
-                  className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                  className="bg-blue-600 text-white border border-blue-700 disabled:opacity-40"
                   disabled={uploadedPhotos.length <= 1}
                   onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i - 1 + uploadedPhotos.length) % uploadedPhotos.length); resetView(); }}
                   data-testid="button-prev-photo"
@@ -1520,7 +1520,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <input
                     type="text"
                     inputMode="numeric"
-                    className="w-10 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
+                    className="w-10 text-center bg-transparent border border-[hsl(215_30%_50%/0.4)] rounded px-1 py-0.5 text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-blue-500"
                     value={photoInputValue ?? String(currentPhotoIdx + 1).padStart(2, "0")}
                     onChange={(e) => {
                       const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
@@ -1544,7 +1544,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 </div>
                 <Button
                   size="icon"
-                  className="bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                  className="bg-blue-600 text-white border border-blue-700 disabled:opacity-40"
                   disabled={uploadedPhotos.length <= 1}
                   onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i + 1) % uploadedPhotos.length); resetView(); }}
                   data-testid="button-next-photo"
@@ -1573,7 +1573,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       }
                     }}
                     placeholder="Section..."
-                    className={`w-24 border-2 !border-[hsl(18_80%_40%)] dark:!border-[hsl(18_80%_60%)] focus-visible:ring-[hsl(18_85%_48%)] bg-white dark:bg-[hsl(25_10%_10%)] placeholder:text-[hsl(18_85%_32%)] placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
+                    className={`w-24 border-2 !border-blue-600 dark:!border-blue-400 focus-visible:ring-blue-500 bg-white dark:bg-[hsl(215_10%_10%)] placeholder:text-blue-700 placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
                     enterKeyHint="done"
                     data-testid="input-photo-section"
                   />
@@ -1600,7 +1600,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
 
           {viewingNearbyIdx !== null && viewingNearbyIdx !== currentPhotoIdx && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[hsl(18_85%_40%/0.15)] border border-[hsl(18_85%_40%/0.3)] rounded-md text-xs text-[hsl(30_40%_85%)]" data-testid="nearby-viewing-banner">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-blue-600/15 border border-blue-600/30 rounded-md text-xs text-[hsl(30_40%_85%)]" data-testid="nearby-viewing-banner">
               <Eye className="h-3 w-3 flex-shrink-0" />
               <span>Viewing nearby photo {viewingNearbyIdx + 1} — pin table still shows photo {currentPhotoIdx + 1}</span>
               <Button
@@ -1971,7 +1971,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 <div className="flex items-center gap-1.5 sm:gap-3">
                   <Button
                     size="icon"
-                    className="h-7 w-7 sm:h-9 sm:w-9 bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                    className="h-7 w-7 sm:h-9 sm:w-9 bg-blue-600 text-white border border-blue-700 disabled:opacity-40"
                     disabled={uploadedPhotos.length <= 1}
                     onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i - 1 + uploadedPhotos.length) % uploadedPhotos.length); resetView(); }}
                     data-testid="button-prev-photo-bottom"
@@ -1982,7 +1982,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     <input
                       type="text"
                       inputMode="numeric"
-                      className="w-8 sm:w-10 text-center bg-transparent border border-[hsl(18_60%_30%/0.4)] rounded px-0.5 py-0.5 text-xs sm:text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-[hsl(18_85%_40%)]"
+                      className="w-8 sm:w-10 text-center bg-transparent border border-[hsl(215_30%_50%/0.4)] rounded px-0.5 py-0.5 text-xs sm:text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-blue-500"
                       value={photoInputValue ?? String(currentPhotoIdx + 1)}
                       onChange={(e) => {
                         const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
@@ -2006,7 +2006,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   </div>
                   <Button
                     size="icon"
-                    className="h-7 w-7 sm:h-9 sm:w-9 bg-[hsl(18_85%_40%)] text-white border border-[hsl(18_85%_30%)] disabled:opacity-40"
+                    className="h-7 w-7 sm:h-9 sm:w-9 bg-blue-600 text-white border border-blue-700 disabled:opacity-40"
                     disabled={uploadedPhotos.length <= 1}
                     onClick={async () => { if (uploadedPhotos.length <= 1) return; await flushSavePins(); skipAutoSave.current = true; setLocalPins([]); setViewingNearbyIdx(null); setCurrentPhotoIdx((i) => (i + 1) % uploadedPhotos.length); resetView(); }}
                     data-testid="button-next-photo-bottom"
@@ -2072,7 +2072,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           )}
 
           {currentPhoto && (
-            <div className="space-y-3 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_11%)] rounded-md p-3 border border-[hsl(18_60%_30%/0.2)]">
+            <div className="space-y-3 bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_11%)] rounded-md p-3 border border-[hsl(215_30%_50%/0.25)]">
               <div className="flex items-center gap-2 flex-wrap">
                 <StickyNote className="h-4 w-4 text-[hsl(18_70%_50%)]" />
                 <span className="text-xs font-semibold uppercase tracking-wider text-[hsl(25_60%_70%)]">Photo Notes:</span>
@@ -2081,7 +2081,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 value={photoNotes}
                 onChange={(e) => handleNotesChange(e.target.value)}
                 placeholder=""
-                className="resize-none border-[hsl(18_40%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] text-sm min-h-[60px]"
+                className="resize-none border-[hsl(215_30%_50%/0.4)] bg-white dark:bg-[hsl(25_10%_10%)] text-sm min-h-[60px]"
                 rows={2}
                 data-testid="textarea-photo-notes"
               />
@@ -2584,7 +2584,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   variant="outline"
-                  className="border-[hsl(18_40%_50%/0.5)] text-[hsl(18_60%_40%)] dark:text-[hsl(25_60%_70%)] dark:border-[hsl(18_40%_50%/0.4)]"
+                  className="border-[hsl(18_40%_50%/0.5)] text-[hsl(18_60%_40%)] dark:text-[hsl(25_60%_70%)] dark:border-[hsl(215_30%_50%/0.4)]"
                   onClick={() => {
                     setLocalPins((prev) => prev.map((p) => ({
                       ...p,
