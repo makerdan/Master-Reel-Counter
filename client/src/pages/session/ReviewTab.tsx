@@ -924,6 +924,7 @@ export default function ReviewTab({
                       placeholder="Reason for flagging (optional)"
                       value={flagReason}
                       onChange={(e) => setFlagReason(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitReview.mutate({ entryId: currentEntry.id, verdict: "flagged", reason: flagReason }); } }}
                       data-testid="input-flag-reason"
                     />
                     <div className="flex gap-2">
