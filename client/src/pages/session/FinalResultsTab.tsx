@@ -191,13 +191,14 @@ function DropZone({ onFile }: { onFile: (file: File) => void }) {
 // ─── FinalResultsTab ─────────────────────────────────────────────────────────
 
 export default function FinalResultsTab({
-  sessionId, entries, photos, onJumpToPin, onSwitchToFlagged,
+  sessionId, entries, photos, onJumpToPin, onSwitchToFlagged, onSwitchToReview,
 }: {
   sessionId: number;
   entries: Entry[];
   photos: Photo[];
   onJumpToPin?: (photoId: number, pinId: number) => void;
   onSwitchToFlagged?: (section: "pins" | "review") => void;
+  onSwitchToReview?: () => void;
 }) {
   const { toast } = useToast();
 
@@ -362,9 +363,19 @@ export default function FinalResultsTab({
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-white/70 shrink-0" />
             <span className="text-sm text-blue-900 dark:text-white">Not yet reviewed:</span>
-            <span className={`text-sm font-semibold tabular-nums ${reviewStats.notReviewed > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-not-reviewed">
-              {reviewStats.notReviewed}
-            </span>
+            {reviewStats.notReviewed > 0 && onSwitchToReview ? (
+              <button
+                onClick={() => onSwitchToReview()}
+                className="text-sm font-semibold tabular-nums text-amber-600 dark:text-amber-400 underline hover:text-amber-700 dark:hover:text-amber-300 cursor-pointer"
+                data-testid="stat-not-reviewed"
+              >
+                {reviewStats.notReviewed}
+              </button>
+            ) : (
+              <span className={`text-sm font-semibold tabular-nums ${reviewStats.notReviewed > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-not-reviewed">
+                {reviewStats.notReviewed}
+              </span>
+            )}
             <span className="text-sm text-blue-800/80 dark:text-white/80">/ {reviewStats.total}</span>
           </div>
           <div className="w-px h-4 bg-blue-300 dark:bg-blue-700/40 hidden sm:block" />

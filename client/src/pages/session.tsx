@@ -822,6 +822,9 @@ function SessionWorkspace({
                       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
                     }, 150);
                   }}
+                  onSwitchToReview={() => {
+                    setMode("review");
+                  }}
                 />
               </TabsContent>
             </Tabs>
