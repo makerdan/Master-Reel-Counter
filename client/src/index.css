@@ -555,6 +555,12 @@
 .pin-marker.committed.pin-linked .pin-reel-badge {
   background: var(--pin-linked-color, rgba(59, 130, 246, 1));
 }
+.pin-marker.committed.pin-linked .pin-delete-btn {
+  background: var(--pin-linked-color, rgba(59, 130, 246, 1));
+}
+.pin-marker.committed.pin-linked .pin-delete-btn:hover {
+  background: color-mix(in srgb, var(--pin-linked-color, rgba(59, 130, 246, 1)) 80%, black);
+}
 .pin-marker.dragging {
   cursor: grabbing;
   transform: translate(-50%, -50%) scale(calc(var(--pin-scale, 1) * 1.12));

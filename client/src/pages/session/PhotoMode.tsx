@@ -1944,7 +1944,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 <div className="photo-overlay-divider" />
                 <button
                   className="photo-overlay-btn"
-                  onClick={(e) => { e.stopPropagation(); savePinScale(Math.min(5, +(pinScale + 0.25).toFixed(2))); }}
+                  onClick={(e) => { e.stopPropagation(); savePinScale(Math.min(7, +(pinScale + 0.25).toFixed(2))); }}
                   title="Increase pin size"
                   data-testid="button-pin-size-up"
                 >
