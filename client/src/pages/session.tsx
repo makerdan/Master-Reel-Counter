@@ -42,6 +42,7 @@ import FlaggedReels from "./session/FlaggedReels";
 import PhotoStrip from "./session/PhotoStrip";
 import ReviewTab from "./session/ReviewTab";
 import FinalResultsTab from "./session/FinalResultsTab";
+import SessionProgress from "./session/SessionProgress";
 import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename } from "./session/utils";
 import { useTimezone } from "@/hooks/use-timezone";
@@ -791,6 +792,14 @@ function SessionWorkspace({
                   <span className="hidden sm:inline">Final Results</span>
                 </TabsTrigger>
               </TabsList>
+
+              {entries.length > 0 && (
+                <SessionProgress
+                  entries={entries}
+                  pins={sessionPins}
+                  sessionId={sessionId}
+                />
+              )}
 
               <TabsContent value="strip">
                 <PhotoStrip
