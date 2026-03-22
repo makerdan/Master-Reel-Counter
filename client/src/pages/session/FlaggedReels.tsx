@@ -1574,7 +1574,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       data-testid={`button-edit-review-flagged-${response.entryId}`}
                     >
                       <Pencil className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">{isEditing ? "Close" : "Edit Reel Data"}</span>
+                      <span className="hidden sm:inline">{isEditing ? "Close w/o Saving" : "Edit Reel Data"}</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -1692,6 +1692,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       <Button
                         variant="outline"
                         size="sm"
+                        className="!border-black dark:!border-white"
                         onClick={() => saveReviewEntryMutation.mutate({
                           entryId: entry!.id,
                           data: reviewEditState,
