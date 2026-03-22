@@ -220,9 +220,18 @@ export default function FinalResultsTab({
   });
 
   const reviewStats = useMemo(() => {
-    const total = entries.length;
+    const pinFlaggedEntryIds = new Set<number>();
+    for (const p of sessionPins) {
+      if (p.entryId && p.flagged) pinFlaggedEntryIds.add(p.entryId);
+    }
+    const reviewableEntries = entries.filter(e => {
+      if (pinFlaggedEntryIds.has(e.id)) return false;
+      if (e.notes && e.notes.includes("[Resolved from flag")) return false;
+      return true;
+    });
+    const total = reviewableEntries.length;
     const reviewedIds = new Set(reviewResponses.map(r => r.entryId));
-    const notReviewed = entries.filter(e => !reviewedIds.has(e.id)).length;
+    const notReviewed = reviewableEntries.filter(e => !reviewedIds.has(e.id)).length;
     const pinFlagged = sessionPins.filter(p => p.flagged).length;
     const reviewFlagged = new Set(reviewResponses.filter(r => r.verdict === "flagged").map(r => r.entryId)).size;
     return { total, notReviewed, pinFlagged, reviewFlagged };
