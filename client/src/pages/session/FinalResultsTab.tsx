@@ -372,7 +372,7 @@ export default function FinalResultsTab({
                 {reviewStats.notReviewed}
               </button>
             ) : (
-              <span className={`text-sm font-semibold tabular-nums ${reviewStats.notReviewed > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-not-reviewed">
+              <span className={`text-sm font-semibold tabular-nums underline ${reviewStats.notReviewed > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-not-reviewed">
                 {reviewStats.notReviewed}
               </span>
             )}
@@ -391,7 +391,7 @@ export default function FinalResultsTab({
                 {reviewStats.pinFlagged}
               </button>
             ) : (
-              <span className={`text-sm font-semibold tabular-nums ${reviewStats.pinFlagged > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-flagged">
+              <span className={`text-sm font-semibold tabular-nums underline ${reviewStats.pinFlagged > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-flagged">
                 {reviewStats.pinFlagged}
               </span>
             )}
@@ -409,7 +409,7 @@ export default function FinalResultsTab({
                 {reviewStats.reviewFlagged}
               </button>
             ) : (
-              <span className={`text-sm font-semibold tabular-nums ${reviewStats.reviewFlagged > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-review-flagged">
+              <span className={`text-sm font-semibold tabular-nums underline ${reviewStats.reviewFlagged > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}`} data-testid="stat-review-flagged">
                 {reviewStats.reviewFlagged}
               </span>
             )}
