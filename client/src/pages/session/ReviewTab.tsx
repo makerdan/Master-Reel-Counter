@@ -1049,11 +1049,11 @@ export default function ReviewTab({
                     {existingResponse?.verdict === "flagged" ? (
                       <Button
                         variant="outline" className="flex-1 border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
-                        onClick={() => submitReview.mutate({ entryId: currentEntry.id, verdict: "approved" })}
-                        disabled={submitReview.isPending}
+                        onClick={() => removeApproval.mutate(currentEntry.id)}
+                        disabled={removeApproval.isPending}
                         data-testid="button-unflag"
                       >
-                        {submitReview.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Flag className="h-4 w-4 mr-1" />}
+                        {removeApproval.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Flag className="h-4 w-4 mr-1" />}
                         Un-Flag
                       </Button>
                     ) : (
