@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw, HardDrive, Globe, FileSpreadsheet, Clock } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, EyeOff, ZoomIn, ZoomOut, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Unlock, Undo2, Redo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw, HardDrive, Globe, FileSpreadsheet, Clock, Shield, Flame, Trophy, Activity, Award, Layers, Target, Calendar, Package, MessageCircle, Reply, Accessibility, Palette, Type, Sliders, Key } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -150,7 +150,8 @@ export function OverviewHelp() {
       </AccordionTrigger>
       <AccordionContent className="text-2xl text-muted-foreground leading-relaxed space-y-2 pb-4">
         <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
-        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders. Inside a session, <HelpBadge>Full Mode</HelpBadge> provides the complete desktop workflow across five tabs: Photos Reel, Reel IDs, Flagged, Review, and Final Results. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience — tap the red button in the session header to enter it.</p>
+        <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders, with bulk actions for managing multiple sessions at once. Inside a session, five tabs provide the complete desktop workflow: <HelpBadge>Photos Reel</HelpBadge>, <HelpBadge>Reel IDs</HelpBadge>, <HelpBadge>Flagged</HelpBadge>, <HelpBadge>Review</HelpBadge>, and <HelpBadge>Final Results</HelpBadge>. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience — tap the red button in the session header to enter it.</p>
+        <p>Each session can have a name, location, and optional <HelpBadge>description</HelpBadge> for documenting context. A built-in <HelpBadge>comments system</HelpBadge> lets your team leave threaded comments on the session, individual entries, or specific photos.</p>
       </AccordionContent>
     </AccordionItem>
   );
@@ -354,12 +355,201 @@ export function DashboardSections() {
         </AccordionContent>
       </AccordionItem>
 
+      <AccordionItem value="dash-bulk-actions">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><SquareCheck className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Bulk Actions</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Select multiple sessions to perform actions in bulk. A floating action bar appears at the bottom of the screen when sessions are selected.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={CheckCircle2} />}
+            label="Select Sessions"
+            description="Tap the checkbox on any session card to select it. Multiple sessions can be selected at once. The action bar shows a count of selected sessions."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={CheckCircle2} />}
+            label="Mark Complete"
+            description="Mark all selected sessions as completed in one action. Completed sessions display a green checkmark badge."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={RotateCcw} />}
+            label="Reopen"
+            description="Reopen all selected sessions, changing their status back to active."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={FolderInput} />}
+            label="Move to Folder"
+            description="Move all selected sessions into a folder, or back to the main Sessions list. A dialog lets you choose the target folder."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Bulk Delete"
+            description="Delete all selected sessions at once. A confirmation dialog appears before deletion to prevent accidental data loss."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="dash-stats">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Summary Stats Page</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">A dedicated statistics page accessible from the dashboard header. Provides a comprehensive breakdown of your counting activity across all sessions.</p>
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Overview Metrics</p>
+          <FeatureRow
+            icon={<HelpIcon icon={BarChart3} />}
+            label="Key Counts"
+            description="Total sessions, completed sessions, active sessions, total reels, total footage, total entries, and total photos — all displayed as stat cards at the top of the page."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Averages & Records</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Award} />}
+            label="Performance Metrics"
+            description="Average footage per session, average entries per session, average reels per entry, and your best session by footage."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Streaks & Activity</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Flame} />}
+            label="Streaks"
+            description="Current streak (consecutive days with activity), longest streak, and busiest day of the week."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Activity} />}
+            label="Weekly Activity Chart"
+            description="A horizontal bar chart showing entries and footage per week, so you can visualize your counting activity over time."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Top Categories & Vendor Codes</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Layers} />}
+            label="Category & Vendor Breakdowns"
+            description="Bar charts showing your most frequently counted wire categories (with footage totals) and most common vendor codes. Helps identify the most prevalent wire types across your sessions."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Shared Session Performance</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Users} />}
+            label="Contributor Leaderboard"
+            description="For sessions shared with collaborators, a per-session breakdown shows each contributor's entries, photos, reels, and footage. Your own stats are highlighted. Progress bars visualize relative contributions."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Role Comparison</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Shield} />}
+            label="Role-Based Metrics"
+            description="Entries, footage, reels, and photos broken down by role (Owner, Editor, Tester, Viewer). Each role has a color-coded bar. Your current roles are highlighted with a ring indicator. Useful for understanding how work is distributed across roles."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
       <AccordionItem value="dash-settings">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Settings className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Settings</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
           <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Configure your profile, preferences, wire categories, and monitor storage usage.</p>
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Display & Theme</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Palette} />}
+            label="Theme Toggle"
+            description="Switch between Light, Dark, and System themes. Your preference is saved and applied across all pages."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Dashboard Thumbnail Size"
+            description="Choose the thumbnail size shown on session cards: None, Small, Medium, or Large. Affects how session photos appear on the dashboard."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Globe} />}
+            label="Timezone"
+            description="Select your timezone for displaying timestamps throughout the app. Defaults to your browser's detected timezone."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Accessibility</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Target} />}
+            label="Larger Touch Targets"
+            description="Enable larger buttons and tap areas for easier use on touch devices or for users who prefer bigger controls."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Type} />}
+            label="Text Size"
+            description="Adjust the base text size across the app. Choose from Small, Default, Large, or Extra Large. Disabled during Mobile Flow."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Data Entry Preferences</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Default Starting Aisle"
+            description="Set a default aisle prefix that auto-fills in new sessions and Mobile Flow, saving you from typing it every time."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={ArrowUp} />}
+            label="Section Auto-Advance Step"
+            description="Configure how much the section number increments when using section stepper buttons (default is 1). Useful for warehouses with non-sequential section numbering."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Ruler} />}
+            label="Default Unit of Measurement"
+            description="Choose between Feet and Meters for all footage displays, inputs, and exports throughout the app."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Capture Preferences</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Sliders} />}
+            label="Photo Quality"
+            description="Adjust the JPEG compression quality for uploaded photos using a slider. Higher quality means larger file sizes but better detail for reading reel labels."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Receiving Quality Override"
+            description="Enable a separate quality setting specifically for photos taken in Receiving mode. Useful when receiving dock photos need different compression than aisle photos."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Export Preferences</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Download} />}
+            label="Default Export Format"
+            description="Choose your preferred export format (PDF or CSV) that will be pre-selected when exporting sessions."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={FileText} />}
+            label="Company Name & Logo"
+            description="Set your company name and upload a logo to brand PDF exports. The company name appears in the header of exported reports."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={FileText} />}
+            label="PDF Footer Text"
+            description="Add custom footer text that appears at the bottom of every page in PDF exports. Useful for disclaimers, report IDs, or company info."
+          />
+
+          <Separator className="my-2" />
+          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Security</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Key} />}
+            label="Tester Password"
+            description="Set up a password for tester login. Testers can sign in using a special URL without needing a Replit account. They receive Editor access to your sessions but cannot lock/unlock, delete sessions, or manage collaborators."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Shield} />}
+            label="Data Encoding (AES-256)"
+            description="Toggle AES-256 encryption on sensitive entry fields (reel tags, wire types, gauges, colors, manufacturers, notes). When enabled, data is encrypted at rest in the database. A limitations section explains which fields are encoded and what trade-offs apply (e.g., server-side search on encrypted fields is limited)."
+          />
 
           <Separator className="my-2" />
           <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Wire Categories</p>
@@ -443,7 +633,12 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={Download} />}
             label="Export"
-            description="Export session data as CSV (spreadsheet), PDF (formatted report), or share via email. The export includes all entries grouped by aisle/section."
+            description="Export session data as Excel (.xlsx workbook) or PDF (formatted report), or share a summary via email. The export dropdown in the session header provides quick access to all formats."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={EyeOff} />}
+            label="Hide Pins Overlay"
+            description="A toggle button on the photo viewer overlay strip that hides all pin markers on the current photo. Useful for getting an unobstructed view of the reel labels. Tap again to show pins."
           />
           <FeatureRow
             icon={<span className="inline-block w-3.5 h-3.5 rounded bg-red-600/80" />}
@@ -1026,19 +1221,49 @@ export function SessionSections() {
         </AccordionContent>
       </AccordionItem>
 
+      <AccordionItem value="session-comments">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Comments</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Leave comments on a session, individual entries, or specific photos to communicate with your team. Comments appear in context wherever they are posted.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={MessageCircle} />}
+            label="Contextual Threads"
+            description="Comments are scoped to their context — session-level comments appear on the session as a whole, while entry comments appear on that specific entry and photo comments on that photo. Each context has its own comment thread."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Reply} />}
+            label="Nested Replies"
+            description="Reply to any top-level comment to create a nested thread. Replies are indented with a left border for visual clarity. Hover over a comment to reveal the Reply button."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Clock} />}
+            label="Time-Ago Formatting"
+            description='Comments display relative timestamps (e.g. "5m ago", "2h ago", "3d ago") that update as time passes. Older comments show the full date.'
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Pencil} />}
+            label="Edit & Delete"
+            description='Edit or delete your own comments. Edited comments show an "(edited)" indicator. Hover over a comment to reveal edit and delete buttons.'
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Users} />}
+            label="Role Permissions"
+            description="Editors and session owners can post, edit, and delete their own comments. Viewers can read comments but cannot post or modify them."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
       <AccordionItem value="session-export">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><Download className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Export & Sharing</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Export session data in multiple formats. Exports can be triggered from the session header or from the three-dot action menu on session cards in the Dashboard.</p>
           <FeatureRow
-            icon={<HelpIcon icon={FileText} />}
-            label="CSV Export"
-            description="Downloads all entries as a CSV spreadsheet. Includes columns for aisle, section, position, pallet ID, reel tag, wire type, gauge, footage, reel count, conductors, color, manufacturer, notes, photo filename, photo notes, detail shot status, and parent photo."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={FileText} />}
-            label="Excel Export"
+            icon={<HelpIcon icon={FileSpreadsheet} />}
+            label="Excel Export (.xlsx)"
             description="Downloads a professionally formatted .xlsx workbook with session metadata in two side-by-side columns at the top, entries grouped by aisle/section with indented pin rows, centered data columns, and column headers with black underline styling. Grand totals for reels and footage appear at the bottom."
           />
           <FeatureRow
@@ -1049,7 +1274,12 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={Mail} />}
             label="Share via Email"
-            description="Opens your email client with a pre-composed message containing the session link for quick sharing."
+            description="Opens your email client with a pre-composed message containing a text summary of the session — name, location, entry count, footage totals, and a grouped breakdown by aisle/section."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Download} />}
+            label="Dashboard Export"
+            description="Export any session directly from the Dashboard without opening it. Use the three-dot menu on a session card to access Excel and PDF export options."
           />
         </AccordionContent>
       </AccordionItem>
