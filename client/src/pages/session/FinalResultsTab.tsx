@@ -246,7 +246,7 @@ export default function FinalResultsTab({
     for (const pin of sessionPins) {
       const entry = pin.entryId ? entryMap.get(pin.entryId) : undefined;
       const pinWire = (pin.wireDetails || "").trim();
-      const entryWire = (entry?.wireType || "").trim();
+      const entryWire = (entry?.reelTag || "").trim() || (entry?.wireType || "").trim();
       const category = pinWire || entryWire || "(uncategorized)";
       const pinVendor = (pin.vendorCode || "").trim();
       const entryVendor = (entry?.manufacturer || "").trim();
