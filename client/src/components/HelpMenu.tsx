@@ -277,7 +277,7 @@ export function DashboardSections() {
           <FeatureRow
             icon={<HelpIcon icon={Copy} />}
             label="Duplicate"
-            description="Creates an exact copy of the session with all its entries, photos, and pins. The copy is named with a '(copy)' suffix."
+            description="Creates an exact copy of the session with all its entries, photos, and pins. A dialog prompts you to enter a name for the copy (defaults to the original name with a '(Copy)' suffix)."
           />
           <FeatureRow
             icon={<HelpIcon icon={FolderInput} />}
@@ -296,8 +296,37 @@ export function DashboardSections() {
           />
           <FeatureRow
             icon={<HelpIcon icon={Trash2} />}
-            label="Delete"
-            description="Permanently delete a session and all its data. A confirmation dialog appears before deletion."
+            label="Move to Trash"
+            description="Moves a session to the Trash instead of deleting it immediately. Trashed sessions are kept for 30 days before being automatically purged. You can restore or permanently delete them from the Trash view."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Download} />}
+            label="Export (PDF / Excel)"
+            description="Export any session directly from its card menu without opening it. Choose between PDF and Excel formats."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
+      <AccordionItem value="dash-trash">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Trash2 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Trash</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Deleted sessions are moved to the Trash instead of being permanently removed. Toggle the Trash view using the trash icon button in the dashboard header.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={RotateCcw} />}
+            label="Restore"
+            description="Bring a trashed session back to your active sessions list. All data (photos, entries, pins) is preserved."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Trash2} />}
+            label="Permanent Delete"
+            description="Permanently remove a trashed session and all its data. This cannot be undone. A separate confirmation dialog appears."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Clock} />}
+            label="Auto-Purge (30 Days)"
+            description="Sessions in the Trash are automatically and permanently deleted after 30 days. The countdown starts from when the session was trashed."
           />
         </AccordionContent>
       </AccordionItem>
@@ -384,7 +413,7 @@ export function DashboardSections() {
           <FeatureRow
             icon={<HelpIcon icon={Trash2} />}
             label="Bulk Delete"
-            description="Delete all selected sessions at once. A confirmation dialog appears before deletion to prevent accidental data loss."
+            description="Move all selected sessions to the Trash at once. A confirmation dialog appears before deletion. Trashed sessions can be restored within 30 days."
           />
         </AccordionContent>
       </AccordionItem>
@@ -1279,7 +1308,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={Download} />}
             label="Dashboard Export"
-            description="Export any session directly from the Dashboard without opening it. Use the three-dot menu on a session card to access Excel and PDF export options."
+            description="Export any session directly from the Dashboard without opening it. Use the three-dot menu on a session card to access Excel and PDF export options. Unsaved changes are automatically flushed before any export."
           />
         </AccordionContent>
       </AccordionItem>
@@ -1415,6 +1444,40 @@ export function MobileFlowSections() {
         </AccordionContent>
       </AccordionItem>
 
+      <AccordionItem value="mobile-offline">
+        <AccordionTrigger className="text-sm font-semibold py-3">
+          <span className="flex items-center gap-2"><Globe className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Install App & Offline Mode</span>
+        </AccordionTrigger>
+        <AccordionContent className="space-y-1 pb-4">
+          <p className="text-[22px] text-muted-foreground leading-relaxed mb-2">Master Reel Counter can be installed as a standalone app on your phone, tablet, or desktop. It works offline in warehouses with no signal.</p>
+          <FeatureRow
+            icon={<HelpIcon icon={Download} />}
+            label="Install as App (PWA)"
+            description="On your phone or tablet, open the app in your browser and tap 'Add to Home Screen' (Safari) or 'Install App' (Chrome). It launches like a native app — no app store needed."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Globe} />}
+            label="Offline Access"
+            description="Once installed, the app caches its pages and assets so it loads even without internet. Previously visited sessions are available offline from the cache."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Camera} />}
+            label="Offline Photo Capture"
+            description="Take photos in areas with no signal. Photos are queued locally on your device and automatically uploaded when connectivity returns."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Plus} />}
+            label="Offline Entry Creation"
+            description="Create new entries while offline. They are saved locally and synced to the server as soon as you reconnect. Pin placement is skipped for offline entries."
+          />
+          <FeatureRow
+            icon={<HelpIcon icon={Activity} />}
+            label="Network Status Indicator"
+            description="A small indicator appears at the bottom of the screen when you go offline, showing your connection status and how many items are waiting to sync. It also shows when syncing is in progress."
+          />
+        </AccordionContent>
+      </AccordionItem>
+
       <AccordionItem value="mobile-tips">
         <AccordionTrigger className="text-sm font-semibold py-3">
           <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Mobile Tips</span>
@@ -1423,7 +1486,7 @@ export function MobileFlowSections() {
           <p><span className="font-semibold text-foreground">Speed Workflow:</span> Set your aisle and section, then rapidly tap "Take Photo" to capture multiple angles. The upload queue handles everything in the background.</p>
           <p><span className="font-semibold text-foreground">Section Stepper:</span> Use the +/− buttons below the Section field to quickly move between sections by one. Zero-padding is preserved automatically, and the value can't go below 0.</p>
           <p><span className="font-semibold text-foreground">Receiving Mode:</span> Check the Receiving box for dock areas. Sections auto-number so you never have to type them — just keep snapping photos.</p>
-          <p><span className="font-semibold text-foreground">Offline Resilience:</span> Head into low-signal warehouse areas with confidence. Photos queue locally and sync when you get back to connectivity.</p>
+          <p><span className="font-semibold text-foreground">Offline Resilience:</span> Head into low-signal warehouse areas with confidence. Photos and entries queue locally and sync when you get back to connectivity. A status indicator shows pending items.</p>
           <p><span className="font-semibold text-foreground">Batch Capture:</span> Use the gallery upload button to select multiple photos at once from your camera roll — all will be tagged with the current aisle/section.</p>
           <p><span className="font-semibold text-foreground">Review Later:</span> Mobile Flow is optimized for capturing. Switch to Full Mode on a tablet or desktop to add pins, wire details, and finalize entries.</p>
         </AccordionContent>
