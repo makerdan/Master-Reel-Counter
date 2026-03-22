@@ -1414,10 +1414,25 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             </Badge>
           </div>
           <div className="divide-y divide-yellow-600/20">
-            {reviewFlaggedItems.map(({ response, entry }) => (
+            {reviewFlaggedItems.map(({ response, entry }) => {
+              const matchingPin = sessionPins.find(p => p.entryId === entry!.id);
+              return (
               <div key={response.id} className="px-3 py-2.5 flex items-center gap-3 flex-wrap" data-testid={`review-flagged-entry-${response.entryId}`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
+                    {matchingPin?.label && (
+                      onViewInPhoto && entry!.photoId ? (
+                        <button
+                          className="font-mono text-sm font-bold text-blue-500 hover:text-blue-400 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0"
+                          onClick={() => onViewInPhoto(entry!.photoId!, matchingPin.id)}
+                          data-testid={`link-pin-review-flagged-${response.entryId}`}
+                        >
+                          P{matchingPin.label}
+                        </button>
+                      ) : (
+                        <span className="font-mono text-sm font-bold text-blue-500">P{matchingPin.label}</span>
+                      )
+                    )}
                     <span className="font-mono text-sm font-semibold">
                       {[entry!.aisle && `Aisle ${entry!.aisle}`, entry!.section && `Section ${entry!.section}`].filter(Boolean).join(" · ") || "No location"}
                     </span>
@@ -1442,7 +1457,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onViewInPhoto(entry!.photoId!, undefined)}
+                    onClick={() => onViewInPhoto(entry!.photoId!, matchingPin?.id)}
                     data-testid={`button-view-review-flagged-${response.entryId}`}
                   >
                     <Eye className="h-4 w-4 sm:mr-1" />
@@ -1450,7 +1465,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                   </Button>
                 )}
               </div>
-            ))}
+            );})}
           </div>
         </div>
       )}
