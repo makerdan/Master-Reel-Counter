@@ -951,7 +951,7 @@ export default function Dashboard() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                className="shrink-0"
                 data-testid={`button-folder-menu-${folder.id}`}
                 title="Folder options"
               >
