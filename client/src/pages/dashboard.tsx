@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -78,6 +78,8 @@ export default function Dashboard() {
   const [editingSession, setEditingSession] = useState<SessionWithStats | null>(null);
   const [editName, setEditName] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [duplicatingSession, setDuplicatingSession] = useState<SessionWithStats | null>(null);
+  const [duplicateName, setDuplicateName] = useState("");
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [renamingFolder, setRenamingFolder] = useState<FolderType | null>(null);
@@ -532,12 +534,13 @@ export default function Dashboard() {
   );
 
   const duplicateSession = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/sessions/${id}/duplicate`, {});
+    mutationFn: async ({ id, name }: { id: number; name?: string }) => {
+      const res = await apiRequest("POST", `/api/sessions/${id}/duplicate`, { name });
       return res.json();
     },
     onSuccess: () => {
       invalidateAll();
+      setDuplicatingSession(null);
       toast({ title: "Session duplicated" });
     },
     onError: () => {
@@ -606,6 +609,12 @@ export default function Dashboard() {
     setEditingSession(session);
     setEditName(session.name);
     setEditLocation(session.location || "");
+  };
+
+  const openDuplicateDialog = (session: SessionWithStats, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setDuplicatingSession(session);
+    setDuplicateName(`${session.name} (Copy)`);
   };
 
   const toggleFolderCollapse = (folderId: number) => {
@@ -824,7 +833,7 @@ export default function Dashboard() {
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        duplicateSession.mutate(session.id);
+                        openDuplicateDialog(session, e);
                       }}
                       data-testid={`menu-duplicate-session-${session.id}`}
                     >
@@ -1380,7 +1389,7 @@ export default function Dashboard() {
                       <Pencil className="h-4 w-4 mr-2" /> Rename Session
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => duplicateSession.mutate(lastSession.id)}
+                      onClick={() => openDuplicateDialog(lastSession)}
                       data-testid="menu-continue-duplicate-session"
                     >
                       <Copy className="h-4 w-4 mr-2" /> Duplicate
@@ -1554,6 +1563,49 @@ export default function Dashboard() {
             </div>
             <p className="text-xs text-muted-foreground text-center">Changes are saved automatically</p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!duplicatingSession} onOpenChange={(o) => {
+        if (!o) setDuplicatingSession(null);
+      }}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Duplicate Session</DialogTitle>
+            <DialogDescription>Enter a name for the duplicated session.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="duplicate-session-name">Session Name</Label>
+              <Input
+                id="duplicate-session-name"
+                value={duplicateName}
+                onChange={(e) => setDuplicateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && duplicateName.trim() && duplicatingSession) {
+                    duplicateSession.mutate({ id: duplicatingSession.id, name: duplicateName.trim() });
+                  }
+                }}
+                data-testid="input-duplicate-session-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDuplicatingSession(null)} data-testid="button-cancel-duplicate">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (duplicatingSession && duplicateName.trim()) {
+                  duplicateSession.mutate({ id: duplicatingSession.id, name: duplicateName.trim() });
+                }
+              }}
+              disabled={!duplicateName.trim() || duplicateSession.isPending}
+              data-testid="button-confirm-duplicate"
+            >
+              {duplicateSession.isPending ? "Duplicating..." : "Duplicate"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

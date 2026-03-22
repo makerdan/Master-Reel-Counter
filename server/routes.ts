@@ -752,13 +752,13 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      const { folderId } = req.body || {};
+      const { folderId, name } = req.body || {};
       const targetFolderId = folderId ?? access.session.folderId ?? null;
       if (targetFolderId) {
         const folder = await storage.getFolder(targetFolderId);
         if (!folder || folder.userId !== userId) return res.status(400).json({ message: "Invalid folder" });
       }
-      const newSession = await storage.duplicateSession(access.session.id, userId, targetFolderId);
+      const newSession = await storage.duplicateSession(access.session.id, userId, targetFolderId, name);
       res.json(newSession);
     } catch (error) {
       res.status(500).json({ message: "Failed to duplicate session" });

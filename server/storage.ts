@@ -108,7 +108,7 @@ export interface IStorage {
   getFolder(id: number): Promise<Folder | undefined>;
   updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined>;
   deleteFolder(id: number): Promise<void>;
-  duplicateSession(sessionId: number, userId: string, targetFolderId: number | null): Promise<Session>;
+  duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string): Promise<Session>;
   searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> }>;
 
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
@@ -640,13 +640,13 @@ export class DatabaseStorage implements IStorage {
     await db.delete(folders).where(eq(folders.id, id));
   }
 
-  async duplicateSession(sessionId: number, userId: string, targetFolderId: number | null): Promise<Session> {
+  async duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string): Promise<Session> {
     const original = await this.getSession(sessionId);
     if (!original) throw new Error("Session not found");
     const [newSession] = await db.insert(countingSessions).values({
       userId,
       folderId: targetFolderId,
-      name: `${original.name} (Copy)`,
+      name: name || `${original.name} (Copy)`,
       location: original.location,
       status: "active",
     }).returning();
