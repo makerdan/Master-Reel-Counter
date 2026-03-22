@@ -108,7 +108,8 @@ export interface IStorage {
   getFolder(id: number): Promise<Folder | undefined>;
   updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined>;
   deleteFolder(id: number): Promise<void>;
-  duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string): Promise<Session>;
+  duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string, copyFileCallback?: (srcKey: string) => Promise<string>): Promise<Session>;
+  resetSessionToPhotos(sessionId: number): Promise<void>;
   searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> }>;
 
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
@@ -640,9 +641,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(folders).where(eq(folders.id, id));
   }
 
-  async duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string): Promise<Session> {
+  async duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string, copyFileCallback?: (srcKey: string) => Promise<string>): Promise<Session> {
     const original = await this.getSession(sessionId);
     if (!original) throw new Error("Session not found");
+
     const [newSession] = await db.insert(countingSessions).values({
       userId,
       folderId: targetFolderId,
@@ -650,12 +652,109 @@ export class DatabaseStorage implements IStorage {
       location: original.location,
       status: "active",
     }).returning();
-    const originalEntries = await this.getSessionEntries(sessionId);
-    for (const entry of originalEntries) {
-      const { id, sessionId: _, createdAt, updatedAt, ...rest } = entry;
-      await db.insert(entries).values({ ...rest, sessionId: newSession.id });
+
+    const originalPhotos = await this.getSessionPhotos(sessionId);
+    const photoIdMap = new Map<number, number>();
+
+    for (const photo of originalPhotos) {
+      let newKey = photo.objectStorageKey;
+      if (copyFileCallback) {
+        try {
+          newKey = await copyFileCallback(photo.objectStorageKey);
+        } catch {
+          newKey = photo.objectStorageKey;
+        }
+      }
+      const { id: oldPhotoId, createdAt, ...photoRest } = photo;
+      const [newPhoto] = await db.insert(photos).values({
+        ...photoRest,
+        sessionId: newSession.id,
+        userId,
+        objectStorageKey: newKey,
+      }).returning();
+      photoIdMap.set(oldPhotoId, newPhoto.id);
     }
+
+    for (const [, newId] of photoIdMap) {
+      const newPhoto = await this.getPhoto(newId);
+      if (newPhoto && newPhoto.parentPhotoId && photoIdMap.has(newPhoto.parentPhotoId)) {
+        await db.update(photos).set({ parentPhotoId: photoIdMap.get(newPhoto.parentPhotoId)! }).where(eq(photos.id, newId));
+      }
+    }
+
+    const originalEntries = await this.getSessionEntries(sessionId);
+    const entryIdMap = new Map<number, number>();
+    for (const entry of originalEntries) {
+      const { id: oldEntryId, sessionId: _, createdAt, updatedAt, ...rest } = entry;
+      const newPhotoId = rest.photoId && photoIdMap.has(rest.photoId) ? photoIdMap.get(rest.photoId)! : rest.photoId;
+      const [newEntry] = await db.insert(entries).values({ ...rest, photoId: newPhotoId, sessionId: newSession.id }).returning();
+      entryIdMap.set(oldEntryId, newEntry.id);
+    }
+
+    const originalPins = await this.getSessionPins(sessionId);
+    const pinIdMap = new Map<number, number>();
+    for (const pin of originalPins) {
+      const { id: oldPinId, ...pinRest } = pin;
+      const newPhotoId = photoIdMap.has(pinRest.photoId) ? photoIdMap.get(pinRest.photoId)! : pinRest.photoId;
+      const newEntryId = pinRest.entryId && entryIdMap.has(pinRest.entryId) ? entryIdMap.get(pinRest.entryId)! : pinRest.entryId;
+      const [newPin] = await db.insert(pins).values({ ...pinRest, photoId: newPhotoId, entryId: newEntryId }).returning();
+      pinIdMap.set(oldPinId, newPin.id);
+    }
+
+    const originalComments = await this.getSessionComments(sessionId);
+    const commentIdMap = new Map<number, number>();
+    for (const comment of originalComments) {
+      const { id: oldId, createdAt, updatedAt, ...commentRest } = comment;
+      const newEntryId = commentRest.entryId && entryIdMap.has(commentRest.entryId) ? entryIdMap.get(commentRest.entryId)! : commentRest.entryId;
+      const newPhotoId = commentRest.photoId && photoIdMap.has(commentRest.photoId) ? photoIdMap.get(commentRest.photoId)! : commentRest.photoId;
+      const [newComment] = await db.insert(comments).values({
+        ...commentRest,
+        sessionId: newSession.id,
+        entryId: newEntryId,
+        photoId: newPhotoId,
+        parentCommentId: null,
+      }).returning();
+      commentIdMap.set(oldId, newComment.id);
+    }
+    for (const comment of originalComments) {
+      if (comment.parentCommentId && commentIdMap.has(comment.parentCommentId)) {
+        const newId = commentIdMap.get(comment.id)!;
+        const newParentId = commentIdMap.get(comment.parentCommentId)!;
+        await db.update(comments).set({ parentCommentId: newParentId }).where(eq(comments.id, newId));
+      }
+    }
+
+    const originalScanResults = await this.getSessionScanResults(sessionId);
+    for (const scan of originalScanResults) {
+      const { id, createdAt, updatedAt, ...scanRest } = scan;
+      const newPhotoId = photoIdMap.has(scanRest.photoId) ? photoIdMap.get(scanRest.photoId)! : scanRest.photoId;
+      const newPinId = pinIdMap.has(scanRest.pinId) ? pinIdMap.get(scanRest.pinId)! : scanRest.pinId;
+      await db.insert(scanResults).values({ ...scanRest, sessionId: newSession.id, photoId: newPhotoId, pinId: newPinId });
+    }
+
+    const dismissedKeys = await this.getDismissedDuplicates(sessionId);
+    if (dismissedKeys.length > 0) {
+      await db.insert(dismissedDuplicates).values(dismissedKeys.map(key => ({ sessionId: newSession.id, key })));
+    }
+
     return newSession;
+  }
+
+  async resetSessionToPhotos(sessionId: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      const sessionPhotos = await tx.select({ id: photos.id }).from(photos).where(eq(photos.sessionId, sessionId));
+      if (sessionPhotos.length > 0) {
+        const photoIds = sessionPhotos.map(p => p.id);
+        await tx.delete(scanResults).where(eq(scanResults.sessionId, sessionId));
+        await tx.delete(pins).where(inArray(pins.photoId, photoIds));
+      }
+      await tx.delete(comments).where(eq(comments.sessionId, sessionId));
+      await tx.delete(entries).where(eq(entries.sessionId, sessionId));
+      await tx.delete(dismissedDuplicates).where(eq(dismissedDuplicates.sessionId, sessionId));
+      await tx.delete(reviewResponses).where(eq(reviewResponses.sessionId, sessionId));
+      await tx.delete(activityLogs).where(eq(activityLogs.sessionId, sessionId));
+      await tx.update(countingSessions).set({ status: "active" }).where(eq(countingSessions.id, sessionId));
+    });
   }
 
   async searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{

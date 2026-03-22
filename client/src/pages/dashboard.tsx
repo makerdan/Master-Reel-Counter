@@ -6,7 +6,7 @@ import {
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
   FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
   Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
-  Lock, Unlock, History, Download, FileText, FileSpreadsheet, Loader2,
+  Lock, Unlock, History, Download, FileText, FileSpreadsheet, Loader2, RotateCw,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -154,6 +154,7 @@ export default function Dashboard() {
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: number; name: string; sessionCount: number } | null>(null);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<{ id: number; name: string } | null>(null);
+  const [resetSessionTarget, setResetSessionTarget] = useState<{ id: number; name: string } | null>(null);
 
   const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
   const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
@@ -328,6 +329,19 @@ export default function Dashboard() {
     },
     onError: () => {
       toast({ title: "Failed to delete session", variant: "destructive" });
+    },
+  });
+
+  const resetSession = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("POST", `/api/sessions/${id}/reset-to-photos`);
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Session reset to photos only" });
+    },
+    onError: () => {
+      toast({ title: "Failed to reset session", variant: "destructive" });
     },
   });
 
@@ -1052,6 +1066,16 @@ export default function Dashboard() {
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setResetSessionTarget({ id: session.id, name: session.name });
+                      }}
+                      data-testid={`menu-reset-session-${session.id}`}
+                    >
+                      <RotateCw className="h-4 w-4 mr-2" /> Reset to Photos Only
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive"
                       onClick={(e) => {
@@ -1892,6 +1916,29 @@ export default function Dashboard() {
               data-testid="button-confirm-delete-session"
             >
               Delete Session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!resetSessionTarget} onOpenChange={(o) => { if (!o) setResetSessionTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset "{resetSessionTarget?.name}" to photos only?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all entries, pins, comments, scan results, and other data — keeping only photos with their metadata. The session status will be reset to active. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-reset-session">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (resetSessionTarget) resetSession.mutate(resetSessionTarget.id);
+                setResetSessionTarget(null);
+              }}
+              data-testid="button-confirm-reset-session"
+            >
+              Reset to Photos Only
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

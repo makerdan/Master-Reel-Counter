@@ -758,10 +758,47 @@ export async function registerRoutes(
         const folder = await storage.getFolder(targetFolderId);
         if (!folder || folder.userId !== userId) return res.status(400).json({ message: "Invalid folder" });
       }
-      const newSession = await storage.duplicateSession(access.session.id, userId, targetFolderId, name);
+      const copyFileCallback = async (srcKey: string): Promise<string> => {
+        const ext = path.extname(srcKey || "");
+        const newId = `${randomUUID()}${ext}`;
+        const newObjectPath = `/uploads/${newId}`;
+        const srcObjectName = toStorageObjectName(srcKey);
+        const destObjectName = toStorageObjectName(newObjectPath);
+        const localSrcFilename = srcKey.startsWith("/uploads/") ? srcKey.slice("/uploads/".length) : srcKey;
+        const localSrcPath = path.join(UPLOADS_DIR, localSrcFilename);
+        const localDestPath = path.join(UPLOADS_DIR, newId);
+        try {
+          await objectStorageClient.bucket(BUCKET_NAME).file(srcObjectName)
+            .copy(objectStorageClient.bucket(BUCKET_NAME).file(destObjectName));
+        } catch {
+          try {
+            await fs.copyFile(localSrcPath, localDestPath);
+          } catch {
+            return srcKey;
+          }
+        }
+        return newObjectPath;
+      };
+      const newSession = await storage.duplicateSession(access.session.id, userId, targetFolderId, name, copyFileCallback);
       res.json(newSession);
     } catch (error) {
       res.status(500).json({ message: "Failed to duplicate session" });
+    }
+  });
+
+  app.post("/api/sessions/:id/reset-to-photos", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = resolveUserId(req);
+      const session = await storage.getSession(parseInt(req.params.id));
+      if (!session) return res.status(404).json({ message: "Session not found" });
+      if (session.userId !== userId) return res.status(403).json({ message: "Only the session owner can reset" });
+      await storage.resetSessionToPhotos(session.id);
+      const displayName = req.user.claims.name || req.user.claims.username || userId;
+      await logActivity(session.id, userId, displayName, "session_reset_to_photos", "session", session.id);
+      broadcastToSession(session.id, { type: "sync", entity: "session", sessionId: session.id });
+      res.json({ message: "Session reset to photos only" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to reset session" });
     }
   });
 
