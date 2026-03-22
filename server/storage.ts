@@ -140,6 +140,7 @@ export interface IStorage {
 
   getSessionReviewResponses(sessionId: number): Promise<ReviewResponse[]>;
   upsertReviewResponse(data: InsertReviewResponse): Promise<ReviewResponse>;
+  deleteReviewResponse(sessionId: number, entryId: number, userId: string): Promise<void>;
   resolveReviewResponsesByEntry(sessionId: number, entryId: number): Promise<void>;
 
   getRoleComparisonStats(userId: string): Promise<{
@@ -1496,6 +1497,15 @@ export class DatabaseStorage implements IStorage {
     }
     const [result] = await db.insert(reviewResponses).values(data).returning();
     return result;
+  }
+
+  async deleteReviewResponse(sessionId: number, entryId: number, userId: string): Promise<void> {
+    await db.delete(reviewResponses)
+      .where(and(
+        eq(reviewResponses.sessionId, sessionId),
+        eq(reviewResponses.entryId, entryId),
+        eq(reviewResponses.userId, userId),
+      ));
   }
 
   async resolveReviewResponsesByEntry(sessionId: number, entryId: number): Promise<void> {

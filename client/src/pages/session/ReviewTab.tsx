@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Check, Flag, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
-  ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, CheckCircle2, Clock,
+  ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, CheckCircle2, Clock, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -632,6 +632,17 @@ export default function ReviewTab({
     onError: () => { toast({ title: "Failed to save review", variant: "destructive" }); },
   });
 
+  const removeApproval = useMutation({
+    mutationFn: async (entryId: number) => {
+      const res = await apiRequest("DELETE", `/api/sessions/${sessionId}/review-responses/${entryId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "review-responses"] });
+    },
+    onError: () => { toast({ title: "Failed to remove approval", variant: "destructive" }); },
+  });
+
   // ── Derived values ─────────────────────────────────────────────────────────
   const currentEntry = assignedEntries[currentIndex] ?? null;
   const currentPin = currentEntry ? pinByEntryId.get(currentEntry.id) : null;
@@ -1014,15 +1025,27 @@ export default function ReviewTab({
                   </div>
                 ) : (
                   <div className="flex gap-2" data-testid="review-actions">
-                    <Button
-                      variant="default" className="flex-1"
-                      onClick={() => submitReview.mutate({ entryId: currentEntry.id, verdict: "approved" })}
-                      disabled={submitReview.isPending}
-                      data-testid="button-approve"
-                    >
-                      {submitReview.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
-                      Approve
-                    </Button>
+                    {existingResponse?.verdict === "approved" ? (
+                      <Button
+                        variant="outline" className="flex-1 border-muted-foreground/30 text-muted-foreground hover:bg-muted"
+                        onClick={() => removeApproval.mutate(currentEntry.id)}
+                        disabled={removeApproval.isPending}
+                        data-testid="button-remove-approval"
+                      >
+                        {removeApproval.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <X className="h-4 w-4 mr-1" />}
+                        Remove Approval
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="default" className="flex-1"
+                        onClick={() => submitReview.mutate({ entryId: currentEntry.id, verdict: "approved" })}
+                        disabled={submitReview.isPending}
+                        data-testid="button-approve"
+                      >
+                        {submitReview.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
+                        Approve
+                      </Button>
+                    )}
                     {existingResponse?.verdict === "flagged" ? (
                       <Button
                         variant="outline" className="flex-1 border-amber-500/30 text-amber-600 hover:bg-amber-500/10"

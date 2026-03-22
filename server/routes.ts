@@ -1604,6 +1604,20 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/sessions/:id/review-responses/:entryId", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const entryId = parseInt(req.params.entryId);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const userId = req.user.claims.sub;
+      await storage.deleteReviewResponse(sessionId, entryId, userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete review response" });
+    }
+  });
+
   app.post("/api/sessions/:id/review-responses/resolve", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
