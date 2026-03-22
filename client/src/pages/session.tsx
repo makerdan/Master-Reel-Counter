@@ -383,15 +383,25 @@ function SessionWorkspace({
   const stdFetchRef  = useRef<Promise<Blob | null> | null>(null);
   const unpinnedEntries = entries.filter(e => !pinByEntryId.has(e.id));
 
-  const flushBeforeExport = async () => {
+  const flushBeforeExport = async (): Promise<boolean> => {
+    if (editingEntry) {
+      toast({
+        title: "Unsaved Changes",
+        description: "You have an entry open for editing. Please save or close it before exporting.",
+        variant: "destructive",
+      });
+      return false;
+    }
     try {
       if (photoModeFlushRef.current) await photoModeFlushRef.current();
     } catch {}
+    return true;
   };
 
   const doExportExcel = async () => {
     try {
-      await flushBeforeExport();
+      const canProceed = await flushBeforeExport();
+      if (!canProceed) return;
       const params = new URLSearchParams();
       if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
       const url = `/api/sessions/${sessionId}/export/excel?${params}`;
@@ -453,7 +463,8 @@ function SessionWorkspace({
   };
 
   const openQualityDialogDirect = async () => {
-    await flushBeforeExport();
+    const canProceed = await flushBeforeExport();
+    if (!canProceed) return;
     abortPdfFetches();
     setPdfQualityOpen(true);
     startPdfFetch("full");
@@ -501,8 +512,9 @@ function SessionWorkspace({
 
   const doExportPdf = async () => {
     const quality = (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full";
+    const canProceed = await flushBeforeExport();
+    if (!canProceed) return;
     setIsPdfExporting(true);
-    await flushBeforeExport();
     try {
       const res = await fetch(buildPdfUrl(quality), { credentials: "include" });
       if (!res.ok) {
