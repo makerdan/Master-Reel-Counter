@@ -60,6 +60,7 @@ export interface IStorage {
   getPhoto(id: number): Promise<Photo | undefined>;
   getPhotoByStorageKey(key: string): Promise<Photo | undefined>;
   getSessionPhotos(sessionId: number): Promise<Photo[]>;
+  getSessionPhotosPaginated(sessionId: number, limit: number, offset: number): Promise<{ photos: Photo[]; total: number }>;
   updatePhoto(id: number, data: Partial<Photo>): Promise<Photo | undefined>;
   deletePhoto(id: number): Promise<void>;
   isObjectKeyShared(key: string, excludePhotoId: number): Promise<boolean>;
@@ -75,6 +76,7 @@ export interface IStorage {
   getPin(id: number): Promise<Pin | undefined>;
   getPhotoPins(photoId: number): Promise<Pin[]>;
   getSessionPins(sessionId: number): Promise<Pin[]>;
+  getSessionPinsPaginated(sessionId: number, limit: number, offset: number): Promise<{ pins: Pin[]; total: number }>;
   updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined>;
   deletePin(id: number): Promise<void>;
 
@@ -290,6 +292,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(photos.createdAt));
   }
 
+  async getSessionPhotosPaginated(sessionId: number, limit: number, offset: number): Promise<{ photos: Photo[]; total: number }> {
+    const [totalResult] = await db.select({ count: count() }).from(photos).where(eq(photos.sessionId, sessionId));
+    const total = totalResult?.count ?? 0;
+    const result = await db.select().from(photos)
+      .where(eq(photos.sessionId, sessionId))
+      .orderBy(desc(photos.createdAt))
+      .limit(limit)
+      .offset(offset);
+    return { photos: result, total };
+  }
+
   async updatePhoto(id: number, data: Partial<Photo>): Promise<Photo | undefined> {
     const [result] = await db.update(photos)
       .set(data)
@@ -376,6 +389,20 @@ export class DatabaseStorage implements IStorage {
     if (sessionPhotos.length === 0) return [];
     const photoIds = sessionPhotos.map(p => p.id);
     return db.select().from(pins).where(inArray(pins.photoId, photoIds));
+  }
+
+  async getSessionPinsPaginated(sessionId: number, limit: number, offset: number): Promise<{ pins: Pin[]; total: number }> {
+    const sessionPhotos = await db.select({ id: photos.id }).from(photos).where(eq(photos.sessionId, sessionId));
+    if (sessionPhotos.length === 0) return { pins: [], total: 0 };
+    const photoIds = sessionPhotos.map(p => p.id);
+    const [totalResult] = await db.select({ count: count() }).from(pins).where(inArray(pins.photoId, photoIds));
+    const total = totalResult?.count ?? 0;
+    const result = await db.select().from(pins)
+      .where(inArray(pins.photoId, photoIds))
+      .orderBy(pins.id)
+      .limit(limit)
+      .offset(offset);
+    return { pins: result, total };
   }
 
   async getSessionIncompletePins(sessionId: number): Promise<{ photoId: number; incompleteCount: number }[]> {

@@ -848,8 +848,15 @@ export async function registerRoutes(
     try {
       const access = await verifySessionAccess(parseInt(req.params.sessionId), req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      const photos = await storage.getSessionPhotos(access.session.id);
-      res.json(photos);
+      if (req.query.limit !== undefined || req.query.offset !== undefined) {
+        const limit = Math.max(1, parseInt(req.query.limit) || 50);
+        const offset = Math.max(0, parseInt(req.query.offset) || 0);
+        const { photos, total } = await storage.getSessionPhotosPaginated(access.session.id, limit, offset);
+        res.json({ photos, total, limit, offset });
+      } else {
+        const photos = await storage.getSessionPhotos(access.session.id);
+        res.json(photos);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch photos" });
     }
@@ -1067,8 +1074,15 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      const sessionPins = await storage.getSessionPins(access.session.id);
-      res.json(sessionPins);
+      if (req.query.limit !== undefined || req.query.offset !== undefined) {
+        const limit = Math.max(1, parseInt(req.query.limit) || 50);
+        const offset = Math.max(0, parseInt(req.query.offset) || 0);
+        const { pins, total } = await storage.getSessionPinsPaginated(access.session.id, limit, offset);
+        res.json({ pins, total, limit, offset });
+      } else {
+        const sessionPins = await storage.getSessionPins(access.session.id);
+        res.json(sessionPins);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch pins" });
     }
