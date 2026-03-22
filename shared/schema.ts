@@ -13,6 +13,7 @@ import {
   uniqueIndex,
   index,
   foreignKey,
+  check,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -43,6 +44,7 @@ export const countingSessions = pgTable("counting_sessions", {
   lastPhotoIndex: integer("last_photo_index").default(0),
 }, (table) => [
   index("counting_sessions_user_id_idx").on(table.userId),
+  check("counting_sessions_status_check", sql`${table.status} IN ('active', 'completed')`),
 ]);
 
 export const photos = pgTable("photos", {
@@ -126,6 +128,7 @@ export const sessionCollaborators = pgTable("session_collaborators", {
   addedAt: timestamp("added_at").defaultNow().notNull(),
 }, (table) => [
   index("session_collaborators_session_id_idx").on(table.sessionId),
+  check("session_collaborators_role_check", sql`${table.role} IN ('owner', 'editor', 'viewer')`),
 ]);
 
 export const sessionInviteLinks = pgTable("session_invite_links", {
@@ -274,13 +277,15 @@ export type Comment = typeof comments.$inferSelect;
 
 export const feedback = pgTable("feedback", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   topic: text("topic").notNull(),
   message: text("message").notNull(),
   page: text("page"),
   status: text("status").notNull().default("PENDING"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  check("feedback_status_check", sql`${table.status} IN ('PENDING', 'REVIEWED', 'RESOLVED')`),
+]);
 
 export const insertFeedbackSchema = createInsertSchema(feedback).omit({
   id: true,
@@ -324,6 +329,7 @@ export const dismissedDuplicates = pgTable("dismissed_duplicates", {
 }, (table) => [
   index("dismissed_duplicates_session_id_idx").on(table.sessionId),
   index("dismissed_duplicates_key_idx").on(table.key),
+  index("dismissed_duplicates_session_key_idx").on(table.sessionId, table.key),
 ]);
 
 export type DismissedDuplicate = typeof dismissedDuplicates.$inferSelect;
@@ -364,6 +370,7 @@ export const reviewResponses = pgTable("review_responses", {
   uniqueIndex("review_responses_session_entry_user_idx").on(table.sessionId, table.entryId, table.userId),
   index("review_responses_session_id_idx").on(table.sessionId),
   index("review_responses_entry_id_idx").on(table.entryId),
+  check("review_responses_verdict_check", sql`${table.verdict} IN ('approved', 'flagged')`),
 ]);
 
 export const insertReviewResponseSchema = createInsertSchema(reviewResponses).omit({

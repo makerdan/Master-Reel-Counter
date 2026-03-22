@@ -57,6 +57,13 @@
       "when": 1774396800000,
       "tag": "0007_add_foreign_keys_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774205171704,
+      "tag": "0008_data_consistency_checks",
+      "breakpoints": true
     }
   ]
 }
