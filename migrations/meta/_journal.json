@@ -50,6 +50,13 @@
       "when": 1742590000000,
       "tag": "0006_add_link_reason_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774396800000,
+      "tag": "0007_add_foreign_keys_indexes",
+      "breakpoints": true
     }
   ]
 }

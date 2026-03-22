@@ -222,22 +222,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSession(id: number): Promise<void> {
-    await db.transaction(async (tx) => {
-      const sessionPhotos = await tx.select({ id: photos.id }).from(photos).where(eq(photos.sessionId, id));
-      if (sessionPhotos.length > 0) {
-        const photoIds = sessionPhotos.map(p => p.id);
-        await tx.delete(pins).where(inArray(pins.photoId, photoIds));
-      }
-      await tx.delete(entries).where(eq(entries.sessionId, id));
-      await tx.delete(photos).where(eq(photos.sessionId, id));
-      await tx.delete(sessionCollaborators).where(eq(sessionCollaborators.sessionId, id));
-      await tx.delete(sessionInviteLinks).where(eq(sessionInviteLinks.sessionId, id));
-      await tx.delete(activityLogs).where(eq(activityLogs.sessionId, id));
-      await tx.delete(comments).where(eq(comments.sessionId, id));
-      await tx.delete(dismissedDuplicates).where(eq(dismissedDuplicates.sessionId, id));
-      await tx.delete(reviewResponses).where(eq(reviewResponses.sessionId, id));
-      await tx.delete(countingSessions).where(eq(countingSessions.id, id));
-    });
+    await db.delete(countingSessions).where(eq(countingSessions.id, id));
   }
 
   async createPhoto(photo: InsertPhoto): Promise<Photo> {
@@ -277,17 +262,14 @@ export class DatabaseStorage implements IStorage {
 
   async deletePhoto(id: number): Promise<void> {
     await db.transaction(async (tx) => {
-      await tx.update(photos).set({ parentPhotoId: null, isDetailShot: false }).where(eq(photos.parentPhotoId, id));
-      await tx.delete(comments).where(eq(comments.photoId, id));
+      await tx.update(photos).set({ isDetailShot: false }).where(eq(photos.parentPhotoId, id));
       const committedPinRows = await tx.select({ entryId: pins.entryId }).from(pins)
         .where(and(eq(pins.photoId, id), sql`${pins.entryId} IS NOT NULL`));
       const pinnedEntryIds = committedPinRows.map(r => r.entryId as number);
       if (pinnedEntryIds.length > 0) {
-        await tx.delete(comments).where(inArray(comments.entryId, pinnedEntryIds));
         await tx.delete(entries).where(inArray(entries.id, pinnedEntryIds));
       }
       await tx.delete(entries).where(eq(entries.photoId, id));
-      await tx.delete(pins).where(eq(pins.photoId, id));
       await tx.delete(photos).where(eq(photos.id, id));
     });
   }
@@ -317,11 +299,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEntry(id: number): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.delete(comments).where(eq(comments.entryId, id));
-      await tx.update(pins).set({ entryId: null }).where(eq(pins.entryId, id));
-      await tx.delete(entries).where(eq(entries.id, id));
-    });
+    await db.delete(entries).where(eq(entries.id, id));
   }
 
   async createPin(pin: InsertPin): Promise<Pin> {

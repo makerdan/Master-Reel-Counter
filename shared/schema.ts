@@ -11,6 +11,8 @@ import {
   boolean,
   jsonb,
   uniqueIndex,
+  index,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -22,7 +24,9 @@ export const folders = pgTable("folders", {
   parentFolderId: integer("parent_folder_id"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("folders_user_id_idx").on(table.userId),
+]);
 
 export const countingSessions = pgTable("counting_sessions", {
   id: serial("id").primaryKey(),
@@ -37,11 +41,13 @@ export const countingSessions = pgTable("counting_sessions", {
   lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
   lastPhotoIndex: integer("last_photo_index").default(0),
-});
+}, (table) => [
+  index("counting_sessions_user_id_idx").on(table.userId),
+]);
 
 export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull(),
   uploadedBy: text("uploaded_by"),
   objectStorageKey: text("object_storage_key").notNull(),
@@ -62,13 +68,16 @@ export const photos = pgTable("photos", {
   pinScale: real("pin_scale").default(1),
   fileSize: integer("file_size"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("photos_session_id_idx").on(table.sessionId),
+  foreignKey({ columns: [table.parentPhotoId], foreignColumns: [table.id] }).onDelete("set null"),
+]);
 
 export const entries = pgTable("entries", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull(),
-  photoId: integer("photo_id"),
+  photoId: integer("photo_id").references(() => photos.id, { onDelete: "set null" }),
   aisle: text("aisle").notNull(),
   section: text("section").notNull(),
   position: text("position"),
@@ -84,12 +93,15 @@ export const entries = pgTable("entries", {
   conductors: text("conductors"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("entries_session_id_idx").on(table.sessionId),
+  index("entries_photo_id_idx").on(table.photoId),
+]);
 
 export const pins = pgTable("pins", {
   id: serial("id").primaryKey(),
-  photoId: integer("photo_id").notNull(),
-  entryId: integer("entry_id"),
+  photoId: integer("photo_id").notNull().references(() => photos.id, { onDelete: "cascade" }),
+  entryId: integer("entry_id").references(() => entries.id, { onDelete: "set null" }),
   xPercent: real("x_percent").notNull(),
   yPercent: real("y_percent").notNull(),
   label: text("label"),
@@ -99,28 +111,35 @@ export const pins = pgTable("pins", {
   footage: integer("footage"),
   flagged: boolean("flagged").default(false),
   flagReason: text("flag_reason"),
-});
+}, (table) => [
+  index("pins_photo_id_idx").on(table.photoId),
+  index("pins_entry_id_idx").on(table.entryId),
+]);
 
 
 export const sessionCollaborators = pgTable("session_collaborators", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull(),
   username: text("username"),
   role: text("role").notNull().default("editor"),
   addedAt: timestamp("added_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("session_collaborators_session_id_idx").on(table.sessionId),
+]);
 
 export const sessionInviteLinks = pgTable("session_invite_links", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
   token: varchar("token").notNull().unique(),
   createdBy: varchar("created_by").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   usedCount: integer("used_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at"),
-});
+}, (table) => [
+  index("session_invite_links_session_id_idx").on(table.sessionId),
+]);
 
 export const userSettings = pgTable("user_settings", {
   id: serial("id").primaryKey(),
@@ -146,11 +165,13 @@ export const userSettings = pgTable("user_settings", {
   customVendorCodes: text("custom_vendor_codes").array().notNull().default(sql`'{}'::text[]`),
   testerPassword: text("tester_password"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("user_settings_user_id_idx").on(table.userId),
+]);
 
 export const activityLogs = pgTable("activity_logs", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull(),
   username: text("username"),
   action: text("action").notNull(),
@@ -158,20 +179,27 @@ export const activityLogs = pgTable("activity_logs", {
   entityId: integer("entity_id"),
   details: text("details"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("activity_logs_session_id_idx").on(table.sessionId),
+]);
 
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull(),
   username: text("username"),
-  entryId: integer("entry_id"),
-  photoId: integer("photo_id"),
+  entryId: integer("entry_id").references(() => entries.id, { onDelete: "cascade" }),
+  photoId: integer("photo_id").references(() => photos.id, { onDelete: "cascade" }),
   parentCommentId: integer("parent_comment_id"),
   text: text("text").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("comments_session_id_idx").on(table.sessionId),
+  index("comments_entry_id_idx").on(table.entryId),
+  index("comments_photo_id_idx").on(table.photoId),
+  foreignKey({ columns: [table.parentCommentId], foreignColumns: [table.id] }).onDelete("cascade"),
+]);
 
 export const insertFolderSchema = createInsertSchema(folders).omit({
   id: true,
@@ -265,16 +293,19 @@ export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 
 export const scanResults = pgTable("scan_results", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
-  photoId: integer("photo_id").notNull(),
-  pinId: integer("pin_id").notNull().unique(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
+  photoId: integer("photo_id").notNull().references(() => photos.id, { onDelete: "cascade" }),
+  pinId: integer("pin_id").notNull().unique().references(() => pins.id, { onDelete: "cascade" }),
   pinLabel: text("pin_label"),
   rawText: text("raw_text"),
   readable: boolean("readable").default(false),
   scannedBy: varchar("scanned_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("scan_results_session_id_idx").on(table.sessionId),
+  index("scan_results_photo_id_idx").on(table.photoId),
+]);
 
 export const insertScanResultSchema = createInsertSchema(scanResults).omit({
   id: true,
@@ -287,10 +318,13 @@ export type InsertScanResult = z.infer<typeof insertScanResultSchema>;
 
 export const dismissedDuplicates = pgTable("dismissed_duplicates", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
   key: text("key").notNull(),
   dismissedAt: timestamp("dismissed_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("dismissed_duplicates_session_id_idx").on(table.sessionId),
+  index("dismissed_duplicates_key_idx").on(table.key),
+]);
 
 export type DismissedDuplicate = typeof dismissedDuplicates.$inferSelect;
 
@@ -306,7 +340,9 @@ export const userWireCategories = pgTable("user_wire_categories", {
   conductors: text("conductors"),
   groundSize: text("ground_size"),
   wireType: text("wire_type"),
-});
+}, (table) => [
+  index("user_wire_categories_user_id_idx").on(table.userId),
+]);
 
 export const insertUserWireCategorySchema = createInsertSchema(userWireCategories).omit({
   id: true,
@@ -317,8 +353,8 @@ export type InsertUserWireCategory = z.infer<typeof insertUserWireCategorySchema
 
 export const reviewResponses = pgTable("review_responses", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull(),
-  entryId: integer("entry_id").notNull(),
+  sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
+  entryId: integer("entry_id").notNull().references(() => entries.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull(),
   username: text("username"),
   verdict: text("verdict").notNull(),
@@ -326,6 +362,8 @@ export const reviewResponses = pgTable("review_responses", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("review_responses_session_entry_user_idx").on(table.sessionId, table.entryId, table.userId),
+  index("review_responses_session_id_idx").on(table.sessionId),
+  index("review_responses_entry_id_idx").on(table.entryId),
 ]);
 
 export const insertReviewResponseSchema = createInsertSchema(reviewResponses).omit({
