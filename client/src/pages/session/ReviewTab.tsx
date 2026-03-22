@@ -1023,15 +1023,27 @@ export default function ReviewTab({
                       {submitReview.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
                       Approve
                     </Button>
-                    <Button
-                      variant="outline" className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10"
-                      onClick={() => setShowFlagInput(true)}
-                      disabled={submitReview.isPending}
-                      data-testid="button-flag"
-                    >
-                      <Flag className="h-4 w-4 mr-1" />
-                      Flag
-                    </Button>
+                    {existingResponse?.verdict === "flagged" ? (
+                      <Button
+                        variant="outline" className="flex-1 border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                        onClick={() => submitReview.mutate({ entryId: currentEntry.id, verdict: "approved" })}
+                        disabled={submitReview.isPending}
+                        data-testid="button-unflag"
+                      >
+                        {submitReview.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Flag className="h-4 w-4 mr-1" />}
+                        Un-Flag
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline" className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+                        onClick={() => setShowFlagInput(true)}
+                        disabled={submitReview.isPending}
+                        data-testid="button-flag"
+                      >
+                        <Flag className="h-4 w-4 mr-1" />
+                        Flag
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
