@@ -371,6 +371,16 @@ export default function ReviewTab({
 
   const photoMap = useMemo(() => new Map(photos.map(p => [p.id, p])), [photos]);
 
+  const detailPhotoByPinLabel = useMemo(() => {
+    const map = new Map<string, Photo>();
+    for (const p of photos) {
+      if (p.isDetailShot && p.linkedPinLabel) {
+        map.set(p.linkedPinLabel, p);
+      }
+    }
+    return map;
+  }, [photos]);
+
   const flaggedEntryIds = useMemo(() => {
     const ids = new Set<number>();
     for (const p of sessionPins) {
@@ -626,6 +636,7 @@ export default function ReviewTab({
   const currentEntry = assignedEntries[currentIndex] ?? null;
   const currentPin = currentEntry ? pinByEntryId.get(currentEntry.id) : null;
   const currentPhoto = currentEntry?.photoId ? photoMap.get(currentEntry.photoId) : null;
+  const detailPhoto = currentPin?.label ? detailPhotoByPinLabel.get(currentPin.label) : undefined;
   const isRevealed = currentEntry ? revealedEntries.has(currentEntry.id) : false;
   // Synchronous ready check — avoids the one-frame flash that a useEffect reset would cause
   const photoReadyKey = `${currentIndex}-${isRevealed}`;
@@ -844,8 +855,31 @@ export default function ReviewTab({
                     Syncing... {timerSeconds !== null ? `${timerSeconds}s` : ""}
                   </p>
                 </div>
+              ) : isPinEntry && detailPhoto ? (
+                /* ── Detail photo view (linked detail shot) ── */
+                <div className="w-full relative">
+                  <ZoomablePhoto
+                    photoUrl={getPhotoUrl(detailPhoto)}
+                    scale={photoScale}
+                    panX={photoPanX}
+                    panY={photoPanY}
+                    rotation={photoRotation}
+                    panMode={panMode}
+                    onScale={setPhotoScale}
+                    onPan={(x, y) => { setPhotoPanX(x); setPhotoPanY(y); }}
+                    onRotate={setPhotoRotation}
+                    onPanMode={setPanMode}
+                    onReady={() => setPhotoReadyForKey(photoReadyKey)}
+                  />
+                  {!photoReady && (
+                    <div
+                      className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                      data-testid="photo-skeleton"
+                    />
+                  )}
+                </div>
               ) : isPinEntry && currentPhoto ? (
-                /* ── Pin / AI Scanner view ── */
+                /* ── Pin / AI Scanner view (cropped) ── */
                 <div className="w-full space-y-2">
                   <div className="relative">
                     <CropCanvas
