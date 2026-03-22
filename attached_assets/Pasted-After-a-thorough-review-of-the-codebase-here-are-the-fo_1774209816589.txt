@@ -1,0 +1,26 @@
+After a thorough review of the codebase, here are the foundation-level improvements I'd highlight:
+
+Database Integrity & Performance
+This is the biggest area. The schema is missing several things that would improve reliability and speed as data grows:
+
+Missing foreign key constraints — Tables like photos, entries, pins, comments, scan_results, and activity_logs reference other tables by ID but don't enforce those relationships at the database level. This means orphaned records can accumulate (e.g., deleting a session doesn't automatically clean up its photos, pins, or entries).
+
+Missing database indexes — Key lookup columns like photos.session_id, entries.session_id, pins.photo_id, activity_logs.session_id, and folders.user_id don't have indexes. As sessions grow with more photos and entries, queries will slow down.
+
+Text-based status fields — Statuses like session status, feedback status, etc. are plain text fields with no constraints. A typo or bad value could put things in an invalid state. These could use check constraints or enums.
+
+Data Cleanup & Consistency
+Cascading deletes — When a session is deleted, all its child data (photos, pins, entries, comments, activity logs, scan results) should be cleaned up automatically. Right now this likely requires manual cleanup in application code.
+
+Inconsistent user ID types — Most tables use varchar for user IDs, but at least one uses text. Small inconsistency that could cause subtle issues.
+
+dismissed_duplicates table — The key field has no index, which will get slower over time as more duplicates are dismissed.
+
+Application-Level Foundations
+Offline/PWA support — Field workers using mobile capture in warehouses likely have spotty connectivity. A service worker and offline queue for photos/entries could be a significant quality-of-life improvement.
+
+Structured notifications — There's WebSocket-based presence, but no formal notification system. As collaboration grows, users might want to be notified when someone flags an entry, comments, or completes a review in a shared session.
+
+Soft deletes / archival — Sessions appear to be hard-deleted. An archive or trash system would let users recover accidentally deleted work.
+
+Pagination on large endpoints — As users accumulate hundreds of sessions and thousands of entries, endpoints that return all records at once could become slow. Server-side pagination would help.
