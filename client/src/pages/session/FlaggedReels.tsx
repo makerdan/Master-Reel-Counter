@@ -768,7 +768,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             </div>
           )}
       </div>
-      <hr className="border-t border-blue-600/30 my-2" />
+      <hr className="border-t border-blue-600/50 my-2" />
       {(isLoading || entriesLoading) ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
