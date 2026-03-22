@@ -856,27 +856,47 @@ export default function ReviewTab({
                   </p>
                 </div>
               ) : isPinEntry && detailPhoto ? (
-                /* ── Detail photo view (linked detail shot) ── */
-                <div className="w-full relative">
-                  <ZoomablePhoto
-                    photoUrl={getPhotoUrl(detailPhoto)}
-                    scale={photoScale}
-                    panX={photoPanX}
-                    panY={photoPanY}
-                    rotation={photoRotation}
-                    panMode={panMode}
-                    onScale={setPhotoScale}
-                    onPan={(x, y) => { setPhotoPanX(x); setPhotoPanY(y); }}
-                    onRotate={setPhotoRotation}
-                    onPanMode={setPanMode}
-                    onReady={() => setPhotoReadyForKey(photoReadyKey)}
-                  />
-                  {!photoReady && (
-                    <div
-                      className="absolute inset-0 rounded-md bg-muted animate-pulse"
-                      data-testid="photo-skeleton"
+                /* ── Detail photo cropped view (linked detail shot, centered) ── */
+                <div className="w-full space-y-2">
+                  <div className="relative">
+                    <CropCanvas
+                      photoUrl={getPhotoUrl(detailPhoto)}
+                      xPercent={50}
+                      yPercent={50}
+                      zoomLevel={pinZoom}
+                      panX={pinPanX}
+                      panY={pinPanY}
+                      onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
+                      onReady={() => setPhotoReadyForKey(photoReadyKey)}
+                      size={260}
                     />
-                  )}
+                    {!photoReady && (
+                      <div
+                        className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                        style={{ width: 260, height: 260 }}
+                        data-testid="photo-skeleton"
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 px-1">
+                    <ZoomOut
+                      className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => setCardZoom(Math.min(ZOOM_MAX, pinZoom + ZOOM_CLICK_STEP))}
+                      data-testid="btn-review-detail-zoom-out"
+                    />
+                    <Slider
+                      value={[ZOOM_MAX - pinZoom + ZOOM_MIN]}
+                      min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP}
+                      onValueChange={([v]) => setCardZoom(ZOOM_MAX - v + ZOOM_MIN)}
+                      className="flex-1"
+                      data-testid="slider-review-detail-zoom"
+                    />
+                    <ZoomIn
+                      className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => setCardZoom(Math.max(ZOOM_MIN, pinZoom - ZOOM_CLICK_STEP))}
+                      data-testid="btn-review-detail-zoom-in"
+                    />
+                  </div>
                 </div>
               ) : isPinEntry && currentPhoto ? (
                 /* ── Pin / AI Scanner view (cropped) ── */
