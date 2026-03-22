@@ -646,7 +646,9 @@ export default function ReviewTab({
   // ── Derived values ─────────────────────────────────────────────────────────
   const currentEntry = assignedEntries[currentIndex] ?? null;
   const currentPin = currentEntry ? pinByEntryId.get(currentEntry.id) : null;
-  const currentPhoto = currentEntry?.photoId ? photoMap.get(currentEntry.photoId) : null;
+  const currentPhoto = currentPin?.photoId
+    ? photoMap.get(currentPin.photoId) ?? (currentEntry?.photoId ? photoMap.get(currentEntry.photoId) : null)
+    : currentEntry?.photoId ? photoMap.get(currentEntry.photoId) : null;
   const detailPhoto = currentPin?.label ? detailPhotoByPinLabel.get(currentPin.label) : undefined;
   const isRevealed = currentEntry ? revealedEntries.has(currentEntry.id) : false;
   // Synchronous ready check — avoids the one-frame flash that a useEffect reset would cause
