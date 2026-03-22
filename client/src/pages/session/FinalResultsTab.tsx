@@ -239,17 +239,24 @@ export default function FinalResultsTab({
 
   const photoMap = useMemo(() => new Map(photos.map(p => [p.id, p])), [photos]);
 
+  const entryMap = useMemo(() => new Map(entries.map(e => [e.id, e])), [entries]);
+
   const tallyRows = useMemo<TallyRow[]>(() => {
     const map = new Map<string, TallyRow>();
     for (const pin of sessionPins) {
-      const category = (pin.wireDetails || "").trim() || "(uncategorized)";
-      const vendorCode = (pin.vendorCode || "").trim() || "";
+      const entry = pin.entryId ? entryMap.get(pin.entryId) : undefined;
+      const pinWire = (pin.wireDetails || "").trim();
+      const entryWire = (entry?.wireType || "").trim();
+      const category = pinWire || entryWire || "(uncategorized)";
+      const pinVendor = (pin.vendorCode || "").trim();
+      const entryVendor = (entry?.manufacturer || "").trim();
+      const vendorCode = pinVendor || entryVendor || "";
       const key = `${category}|||${vendorCode}`;
       const photo = photoMap.get(pin.photoId);
       const aisle = photo?.aisle || "";
       const section = photo?.section || "";
-      const reelCount = pin.reelCount ?? 1;
-      const footage = pin.footage ?? null;
+      const reelCount = pin.reelCount ?? entry?.reelCount ?? 1;
+      const footage = pin.footage ?? entry?.footage ?? null;
 
       if (!map.has(key)) {
         map.set(key, { category, vendorCode, totalReels: 0, totalFootage: 0, locations: [] });
@@ -267,7 +274,7 @@ export default function FinalResultsTab({
       if (cc !== 0) return cc;
       return a.vendorCode.localeCompare(b.vendorCode);
     });
-  }, [sessionPins, photoMap]);
+  }, [sessionPins, photoMap, entryMap]);
 
   const [inventoryRows, setInventoryRows] = useState<InventoryRow[] | null>(null);
   const [inventoryFileName, setInventoryFileName] = useState<string | null>(null);
