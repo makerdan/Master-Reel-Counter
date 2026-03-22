@@ -170,6 +170,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
   const [relabelIsCommitted, setRelabelIsCommitted] = useState(false);
+  const [editingCommittedPinId, setEditingCommittedPinId] = useState<string | null>(null);
+  const [committedEditState, setCommittedEditState] = useState<{ label: string; wireDetails: string; vendorCode: string; footage: string; reelCount: string }>({ label: "", wireDetails: "", vendorCode: "", footage: "", reelCount: "1" });
+  const [committedCategorySuggestions, setCommittedCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [showCommittedCategorySuggestions, setShowCommittedCategorySuggestions] = useState(false);
   const dragRef = useRef<{
     isDragging: boolean;
     pinId: string | null;
@@ -1048,11 +1052,22 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     }
     const committed = committedPins.find((p) => p.id === pinId);
     if (committed) {
-      setRelabelPinId(pinId);
-      setRelabelValue(committed.label);
-      setRelabelIsCommitted(true);
+      const matchedEntry = committed.entryId && sessionEntries ? sessionEntries.find(e => e.id === committed.entryId) : null;
+      const rc = matchedEntry?.reelCount && matchedEntry.reelCount > 0 ? matchedEntry.reelCount : (committed.reelCount || 1);
+      const totalFt = matchedEntry?.footage ? Number(matchedEntry.footage) : null;
+      const perReelFt = totalFt !== null ? totalFt / rc : null;
+      setEditingCommittedPinId(pinId);
+      setCommittedEditState({
+        label: committed.label,
+        wireDetails: matchedEntry?.reelTag || matchedEntry?.wireType || "",
+        vendorCode: matchedEntry?.manufacturer || "",
+        footage: perReelFt !== null ? String(toDisplayUnit(perReelFt, currentUnit)) : "",
+        reelCount: String(rc),
+      });
+      setCommittedCategorySuggestions([]);
+      setShowCommittedCategorySuggestions(false);
     }
-  }, [localPins, committedPins]);
+  }, [localPins, committedPins, sessionEntries, currentUnit]);
 
   const applyRelabel = useCallback(async () => {
     if (!relabelPinId || !relabelValue.trim()) return;
@@ -1078,6 +1093,51 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     setRelabelValue("");
     setRelabelIsCommitted(false);
   }, [relabelPinId, relabelValue, relabelIsCommitted, committedPins, sessionId]);
+
+  const applyCommittedCatalogMatch = useCallback((match: ParsedCatalogEntry) => {
+    setCommittedEditState(s => {
+      const updates: Partial<typeof s> = { wireDetails: match.catalog };
+      if (match.footage) {
+        updates.footage = String(toDisplayUnit(match.footage, currentUnit));
+      }
+      return { ...s, ...updates };
+    });
+    setCommittedCategorySuggestions([]);
+    setShowCommittedCategorySuggestions(false);
+  }, [currentUnit]);
+
+  const saveCommittedPinEdit = useCallback(async () => {
+    if (!editingCommittedPinId) return;
+    const pin = committedPins.find(p => p.id === editingCommittedPinId);
+    if (!pin?.dbId) return;
+    const newLabel = committedEditState.label.trim();
+    const displayFootage = committedEditState.footage ? Number(committedEditState.footage) : null;
+    const parsedFootage = displayFootage !== null && Number.isFinite(displayFootage) ? toBaseFeet(displayFootage, currentUnit) : null;
+    const parsedReelCount = committedEditState.reelCount ? parseInt(committedEditState.reelCount) : 1;
+
+    try {
+      if (newLabel && newLabel !== pin.label) {
+        await apiRequest("PATCH", `/api/pins/${pin.dbId}`, { label: newLabel });
+        setCommittedPins(prev => prev.map(p => p.id === editingCommittedPinId ? { ...p, label: newLabel } : p));
+      }
+      if (pin.entryId) {
+        const totalFootage = parsedFootage ? parsedFootage * (parsedReelCount > 0 ? parsedReelCount : 1) : undefined;
+        await apiRequest("PATCH", `/api/entries/${pin.entryId}`, {
+          reelTag: committedEditState.wireDetails || undefined,
+          manufacturer: committedEditState.vendorCode || undefined,
+          footage: totalFootage,
+          reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      setEditingCommittedPinId(null);
+      toast({ title: "Saved", description: "Pin details updated." });
+      onPinDataChanged?.();
+    } catch {
+      toast({ title: "Save failed", variant: "destructive" });
+    }
+  }, [editingCommittedPinId, committedPins, committedEditState, currentUnit, sessionId, toast, onPinDataChanged]);
 
   const updatePinField = useCallback((pinId: string, field: keyof LocalPin, value: any) => {
     setLocalPins((prev) =>
@@ -1844,6 +1904,124 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           </div>
                         )}
                       </div>
+                      {editingCommittedPinId === pin.id && (
+                        <div
+                          className="absolute z-50 bg-card border border-border rounded-lg shadow-xl p-3 w-64"
+                          style={{ top: pin.y < 50 ? "100%" : "auto", bottom: pin.y >= 50 ? "100%" : "auto", left: "50%", transform: "translateX(-50%)", marginTop: pin.y < 50 ? 4 : 0, marginBottom: pin.y >= 50 ? 4 : 0 }}
+                          onClick={(e) => e.stopPropagation()}
+                          data-testid={`committed-pin-edit-form-${pin.id}`}
+                        >
+                          <div className="space-y-2">
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">Relabel Pin:</label>
+                              <Input
+                                value={committedEditState.label}
+                                onChange={(e) => setCommittedEditState(s => ({ ...s, label: e.target.value }))}
+                                className="h-7 text-xs font-mono"
+                                data-testid={`input-committed-relabel-${pin.id}`}
+                              />
+                            </div>
+                            <div className="relative">
+                              <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">Category:</label>
+                              <Input
+                                value={committedEditState.wireDetails}
+                                onChange={(e) => {
+                                  const val = e.target.value.toUpperCase();
+                                  setCommittedEditState(s => ({ ...s, wireDetails: val }));
+                                  if (val.length >= 2) {
+                                    const matches = lookupCategory(val, userParsedCatalog);
+                                    setCommittedCategorySuggestions(matches);
+                                    setShowCommittedCategorySuggestions(matches.length > 0);
+                                  } else {
+                                    setCommittedCategorySuggestions([]);
+                                    setShowCommittedCategorySuggestions(false);
+                                  }
+                                }}
+                                onFocus={() => {
+                                  if (committedEditState.wireDetails.length >= 2) {
+                                    const matches = lookupCategory(committedEditState.wireDetails, userParsedCatalog);
+                                    setCommittedCategorySuggestions(matches);
+                                    setShowCommittedCategorySuggestions(matches.length > 0);
+                                  }
+                                }}
+                                onBlur={() => setTimeout(() => setShowCommittedCategorySuggestions(false), 200)}
+                                className="h-7 text-xs uppercase"
+                                autoComplete="off"
+                                data-testid={`input-committed-category-${pin.id}`}
+                              />
+                              {showCommittedCategorySuggestions && committedCategorySuggestions.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-36 overflow-y-auto" data-testid="committed-category-suggestions">
+                                  {committedCategorySuggestions.map((s) => (
+                                    <button
+                                      key={s.catalog}
+                                      type="button"
+                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                                      onMouseDown={(e) => { e.preventDefault(); applyCommittedCatalogMatch(s); }}
+                                      data-testid={`committed-suggestion-${s.catalog}`}
+                                    >
+                                      <span className="font-mono font-semibold">{s.catalog}</span>
+                                      {s.footage && <span className="text-orange-500 ml-1">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">Vendor Code:</label>
+                              <Input
+                                value={committedEditState.vendorCode}
+                                onChange={(e) => setCommittedEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
+                                className="h-7 text-xs uppercase"
+                                maxLength={3}
+                                list="vendor-code-suggestions-committed"
+                                data-testid={`input-committed-vendor-${pin.id}`}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">Footage ({uLabel}):</label>
+                                <Input
+                                  type="number"
+                                  value={committedEditState.footage}
+                                  onChange={(e) => setCommittedEditState(s => ({ ...s, footage: e.target.value }))}
+                                  className="h-7 text-xs"
+                                  data-testid={`input-committed-footage-${pin.id}`}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block"># Reels:</label>
+                                <Input
+                                  type="number"
+                                  value={committedEditState.reelCount}
+                                  onChange={(e) => setCommittedEditState(s => ({ ...s, reelCount: e.target.value }))}
+                                  min={1}
+                                  className="h-7 text-xs"
+                                  data-testid={`input-committed-reel-count-${pin.id}`}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 h-7 text-xs"
+                                onClick={() => setEditingCommittedPinId(null)}
+                                data-testid={`button-cancel-committed-edit-${pin.id}`}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="flex-1 h-7 text-xs"
+                                onClick={saveCommittedPinEdit}
+                                data-testid={`button-save-committed-edit-${pin.id}`}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );})}
                 </>
@@ -2766,6 +2944,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           </SheetContent>
         </Sheet>
       )}
+      <datalist id="vendor-code-suggestions-committed">
+        {vendorCodes.map(code => (
+          <option key={code} value={code} />
+        ))}
+      </datalist>
     </div>
   );
 }

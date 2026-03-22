@@ -1604,6 +1604,25 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/sessions/:id/review-responses/resolve", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to resolve review flags" });
+      const { entryId } = req.body;
+      if (!entryId) return res.status(400).json({ message: "entryId is required" });
+      const entry = await storage.getEntry(entryId);
+      if (!entry || entry.sessionId !== sessionId) {
+        return res.status(400).json({ message: "Entry does not belong to this session" });
+      }
+      await storage.resolveReviewResponsesByEntry(sessionId, entryId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to resolve review responses" });
+    }
+  });
+
   app.delete("/api/pins/:pinId", isAuthenticated, async (req: any, res) => {
     try {
       const pin = await storage.getPin(parseInt(req.params.pinId));

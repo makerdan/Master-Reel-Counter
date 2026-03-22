@@ -140,6 +140,7 @@ export interface IStorage {
 
   getSessionReviewResponses(sessionId: number): Promise<ReviewResponse[]>;
   upsertReviewResponse(data: InsertReviewResponse): Promise<ReviewResponse>;
+  resolveReviewResponsesByEntry(sessionId: number, entryId: number): Promise<void>;
 
   getRoleComparisonStats(userId: string): Promise<{
     Owner: { entries: number; footage: number; reels: number; photos: number };
@@ -1495,6 +1496,16 @@ export class DatabaseStorage implements IStorage {
     }
     const [result] = await db.insert(reviewResponses).values(data).returning();
     return result;
+  }
+
+  async resolveReviewResponsesByEntry(sessionId: number, entryId: number): Promise<void> {
+    await db.update(reviewResponses)
+      .set({ verdict: "approved", flagReason: null })
+      .where(and(
+        eq(reviewResponses.sessionId, sessionId),
+        eq(reviewResponses.entryId, entryId),
+        eq(reviewResponses.verdict, "flagged"),
+      ));
   }
 }
 

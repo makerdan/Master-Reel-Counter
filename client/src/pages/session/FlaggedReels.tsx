@@ -294,6 +294,10 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
   const [categorySuggestions, setCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const [editingReviewEntryId, setEditingReviewEntryId] = useState<number | null>(null);
+  const [reviewEditState, setReviewEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
+  const [reviewCategorySuggestions, setReviewCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [showReviewCategorySuggestions, setShowReviewCategorySuggestions] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [dupsOpen, setDupsOpen] = useState(true);
   const { data: dismissedKeysFromDb = [] } = useQuery<string[]>({
@@ -481,6 +485,100 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
     setCategorySuggestions([]);
     setShowCategorySuggestions(false);
   }, [currentUnit]);
+
+  const openReviewEditor = useCallback((entry: Entry, response: ReviewResponse) => {
+    setEditingReviewEntryId(entry.id);
+    const rc = entry.reelCount && entry.reelCount > 0 ? entry.reelCount : 1;
+    const totalFt = entry.footage ? Number(entry.footage) : null;
+    const perReelFt = totalFt !== null ? totalFt / rc : null;
+    setReviewEditState({
+      wireDetails: entry.reelTag || entry.wireType || "",
+      vendorCode: entry.manufacturer || "",
+      footage: perReelFt !== null ? String(toDisplayUnit(perReelFt, currentUnit)) : "",
+      notes: entry.notes || "",
+      flagReason: response.flagReason || "",
+      reelCount: String(rc),
+    });
+    setReviewCategorySuggestions([]);
+    setShowReviewCategorySuggestions(false);
+  }, [currentUnit]);
+
+  const applyReviewCatalogMatch = useCallback((match: ParsedCatalogEntry) => {
+    setReviewEditState(s => {
+      const updates: Partial<EditingState> = { wireDetails: match.catalog };
+      const vendors = new Set(PARSED_CATALOG.filter(e => e.catalog === match.catalog).map(e => e.vendor));
+      const uniqueVendor = vendors.size === 1 ? [...vendors][0] : null;
+      if (uniqueVendor && !s.vendorCode) updates.vendorCode = uniqueVendor;
+      if (match.footage) {
+        updates.footage = String(toDisplayUnit(match.footage, currentUnit));
+      }
+      return { ...s, ...updates };
+    });
+    setReviewCategorySuggestions([]);
+    setShowReviewCategorySuggestions(false);
+  }, [currentUnit]);
+
+  const saveReviewEntryMutation = useMutation({
+    mutationFn: async ({ entryId, data, resolve }: {
+      entryId: number; data: EditingState; resolve?: boolean;
+    }) => {
+      const displayFootage = data.footage ? Number(data.footage) : null;
+      const parsedFootage = displayFootage !== null && Number.isFinite(displayFootage) ? toBaseFeet(displayFootage, currentUnit) : null;
+      const parsedReelCount = data.reelCount ? parseInt(data.reelCount) : 1;
+      const totalFootage = parsedFootage ? parsedFootage * (parsedReelCount > 0 ? parsedReelCount : 1) : undefined;
+
+      await apiRequest("PATCH", `/api/entries/${entryId}`, {
+        reelTag: data.wireDetails || undefined,
+        manufacturer: data.vendorCode || undefined,
+        footage: totalFootage,
+        reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
+        notes: resolve
+          ? (data.notes ? `${data.notes}\n[Resolved from review flag: ${data.flagReason || "no reason"}]` : `[Resolved from review flag: ${data.flagReason || "no reason"}]`)
+          : (data.notes || undefined),
+      });
+
+      if (resolve) {
+        await apiRequest("POST", `/api/sessions/${sessionId}/review-responses/resolve`, {
+          entryId,
+        });
+      }
+
+      return { resolved: !!resolve };
+    },
+    onSuccess: ({ resolved }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "review-responses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      setEditingReviewEntryId(null);
+      toast({
+        title: resolved ? "Resolved" : "Saved",
+        description: resolved ? "Entry updated and review flag cleared." : "Entry details saved.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Save failed", variant: "destructive" });
+    },
+  });
+
+  const unflagReviewMutation = useMutation({
+    mutationFn: async ({ entryId, flagReason }: { entryId: number; flagReason: string | null }) => {
+      await apiRequest("POST", `/api/sessions/${sessionId}/review-responses/resolve`, {
+        entryId,
+      });
+      const marker = flagReason ? `[Resolved from review flag: ${flagReason}]` : "[Resolved from review flag]";
+      const entry = allEntries.find(e => e.id === entryId);
+      const updatedNotes = entry?.notes ? `${entry.notes}\n${marker}` : marker;
+      await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: updatedNotes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "review-responses"] });
+      toast({ title: "Un-flagged", description: "Review flag removed." });
+    },
+    onError: () => {
+      toast({ title: "Un-flag failed", variant: "destructive" });
+    },
+  });
 
   const getUniqueVendor = (catalog: string): string | null => {
     const vendors = new Set(PARSED_CATALOG.filter(e => e.catalog === catalog).map(e => e.vendor));
@@ -1416,53 +1514,211 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
           <div className="divide-y divide-yellow-600/20">
             {reviewFlaggedItems.map(({ response, entry }) => {
               const matchingPin = sessionPins.find(p => p.entryId === entry!.id);
+              const isEditing = editingReviewEntryId === entry!.id;
               return (
-              <div key={response.id} className="px-3 py-2.5 flex items-center gap-3 flex-wrap" data-testid={`review-flagged-entry-${response.entryId}`}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {matchingPin?.label && (
-                      onViewInPhoto && entry!.photoId ? (
-                        <button
-                          className="font-mono text-sm font-bold text-blue-500 hover:text-blue-400 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0"
-                          onClick={() => onViewInPhoto(entry!.photoId!, matchingPin.id)}
-                          data-testid={`link-pin-review-flagged-${response.entryId}`}
-                        >
-                          P{matchingPin.label}
-                        </button>
-                      ) : (
-                        <span className="font-mono text-sm font-bold text-blue-500">P{matchingPin.label}</span>
-                      )
+              <div key={response.id} className="px-3 py-2.5" data-testid={`review-flagged-entry-${response.entryId}`}>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {matchingPin?.label && (
+                        onViewInPhoto && entry!.photoId ? (
+                          <button
+                            className="font-mono text-sm font-bold text-blue-500 hover:text-blue-400 underline underline-offset-2 cursor-pointer bg-transparent border-none p-0"
+                            onClick={() => onViewInPhoto(entry!.photoId!, matchingPin.id)}
+                            data-testid={`link-pin-review-flagged-${response.entryId}`}
+                          >
+                            P{matchingPin.label}
+                          </button>
+                        ) : (
+                          <span className="font-mono text-sm font-bold text-blue-500">P{matchingPin.label}</span>
+                        )
+                      )}
+                      <span className="font-mono text-sm font-semibold">
+                        {[entry!.aisle && `Aisle ${entry!.aisle}`, entry!.section && `Section ${entry!.section}`].filter(Boolean).join(" · ") || "No location"}
+                      </span>
+                      {entry!.reelTag && (
+                        <Badge variant="outline" className="text-[10px] font-mono">{entry!.reelTag}</Badge>
+                      )}
+                      {entry!.manufacturer && (
+                        <Badge variant="outline" className="text-[10px]">{entry!.manufacturer}</Badge>
+                      )}
+                    </div>
+                    {response.flagReason && (
+                      <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
+                        <AlertTriangle className="h-3 w-3 inline mr-1" />
+                        {response.flagReason}
+                      </p>
                     )}
-                    <span className="font-mono text-sm font-semibold">
-                      {[entry!.aisle && `Aisle ${entry!.aisle}`, entry!.section && `Section ${entry!.section}`].filter(Boolean).join(" · ") || "No location"}
-                    </span>
-                    {entry!.reelTag && (
-                      <Badge variant="outline" className="text-[10px] font-mono">{entry!.reelTag}</Badge>
-                    )}
-                    {entry!.manufacturer && (
-                      <Badge variant="outline" className="text-[10px]">{entry!.manufacturer}</Badge>
-                    )}
-                  </div>
-                  {response.flagReason && (
-                    <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
-                      <AlertTriangle className="h-3 w-3 inline mr-1" />
-                      {response.flagReason}
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Flagged by {response.username || "unknown"} during review
                     </p>
-                  )}
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Flagged by {response.username || "unknown"} during review
-                  </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    {onViewInPhoto && entry!.photoId && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="!border-black dark:!border-white"
+                        onClick={() => onViewInPhoto(entry!.photoId!, matchingPin?.id)}
+                        data-testid={`button-view-review-flagged-${response.entryId}`}
+                      >
+                        <Eye className="h-4 w-4 sm:mr-1" />
+                        <span className="hidden sm:inline">View in Reel IDs</span>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="!border-black dark:!border-white"
+                      onClick={() => isEditing ? setEditingReviewEntryId(null) : openReviewEditor(entry!, response)}
+                      data-testid={`button-edit-review-flagged-${response.entryId}`}
+                    >
+                      <Pencil className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">{isEditing ? "Close" : "Edit Reel Data"}</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="!border-black dark:!border-white"
+                      onClick={() => unflagReviewMutation.mutate({ entryId: entry!.id, flagReason: response.flagReason })}
+                      disabled={unflagReviewMutation.isPending}
+                      data-testid={`button-unflag-review-${response.entryId}`}
+                    >
+                      {unflagReviewMutation.isPending ? <Loader2 className="h-4 w-4 sm:mr-1 animate-spin" /> : <Check className="h-4 w-4 sm:mr-1" />}
+                      <span className="hidden sm:inline">Un-Flag</span>
+                    </Button>
+                  </div>
                 </div>
-                {onViewInPhoto && entry!.photoId && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onViewInPhoto(entry!.photoId!, matchingPin?.id)}
-                    data-testid={`button-view-review-flagged-${response.entryId}`}
-                  >
-                    <Eye className="h-4 w-4 sm:mr-1" />
-                    <span className="hidden sm:inline">View</span>
-                  </Button>
+                {isEditing && (
+                  <div className="border-t border-yellow-600/30 pt-3 mt-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                      <div className="relative">
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
+                        <Input
+                          value={reviewEditState.wireDetails}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setReviewEditState(s => ({ ...s, wireDetails: val }));
+                            if (val.length >= 2) {
+                              const matches = lookupCategory(val, userParsedCatalog);
+                              setReviewCategorySuggestions(matches);
+                              setShowReviewCategorySuggestions(matches.length > 0);
+                            } else {
+                              setReviewCategorySuggestions([]);
+                              setShowReviewCategorySuggestions(false);
+                            }
+                          }}
+                          onFocus={() => {
+                            if (reviewEditState.wireDetails.length >= 2) {
+                              const matches = lookupCategory(reviewEditState.wireDetails, userParsedCatalog);
+                              setReviewCategorySuggestions(matches);
+                              setShowReviewCategorySuggestions(matches.length > 0);
+                            }
+                          }}
+                          onBlur={() => setTimeout(() => setShowReviewCategorySuggestions(false), 200)}
+                          className="uppercase"
+                          autoComplete="off"
+                          data-testid={`input-review-wire-details-${entry!.id}`}
+                        />
+                        {showReviewCategorySuggestions && reviewCategorySuggestions.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="review-category-suggestions">
+                            {reviewCategorySuggestions.map((s) => (
+                              <button
+                                key={s.catalog}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                                onMouseDown={(e) => { e.preventDefault(); applyReviewCatalogMatch(s); }}
+                                data-testid={`review-suggestion-${s.catalog}`}
+                              >
+                                <span className="font-mono font-semibold">{s.catalog}</span>
+                                <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
+                                {s.footage && <span className="text-orange-500 ml-1 text-xs">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Vendor Code</label>
+                        <Input
+                          value={reviewEditState.vendorCode}
+                          onChange={(e) => setReviewEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
+                          className="uppercase"
+                          maxLength={3}
+                          list="vendor-code-suggestions"
+                          data-testid={`input-review-vendor-code-${entry!.id}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Footage ({uLabel})</label>
+                        <Input
+                          type="number"
+                          value={reviewEditState.footage}
+                          onChange={(e) => setReviewEditState(s => ({ ...s, footage: e.target.value }))}
+                          data-testid={`input-review-footage-${entry!.id}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Number of Reels:</label>
+                        <Input
+                          type="number"
+                          value={reviewEditState.reelCount}
+                          onChange={(e) => setReviewEditState(s => ({ ...s, reelCount: e.target.value }))}
+                          min={1}
+                          inputMode="numeric"
+                          data-testid={`input-review-reel-count-${entry!.id}`}
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
+                      <Textarea
+                        value={reviewEditState.notes}
+                        onChange={(e) => setReviewEditState(s => ({ ...s, notes: e.target.value }))}
+                        rows={2}
+                        data-testid={`input-review-notes-${entry!.id}`}
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Flag Reason:</label>
+                      <Input
+                        value={reviewEditState.flagReason}
+                        onChange={(e) => setReviewEditState(s => ({ ...s, flagReason: e.target.value }))}
+                        data-testid={`input-review-flag-reason-${entry!.id}`}
+                        disabled
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => saveReviewEntryMutation.mutate({
+                          entryId: entry!.id,
+                          data: reviewEditState,
+                        })}
+                        disabled={saveReviewEntryMutation.isPending}
+                        data-testid={`button-save-review-edit-${entry!.id}`}
+                      >
+                        {saveReviewEntryMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                        Save Details
+                      </Button>
+                      {reviewEditState.wireDetails.trim() && reviewEditState.vendorCode.trim() && reviewEditState.footage.trim() && reviewEditState.reelCount.trim() && (
+                        <Button
+                          size="sm"
+                          onClick={() => saveReviewEntryMutation.mutate({
+                            entryId: entry!.id,
+                            data: reviewEditState,
+                            resolve: true,
+                          })}
+                          disabled={saveReviewEntryMutation.isPending}
+                          data-testid={`button-save-resolve-review-${entry!.id}`}
+                        >
+                          {saveReviewEntryMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                          Save &amp; Resolve
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             );})}
