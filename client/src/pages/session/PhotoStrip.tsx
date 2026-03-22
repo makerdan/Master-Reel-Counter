@@ -321,7 +321,7 @@ function PhotoCard({
               title={pin.label || "Pin"}
             >
               {(() => {
-                const hasLinkedPhoto = pin.label ? linkedPinLabels.has(pin.label) : false;
+                const hasLinkedPhoto = isDetail || (pin.label ? linkedPinLabels.has(pin.label) : false);
                 const dotColor = hasLinkedPhoto ? "bg-blue-500" : "bg-orange-400";
                 return (pin.reelCount ?? 1) >= 2 ? (
                   <div className={`w-5 h-5 rounded-full ${dotColor} border-2 border-white shadow-md flex items-center justify-center`}>
