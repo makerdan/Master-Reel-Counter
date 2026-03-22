@@ -6,7 +6,7 @@ import {
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
   FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
   Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
-  Lock, Unlock, History,
+  Lock, Unlock, History, Download, FileText, FileSpreadsheet, Loader2,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { findFolderConflict, getNextAutoNumberedName } from "@/lib/folder-conflicts";
 import { FolderConflictDialog, type ConflictResolution } from "@/components/folder-conflict-dialog";
+import { buildExportFilename } from "./session/utils";
 
 type SessionWithStats = Session & {
   entryCount: number;
@@ -153,6 +154,19 @@ export default function Dashboard() {
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: number; name: string; sessionCount: number } | null>(null);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<{ id: number; name: string } | null>(null);
+
+  const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
+  const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
+    () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
+  );
+  const [pdfDialogWaiting, setPdfDialogWaiting] = useState(false);
+  const [exportSessionTarget, setExportSessionTarget] = useState<SessionWithStats | null>(null);
+  const fullAbortRef = useRef<AbortController | null>(null);
+  const stdAbortRef = useRef<AbortController | null>(null);
+  const fullBlobRef = useRef<Blob | null>(null);
+  const stdBlobRef = useRef<Blob | null>(null);
+  const fullFetchRef = useRef<Promise<Blob | null> | null>(null);
+  const stdFetchRef = useRef<Promise<Blob | null> | null>(null);
 
   const [folderConflict, setFolderConflict] = useState<{
     mode: "create" | "create-and-move";
@@ -604,6 +618,116 @@ export default function Dashboard() {
     });
   };
 
+  useEffect(() => {
+    return () => { abortPdfFetches(); };
+  }, []);
+
+  const handleExportExcel = async (session: SessionWithStats) => {
+    toast({ title: "Exporting Excel…", description: session.name });
+    try {
+      const params = new URLSearchParams();
+      if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
+      const url = `/api/sessions/${session.id}/export/excel?${params}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = buildExportFilename(session, "xlsx");
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+      toast({ title: "Excel export complete" });
+    } catch {
+      toast({ title: "Failed to export Excel", variant: "destructive" });
+    }
+  };
+
+  const buildPdfUrl = (sessionId: number, quality: "full" | "standard") => {
+    const params = new URLSearchParams();
+    if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
+    if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
+    params.set("quality", quality);
+    return `/api/sessions/${sessionId}/export/pdf?${params}`;
+  };
+
+  const startPdfFetch = (sessionId: number, quality: "full" | "standard") => {
+    const ctrl = new AbortController();
+    if (quality === "full") fullAbortRef.current = ctrl;
+    else stdAbortRef.current = ctrl;
+    const p = fetch(buildPdfUrl(sessionId, quality), { credentials: "include", signal: ctrl.signal })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        return blob.size >= 500 ? blob : null;
+      })
+      .catch(() => null);
+    if (quality === "full") fullFetchRef.current = p;
+    else stdFetchRef.current = p;
+    p.then((blob) => {
+      if (quality === "full") fullBlobRef.current = blob;
+      else stdBlobRef.current = blob;
+    });
+  };
+
+  const abortPdfFetches = () => {
+    fullAbortRef.current?.abort(); fullAbortRef.current = null;
+    stdAbortRef.current?.abort(); stdAbortRef.current = null;
+    fullBlobRef.current = null; stdBlobRef.current = null;
+    fullFetchRef.current = null; stdFetchRef.current = null;
+  };
+
+  const handleExportPdf = (session: SessionWithStats) => {
+    setExportSessionTarget(session);
+    abortPdfFetches();
+    setPdfQualityOpen(true);
+    startPdfFetch(session.id, "full");
+    startPdfFetch(session.id, "standard");
+  };
+
+  const confirmPdfQualityExport = async () => {
+    if (!exportSessionTarget) return;
+    localStorage.setItem("pdfExportQuality", pdfQualityChoice);
+    if (pdfQualityChoice === "full") { stdAbortRef.current?.abort(); stdAbortRef.current = null; }
+    else { fullAbortRef.current?.abort(); fullAbortRef.current = null; }
+    const blobRef = pdfQualityChoice === "full" ? fullBlobRef : stdBlobRef;
+    const fetchRef = pdfQualityChoice === "full" ? fullFetchRef : stdFetchRef;
+    let blob = blobRef.current;
+    if (!blob) {
+      setPdfDialogWaiting(true);
+      blob = (await fetchRef.current) ?? null;
+      setPdfDialogWaiting(false);
+    }
+    setPdfQualityOpen(false);
+    const session = exportSessionTarget;
+    setExportSessionTarget(null);
+    abortPdfFetches();
+    if (!blob) {
+      toast({
+        title: "PDF Export Failed",
+        description: "Export failed — Try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const baseName = buildExportFilename(session, "pdf");
+    a.download = pdfQualityChoice === "standard"
+      ? baseName.replace(/\.pdf$/, " (Standard Quality).pdf")
+      : baseName;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "PDF export complete" });
+  };
+
+  const cancelPdfQualityDialog = () => {
+    abortPdfFetches();
+    setPdfQualityOpen(false);
+    setExportSessionTarget(null);
+  };
+
   const openEditDialog = (session: SessionWithStats, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setEditingSession(session);
@@ -902,6 +1026,31 @@ export default function Dashboard() {
                     >
                       <History className="h-4 w-4 mr-2" /> Activity Log
                     </DropdownMenuItem>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger data-testid={`menu-export-session-${session.id}`}>
+                        <Download className="h-4 w-4 mr-2" /> Export
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent collisionPadding={8}>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportExcel(session);
+                          }}
+                          data-testid={`menu-export-excel-${session.id}`}
+                        >
+                          <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportPdf(session);
+                          }}
+                          data-testid={`menu-export-pdf-${session.id}`}
+                        >
+                          <FileText className="h-4 w-4 mr-2" /> PDF
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
@@ -1840,6 +1989,64 @@ export default function Dashboard() {
         </div>
         );
       })()}
+
+      <Dialog open={pdfQualityOpen} onOpenChange={(open) => { if (!open) cancelPdfQualityDialog(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>PDF Export Quality</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {(["full", "standard"] as const).map((q) => (
+              <button
+                key={q}
+                onClick={() => setPdfQualityChoice(q)}
+                className={`w-full text-left rounded-lg border-2 p-4 transition-colors ${
+                  pdfQualityChoice === q
+                    ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30"
+                    : "border-border hover:border-muted-foreground/40"
+                }`}
+                data-testid={`button-dashboard-pdf-quality-${q}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sm">
+                    {q === "full" ? "Full Quality" : "Standard"}
+                  </span>
+                  {q === "full" && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 uppercase tracking-wide">
+                      Recommended
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {q === "full"
+                    ? "Original resolution — best for auditing reel labels"
+                    : "1600 px wide — faster download, smaller file"}
+                </p>
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={cancelPdfQualityDialog} data-testid="button-dashboard-pdf-quality-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmPdfQualityExport}
+              disabled={pdfDialogWaiting}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              data-testid="button-dashboard-pdf-quality-confirm"
+            >
+              {pdfDialogWaiting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                "Export"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
