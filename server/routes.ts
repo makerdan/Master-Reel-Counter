@@ -2811,7 +2811,17 @@ export async function registerRoutes(
                 entryPinMap.set(pin.entryId, `P${String(pin.label).padStart(3, "0")}`);
               }
             }
-            tblEndY = drawEntriesTable(photoEntries, tblX, tblW, y, 5.5, 14, entryPinMap.size > 0 ? entryPinMap : undefined);
+            let augmentedEntries = photoEntries;
+            if (pl.photo.isDetailShot && pl.photo.parentPhotoId) {
+              const parentPh = allPhotosFlat.find((p: any) => p.id === pl.photo.parentPhotoId);
+              const parentName = parentPh?.originalFilename || `Photo ${pl.photo.parentPhotoId}`;
+              const detailNote = `Detail photo of ${parentName}`;
+              augmentedEntries = photoEntries.map((e: any) => ({
+                ...e,
+                notes: e.notes ? `${detailNote}; ${e.notes}` : detailNote,
+              }));
+            }
+            tblEndY = drawEntriesTable(augmentedEntries, tblX, tblW, y, 5.5, 14, entryPinMap.size > 0 ? entryPinMap : undefined);
           }
 
           const totalH = Math.max(h + captionH, tblEndY - y);
