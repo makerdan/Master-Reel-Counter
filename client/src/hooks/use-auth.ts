@@ -18,6 +18,9 @@ async function fetchUser(): Promise<User | null> {
 }
 
 async function logout(isTester?: boolean): Promise<void> {
+  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: "CLEAR_API_CACHE" });
+  }
   window.location.href = isTester ? "/api/auth/tester-logout" : "/api/logout";
 }
 

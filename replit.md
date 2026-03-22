@@ -53,3 +53,4 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Client-side Wire Catalog:** Approximately 180 hardcoded entries for category lookup and autofill.
 - **OpenAI Vision (gpt-4o):** Used for AI label scanning.
 - **ExcelJS:** For generating Excel (.xlsx) exports.
+- **PWA Support:** Web app manifest, service worker (caches app shell and static assets), offline photo/entry queue via IndexedDB, network status indicator with auto-sync on reconnect. Service worker registered in production only. Session data cached in React Query with 30-minute gc time for offline viewing.

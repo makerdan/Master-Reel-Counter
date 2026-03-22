@@ -26,6 +26,8 @@ import {
   Sheet, SheetContent,
 } from "@/components/ui/sheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
+import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { lookupCategory, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
@@ -719,11 +721,21 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
     for (const file of files) {
       try {
-        const result = await uploadFile(file);
-        if (!result) {
-          toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
+        const uploadResult = await uploadFile(file);
+        if (!uploadResult.success) {
+          if (uploadResult.networkError) {
+            const blob = file.slice(0, file.size, file.type);
+            const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            let sectionVal = "";
+            if (isRec) { sectionVal = String(nextRecNum).padStart(3, "0"); nextRecNum++; }
+            await saveToQueue({ id: queueId, sessionId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, createdAt: Date.now() });
+            toast({ title: "Photo queued", description: `${file.name} will upload when back online` });
+          } else {
+            toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
+          }
           continue;
         }
+        const result = uploadResult.data;
         let sectionVal = "";
         if (isRec) {
           sectionVal = String(nextRecNum).padStart(3, "0");
@@ -1278,8 +1290,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           const totalFootage = pin.footage ? pin.footage * pin.reelCount : undefined;
           const noteParts: string[] = [];
           if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
-          const entry = await withRetry(async () => {
-            const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
+          const { entry, queued: entryQueued } = await withRetry(async () => {
+            return await createEntryWithOfflineFallback(sessionId, {
               aisle: entryAisle,
               section: entrySection,
               position: "",
@@ -1290,9 +1302,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               photoId: entryPhotoId || undefined,
               notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
             });
-            return await res.json();
           });
-          if (pinPhotoId) {
+          if (pinPhotoId && !entryQueued) {
             try {
               const savedPin = await withRetry(async () => {
                 const pinRes = await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {

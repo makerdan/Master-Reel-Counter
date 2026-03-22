@@ -18,6 +18,7 @@ import HelpPage from "@/pages/help";
 import TesterLoginPage from "@/pages/tester-login";
 import PendingApproval from "@/pages/pending-approval";
 import NotFound from "@/pages/not-found";
+import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 
 const TEXT_SIZE_MAP: Record<string, string> = {
   small: "14px",
@@ -105,6 +106,7 @@ function App() {
             <Toaster />
             <ThemeSyncer />
             <TextSizeSyncer />
+            <NetworkStatusIndicator />
             <AuthRouter />
           </TooltipProvider>
         </ThemeProvider>

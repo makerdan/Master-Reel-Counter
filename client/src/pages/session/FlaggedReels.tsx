@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { useToast } from "@/hooks/use-toast";
 import type { Entry, Pin, Photo, ReviewResponse } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
@@ -424,7 +425,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
         if (!resolvedEntryId) {
           const totalFootage = parsedFootage ? parsedFootage * (parsedReelCount > 0 ? parsedReelCount : 1) : undefined;
           const notesWithMarker = data.notes ? `${data.notes}\n${resolvedMarker}` : resolvedMarker;
-          const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, {
+          const { entry: newEntry, queued: entryQueued } = await createEntryWithOfflineFallback(sessionId, {
             aisle: photoAisle || "",
             section: photoSection || "",
             position: "",
@@ -435,9 +436,10 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
             photoId,
             notes: notesWithMarker,
           });
-          const newEntry = await res.json();
           resolvedEntryId = newEntry.id;
-          await apiRequest("PATCH", `/api/pins/${pinId}`, { entryId: resolvedEntryId });
+          if (!entryQueued) {
+            await apiRequest("PATCH", `/api/pins/${pinId}`, { entryId: resolvedEntryId });
+          }
         } else {
           const notesWithMarker = data.notes ? `${data.notes}\n${resolvedMarker}` : resolvedMarker;
           await apiRequest("PATCH", `/api/entries/${resolvedEntryId}`, {

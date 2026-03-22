@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
+import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { lookupCategory, PARSED_CATALOG, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
@@ -220,31 +222,52 @@ export default function SingleEntryMode({
   const handleSinglePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const result = await uploadFile(file);
-      if (!result) {
-        toast({ title: "Upload failed", variant: "destructive" });
-        return;
-      }
-      const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
-        objectStorageKey: result.objectPath,
-        originalFilename: file.name,
-        mimeType: file.type,
-        fileSize: result.metadata?.size || file.size,
-        aisle: form.aisle,
-        section: form.section,
-      });
-      const savedPhoto = await res.json();
-      await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
-      if (onSwitchToPhoto) {
-        toast({ title: "Photo captured — switching to pin mode" });
-        onSwitchToPhoto(savedPhoto.id, form.aisle, form.section);
+    const uploadResult = await uploadFile(file);
+    if (!uploadResult.success) {
+      if (uploadResult.networkError) {
+        try {
+          const blob = file.slice(0, file.size, file.type);
+          const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          await saveToQueue({
+            id: queueId,
+            sessionId,
+            blob,
+            aisle: form.aisle,
+            section: form.section,
+            notes: "",
+            isReceiving: form.aisle.trim().toLowerCase() === "receiving",
+            createdAt: Date.now(),
+          });
+          toast({ title: "Photo queued for upload when back online" });
+        } catch {
+          toast({ title: "Failed to queue photo", variant: "destructive" });
+        }
       } else {
-        setCapturedPhoto({ url: result.objectPath, objectPath: result.objectPath, photoId: savedPhoto.id });
-        toast({ title: "Photo captured" });
+        toast({ title: "Upload failed", variant: "destructive" });
       }
-    } catch {
-      toast({ title: "Photo upload failed", variant: "destructive" });
+    } else {
+      try {
+        const result = uploadResult.data;
+        const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
+          objectStorageKey: result.objectPath,
+          originalFilename: file.name,
+          mimeType: file.type,
+          fileSize: result.metadata?.size || file.size,
+          aisle: form.aisle,
+          section: form.section,
+        });
+        const savedPhoto = await res.json();
+        await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+        if (onSwitchToPhoto) {
+          toast({ title: "Photo captured — switching to pin mode" });
+          onSwitchToPhoto(savedPhoto.id, form.aisle, form.section);
+        } else {
+          setCapturedPhoto({ url: result.objectPath, objectPath: result.objectPath, photoId: savedPhoto.id });
+          toast({ title: "Photo captured" });
+        }
+      } catch {
+        toast({ title: "Photo upload failed", variant: "destructive" });
+      }
     }
     if (singleFileRef.current) singleFileRef.current.value = "";
     if (singleCameraRef.current) singleCameraRef.current.value = "";
@@ -322,11 +345,10 @@ export default function SingleEntryMode({
       let result;
       if (editingEntry) {
         const res = await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
-        result = { type: "update" as const, body, previousData: editingEntry };
+        result = { type: "update" as const, body, previousData: editingEntry, queued: false };
       } else {
-        const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, body);
-        const created = await res.json();
-        result = { type: "create" as const, body, id: created.id };
+        const { entry: created, queued } = await createEntryWithOfflineFallback(sessionId, body);
+        result = { type: "create" as const, body, id: created.id, queued };
       }
       return result;
     },
@@ -343,7 +365,7 @@ export default function SingleEntryMode({
           onUndoableSave({ type: "update-entry", sessionId, entityId: editingEntry.id, data: result.body, previousData: result.previousData });
         }
       }
-      toast({ title: editingEntry ? "Entry updated" : "Entry saved" });
+      toast({ title: editingEntry ? "Entry updated" : (result?.queued ? "Entry queued for sync" : "Entry saved") });
       if (editingEntry) {
         onDoneEditing();
       } else {
