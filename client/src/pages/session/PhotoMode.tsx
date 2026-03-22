@@ -557,6 +557,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, [currentPhoto?.dbId, applyPins, pinLoadKey]);
 
   useEffect(() => {
+    setEditingCommittedPinId(null);
+  }, [currentPhotoIdx]);
+
+  useEffect(() => {
     if (!pinRefreshSignal) return;
     pinFetchCache.current.clear();
     setPinLoadKey(k => k + 1);
@@ -1904,124 +1908,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           </div>
                         )}
                       </div>
-                      {editingCommittedPinId === pin.id && (
-                        <div
-                          className="absolute z-50 bg-card border border-border rounded-lg shadow-xl p-3 w-64"
-                          style={{ top: pin.y < 50 ? "100%" : "auto", bottom: pin.y >= 50 ? "100%" : "auto", left: "50%", transform: "translateX(-50%)", marginTop: pin.y < 50 ? 4 : 0, marginBottom: pin.y >= 50 ? 4 : 0 }}
-                          onClick={(e) => e.stopPropagation()}
-                          data-testid={`committed-pin-edit-form-${pin.id}`}
-                        >
-                          <div className="space-y-2">
-                            <div>
-                              <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">Relabel Pin:</label>
-                              <Input
-                                value={committedEditState.label}
-                                onChange={(e) => setCommittedEditState(s => ({ ...s, label: e.target.value }))}
-                                className="h-7 text-xs font-mono"
-                                data-testid={`input-committed-relabel-${pin.id}`}
-                              />
-                            </div>
-                            <div className="relative">
-                              <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">Category:</label>
-                              <Input
-                                value={committedEditState.wireDetails}
-                                onChange={(e) => {
-                                  const val = e.target.value.toUpperCase();
-                                  setCommittedEditState(s => ({ ...s, wireDetails: val }));
-                                  if (val.length >= 2) {
-                                    const matches = lookupCategory(val, userParsedCatalog);
-                                    setCommittedCategorySuggestions(matches);
-                                    setShowCommittedCategorySuggestions(matches.length > 0);
-                                  } else {
-                                    setCommittedCategorySuggestions([]);
-                                    setShowCommittedCategorySuggestions(false);
-                                  }
-                                }}
-                                onFocus={() => {
-                                  if (committedEditState.wireDetails.length >= 2) {
-                                    const matches = lookupCategory(committedEditState.wireDetails, userParsedCatalog);
-                                    setCommittedCategorySuggestions(matches);
-                                    setShowCommittedCategorySuggestions(matches.length > 0);
-                                  }
-                                }}
-                                onBlur={() => setTimeout(() => setShowCommittedCategorySuggestions(false), 200)}
-                                className="h-7 text-xs uppercase"
-                                autoComplete="off"
-                                data-testid={`input-committed-category-${pin.id}`}
-                              />
-                              {showCommittedCategorySuggestions && committedCategorySuggestions.length > 0 && (
-                                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-36 overflow-y-auto" data-testid="committed-category-suggestions">
-                                  {committedCategorySuggestions.map((s) => (
-                                    <button
-                                      key={s.catalog}
-                                      type="button"
-                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
-                                      onMouseDown={(e) => { e.preventDefault(); applyCommittedCatalogMatch(s); }}
-                                      data-testid={`committed-suggestion-${s.catalog}`}
-                                    >
-                                      <span className="font-mono font-semibold">{s.catalog}</span>
-                                      {s.footage && <span className="text-orange-500 ml-1">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">Vendor Code:</label>
-                              <Input
-                                value={committedEditState.vendorCode}
-                                onChange={(e) => setCommittedEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
-                                className="h-7 text-xs uppercase"
-                                maxLength={3}
-                                list="vendor-code-suggestions-committed"
-                                data-testid={`input-committed-vendor-${pin.id}`}
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block">Footage ({uLabel}):</label>
-                                <Input
-                                  type="number"
-                                  value={committedEditState.footage}
-                                  onChange={(e) => setCommittedEditState(s => ({ ...s, footage: e.target.value }))}
-                                  className="h-7 text-xs"
-                                  data-testid={`input-committed-footage-${pin.id}`}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] font-medium text-muted-foreground mb-0.5 block"># Reels:</label>
-                                <Input
-                                  type="number"
-                                  value={committedEditState.reelCount}
-                                  onChange={(e) => setCommittedEditState(s => ({ ...s, reelCount: e.target.value }))}
-                                  min={1}
-                                  className="h-7 text-xs"
-                                  data-testid={`input-committed-reel-count-${pin.id}`}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex gap-2 pt-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 h-7 text-xs"
-                                onClick={() => setEditingCommittedPinId(null)}
-                                data-testid={`button-cancel-committed-edit-${pin.id}`}
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="flex-1 h-7 text-xs"
-                                onClick={saveCommittedPinEdit}
-                                data-testid={`button-save-committed-edit-${pin.id}`}
-                              >
-                                Save
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   );})}
                 </>
@@ -2944,6 +2830,130 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           </SheetContent>
         </Sheet>
       )}
+      <Sheet open={!!editingCommittedPinId} onOpenChange={(open) => {
+        if (!open) setEditingCommittedPinId(null);
+      }}>
+        <SheetContent
+          side="bottom"
+          className="bg-card border-t border-border p-4 overflow-y-auto"
+          style={{ maxHeight: "60vh" }}
+          data-testid="committed-pin-edit-sheet"
+        >
+          <div className="space-y-3 max-w-md mx-auto">
+            <div className="flex items-center gap-2 mb-1">
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">Edit Pin P{committedEditState.label}</span>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">Relabel Pin:</label>
+              <Input
+                value={committedEditState.label}
+                onChange={(e) => setCommittedEditState(s => ({ ...s, label: e.target.value }))}
+                className="h-8 text-sm font-mono"
+                data-testid="input-committed-relabel"
+              />
+            </div>
+            <div className="relative">
+              <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">Category:</label>
+              <Input
+                value={committedEditState.wireDetails}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setCommittedEditState(s => ({ ...s, wireDetails: val }));
+                  if (val.length >= 2) {
+                    const matches = lookupCategory(val, userParsedCatalog);
+                    setCommittedCategorySuggestions(matches);
+                    setShowCommittedCategorySuggestions(matches.length > 0);
+                  } else {
+                    setCommittedCategorySuggestions([]);
+                    setShowCommittedCategorySuggestions(false);
+                  }
+                }}
+                onFocus={() => {
+                  if (committedEditState.wireDetails.length >= 2) {
+                    const matches = lookupCategory(committedEditState.wireDetails, userParsedCatalog);
+                    setCommittedCategorySuggestions(matches);
+                    setShowCommittedCategorySuggestions(matches.length > 0);
+                  }
+                }}
+                onBlur={() => setTimeout(() => setShowCommittedCategorySuggestions(false), 200)}
+                className="h-8 text-sm uppercase"
+                autoComplete="off"
+                data-testid="input-committed-category"
+              />
+              {showCommittedCategorySuggestions && committedCategorySuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-36 overflow-y-auto" data-testid="committed-category-suggestions">
+                  {committedCategorySuggestions.map((s) => (
+                    <button
+                      key={s.catalog}
+                      type="button"
+                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                      onMouseDown={(e) => { e.preventDefault(); applyCommittedCatalogMatch(s); }}
+                      data-testid={`committed-suggestion-${s.catalog}`}
+                    >
+                      <span className="font-mono font-semibold">{s.catalog}</span>
+                      {s.footage && <span className="text-orange-500 ml-1">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">Vendor Code:</label>
+              <Input
+                value={committedEditState.vendorCode}
+                onChange={(e) => setCommittedEditState(s => ({ ...s, vendorCode: e.target.value.toUpperCase().slice(0, 3) }))}
+                className="h-8 text-sm uppercase"
+                maxLength={3}
+                list="vendor-code-suggestions-committed"
+                data-testid="input-committed-vendor"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">Footage ({uLabel}):</label>
+                <Input
+                  type="number"
+                  value={committedEditState.footage}
+                  onChange={(e) => setCommittedEditState(s => ({ ...s, footage: e.target.value }))}
+                  className="h-8 text-sm"
+                  data-testid="input-committed-footage"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block"># Reels:</label>
+                <Input
+                  type="number"
+                  value={committedEditState.reelCount}
+                  onChange={(e) => setCommittedEditState(s => ({ ...s, reelCount: e.target.value }))}
+                  min={1}
+                  className="h-8 text-sm"
+                  data-testid="input-committed-reel-count"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => setEditingCommittedPinId(null)}
+                data-testid="button-cancel-committed-edit"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 h-8"
+                onClick={saveCommittedPinEdit}
+                data-testid="button-save-committed-edit"
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
       <datalist id="vendor-code-suggestions-committed">
         {vendorCodes.map(code => (
           <option key={code} value={code} />
