@@ -341,6 +341,11 @@ function PhotoCard({
         <div className="text-[10px] font-mono font-semibold text-muted-foreground tracking-wide">
           {photoSeqLabel(photo)}
         </div>
+        {isDetail && linkReason && (
+          <div className="text-[11px] font-medium text-blue-600 dark:text-blue-400" data-testid={`text-link-reason-${photo.id}`}>
+            {linkReason}{linkedPinLabel ? ` · Pin ${linkedPinLabel}` : ""}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-1">
           <div>
             <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Aisle</label>
