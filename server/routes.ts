@@ -1944,6 +1944,14 @@ export async function registerRoutes(
       }
 
       const accentHex = "#ea580c";
+      const BLUE_SHADES_HEX = [
+        "#3B82F6",
+        "#38BDF8",
+        "#6366F1",
+        "#1D4ED8",
+        "#06B6D4",
+        "#8B5CF6",
+      ];
       const headerBg = "#f5f0eb";
       const borderColor = "#cccccc";
 
@@ -2183,7 +2191,8 @@ export async function registerRoutes(
         return y + headerHeight;
       };
 
-      const drawCommittedPin = (pin: any, imgX: number, imgY: number, imgW: number, imgH: number, _imgOrigW: number, pinScale: number) => {
+      const drawCommittedPin = (pin: any, imgX: number, imgY: number, imgW: number, imgH: number, _imgOrigW: number, pinScale: number, overrideColor?: string) => {
+        const pinColor = overrideColor || accentHex;
         const pinCenterX = imgX + (pin.xPercent / 100) * imgW;
         const pinCenterY = imgY + (pin.yPercent / 100) * imgH;
 
@@ -2199,7 +2208,7 @@ export async function registerRoutes(
 
         doc.save();
         doc.roundedRect(px, py, pw, ph, cornerR)
-          .strokeColor(accentHex)
+          .strokeColor(pinColor)
           .lineWidth(borderW)
           .stroke();
 
@@ -2235,7 +2244,7 @@ export async function registerRoutes(
             .lineTo(tabX, tabY + labelH)
             .lineTo(tabX, tabY + tabCornerR)
             .quadraticCurveTo(tabX, tabY, tabX + tabCornerR, tabY)
-            .fill(accentHex);
+            .fill(pinColor);
           doc.fillColor("#ffffff").fontSize(labelFontSize)
             .text(labelText, tabX + labelPadX, tabY + labelPadY, { lineBreak: false });
 
@@ -2250,7 +2259,7 @@ export async function registerRoutes(
               .lineTo(badgeX, tabY + labelH)
               .lineTo(badgeX, tabY + tabCornerR)
               .quadraticCurveTo(badgeX, tabY, badgeX + tabCornerR, tabY)
-              .fill(accentHex);
+              .fill(pinColor);
             doc.fillColor("#ffffff").fontSize(labelFontSize)
               .text(badgeText, badgeX + labelPadX, tabY + labelPadY, { lineBreak: false });
             doc.restore();
@@ -2445,7 +2454,8 @@ export async function registerRoutes(
           if (flaggedPinIds.has(pin.id)) {
             drawFlaggedPin(pin, imgX, y, w, h, pl.origW, pinScale);
           } else {
-            drawCommittedPin(pin, imgX, y, w, h, pl.origW, pinScale);
+            const shade = getPinColor(pin, pl.photo.id, pl.photo);
+            drawCommittedPin(pin, imgX, y, w, h, pl.origW, pinScale, shade);
           }
         }
 
@@ -2486,7 +2496,8 @@ export async function registerRoutes(
           if (flaggedPinIds.has(pin.id)) {
             drawFlaggedPin(pin, x, y, w, h, pl.origW, pinScale);
           } else {
-            drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale);
+            const shade = getPinColor(pin, pl.photo.id, pl.photo);
+            drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale, shade);
           }
         }
         doc.rect(x, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
@@ -2638,6 +2649,45 @@ export async function registerRoutes(
       });
       console.log(`[pdf] preloaded ${photoLayoutMap.size}/${allPhotosFlat.length} photos in ${Date.now() - tLoad}ms`);
 
+      const originalShadeMap = new Map<number, Map<string, number>>();
+      const detailShadeMap = new Map<number, number>();
+      for (const photo of allPhotosFlat) {
+        if (photo.isDetailShot || photo.parentPhotoId) continue;
+        const labels: string[] = [];
+        for (const dp of allPhotosFlat) {
+          if (dp.parentPhotoId === photo.id && dp.linkedPinLabel && !labels.includes(dp.linkedPinLabel)) {
+            labels.push(dp.linkedPinLabel);
+          }
+        }
+        if (labels.length === 0) continue;
+        labels.sort();
+        const shadeMap = new Map<string, number>();
+        labels.forEach((l, i) => shadeMap.set(l, i % BLUE_SHADES_HEX.length));
+        originalShadeMap.set(photo.id, shadeMap);
+      }
+      for (const photo of allPhotosFlat) {
+        if (!photo.isDetailShot || !photo.parentPhotoId) continue;
+        const parentShades = originalShadeMap.get(photo.parentPhotoId);
+        if (parentShades && photo.linkedPinLabel) {
+          const idx = parentShades.get(photo.linkedPinLabel);
+          if (idx !== undefined) detailShadeMap.set(photo.id, idx);
+        }
+      }
+
+      const getPinColor = (pin: any, photoId: number, photo: any): string | undefined => {
+        const parentShades = originalShadeMap.get(photoId);
+        if (parentShades && pin.label) {
+          const labelStr = String(pin.label);
+          const shadeIdx = parentShades.get(labelStr);
+          if (shadeIdx !== undefined) return BLUE_SHADES_HEX[shadeIdx];
+        }
+        if (photo.isDetailShot && photo.parentPhotoId) {
+          const dIdx = detailShadeMap.get(photoId);
+          if (dIdx !== undefined) return BLUE_SHADES_HEX[dIdx];
+        }
+        return undefined;
+      };
+
       let tocSecIdx = 0;
       for (const sec of sortedSections) {
         const allPhotos = sec.photos || [];
@@ -2769,7 +2819,8 @@ export async function registerRoutes(
             if (flaggedPinIds.has(pin.id)) {
               drawFlaggedPin(pin, x, y, w, h, pl.origW, pinScale);
             } else {
-              drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale);
+              const shade = getPinColor(pin, pl.photo.id, pl.photo);
+              drawCommittedPin(pin, x, y, w, h, pl.origW, pinScale, shade);
             }
           }
           doc.rect(x, y, w, h).strokeColor(borderColor).lineWidth(0.5).stroke();
@@ -3081,7 +3132,8 @@ export async function registerRoutes(
             const pinScale = pl.photo.pinScale || 1;
             for (const cp of committedPins) {
               if (cp.id === item.pin.id) continue;
-              drawCommittedPin(cp, tableLeft, currentY, w, h, pl.origW, pinScale);
+              const shade = getPinColor(cp, pl.photo.id, pl.photo);
+              drawCommittedPin(cp, tableLeft, currentY, w, h, pl.origW, pinScale, shade);
             }
 
             drawFlaggedPin(item.pin, tableLeft, currentY, w, h, pl.origW, pinScale);
@@ -3154,7 +3206,16 @@ export async function registerRoutes(
         }
       }
 
-      const categoryMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
+      const entryBlueShadeMap = new Map<number, string>();
+      for (const pin of Array.from(allPinsMap.values()).flat()) {
+        if (!pin.entryId) continue;
+        const photo = allPhotosFlat.find((p: any) => p.id === pin.photoId);
+        if (!photo || !photo.isDetailShot || !photo.parentPhotoId) continue;
+        const color = getPinColor(pin, photo.id, photo);
+        if (color) entryBlueShadeMap.set(pin.entryId, color);
+      }
+
+      const categoryMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: { text: string; color?: string }[] }>();
       for (const e of activeEntries) {
         const cat = e.reelTag || e.wireType || "Uncategorized";
         const vendor = e.manufacturer || "";
@@ -3163,16 +3224,17 @@ export async function registerRoutes(
         const pinLabel = entryPinLabelMap.get(e.id);
         const locParts = [e.aisle, e.section, pinLabel].filter(Boolean);
         const loc = locParts.join("-");
+        const locColor = entryBlueShadeMap.get(e.id);
         if (existing) {
           existing.totalFootage += (e.footage || 0);
           existing.reelCount += (e.reelCount || 1);
-          if (loc) existing.locations.push(loc);
+          if (loc) existing.locations.push({ text: loc, color: locColor });
         } else {
           categoryMap.set(groupKey, {
             vendorCode: vendor,
             totalFootage: e.footage || 0,
             reelCount: e.reelCount || 1,
-            locations: loc ? [loc] : [],
+            locations: loc ? [{ text: loc, color: locColor }] : [],
           });
         }
       }
@@ -3285,7 +3347,7 @@ export async function registerRoutes(
           altIdx = 0;
         }
 
-        const locText = cat.locations.join(", ");
+        const locText = cat.locations.map((l: { text: string }) => l.text).join(", ");
         doc.font('Helvetica').fontSize(6.5);
         const locH = locText ? doc.heightOfString(locText, { width: sumScaled[4].width - 6 }) : 0;
         const actualRowH = Math.max(rowH, locH + 8);
@@ -3302,7 +3364,7 @@ export async function registerRoutes(
           cat.vendorCode,
           String(cat.reelCount),
           `${fmtFootage(cat.totalFootage)} ${pdfULabel}`,
-          locText,
+          "",
         ];
         const aligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
         for (let j = 0; j < sumScaled.length; j++) {
@@ -3311,7 +3373,25 @@ export async function registerRoutes(
             : currentY + 4;
           if (j === 3) doc.font('Helvetica-Bold');
           if (j === 4) {
-            doc.text(vals[j], x + 3, cellY, { width: sumScaled[j].width - 6, lineBreak: true, height: actualRowH - 8 });
+            const locCellX = x + 3;
+            const locCellW = sumScaled[j].width - 6;
+            const locCellY = cellY;
+            let locDrawX = locCellX;
+            let locDrawY = locCellY;
+            const locLineH = 7.5;
+            doc.font('Helvetica').fontSize(6.5);
+            for (let li = 0; li < cat.locations.length; li++) {
+              const locItem = cat.locations[li];
+              const segment = li < cat.locations.length - 1 ? `${locItem.text}, ` : locItem.text;
+              doc.fillColor(locItem.color || "#333333");
+              const segW = doc.widthOfString(segment);
+              if (locDrawX + segW > locCellX + locCellW && locDrawX > locCellX) {
+                locDrawX = locCellX;
+                locDrawY += locLineH;
+              }
+              doc.text(segment, locDrawX, locDrawY, { lineBreak: false, continued: false });
+              locDrawX += segW;
+            }
           } else {
             doc.text(vals[j], x + 3, cellY, { width: sumScaled[j].width - 6, lineBreak: false, align: aligns[j] });
           }
