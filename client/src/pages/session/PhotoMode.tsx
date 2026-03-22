@@ -293,6 +293,20 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const displayedPhotoIdx = viewingNearbyIdx !== null ? viewingNearbyIdx : currentPhotoIdx;
   const displayedPhoto = uploadedPhotos[displayedPhotoIdx];
   const photoSrc = displayedPhoto?.url || currentPhoto?.url || "";
+
+  const linkedPinLabelsForPhoto = useMemo(() => {
+    const labels = new Set<string>();
+    const photoDbId = displayedPhoto?.dbId;
+    if (!photoDbId) return labels;
+    if (displayedPhoto?.isDetailShot) return labels;
+    for (const p of photos) {
+      if (p.parentPhotoId === photoDbId && p.linkedPinLabel) {
+        labels.add(p.linkedPinLabel);
+      }
+    }
+    return labels;
+  }, [photos, displayedPhoto?.dbId, displayedPhoto?.isDetailShot]);
+  const isDisplayedPhotoDetail = displayedPhoto?.isDetailShot || false;
   const photoLoaded = photoLoadedKey === photoSrc;
 
   useEffect(() => {
@@ -1764,10 +1778,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       </div>
                     </div>
                   ))}
-                  {photoLoaded && pinsVisible && committedPins.map((pin) => (
+                  {photoLoaded && pinsVisible && committedPins.map((pin) => {
+                    const isPinLinked = isDisplayedPhotoDetail || linkedPinLabelsForPhoto.has(pin.label);
+                    return (
                     <div
                       key={pin.id}
-                      className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}${highlightedCommittedPinDbId && pin.dbId === highlightedCommittedPinDbId ? " pin-highlight-pulse" : ""}`}
+                      className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}${highlightedCommittedPinDbId && pin.dbId === highlightedCommittedPinDbId ? " pin-highlight-pulse" : ""}${isPinLinked ? " pin-linked" : ""}`}
                       style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                       data-testid={`pin-committed-${pin.id}`}
                     >
@@ -1802,7 +1818,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         )}
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </>
               ) : (
                 <>

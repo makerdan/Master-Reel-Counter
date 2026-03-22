@@ -546,6 +546,15 @@
   pointer-events: none;
   font-family: 'JetBrains Mono', monospace;
 }
+.pin-marker.committed.pin-linked {
+  border-color: rgba(59, 130, 246, 1);
+}
+.pin-marker.committed.pin-linked .pin-label {
+  background: rgba(59, 130, 246, 1);
+}
+.pin-marker.committed.pin-linked .pin-reel-badge {
+  background: rgba(59, 130, 246, 1);
+}
 .pin-marker.dragging {
   cursor: grabbing;
   transform: translate(-50%, -50%) scale(calc(var(--pin-scale, 1) * 1.12));
