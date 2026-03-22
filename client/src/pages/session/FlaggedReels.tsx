@@ -396,14 +396,14 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   });
 
   const savePinMutation = useMutation({
-    mutationFn: async ({ pinId, entryId, photoId, photoAisle, photoSection, data }: {
+    mutationFn: async ({ pinId, entryId, photoId, photoAisle, photoSection, data, resolve }: {
       pinId: number; entryId: number | null; photoId: number;
-      photoAisle: string | null; photoSection: string | null; data: EditingState;
+      photoAisle: string | null; photoSection: string | null; data: EditingState; resolve?: boolean;
     }) => {
       const displayFootage = data.footage ? Number(data.footage) : null;
       const parsedFootage = displayFootage !== null && Number.isFinite(displayFootage) ? toBaseFeet(displayFootage, currentUnit) : null;
       const parsedReelCount = data.reelCount ? parseInt(data.reelCount) : 1;
-      const resolving = data.wireDetails.trim().length > 0;
+      const resolving = !!resolve;
 
       await apiRequest("PATCH", `/api/pins/${pinId}`, {
         wireDetails: data.wireDetails || null,
@@ -460,7 +460,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       if (resolved) {
         toast({ title: "Resolved", description: "Reel details saved and flag removed." });
       } else {
-        toast({ title: "Details saved", description: "Fill in wire category to fully resolve." });
+        toast({ title: "Details saved", description: "Reel data updated. Fill all fields to resolve flag." });
       }
     },
     onError: () => {
@@ -883,11 +883,11 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                                 key={dp.id}
                                 type="button"
                                 className="relative w-16 h-16 rounded overflow-hidden border-2 border-blue-400 cursor-pointer hover:border-blue-300 hover:shadow-lg shrink-0 transition-all"
-                                onClick={() => setPreviewPhotoUrl(`/api/photos/${dp.id}/image`)}
+                                onClick={() => setPreviewPhotoUrl(photoUrl(dp.objectStorageKey))}
                                 data-testid={`detail-thumb-desktop-${dp.id}`}
                                 title={`${dp.linkReason || "Detail"} — click to enlarge`}
                               >
-                                <img src={`/api/photos/${dp.id}/image`} alt="detail" className="w-full h-full object-cover" />
+                                <img src={photoUrl(dp.objectStorageKey)} alt="detail" className="w-full h-full object-cover" />
                                 <span className="absolute bottom-0 left-0 right-0 bg-blue-600/90 text-white text-[7px] text-center leading-3 py-px truncate px-0.5">{dp.linkReason || "Detail"}</span>
                               </button>
                             ))}
@@ -1032,8 +1032,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             data-testid={`input-flag-reason-${pin.id}`}
                           />
                         </div>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
                           <Button
+                            variant="outline"
                             size="sm"
                             onClick={() => savePinMutation.mutate({
                               pinId: pin.id,
@@ -1046,14 +1047,28 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             disabled={savePinMutation.isPending}
                             data-testid={`button-save-edit-${pin.id}`}
                           >
-                            {savePinMutation.isPending
-                              ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              : editState.wireDetails.trim()
-                                ? <CheckCircle2 className="h-4 w-4 mr-1" />
-                                : <Save className="h-4 w-4 mr-1" />
-                            }
-                            {editState.wireDetails.trim() ? "Save & Resolve" : "Save Details"}
+                            {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                            Save Details
                           </Button>
+                          {editState.wireDetails.trim() && editState.vendorCode.trim() && editState.footage.trim() && editState.reelCount.trim() && (
+                            <Button
+                              size="sm"
+                              onClick={() => savePinMutation.mutate({
+                                pinId: pin.id,
+                                entryId: pin.entryId,
+                                photoId: group.photoId,
+                                photoAisle: group.photoAisle,
+                                photoSection: group.photoSection,
+                                data: editState,
+                                resolve: true,
+                              })}
+                              disabled={savePinMutation.isPending}
+                              data-testid={`button-save-resolve-${pin.id}`}
+                            >
+                              {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                              Save &amp; Resolve Flag
+                            </Button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1113,11 +1128,11 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               key={dp.id}
                               type="button"
                               className="relative w-16 h-16 rounded overflow-hidden border-2 border-blue-400 cursor-pointer active:border-blue-300 shrink-0"
-                              onClick={() => setPreviewPhotoUrl(`/api/photos/${dp.id}/image`)}
+                              onClick={() => setPreviewPhotoUrl(photoUrl(dp.objectStorageKey))}
                               data-testid={`detail-thumb-mobile-${dp.id}`}
                               title={`${dp.linkReason || "Detail"} — tap to enlarge`}
                             >
-                              <img src={`/api/photos/${dp.id}/image`} alt="detail" className="w-full h-full object-cover" />
+                              <img src={photoUrl(dp.objectStorageKey)} alt="detail" className="w-full h-full object-cover" />
                               <span className="absolute bottom-0 left-0 right-0 bg-blue-600/90 text-white text-[7px] text-center leading-3 py-px truncate px-0.5">{dp.linkReason || "Detail"}</span>
                             </button>
                           ))}
@@ -1258,8 +1273,9 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               data-testid={`input-flag-reason-mobile-${pin.id}`}
                             />
                           </div>
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-2 flex-wrap">
                             <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => savePinMutation.mutate({
                                 pinId: pin.id,
@@ -1272,14 +1288,28 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                               disabled={savePinMutation.isPending}
                               data-testid={`button-save-edit-mobile-${pin.id}`}
                             >
-                              {savePinMutation.isPending
-                                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                : editState.wireDetails.trim()
-                                  ? <CheckCircle2 className="h-4 w-4 mr-1" />
-                                  : <Save className="h-4 w-4 mr-1" />
-                              }
-                              {editState.wireDetails.trim() ? "Save & Resolve" : "Save Details"}
+                              {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                              Save Details
                             </Button>
+                            {editState.wireDetails.trim() && editState.vendorCode.trim() && editState.footage.trim() && editState.reelCount.trim() && (
+                              <Button
+                                size="sm"
+                                onClick={() => savePinMutation.mutate({
+                                  pinId: pin.id,
+                                  entryId: pin.entryId,
+                                  photoId: group.photoId,
+                                  photoAisle: group.photoAisle,
+                                  photoSection: group.photoSection,
+                                  data: editState,
+                                  resolve: true,
+                                })}
+                                disabled={savePinMutation.isPending}
+                                data-testid={`button-save-resolve-mobile-${pin.id}`}
+                              >
+                                {savePinMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+                                Save &amp; Resolve Flag
+                              </Button>
+                            )}
                           </div>
                         </div>
                       )}
