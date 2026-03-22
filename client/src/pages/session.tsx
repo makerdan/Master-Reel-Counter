@@ -190,6 +190,7 @@ function SessionWorkspace({
   const [stripScrollToPhotoId, setStripScrollToPhotoId] = useState<number | null>(null);
   const syncedPhotoIdRef = useRef<number | null>(null);
   const lastPhotoModePhotoIdRef = useRef<number | null>(null);
+  const photoModeFlushRef = useRef<(() => Promise<void>) | null>(null);
   const [editName, setEditName] = useState(session.name);
   const [editLocation, setEditLocation] = useState(session.location || "");
   const [editDescription, setEditDescription] = useState((session as any).description || "");
@@ -382,8 +383,15 @@ function SessionWorkspace({
   const stdFetchRef  = useRef<Promise<Blob | null> | null>(null);
   const unpinnedEntries = entries.filter(e => !pinByEntryId.has(e.id));
 
+  const flushBeforeExport = async () => {
+    try {
+      if (photoModeFlushRef.current) await photoModeFlushRef.current();
+    } catch {}
+  };
+
   const doExportExcel = async () => {
     try {
+      await flushBeforeExport();
       const params = new URLSearchParams();
       if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
       const url = `/api/sessions/${sessionId}/export/excel?${params}`;
@@ -444,7 +452,8 @@ function SessionWorkspace({
     fullFetchRef.current = null; stdFetchRef.current = null;
   };
 
-  const openQualityDialogDirect = () => {
+  const openQualityDialogDirect = async () => {
+    await flushBeforeExport();
     abortPdfFetches();
     setPdfQualityOpen(true);
     startPdfFetch("full");
@@ -493,6 +502,7 @@ function SessionWorkspace({
   const doExportPdf = async () => {
     const quality = (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full";
     setIsPdfExporting(true);
+    await flushBeforeExport();
     try {
       const res = await fetch(buildPdfUrl(quality), { credentials: "include" });
       if (!res.ok) {
@@ -770,7 +780,7 @@ function SessionWorkspace({
               </TabsContent>
 
               <TabsContent value="photo">
-                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} onJumpToStripPhoto={(photoId) => { setStripScrollToPhotoId(photoId); setMode("strip"); }} />
+                <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} onJumpToStripPhoto={(photoId) => { setStripScrollToPhotoId(photoId); setMode("strip"); }} flushRef={photoModeFlushRef} />
               </TabsContent>
 
               <TabsContent value="flagged">
@@ -1027,7 +1037,7 @@ function SessionWorkspace({
                 setExportWarningOpen(false);
                 const type = pendingExportType;
                 setPendingExportType(null);
-                if (type === "pdf") openQualityDialogDirect();
+                if (type === "pdf") await openQualityDialogDirect();
                 else if (type === "excel") await doExportExcel();
               }}
             >

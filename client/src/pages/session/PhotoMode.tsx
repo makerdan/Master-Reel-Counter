@@ -57,7 +57,7 @@ function getScanPanelStorageKey(sessionId: number) {
 
 type OnlineUser = { userId: string; username: string };
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto, flushRef }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void; flushRef?: React.MutableRefObject<(() => Promise<void>) | null> }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -485,6 +485,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     } catch {
     }
   }, [uploadedPhotos, currentPhotoIdx]);
+
+  useEffect(() => {
+    if (flushRef) flushRef.current = flushSavePins;
+    return () => { if (flushRef) flushRef.current = null; };
+  }, [flushRef, flushSavePins]);
 
   const applyPins = useCallback((dbPins: Pin[]) => {
     const draftPins = dbPins.filter(p => !p.entryId);
