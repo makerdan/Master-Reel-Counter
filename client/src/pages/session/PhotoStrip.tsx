@@ -6,8 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { formatPinLabel, generateDetailPinLabel, isDSuffixLabel } from "./utils";
 import type { Photo, Pin } from "@shared/schema";
 
 function photoUrl(key: string): string {
@@ -113,6 +118,8 @@ function PhotoCard({
   const [customReasonOpen, setCustomReasonOpen] = useState(false);
   const [customReasonText, setCustomReasonText] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [relabelLinkDialog, setRelabelLinkDialog] = useState<{ parentPinLabel: string; pinsToRelabel: Pin[]; linkParams: { parentId: number; reason: string; pinLabel: string } } | null>(null);
+  const [relabelUnlinkDialog, setRelabelUnlinkDialog] = useState<{ pinsToRelabel: Pin[] } | null>(null);
   const aisleRef = useRef(aisle);
   const sectionRef = useRef(section);
   const notesRef = useRef(notes);
@@ -153,6 +160,33 @@ function PhotoCard({
     onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
   });
 
+  const invalidatePins = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/photos", String(photo.id), "pins"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
+  };
+
+  const relabelPins = async (pinIds: number[], newLabels: string[]) => {
+    for (let i = 0; i < pinIds.length; i++) {
+      await apiRequest("PATCH", `/api/pins/${pinIds[i]}`, { label: newLabels[i] });
+    }
+  };
+
+  const getNextSequentialLabels = async (count: number): Promise<string[]> => {
+    const res = await apiRequest("GET", `/api/sessions/${sessionId}/pins`);
+    const allSessionPins: { label?: string | null }[] = await res.json();
+    let maxNum = allSessionPins.reduce((m, p) => {
+      const n = parseInt(p.label || "0", 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+    const labels: string[] = [];
+    for (let i = 0; i < count; i++) {
+      maxNum++;
+      labels.push(String(maxNum).padStart(3, "0"));
+    }
+    return labels;
+  };
+
   const unlinkMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("PATCH", `/api/photos/${photo.id}`, { parentPhotoId: null, isDetailShot: false, linkReason: null, linkedPinLabel: null });
@@ -166,6 +200,34 @@ function PhotoCard({
     },
     onError: () => toast({ title: "Failed to unlink photo", variant: "destructive" }),
   });
+
+  const handleUnlink = async () => {
+    const photoPins = pins.filter(p => isDSuffixLabel(p.label || ""));
+    if (photoPins.length > 0) {
+      setRelabelUnlinkDialog({ pinsToRelabel: photoPins });
+    } else {
+      unlinkMutation.mutate();
+    }
+  };
+
+  const confirmUnlinkRelabel = async (doRelabel: boolean) => {
+    const dialog = relabelUnlinkDialog;
+    setRelabelUnlinkDialog(null);
+    try {
+      await unlinkMutation.mutateAsync();
+      if (doRelabel && dialog) {
+        try {
+          const newLabels = await getNextSequentialLabels(dialog.pinsToRelabel.length);
+          await relabelPins(dialog.pinsToRelabel.map(p => p.id), newLabels);
+          invalidatePins();
+        } catch {
+          toast({ title: "Failed to relabel pins", variant: "destructive" });
+        }
+      }
+    } catch {
+      toast({ title: "Failed to unlink photo", variant: "destructive" });
+    }
+  };
 
   const linkMutation = useMutation({
     mutationFn: async (params: { parentId: number; reason: string; pinLabel: string }) => {
@@ -189,6 +251,43 @@ function PhotoCard({
     },
     onError: () => toast({ title: "Failed to link photo", variant: "destructive" }),
   });
+
+  const handleLink = (params: { parentId: number; reason: string; pinLabel: string }) => {
+    const photoPins = pins.filter(p => p.label);
+    if (params.pinLabel && photoPins.length > 0) {
+      const hasNonDSuffix = photoPins.some(p => !isDSuffixLabel(p.label || ""));
+      if (hasNonDSuffix) {
+        setRelabelLinkDialog({ parentPinLabel: params.pinLabel, pinsToRelabel: photoPins, linkParams: params });
+        return;
+      }
+    }
+    linkMutation.mutate(params);
+  };
+
+  const confirmLinkRelabel = async (doRelabel: boolean) => {
+    const dialog = relabelLinkDialog;
+    setRelabelLinkDialog(null);
+    if (!dialog) return;
+    try {
+      await linkMutation.mutateAsync(dialog.linkParams);
+      if (doRelabel) {
+        try {
+          const existingLabels: string[] = [];
+          const newLabels = dialog.pinsToRelabel.map(p => {
+            const label = generateDetailPinLabel(dialog.parentPinLabel, existingLabels);
+            existingLabels.push(label);
+            return label;
+          });
+          await relabelPins(dialog.pinsToRelabel.map(p => p.id), newLabels);
+          invalidatePins();
+        } catch {
+          toast({ title: "Failed to relabel pins", variant: "destructive" });
+        }
+      }
+    } catch {
+      toast({ title: "Failed to link photo", variant: "destructive" });
+    }
+  };
 
   const handleAisleBlur = () => {
     if (aisle !== aisleRef.current) {
@@ -246,7 +345,7 @@ function PhotoCard({
     : "Linked";
 
   const linkBadgeText = (() => {
-    const pinRef = linkedPinLabel ? `P${String(linkedPinLabel).padStart(3, "0")}` : "";
+    const pinRef = linkedPinLabel ? formatPinLabel(linkedPinLabel) : "";
     if (linkReason === "Close-up" && pinRef) return `Close-up of ${pinRef}`;
     if (linkReason === "Close-up") return "Close-up";
     if (linkReason === "Re-shoot for flag" && pinRef) return `Re-shoot for Flag · ${pinRef}`;
@@ -410,7 +509,7 @@ function PhotoCard({
             <span className="inline-flex items-center gap-0.5">
               <span
                 className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0 h-4 rounded border font-medium ${linkBadgeColor}`}
-                title={`Linked to: ${parentLabel}${linkReason ? ` (${linkReason})` : ""}${linkedPinLabel ? ` · Pin ${linkedPinLabel}` : ""}`}
+                title={`Linked to: ${parentLabel}${linkReason ? ` (${linkReason})` : ""}${linkedPinLabel ? ` · Pin ${formatPinLabel(linkedPinLabel)}` : ""}`}
                 data-testid={`badge-link-info-${photo.id}`}
               >
                 <Link2 className="h-2.5 w-2.5" />
@@ -419,7 +518,7 @@ function PhotoCard({
               {canEdit && (
                 <button
                   className="text-muted-foreground hover:text-destructive transition-colors"
-                  onClick={() => unlinkMutation.mutate()}
+                  onClick={() => handleUnlink()}
                   disabled={unlinkMutation.isPending}
                   title="Unlink from parent"
                   data-testid={`button-strip-unlink-${photo.id}`}
@@ -493,7 +592,7 @@ function PhotoCard({
 
         {isDetail && linkReason && (
           <div className="text-[11px] font-medium text-blue-600 dark:text-blue-400" data-testid={`text-link-reason-${photo.id}`}>
-            {linkReason}{linkedPinLabel ? ` · Pin ${linkedPinLabel}` : ""}
+            {linkReason}{linkedPinLabel ? ` · Pin ${formatPinLabel(linkedPinLabel)}` : ""}
           </div>
         )}
 
@@ -534,7 +633,7 @@ function PhotoCard({
                       <option value="">No specific pin</option>
                       {parentPinsForLink.map((pin) => (
                         <option key={pin.id} value={pin.label!}>
-                          P{String(pin.label).padStart(3, "0")}
+                          {formatPinLabel(pin.label!)}
                         </option>
                       ))}
                     </select>
@@ -597,7 +696,7 @@ function PhotoCard({
                   </button>
                   <button
                     className="text-sm font-semibold text-white bg-primary hover:bg-primary/80 disabled:opacity-50 rounded px-4 py-1.5"
-                    onClick={() => linkMutation.mutate({ parentId: selectedParentForLink, reason: linkReason, pinLabel: linkedPinLabel })}
+                    onClick={() => handleLink({ parentId: selectedParentForLink!, reason: linkReason, pinLabel: linkedPinLabel })}
                     disabled={linkMutation.isPending}
                     data-testid={`button-strip-confirm-link-${photo.id}`}
                   >
@@ -630,6 +729,60 @@ function PhotoCard({
           />
         )}
       </div>
+
+      <AlertDialog open={!!relabelLinkDialog} onOpenChange={(open) => { if (!open) setRelabelLinkDialog(null); }}>
+        <AlertDialogContent data-testid={`dialog-relabel-link-${photo.id}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Relabel pins?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {relabelLinkDialog && (() => {
+                const existingLabels: string[] = [];
+                const newLabels = relabelLinkDialog.pinsToRelabel.map(p => {
+                  const label = generateDetailPinLabel(relabelLinkDialog.parentPinLabel, existingLabels);
+                  existingLabels.push(label);
+                  return label;
+                });
+                return relabelLinkDialog.pinsToRelabel.map((p, i) => (
+                  <span key={p.id} className="block">
+                    {formatPinLabel(p.label || "")} will be renamed to {formatPinLabel(newLabels[i])}
+                  </span>
+                ));
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => confirmLinkRelabel(false)} data-testid={`button-relabel-link-cancel-${photo.id}`}>
+              Keep current labels
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmLinkRelabel(true)} data-testid={`button-relabel-link-confirm-${photo.id}`}>
+              Relabel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!relabelUnlinkDialog} onOpenChange={(open) => { if (!open) setRelabelUnlinkDialog(null); }}>
+        <AlertDialogContent data-testid={`dialog-relabel-unlink-${photo.id}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Relabel pins?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {relabelUnlinkDialog && relabelUnlinkDialog.pinsToRelabel.map(p => (
+                <span key={p.id} className="block">
+                  {formatPinLabel(p.label || "")} will be renamed to a sequential number
+                </span>
+              ))}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => confirmUnlinkRelabel(false)} data-testid={`button-relabel-unlink-cancel-${photo.id}`}>
+              Keep current labels
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmUnlinkRelabel(true)} data-testid={`button-relabel-unlink-confirm-${photo.id}`}>
+              Relabel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

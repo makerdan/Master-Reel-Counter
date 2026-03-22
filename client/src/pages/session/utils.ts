@@ -1,3 +1,39 @@
+export function formatPinLabel(label: string): string {
+  if (/^\d+$/.test(label)) {
+    return `P${label.padStart(3, "0")}`;
+  }
+  const m = label.match(/^(\d+)(d\d*)?$/);
+  if (m) {
+    return `P${m[1].padStart(3, "0")}${m[2] || ""}`;
+  }
+  return `P${label}`;
+}
+
+export function isDSuffixLabel(label: string): boolean {
+  return /^\d+d\d*$/.test(label);
+}
+
+export function generateDetailPinLabel(parentPinLabel: string, existingLabels: string[]): string {
+  const parentNum = parentPinLabel.replace(/^0+/, "") || "0";
+  const paddedParent = parentPinLabel.padStart(3, "0");
+  const baseLabel = `${paddedParent}d`;
+  const existing = existingLabels.filter(l => {
+    const m = l.match(/^(\d+)d(\d*)$/);
+    if (!m) return false;
+    return m[1].replace(/^0+/, "") === parentNum || m[1] === paddedParent;
+  });
+  if (existing.length === 0) {
+    return baseLabel;
+  }
+  const nums = existing.map(l => {
+    const m = l.match(/^(\d+)d(\d*)$/);
+    if (!m) return 0;
+    return m[2] ? parseInt(m[2], 10) : 0;
+  });
+  const maxNum = Math.max(...nums);
+  return `${paddedParent}d${maxNum + 1}`;
+}
+
 export const VENDOR_CODE_MAP: Record<string, string[]> = {
   COP: ["THHN", "TC", "RX", "UF", "BARE"],
   ALU: ["XHHW", "URD", "TRIPLEX", "MHF"],

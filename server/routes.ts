@@ -26,6 +26,17 @@ import { cropPhoto } from "./lib/cropPhoto";
 import ExcelJS from "exceljs";
 import { openai } from "./replit_integrations/image/client";
 
+function formatPinLabel(label: string): string {
+  if (/^\d+$/.test(label)) {
+    return `P${label.padStart(3, "0")}`;
+  }
+  const m = label.match(/^(\d+)(d\d*)?$/);
+  if (m) {
+    return `P${m[1].padStart(3, "0")}${m[2] || ""}`;
+  }
+  return `P${label}`;
+}
+
 const sessionRooms = new Map<number, Set<WebSocket>>();
 const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null }>();
 
@@ -2218,7 +2229,7 @@ export async function registerRoutes(
           const labelPadY = Math.max(0.5, 1 * sf);
           const tabCornerR = Math.max(0.5, 3 * sf);
 
-          const labelText = `P${pin.label}`;
+          const labelText = formatPinLabel(String(pin.label));
           doc.font('Helvetica-Bold').fontSize(labelFontSize);
           const labelTextW = doc.widthOfString(labelText);
           const labelW = labelTextW + labelPadX * 2;
@@ -2297,7 +2308,7 @@ export async function registerRoutes(
           const labelPadY = Math.max(0.5, 1 * sf);
           const tabCornerR = Math.max(0.5, 3 * sf);
 
-          const labelText = `P${pin.label}`;
+          const labelText = formatPinLabel(String(pin.label));
           doc.font('Helvetica-Bold').fontSize(labelFontSize);
           const labelTextW = doc.widthOfString(labelText);
           const labelW = labelTextW + labelPadX * 2;
@@ -2521,7 +2532,7 @@ export async function registerRoutes(
         for (const e of entries) {
           const entryLines: { text: string; fontSize: number; color: string; font: string; indent: boolean }[] = [];
           const pinLabel = photoPins.find((p: any) => p.entryId === e.id)?.label;
-          const header = pinLabel ? `P${String(pinLabel).padStart(3, "0")} — ${e.reelTag || e.wireType || "Entry"}` : (e.reelTag || e.wireType || "Entry");
+          const header = pinLabel ? `${formatPinLabel(String(pinLabel))} — ${e.reelTag || e.wireType || "Entry"}` : (e.reelTag || e.wireType || "Entry");
           entryLines.push({ text: header, fontSize: 6.5, color: accentHex, font: 'Helvetica-Bold', indent: false });
 
           const details: string[] = [];
@@ -2836,7 +2847,7 @@ export async function registerRoutes(
             const parentPh = allPhotosFlat.find((p: any) => p.id === pl.photo.parentPhotoId);
             const parentName = parentPh?.originalFilename || `Photo ${pl.photo.parentPhotoId}`;
             const reason = pl.photo.linkReason || "Detail";
-            const pinRef = pl.photo.linkedPinLabel ? `P${String(pl.photo.linkedPinLabel).padStart(3, "0")}` : "";
+            const pinRef = pl.photo.linkedPinLabel ? formatPinLabel(String(pl.photo.linkedPinLabel)) : "";
             const reasonParts = [reason];
             if (pinRef) reasonParts.push(`of ${pinRef}`);
             detailLabel = `Detail: ${reasonParts.join(" ")} (from ${parentName})`;
@@ -2859,7 +2870,7 @@ export async function registerRoutes(
             const entryPinMap = new Map<number, string>();
             for (const pin of photoPins) {
               if (pin.entryId && pin.label) {
-                entryPinMap.set(pin.entryId, `P${String(pin.label).padStart(3, "0")}`);
+                entryPinMap.set(pin.entryId, formatPinLabel(String(pin.label)));
               }
             }
             let augmentedEntries = photoEntries;
@@ -2946,7 +2957,7 @@ export async function registerRoutes(
             const entryPinMap = new Map<number, string>();
             for (const pin of photoPins) {
               if (pin.entryId && pin.label) {
-                entryPinMap.set(pin.entryId, `P${String(pin.label).padStart(3, "0")}`);
+                entryPinMap.set(pin.entryId, formatPinLabel(String(pin.label)));
               }
             }
             tblEndY = drawEntriesTable(item.entries, tblX, tblW, y, 5.5, 14, entryPinMap.size > 0 ? entryPinMap : undefined);
@@ -3097,7 +3108,7 @@ export async function registerRoutes(
           const a = item.photo?.aisle || "—";
           const s = item.photo?.section || "—";
           const aisleDisplay = a.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${a}`;
-          const pinLabel = item.pin.label ? `P${String(item.pin.label).padStart(3, "0")}` : "P???";
+          const pinLabel = item.pin.label ? formatPinLabel(String(item.pin.label)) : "P???";
 
           doc.rect(tableLeft, currentY, pageWidth, 18).fill("#e8e0d8");
           doc.fontSize(9).fillColor(accentHex).text(
@@ -3201,7 +3212,7 @@ export async function registerRoutes(
       for (const [, pins] of allPinsMap) {
         for (const pin of pins) {
           if (pin.entryId && pin.label) {
-            entryPinLabelMap.set(pin.entryId, `P${String(pin.label).padStart(3, "0")}`);
+            entryPinLabelMap.set(pin.entryId, formatPinLabel(String(pin.label)));
           }
         }
       }
@@ -3726,7 +3737,7 @@ export async function registerRoutes(
 
       const writeEntryRow = (e: any, isFlagged: boolean, altShade: boolean) => {
         const pin = entryPinMap.get(e.id);
-        const pinLabel = pin?.label ? `P${String(pin.label).padStart(3, "0")}` : "";
+        const pinLabel = pin?.label ? formatPinLabel(String(pin.label)) : "";
         const flagPin = isFlagged ? allFlaggedPins.find((fp: any) => fp.entryId === e.id) : null;
         let detailOfText = "";
         if (e.photoId) {
@@ -3734,7 +3745,7 @@ export async function registerRoutes(
           if (detailInfo) {
             const parts: string[] = [];
             if (detailInfo.reason) parts.push(detailInfo.reason);
-            if (detailInfo.pinLabel) parts.push(`of P${String(detailInfo.pinLabel).padStart(3, "0")}`);
+            if (detailInfo.pinLabel) parts.push(`of ${formatPinLabel(String(detailInfo.pinLabel))}`);
             detailOfText = parts.length > 0 ? parts.join(" ") : "Detail shot";
           }
         }
@@ -3867,7 +3878,7 @@ export async function registerRoutes(
         const groupKey = `${cat}|||${vendor}`;
         const existing = categoryMap.get(groupKey);
         const pin = entryPinMap.get(e.id);
-        const pinLabel = pin?.label ? `P${String(pin.label).padStart(3, "0")}` : undefined;
+        const pinLabel = pin?.label ? formatPinLabel(String(pin.label)) : undefined;
         const locParts = [e.aisle, e.section, pinLabel].filter(Boolean);
         const loc = locParts.join("-");
         if (existing) {

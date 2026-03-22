@@ -35,7 +35,7 @@ import { useWireCategories } from "@/hooks/use-wire-categories";
 import type { Photo, Pin, Entry } from "@shared/schema";
 import ReelCropPreview from "./ReelCropPreview";
 import type { LocalPin } from "./types";
-import { deriveVendorCode } from "./utils";
+import { deriveVendorCode, formatPinLabel, generateDetailPinLabel } from "./utils";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
@@ -78,7 +78,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number; pinScale?: number; rotation?: number }>>([]);
+  const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number; linkedPinLabel?: string; pinScale?: number; rotation?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const initialRestoredRef = useRef(false);
   const saveEnabledRef = useRef(false);
@@ -357,6 +357,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         notes: p.notes || "",
         isDetailShot: p.isDetailShot || false,
         parentPhotoId: p.parentPhotoId || undefined,
+        linkedPinLabel: p.linkedPinLabel || undefined,
         pinScale: p.pinScale ?? 1,
         rotation: p.rotation ?? 0,
       };
@@ -791,13 +792,24 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
     if (x < 0 || x > 100 || y < 0 || y > 100) return;
 
-    const nextNumber = globalMaxPinRef.current + 1;
-    globalMaxPinRef.current = nextNumber;
+    let label: string;
+    const isDetailWithPin = currentPhoto?.isDetailShot && currentPhoto?.linkedPinLabel;
+    if (isDetailWithPin) {
+      const existingLabels = [
+        ...localPins.map(p => p.label),
+        ...committedPins.map(p => p.label),
+      ];
+      label = generateDetailPinLabel(currentPhoto.linkedPinLabel!, existingLabels);
+    } else {
+      const nextNumber = globalMaxPinRef.current + 1;
+      globalMaxPinRef.current = nextNumber;
+      label = String(nextNumber).padStart(3, "0");
+    }
     const newPin: LocalPin = {
       id: `pin-${Date.now()}`,
       x,
       y,
-      label: String(nextNumber).padStart(3, "0"),
+      label,
       reelCount: 1,
     };
     setLocalPins((prev) => [...prev, newPin]);
@@ -1834,7 +1846,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           title="Click to rename"
                           data-testid={`label-pin-${pin.id}`}
                         >
-                          {pin.label}
+                          {formatPinLabel(pin.label)}
                         </div>
                       </div>
                       <div className="pin-bottom-row">
@@ -1901,7 +1913,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         >
                           <Pencil className="w-2.5 h-2.5" />
                         </button>
-                        <div className="pin-label">P{pin.label}</div>
+                        <div className="pin-label">{formatPinLabel(pin.label)}</div>
                         {pin.reelCount >= 2 && (
                           <div className="pin-reel-badge" data-testid={`badge-reel-count-${pin.id}`}>
                             X{pin.reelCount}
@@ -1921,7 +1933,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       data-testid={`pin-nearby-committed-${pin.id}`}
                     >
                       <div className="pin-committed-topbar">
-                        <div className="pin-label">P{pin.label}</div>
+                        <div className="pin-label">{formatPinLabel(pin.label)}</div>
                         {pin.reelCount >= 2 && (
                           <div className="pin-reel-badge">
                             X{pin.reelCount}
@@ -2311,7 +2323,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         photoUrl={currentPhoto.url}
                         pinX={selectedPin.x}
                         pinY={selectedPin.y}
-                        label={selectedPin.label}
+                        label={formatPinLabel(selectedPin.label)}
                         zoomLevel={zoomLevel}
                         onZoomChange={setZoomLevel}
                         onClose={() => setSelectedPinId(null)}
@@ -2351,7 +2363,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               if (pinEl) pinEl.scrollIntoView({ behavior: "smooth", block: "center" });
                             }}
                             data-testid={`pin-label-link-${pin.id}`}
-                          >{pin.label}</span>
+                          >{formatPinLabel(pin.label)}</span>
                         </td>
                         <td className="relative">
                           <input

@@ -20,6 +20,7 @@ import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { matchLabelText, type LabelMatchResult } from "@/lib/labelMatcher";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
+import { formatPinLabel } from "./utils";
 import type { Photo, Pin } from "@shared/schema";
 
 const ZOOM_MIN = 0.005;
@@ -1487,7 +1488,7 @@ export default function LabelScannerTab({
                               data-testid={`checkbox-pin-${card.pin.id}`}
                             />
                             <span className={`font-mono font-bold text-white ${isBatch ? "text-xs" : "text-sm"}`}>
-                              {card.pin.label || `#${card.pin.id}`}
+                              {card.pin.label ? formatPinLabel(card.pin.label) : `#${card.pin.id}`}
                             </span>
                             {card.pin.flagged ? (
                               <button
@@ -1719,7 +1720,7 @@ export default function LabelScannerTab({
                     data-testid={`checkbox-pin-${card.pin.id}`}
                   />
                   <span className={`font-mono font-bold text-white ${isBatch ? "text-xs" : "text-sm"}`}>
-                    {card.pin.label || `#${card.pin.id}`}
+                    {card.pin.label ? formatPinLabel(card.pin.label) : `#${card.pin.id}`}
                   </span>
                   {card.pin.flagged ? (
                     <button
