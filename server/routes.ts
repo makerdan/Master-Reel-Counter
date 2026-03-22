@@ -8,7 +8,7 @@ import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/route
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCategorySchema } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCategorySchema, countingSessions } from "@shared/schema";
 import { z } from "zod";
 import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -4503,7 +4503,15 @@ export async function registerRoutes(
         storage.getSharedSessionPerformance(userId),
         storage.getRoleComparisonStats(userId),
       ]);
-      res.json({ ...stats, sharedPerformance, roleComparison, currentUserId: userId });
+
+      const userSessions = await db.select({ id: countingSessions.id })
+        .from(countingSessions)
+        .where(eq(countingSessions.userId, userId));
+      const sessionIds = userSessions.map(s => s.id);
+
+      const enhancedStats = await storage.getEnhancedStats(userId, sessionIds);
+
+      res.json({ ...stats, sharedPerformance, roleComparison, currentUserId: userId, ...enhancedStats });
     } catch (error) {
       res.status(500).json({ message: "Failed to get stats" });
     }

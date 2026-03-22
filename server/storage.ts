@@ -188,6 +188,34 @@ export interface IStorage {
     busiestDay: string | null;
   }>;
 
+  getEnhancedStats(userId: string, sessionIds: number[]): Promise<{
+    dataQuality: {
+      totalFlaggedPins: number;
+      totalPins: number;
+      flagRate: number;
+      totalReviewResponses: number;
+      approvedCount: number;
+      flaggedCount: number;
+      dismissedDuplicateCount: number;
+    };
+    aiScanner: {
+      totalScans: number;
+      readableCount: number;
+      unreadableCount: number;
+    } | null;
+    photoInsights: {
+      totalDetailShots: number;
+      totalRegularPhotos: number;
+      avgPhotosPerSession: number;
+      photosWithLinkedPins: number;
+    };
+    wireBreakdown: {
+      topWireTypes: { wireType: string; count: number; footage: number }[];
+      topGauges: { gauge: string; count: number; footage: number }[];
+    };
+    dailyActivity: { date: string; count: number }[];
+  }>;
+
   getSharedSessionPerformance(userId: string): Promise<{
     sessionId: number;
     sessionName: string;
@@ -1225,6 +1253,160 @@ export class DatabaseStorage implements IStorage {
       currentStreak,
       longestStreak,
       busiestDay,
+    };
+  }
+
+  async getEnhancedStats(userId: string, sessionIds: number[]): Promise<{
+    dataQuality: {
+      totalFlaggedPins: number;
+      totalPins: number;
+      flagRate: number;
+      totalReviewResponses: number;
+      approvedCount: number;
+      flaggedCount: number;
+      dismissedDuplicateCount: number;
+    };
+    aiScanner: {
+      totalScans: number;
+      readableCount: number;
+      unreadableCount: number;
+    } | null;
+    photoInsights: {
+      totalDetailShots: number;
+      totalRegularPhotos: number;
+      avgPhotosPerSession: number;
+      photosWithLinkedPins: number;
+    };
+    wireBreakdown: {
+      topWireTypes: { wireType: string; count: number; footage: number }[];
+      topGauges: { gauge: string; count: number; footage: number }[];
+    };
+    dailyActivity: { date: string; count: number }[];
+  }> {
+    if (sessionIds.length === 0) {
+      return {
+        dataQuality: { totalFlaggedPins: 0, totalPins: 0, flagRate: 0, totalReviewResponses: 0, approvedCount: 0, flaggedCount: 0, dismissedDuplicateCount: 0 },
+        aiScanner: null,
+        photoInsights: { totalDetailShots: 0, totalRegularPhotos: 0, avgPhotosPerSession: 0, photosWithLinkedPins: 0 },
+        wireBreakdown: { topWireTypes: [], topGauges: [] },
+        dailyActivity: [],
+      };
+    }
+
+    const sessionPhotoIds = db.select({ id: photos.id }).from(photos).where(inArray(photos.sessionId, sessionIds));
+
+    const [pinStats] = await db.select({
+      totalPins: count(),
+      flaggedPins: sql<number>`count(*) filter (where ${pins.flagged} = true)`,
+    }).from(pins).where(inArray(pins.photoId, sessionPhotoIds));
+
+    const totalPins = Number(pinStats.totalPins) || 0;
+    const totalFlaggedPins = Number(pinStats.flaggedPins) || 0;
+    const flagRate = totalPins > 0 ? Math.round((totalFlaggedPins / totalPins) * 1000) / 10 : 0;
+
+    const [reviewStats] = await db.select({
+      total: count(),
+      approved: sql<number>`count(*) filter (where ${reviewResponses.verdict} = 'approved')`,
+      flagged: sql<number>`count(*) filter (where ${reviewResponses.verdict} = 'flagged')`,
+    }).from(reviewResponses).where(inArray(reviewResponses.sessionId, sessionIds));
+
+    const [dismissedStats] = await db.select({
+      total: count(),
+    }).from(dismissedDuplicates).where(inArray(dismissedDuplicates.sessionId, sessionIds));
+
+    const [scanStats] = await db.select({
+      total: count(),
+      readable: sql<number>`count(*) filter (where ${scanResults.readable} = true)`,
+    }).from(scanResults).where(inArray(scanResults.sessionId, sessionIds));
+
+    const totalScans = Number(scanStats.total) || 0;
+    const aiScanner = totalScans > 0 ? {
+      totalScans,
+      readableCount: Number(scanStats.readable) || 0,
+      unreadableCount: totalScans - (Number(scanStats.readable) || 0),
+    } : null;
+
+    const [photoInsightsRaw] = await db.select({
+      totalDetailShots: sql<number>`count(*) filter (where ${photos.isDetailShot} = true)`,
+      totalRegularPhotos: sql<number>`count(*) filter (where ${photos.isDetailShot} = false or ${photos.isDetailShot} is null)`,
+      totalPhotos: count(),
+    }).from(photos).where(inArray(photos.sessionId, sessionIds));
+
+    const totalPhotosCount = Number(photoInsightsRaw.totalPhotos) || 0;
+    const avgPhotosPerSession = sessionIds.length > 0 ? Math.round((totalPhotosCount / sessionIds.length) * 10) / 10 : 0;
+
+    const [linkedPinPhotos] = await db.select({
+      count: sql<number>`count(distinct ${pins.photoId})`,
+    }).from(pins)
+      .innerJoin(photos, eq(pins.photoId, photos.id))
+      .where(and(inArray(photos.sessionId, sessionIds), isNotNull(pins.entryId)));
+
+    const topWireTypesRaw = await db.select({
+      wireType: entries.wireType,
+      count: count(),
+      footage: sum(entries.footage),
+    }).from(entries)
+      .where(and(inArray(entries.sessionId, sessionIds), sql`${entries.wireType} IS NOT NULL AND ${entries.wireType} != ''`))
+      .groupBy(entries.wireType)
+      .orderBy(desc(count()))
+      .limit(10);
+
+    const topGaugesRaw = await db.select({
+      gauge: entries.gauge,
+      count: count(),
+      footage: sum(entries.footage),
+    }).from(entries)
+      .where(and(inArray(entries.sessionId, sessionIds), sql`${entries.gauge} IS NOT NULL AND ${entries.gauge} != ''`))
+      .groupBy(entries.gauge)
+      .orderBy(desc(count()))
+      .limit(10);
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const dailyActivityRaw = await db.select({
+      date: sql<string>`to_char(${entries.createdAt}::date, 'YYYY-MM-DD')`,
+      count: count(),
+    }).from(entries)
+      .where(and(
+        inArray(entries.sessionId, sessionIds),
+        sql`${entries.createdAt} >= ${thirtyDaysAgo.toISOString()}`,
+      ))
+      .groupBy(sql`${entries.createdAt}::date`)
+      .orderBy(sql`${entries.createdAt}::date`);
+
+    return {
+      dataQuality: {
+        totalFlaggedPins,
+        totalPins,
+        flagRate,
+        totalReviewResponses: Number(reviewStats.total) || 0,
+        approvedCount: Number(reviewStats.approved) || 0,
+        flaggedCount: Number(reviewStats.flagged) || 0,
+        dismissedDuplicateCount: Number(dismissedStats.total) || 0,
+      },
+      aiScanner,
+      photoInsights: {
+        totalDetailShots: Number(photoInsightsRaw.totalDetailShots) || 0,
+        totalRegularPhotos: Number(photoInsightsRaw.totalRegularPhotos) || 0,
+        avgPhotosPerSession,
+        photosWithLinkedPins: Number(linkedPinPhotos.count) || 0,
+      },
+      wireBreakdown: {
+        topWireTypes: topWireTypesRaw.map(w => ({
+          wireType: w.wireType!,
+          count: Number(w.count),
+          footage: Number(w.footage) || 0,
+        })),
+        topGauges: topGaugesRaw.map(g => ({
+          gauge: g.gauge!,
+          count: Number(g.count),
+          footage: Number(g.footage) || 0,
+        })),
+      },
+      dailyActivity: dailyActivityRaw.map(d => ({
+        date: d.date,
+        count: Number(d.count),
+      })),
     };
   }
 

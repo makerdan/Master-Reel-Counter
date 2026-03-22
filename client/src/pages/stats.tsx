@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import {
   ArrowLeft, BarChart3, Package, Ruler, Camera, CheckCircle, Clock, TrendingUp,
   Flame, Trophy, Calendar, Target, Users, Shield, Activity, Award, Layers,
+  Flag, ScanLine, Image, Zap, Grid3X3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +58,31 @@ interface UserStats {
   sharedPerformance: SharedSession[];
   roleComparison: RoleComparison;
   currentUserId: string;
+  dataQuality: {
+    totalFlaggedPins: number;
+    totalPins: number;
+    flagRate: number;
+    totalReviewResponses: number;
+    approvedCount: number;
+    flaggedCount: number;
+    dismissedDuplicateCount: number;
+  };
+  aiScanner: {
+    totalScans: number;
+    readableCount: number;
+    unreadableCount: number;
+  } | null;
+  photoInsights: {
+    totalDetailShots: number;
+    totalRegularPhotos: number;
+    avgPhotosPerSession: number;
+    photosWithLinkedPins: number;
+  };
+  wireBreakdown: {
+    topWireTypes: { wireType: string; count: number; footage: number }[];
+    topGauges: { gauge: string; count: number; footage: number }[];
+  };
+  dailyActivity: { date: string; count: number }[];
 }
 
 export default function StatsPage() {
@@ -162,6 +188,31 @@ export default function StatsPage() {
                     <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Total Entries:" value={stats.totalEntries.toLocaleString()} testId="stat-total-entries" />
                     <StatCard icon={<Camera className="h-4 w-4" />} label="Total Photos:" value={stats.totalPhotos.toLocaleString()} testId="stat-total-photos" />
                   </div>
+                  {stats.totalSessions > 0 && (
+                    <Card className="mt-3" data-testid="card-session-completion">
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            Session Completion Rate
+                          </span>
+                          <span className="text-xs font-semibold mono" data-testid="stat-completion-rate">
+                            {Math.round((stats.completedSessions / stats.totalSessions) * 100)}%
+                          </span>
+                        </div>
+                        <div className="h-3 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-green-500 rounded-full transition-all"
+                            style={{ width: `${(stats.completedSessions / stats.totalSessions) * 100}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between mt-1 text-[10px] text-muted-foreground mono">
+                          <span>{stats.completedSessions} completed</span>
+                          <span>{stats.activeSessions} active</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </section>
 
                 <section data-testid="section-averages-records">
@@ -281,6 +332,136 @@ export default function StatsPage() {
                       <p className="text-sm text-muted-foreground">Start counting reels to see detailed breakdowns here.</p>
                     </CardContent>
                   </Card>
+                )}
+
+                {(stats.wireBreakdown.topWireTypes.length > 0 || stats.wireBreakdown.topGauges.length > 0) && (
+                  <section data-testid="section-wire-breakdown">
+                    <SectionHeading icon={<Zap className="h-4 w-4" />} title="Wire Breakdown" testId="heading-wire-breakdown" />
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {stats.wireBreakdown.topWireTypes.length > 0 && (() => {
+                        const maxWt = Math.max(...stats.wireBreakdown.topWireTypes.map(x => x.count), 1);
+                        return (
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-semibold">Top Wire Types:</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                {stats.wireBreakdown.topWireTypes.map((w, i) => (
+                                  <div key={w.wireType} className="flex items-center gap-2" data-testid={`stat-wiretype-${i}`}>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <span className="text-xs mono truncate">{w.wireType}</span>
+                                        <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{w.count} ({w.footage.toLocaleString()} ft)</span>
+                                      </div>
+                                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div className="h-full bg-yellow-500/70 rounded-full" style={{ width: `${(w.count / maxWt) * 100}%` }} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })()}
+                      {stats.wireBreakdown.topGauges.length > 0 && (() => {
+                        const maxG = Math.max(...stats.wireBreakdown.topGauges.map(x => x.count), 1);
+                        return (
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-semibold">Top Gauges:</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-2">
+                                {stats.wireBreakdown.topGauges.map((g, i) => (
+                                  <div key={g.gauge} className="flex items-center gap-2" data-testid={`stat-gauge-${i}`}>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <span className="text-xs mono truncate">{g.gauge}</span>
+                                        <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{g.count} ({g.footage.toLocaleString()} ft)</span>
+                                      </div>
+                                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div className="h-full bg-cyan-500/70 rounded-full" style={{ width: `${(g.count / maxG) * 100}%` }} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })()}
+                    </div>
+                  </section>
+                )}
+
+                {stats.dailyActivity.length > 0 && (
+                  <section data-testid="section-daily-heatmap">
+                    <SectionHeading icon={<Grid3X3 className="h-4 w-4" />} title="Daily Activity (Last 30 Days)" testId="heading-daily-heatmap" />
+                    <Card>
+                      <CardContent className="pt-4">
+                        <DailyHeatmap dailyActivity={stats.dailyActivity} />
+                      </CardContent>
+                    </Card>
+                  </section>
+                )}
+
+                {(stats.dataQuality.totalPins > 0 || stats.dataQuality.totalReviewResponses > 0 || stats.dataQuality.dismissedDuplicateCount > 0) && (
+                  <section data-testid="section-data-quality">
+                    <SectionHeading icon={<Flag className="h-4 w-4" />} title="Data Quality" testId="heading-data-quality" />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <StatCard icon={<Flag className="h-4 w-4" />} label="Flagged Pins:" value={stats.dataQuality.totalFlaggedPins} testId="stat-flagged-pins" />
+                      <StatCard icon={<Target className="h-4 w-4" />} label="Flag Rate:" value={`${stats.dataQuality.flagRate}%`} testId="stat-flag-rate" />
+                      {stats.dataQuality.totalReviewResponses > 0 && (
+                        <StatCard icon={<Shield className="h-4 w-4" />} label="Total Reviews:" value={stats.dataQuality.totalReviewResponses} testId="stat-total-reviews" />
+                      )}
+                      <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Reviews (Approved):" value={stats.dataQuality.approvedCount} testId="stat-approved-reviews" />
+                      <StatCard icon={<Flag className="h-4 w-4" />} label="Reviews (Flagged):" value={stats.dataQuality.flaggedCount} testId="stat-flagged-reviews" />
+                      {stats.dataQuality.dismissedDuplicateCount > 0 && (
+                        <StatCard icon={<Layers className="h-4 w-4" />} label="Dismissed Dupes:" value={stats.dataQuality.dismissedDuplicateCount} testId="stat-dismissed-dupes" />
+                      )}
+                    </div>
+                  </section>
+                )}
+
+                {stats.aiScanner && (
+                  <section data-testid="section-ai-scanner">
+                    <SectionHeading icon={<ScanLine className="h-4 w-4" />} title="AI Scanner Stats" testId="heading-ai-scanner" />
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <StatCard icon={<ScanLine className="h-4 w-4" />} label="Total Scans:" value={stats.aiScanner.totalScans} testId="stat-total-scans" />
+                      <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Readable:" value={stats.aiScanner.readableCount} testId="stat-readable-scans" />
+                      <StatCard icon={<Clock className="h-4 w-4" />} label="Unreadable:" value={stats.aiScanner.unreadableCount} testId="stat-unreadable-scans" />
+                    </div>
+                    <Card className="mt-3">
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs text-muted-foreground">Readable Rate</span>
+                          <span className="text-xs font-semibold mono" data-testid="stat-readable-rate">
+                            {Math.round((stats.aiScanner.readableCount / stats.aiScanner.totalScans) * 100)}%
+                          </span>
+                        </div>
+                        <div className="h-3 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 rounded-full transition-all"
+                            style={{ width: `${(stats.aiScanner.readableCount / stats.aiScanner.totalScans) * 100}%` }}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </section>
+                )}
+
+                {(stats.photoInsights.totalDetailShots > 0 || stats.photoInsights.totalRegularPhotos > 0) && (
+                  <section data-testid="section-photo-insights">
+                    <SectionHeading icon={<Image className="h-4 w-4" />} title="Photo Insights" testId="heading-photo-insights" />
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <StatCard icon={<Image className="h-4 w-4" />} label="Detail Shots:" value={stats.photoInsights.totalDetailShots} testId="stat-detail-shots" />
+                      <StatCard icon={<Camera className="h-4 w-4" />} label="Regular Photos:" value={stats.photoInsights.totalRegularPhotos} testId="stat-regular-photos" />
+                      <StatCard icon={<Activity className="h-4 w-4" />} label="Avg Photos/Session:" value={stats.photoInsights.avgPhotosPerSession} testId="stat-avg-photos-session" />
+                      <StatCard icon={<Target className="h-4 w-4" />} label="Photos w/ Pins:" value={stats.photoInsights.photosWithLinkedPins} testId="stat-photos-with-pins" />
+                    </div>
+                  </section>
                 )}
               </>
             )}
@@ -437,6 +618,64 @@ function RoleComparisonSection({ roleComparison }: { roleComparison: RoleCompari
         );
       })}
     </section>
+  );
+}
+
+function DailyHeatmap({ dailyActivity }: { dailyActivity: { date: string; count: number }[] }) {
+  const activityMap = new Map(dailyActivity.map(d => [d.date, d.count]));
+  const maxCount = Math.max(...dailyActivity.map(d => d.count), 1);
+
+  const days: { date: string; count: number; label: string }[] = [];
+  const today = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    days.push({
+      date: dateStr,
+      count: activityMap.get(dateStr) || 0,
+      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    });
+  }
+
+  const getIntensity = (count: number) => {
+    if (count === 0) return "bg-muted";
+    const ratio = count / maxCount;
+    if (ratio <= 0.25) return "bg-primary/25";
+    if (ratio <= 0.5) return "bg-primary/50";
+    if (ratio <= 0.75) return "bg-primary/75";
+    return "bg-primary";
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1" data-testid="daily-heatmap-grid">
+        {days.map((day) => (
+          <div
+            key={day.date}
+            className={`w-5 h-5 rounded-sm ${getIntensity(day.count)} cursor-default`}
+            title={`${day.label}: ${day.count} entries`}
+            data-testid={`heatmap-cell-${day.date}`}
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-[10px] text-muted-foreground mono">{days[0]?.label}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground">Less</span>
+          <div className="w-3 h-3 rounded-sm bg-muted" />
+          <div className="w-3 h-3 rounded-sm bg-primary/25" />
+          <div className="w-3 h-3 rounded-sm bg-primary/50" />
+          <div className="w-3 h-3 rounded-sm bg-primary/75" />
+          <div className="w-3 h-3 rounded-sm bg-primary" />
+          <span className="text-[10px] text-muted-foreground">More</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground mono">{days[days.length - 1]?.label}</span>
+      </div>
+    </div>
   );
 }
 
