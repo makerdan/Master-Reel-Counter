@@ -154,7 +154,9 @@ export default function Dashboard() {
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: number; name: string; sessionCount: number } | null>(null);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<{ id: number; name: string } | null>(null);
+  const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [resetSessionTarget, setResetSessionTarget] = useState<{ id: number; name: string } | null>(null);
+  const [showTrash, setShowTrash] = useState(false);
 
   const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
   const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
@@ -200,15 +202,52 @@ export default function Dashboard() {
     large: "h-6 w-6",
   };
 
-  const { data: sessions, isLoading, isError: sessionsError } = useQuery<SessionWithStats[]>({
-    queryKey: ["/api/sessions"],
+  const PAGE_SIZE = 50;
+  const [sessionsOffset, setSessionsOffset] = useState(0);
+  const [allLoadedSessions, setAllLoadedSessions] = useState<SessionWithStats[]>([]);
+
+  type SessionsResponse = { sessions: SessionWithStats[]; total: number; limit: number; offset: number };
+
+  const { data: sessionsData, isLoading, isError: sessionsError } = useQuery<SessionsResponse>({
+    queryKey: ["/api/sessions", showTrash, sessionsOffset],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (showTrash) params.set("trash", "true");
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(sessionsOffset));
+      const res = await fetch(`/api/sessions?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch sessions");
+      return res.json();
+    },
     enabled: !!user,
-    placeholderData: [],
   });
+
+  useEffect(() => {
+    if (sessionsData) {
+      if (sessionsOffset === 0) {
+        setAllLoadedSessions(sessionsData.sessions);
+      } else {
+        setAllLoadedSessions(prev => {
+          const existingIds = new Set(prev.map(s => s.id));
+          const newSessions = sessionsData.sessions.filter(s => !existingIds.has(s.id));
+          return [...prev, ...newSessions];
+        });
+      }
+    }
+  }, [sessionsData, sessionsOffset]);
+
+  useEffect(() => {
+    setSessionsOffset(0);
+    setAllLoadedSessions([]);
+  }, [showTrash]);
+
+  const sessions = allLoadedSessions;
+  const sessionsTotal = sessionsData?.total ?? 0;
+  const hasMoreSessions = sessions.length < sessionsTotal;
 
   const { data: sharedSessions } = useQuery<SharedSessionWithStats[]>({
     queryKey: ["/api/sessions/shared"],
-    enabled: !!user,
+    enabled: !!user && !showTrash,
     placeholderData: [],
   });
 
@@ -295,6 +334,8 @@ export default function Dashboard() {
   }, [filteredSessions, userFolders, sortSessions]);
 
   const invalidateAll = useCallback(() => {
+    setSessionsOffset(0);
+    setAllLoadedSessions([]);
     queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
     queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
   }, []);
@@ -325,10 +366,36 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       invalidateAll();
-      toast({ title: "Session deleted" });
+      toast({ title: "Session moved to trash" });
     },
     onError: () => {
       toast({ title: "Failed to delete session", variant: "destructive" });
+    },
+  });
+
+  const restoreSession = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("POST", `/api/sessions/${id}/restore`);
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Session restored" });
+    },
+    onError: () => {
+      toast({ title: "Failed to restore session", variant: "destructive" });
+    },
+  });
+
+  const permanentDeleteSession = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/sessions/${id}/permanent`);
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Session permanently deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to permanently delete session", variant: "destructive" });
     },
   });
 
@@ -1277,6 +1344,21 @@ export default function Dashboard() {
             Sessions Dashboard
           </h1>
           <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={showTrash ? "default" : "outline"}
+                  size="sm"
+                  className={showTrash ? "" : "border border-black"}
+                  onClick={() => setShowTrash(v => !v)}
+                  data-testid="button-toggle-trash"
+                >
+                  <Trash2 className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Trash</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{showTrash ? "Back to sessions" : "View trash"}</TooltipContent>
+            </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="border border-black" data-testid="button-sort-sessions" title="Sort sessions">
@@ -1513,6 +1595,101 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {showTrash ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Trash2 className="h-5 w-5 text-muted-foreground" />
+              <h2 className="text-xl font-bold" data-testid="text-trash-title">Trash</h2>
+              <span className="text-sm text-muted-foreground">({sessionsTotal} session{sessionsTotal !== 1 ? "s" : ""})</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Sessions in trash are automatically permanently deleted after 30 days.</p>
+            {isLoading && sessions.length === 0 ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-24 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : sessions.length === 0 ? (
+              <Card className="border border-border">
+                <CardContent className="py-12 text-center">
+                  <Trash2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-muted-foreground text-sm">Trash is empty</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {sessions.map(session => (
+                  <Card
+                    key={session.id}
+                    className="border border-border hover:border-primary/40 transition-colors"
+                    data-testid={`card-trash-session-${session.id}`}
+                  >
+                    <CardContent className="py-3 px-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate" data-testid={`text-trash-session-name-${session.id}`}>{session.name}</p>
+                          {session.location && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-3 w-3" /> {session.location}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Deleted {session.deletedAt ? formatTimestamp(session.deletedAt, tz) : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => restoreSession.mutate(session.id)}
+                                disabled={restoreSession.isPending}
+                                data-testid={`button-restore-session-${session.id}`}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Restore this session</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => setPermanentDeleteTarget({ id: session.id, name: session.name })}
+                                disabled={permanentDeleteSession.isPending}
+                                data-testid={`button-permanent-delete-session-${session.id}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Permanently delete</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {hasMoreSessions && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSessionsOffset(prev => prev + PAGE_SIZE)}
+                      disabled={isLoading}
+                      data-testid="button-load-more-trash"
+                    >
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                      Load more
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+        <>
         {(() => {
           try {
             const lastId = localStorage.getItem("reel-counter-last-session");
@@ -1702,6 +1879,23 @@ export default function Dashboard() {
               {filteredSharedSessions.map((session) => renderSessionCard(session as any, true))}
             </div>
           </>
+        )}
+
+        {hasMoreSessions && !showTrash && (
+          <div className="flex justify-center pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSessionsOffset(prev => prev + PAGE_SIZE)}
+              disabled={isLoading}
+              data-testid="button-load-more-sessions"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Load more ({sessions.length} of {sessionsTotal})
+            </Button>
+          </div>
+        )}
+        </>
         )}
       </main>
 
@@ -1901,9 +2095,9 @@ export default function Dashboard() {
       <AlertDialog open={!!deleteSessionTarget} onOpenChange={(o) => { if (!o) setDeleteSessionTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{deleteSessionTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>Move "{deleteSessionTarget?.name}" to trash?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this session and all its entries, photos, and pins. This cannot be undone.
+              This session will be moved to trash. You can restore it within 30 days, after which it will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1915,7 +2109,31 @@ export default function Dashboard() {
               }}
               data-testid="button-confirm-delete-session"
             >
-              Delete Session
+              Move to Trash
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!permanentDeleteTarget} onOpenChange={(o) => { if (!o) setPermanentDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete "{permanentDeleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this session and all its entries, photos, and pins. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-permanent-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (permanentDeleteTarget) permanentDeleteSession.mutate(permanentDeleteTarget.id);
+                setPermanentDeleteTarget(null);
+              }}
+              data-testid="button-confirm-permanent-delete"
+            >
+              Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

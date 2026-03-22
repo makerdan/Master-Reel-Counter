@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, asc, inArray, sql, count, sum, min, max, ilike, or, isNull } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, sql, count, sum, min, max, ilike, or, isNull, isNotNull, lt } from "drizzle-orm";
 import {
   countingSessions,
   photos,
@@ -49,9 +49,12 @@ import {
 export interface IStorage {
   createSession(session: InsertSession): Promise<Session>;
   getSession(id: number): Promise<Session | undefined>;
-  getUserSessions(userId: string): Promise<Session[]>;
+  getUserSessions(userId: string, options?: { trash?: boolean; limit?: number; offset?: number }): Promise<{ sessions: Session[]; total: number }>;
   updateSession(id: number, data: Partial<Session>): Promise<Session | undefined>;
+  softDeleteSession(id: number): Promise<void>;
+  restoreSession(id: number): Promise<void>;
   deleteSession(id: number): Promise<void>;
+  getExpiredTrashSessions(olderThanDays: number): Promise<Session[]>;
 
   createPhoto(photo: InsertPhoto): Promise<Photo>;
   getPhoto(id: number): Promise<Photo | undefined>;
@@ -64,6 +67,7 @@ export interface IStorage {
   createEntry(entry: InsertEntry): Promise<Entry>;
   getEntry(id: number): Promise<Entry | undefined>;
   getSessionEntries(sessionId: number): Promise<Entry[]>;
+  getSessionEntriesPaginated(sessionId: number, limit: number, offset: number): Promise<{ entries: Entry[]; total: number }>;
   updateEntry(id: number, data: Partial<Entry>): Promise<Entry | undefined>;
   deleteEntry(id: number): Promise<void>;
 
@@ -113,7 +117,7 @@ export interface IStorage {
   searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> }>;
 
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
-  getSessionActivityLogs(sessionId: number, limit?: number, offset?: number, userId?: string): Promise<ActivityLog[]>;
+  getSessionActivityLogs(sessionId: number, limit?: number, offset?: number, userId?: string): Promise<{ logs: ActivityLog[]; total: number }>;
   getSessionActivityUsers(sessionId: number): Promise<Array<{ userId: string; username: string | null }>>;
 
   createComment(comment: InsertComment): Promise<Comment>;
@@ -207,10 +211,29 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getUserSessions(userId: string): Promise<Session[]> {
-    return db.select().from(countingSessions)
-      .where(eq(countingSessions.userId, userId))
-      .orderBy(desc(countingSessions.lastUpdatedAt));
+  async getUserSessions(userId: string, options?: { trash?: boolean; limit?: number; offset?: number }): Promise<{ sessions: Session[]; total: number }> {
+    const trash = options?.trash ?? false;
+    const deletedCondition = trash
+      ? isNotNull(countingSessions.deletedAt)
+      : isNull(countingSessions.deletedAt);
+    const conditions = and(eq(countingSessions.userId, userId), deletedCondition);
+
+    const [totalResult] = await db.select({ count: count() }).from(countingSessions).where(conditions);
+    const total = totalResult?.count ?? 0;
+
+    let query = db.select().from(countingSessions)
+      .where(conditions)
+      .orderBy(trash ? desc(countingSessions.deletedAt) : desc(countingSessions.lastUpdatedAt));
+
+    if (options?.limit) {
+      query = query.limit(options.limit) as any;
+    }
+    if (options?.offset) {
+      query = query.offset(options.offset) as any;
+    }
+
+    const sessions = await query;
+    return { sessions, total };
   }
 
   async updateSession(id: number, data: Partial<Session>): Promise<Session | undefined> {
@@ -223,6 +246,27 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSession(id: number): Promise<void> {
     await db.delete(countingSessions).where(eq(countingSessions.id, id));
+  }
+
+  async softDeleteSession(id: number): Promise<void> {
+    await db.update(countingSessions)
+      .set({ deletedAt: new Date() })
+      .where(eq(countingSessions.id, id));
+  }
+
+  async restoreSession(id: number): Promise<void> {
+    await db.update(countingSessions)
+      .set({ deletedAt: null })
+      .where(eq(countingSessions.id, id));
+  }
+
+  async getExpiredTrashSessions(olderThanDays: number): Promise<Session[]> {
+    const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+    return db.select().from(countingSessions)
+      .where(and(
+        isNotNull(countingSessions.deletedAt),
+        lt(countingSessions.deletedAt, cutoff)
+      ));
   }
 
   async createPhoto(photo: InsertPhoto): Promise<Photo> {
@@ -288,6 +332,17 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(entries)
       .where(eq(entries.sessionId, sessionId))
       .orderBy(desc(entries.createdAt));
+  }
+
+  async getSessionEntriesPaginated(sessionId: number, limit: number, offset: number): Promise<{ entries: Entry[]; total: number }> {
+    const [totalResult] = await db.select({ count: count() }).from(entries).where(eq(entries.sessionId, sessionId));
+    const total = totalResult?.count ?? 0;
+    const result = await db.select().from(entries)
+      .where(eq(entries.sessionId, sessionId))
+      .orderBy(desc(entries.createdAt))
+      .limit(limit)
+      .offset(offset);
+    return { entries: result, total };
   }
 
   async updateEntry(id: number, data: Partial<Entry>): Promise<Entry | undefined> {
@@ -547,7 +602,7 @@ export class DatabaseStorage implements IStorage {
     if (collabs.length === 0) return [];
     const sessionIds = collabs.map(c => c.sessionId);
     const sessions = await db.select().from(countingSessions)
-      .where(inArray(countingSessions.id, sessionIds))
+      .where(and(inArray(countingSessions.id, sessionIds), isNull(countingSessions.deletedAt)))
       .orderBy(desc(countingSessions.lastUpdatedAt));
     const roleMap = new Map(collabs.map(c => [c.sessionId, c.role]));
     return sessions.map(s => ({ ...s, role: roleMap.get(s.id) || "editor" }));
@@ -786,7 +841,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const allUserSessions = await db.select().from(countingSessions)
-      .where(eq(countingSessions.userId, userId));
+      .where(and(eq(countingSessions.userId, userId), isNull(countingSessions.deletedAt)));
     const allSessionIds = allUserSessions.map(s => s.id);
     const ownedMatched = new Set<number>();
 
@@ -928,14 +983,17 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getSessionActivityLogs(sessionId: number, limit = 50, offset = 0, userId?: string): Promise<ActivityLog[]> {
+  async getSessionActivityLogs(sessionId: number, limit = 50, offset = 0, userId?: string): Promise<{ logs: ActivityLog[]; total: number }> {
     const conditions = [eq(activityLogs.sessionId, sessionId)];
     if (userId) conditions.push(eq(activityLogs.userId, userId));
-    return db.select().from(activityLogs)
+    const [totalResult] = await db.select({ count: count() }).from(activityLogs).where(and(...conditions));
+    const total = totalResult?.count ?? 0;
+    const logs = await db.select().from(activityLogs)
       .where(and(...conditions))
       .orderBy(desc(activityLogs.createdAt))
       .limit(limit)
       .offset(offset);
+    return { logs, total };
   }
 
   async getSessionActivityUsers(sessionId: number): Promise<Array<{ userId: string; username: string | null }>> {

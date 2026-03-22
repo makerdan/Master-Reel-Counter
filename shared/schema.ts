@@ -42,6 +42,7 @@ export const countingSessions = pgTable("counting_sessions", {
   lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
   lastPhotoIndex: integer("last_photo_index").default(0),
+  deletedAt: timestamp("deleted_at"),
 }, (table) => [
   index("counting_sessions_user_id_idx").on(table.userId),
   check("counting_sessions_status_check", sql`${table.status} IN ('active', 'completed')`),
@@ -214,6 +215,7 @@ export const insertSessionSchema = createInsertSchema(countingSessions).omit({
   startedAt: true,
   lastUpdatedAt: true,
   completedAt: true,
+  deletedAt: true,
 });
 
 export const insertPhotoSchema = createInsertSchema(photos).omit({

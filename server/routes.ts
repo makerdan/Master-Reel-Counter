@@ -94,9 +94,10 @@ async function logActivity(sessionId: number, userId: string, username: string |
   } catch (err) { console.error("logActivity failed:", err); }
 }
 
-async function verifySessionAccess(sessionId: number, userId: string, testerOwnerUserId?: string): Promise<{ session: any; role: "owner" | "editor" | "viewer" } | null> {
+async function verifySessionAccess(sessionId: number, userId: string, testerOwnerUserId?: string, allowTrashed = false): Promise<{ session: any; role: "owner" | "editor" | "viewer" } | null> {
   const session = await storage.getSession(sessionId);
   if (!session) return null;
+  if (!allowTrashed && session.deletedAt) return null;
   if (session.userId === userId) return { session, role: "owner" };
   if (testerOwnerUserId && session.userId === testerOwnerUserId) return { session, role: "editor" };
   const collab = await storage.getCollaborator(sessionId, userId);
@@ -405,7 +406,10 @@ export async function registerRoutes(
   app.get("/api/sessions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = resolveUserId(req);
-      const sessions = await storage.getUserSessions(userId);
+      const trash = req.query.trash === "true";
+      const limit = req.query.limit ? parseInt(req.query.limit) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset) : undefined;
+      const { sessions, total } = await storage.getUserSessions(userId, { trash, limit, offset });
       const sessionIds = sessions.map(s => s.id);
       const [stats, photoStats, thumbnails, collabUsernames] = await Promise.all([
         storage.getSessionStats(sessionIds),
@@ -420,7 +424,7 @@ export async function registerRoutes(
         const collaboratorUsernames = collabUsernames.get(s.id) || [];
         return { ...s, ...st, ...ps, thumbnailKey, collaboratorUsernames };
       });
-      res.json(sessionsWithStats);
+      res.json({ sessions: sessionsWithStats, total, limit, offset: offset || 0 });
     } catch (error) {
       console.error("Error fetching sessions:", error);
       res.status(500).json({ message: "Failed to fetch sessions" });
@@ -530,6 +534,30 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can delete sessions" });
+      await storage.softDeleteSession(access.session.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete session" });
+    }
+  });
+
+  app.post("/api/sessions/:id/restore", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req), true);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can restore sessions" });
+      await storage.restoreSession(access.session.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to restore session" });
+    }
+  });
+
+  app.delete("/api/sessions/:id/permanent", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req), true);
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can permanently delete sessions" });
       const sessionPhotos = await storage.getSessionPhotos(access.session.id);
       for (const photo of sessionPhotos) {
         try {
@@ -548,7 +576,7 @@ export async function registerRoutes(
       await storage.deleteSession(access.session.id);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete session" });
+      res.status(500).json({ message: "Failed to permanently delete session" });
     }
   });
 
@@ -1052,10 +1080,18 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      const rawEntries = await storage.getSessionEntries(access.session.id);
       const encKey = isOwner(access.role) ? await getEncryptionKey(userId) : await getEncryptionKey(access.session.userId);
-      const result = encKey ? rawEntries.map(e => decryptEntry(e, encKey) as any) : rawEntries;
-      res.json(result);
+      if (req.query.limit) {
+        const limit = parseInt(req.query.limit) || 50;
+        const offset = parseInt(req.query.offset) || 0;
+        const { entries: rawEntries, total } = await storage.getSessionEntriesPaginated(access.session.id, limit, offset);
+        const result = encKey ? rawEntries.map(e => decryptEntry(e, encKey) as any) : rawEntries;
+        res.json({ entries: result, total, limit, offset });
+      } else {
+        const rawEntries = await storage.getSessionEntries(access.session.id);
+        const result = encKey ? rawEntries.map(e => decryptEntry(e, encKey) as any) : rawEntries;
+        res.json(result);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch entries" });
     }
@@ -4224,7 +4260,7 @@ export async function registerRoutes(
   app.post("/api/storage/backfill-sizes", isAuthenticated, async (req: any, res) => {
     try {
       const userId = resolveUserId(req);
-      const userSessions = await storage.getUserSessions(userId);
+      const { sessions: userSessions } = await storage.getUserSessions(userId);
       const userSessionIds = userSessions.map(s => s.id);
       if (userSessionIds.length === 0) {
         return res.json({ total: 0, updated: 0, failed: 0 });
@@ -4469,8 +4505,8 @@ export async function registerRoutes(
       const limit = parseInt(req.query.limit) || 50;
       const offset = parseInt(req.query.offset) || 0;
       const filterUserId = typeof req.query.userId === "string" ? req.query.userId : undefined;
-      const logs = await storage.getSessionActivityLogs(sessionId, limit, offset, filterUserId);
-      res.json(logs);
+      const { logs, total } = await storage.getSessionActivityLogs(sessionId, limit, offset, filterUserId);
+      res.json({ logs, total, limit, offset });
     } catch (error) {
       res.status(500).json({ message: "Failed to get activity logs" });
     }
@@ -4828,6 +4864,46 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       wsUserMap.delete(ws);
     });
   });
+
+  const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000;
+  const TRASH_MAX_AGE_DAYS = 30;
+
+  async function purgeExpiredTrash() {
+    try {
+      const expiredSessions = await storage.getExpiredTrashSessions(TRASH_MAX_AGE_DAYS);
+      for (const session of expiredSessions) {
+        try {
+          const sessionPhotos = await storage.getSessionPhotos(session.id);
+          for (const photo of sessionPhotos) {
+            try {
+              const shared = await storage.isObjectKeyShared(photo.objectStorageKey, photo.id);
+              if (!shared) {
+                const key = photo.objectStorageKey;
+                const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+                const filePath = path.join(UPLOADS_DIR, filename);
+                await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
+                await fs.unlink(filePath).catch(() => {});
+              }
+            } catch (err) {
+              console.warn("Could not delete photo file during trash purge:", err);
+            }
+          }
+          await storage.deleteSession(session.id);
+          console.log(`Purged expired trashed session ${session.id} (${session.name})`);
+        } catch (err) {
+          console.error(`Failed to purge trashed session ${session.id}:`, err);
+        }
+      }
+      if (expiredSessions.length > 0) {
+        console.log(`Trash purge complete: ${expiredSessions.length} session(s) permanently deleted`);
+      }
+    } catch (err) {
+      console.error("Trash purge error:", err);
+    }
+  }
+
+  setInterval(purgeExpiredTrash, TRASH_PURGE_INTERVAL_MS);
+  setTimeout(purgeExpiredTrash, 30000);
 
   return httpServer;
 }

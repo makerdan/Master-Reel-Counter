@@ -18,7 +18,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Mobile-first:** Dedicated mobile capture mode for quick photo taking.
 
 **Technical Implementations & Feature Specifications:**
-- **Session Management:** Users can create, duplicate, move, and organize counting sessions.
+- **Session Management:** Users can create, duplicate, move, and organize counting sessions. Sessions support soft delete (moved to trash with `deletedAt` timestamp). Trashed sessions can be restored within 30 days or permanently deleted. A background interval auto-purges expired trash hourly. The dashboard includes a "Trash" toggle to view/restore/permanently delete trashed sessions.
 - **Entry Management:** Manual entry of reel data with category autocomplete, auto-calculation of total footage, and quick entry panels.
 - **Photo Management:** Photo annotation with pin placement, background uploads, offline photo queue (IndexedDB), per-photo pin scaling, notes, and nearby photo viewer. Photos are stored in Replit Object Storage.
 - **Collaboration:** Real-time collaborative sessions with role-based permissions (owner, editor, viewer), multiple invitation methods, and online presence tracking via WebSockets.
@@ -41,7 +41,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Frontend:** React + Vite with TanStack Query for data fetching and wouter for routing.
 - **Backend:** Express.js.
 - **Database:** PostgreSQL with Drizzle ORM, using transactions for atomic operations.
-- **API:** RESTful API with authentication and session access verification.
+- **API:** RESTful API with authentication and session access verification. List endpoints support server-side pagination (limit/offset) with total counts.
 - **Real-time Communication:** WebSockets for collaborative sessions with access verification.
 - **Data Encoding:** AES-256-GCM encryption with key wrapping for sensitive fields.
 - **Cascade Deletion:** Comprehensive cleanup of related data upon deletion of sessions, photos, or entries.

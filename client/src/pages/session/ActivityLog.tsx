@@ -105,18 +105,44 @@ export default function ActivityLog({
 
   const isFiltering = selectedUserId !== "all";
 
-  const { data: logs = [], isLoading: logsLoading, isError: logsError } = useQuery<ActivityLogEntry[]>({
-    queryKey: ["/api/sessions", sessionId.toString(), "activity", isFiltering ? selectedUserId : "all"],
+  type ActivityResponse = { logs: ActivityLogEntry[]; total: number; limit: number; offset: number };
+  const ACTIVITY_PAGE_SIZE = 50;
+  const [activityOffset, setActivityOffset] = useState(0);
+  const [allLogs, setAllLogs] = useState<ActivityLogEntry[]>([]);
+  const prevFilterRef = useRef(selectedUserId);
+  if (prevFilterRef.current !== selectedUserId) {
+    prevFilterRef.current = selectedUserId;
+    if (activityOffset !== 0) setActivityOffset(0);
+    if (allLogs.length > 0) setAllLogs([]);
+  }
+
+  const { data: activityData, isLoading: logsLoading, isError: logsError } = useQuery<ActivityResponse>({
+    queryKey: ["/api/sessions", sessionId.toString(), "activity", isFiltering ? selectedUserId : "all", activityOffset],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (isFiltering) params.set("userId", selectedUserId);
-      const url = `/api/sessions/${sessionId}/activity${params.toString() ? `?${params.toString()}` : ""}`;
+      params.set("limit", String(ACTIVITY_PAGE_SIZE));
+      params.set("offset", String(activityOffset));
+      const url = `/api/sessions/${sessionId}/activity?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
     refetchInterval: 30000,
   });
+
+  const activityTotal = activityData?.total ?? 0;
+
+  
+
+  const logs = (() => {
+    if (!activityData) return allLogs.length > 0 ? allLogs : [];
+    if (activityOffset === 0) return activityData.logs;
+    const existingIds = new Set(allLogs.map(l => l.id));
+    return [...allLogs, ...activityData.logs.filter(l => !existingIds.has(l.id))];
+  })();
+
+  const hasMoreLogs = logs.length < activityTotal;
 
   const { data: rawComments = [] } = useQuery<Array<{
     id: number;
@@ -334,6 +360,22 @@ export default function ActivityLog({
               </div>
             );
           })}
+          {hasMoreLogs && (
+            <div className="flex justify-center py-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setAllLogs(logs);
+                  setActivityOffset(prev => prev + ACTIVITY_PAGE_SIZE);
+                }}
+                disabled={logsLoading}
+                data-testid="button-load-more-activity"
+              >
+                Load more activity
+              </Button>
+            </div>
+          )}
           <div ref={listEndRef} />
         </div>
       )}
