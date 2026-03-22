@@ -1097,7 +1097,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" data-testid="button-sort-sessions" title="Sort sessions">
+                <Button variant="outline" size="sm" className="border border-black" data-testid="button-sort-sessions" title="Sort sessions">
                   <ArrowUpDown className="h-4 w-4 sm:mr-1" />
                   <span className="hidden sm:inline">{sortField === "date" ? "Date" : sortField === "name" ? "Name" : sortField === "entries" ? "Reels" : "Footage"}</span>
                   {sortDirection === "desc" ? <ArrowDown className="h-3 w-3 sm:ml-1" /> : <ArrowUp className="h-3 w-3 sm:ml-1" />}
@@ -1132,7 +1132,7 @@ export default function Dashboard() {
             </DropdownMenu>
             <Dialog open={newFolderDialogOpen} onOpenChange={setNewFolderDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline" size="sm" data-testid="button-new-folder" title="Create a new folder">
+                <Button variant="outline" size="sm" className="border border-black" data-testid="button-new-folder" title="Create a new folder">
                   <FolderPlus className="h-4 w-4" />
                   <span className="hidden sm:inline">New Folder</span>
                 </Button>
