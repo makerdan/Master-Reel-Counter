@@ -4319,7 +4319,7 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const settings = await storage.getUserSettings(userId);
       const response = settings
-        ? { ...settings, testerPassword: settings.testerPassword ? "********" : null }
+        ? { ...settings, defaultExportFormat: settings.defaultExportFormat === "csv" ? "pdf" : settings.defaultExportFormat, testerPassword: settings.testerPassword ? "********" : null }
         : {
           userId,
           encodingEnabled: false,

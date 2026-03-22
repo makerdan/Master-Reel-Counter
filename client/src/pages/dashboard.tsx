@@ -1112,24 +1112,49 @@ export default function Dashboard() {
                         <Download className="h-4 w-4 mr-2" /> Export
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent collisionPadding={8}>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleExportExcel(session);
-                          }}
-                          data-testid={`menu-export-excel-${session.id}`}
-                        >
-                          <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleExportPdf(session);
-                          }}
-                          data-testid={`menu-export-pdf-${session.id}`}
-                        >
-                          <FileText className="h-4 w-4 mr-2" /> PDF
-                        </DropdownMenuItem>
+                        {(userSettings?.defaultExportFormat === "excel") ? (
+                          <>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleExportExcel(session);
+                              }}
+                              data-testid={`menu-export-excel-${session.id}`}
+                            >
+                              <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleExportPdf(session);
+                              }}
+                              data-testid={`menu-export-pdf-${session.id}`}
+                            >
+                              <FileText className="h-4 w-4 mr-2" /> PDF
+                            </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleExportPdf(session);
+                              }}
+                              data-testid={`menu-export-pdf-${session.id}`}
+                            >
+                              <FileText className="h-4 w-4 mr-2" /> PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleExportExcel(session);
+                              }}
+                              data-testid={`menu-export-excel-${session.id}`}
+                            >
+                              <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSeparator />

@@ -666,14 +666,29 @@ function SessionWorkspace({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isPdfExporting}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isPdfExporting}>
-                  {isPdfExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                  {isPdfExporting ? "Generating PDF…" : "PDF"}
-                </DropdownMenuItem>
+                {(userSettings?.defaultExportFormat === "excel") ? (
+                  <>
+                    <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isPdfExporting}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isPdfExporting}>
+                      {isPdfExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                      {isPdfExporting ? "Generating PDF…" : "PDF"}
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isPdfExporting}>
+                      {isPdfExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                      {isPdfExporting ? "Generating PDF…" : "PDF"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isPdfExporting}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Excel
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuItem onClick={shareSession} data-testid="button-share-session">
                   <Mail className="h-4 w-4 mr-2" />
                   Share via Email

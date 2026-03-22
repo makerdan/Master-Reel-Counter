@@ -1340,7 +1340,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground">Preferred format when exporting session data.</p>
               </div>
               <Select
-                value={settings?.defaultExportFormat || "pdf"}
+                value={settings?.defaultExportFormat === "csv" ? "pdf" : (settings?.defaultExportFormat || "pdf")}
                 onValueChange={(val) => saveSetting("defaultExportFormat", val)}
                 data-testid="select-export-format"
               >
@@ -1349,7 +1349,7 @@ export default function SettingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pdf"><span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" /> PDF</span></SelectItem>
-                  <SelectItem value="csv"><span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" /> CSV</span></SelectItem>
+                  <SelectItem value="excel"><span className="flex items-center gap-2"><FileText className="h-3.5 w-3.5" /> Excel</span></SelectItem>
                 </SelectContent>
               </Select>
             </div>
