@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -255,6 +255,16 @@ function PhotoCard({
     return "bg-muted text-muted-foreground border-border";
   })();
 
+  const linkedPinLabels = useMemo(() => {
+    const labels = new Set<string>();
+    for (const p of allPhotos) {
+      if (p.parentPhotoId === photo.id && p.linkedPinLabel) {
+        labels.add(p.linkedPinLabel);
+      }
+    }
+    return labels;
+  }, [allPhotos, photo.id]);
+
   const candidateParents = sortPhotos(allPhotos.filter(p => !p.isDetailShot && p.id !== photo.id));
 
   const parentPinsForLink = selectedParentForLink
@@ -310,13 +320,17 @@ function PhotoCard({
               }}
               title={pin.label || "Pin"}
             >
-              {(pin.reelCount ?? 1) >= 2 ? (
-                <div className="w-5 h-5 rounded-full bg-orange-400 border-2 border-white shadow-md flex items-center justify-center">
-                  <span className="text-[9px] font-bold leading-none text-black">{pin.reelCount}</span>
-                </div>
-              ) : (
-                <div className="w-3 h-3 rounded-full bg-orange-400 border-2 border-white shadow-md" />
-              )}
+              {(() => {
+                const hasLinkedPhoto = pin.label ? linkedPinLabels.has(pin.label) : false;
+                const dotColor = hasLinkedPhoto ? "bg-blue-500" : "bg-orange-400";
+                return (pin.reelCount ?? 1) >= 2 ? (
+                  <div className={`w-5 h-5 rounded-full ${dotColor} border-2 border-white shadow-md flex items-center justify-center`}>
+                    <span className="text-[9px] font-bold leading-none text-black">{pin.reelCount}</span>
+                  </div>
+                ) : (
+                  <div className={`w-3 h-3 rounded-full ${dotColor} border-2 border-white shadow-md`} />
+                );
+              })()}
             </div>
           );
         })}
