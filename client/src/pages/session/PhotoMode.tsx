@@ -42,6 +42,15 @@ import { formatFullTimestamp } from "@/lib/timezone";
 import SingleEntryMode from "./SingleEntryMode";
 import LabelScannerTab from "./LabelScannerTab";
 
+const BLUE_SHADES_CSS = [
+  "rgba(59,130,246,1)",
+  "rgba(56,189,248,1)",
+  "rgba(99,102,241,1)",
+  "rgba(29,78,216,1)",
+  "rgba(6,182,212,1)",
+  "rgba(139,92,246,1)",
+];
+
 function getScanPanelStorageKey(sessionId: number) {
   return `scan-panel-open-${sessionId}`;
 }
@@ -294,18 +303,35 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const displayedPhoto = uploadedPhotos[displayedPhotoIdx];
   const photoSrc = displayedPhoto?.url || currentPhoto?.url || "";
 
-  const linkedPinLabelsForPhoto = useMemo(() => {
-    const labels = new Set<string>();
+  const linkedPinShadeMapForPhoto = useMemo(() => {
+    const map = new Map<string, number>();
     const photoDbId = displayedPhoto?.dbId;
-    if (!photoDbId) return labels;
-    if (displayedPhoto?.isDetailShot) return labels;
+    if (!photoDbId || displayedPhoto?.isDetailShot) return map;
+    const labels: string[] = [];
     for (const p of photos) {
-      if (p.parentPhotoId === photoDbId && p.linkedPinLabel) {
-        labels.add(p.linkedPinLabel);
+      if (p.parentPhotoId === photoDbId && p.linkedPinLabel && !labels.includes(p.linkedPinLabel)) {
+        labels.push(p.linkedPinLabel);
       }
     }
-    return labels;
+    labels.sort();
+    labels.forEach((l, i) => map.set(l, i));
+    return map;
   }, [photos, displayedPhoto?.dbId, displayedPhoto?.isDetailShot]);
+
+  const detailShadeIndexForPhoto = useMemo(() => {
+    if (!displayedPhoto?.isDetailShot || !displayedPhoto?.parentPhotoId) return 0;
+    const currentLinkedPin = photos.find(p => p.id === displayedPhoto.dbId)?.linkedPinLabel;
+    if (!currentLinkedPin) return 0;
+    const sibs: string[] = [];
+    for (const p of photos) {
+      if (p.parentPhotoId === displayedPhoto.parentPhotoId && p.linkedPinLabel && !sibs.includes(p.linkedPinLabel)) {
+        sibs.push(p.linkedPinLabel);
+      }
+    }
+    sibs.sort();
+    return Math.max(0, sibs.indexOf(currentLinkedPin));
+  }, [photos, displayedPhoto?.isDetailShot, displayedPhoto?.parentPhotoId, displayedPhoto?.dbId]);
+
   const isDisplayedPhotoDetail = displayedPhoto?.isDetailShot || false;
   const photoLoaded = photoLoadedKey === photoSrc;
 
@@ -1779,12 +1805,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     </div>
                   ))}
                   {photoLoaded && pinsVisible && committedPins.map((pin) => {
-                    const isPinLinked = isDisplayedPhotoDetail || linkedPinLabelsForPhoto.has(pin.label);
+                    const shadeIdx = isDisplayedPhotoDetail ? detailShadeIndexForPhoto : linkedPinShadeMapForPhoto.get(pin.label);
+                    const hasShade = shadeIdx !== undefined && shadeIdx >= 0;
                     return (
                     <div
                       key={pin.id}
-                      className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}${highlightedCommittedPinDbId && pin.dbId === highlightedCommittedPinDbId ? " pin-highlight-pulse" : ""}${isPinLinked ? " pin-linked" : ""}`}
-                      style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                      className={`pin-marker committed${pin.y < 15 ? " topbar-below" : ""}${highlightedCommittedPinDbId && pin.dbId === highlightedCommittedPinDbId ? " pin-highlight-pulse" : ""}${hasShade ? " pin-linked" : ""}`}
+                      style={{ left: `${pin.x}%`, top: `${pin.y}%`, ...(hasShade ? { "--pin-linked-color": BLUE_SHADES_CSS[shadeIdx! % BLUE_SHADES_CSS.length] } as React.CSSProperties : {}) }}
                       data-testid={`pin-committed-${pin.id}`}
                     >
                       <div className="pin-committed-topbar">

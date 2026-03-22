@@ -68,6 +68,16 @@ function orderWithDetailShots(photos: Photo[]): Photo[] {
   return result;
 }
 
+const BLUE_SHADES = [
+  { bg: "bg-blue-500", border: "border-blue-300", shadow: "shadow-[0_0_0_3px_rgba(59,130,246,0.5)]", css: "rgba(59,130,246,1)" },
+  { bg: "bg-sky-400", border: "border-sky-200", shadow: "shadow-[0_0_0_3px_rgba(56,189,248,0.5)]", css: "rgba(56,189,248,1)" },
+  { bg: "bg-indigo-500", border: "border-indigo-300", shadow: "shadow-[0_0_0_3px_rgba(99,102,241,0.5)]", css: "rgba(99,102,241,1)" },
+  { bg: "bg-blue-700", border: "border-blue-400", shadow: "shadow-[0_0_0_3px_rgba(29,78,216,0.5)]", css: "rgba(29,78,216,1)" },
+  { bg: "bg-cyan-500", border: "border-cyan-300", shadow: "shadow-[0_0_0_3px_rgba(6,182,212,0.5)]", css: "rgba(6,182,212,1)" },
+  { bg: "bg-violet-500", border: "border-violet-300", shadow: "shadow-[0_0_0_3px_rgba(139,92,246,0.5)]", css: "rgba(139,92,246,1)" },
+];
+function blueShade(index: number) { return BLUE_SHADES[index % BLUE_SHADES.length]; }
+
 function PhotoCard({
   photo,
   sessionId,
@@ -255,23 +265,38 @@ function PhotoCard({
     return "bg-muted text-muted-foreground border-border";
   })();
 
-  const linkedPinLabels = useMemo(() => {
-    const labels = new Set<string>();
+  const isDetail = photo.isDetailShot && parentId !== null;
+
+  const linkedPinShadeMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const labels: string[] = [];
     for (const p of allPhotos) {
-      if (p.parentPhotoId === photo.id && p.linkedPinLabel) {
-        labels.add(p.linkedPinLabel);
+      if (p.parentPhotoId === photo.id && p.linkedPinLabel && !labels.includes(p.linkedPinLabel)) {
+        labels.push(p.linkedPinLabel);
       }
     }
-    return labels;
+    labels.sort();
+    labels.forEach((l, i) => map.set(l, i));
+    return map;
   }, [allPhotos, photo.id]);
+
+  const detailShadeIndex = useMemo(() => {
+    if (!isDetail || !photo.linkedPinLabel || !photo.parentPhotoId) return 0;
+    const siblings: string[] = [];
+    for (const p of allPhotos) {
+      if (p.parentPhotoId === photo.parentPhotoId && p.linkedPinLabel && !siblings.includes(p.linkedPinLabel)) {
+        siblings.push(p.linkedPinLabel);
+      }
+    }
+    siblings.sort();
+    return siblings.indexOf(photo.linkedPinLabel);
+  }, [allPhotos, photo.parentPhotoId, photo.linkedPinLabel, isDetail]);
 
   const candidateParents = sortPhotos(allPhotos.filter(p => !p.isDetailShot && p.id !== photo.id));
 
   const parentPinsForLink = selectedParentForLink
     ? allPins.filter(p => p.photoId === selectedParentForLink && p.label)
     : [];
-
-  const isDetail = photo.isDetailShot && parentId !== null;
 
   return (
     <div className={`rounded-md border bg-card overflow-hidden group relative flex flex-col ${isDetail ? "!border-blue-500 ml-3" : "border-border"}`} data-testid={`strip-card-${photo.id}`}>
@@ -321,8 +346,8 @@ function PhotoCard({
               title={pin.label || "Pin"}
             >
               {(() => {
-                const hasLinkedPhoto = isDetail || (pin.label ? linkedPinLabels.has(pin.label) : false);
-                const dotColor = hasLinkedPhoto ? "bg-blue-500" : "bg-orange-400";
+                const shadeIdx = isDetail ? detailShadeIndex : (pin.label ? linkedPinShadeMap.get(pin.label) : undefined);
+                const dotColor = shadeIdx !== undefined && shadeIdx >= 0 ? blueShade(shadeIdx).bg : "bg-orange-400";
                 return (pin.reelCount ?? 1) >= 2 ? (
                   <div className={`w-5 h-5 rounded-full ${dotColor} border-2 border-white shadow-md flex items-center justify-center`}>
                     <span className="text-[9px] font-bold leading-none text-black">{pin.reelCount}</span>
@@ -609,7 +634,7 @@ function PhotoCard({
   );
 }
 
-type LightboxPhoto = { url: string; label: string; pins?: Pin[]; linkedPinLabels?: Set<string>; isDetailShot?: boolean };
+type LightboxPhoto = { url: string; label: string; pins?: Pin[]; linkedPinShadeMap?: Map<string, number>; isDetailShot?: boolean; detailShadeIndex?: number };
 
 function Lightbox({
   photos,
@@ -678,10 +703,11 @@ function Lightbox({
           data-testid="img-lightbox-full"
         />
         {current.pins && current.pins.map((pin) => {
-          const isPinLinked = current.isDetailShot || (pin.label && current.linkedPinLabels?.has(pin.label));
-          const dotBg = isPinLinked ? "bg-blue-500" : "bg-orange-500";
-          const dotBorder = isPinLinked ? "border-blue-300" : "border-orange-300";
-          const dotShadow = isPinLinked ? "shadow-[0_0_0_3px_rgba(59,130,246,0.5)]" : "shadow-[0_0_0_3px_rgba(251,146,60,0.5)]";
+          const shadeIdx = current.isDetailShot ? (current.detailShadeIndex ?? 0) : (pin.label ? current.linkedPinShadeMap?.get(pin.label) : undefined);
+          const shade = shadeIdx !== undefined && shadeIdx >= 0 ? blueShade(shadeIdx) : null;
+          const dotBg = shade ? shade.bg : "bg-orange-500";
+          const dotBorder = shade ? shade.border : "border-orange-300";
+          const dotShadow = shade ? shade.shadow : "shadow-[0_0_0_3px_rgba(251,146,60,0.5)]";
           return (
           <div
             key={pin.id}
@@ -877,16 +903,31 @@ export default function PhotoStrip({
                         onJumpToPhoto={onJumpToPhoto}
                         onLightbox={() => {
                           const sectionPhotos: LightboxPhoto[] = sectionGroup.photos.map(p => {
-                            const linked = new Set<string>();
+                            const shadeMap = new Map<string, number>();
+                            const labels: string[] = [];
                             for (const op of photos) {
-                              if (op.parentPhotoId === p.id && op.linkedPinLabel) linked.add(op.linkedPinLabel);
+                              if (op.parentPhotoId === p.id && op.linkedPinLabel && !labels.includes(op.linkedPinLabel)) {
+                                labels.push(op.linkedPinLabel);
+                              }
+                            }
+                            labels.sort();
+                            labels.forEach((l, i) => shadeMap.set(l, i));
+                            let dsi = 0;
+                            if (p.isDetailShot && p.parentPhotoId && p.linkedPinLabel) {
+                              const sibs: string[] = [];
+                              for (const op of photos) {
+                                if (op.parentPhotoId === p.parentPhotoId && op.linkedPinLabel && !sibs.includes(op.linkedPinLabel)) sibs.push(op.linkedPinLabel);
+                              }
+                              sibs.sort();
+                              dsi = sibs.indexOf(p.linkedPinLabel);
                             }
                             return {
                               url: photoUrl(p.objectStorageKey),
                               label: [p.aisle, p.section].filter(Boolean).join(" / ") || `Photo #${p.id}`,
                               pins: pinsByPhoto.get(p.id) ?? [],
-                              linkedPinLabels: linked,
+                              linkedPinShadeMap: shadeMap,
                               isDetailShot: p.isDetailShot || false,
+                              detailShadeIndex: dsi,
                             };
                           });
                           const idx = sectionGroup.photos.findIndex(p => p.id === photo.id);

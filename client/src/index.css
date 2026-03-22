@@ -547,13 +547,13 @@
   font-family: 'JetBrains Mono', monospace;
 }
 .pin-marker.committed.pin-linked {
-  border-color: rgba(59, 130, 246, 1);
+  border-color: var(--pin-linked-color, rgba(59, 130, 246, 1));
 }
 .pin-marker.committed.pin-linked .pin-label {
-  background: rgba(59, 130, 246, 1);
+  background: var(--pin-linked-color, rgba(59, 130, 246, 1));
 }
 .pin-marker.committed.pin-linked .pin-reel-badge {
-  background: rgba(59, 130, 246, 1);
+  background: var(--pin-linked-color, rgba(59, 130, 246, 1));
 }
 .pin-marker.dragging {
   cursor: grabbing;
