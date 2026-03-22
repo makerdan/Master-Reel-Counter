@@ -609,7 +609,7 @@ function PhotoCard({
   );
 }
 
-type LightboxPhoto = { url: string; label: string; pins?: Pin[] };
+type LightboxPhoto = { url: string; label: string; pins?: Pin[]; linkedPinLabels?: Set<string>; isDetailShot?: boolean };
 
 function Lightbox({
   photos,
@@ -677,7 +677,12 @@ function Lightbox({
           className="max-w-[85vw] max-h-[88vh] object-contain rounded shadow-2xl block"
           data-testid="img-lightbox-full"
         />
-        {current.pins && current.pins.map((pin) => (
+        {current.pins && current.pins.map((pin) => {
+          const isPinLinked = current.isDetailShot || (pin.label && current.linkedPinLabels?.has(pin.label));
+          const dotBg = isPinLinked ? "bg-blue-500" : "bg-orange-500";
+          const dotBorder = isPinLinked ? "border-blue-300" : "border-orange-300";
+          const dotShadow = isPinLinked ? "shadow-[0_0_0_3px_rgba(59,130,246,0.5)]" : "shadow-[0_0_0_3px_rgba(251,146,60,0.5)]";
+          return (
           <div
             key={pin.id}
             className="absolute pointer-events-none"
@@ -688,14 +693,14 @@ function Lightbox({
             }}
           >
             {(pin.reelCount ?? 1) >= 2 ? (
-              <div className="w-8 h-8 rounded-full bg-orange-500 border-[3px] border-orange-300 shadow-[0_0_0_3px_rgba(251,146,60,0.5)] flex items-center justify-center">
+              <div className={`w-8 h-8 rounded-full ${dotBg} border-[3px] ${dotBorder} ${dotShadow} flex items-center justify-center`}>
                 <span className="text-sm font-bold leading-none text-black">{pin.reelCount}</span>
               </div>
             ) : (
-              <div className="w-5 h-5 rounded-full bg-orange-500 border-[3px] border-orange-300 shadow-[0_0_0_3px_rgba(251,146,60,0.5)]" />
+              <div className={`w-5 h-5 rounded-full ${dotBg} border-[3px] ${dotBorder} ${dotShadow}`} />
             )}
           </div>
-        ))}
+        );})}
       </div>
 
       {hasNext && (
@@ -871,11 +876,19 @@ export default function PhotoStrip({
                         allPins={allPins}
                         onJumpToPhoto={onJumpToPhoto}
                         onLightbox={() => {
-                          const sectionPhotos: LightboxPhoto[] = sectionGroup.photos.map(p => ({
-                            url: photoUrl(p.objectStorageKey),
-                            label: [p.aisle, p.section].filter(Boolean).join(" / ") || `Photo #${p.id}`,
-                            pins: pinsByPhoto.get(p.id) ?? [],
-                          }));
+                          const sectionPhotos: LightboxPhoto[] = sectionGroup.photos.map(p => {
+                            const linked = new Set<string>();
+                            for (const op of photos) {
+                              if (op.parentPhotoId === p.id && op.linkedPinLabel) linked.add(op.linkedPinLabel);
+                            }
+                            return {
+                              url: photoUrl(p.objectStorageKey),
+                              label: [p.aisle, p.section].filter(Boolean).join(" / ") || `Photo #${p.id}`,
+                              pins: pinsByPhoto.get(p.id) ?? [],
+                              linkedPinLabels: linked,
+                              isDetailShot: p.isDetailShot || false,
+                            };
+                          });
                           const idx = sectionGroup.photos.findIndex(p => p.id === photo.id);
                           setLightbox({ photos: sectionPhotos, index: idx >= 0 ? idx : 0 });
                         }}
