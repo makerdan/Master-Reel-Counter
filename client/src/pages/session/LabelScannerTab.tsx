@@ -610,13 +610,13 @@ export default function LabelScannerTab({
         const savedIncluded = hasSavedSelection ? savedSelections[String(pin.id)] : undefined;
         const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: savedIncluded ?? true, isDraft: !pin.entryId };
         if (sr) {
-          return { ...base, included: savedIncluded ?? false, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
+          return { ...base, included: savedIncluded ?? true, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
         }
         const local = localResultsMap.get(pin.id);
         if (local && local.rawText !== null) {
           return {
             ...base,
-            included: savedIncluded ?? false,
+            included: savedIncluded ?? true,
             editCatalog: local.editCatalog ?? "",
             editFootage: local.editFootage ?? "",
             editVendor: local.editVendor ?? "",
@@ -624,7 +624,7 @@ export default function LabelScannerTab({
             matchResult: local.rawText ? matchLabelText(local.rawText) : undefined,
           };
         }
-        return { ...base, included: savedIncluded ?? false, editCatalog: "", editFootage: "", editVendor: "" };
+        return { ...base, included: savedIncluded ?? true, editCatalog: "", editFootage: "", editVendor: "" };
       });
       builtHasResults = built.some((c) => c.result);
       return builtHasResults ? sortCardsByCatalog(built) : built;
