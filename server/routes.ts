@@ -1049,23 +1049,93 @@ export async function registerRoutes(
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
-      try {
-        const key = photo.objectStorageKey;
-        const shared = await storage.isObjectKeyShared(key, photo.id);
-        if (!shared) {
-          const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
-          const filePath = path.join(UPLOADS_DIR, filename);
-          await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
-          await fs.unlink(filePath).catch(() => {});
+      const keepFile = req.query.keepFile === "1";
+      if (!keepFile) {
+        try {
+          const key = photo.objectStorageKey;
+          const shared = await storage.isObjectKeyShared(key, photo.id);
+          if (!shared) {
+            const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+            const filePath = path.join(UPLOADS_DIR, filename);
+            await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
+            await fs.unlink(filePath).catch(() => {});
+          }
+        } catch (err) {
+          console.warn("Could not delete uploaded file:", err);
         }
-      } catch (err) {
-        console.warn("Could not delete uploaded file:", err);
       }
       await storage.deletePhoto(photo.id);
       logActivity(photo.sessionId, req.user.claims.sub, req.user.claims.username, "photo_deleted", "photo", photo.id, photo.originalFilename || undefined);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete photo" });
+    }
+  });
+
+  app.post("/api/sessions/:id/photos/restore", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to restore photos" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
+
+      const body = req.body;
+      if (!body.objectStorageKey || typeof body.objectStorageKey !== "string") {
+        return res.status(400).json({ message: "objectStorageKey is required" });
+      }
+
+      const safePhotoData: any = {
+        sessionId: access.session.id,
+        userId,
+        objectStorageKey: body.objectStorageKey,
+      };
+      const allowedFields = [
+        "uploadedBy", "originalFilename", "mimeType", "width", "height",
+        "exifTimestamp", "exifGps", "rotation", "aisle", "section", "notes",
+        "isDetailShot", "parentPhotoId", "linkReason", "linkedPinLabel",
+        "pinScale", "fileSize",
+      ];
+      for (const field of allowedFields) {
+        if (body[field] !== undefined) {
+          safePhotoData[field] = body[field];
+        }
+      }
+
+      const photo = await storage.createPhoto(safePhotoData);
+
+      const oldPhotoId = body.oldPhotoId ? parseInt(body.oldPhotoId) : null;
+      const encKey = await getEncryptionKey(access.session.userId);
+
+      const entryIdMap = new Map<number, number>();
+      if (body.entries && Array.isArray(body.entries)) {
+        for (const entryData of body.entries) {
+          const { id: oldId, createdAt: _ca, updatedAt: _ua, ...entryFields } = entryData;
+          let safeEntryData: any = {
+            ...entryFields,
+            sessionId: access.session.id,
+            userId,
+            photoId: (oldPhotoId && entryFields.photoId === oldPhotoId) ? photo.id : (entryFields.photoId || null),
+          };
+          if (encKey) safeEntryData = encryptEntry(safeEntryData, encKey) as any;
+          const parsed = insertEntrySchema.parse(safeEntryData);
+          const newEntry = await storage.createEntry(parsed);
+          if (oldId) entryIdMap.set(oldId, newEntry.id);
+        }
+      }
+
+      if (body.pins && Array.isArray(body.pins)) {
+        for (const pinData of body.pins) {
+          const { id: _id, createdAt: _ca, ...pinFields } = pinData;
+          const restoredEntryId = pinFields.entryId ? (entryIdMap.get(pinFields.entryId) ?? null) : null;
+          await storage.createPin({ ...pinFields, photoId: photo.id, entryId: restoredEntryId });
+        }
+      }
+
+      res.json(photo);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to restore photo" });
     }
   });
 

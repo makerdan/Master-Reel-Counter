@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin";
+type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
 
 interface UndoAction {
   type: ActionType;
@@ -18,11 +18,23 @@ export function useUndoRedo(sessionId: number) {
   const [redoStack, setRedoStack] = useState<UndoAction[]>([]);
   const busyRef = useRef(false);
 
-  const invalidateSession = useCallback(() => {
+  const invalidateSession = useCallback((actionType?: ActionType) => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "dismissed-duplicates"] });
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
+    if (actionType === "create-comment" || actionType === "update-comment" || actionType === "delete-comment") {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "activity"] });
+    }
+    if (actionType === "update-session" || actionType === "lock-session") {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+    }
+    if (actionType === "delete-photo" || actionType === "duplicate-photo") {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
+    }
   }, [sessionId]);
 
   const pushUndo = useCallback((action: UndoAction) => {
@@ -83,6 +95,41 @@ export function useUndoRedo(sessionId: number) {
         await apiRequest("PATCH", `/api/pins/${action.entityId}/flag`, { flagged: true, flagReason: action.previousData?.flagReason ?? null });
         return { type: "flag-pin", sessionId: action.sessionId, entityId: action.entityId, data: { flagged: true, flagReason: action.previousData?.flagReason ?? null }, previousData: { flagged: false, flagReason: null } };
       }
+      case "delete-photo": {
+        const res = await apiRequest("POST", `/api/sessions/${action.sessionId}/photos/restore`, { ...action.previousData, oldPhotoId: action.entityId });
+        const created = await res.json();
+        return { type: "duplicate-photo", sessionId: action.sessionId, entityId: created.id, data: action.previousData, previousData: action.previousData };
+      }
+      case "duplicate-photo": {
+        await apiRequest("DELETE", `/api/photos/${action.entityId}?keepFile=1`);
+        return { type: "delete-photo", sessionId: action.sessionId, entityId: action.entityId, data: action.data, previousData: action.data };
+      }
+      case "update-photo": {
+        await apiRequest("PATCH", `/api/photos/${action.entityId}`, action.previousData);
+        return { type: "update-photo", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
+      }
+      case "update-session": {
+        await apiRequest("PATCH", `/api/sessions/${action.sessionId}`, action.previousData);
+        return { type: "update-session", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
+      }
+      case "lock-session": {
+        const newLocked = !action.data.locked;
+        await apiRequest("POST", `/api/sessions/${action.sessionId}/lock`, { locked: newLocked });
+        return { type: "lock-session", sessionId: action.sessionId, entityId: 0, data: { locked: newLocked }, previousData: action.data };
+      }
+      case "create-comment": {
+        await apiRequest("DELETE", `/api/comments/${action.entityId}`);
+        return { type: "delete-comment", sessionId: action.sessionId, entityId: action.entityId, data: action.data, previousData: action.data };
+      }
+      case "delete-comment": {
+        const res = await apiRequest("POST", `/api/sessions/${action.sessionId}/comments`, action.previousData);
+        const created = await res.json();
+        return { type: "create-comment", sessionId: action.sessionId, entityId: created.id, data: action.previousData };
+      }
+      case "update-comment": {
+        await apiRequest("PATCH", `/api/comments/${action.entityId}`, { text: action.previousData.text });
+        return { type: "update-comment", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
+      }
     }
   }, []);
 
@@ -96,7 +143,7 @@ export function useUndoRedo(sessionId: number) {
       const reversed = await applyReverse(action);
       setUndoStack(prev => prev.slice(0, -1));
       setRedoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reversed]);
-      invalidateSession();
+      invalidateSession(action.type);
     } catch {
     } finally {
       busyRef.current = false;
@@ -113,7 +160,7 @@ export function useUndoRedo(sessionId: number) {
       const reversed = await applyReverse(action);
       setRedoStack(prev => prev.slice(0, -1));
       setUndoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reversed]);
-      invalidateSession();
+      invalidateSession(action.type);
     } catch {
     } finally {
       busyRef.current = false;

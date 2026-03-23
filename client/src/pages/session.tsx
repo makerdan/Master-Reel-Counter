@@ -235,13 +235,21 @@ function SessionWorkspace({
 
   const toggleLock = useMutation({
     mutationFn: async () => {
+      const wasLocked = isLocked;
       const res = await apiRequest("POST", `/api/sessions/${sessionId}/lock`, { locked: !isLocked });
-      return res.json();
+      return { result: await res.json(), wasLocked };
     },
-    onSuccess: () => {
+    onSuccess: ({ wasLocked }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
-      toast({ title: isLocked ? "Session unlocked" : "Session locked" });
+      toast({ title: wasLocked ? "Session unlocked" : "Session locked" });
+      pushUndo({
+        type: "lock-session",
+        sessionId,
+        entityId: 0,
+        data: { locked: !wasLocked },
+        previousData: { locked: wasLocked },
+      });
     },
   });
 
@@ -282,18 +290,29 @@ function SessionWorkspace({
   const totalFootage = entries.reduce((sum, e) => sum + (e.footage || 0), 0);
   const displayTotalFootage = toDisplayUnit(totalFootage, currentUnit);
 
+  const prevSessionValuesRef = useRef<{ name: string; location: string; description: string } | null>(null);
+
   const updateSession = useMutation({
-    mutationFn: async ({ name, location, description }: { name: string; location: string; description?: string }) => {
+    mutationFn: async ({ name, location, description, _previous }: { name: string; location: string; description?: string; _previous?: { name: string; location: string; description: string } }) => {
       const res = await apiRequest("PATCH", `/api/sessions/${sessionId}`, {
         name,
         location: location || null,
         ...(description !== undefined ? { description: description || null } : {}),
       });
-      return res.json();
+      return { result: await res.json(), _previous, newValues: { name, location: location || null, description: description || null } };
     },
-    onSuccess: async () => {
+    onSuccess: async ({ _previous, newValues }) => {
       await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
       queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
+      if (_previous) {
+        pushUndo({
+          type: "update-session",
+          sessionId,
+          entityId: sessionId,
+          data: { name: newValues.name, location: newValues.location, description: newValues.description },
+          previousData: { name: _previous.name, location: _previous.location || null, description: _previous.description || null },
+        });
+      }
     },
     onError: () => {
       toast({ title: "Failed to update session", variant: "destructive" });
@@ -327,7 +346,13 @@ function SessionWorkspace({
     if (editName === session.name && (editLocation || "") === (session.location || "") && (editDescription || "") === ((session as any).description || "")) return;
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      updateSession.mutate({ name: editName, location: editLocation, description: editDescription });
+      const prev = prevSessionValuesRef.current || {
+        name: session.name,
+        location: session.location || "",
+        description: (session as any).description || "",
+      };
+      prevSessionValuesRef.current = { name: editName, location: editLocation, description: editDescription };
+      updateSession.mutate({ name: editName, location: editLocation, description: editDescription, _previous: prev });
     }, 1000);
     return () => clearTimeout(autoSaveTimerRef.current);
   }, [editName, editLocation, editDescription, editSessionOpen]);
@@ -722,7 +747,7 @@ function SessionWorkspace({
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <ActivityLog sessionId={sessionId} currentUserId={user?.id as string | undefined} isOwner={isOwner} />
+            <ActivityLog sessionId={sessionId} currentUserId={user?.id as string | undefined} isOwner={isOwner} onPushUndo={pushUndo} />
           </div>
         </div>
       )}
@@ -810,6 +835,7 @@ function SessionWorkspace({
                     setMode("photo");
                   }}
                   onClearUndoHistory={clearHistory}
+                  onPushUndo={pushUndo}
                   scrollToPhotoId={stripScrollToPhotoId}
                   onScrolled={() => setStripScrollToPhotoId(null)}
                 />
@@ -987,7 +1013,16 @@ function SessionWorkspace({
 
       <Dialog open={editSessionOpen} onOpenChange={(open) => {
         if (!open && editName.trim() && (editName !== session.name || (editLocation || "") !== (session.location || "") || (editDescription || "") !== ((session as any).description || ""))) {
-          updateSession.mutate({ name: editName, location: editLocation, description: editDescription });
+          const prev = prevSessionValuesRef.current || {
+            name: session.name,
+            location: session.location || "",
+            description: (session as any).description || "",
+          };
+          prevSessionValuesRef.current = { name: editName, location: editLocation, description: editDescription };
+          updateSession.mutate({ name: editName, location: editLocation, description: editDescription, _previous: prev });
+        }
+        if (open) {
+          prevSessionValuesRef.current = null;
         }
         setEditSessionOpen(open);
       }}>

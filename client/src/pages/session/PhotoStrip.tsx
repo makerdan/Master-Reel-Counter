@@ -93,6 +93,7 @@ function PhotoCard({
   onJumpToPhoto,
   onLightbox,
   onClearUndoHistory,
+  onPushUndo,
 }: {
   photo: Photo;
   sessionId: number;
@@ -103,6 +104,7 @@ function PhotoCard({
   onJumpToPhoto: (id: number) => void;
   onLightbox: (url: string, label: string) => void;
   onClearUndoHistory?: () => void;
+  onPushUndo?: (action: any) => void;
 }) {
   const { toast } = useToast();
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
@@ -145,18 +147,44 @@ function PhotoCard({
   };
 
   const locationMutation = useMutation({
-    mutationFn: async (update: { aisle?: string; section?: string }) => {
-      await apiRequest("PATCH", `/api/photos/${photo.id}`, update);
+    mutationFn: async (update: { aisle?: string; section?: string; _previous?: { aisle?: string; section?: string } }) => {
+      const { _previous, ...patch } = update;
+      await apiRequest("PATCH", `/api/photos/${photo.id}`, patch);
+      return { patch, _previous };
     },
-    onSuccess: () => { invalidatePhotos(); invalidateEntries(); },
+    onSuccess: (result) => {
+      invalidatePhotos(); invalidateEntries();
+      if (onPushUndo && result?._previous) {
+        onPushUndo({
+          type: "update-photo",
+          sessionId,
+          entityId: photo.id,
+          data: result.patch,
+          previousData: result._previous,
+        });
+      }
+    },
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
 
   const notesMutation = useMutation({
     mutationFn: async (val: string) => {
+      const previousNotes = notesRef.current || "";
       await apiRequest("PATCH", `/api/photos/${photo.id}`, { notes: val });
+      return { notes: val, previousNotes };
     },
-    onSuccess: invalidatePhotos,
+    onSuccess: (result) => {
+      invalidatePhotos();
+      if (onPushUndo && result) {
+        onPushUndo({
+          type: "update-photo",
+          sessionId,
+          entityId: photo.id,
+          data: { notes: result.notes },
+          previousData: { notes: result.previousNotes },
+        });
+      }
+    },
     onError: () => toast({ title: "Failed to save notes", variant: "destructive" }),
   });
 
@@ -291,8 +319,9 @@ function PhotoCard({
 
   const handleAisleBlur = () => {
     if (aisle !== aisleRef.current) {
+      const prev = aisleRef.current;
       aisleRef.current = aisle;
-      locationMutation.mutate({ aisle });
+      locationMutation.mutate({ aisle, _previous: { aisle: prev } });
     }
   };
 
@@ -302,8 +331,9 @@ function PhotoCard({
       return;
     }
     if (section !== sectionRef.current) {
+      const prev = sectionRef.current;
       sectionRef.current = section;
-      locationMutation.mutate({ section });
+      locationMutation.mutate({ section, _previous: { section: prev } });
     }
   };
 
@@ -315,22 +345,53 @@ function PhotoCard({
   };
 
   const duplicateMutation = useMutation({
-    mutationFn: async () => apiRequest("POST", `/api/photos/${photo.id}/duplicate`),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/photos/${photo.id}/duplicate`);
+      return res.json();
+    },
+    onSuccess: (newPhoto) => {
       invalidatePhotos();
+      if (onPushUndo && newPhoto?.id) {
+        onPushUndo({
+          type: "duplicate-photo",
+          sessionId,
+          entityId: newPhoto.id,
+          data: newPhoto,
+        });
+      }
       toast({ title: "Photo duplicated" });
     },
     onError: () => toast({ title: "Failed to duplicate photo", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async () => apiRequest("DELETE", `/api/photos/${photo.id}`),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const { id, createdAt, ...rest } = photo;
+      const capturedPins = [...pins];
+      const pinnedEntryIds = capturedPins.filter(p => p.entryId).map(p => p.entryId!);
+      const entriesRes = await apiRequest("GET", `/api/sessions/${sessionId}/entries`);
+      const allEntries: any[] = await entriesRes.json();
+      const capturedEntries = allEntries.filter(
+        (e: any) => pinnedEntryIds.includes(e.id) || e.photoId === photo.id
+      );
+      await apiRequest("DELETE", `/api/photos/${photo.id}?keepFile=1`);
+      return { photoData: rest, capturedPins, capturedEntries };
+    },
+    onSuccess: ({ photoData, capturedPins, capturedEntries }) => {
       invalidatePhotos();
       invalidateEntries();
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       onClearUndoHistory?.();
+      if (onPushUndo) {
+        onPushUndo({
+          type: "delete-photo",
+          sessionId,
+          entityId: photo.id,
+          data: photoData,
+          previousData: { ...photoData, pins: capturedPins, entries: capturedEntries },
+        });
+      }
       toast({ title: "Photo deleted" });
     },
     onError: () => toast({ title: "Failed to delete photo", variant: "destructive" }),
@@ -914,6 +975,7 @@ export default function PhotoStrip({
   canEdit,
   onJumpToPhoto,
   onClearUndoHistory,
+  onPushUndo,
   scrollToPhotoId,
   onScrolled,
 }: {
@@ -921,6 +983,7 @@ export default function PhotoStrip({
   canEdit: boolean;
   onJumpToPhoto: (photoId: number) => void;
   onClearUndoHistory?: () => void;
+  onPushUndo?: (action: any) => void;
   scrollToPhotoId?: number | null;
   onScrolled?: () => void;
 }) {
@@ -1087,6 +1150,7 @@ export default function PhotoStrip({
                           setLightbox({ photos: sectionPhotos, index: idx >= 0 ? idx : 0 });
                         }}
                         onClearUndoHistory={onClearUndoHistory}
+                        onPushUndo={onPushUndo}
                       />
                     ))}
                   </div>

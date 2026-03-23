@@ -91,10 +91,12 @@ export default function ActivityLog({
   sessionId,
   currentUserId,
   isOwner,
+  onPushUndo,
 }: {
   sessionId: number;
   currentUserId?: string;
   isOwner?: boolean;
+  onPushUndo?: (action: any) => void;
 }) {
   const tz = useTimezone();
   const { toast } = useToast();
@@ -174,10 +176,18 @@ export default function ActivityLog({
       const res = await apiRequest("POST", `/api/sessions/${sessionId}/comments`, { text });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
       setNoteText("");
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "activity"] });
+      if (onPushUndo && created?.id) {
+        onPushUndo({
+          type: "create-comment",
+          sessionId,
+          entityId: created.id,
+          data: created,
+        });
+      }
     },
     onError: () => {
       toast({ title: "Failed to post note", variant: "destructive" });
@@ -185,12 +195,22 @@ export default function ActivityLog({
   });
 
   const deleteNote = useMutation({
-    mutationFn: async (commentId: number) => {
-      const res = await apiRequest("DELETE", `/api/comments/${commentId}`);
-      return res.json();
+    mutationFn: async ({ commentId, noteText }: { commentId: number; noteText: string }) => {
+      await apiRequest("DELETE", `/api/comments/${commentId}`);
+      return { commentId, noteText };
     },
-    onSuccess: () => {
+    onSuccess: ({ commentId, noteText: deletedText }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "activity"] });
+      if (onPushUndo) {
+        onPushUndo({
+          type: "delete-comment",
+          sessionId,
+          entityId: commentId,
+          data: { text: deletedText },
+          previousData: { text: deletedText },
+        });
+      }
     },
     onError: () => {
       toast({ title: "Failed to delete note", variant: "destructive" });
@@ -330,7 +350,7 @@ export default function ActivityLog({
                       size="icon"
                       variant="ghost"
                       className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                      onClick={() => deleteNote.mutate(note.id)}
+                      onClick={() => deleteNote.mutate({ commentId: note.id, noteText: note.text })}
                       disabled={deleteNote.isPending}
                       data-testid={`button-delete-note-${note.id}`}
                       title="Delete note"

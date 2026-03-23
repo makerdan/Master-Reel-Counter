@@ -42,11 +42,13 @@ export default function Comments({
   entryId,
   photoId,
   role,
+  onPushUndo,
 }: {
   sessionId: number;
   entryId?: number;
   photoId?: number;
   role?: string;
+  onPushUndo?: (action: any) => void;
 }) {
   const tz = useTimezone();
   const { user } = useAuth();
@@ -80,34 +82,61 @@ export default function Comments({
       const res = await apiRequest("POST", `/api/sessions/${sessionId}/comments`, body);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });
       setNewText("");
       setReplyTo(null);
       setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }), 100);
+      if (onPushUndo && created?.id) {
+        onPushUndo({
+          type: "create-comment",
+          sessionId,
+          entityId: created.id,
+          data: created,
+        });
+      }
     },
     onError: () => toast({ title: "Failed to post comment", variant: "destructive" }),
   });
 
   const updateComment = useMutation({
-    mutationFn: async ({ id, text }: { id: number; text: string }) => {
+    mutationFn: async ({ id, text, previousText }: { id: number; text: string; previousText: string }) => {
       const res = await apiRequest("PATCH", `/api/comments/${id}`, { text });
-      return res.json();
+      return { comment: await res.json(), previousText };
     },
-    onSuccess: () => {
+    onSuccess: ({ comment, previousText }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });
       setEditingId(null);
       setEditText("");
+      if (onPushUndo && comment?.id) {
+        onPushUndo({
+          type: "update-comment",
+          sessionId,
+          entityId: comment.id,
+          data: { text: comment.text },
+          previousData: { text: previousText },
+        });
+      }
     },
     onError: () => toast({ title: "Failed to update comment", variant: "destructive" }),
   });
 
   const deleteComment = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async ({ id, comment }: { id: number; comment: CommentData }) => {
       await apiRequest("DELETE", `/api/comments/${id}`);
+      return comment;
     },
-    onSuccess: () => {
+    onSuccess: (deletedComment) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "comments"] });
+      if (onPushUndo && deletedComment) {
+        onPushUndo({
+          type: "delete-comment",
+          sessionId,
+          entityId: deletedComment.id,
+          data: deletedComment,
+          previousData: { text: deletedComment.text, entryId: deletedComment.entryId, photoId: deletedComment.photoId, parentCommentId: deletedComment.parentCommentId },
+        });
+      }
     },
     onError: () => toast({ title: "Failed to delete comment", variant: "destructive" }),
   });
@@ -142,7 +171,7 @@ export default function Comments({
             data-testid={`input-edit-comment-${comment.id}`}
           />
           <div className="flex gap-1 mt-1">
-            <Button size="sm" variant="default" className="h-6 text-xs px-2" onClick={() => updateComment.mutate({ id: comment.id, text: editText })} disabled={!editText.trim()} data-testid={`button-save-edit-${comment.id}`}>
+            <Button size="sm" variant="default" className="h-6 text-xs px-2" onClick={() => updateComment.mutate({ id: comment.id, text: editText, previousText: comment.text })} disabled={!editText.trim()} data-testid={`button-save-edit-${comment.id}`}>
               Save
             </Button>
             <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => { setEditingId(null); setEditText(""); }}>
@@ -178,7 +207,7 @@ export default function Comments({
                 </Button>
               )}
               {isOwn && (
-                <Button size="sm" variant="ghost" className="h-5 text-[10px] px-1 text-destructive" onClick={() => deleteComment.mutate(comment.id)} data-testid={`button-delete-comment-${comment.id}`}>
+                <Button size="sm" variant="ghost" className="h-5 text-[10px] px-1 text-destructive" onClick={() => deleteComment.mutate({ id: comment.id, comment })} data-testid={`button-delete-comment-${comment.id}`}>
                   <Trash2 className="h-3 w-3" />
                 </Button>
               )}
