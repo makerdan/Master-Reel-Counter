@@ -59,7 +59,7 @@ export default function SessionProgress({
 
   const metrics = useMemo(() => {
     const total = entries.length;
-    const photographed = entries.filter(e => pinByEntryId.has(e.id)).length;
+    const pinned = entries.filter(e => pinByEntryId.has(e.id)).length;
     const tagged = entries.filter(e => e.wireType && e.gauge && e.footage).length;
 
     const reviewedEntryIds = new Set(reviewResponses.map(r => r.entryId));
@@ -75,7 +75,7 @@ export default function SessionProgress({
       e => flaggedPinEntryIds.has(e.id) || flaggedReviewEntryIds.has(e.id)
     ).length;
 
-    return { total, photographed, tagged, reviewed, flagged };
+    return { total, pinned, tagged, reviewed, flagged };
   }, [entries, pinByEntryId, reviewResponses, pins]);
 
   if (metrics.total === 0) return null;
@@ -98,7 +98,7 @@ export default function SessionProgress({
         <span className="text-sm font-semibold">Session Progress</span>
         {collapsed && (
           <span className="text-xs text-muted-foreground ml-auto">
-            {metrics.photographed}/{metrics.total} photographed · {metrics.tagged}/{metrics.total} tagged
+            {metrics.pinned}/{metrics.total} pinned · {metrics.tagged}/{metrics.total} tagged
           </span>
         )}
       </button>
@@ -106,9 +106,9 @@ export default function SessionProgress({
         <CardContent className="pt-0 pb-3 px-3">
           <div className="flex flex-wrap gap-4">
             <ProgressBar
-              label="Photographed"
+              label="Pinned"
               icon={Camera}
-              current={metrics.photographed}
+              current={metrics.pinned}
               total={metrics.total}
               colorClass="bg-blue-500"
             />
