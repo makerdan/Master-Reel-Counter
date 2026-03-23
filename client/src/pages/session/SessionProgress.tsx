@@ -1,19 +1,19 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Camera, Tag, CheckCircle2, Flag } from "lucide-react";
+import { ChevronDown, MapPin, CheckCircle2, Flag, CircleDot } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Entry, Pin, ReviewResponse } from "@shared/schema";
 
-function ProgressBar({ label, icon: Icon, current, total, colorClass }: {
+function MetricBar({ label, icon: Icon, current, total, colorClass }: {
   label: string;
-  icon: typeof Camera;
+  icon: typeof MapPin;
   current: number;
   total: number;
   colorClass: string;
 }) {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
   return (
-    <div className="flex-1 min-w-[140px]" data-testid={`progress-${label.toLowerCase()}`}>
+    <div className="flex-1 min-w-[140px]" data-testid={`progress-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <div className="flex items-center gap-1.5 mb-1">
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
@@ -23,7 +23,7 @@ function ProgressBar({ label, icon: Icon, current, total, colorClass }: {
         <div
           className={`h-full rounded-full transition-all duration-300 ${colorClass}`}
           style={{ width: `${pct}%` }}
-          data-testid={`progress-bar-${label.toLowerCase()}`}
+          data-testid={`progress-bar-${label.toLowerCase().replace(/\s+/g, "-")}`}
         />
       </div>
     </div>
@@ -52,33 +52,34 @@ export default function SessionProgress({
     enabled: sessionId > 0,
   });
 
-  const pinByEntryId = useMemo(
-    () => new Map(pins.filter(p => p.entryId).map(p => [p.entryId!, p])),
-    [pins]
-  );
-
   const metrics = useMemo(() => {
-    const total = entries.length;
-    const pinned = entries.filter(e => pinByEntryId.has(e.id)).length;
-    const tagged = entries.filter(e => e.wireType && e.gauge && e.footage).length;
+    const totalPins = pins.length;
+    const activePins = pins.filter(p => !p.entryId).length;
+    const committedPins = pins.filter(p => !!p.entryId).length;
 
-    const reviewedEntryIds = new Set(reviewResponses.map(r => r.entryId));
-    const reviewed = entries.filter(e => reviewedEntryIds.has(e.id)).length;
+    const reviewableEntryIds = new Set(
+      pins.filter(p => p.entryId).map(p => p.entryId!)
+    );
+    const totalReviewable = reviewableEntryIds.size;
+    const approvedEntryIds = new Set(
+      reviewResponses.filter(r => r.verdict === "approved").map(r => r.entryId)
+    );
+    const reviewed = entries.filter(e => approvedEntryIds.has(e.id)).length;
 
-    const flaggedPinEntryIds = new Set(
-      pins.filter(p => p.flagged && p.entryId).map(p => p.entryId!)
+    const flaggedPinIds = new Set(
+      pins.filter(p => p.flagged).map(p => p.id)
     );
     const flaggedReviewEntryIds = new Set(
       reviewResponses.filter(r => r.verdict === "flagged").map(r => r.entryId)
     );
-    const flagged = entries.filter(
-      e => flaggedPinEntryIds.has(e.id) || flaggedReviewEntryIds.has(e.id)
-    ).length;
+    const flaggedFromReviews = entries.filter(e => flaggedReviewEntryIds.has(e.id)).length;
+    const flaggedTotal = flaggedPinIds.size + flaggedFromReviews;
 
-    return { total, pinned, tagged, reviewed, flagged };
-  }, [entries, pinByEntryId, reviewResponses, pins]);
+    return { totalPins, activePins, committedPins, totalReviewable, reviewed, flaggedTotal };
+  }, [entries, pins, reviewResponses]);
 
-  if (metrics.total === 0) return null;
+  const totalPins = metrics.totalPins;
+  if (totalPins === 0 && entries.length === 0) return null;
 
   const toggle = () => {
     const next = !collapsed;
@@ -98,39 +99,39 @@ export default function SessionProgress({
         <span className="text-sm font-semibold">Session Progress</span>
         {collapsed && (
           <span className="text-xs text-muted-foreground ml-auto">
-            {metrics.pinned}/{metrics.total} pinned · {metrics.tagged}/{metrics.total} tagged
+            {metrics.activePins} active · {metrics.committedPins} committed · {metrics.reviewed} reviewed
           </span>
         )}
       </button>
       {!collapsed && (
         <CardContent className="pt-0 pb-3 px-3">
           <div className="flex flex-wrap gap-4">
-            <ProgressBar
-              label="Pinned"
-              icon={Camera}
-              current={metrics.pinned}
-              total={metrics.total}
+            <MetricBar
+              label="Active Pins"
+              icon={CircleDot}
+              current={metrics.activePins}
+              total={metrics.totalPins}
               colorClass="bg-blue-500"
             />
-            <ProgressBar
-              label="Tagged"
-              icon={Tag}
-              current={metrics.tagged}
-              total={metrics.total}
+            <MetricBar
+              label="Committed Pins"
+              icon={MapPin}
+              current={metrics.committedPins}
+              total={metrics.totalPins}
               colorClass="bg-green-500"
             />
-            <ProgressBar
+            <MetricBar
               label="Reviewed"
               icon={CheckCircle2}
               current={metrics.reviewed}
-              total={metrics.total}
+              total={metrics.totalReviewable}
               colorClass="bg-purple-500"
             />
-            <ProgressBar
+            <MetricBar
               label="Flagged"
               icon={Flag}
-              current={metrics.flagged}
-              total={metrics.total}
+              current={metrics.flaggedTotal}
+              total={metrics.totalPins}
               colorClass="bg-amber-500"
             />
           </div>
