@@ -841,7 +841,7 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(dismissedDuplicates).where(eq(dismissedDuplicates.sessionId, sessionId));
       await tx.delete(reviewResponses).where(eq(reviewResponses.sessionId, sessionId));
       await tx.delete(activityLogs).where(eq(activityLogs.sessionId, sessionId));
-      await tx.update(photos).set({ pinScale: 1 }).where(eq(photos.sessionId, sessionId));
+      await tx.update(photos).set({ pinScale: 1, isDetailShot: false, parentPhotoId: null, linkedPinLabel: null }).where(eq(photos.sessionId, sessionId));
       await tx.update(countingSessions).set({ status: "active" }).where(eq(countingSessions.id, sessionId));
     });
   }
