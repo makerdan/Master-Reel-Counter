@@ -1461,7 +1461,7 @@ export default function LabelScannerTab({
                 <div className={`grid gap-3 ${
                   phase === "preview"
                     ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-                    : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                    : "grid-cols-1 sm:grid-cols-2"
                 }`}>
                   {batch.cards.map((card) => {
                     const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
@@ -1473,7 +1473,7 @@ export default function LabelScannerTab({
                     return (
                       <div
                         key={card.pin.id}
-                        className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors overflow-hidden ${
+                        className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors ${
                           card.included
                             ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)]"
                             : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)] opacity-60"
@@ -1626,7 +1626,7 @@ export default function LabelScannerTab({
                           </div>
                         )}
                         {!card.result && phase === "results" && (
-                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)] overflow-hidden" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
                             <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
                               Not analyzed — enter manually
                             </Badge>
@@ -1692,7 +1692,7 @@ export default function LabelScannerTab({
         <div className={`grid gap-3 ${
           batchMode && phase === "preview"
             ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
-            : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+            : "grid-cols-1 sm:grid-cols-2"
         }`}>
         {displayCards.map((card) => {
           const hasFilled = !!(card.pin.wireDetails && card.pin.footage);
@@ -1705,7 +1705,7 @@ export default function LabelScannerTab({
           return (
             <div
               key={card.pin.id}
-              className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors overflow-hidden ${
+              className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors ${
                 card.included
                   ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)]"
                   : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)] opacity-60"
@@ -1884,7 +1884,7 @@ export default function LabelScannerTab({
               )}
 
               {!card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)] overflow-hidden" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
                   <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
                     Not analyzed — enter manually
                   </Badge>
