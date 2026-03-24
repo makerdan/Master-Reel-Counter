@@ -597,7 +597,7 @@ function RoleComparisonSection({ roleComparison }: { roleComparison: RoleCompari
                       className={`flex items-center gap-2 ${isYou ? "bg-primary/5 rounded-md px-1.5 py-0.5 ring-1 ring-primary/20" : ""} ${!hasValue && !isYou ? "opacity-40" : ""}`}
                       data-testid={`role-bar-${metric.key}-${role.toLowerCase()}`}
                     >
-                      <span className={`w-14 text-xs font-medium shrink-0 ${isYou ? "text-primary font-semibold" : hasValue ? colors.text : "text-muted-foreground"}`}>
+                      <span className={`w-14 text-xs font-medium shrink-0 ${isYou ? "text-primary font-semibold" : hasValue ? "text-foreground" : "text-muted-foreground"}`}>
                         {role}
                       </span>
                       <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
