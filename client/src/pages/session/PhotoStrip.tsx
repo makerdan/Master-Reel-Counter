@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
+import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -566,7 +569,7 @@ function PhotoCard({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {parentId !== null ? (
+          {parentId !== null && (
             <span className="inline-flex items-center gap-0.5">
               <span
                 className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0 h-4 rounded border font-medium ${linkBadgeColor}`}
@@ -588,8 +591,10 @@ function PhotoCard({
                 </button>
               )}
             </span>
-          ) : (
-            canEdit && (
+          )}
+
+          <div className="hidden sm:flex items-center gap-3 flex-1">
+            {parentId === null && canEdit && (
               <button
                 className="text-muted-foreground hover:text-primary transition-colors"
                 onClick={() => setLinkPickerOpen((o) => !o)}
@@ -598,57 +603,122 @@ function PhotoCard({
               >
                 <Link2 className="h-3.5 w-3.5" />
               </button>
-            )
-          )}
+            )}
 
-          {canEdit && (
+            {canEdit && (
+              <button
+                className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); }}
+                disabled={duplicateMutation.isPending}
+                title="Duplicate this photo"
+                data-testid={`button-strip-duplicate-${photo.id}`}
+              >
+                {duplicateMutation.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            )}
+
+            {canEdit && (
+              confirmDelete ? (
+                <button
+                  className="text-[10px] font-medium text-destructive border border-destructive/50 rounded px-1 py-0 h-4 hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                  onPointerDown={(e) => { e.preventDefault(); deleteMutation.mutate(); }}
+                  onBlur={() => setConfirmDelete(false)}
+                  disabled={deleteMutation.isPending}
+                  title="Confirm delete"
+                  data-testid={`button-strip-delete-confirm-${photo.id}`}
+                  autoFocus
+                >
+                  {deleteMutation.isPending ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : "Delete?"}
+                </button>
+              ) : (
+                <button
+                  className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                  onPointerDown={(e) => { e.preventDefault(); setConfirmDelete(true); }}
+                  disabled={deleteMutation.isPending}
+                  title="Delete this photo"
+                  data-testid={`button-strip-delete-${photo.id}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )
+            )}
+
             <button
-              className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-              onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); }}
-              disabled={duplicateMutation.isPending}
-              title="Duplicate this photo"
-              data-testid={`button-strip-duplicate-${photo.id}`}
+              className="ml-auto"
+              onClick={() => setNotesOpen((o) => !o)}
+              title={hasNotes ? "View/edit notes" : "Add notes"}
+              data-testid={`button-strip-notes-${photo.id}`}
             >
-              {duplicateMutation.isPending
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <Copy className="h-3.5 w-3.5" />}
+              <Pencil className={`h-3.5 w-3.5 ${hasNotes ? "text-primary fill-primary/20" : "text-muted-foreground"}`} />
             </button>
-          )}
+          </div>
 
-          {canEdit && (
-            confirmDelete ? (
-              <button
-                className="text-[10px] font-medium text-destructive border border-destructive/50 rounded px-1 py-0 h-4 hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                onPointerDown={(e) => { e.preventDefault(); deleteMutation.mutate(); }}
-                onBlur={() => setConfirmDelete(false)}
-                disabled={deleteMutation.isPending}
-                title="Confirm delete"
-                data-testid={`button-strip-delete-confirm-${photo.id}`}
-                autoFocus
-              >
-                {deleteMutation.isPending ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : "Delete?"}
-              </button>
-            ) : (
-              <button
-                className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
-                onPointerDown={(e) => { e.preventDefault(); setConfirmDelete(true); }}
-                disabled={deleteMutation.isPending}
-                title="Delete this photo"
-                data-testid={`button-strip-delete-${photo.id}`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )
-          )}
-
-          <button
-            className="ml-auto"
-            onClick={() => setNotesOpen((o) => !o)}
-            title={hasNotes ? "View/edit notes" : "Add notes"}
-            data-testid={`button-strip-notes-${photo.id}`}
-          >
-            <Pencil className={`h-3.5 w-3.5 ${hasNotes ? "text-primary fill-primary/20" : "text-muted-foreground"}`} />
-          </button>
+          <div className="sm:hidden ml-auto">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-1 rounded hover:bg-muted transition-colors" data-testid={`button-strip-actions-${photo.id}`}>
+                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[160px]">
+                {parentId === null && canEdit && (
+                  <DropdownMenuItem
+                    onClick={() => setLinkPickerOpen((o) => !o)}
+                    data-testid={`menu-strip-link-${photo.id}`}
+                  >
+                    <Link2 className="h-4 w-4 mr-2" />
+                    Link to parent
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={() => setNotesOpen((o) => !o)}
+                  data-testid={`menu-strip-notes-${photo.id}`}
+                >
+                  <Pencil className={`h-4 w-4 mr-2 ${hasNotes ? "text-primary" : ""}`} />
+                  {hasNotes ? "View notes" : "Add notes"}
+                </DropdownMenuItem>
+                {canEdit && (
+                  <DropdownMenuItem
+                    onClick={() => duplicateMutation.mutate()}
+                    disabled={duplicateMutation.isPending}
+                    data-testid={`menu-strip-duplicate-${photo.id}`}
+                  >
+                    {duplicateMutation.isPending
+                      ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      : <Copy className="h-4 w-4 mr-2" />}
+                    Duplicate
+                  </DropdownMenuItem>
+                )}
+                {canEdit && (
+                  confirmDelete ? (
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive font-semibold"
+                      onClick={(e) => { e.preventDefault(); deleteMutation.mutate(); }}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`menu-strip-delete-confirm-${photo.id}`}
+                    >
+                      {deleteMutation.isPending
+                        ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        : <Trash2 className="h-4 w-4 mr-2" />}
+                      Confirm Delete?
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={(e) => { e.preventDefault(); setConfirmDelete(true); }}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`menu-strip-delete-${photo.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  )
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {isDetail && linkReason && (
