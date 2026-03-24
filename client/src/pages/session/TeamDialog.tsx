@@ -221,7 +221,7 @@ export default function TeamDialog({
           })()}
 
           <Tabs defaultValue="username" className="w-full">
-            <TabsList className="w-full" data-testid="tabs-invite-method">
+            <TabsList className="w-full grid grid-cols-2 sm:flex h-auto sm:h-9" data-testid="tabs-invite-method">
               <TabsTrigger value="username" className="flex-1 border border-white/20" data-testid="tab-invite-username">
                 <UserPlus className="h-3 w-3 mr-1" />
                 Username

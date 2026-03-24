@@ -1441,6 +1441,16 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
+  const scrollInputIntoView = useCallback((el: HTMLElement) => {
+    if (!isMobile) return;
+    const fixedOffset = 53 + previewHeight + 8;
+    const rect = el.getBoundingClientRect();
+    if (rect.top < fixedOffset) {
+      const scrollTop = window.scrollY + rect.top - fixedOffset;
+      window.scrollTo({ top: scrollTop, behavior: "smooth" });
+    }
+  }, [isMobile, previewHeight]);
+
   return (
     <div className="rounded-lg border border-blue-500 sm:!border-blue-600/50 bg-[hsl(210_10%_96%)] dark:bg-[hsl(215_10%_13%)] p-4 overflow-hidden">
       <div className="space-y-4 min-w-0">
@@ -1485,6 +1495,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               placeholder="Aisle..."
               className={`w-24 border-2 !border-blue-600 dark:!border-blue-400 focus-visible:ring-blue-500 bg-white dark:bg-[hsl(215_10%_10%)] placeholder:text-blue-700 placeholder:font-semibold ${aisle.trim() ? "input-filled" : "input-pulse-empty"}`}
               enterKeyHint="next"
+              onFocus={(e) => scrollInputIntoView(e.currentTarget)}
               data-testid="input-photo-aisle"
             />
           </div>
@@ -1510,6 +1521,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               placeholder="Sec..."
               className={`w-14 border-2 !border-blue-600 dark:!border-blue-400 focus-visible:ring-blue-500 bg-white dark:bg-[hsl(215_10%_10%)] placeholder:text-blue-700 placeholder:font-semibold ${(currentPhoto?.section || "").trim() ? "input-filled" : "input-pulse-empty"}`}
               enterKeyHint="done"
+              onFocus={(e) => scrollInputIntoView(e.currentTarget)}
               data-testid="input-photo-section-top"
             />
           </div>
@@ -2404,6 +2416,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             onFocus={(e) => {
                               setSelectedPinId(pin.id);
                               setSuggestionIndex(-1);
+                              scrollInputIntoView(e.currentTarget);
                               if (pin.wireDetails) {
                                 const matches = lookupCategory(pin.wireDetails, userParsedCatalog);
                                 setSuggestions(matches);
@@ -2516,7 +2529,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                 updatePinField(pin.id, "vendorCode", e.target.value);
                               }
                             }}
-                            onFocus={() => setSelectedPinId(pin.id)}
+                            onFocus={(e) => { setSelectedPinId(pin.id); scrollInputIntoView(e.currentTarget); }}
                             data-testid={`select-vendor-code-${index}`}
                           >
                             <option value="">--</option>
@@ -2576,7 +2589,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               const raw = e.target.value.replace(/,/g, "");
                               updatePinField(pin.id, "footage", raw ? toBaseFeet(parseInt(raw), currentUnit) : undefined);
                             }}
-                            onFocus={() => { setSelectedPinId(pin.id); setFocusedFootagePinId(pin.id); }}
+                            onFocus={(e) => { setSelectedPinId(pin.id); setFocusedFootagePinId(pin.id); scrollInputIntoView(e.currentTarget); }}
                             onBlur={() => setFocusedFootagePinId(null)}
                             autoComplete="off"
                             data-testid={`input-footage-${index}`}
@@ -2587,7 +2600,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             type="number"
                             value={pin.reelCount}
                             onChange={(e) => updatePinField(pin.id, "reelCount", Math.max(1, parseInt(e.target.value) || 1))}
-                            onFocus={() => setSelectedPinId(pin.id)}
+                            onFocus={(e) => { setSelectedPinId(pin.id); scrollInputIntoView(e.currentTarget); }}
                             min={1}
                             inputMode="numeric"
                             autoComplete="off"

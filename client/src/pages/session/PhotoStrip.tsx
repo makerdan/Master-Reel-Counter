@@ -1194,7 +1194,16 @@ export default function PhotoStrip({
                 onClick={() => onJumpToPhoto(aisleGroup.sections[0].photos[0].id)}
                 data-testid={`link-strip-aisle-${aisleGroup.aisle || "none"}`}
               >
-                {aisleGroup.aisle ? `Aisle: ${aisleGroup.aisle}` : "No Aisle Set"}
+                {aisleGroup.aisle ? (
+                  <>
+                    <span className="sm:hidden">
+                      {`Aisle: ${aisleGroup.aisle.toLowerCase() === "receiving" ? "Rec." : aisleGroup.aisle}`}
+                    </span>
+                    <span className="hidden sm:inline">
+                      {`Aisle: ${aisleGroup.aisle}`}
+                    </span>
+                  </>
+                ) : "No Aisle Set"}
               </button>
               <span className="ml-2 text-xs text-muted-foreground">
                 ({totalPhotos} photo{totalPhotos !== 1 ? "s" : ""})
