@@ -1914,7 +1914,7 @@ export default function Dashboard() {
           </>
         )}
 
-        {hasMoreSessions && !showTrash && (
+        {hasMoreSessions && !showTrash && !(isSearching && !filteredSessions.length && !filteredSharedSessions.length) && (
           <div className="flex justify-center pt-4">
             <Button
               variant="outline"
