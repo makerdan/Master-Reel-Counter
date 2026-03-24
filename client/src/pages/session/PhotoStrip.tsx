@@ -123,6 +123,7 @@ function PhotoCard({
   const [customReasonOpen, setCustomReasonOpen] = useState(false);
   const [customReasonText, setCustomReasonText] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [relabelLinkDialog, setRelabelLinkDialog] = useState<{ parentPinLabel: string; pinsToRelabel: Pin[]; linkParams: { parentId: number; reason: string; pinLabel: string } } | null>(null);
   const [relabelUnlinkDialog, setRelabelUnlinkDialog] = useState<{ pinsToRelabel: Pin[] } | null>(null);
   const aisleRef = useRef(aisle);
@@ -606,17 +607,29 @@ function PhotoCard({
             )}
 
             {canEdit && (
-              <button
-                className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); }}
-                disabled={duplicateMutation.isPending}
-                title="Duplicate this photo"
-                data-testid={`button-strip-duplicate-${photo.id}`}
-              >
-                {duplicateMutation.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Copy className="h-3.5 w-3.5" />}
-              </button>
+              confirmDuplicate ? (
+                <button
+                  className="text-[10px] font-medium text-primary border border-primary/50 rounded px-1 py-0 h-4 hover:bg-primary/10 transition-colors disabled:opacity-50"
+                  onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); setConfirmDuplicate(false); }}
+                  onBlur={() => setConfirmDuplicate(false)}
+                  disabled={duplicateMutation.isPending}
+                  title="Confirm duplicate"
+                  data-testid={`button-strip-duplicate-confirm-${photo.id}`}
+                  autoFocus
+                >
+                  {duplicateMutation.isPending ? <Loader2 className="h-2.5 w-2.5 animate-spin inline" /> : "Duplicate?"}
+                </button>
+              ) : (
+                <button
+                  className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                  onPointerDown={(e) => { e.preventDefault(); setConfirmDuplicate(true); }}
+                  disabled={duplicateMutation.isPending}
+                  title="Duplicate this photo"
+                  data-testid={`button-strip-duplicate-${photo.id}`}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              )
             )}
 
             {canEdit && (
@@ -680,16 +693,28 @@ function PhotoCard({
                   {hasNotes ? "View notes" : "Add notes"}
                 </DropdownMenuItem>
                 {canEdit && (
-                  <DropdownMenuItem
-                    onClick={() => duplicateMutation.mutate()}
-                    disabled={duplicateMutation.isPending}
-                    data-testid={`menu-strip-duplicate-${photo.id}`}
-                  >
-                    {duplicateMutation.isPending
-                      ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      : <Copy className="h-4 w-4 mr-2" />}
-                    Duplicate
-                  </DropdownMenuItem>
+                  confirmDuplicate ? (
+                    <DropdownMenuItem
+                      className="text-primary focus:text-primary font-semibold"
+                      onClick={(e) => { e.preventDefault(); duplicateMutation.mutate(); setConfirmDuplicate(false); }}
+                      disabled={duplicateMutation.isPending}
+                      data-testid={`menu-strip-duplicate-confirm-${photo.id}`}
+                    >
+                      {duplicateMutation.isPending
+                        ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        : <Copy className="h-4 w-4 mr-2" />}
+                      Confirm Duplicate?
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onSelect={(e) => { e.preventDefault(); setConfirmDuplicate(true); }}
+                      disabled={duplicateMutation.isPending}
+                      data-testid={`menu-strip-duplicate-${photo.id}`}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Duplicate
+                    </DropdownMenuItem>
+                  )
                 )}
                 {canEdit && (
                   confirmDelete ? (
