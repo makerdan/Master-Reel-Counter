@@ -880,13 +880,34 @@ function Lightbox({
     return () => document.removeEventListener("keydown", handleKey);
   }, [handleKey]);
 
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const dt = Date.now() - touchStartRef.current.time;
+    touchStartRef.current = null;
+    if (dt > 500 || Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
+    if (dx < 0) next();
+    else prev();
+  }, [prev, next]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90"
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       data-testid="lightbox-overlay"
     >
-      <div className="absolute top-3 right-3 flex items-center gap-2">
+      <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
         <span className="text-white/70 text-sm truncate max-w-[200px]">{current.label}</span>
         <button
           className="text-white/80 hover:text-white bg-black/40 rounded-full p-1.5 transition-colors"
@@ -900,20 +921,20 @@ function Lightbox({
 
       {hasPrev && (
         <button
-          className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white bg-black/40 hover:bg-black/70 rounded-full p-2 transition-colors"
+          className="absolute left-1 sm:left-4 top-1/2 -translate-y-1/2 z-10 text-white/80 hover:text-white bg-black/60 hover:bg-black/80 rounded-full p-1.5 sm:p-2 transition-colors"
           onClick={(e) => { e.stopPropagation(); prev(); }}
           data-testid="button-lightbox-prev"
           title="Previous (←)"
         >
-          <ChevronLeft className="h-6 w-6" />
+          <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
         </button>
       )}
 
-      <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div className="relative px-10 sm:px-16" onClick={(e) => e.stopPropagation()}>
         <img
           src={current.url}
           alt={current.label}
-          className="max-w-[85vw] max-h-[88vh] object-contain rounded shadow-2xl block"
+          className="max-w-[calc(100vw-5rem)] sm:max-w-[85vw] max-h-[88vh] object-contain rounded shadow-2xl block"
           data-testid="img-lightbox-full"
         />
         {current.pins && current.pins.map((pin) => {
@@ -945,12 +966,12 @@ function Lightbox({
 
       {hasNext && (
         <button
-          className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white bg-black/40 hover:bg-black/70 rounded-full p-2 transition-colors"
+          className="absolute right-1 sm:right-4 top-1/2 -translate-y-1/2 z-10 text-white/80 hover:text-white bg-black/60 hover:bg-black/80 rounded-full p-1.5 sm:p-2 transition-colors"
           onClick={(e) => { e.stopPropagation(); next(); }}
           data-testid="button-lightbox-next"
           title="Next (→)"
         >
-          <ChevronRight className="h-6 w-6" />
+          <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
         </button>
       )}
 
@@ -959,7 +980,7 @@ function Lightbox({
           {photos.map((_, i) => (
             <button
               key={i}
-              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === index ? "bg-white" : "bg-white/30 hover:bg-white/60"}`}
+              className={`w-2 h-2 rounded-full transition-colors ${i === index ? "bg-white" : "bg-white/30 hover:bg-white/60"}`}
               onClick={(e) => { e.stopPropagation(); onNavigate(i); }}
               data-testid={`button-lightbox-dot-${i}`}
             />
