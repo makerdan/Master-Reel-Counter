@@ -1306,12 +1306,17 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background dashboard-theme">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="relative flex items-center gap-2 px-4 py-3 max-w-5xl mx-auto">
-          <div className="flex items-center gap-2 shrink-0 min-w-0">
+          <button
+            className="flex items-center gap-2 shrink-0 min-w-0 hover:opacity-80 transition-opacity"
+            onClick={() => { setLocation("/"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            data-testid="button-home-nav"
+            title="Go to Sessions Dashboard"
+          >
             <Cable className="h-5 w-5 text-primary shrink-0" />
             <span className="font-semibold text-sm truncate max-w-[80px] sm:max-w-none" data-testid="text-user-name">
               {user?.firstName || "User"}
             </span>
-          </div>
+          </button>
           <div className="absolute inset-0 hidden sm:flex items-center justify-center pointer-events-none">
             <span className="text-sm font-semibold tracking-wide text-black dark:text-white underline truncate" data-testid="text-app-title">
               Master Reel Counter
@@ -1472,9 +1477,10 @@ export default function Dashboard() {
             </Dialog>
             <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
               <DialogTrigger asChild>
-                <Button data-testid="button-new-session" title="Create a new counting session">
+                <Button data-testid="button-new-session" title="Create a new counting session" size="sm">
                   <Plus className="h-4 w-4" />
-                  New Session
+                  <span className="hidden sm:inline">New Session</span>
+                  <span className="sm:hidden">New</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -1534,10 +1540,11 @@ export default function Dashboard() {
                 if (e.key === "Enter" && searchQuery.trim()) {
                   addRecentSearch(searchQuery);
                   setShowRecentSearches(false);
+                  (e.target as HTMLInputElement).blur();
                 }
               }}
               placeholder="Search sessions..."
-              className="pl-9 pr-9"
+              className="pl-9 pr-10"
               data-testid="input-search-sessions"
             />
             {searchQuery && (
@@ -1546,7 +1553,7 @@ export default function Dashboard() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7"
                     onClick={() => { setSearchQuery(""); setShowRecentSearches(false); }}
                     data-testid="button-clear-search"
                   >

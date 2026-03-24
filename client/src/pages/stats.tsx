@@ -256,9 +256,9 @@ export default function StatsPage() {
                                     className="h-4 bg-primary/80 rounded-sm"
                                     style={{ width: `${(w.entries / maxWeeklyEntries) * 100}%`, minWidth: w.entries > 0 ? 4 : 0 }}
                                   />
-                                  <span className="mono text-muted-foreground shrink-0">{w.entries} entries</span>
+                                  <span className="mono text-muted-foreground shrink-0">{w.entries}<span className="hidden sm:inline"> entries</span></span>
                                 </div>
-                                <span className="mono text-muted-foreground shrink-0 w-20 text-right">{w.footage.toLocaleString()} ft</span>
+                                <span className="mono text-muted-foreground shrink-0 w-16 sm:w-20 text-right">{w.footage.toLocaleString()} ft</span>
                               </div>
                             );
                           })}
@@ -419,7 +419,7 @@ export default function StatsPage() {
                       <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Reviews (Approved):" value={stats.dataQuality.approvedCount} testId="stat-approved-reviews" />
                       <StatCard icon={<Flag className="h-4 w-4" />} label="Reviews (Flagged):" value={stats.dataQuality.flaggedCount} testId="stat-flagged-reviews" />
                       {stats.dataQuality.dismissedDuplicateCount > 0 && (
-                        <StatCard icon={<Layers className="h-4 w-4" />} label="Dismissed Dupes:" value={stats.dataQuality.dismissedDuplicateCount} testId="stat-dismissed-dupes" />
+                        <StatCard icon={<Layers className="h-4 w-4" />} label="Dismissed Duplicates:" value={stats.dataQuality.dismissedDuplicateCount} testId="stat-dismissed-dupes" />
                       )}
                     </div>
                   </section>
@@ -606,7 +606,7 @@ function RoleComparisonSection({ roleComparison }: { roleComparison: RoleCompari
                           style={{ width: `${(value / maxVal) * 100}%`, minWidth: hasValue ? 4 : 0 }}
                         />
                       </div>
-                      <span className={`text-xs mono shrink-0 w-16 text-right ${isYou ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+                      <span className={`text-xs mono shrink-0 w-16 text-right ${isYou ? "text-primary font-semibold" : "text-foreground"}`}>
                         {metric.format(value)}
                       </span>
                     </div>
