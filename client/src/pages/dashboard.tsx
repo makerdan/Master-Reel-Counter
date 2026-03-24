@@ -1312,7 +1312,7 @@ export default function Dashboard() {
               {user?.firstName || "User"}
             </span>
           </div>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 hidden sm:flex items-center justify-center pointer-events-none">
             <span className="text-sm font-semibold tracking-wide text-black dark:text-white underline truncate" data-testid="text-app-title">
               Master Reel Counter
             </span>
