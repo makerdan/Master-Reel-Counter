@@ -8,21 +8,22 @@ function MetricBar({ label, icon: Icon, current, total, colorClass }: {
   label: string;
   icon: typeof MapPin;
   current: number;
-  total: number;
+  total?: number;
   colorClass: string;
 }) {
-  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  const hasTotal = total !== undefined && total > 0;
+  const pct = hasTotal ? Math.round((current / total) * 100) : 0;
   return (
     <div className="flex-1 min-w-[140px]" data-testid={`progress-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <div className="flex items-center gap-1.5 mb-1">
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="text-xs font-semibold ml-auto">{current}/{total}</span>
+        <span className="text-xs font-semibold ml-auto">{hasTotal ? `${current}/${total}` : current}</span>
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-300 ${colorClass}`}
-          style={{ width: `${pct}%` }}
+          style={{ width: hasTotal ? `${pct}%` : (current > 0 ? "100%" : "0%") }}
           data-testid={`progress-bar-${label.toLowerCase().replace(/\s+/g, "-")}`}
         />
       </div>
@@ -131,7 +132,6 @@ export default function SessionProgress({
               label="Flagged"
               icon={Flag}
               current={metrics.flaggedTotal}
-              total={metrics.totalPins}
               colorClass="bg-amber-500"
             />
           </div>
