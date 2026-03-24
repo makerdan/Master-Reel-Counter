@@ -177,6 +177,26 @@ function SessionWorkspace({
     } catch { return false; }
   })();
   const [mode, setMode] = useState<string>(initialTab);
+  const TAB_ORDER = ["strip", "photo", "flagged", "review", "results"];
+  const tabSwipeRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const handleTabSwipeStart = useCallback((e: React.TouchEvent) => {
+    tabSwipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
+  }, []);
+  const handleTabSwipeEnd = useCallback((e: React.TouchEvent) => {
+    const s = tabSwipeRef.current;
+    if (!s) return;
+    const dx = e.changedTouches[0].clientX - s.x;
+    const dy = e.changedTouches[0].clientY - s.y;
+    const dt = Date.now() - s.time;
+    tabSwipeRef.current = null;
+    if (dt > 400 || Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    setMode((prev) => {
+      const ci = TAB_ORDER.indexOf(prev);
+      if (dx < 0 && ci < TAB_ORDER.length - 1) return TAB_ORDER[ci + 1];
+      if (dx > 0 && ci > 0) return TAB_ORDER[ci - 1];
+      return prev;
+    });
+  }, []);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [editPhotoLoaded, setEditPhotoLoaded] = useState(false);
   useEffect(() => { setEditPhotoLoaded(false); }, [editingEntry?.id]);
@@ -794,7 +814,7 @@ function SessionWorkspace({
                 setNavigateSection("");
               }
               setMode(newMode);
-            }}>
+            }} onTouchStart={handleTabSwipeStart} onTouchEnd={handleTabSwipeEnd}>
               <TabsList className="w-full bg-blue-600 border border-blue-700/40">
                 <TabsTrigger value="strip" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photos Reel">
                   <LayoutGrid className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
