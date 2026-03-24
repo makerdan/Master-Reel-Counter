@@ -1099,7 +1099,7 @@ export default function PhotoStrip({
                     <span className="text-[11px] text-muted-foreground/50">
                       · {sectionGroup.photos.length} photo{sectionGroup.photos.length !== 1 ? "s" : ""}
                     </span>
-                    {sectionGroup.photos.length > 1 && (
+                    {sectionGroup.photos.some(p => p.isDetailShot && p.parentPhotoId != null) && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-500 bg-blue-500/10 border border-blue-500/20 rounded px-1 py-0">
                         <Link2 className="h-2.5 w-2.5" />
                         Linked
