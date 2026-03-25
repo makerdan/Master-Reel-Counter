@@ -463,7 +463,7 @@ function PhotoCard({
     : [];
 
   return (
-    <div className={`rounded-md border bg-card group relative flex flex-col ${isDetail ? "!border-blue-500 ml-3" : "border-border"}`} data-testid={`strip-card-${photo.id}`}>
+    <div className={`rounded-md border bg-card group relative flex flex-col ${isDetail ? "!border-blue-500 sm:ml-3" : "border-border"}`} data-testid={`strip-card-${photo.id}`}>
       <div ref={thumbContainerRef} className="relative aspect-square lg:aspect-video bg-muted overflow-hidden">
         <img
           src={photoUrl(photo.objectStorageKey)}

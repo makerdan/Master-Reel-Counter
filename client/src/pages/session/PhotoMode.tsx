@@ -2152,7 +2152,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       type="text"
                       inputMode="numeric"
                       className="w-8 sm:w-10 text-center bg-transparent border border-[hsl(215_30%_50%/0.4)] rounded px-0.5 py-0.5 text-xs sm:text-sm mono text-[hsl(30_40%_85%)] focus:outline-none focus:border-blue-500"
-                      value={photoInputValue ?? String(currentPhotoIdx + 1)}
+                      value={photoInputValue ?? String(currentPhotoIdx + 1).padStart(2, "0")}
                       onChange={(e) => {
                         const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
                         setPhotoInputValue(raw);
@@ -2171,7 +2171,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       onBlur={() => setPhotoInputValue(null)}
                       data-testid="input-photo-number"
                     />
-                    <span>/ {uploadedPhotos.length}</span>
+                    <span>/ {String(uploadedPhotos.length).padStart(2, "0")}</span>
                   </div>
                   <Button
                     size="icon"
@@ -2361,15 +2361,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   </>
                 );
               })()}
-              <div className="text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Pin #</div>
+              <div className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Pin #</div>
               <div className="overflow-x-auto">
                 <table className="pin-entry-table" ref={pinTableRef} data-testid="pin-entry-table">
                   <thead>
                     <tr>
                       <th style={{ width: 70, textAlign: "center" }}>PIN #:</th>
                       <th style={{ minWidth: 140 }}>Category:</th>
-                      <th style={{ width: 80, textAlign: "center" }}>Vendor Code:</th>
-                      <th style={{ width: 80 }}>Reel Footage:</th>
+                      <th style={{ width: 80, textAlign: "center" }}><span className="hidden sm:inline">Vendor Code:</span><span className="sm:hidden">VEN:</span></th>
+                      <th style={{ width: 80 }}><span className="hidden sm:inline">Reel Footage:</span><span className="sm:hidden">LENGTH:</span></th>
                       <th style={{ width: 60, textAlign: "center" }}># of Reels:</th>
                       <th style={{ width: 40 }}></th>
                     </tr>
@@ -2741,7 +2741,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     data-testid="button-next-incomplete"
                   >
                     <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                    <span className="text-xs font-semibold">Next Reel ({nextReelCount})</span>
+                    <span className="text-xs font-semibold">Go To Next Reel ({nextReelCount})</span>
                   </Button>
                 )}
               </div>
@@ -2764,7 +2764,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       reelCount: 1,
                     })));
                   }}
-                  disabled={createEntries.isPending}
+                  disabled={createEntries.isPending || !localPins.some(p => p.wireDetails || p.vendorCode || p.footage != null || (p.reelCount ?? 1) !== 1)}
                   data-testid="button-clear-pins"
                 >
                   Clear All Details
