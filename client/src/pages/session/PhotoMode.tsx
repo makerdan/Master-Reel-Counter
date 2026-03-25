@@ -186,6 +186,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const justDraggedRef = useRef(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; errors: string[] } | null>(null);
   const [conflictDialog, setConflictDialog] = useState<{ conflicts: Array<{ label: string; entryId?: number; dbPinId?: number }>; pinsToCommit: LocalPin[] } | null>(null);
+  const [detailWarnLabels, setDetailWarnLabels] = useState<string[]>([]);
+  const dismissedDetailWarn = useRef<Set<string>>(new Set());
   const [showQuickEntry, setShowQuickEntry] = useState(false);
   const [photoInputValue, setPhotoInputValue] = useState<string | null>(null);
   const [flagPopoverPinId, setFlagPopoverPinId] = useState<string | null>(null);
@@ -534,6 +536,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       setPinsLoaded(false);
       return;
     }
+    dismissedDetailWarn.current.clear();
     // Evict the cache for the photo we just left (its pins may have been modified)
     if (prevPhotoDbIdRef.current && prevPhotoDbIdRef.current !== currentPhoto.dbId) {
       pinFetchCache.current.delete(prevPhotoDbIdRef.current);
@@ -1400,6 +1403,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const handleCommitClick = useCallback(() => {
     const allPins = [...localPinsRef.current];
     const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && p.footage && p.footage > 0 && !p.flagged);
+    if (!currentPhoto?.isDetailShot) {
+      const warnedLabels = pinsToCommit
+        .map(p => p.label)
+        .filter(label => linkedPinShadeMapForPhoto.has(label) && !dismissedDetailWarn.current.has(label));
+      if (warnedLabels.length > 0) {
+        setDetailWarnLabels(warnedLabels);
+        return;
+      }
+    }
     const conflicts = committedPins
       .filter(cp => pinsToCommit.some(p => p.label === cp.label))
       .map(cp => ({ label: cp.label, entryId: cp.entryId, dbPinId: cp.dbId }));
@@ -1408,7 +1420,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     } else {
       createEntries.mutate({});
     }
-  }, [committedPins, createEntries]);
+  }, [committedPins, createEntries, currentPhoto?.isDetailShot, linkedPinShadeMapForPhoto]);
 
   const resetView = () => {
     setScale(1);
@@ -2803,6 +2815,60 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={detailWarnLabels.length > 0} onOpenChange={(open) => { if (!open) setDetailWarnLabels([]); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Detail photo available</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="mb-2">
+                  {detailWarnLabels.length === 1
+                    ? <>Pin <span className="font-mono font-semibold text-foreground">{detailWarnLabels[0]}</span> has a detail photo.</>
+                    : <>Pins <span className="font-mono font-semibold text-foreground">{detailWarnLabels.join(", ")}</span> each have a detail photo.</>
+                  }
+                </p>
+                <p>For the most accurate data, fill in and commit from the detail shot instead of the overview photo.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel
+              onClick={() => setDetailWarnLabels([])}
+              data-testid="button-detail-warn-cancel"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              onClick={() => {
+                detailWarnLabels.forEach(l => dismissedDetailWarn.current.add(l));
+                setDetailWarnLabels([]);
+                handleCommitClick();
+              }}
+              data-testid="button-detail-warn-commit-anyway"
+            >
+              Commit anyway
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                const targetLabel = detailWarnLabels[0];
+                const targetDbId = photos.find(
+                  ph => ph.parentPhotoId === currentPhoto?.dbId && ph.linkedPinLabel === targetLabel
+                )?.id;
+                if (targetDbId != null) {
+                  const idx = uploadedPhotos.findIndex(p => p.dbId === targetDbId);
+                  if (idx !== -1) setCurrentPhotoIdx(idx);
+                }
+                setDetailWarnLabels([]);
+              }}
+              data-testid="button-detail-warn-go-to-detail"
+            >
+              Go to detail shot
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!conflictDialog} onOpenChange={(open) => { if (!open) setConflictDialog(null); }}>
         <AlertDialogContent>
