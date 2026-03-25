@@ -2833,12 +2833,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel
-              onClick={() => setDetailWarnLabels([])}
-              data-testid="button-detail-warn-cancel"
-            >
-              Cancel
-            </AlertDialogCancel>
             <AlertDialogAction
               className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
               onClick={() => {
