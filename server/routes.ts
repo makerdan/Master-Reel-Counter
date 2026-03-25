@@ -1235,6 +1235,13 @@ export async function registerRoutes(
       if (encKey) entryData = encryptEntry(entryData, encKey) as any;
       const data = insertEntrySchema.parse(entryData);
       const entry = await storage.createEntry(data);
+      if (data.photoId) {
+        try {
+          await storage.resolveParentPinForDetailShot(data.photoId, entry.id);
+        } catch (resolveErr) {
+          console.error("Non-fatal: failed to resolve parent pin for detail shot", resolveErr);
+        }
+      }
       await storage.updateSession(access.session.id, {});
       const result = encKey ? decryptEntry(entry, encKey) : entry;
       const username = req.user.claims.first_name || req.user.claims.email || userId;
