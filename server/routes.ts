@@ -835,11 +835,51 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const query = String(req.query.q || "");
       const searchInside = req.query.inside === "true";
-      if (!query.trim()) return res.json({ ownedIds: [], sharedIds: [], reasons: {} });
-      const result = await storage.searchUserSessions(userId, query, searchInside);
+      const filters: {
+        status?: string;
+        collaborator?: string;
+        minFootage?: number;
+        dateMonth?: number;
+        dateYear?: number;
+        wireType?: string;
+      } = {};
+      if (req.query.status && (req.query.status === "active" || req.query.status === "completed")) {
+        filters.status = String(req.query.status);
+      }
+      if (req.query.collaborator) filters.collaborator = String(req.query.collaborator);
+      if (req.query.minFootage) {
+        const mf = parseInt(String(req.query.minFootage));
+        if (!isNaN(mf) && mf > 0) filters.minFootage = mf;
+      }
+      if (req.query.dateMonth) {
+        const dm = parseInt(String(req.query.dateMonth));
+        if (!isNaN(dm) && dm >= 1 && dm <= 12) filters.dateMonth = dm;
+      }
+      if (req.query.dateYear) {
+        const dy = parseInt(String(req.query.dateYear));
+        if (!isNaN(dy) && dy >= 2000 && dy <= 2100) filters.dateYear = dy;
+      }
+      if (req.query.wireType) filters.wireType = String(req.query.wireType);
+      const hasFilters = Object.keys(filters).length > 0;
+      if (!query.trim() && !hasFilters) return res.json({ ownedIds: [], sharedIds: [], reasons: {}, entrySnippets: {} });
+      const result = await storage.searchUserSessions(userId, query, searchInside, filters);
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Search failed" });
+    }
+  });
+
+  app.get("/api/sessions/:id/entries/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = resolveUserId(req);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const query = String(req.query.q || "").trim();
+      if (!query) return res.json({ matches: [], total: 0 });
+      const matches = await storage.searchSessionEntries(access.session.id, query);
+      res.json({ matches, total: matches.length });
+    } catch (error) {
+      res.status(500).json({ message: "Entry search failed" });
     }
   });
 

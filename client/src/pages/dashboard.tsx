@@ -7,6 +7,7 @@ import {
   FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
   Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
   Lock, Unlock, History, Download, FileText, FileSpreadsheet, Loader2, RotateCw,
+  SlidersHorizontal, Lightbulb,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -89,6 +91,13 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInside, setSearchInside] = useState(false);
   const [showRecentSearches, setShowRecentSearches] = useState(false);
+  const [showFilterBar, setShowFilterBar] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<"" | "active" | "completed">("");
+  const [filterCollaborator, setFilterCollaborator] = useState("");
+  const [filterWireType, setFilterWireType] = useState("");
+  const [filterMinFootage, setFilterMinFootage] = useState("");
+  const [filterDateMonth, setFilterDateMonth] = useState("");
+  const [filterDateYear, setFilterDateYear] = useState("");
 
   type SortField = "date" | "name" | "entries" | "footage";
   type SortDirection = "asc" | "desc";
@@ -257,18 +266,35 @@ export default function Dashboard() {
     placeholderData: [],
   });
 
-  type SearchResult = { ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> };
-  const emptySearch: SearchResult = { ownedIds: [], sharedIds: [], reasons: {} };
+  type SearchResult = { ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]>; entrySnippets?: Record<number, { field: string; preview: string }[]> };
+  const emptySearch: SearchResult = { ownedIds: [], sharedIds: [], reasons: {}, entrySnippets: {} };
+
+  const activeFilters = {
+    status: filterStatus || undefined,
+    collaborator: filterCollaborator.trim() || undefined,
+    wireType: filterWireType.trim() || undefined,
+    minFootage: filterMinFootage ? parseInt(filterMinFootage) : undefined,
+    dateMonth: filterDateMonth ? parseInt(filterDateMonth) : undefined,
+    dateYear: filterDateYear ? parseInt(filterDateYear) : undefined,
+  };
+  const hasActiveFilters = !!(activeFilters.status || activeFilters.collaborator || activeFilters.wireType || activeFilters.minFootage || activeFilters.dateMonth || activeFilters.dateYear);
 
   const { data: searchResults } = useQuery<SearchResult>({
-    queryKey: ["/api/search/sessions", searchQuery, searchInside],
+    queryKey: ["/api/search/sessions", searchQuery, searchInside, activeFilters],
     queryFn: async () => {
-      if (!searchQuery.trim()) return emptySearch;
-      const res = await fetch(`/api/search/sessions?q=${encodeURIComponent(searchQuery)}&inside=${searchInside}`);
+      if (!searchQuery.trim() && !hasActiveFilters) return emptySearch;
+      const params = new URLSearchParams({ q: searchQuery, inside: String(searchInside) });
+      if (activeFilters.status) params.set("status", activeFilters.status);
+      if (activeFilters.collaborator) params.set("collaborator", activeFilters.collaborator);
+      if (activeFilters.wireType) params.set("wireType", activeFilters.wireType);
+      if (activeFilters.minFootage) params.set("minFootage", String(activeFilters.minFootage));
+      if (activeFilters.dateMonth) params.set("dateMonth", String(activeFilters.dateMonth));
+      if (activeFilters.dateYear) params.set("dateYear", String(activeFilters.dateYear));
+      const res = await fetch(`/api/search/sessions?${params}`);
       if (!res.ok) return emptySearch;
       return res.json();
     },
-    enabled: !!user && searchQuery.trim().length > 0,
+    enabled: !!user && (searchQuery.trim().length > 0 || hasActiveFilters),
     placeholderData: emptySearch,
   });
 
@@ -278,10 +304,11 @@ export default function Dashboard() {
     }
   }, [searchResults]);
 
-  const isSearching = searchQuery.trim().length > 0;
+  const isSearching = searchQuery.trim().length > 0 || hasActiveFilters;
   const ownedMatchSet = useMemo(() => new Set(searchResults?.ownedIds || []), [searchResults]);
   const sharedMatchSet = useMemo(() => new Set(searchResults?.sharedIds || []), [searchResults]);
   const matchReasons = searchResults?.reasons || {};
+  const entrySnippets = searchResults?.entrySnippets || {};
 
   const filteredSessions = useMemo(() => {
     if (!sessions) return [];
@@ -862,6 +889,7 @@ export default function Dashboard() {
   const renderSessionCard = (session: SessionWithStats, isShared = false) => {
     const prefix = isShared ? "shared-" : "";
     const sessionReasons = isSearching ? (matchReasons[session.id] || []) : [];
+    const sessionSnippets = isSearching ? (entrySnippets[session.id] || []) : [];
     const isSelected = selectedSessions.has(session.id);
     return (
       <Card
@@ -923,16 +951,21 @@ export default function Dashboard() {
                     {(session as SharedSessionWithStats).role}
                   </Badge>
                 )}
-                {sessionReasons.length > 0 && sessionReasons.map(reason => (
-                  <Badge
-                    key={reason}
-                    variant="outline"
-                    className="no-default-hover-elevate no-default-active-elevate border-primary/40 text-primary bg-primary/5"
-                    data-testid={`badge-match-reason-${reason}-${session.id}`}
-                  >
-                    {reasonLabels[reason] || reason}
-                  </Badge>
-                ))}
+                {sessionReasons.length > 0 && (
+                  <span className="flex items-center gap-1 flex-wrap" data-testid={`match-reasons-${session.id}`}>
+                    <span className="text-xs text-primary/70 font-medium">Matched:</span>
+                    {sessionReasons.map(reason => (
+                      <Badge
+                        key={reason}
+                        variant="outline"
+                        className="no-default-hover-elevate no-default-active-elevate border-primary/40 text-primary bg-primary/5 text-xs"
+                        data-testid={`badge-match-reason-${reason}-${session.id}`}
+                      >
+                        {reasonLabels[reason] || reason}
+                      </Badge>
+                    ))}
+                  </span>
+                )}
               </div>
               <div className="flex items-start gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
                 {isShared && (session as SharedSessionWithStats).ownerUsername && (
@@ -995,6 +1028,15 @@ export default function Dashboard() {
                       +{(session as any).collaboratorUsernames.length - 3}
                     </span>
                   )}
+                </div>
+              )}
+              {sessionSnippets.length > 0 && (
+                <div className="mt-2 space-y-0.5" data-testid={`entry-snippets-${session.id}`}>
+                  {sessionSnippets.slice(0, 2).map((snippet, i) => (
+                    <p key={i} className="text-xs text-muted-foreground italic" data-testid={`snippet-${session.id}-${i}`}>
+                      <span className="font-medium not-italic text-muted-foreground/80">{snippet.field}:</span> "{snippet.preview}"
+                    </p>
+                  ))}
                 </div>
               )}
             </div>
@@ -1544,25 +1586,41 @@ export default function Dashboard() {
                 }
               }}
               placeholder="Search sessions..."
-              className="pl-9 pr-10"
+              className="pl-9 pr-20"
               data-testid="input-search-sessions"
             />
-            {searchQuery && (
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     size="icon"
-                    variant="ghost"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7"
-                    onClick={() => { setSearchQuery(""); setShowRecentSearches(false); }}
-                    data-testid="button-clear-search"
+                    variant={showFilterBar ? "default" : "ghost"}
+                    className="h-7 w-7"
+                    onClick={() => setShowFilterBar(v => !v)}
+                    data-testid="button-toggle-filter-bar"
                   >
-                    <X className="h-4 w-4" />
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Clear search</TooltipContent>
+                <TooltipContent>Filters{hasActiveFilters ? " (active)" : ""}</TooltipContent>
               </Tooltip>
-            )}
+              {searchQuery && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      onClick={() => { setSearchQuery(""); setShowRecentSearches(false); }}
+                      data-testid="button-clear-search"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Clear search</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
             {showRecentSearches && recentSearches.length > 0 && !searchQuery && (
               <div
                 ref={recentDropdownRef}
@@ -1615,17 +1673,167 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="search-inside"
-              checked={searchInside}
-              onCheckedChange={(checked) => setSearchInside(checked === true)}
-              data-testid="checkbox-search-inside"
-            />
-            <label htmlFor="search-inside" className="text-xs text-muted-foreground cursor-pointer">
-              Search inside sessions (entries, categories, notes)
-            </label>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2" data-testid="toggle-search-inside">
+              <Switch
+                id="search-inside"
+                checked={searchInside}
+                onCheckedChange={setSearchInside}
+                data-testid="switch-search-inside"
+              />
+              <label htmlFor="search-inside" className="text-sm font-medium cursor-pointer select-none">
+                Search inside sessions
+              </label>
+            </div>
+            {(hasActiveFilters) && (
+              <div className="flex items-center gap-1 flex-wrap">
+                {filterStatus && (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 pr-1 cursor-pointer"
+                    data-testid="chip-filter-status"
+                    onClick={() => setFilterStatus("")}
+                  >
+                    Status: {filterStatus}
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                {filterCollaborator && (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 pr-1 cursor-pointer"
+                    data-testid="chip-filter-collaborator"
+                    onClick={() => setFilterCollaborator("")}
+                  >
+                    Collaborator: {filterCollaborator}
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                {filterWireType && (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 pr-1 cursor-pointer"
+                    data-testid="chip-filter-wiretype"
+                    onClick={() => setFilterWireType("")}
+                  >
+                    Wire: {filterWireType}
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                {filterMinFootage && (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 pr-1 cursor-pointer"
+                    data-testid="chip-filter-footage"
+                    onClick={() => setFilterMinFootage("")}
+                  >
+                    Min {filterMinFootage} {uLabel}
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                {(filterDateMonth || filterDateYear) && (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 pr-1 cursor-pointer"
+                    data-testid="chip-filter-date"
+                    onClick={() => { setFilterDateMonth(""); setFilterDateYear(""); }}
+                  >
+                    Date: {filterDateMonth ? ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(filterDateMonth)-1] : ""}{filterDateMonth && filterDateYear ? " " : ""}{filterDateYear}
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-muted-foreground"
+                  onClick={() => { setFilterStatus(""); setFilterCollaborator(""); setFilterWireType(""); setFilterMinFootage(""); setFilterDateMonth(""); setFilterDateYear(""); }}
+                  data-testid="button-clear-all-filters"
+                >
+                  Clear filters
+                </Button>
+              </div>
+            )}
           </div>
+
+          {showFilterBar && (
+            <div className="rounded-lg border bg-muted/30 p-3 space-y-2" data-testid="filter-bar">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Status</label>
+                  <div className="flex gap-1">
+                    {(["", "active", "completed"] as const).map(s => (
+                      <button
+                        key={s || "any"}
+                        type="button"
+                        onClick={() => setFilterStatus(s)}
+                        className={`text-xs px-2 py-1 rounded border transition-colors ${filterStatus === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:bg-muted"}`}
+                        data-testid={`filter-status-${s || "any"}`}
+                      >
+                        {s === "" ? "Any" : s.charAt(0).toUpperCase() + s.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Collaborator</label>
+                  <Input
+                    value={filterCollaborator}
+                    onChange={e => setFilterCollaborator(e.target.value)}
+                    placeholder="Username..."
+                    className="h-7 text-xs"
+                    data-testid="input-filter-collaborator"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Wire Type</label>
+                  <Input
+                    value={filterWireType}
+                    onChange={e => setFilterWireType(e.target.value)}
+                    placeholder="e.g. THHN"
+                    className="h-7 text-xs"
+                    data-testid="input-filter-wiretype"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Min Footage ({uLabel})</label>
+                  <Input
+                    type="number"
+                    value={filterMinFootage}
+                    onChange={e => setFilterMinFootage(e.target.value)}
+                    placeholder="e.g. 500"
+                    className="h-7 text-xs"
+                    data-testid="input-filter-footage"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Month</label>
+                  <select
+                    value={filterDateMonth}
+                    onChange={e => setFilterDateMonth(e.target.value)}
+                    className="w-full h-7 text-xs rounded-md border border-border bg-background px-2"
+                    data-testid="select-filter-month"
+                  >
+                    <option value="">Any</option>
+                    {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m, i) => (
+                      <option key={m} value={String(i+1)}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Year</label>
+                  <Input
+                    type="number"
+                    value={filterDateYear}
+                    onChange={e => setFilterDateYear(e.target.value)}
+                    placeholder="e.g. 2025"
+                    className="h-7 text-xs"
+                    data-testid="input-filter-year"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {showTrash ? (
@@ -1878,9 +2086,26 @@ export default function Dashboard() {
           </div>
         ) : isSearching && !filteredSessions.length && !filteredSharedSessions.length ? (
           <Card className="border border-border">
-            <CardContent className="py-8 text-center">
-              <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
-              <p className="text-muted-foreground text-sm">No sessions match "{searchQuery}"</p>
+            <CardContent className="py-10 text-center space-y-3" data-testid="no-search-results">
+              <Search className="h-10 w-10 mx-auto text-muted-foreground/50" />
+              <div>
+                <p className="text-sm font-medium mb-0.5">{searchQuery.trim() ? `No sessions found for "${searchQuery}"` : "No sessions match the active filters"}</p>
+                <p className="text-xs text-muted-foreground">Try refining your search or clear filters</p>
+              </div>
+              <div className="flex flex-col items-center gap-1.5 pt-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span>Try a wire type like <button className="underline hover:text-foreground" onClick={() => { setFilterWireType("THHN"); setShowFilterBar(true); }} data-testid="tip-wiretype">THHN</button></span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span>Enable <button className="underline hover:text-foreground" onClick={() => setSearchInside(true)} data-testid="tip-search-inside">"Search inside sessions"</button> to search entry fields</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Lightbulb className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span>Search by collaborator username using the Filters panel</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         ) : (

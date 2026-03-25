@@ -22,6 +22,21 @@ import type { Entry, Photo, Pin, ReviewResponse } from "@shared/schema";
 
 type FilterChip = "flagged" | "incomplete" | "no-photo" | string;
 
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query.trim() || !text) return <>{text}</>;
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase().trim();
+  const idx = lowerText.indexOf(lowerQuery);
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-yellow-200 dark:bg-yellow-700 rounded-sm px-0.5">{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
 function EntryPhotoDialogContent({ src, entryId, pin }: {
   src: string;
   entryId: number;
@@ -116,7 +131,30 @@ function EntryTable({
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeFilters, setActiveFilters] = useState<Set<FilterChip>>(new Set());
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  const { data: serverSearchData, isFetching: isSearchFetching } = useQuery<{ matches: { entryId: number; field: string; preview: string }[]; total: number }>({
+    queryKey: ["/api/sessions", sessionId.toString(), "entries", "search", debouncedQuery],
+    queryFn: async () => {
+      if (!debouncedQuery.trim()) return { matches: [], total: 0 };
+      const res = await fetch(`/api/sessions/${sessionId}/entries/search?q=${encodeURIComponent(debouncedQuery)}`, { credentials: "include" });
+      if (!res.ok) return { matches: [], total: 0 };
+      return res.json();
+    },
+    enabled: debouncedQuery.trim().length > 0,
+    placeholderData: { matches: [], total: 0 },
+  });
+
+  const serverMatchedIds = useMemo(() => {
+    if (!debouncedQuery.trim() || !serverSearchData?.matches) return null;
+    return new Set(serverSearchData.matches.map(m => m.entryId));
+  }, [serverSearchData, debouncedQuery]);
 
   const toggleFilter = (filter: FilterChip) => {
     setActiveFilters(prev => {
@@ -132,6 +170,7 @@ function EntryTable({
 
   const clearFilters = () => {
     setSearchQuery("");
+    setDebouncedQuery("");
     setActiveFilters(new Set());
   };
 
@@ -157,15 +196,8 @@ function EntryTable({
   const filteredEntries = useMemo(() => {
     let result = entries;
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(e =>
-        (e.reelTag && e.reelTag.toLowerCase().includes(q)) ||
-        (e.wireType && e.wireType.toLowerCase().includes(q)) ||
-        (e.gauge && e.gauge.toLowerCase().includes(q)) ||
-        (e.color && e.color.toLowerCase().includes(q)) ||
-        (e.manufacturer && e.manufacturer.toLowerCase().includes(q))
-      );
+    if (serverMatchedIds !== null) {
+      result = result.filter(e => serverMatchedIds.has(e.id));
     }
 
     const statusFilters: string[] = [];
@@ -194,10 +226,11 @@ function EntryTable({
     }
 
     return result;
-  }, [entries, searchQuery, activeFilters, flaggedEntryIds, pinByEntryId]);
+  }, [entries, serverMatchedIds, activeFilters, flaggedEntryIds, pinByEntryId]);
 
   const hasActiveFilters = searchQuery.trim() !== "" || activeFilters.size > 0;
   const isFiltered = hasActiveFilters;
+  const isSearchActive = debouncedQuery.trim().length > 0;
 
   const incompleteCount = useMemo(() => entries.filter(e => !e.reelTag || !e.footage).length, [entries]);
   const noPhotoCount = useMemo(() => entries.filter(e => !pinByEntryId.has(e.id)).length, [entries, pinByEntryId]);
@@ -273,18 +306,33 @@ function EntryTable({
           <CardTitle className="text-sm" data-testid="text-entries-title">
             Table View - {isFiltered ? `${filteredEntries.length} of ${entries.length}` : entries.length} Entries
           </CardTitle>
+          {isSearchActive && (
+            <span
+              className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1"
+              data-testid="text-search-match-count"
+            >
+              {isSearchFetching ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : null}
+              {!isSearchFetching && `${filteredEntries.length} of ${entries.length} match "${debouncedQuery}"`}
+              {isSearchFetching && "Searching..."}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 max-w-xs min-w-[180px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search reel tag, wire type, gauge..."
+              placeholder="Search entries..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 h-8 text-xs"
               data-testid="input-entry-search"
             />
+            {isSearchFetching && (
+              <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin text-muted-foreground" />
+            )}
           </div>
           {hasActiveFilters && (
             <Button
@@ -403,19 +451,19 @@ function EntryTable({
                         const isUnpinned = !pinByEntryId.has(entry.id);
                         return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
                           <td className={`mono ${isUnpinned ? "" : "text-muted-foreground"}`} style={{ textAlign: "center" }}>{(() => { const pin = pinByEntryId.get(entry.id); if (pin && onJumpToPin) { return <button className="underline decoration-dotted hover:text-foreground transition-colors cursor-pointer" data-testid={`link-pin-${pin.id}`} onClick={() => onJumpToPin(pin.photoId, pin.id)}>{pin.label}</button>; } if (pin) return pin.label; if (pinsFetching) return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground mx-auto" data-testid={`spinner-pin-${entry.id}`} />; return <span className="text-muted-foreground">—</span>; })()}</td>
-                          <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.aisle}</td>
-                          <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.section}</td>
+                          <td className="hidden sm:table-cell" style={{ textAlign: "center" }}><HighlightText text={entry.aisle || ""} query={debouncedQuery} /></td>
+                          <td className="hidden sm:table-cell" style={{ textAlign: "center" }}><HighlightText text={entry.section || ""} query={debouncedQuery} /></td>
                           <td className="mono font-bold">
-                            {entry.reelTag || "-"}
-                            {entry.manufacturer && <span className="sm:hidden">-{entry.manufacturer}</span>}
+                            {entry.reelTag ? <HighlightText text={entry.reelTag} query={debouncedQuery} /> : "-"}
+                            {entry.manufacturer && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
                             {!entry.reelTag && (
                               <span className="inline-flex items-center ml-1" title="No category">
                                 <AlertTriangle className="h-3 w-3 text-amber-500" />
                               </span>
                             )}
                           </td>
-                          <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
-                          <td className="hidden" style={{ textAlign: "center" }}>{entry.manufacturer || "-"}</td>
+                          <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer ? <HighlightText text={entry.manufacturer} query={debouncedQuery} /> : "-"}</td>
+                          <td className="hidden" style={{ textAlign: "center" }}>{entry.manufacturer ? <HighlightText text={entry.manufacturer} query={debouncedQuery} /> : "-"}</td>
                           <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
                           <td className="hidden sm:table-cell mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()} ${uLabel}` : "-"}</td>
                           <td className="mono font-bold" style={{ textAlign: "center" }}>

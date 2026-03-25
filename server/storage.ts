@@ -116,7 +116,15 @@ export interface IStorage {
   deleteFolder(id: number): Promise<void>;
   duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string, copyFileCallback?: (srcKey: string) => Promise<string>): Promise<Session>;
   resetSessionToPhotos(sessionId: number): Promise<void>;
-  searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]> }>;
+  searchUserSessions(userId: string, query: string, searchInside: boolean, filters?: {
+    status?: string;
+    collaborator?: string;
+    minFootage?: number;
+    dateMonth?: number;
+    dateYear?: number;
+    wireType?: string;
+  }): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]>; entrySnippets?: Record<number, { field: string; preview: string }[]> }>;
+  searchSessionEntries(sessionId: number, query: string): Promise<{ entryId: number; field: string; preview: string }[]>;
 
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
   getSessionActivityLogs(sessionId: number, limit?: number, offset?: number, userId?: string): Promise<{ logs: ActivityLog[]; total: number }>;
@@ -846,10 +854,62 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async searchUserSessions(userId: string, query: string, searchInside: boolean): Promise<{
+  async searchSessionEntries(sessionId: number, query: string): Promise<{ entryId: number; field: string; preview: string }[]> {
+    const pattern = `%${query}%`;
+    const lowerQuery = query.toLowerCase();
+    const matchingEntries = await db.select().from(entries)
+      .where(and(
+        eq(entries.sessionId, sessionId),
+        or(
+          ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
+          ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
+          ilike(sql`COALESCE(${entries.gauge}, '')`, pattern),
+          ilike(sql`COALESCE(${entries.color}, '')`, pattern),
+          ilike(sql`COALESCE(${entries.manufacturer}, '')`, pattern),
+          ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
+          ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
+          ilike(sql`COALESCE(${entries.section}, '')`, pattern),
+        )
+      ));
+    const results: { entryId: number; field: string; preview: string }[] = [];
+    const fieldOrder: { field: string; val: (e: typeof matchingEntries[0]) => string | null }[] = [
+      { field: "Reel Tag", val: e => e.reelTag },
+      { field: "Wire Type", val: e => e.wireType },
+      { field: "Gauge", val: e => e.gauge },
+      { field: "Color", val: e => e.color },
+      { field: "Manufacturer", val: e => e.manufacturer },
+      { field: "Notes", val: e => e.notes },
+      { field: "Aisle", val: e => e.aisle },
+      { field: "Section", val: e => e.section },
+    ];
+    for (const entry of matchingEntries) {
+      for (const { field, val } of fieldOrder) {
+        const v = val(entry);
+        if (v && v.toLowerCase().includes(lowerQuery)) {
+          const idx = v.toLowerCase().indexOf(lowerQuery);
+          const start = Math.max(0, idx - 20);
+          const end = Math.min(v.length, idx + query.length + 20);
+          const preview = (start > 0 ? "…" : "") + v.slice(start, end) + (end < v.length ? "…" : "");
+          results.push({ entryId: entry.id, field, preview });
+          break;
+        }
+      }
+    }
+    return results;
+  }
+
+  async searchUserSessions(userId: string, query: string, searchInside: boolean, filters?: {
+    status?: string;
+    collaborator?: string;
+    minFootage?: number;
+    dateMonth?: number;
+    dateYear?: number;
+    wireType?: string;
+  }): Promise<{
     ownedIds: number[];
     sharedIds: number[];
     reasons: Record<number, string[]>;
+    entrySnippets?: Record<number, { field: string; preview: string }[]>;
   }> {
     const lowerQuery = query.trim().toLowerCase();
     const pattern = `%${query}%`;
@@ -865,29 +925,33 @@ export class DatabaseStorage implements IStorage {
       jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
     };
 
-    let dateMonth: number | null = null;
-    let dateYear: number | null = null;
-    const mmyyyyMatch = lowerQuery.match(/^(\d{1,2})[\/\-](\d{4})$/);
-    if (mmyyyyMatch) {
-      dateMonth = parseInt(mmyyyyMatch[1]);
-      dateYear = parseInt(mmyyyyMatch[2]);
-    } else {
-      const parts = lowerQuery.split(/[\s,/\-]+/);
-      for (const part of parts) {
-        if (monthNames[part] !== undefined) dateMonth = monthNames[part];
-        else if (/^\d{4}$/.test(part)) dateYear = parseInt(part);
+    let dateMonth: number | null = filters?.dateMonth ?? null;
+    let dateYear: number | null = filters?.dateYear ?? null;
+    if (!dateMonth && !dateYear) {
+      const mmyyyyMatch = lowerQuery.match(/^(\d{1,2})[\/\-](\d{4})$/);
+      if (mmyyyyMatch) {
+        dateMonth = parseInt(mmyyyyMatch[1]);
+        dateYear = parseInt(mmyyyyMatch[2]);
+      } else {
+        const parts = lowerQuery.split(/[\s,/\-]+/);
+        for (const part of parts) {
+          if (monthNames[part] !== undefined) dateMonth = monthNames[part];
+          else if (/^\d{4}$/.test(part)) dateYear = parseInt(part);
+        }
       }
     }
 
-    let statusMatch: string | null = null;
-    if (lowerQuery === "active" || lowerQuery === "completed") {
-      statusMatch = lowerQuery;
+    let statusFilter: string | null = filters?.status ?? null;
+    if (!statusFilter && (lowerQuery === "active" || lowerQuery === "completed")) {
+      statusFilter = lowerQuery;
     }
 
-    let footageMin: number | null = null;
-    const footageMatch = lowerQuery.match(/^[>]?\s*(\d+)\+?\s*(ft|feet|footage)?$/);
-    if (footageMatch && parseInt(footageMatch[1]) >= 100) {
-      footageMin = parseInt(footageMatch[1]);
+    let footageMin: number | null = filters?.minFootage ?? null;
+    if (footageMin === null) {
+      const footageMatch = lowerQuery.match(/^[>]?\s*(\d+)\+?\s*(ft|feet|footage)?$/);
+      if (footageMatch && parseInt(footageMatch[1]) >= 100) {
+        footageMin = parseInt(footageMatch[1]);
+      }
     }
 
     let reelMin: number | null = null;
@@ -896,50 +960,128 @@ export class DatabaseStorage implements IStorage {
       reelMin = parseInt(reelMatch[1]);
     }
 
+    const collaboratorFilter = filters?.collaborator?.trim().toLowerCase() ?? null;
+    const wireTypeFilter = filters?.wireType?.trim().toLowerCase() ?? null;
+
+    const hasStructuredFilters = !!(statusFilter || dateMonth || dateYear || footageMin || collaboratorFilter || wireTypeFilter);
+
+    const matchesStructuredFilters = async (sessionIds: number[], sessionList: (typeof countingSessions.$inferSelect)[]): Promise<Set<number>> => {
+      if (!hasStructuredFilters) return new Set(sessionIds);
+
+      let eligible = new Set(sessionIds);
+
+      if (statusFilter) {
+        eligible = new Set([...eligible].filter(id => {
+          const s = sessionList.find(s => s.id === id);
+          return s && s.status === statusFilter;
+        }));
+      }
+
+      if (dateMonth || dateYear) {
+        eligible = new Set([...eligible].filter(id => {
+          const s = sessionList.find(s => s.id === id);
+          if (!s) return false;
+          const d = new Date(s.startedAt);
+          const mMatch = dateMonth ? d.getMonth() + 1 === dateMonth : true;
+          const yMatch = dateYear ? d.getFullYear() === dateYear : true;
+          return mMatch && yMatch;
+        }));
+      }
+
+      if ((footageMin !== null || reelMin !== null) && eligible.size > 0) {
+        const eligibleArr = Array.from(eligible);
+        const stats = await this.getSessionStats(eligibleArr);
+        if (footageMin !== null) {
+          eligible = new Set([...eligible].filter(id => {
+            const stat = stats.get(id);
+            return stat && stat.totalFootage >= footageMin!;
+          }));
+        }
+        if (reelMin !== null) {
+          eligible = new Set([...eligible].filter(id => {
+            const stat = stats.get(id);
+            return stat && stat.entryCount >= reelMin!;
+          }));
+        }
+      }
+
+      if (collaboratorFilter && eligible.size > 0) {
+        const eligibleArr = Array.from(eligible);
+        const collabPattern = `%${collaboratorFilter}%`;
+        const collabMatches = await db.select({ sessionId: sessionCollaborators.sessionId })
+          .from(sessionCollaborators)
+          .where(and(
+            inArray(sessionCollaborators.sessionId, eligibleArr),
+            ilike(sql`COALESCE(${sessionCollaborators.username}, '')`, collabPattern),
+          ))
+          .groupBy(sessionCollaborators.sessionId);
+        const withCollab = new Set(collabMatches.map(m => m.sessionId));
+        eligible = new Set([...eligible].filter(id => withCollab.has(id)));
+      }
+
+      if (wireTypeFilter && eligible.size > 0) {
+        const eligibleArr = Array.from(eligible);
+        const wirePattern = `%${wireTypeFilter}%`;
+        const wireMatches = await db.select({ sessionId: entries.sessionId })
+          .from(entries)
+          .where(and(
+            inArray(entries.sessionId, eligibleArr),
+            ilike(sql`COALESCE(${entries.wireType}, '')`, wirePattern),
+          ))
+          .groupBy(entries.sessionId);
+        const withWire = new Set(wireMatches.map(m => m.sessionId));
+        eligible = new Set([...eligible].filter(id => withWire.has(id)));
+      }
+
+      return eligible;
+    };
+
+    const buildSnippets = (matchingEntries: (typeof entries.$inferSelect)[], targetSet: Set<number>) => {
+      const snippets: Record<number, { field: string; preview: string }[]> = {};
+      const sessionSnippetCount: Record<number, number> = {};
+      for (const entry of matchingEntries) {
+        if (!targetSet.has(entry.sessionId)) continue;
+        const count = sessionSnippetCount[entry.sessionId] ?? 0;
+        if (count >= 2) continue;
+        const fieldValues: { field: string; val: string | null }[] = [
+          { field: "Notes", val: entry.notes },
+          { field: "Wire Type", val: entry.wireType },
+          { field: "Reel Tag", val: entry.reelTag },
+          { field: "Gauge", val: entry.gauge },
+          { field: "Color", val: entry.color },
+          { field: "Manufacturer", val: entry.manufacturer },
+          { field: "Aisle", val: entry.aisle },
+          { field: "Section", val: entry.section },
+        ];
+        for (const { field, val } of fieldValues) {
+          if (val && val.toLowerCase().includes(lowerQuery)) {
+            const idx = val.toLowerCase().indexOf(lowerQuery);
+            const start = Math.max(0, idx - 20);
+            const end = Math.min(val.length, idx + query.length + 20);
+            const preview = (start > 0 ? "…" : "") + val.slice(start, end) + (end < val.length ? "…" : "");
+            if (!snippets[entry.sessionId]) snippets[entry.sessionId] = [];
+            snippets[entry.sessionId].push({ field, preview });
+            sessionSnippetCount[entry.sessionId] = count + 1;
+            break;
+          }
+        }
+      }
+      return snippets;
+    };
+
     const allUserSessions = await db.select().from(countingSessions)
       .where(and(eq(countingSessions.userId, userId), isNull(countingSessions.deletedAt)));
     const allSessionIds = allUserSessions.map(s => s.id);
-    const ownedMatched = new Set<number>();
 
-    for (const s of allUserSessions) {
-      if (s.name.toLowerCase().includes(lowerQuery)) {
-        ownedMatched.add(s.id);
-        addReason(s.id, "name");
-      }
-      if (s.location && s.location.toLowerCase().includes(lowerQuery)) {
-        ownedMatched.add(s.id);
-        addReason(s.id, "location");
-      }
-      if (statusMatch && s.status === statusMatch) {
-        ownedMatched.add(s.id);
-        addReason(s.id, "status");
-      }
-      if (dateMonth || dateYear) {
-        const d = new Date(s.startedAt);
-        const mMatch = dateMonth ? d.getMonth() + 1 === dateMonth : true;
-        const yMatch = dateYear ? d.getFullYear() === dateYear : true;
-        if (mMatch && yMatch) {
-          ownedMatched.add(s.id);
-          addReason(s.id, "date");
-        }
+    const textMatchedOwned = new Set<number>();
+    if (lowerQuery) {
+      for (const s of allUserSessions) {
+        if (s.name.toLowerCase().includes(lowerQuery)) { textMatchedOwned.add(s.id); addReason(s.id, "name"); }
+        if (s.location && s.location.toLowerCase().includes(lowerQuery)) { textMatchedOwned.add(s.id); addReason(s.id, "location"); }
       }
     }
 
-    if ((footageMin !== null || reelMin !== null) && allSessionIds.length > 0) {
-      const stats = await this.getSessionStats(allSessionIds);
-      for (const [sid, stat] of stats) {
-        if (footageMin !== null && stat.totalFootage >= footageMin) {
-          ownedMatched.add(sid);
-          addReason(sid, "footage");
-        }
-        if (reelMin !== null && stat.entryCount >= reelMin) {
-          ownedMatched.add(sid);
-          addReason(sid, "reels");
-        }
-      }
-    }
-
-    if (allSessionIds.length > 0) {
+    if (allSessionIds.length > 0 && lowerQuery) {
       const collabMatches = await db.select({ sessionId: sessionCollaborators.sessionId })
         .from(sessionCollaborators)
         .where(and(
@@ -947,32 +1089,60 @@ export class DatabaseStorage implements IStorage {
           ilike(sql`COALESCE(${sessionCollaborators.username}, '')`, pattern),
         ))
         .groupBy(sessionCollaborators.sessionId);
-      for (const m of collabMatches) {
-        ownedMatched.add(m.sessionId);
-        addReason(m.sessionId, "collaborator");
-      }
+      for (const m of collabMatches) { textMatchedOwned.add(m.sessionId); addReason(m.sessionId, "collaborator"); }
     }
 
-    if (searchInside && allSessionIds.length > 0) {
-      const entryMatches = await db.select({ sessionId: entries.sessionId })
-        .from(entries)
+    let entryMatchedOwned = new Set<number>();
+    let ownedEntryMatches: (typeof entries.$inferSelect)[] = [];
+    if (searchInside && allSessionIds.length > 0 && lowerQuery) {
+      ownedEntryMatches = await db.select().from(entries)
         .where(and(
           inArray(entries.sessionId, allSessionIds),
           or(
             ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
             ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
+            ilike(sql`COALESCE(${entries.gauge}, '')`, pattern),
+            ilike(sql`COALESCE(${entries.color}, '')`, pattern),
             ilike(sql`COALESCE(${entries.manufacturer}, '')`, pattern),
             ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
             ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
             ilike(sql`COALESCE(${entries.section}, '')`, pattern),
           )
-        ))
-        .groupBy(entries.sessionId);
-      for (const m of entryMatches) {
-        ownedMatched.add(m.sessionId);
-        addReason(m.sessionId, "entries");
+        ));
+      for (const entry of ownedEntryMatches) { entryMatchedOwned.add(entry.sessionId); addReason(entry.sessionId, "entries"); }
+    }
+
+    const textMatched = new Set([...textMatchedOwned, ...entryMatchedOwned]);
+
+    let eligibleOwned: Set<number>;
+    if (hasStructuredFilters) {
+      eligibleOwned = await matchesStructuredFilters(allSessionIds, allUserSessions);
+      if (lowerQuery) {
+        eligibleOwned = new Set([...eligibleOwned].filter(id => textMatched.has(id)));
+      }
+    } else {
+      eligibleOwned = textMatched;
+    }
+
+    for (const s of allUserSessions) {
+      if (!eligibleOwned.has(s.id)) {
+        delete reasons[s.id];
+      } else if (!reasons[s.id] || reasons[s.id].length === 0) {
+        if (statusFilter) addReason(s.id, "status");
+        if (dateMonth || dateYear) addReason(s.id, "date");
+        if (footageMin !== null) addReason(s.id, "footage");
+        if (collaboratorFilter) addReason(s.id, "collaborator");
+        if (wireTypeFilter) addReason(s.id, "wire_type");
       }
     }
+
+    const entrySnippets: Record<number, { field: string; preview: string }[]> = {};
+    if (searchInside && ownedEntryMatches.length > 0) {
+      const snippets = buildSnippets(ownedEntryMatches, eligibleOwned);
+      Object.assign(entrySnippets, snippets);
+    }
+
+    const ownedMatched = eligibleOwned;
 
     const sharedMatched = new Set<number>();
     const collabs = await db.select().from(sessionCollaborators)
@@ -981,49 +1151,64 @@ export class DatabaseStorage implements IStorage {
       const sharedSessionIds = collabs.map(c => c.sessionId);
       const sharedSessions = await db.select().from(countingSessions)
         .where(inArray(countingSessions.id, sharedSessionIds));
-      for (const s of sharedSessions) {
-        if (s.name.toLowerCase().includes(lowerQuery)) {
-          sharedMatched.add(s.id);
-          addReason(s.id, "name");
-        }
-        if (s.location && s.location.toLowerCase().includes(lowerQuery)) {
-          sharedMatched.add(s.id);
-          addReason(s.id, "location");
-        }
-        if (statusMatch && s.status === statusMatch) {
-          sharedMatched.add(s.id);
-          addReason(s.id, "status");
-        }
-        if (dateMonth || dateYear) {
-          const d = new Date(s.startedAt);
-          const mMatch = dateMonth ? d.getMonth() + 1 === dateMonth : true;
-          const yMatch = dateYear ? d.getFullYear() === dateYear : true;
-          if (mMatch && yMatch) {
-            sharedMatched.add(s.id);
-            addReason(s.id, "date");
-          }
+
+      const textMatchedShared = new Set<number>();
+      if (lowerQuery) {
+        for (const s of sharedSessions) {
+          if (s.name.toLowerCase().includes(lowerQuery)) { textMatchedShared.add(s.id); addReason(s.id, "name"); }
+          if (s.location && s.location.toLowerCase().includes(lowerQuery)) { textMatchedShared.add(s.id); addReason(s.id, "location"); }
         }
       }
 
-      if (searchInside && sharedSessionIds.length > 0) {
-        const entryMatches = await db.select({ sessionId: entries.sessionId })
-          .from(entries)
+      let sharedEntryMatches: (typeof entries.$inferSelect)[] = [];
+      const entryMatchedShared = new Set<number>();
+      if (searchInside && sharedSessionIds.length > 0 && lowerQuery) {
+        sharedEntryMatches = await db.select().from(entries)
           .where(and(
             inArray(entries.sessionId, sharedSessionIds),
             or(
               ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
               ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
+              ilike(sql`COALESCE(${entries.gauge}, '')`, pattern),
+              ilike(sql`COALESCE(${entries.color}, '')`, pattern),
               ilike(sql`COALESCE(${entries.manufacturer}, '')`, pattern),
               ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
               ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
               ilike(sql`COALESCE(${entries.section}, '')`, pattern),
             )
-          ))
-          .groupBy(entries.sessionId);
-        for (const m of entryMatches) {
-          sharedMatched.add(m.sessionId);
-          addReason(m.sessionId, "entries");
+          ));
+        for (const entry of sharedEntryMatches) { entryMatchedShared.add(entry.sessionId); addReason(entry.sessionId, "entries"); }
+      }
+
+      const textMatchedSharedAll = new Set([...textMatchedShared, ...entryMatchedShared]);
+
+      let eligibleShared: Set<number>;
+      if (hasStructuredFilters) {
+        eligibleShared = await matchesStructuredFilters(sharedSessionIds, sharedSessions);
+        if (lowerQuery) {
+          eligibleShared = new Set([...eligibleShared].filter(id => textMatchedSharedAll.has(id)));
         }
+      } else {
+        eligibleShared = textMatchedSharedAll;
+      }
+
+      for (const s of sharedSessions) {
+        if (!eligibleShared.has(s.id)) {
+          delete reasons[s.id];
+        } else if (!reasons[s.id] || reasons[s.id].length === 0) {
+          if (statusFilter) addReason(s.id, "status");
+          if (dateMonth || dateYear) addReason(s.id, "date");
+          if (footageMin !== null) addReason(s.id, "footage");
+          if (collaboratorFilter) addReason(s.id, "collaborator");
+          if (wireTypeFilter) addReason(s.id, "wire_type");
+        }
+      }
+
+      for (const id of eligibleShared) sharedMatched.add(id);
+
+      if (searchInside && sharedEntryMatches.length > 0) {
+        const snippets = buildSnippets(sharedEntryMatches, eligibleShared);
+        Object.assign(entrySnippets, snippets);
       }
     }
 
@@ -1031,6 +1216,7 @@ export class DatabaseStorage implements IStorage {
       ownedIds: Array.from(ownedMatched),
       sharedIds: Array.from(sharedMatched),
       reasons,
+      entrySnippets,
     };
   }
 
