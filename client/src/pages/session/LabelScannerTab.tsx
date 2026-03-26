@@ -76,6 +76,80 @@ function parseSortKey(catalog: string): { type: string; color: string; size: num
   return { type: s || "ZZZZ", color: "ZZ", size: 99999, footage: 99999 };
 }
 
+function measureTextWidth(text: string, fontSize: number, fontFamily: string): number {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return 0;
+  ctx.font = `600 ${fontSize}px ${fontFamily}`;
+  return ctx.measureText(text).width;
+}
+
+interface FitTextInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  className?: string;
+  maxFontSize?: number;
+  minFontSize?: number;
+  fontFamily?: string;
+  paddingH?: number;
+  "data-testid"?: string;
+}
+
+function FitTextInput({
+  value,
+  onChange,
+  className,
+  maxFontSize = 28,
+  minFontSize = 11,
+  fontFamily = "'Times New Roman', serif",
+  paddingH = 16,
+  ...props
+}: FitTextInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [fontSize, setFontSize] = useState(maxFontSize);
+
+  const recalc = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const available = el.clientWidth - paddingH;
+    if (available <= 0) return;
+    const text = value || "";
+    if (!text) { setFontSize(maxFontSize); return; }
+    let low = minFontSize, high = maxFontSize, best = minFontSize;
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      if (measureTextWidth(text, mid, fontFamily) <= available) {
+        best = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    setFontSize(best);
+  }, [value, maxFontSize, minFontSize, fontFamily, paddingH]);
+
+  useLayoutEffect(() => { recalc(); }, [recalc]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => recalc());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [recalc]);
+
+  return (
+    <input
+      ref={inputRef}
+      value={value}
+      onChange={onChange}
+      className={className}
+      style={{ fontSize: `${fontSize}px`, fontFamily, lineHeight: 1.2, fontWeight: 600 }}
+      {...props}
+    />
+  );
+}
+
 function getResultsStorageKey(sessionId: number) {
   return `scanner-results-${sessionId}`;
 }
@@ -1577,7 +1651,7 @@ export default function LabelScannerTab({
                           </div>
                         )}
                         {card.result && phase === "results" && (
-                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}>
+                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]">
                             <div className="rounded bg-black/30 px-2 py-1" data-testid={`raw-text-${card.pin.id}`}>
                               <span className="text-[10px] text-white/30 uppercase tracking-wider" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AI Raw</span>
                               <p className="text-[11px] text-white/50 break-words whitespace-pre-wrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
@@ -1588,24 +1662,23 @@ export default function LabelScannerTab({
                               <div className={`rounded-md border px-2 py-1 ${
                                 card.matchResult.confidence === "high" ? "bg-green-900/50 border-green-700/40" : card.matchResult.confidence === "medium" ? "bg-amber-900/50 border-amber-700/40" : "bg-red-900/50 border-red-700/40"
                               }`}>
-                                <Input
+                                <FitTextInput
                                   value={card.editCatalog}
                                   onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                                  className={`border-0 bg-transparent uppercase p-0 h-auto ${
+                                  className={`w-full bg-transparent uppercase outline-none ${
                                     card.matchResult.confidence === "high" ? "text-green-300" : card.matchResult.confidence === "medium" ? "text-amber-300" : "text-red-300"
                                   }`}
-                                  style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}
+                                  paddingH={0}
                                   data-testid={`input-catalog-${card.pin.id}`}
                                 />
                               </div>
                             ) : (
                               <div>
                                 <label className="text-[10px] text-white/40">Category</label>
-                                <Input
+                                <FitTextInput
                                   value={card.editCatalog}
                                   onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                                  className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                                  style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
+                                  className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                                   placeholder="Enter category..."
                                   data-testid={`input-catalog-${card.pin.id}`}
                                 />
@@ -1613,43 +1686,40 @@ export default function LabelScannerTab({
                             )}
                             <div className="w-24">
                               <label className="text-[10px] text-white/40">Vendor</label>
-                              <Input
+                              <FitTextInput
                                 value={card.editVendor}
                                 onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                                 maxLength={3}
                                 list="vendor-code-suggestions-scanner"
-                                className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
+                                className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                                 data-testid={`input-vendor-${card.pin.id}`}
                               />
                             </div>
                           </div>
                         )}
                         {!card.result && phase === "results" && (
-                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}>
-                            <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
+                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]">
+                            <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap text-[11px]" data-testid={`badge-manual-${card.pin.id}`}>
                               Not analyzed — enter manually
                             </Badge>
                             <div>
                               <label className="text-[10px] text-white/40">Category</label>
-                              <Input
+                              <FitTextInput
                                 value={card.editCatalog}
                                 onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                                className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
+                                className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                                 placeholder="Enter category..."
                                 data-testid={`input-catalog-manual-${card.pin.id}`}
                               />
                             </div>
                             <div className="w-24">
                               <label className="text-[10px] text-white/40">Vendor</label>
-                              <Input
+                              <FitTextInput
                                 value={card.editVendor}
                                 onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                                 maxLength={3}
                                 list="vendor-code-suggestions-scanner"
-                                className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
+                                className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                                 data-testid={`input-vendor-manual-${card.pin.id}`}
                               />
                             </div>
@@ -1826,7 +1896,7 @@ export default function LabelScannerTab({
               )}
 
               {card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]">
                   <div className="rounded bg-black/30 px-2 py-1" data-testid={`raw-text-${card.pin.id}`}>
                     <span className="text-[10px] text-white/30 uppercase tracking-wider" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AI Raw</span>
                     <p
@@ -1844,24 +1914,23 @@ export default function LabelScannerTab({
                         ? "bg-amber-900/50 border-amber-700/40"
                         : "bg-red-900/50 border-red-700/40"
                     }`}>
-                      <Input
+                      <FitTextInput
                         value={card.editCatalog}
                         onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                        className={`border-0 bg-transparent uppercase p-0 h-auto ${
+                        className={`w-full bg-transparent uppercase outline-none ${
                           card.matchResult.confidence === "high" ? "text-green-300" : card.matchResult.confidence === "medium" ? "text-amber-300" : "text-red-300"
                         }`}
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}
+                        paddingH={0}
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
                     </div>
                   ) : (
                     <div>
                       <label className="text-[10px] text-white/40">Category</label>
-                      <Input
+                      <FitTextInput
                         value={card.editCatalog}
                         onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                        className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
+                        className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                         placeholder="Enter category..."
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
@@ -1870,13 +1939,12 @@ export default function LabelScannerTab({
 
                   <div className="w-24">
                     <label className="text-[10px] text-white/40">Vendor</label>
-                    <Input
+                    <FitTextInput
                       value={card.editVendor}
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       maxLength={3}
                       list="vendor-code-suggestions-scanner"
-                      className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
+                      className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                       data-testid={`input-vendor-${card.pin.id}`}
                     />
                   </div>
@@ -1884,30 +1952,28 @@ export default function LabelScannerTab({
               )}
 
               {!card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}>
-                  <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]">
+                  <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap text-[11px]" data-testid={`badge-manual-${card.pin.id}`}>
                     Not analyzed — enter manually
                   </Badge>
                   <div>
                     <label className="text-[10px] text-white/40">Category</label>
-                    <Input
+                    <FitTextInput
                       value={card.editCatalog}
                       onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
-                      className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
+                      className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                       placeholder="Enter category..."
                       data-testid={`input-catalog-manual-${card.pin.id}`}
                     />
                   </div>
                   <div className="w-24">
                     <label className="text-[10px] text-white/40">Vendor</label>
-                    <Input
+                    <FitTextInput
                       value={card.editVendor}
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       maxLength={3}
                       list="vendor-code-suggestions-scanner"
-                      className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
+                      className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                       data-testid={`input-vendor-manual-${card.pin.id}`}
                     />
                   </div>
