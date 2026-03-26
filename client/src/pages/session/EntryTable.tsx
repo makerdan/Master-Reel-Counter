@@ -103,7 +103,7 @@ function FilterChipButton({ label, active, count, onClick, testId }: {
 }
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, onJumpToPin, unitLabel: uLabel = "ft", currentUnit = "feet" as UnitType,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, exclusiveExpandKey, onJumpToPin, unitLabel: uLabel = "ft", currentUnit = "feet" as UnitType,
 }: {
   entries: Entry[];
   photos: Photo[];
@@ -113,6 +113,7 @@ function EntryTable({
   onUndoableDelete?: (action: any) => void;
   canEdit?: boolean;
   forceExpandKey?: string;
+  exclusiveExpandKey?: string;
   onJumpToPin?: (photoId: number, pinId: number) => void;
   unitLabel?: string;
   currentUnit?: UnitType;
@@ -272,6 +273,12 @@ function EntryTable({
       setExpandedSections(prev => ({ ...prev, [forceExpandKey]: true }));
     }
   }, [forceExpandKey]);
+
+  useEffect(() => {
+    if (exclusiveExpandKey) {
+      setExpandedSections({ [exclusiveExpandKey]: true });
+    }
+  }, [exclusiveExpandKey]);
 
   if (!entries || entries.length === 0) {
     return (

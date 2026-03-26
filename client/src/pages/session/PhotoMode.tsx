@@ -59,7 +59,7 @@ function getScanPanelStorageKey(sessionId: number) {
 
 type OnlineUser = { userId: string; username: string };
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto, flushRef }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void; flushRef?: React.MutableRefObject<(() => Promise<void>) | null> }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto, flushRef, onScanApplied }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void; flushRef?: React.MutableRefObject<(() => Promise<void>) | null>; onScanApplied?: (sectionKey: string) => void }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -2112,6 +2112,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     onPinDataChanged={onPinDataChanged}
                     onlineUsers={onlineUsers}
                     pushUndo={onPushUndo}
+                    onApplied={onScanApplied}
                   />
                 </div>
               )}
@@ -2927,6 +2928,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               onPinDataChanged={onPinDataChanged}
               onlineUsers={onlineUsers}
               pushUndo={onPushUndo}
+              onApplied={onScanApplied}
             />
           </SheetContent>
         </Sheet>

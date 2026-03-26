@@ -380,6 +380,7 @@ export default function LabelScannerTab({
   onPhotoChange,
   onlineUsers = [],
   pushUndo,
+  onApplied,
 }: {
   sessionId: number;
   photos: Photo[];
@@ -390,6 +391,7 @@ export default function LabelScannerTab({
   onPhotoChange?: (photoId: number | null) => void;
   onlineUsers?: OnlineUser[];
   pushUndo?: (action: { type: string; sessionId: number; entityId: number; data: any; previousData?: any }) => void;
+  onApplied?: (sectionKey: string) => void;
 }) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
@@ -1181,7 +1183,7 @@ export default function LabelScannerTab({
 
       return { successCount: succeededPinIds.length, failures, succeededPinIds };
     },
-    onSuccess: (data) => {
+    onSuccess: (data, cardsToApply) => {
       if (currentPhotoId) {
         queryClient.invalidateQueries({ queryKey: ["/api/photos", String(currentPhotoId), "pins"] });
       }
@@ -1196,6 +1198,21 @@ export default function LabelScannerTab({
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "entries"] });
       onPinDataChanged?.();
+      if (onApplied && data.successCount > 0) {
+        const sectionCounts = new Map<string, number>();
+        for (const card of cardsToApply) {
+          if (!card.included) continue;
+          const cardPhoto = photos.find((p) => p.id === card.pin.photoId);
+          const key = `${cardPhoto?.aisle || "—"}-${cardPhoto?.section || "—"}`;
+          sectionCounts.set(key, (sectionCounts.get(key) || 0) + 1);
+        }
+        let primaryKey = "";
+        let maxCount = 0;
+        for (const [key, count] of sectionCounts) {
+          if (count > maxCount) { maxCount = count; primaryKey = key; }
+        }
+        if (primaryKey) onApplied(primaryKey);
+      }
       if (data.failures.length > 0) {
         toast({
           title: `Applied ${data.successCount} of ${data.successCount + data.failures.length}`,
