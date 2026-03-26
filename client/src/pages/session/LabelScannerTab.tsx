@@ -354,7 +354,7 @@ function CropCanvas({
       width={size}
       height={size}
       className="rounded border border-blue-600/30 bg-black"
-      style={{ width: size, height: size, cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
+      style={{ width: size, height: size, maxWidth: "100%", aspectRatio: "1", cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
       onMouseDown={handlePointerDown}
       onMouseMove={handlePointerMove}
       onMouseUp={handlePointerUp}
