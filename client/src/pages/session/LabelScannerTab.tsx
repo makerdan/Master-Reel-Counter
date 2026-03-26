@@ -1300,7 +1300,7 @@ export default function LabelScannerTab({
               data-testid="btn-next-photo-no-pins"
             >
               <AlertCircle className="h-3.5 w-3.5 mr-1" />
-              <span className="text-xs font-semibold">Next Photo ({availablePhotos.length - idx - 1})</span>
+              <span className="text-xs font-semibold">Go To Next Photo ({availablePhotos.length - idx - 1})</span>
             </Button>
           )}
         </div>
@@ -1371,7 +1371,7 @@ export default function LabelScannerTab({
               data-testid="btn-next-photo"
             >
               <AlertCircle className="h-3.5 w-3.5 mr-1" />
-              <span className="text-xs font-semibold">Next Photo ({availablePhotos.length - currentPhotoIndex - 1})</span>
+              <span className="text-xs font-semibold">Go To Next Photo ({availablePhotos.length - currentPhotoIndex - 1})</span>
             </Button>
           )}
         </div>
