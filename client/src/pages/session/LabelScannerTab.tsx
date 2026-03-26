@@ -1577,7 +1577,7 @@ export default function LabelScannerTab({
                           </div>
                         )}
                         {card.result && phase === "results" && (
-                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}>
                             <div className="rounded bg-black/30 px-2 py-1" data-testid={`raw-text-${card.pin.id}`}>
                               <span className="text-[10px] text-white/30 uppercase tracking-wider" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AI Raw</span>
                               <p className="text-[11px] text-white/50 break-words whitespace-pre-wrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
@@ -1594,7 +1594,7 @@ export default function LabelScannerTab({
                                   className={`border-0 bg-transparent uppercase p-0 h-auto ${
                                     card.matchResult.confidence === "high" ? "text-green-300" : card.matchResult.confidence === "medium" ? "text-amber-300" : "text-red-300"
                                   }`}
-                                  style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}
+                                  style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}
                                   data-testid={`input-catalog-${card.pin.id}`}
                                 />
                               </div>
@@ -1605,7 +1605,7 @@ export default function LabelScannerTab({
                                   value={card.editCatalog}
                                   onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                                   className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                                  style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                                  style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
                                   placeholder="Enter category..."
                                   data-testid={`input-catalog-${card.pin.id}`}
                                 />
@@ -1619,14 +1619,14 @@ export default function LabelScannerTab({
                                 maxLength={3}
                                 list="vendor-code-suggestions-scanner"
                                 className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
                                 data-testid={`input-vendor-${card.pin.id}`}
                               />
                             </div>
                           </div>
                         )}
                         {!card.result && phase === "results" && (
-                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                          <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}>
                             <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
                               Not analyzed — enter manually
                             </Badge>
@@ -1636,7 +1636,7 @@ export default function LabelScannerTab({
                                 value={card.editCatalog}
                                 onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                                 className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
                                 placeholder="Enter category..."
                                 data-testid={`input-catalog-manual-${card.pin.id}`}
                               />
@@ -1649,7 +1649,7 @@ export default function LabelScannerTab({
                                 maxLength={3}
                                 list="vendor-code-suggestions-scanner"
                                 className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                                style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
                                 data-testid={`input-vendor-manual-${card.pin.id}`}
                               />
                             </div>
@@ -1826,7 +1826,7 @@ export default function LabelScannerTab({
               )}
 
               {card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}>
                   <div className="rounded bg-black/30 px-2 py-1" data-testid={`raw-text-${card.pin.id}`}>
                     <span className="text-[10px] text-white/30 uppercase tracking-wider" style={{ fontFamily: "'JetBrains Mono', monospace" }}>AI Raw</span>
                     <p
@@ -1850,7 +1850,7 @@ export default function LabelScannerTab({
                         className={`border-0 bg-transparent uppercase p-0 h-auto ${
                           card.matchResult.confidence === "high" ? "text-green-300" : card.matchResult.confidence === "medium" ? "text-amber-300" : "text-red-300"
                         }`}
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
                     </div>
@@ -1861,7 +1861,7 @@ export default function LabelScannerTab({
                         value={card.editCatalog}
                         onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                         className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                        style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
                         placeholder="Enter category..."
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
@@ -1876,7 +1876,7 @@ export default function LabelScannerTab({
                       maxLength={3}
                       list="vendor-code-suggestions-scanner"
                       className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-${card.pin.id}`}
                     />
                   </div>
@@ -1884,7 +1884,7 @@ export default function LabelScannerTab({
               )}
 
               {!card.result && phase === "results" && (
-                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px" }}>
+                <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]" style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px" }}>
                   <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap" style={{ fontFamily: "'Times New Roman', serif", fontSize: "14px" }} data-testid={`badge-manual-${card.pin.id}`}>
                     Not analyzed — enter manually
                   </Badge>
@@ -1894,7 +1894,7 @@ export default function LabelScannerTab({
                       value={card.editCatalog}
                       onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                       className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
                       placeholder="Enter category..."
                       data-testid={`input-catalog-manual-${card.pin.id}`}
                     />
@@ -1907,7 +1907,7 @@ export default function LabelScannerTab({
                       maxLength={3}
                       list="vendor-code-suggestions-scanner"
                       className="bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase"
-                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "28px", height: "auto", padding: "4px 8px" }}
+                      style={{ fontFamily: "'Times New Roman', serif", fontSize: "16px", height: "auto", padding: "4px 8px" }}
                       data-testid={`input-vendor-manual-${card.pin.id}`}
                     />
                   </div>
