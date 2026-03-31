@@ -1266,7 +1266,7 @@ export default function PhotoStrip({
                             }
                             return {
                               url: photoUrl(p.objectStorageKey),
-                              label: [p.aisle, p.section].filter(Boolean).join(" / ") || `Photo #${p.id}`,
+                              label: (p.aisle || p.section) ? [p.aisle ? `A${p.aisle}` : null, p.section ? `S${p.section}` : null].filter(Boolean).join(" - ") : `Photo #${p.id}`,
                               pins: pinsByPhoto.get(p.id) ?? [],
                               linkedPinShadeMap: shadeMap,
                               isDetailShot: p.isDetailShot || false,
