@@ -114,7 +114,10 @@ function PhotoCard({
   const [aisle, setAisle] = useState(photo.aisle || "");
   const [section, setSection] = useState(photo.section || "");
   const [notes, setNotes] = useState(photo.notes || "");
-  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(() => {
+    if (!photo.notes?.trim()) return false;
+    return sessionStorage.getItem(`notes-closed-${photo.id}`) !== "1";
+  });
   const [parentId, setParentId] = useState<number | null>(photo.parentPhotoId ?? null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [linkReason, setLinkReason] = useState(photo.linkReason || "");
@@ -662,7 +665,12 @@ function PhotoCard({
 
             <button
               className="ml-auto"
-              onClick={() => setNotesOpen((o) => !o)}
+              onClick={() => setNotesOpen((o) => {
+                const next = !o;
+                if (!next) sessionStorage.setItem(`notes-closed-${photo.id}`, "1");
+                else sessionStorage.removeItem(`notes-closed-${photo.id}`);
+                return next;
+              })}
               title={hasNotes ? "View/edit notes" : "Add notes"}
               data-testid={`button-strip-notes-${photo.id}`}
             >
@@ -688,7 +696,12 @@ function PhotoCard({
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
-                  onClick={() => setNotesOpen((o) => !o)}
+                  onClick={() => setNotesOpen((o) => {
+                    const next = !o;
+                    if (!next) sessionStorage.setItem(`notes-closed-${photo.id}`, "1");
+                    else sessionStorage.removeItem(`notes-closed-${photo.id}`);
+                    return next;
+                  })}
                   data-testid={`menu-strip-notes-${photo.id}`}
                 >
                   <Pencil className={`h-4 w-4 mr-2 ${hasNotes ? "text-primary" : ""}`} />
