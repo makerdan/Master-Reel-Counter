@@ -456,7 +456,9 @@ function PhotoCard({
     return siblings.indexOf(photo.linkedPinLabel);
   }, [allPhotos, photo.parentPhotoId, photo.linkedPinLabel, isDetail]);
 
-  const candidateParents = sortPhotos(allPhotos.filter(p => !p.isDetailShot && p.id !== photo.id));
+  const candidateParents = allPhotos
+    .filter(p => !p.isDetailShot && p.id !== photo.id)
+    .sort((a, b) => photoSeqLabel(a).localeCompare(photoSeqLabel(b), undefined, { numeric: true }));
 
   const parentPinsForLink = selectedParentForLink
     ? allPins.filter(p => p.photoId === selectedParentForLink && p.label)
