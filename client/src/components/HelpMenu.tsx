@@ -1519,7 +1519,7 @@ const helpChatState: { messages: ChatMessage[] } = {
   messages: [],
 };
 
-function AskAIChat() {
+export function AskAIChat() {
   const [messages, setMessagesRaw] = useState<ChatMessage[]>(helpChatState.messages);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);

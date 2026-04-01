@@ -1,11 +1,11 @@
 import { useLocation } from "wouter";
-import { ChevronLeft, HelpCircle, Cable, Camera, Smartphone } from "lucide-react";
+import { ChevronLeft, HelpCircle, Cable, Camera, Smartphone, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
 } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
-import { OverviewHelp, DashboardSections, SessionSections, MobileFlowSections } from "@/components/HelpMenu";
+import { OverviewHelp, DashboardSections, SessionSections, MobileFlowSections, AskAIChat } from "@/components/HelpMenu";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function HelpPage() {
@@ -65,6 +65,16 @@ export default function HelpPage() {
         <Accordion type="multiple" className="w-full">
           <MobileFlowSections />
         </Accordion>
+
+        <Separator className="my-6" />
+        <div className="flex items-center gap-2 mb-2">
+          <Bot className="h-5 w-5 text-[hsl(18_70%_50%)]" />
+          <h2 className="text-lg font-bold">Ask AI</h2>
+        </div>
+        <p className="text-2xl text-muted-foreground mb-3">Ask any question about the app and get an instant answer.</p>
+        <div className="border rounded-lg overflow-hidden" style={{ height: 520 }}>
+          <AskAIChat />
+        </div>
       </main>
     </div>
   );
