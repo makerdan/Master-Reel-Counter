@@ -7,9 +7,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { OverviewHelp, DashboardSections, SessionSections, MobileFlowSections, AskAIChat } from "@/components/HelpMenu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function HelpPage() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -39,17 +41,17 @@ export default function HelpPage() {
         <Separator className="my-6" />
         <div className="flex items-center gap-2 mb-2">
           <Cable className="h-5 w-5 text-[hsl(18_70%_50%)]" />
-          <h2 className="text-lg font-bold">Sessions Dashboard</h2>
+          <h2 className="text-xl font-bold">Sessions Dashboard</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-3">Managing sessions, folders, sorting, and search from the Sessions Dashboard.</p>
         <Accordion type="multiple" className="w-full">
-          <DashboardSections />
+          <DashboardSections isTester={user?.isTester} />
         </Accordion>
 
         <Separator className="my-6" />
         <div className="flex items-center gap-2 mb-2">
           <Camera className="h-5 w-5 text-[hsl(18_70%_50%)]" />
-          <h2 className="text-lg font-bold">Session — Full Mode</h2>
+          <h2 className="text-xl font-bold">Session — Full Mode</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-3">Photo annotation, pin placement, entry management, collaboration, and exports inside a counting session.</p>
         <Accordion type="multiple" className="w-full">
@@ -59,7 +61,7 @@ export default function HelpPage() {
         <Separator className="my-6" />
         <div className="flex items-center gap-2 mb-2">
           <Smartphone className="h-5 w-5 text-[hsl(18_70%_50%)]" />
-          <h2 className="text-lg font-bold">Session — Mobile Flow</h2>
+          <h2 className="text-xl font-bold">Session — Mobile Flow</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-3">Streamlined capture workflow for walking through the warehouse with a phone.</p>
         <Accordion type="multiple" className="w-full">
@@ -69,7 +71,7 @@ export default function HelpPage() {
         <Separator className="my-6" />
         <div className="flex items-center gap-2 mb-2">
           <Bot className="h-5 w-5 text-[hsl(18_70%_50%)]" />
-          <h2 className="text-lg font-bold">Ask AI</h2>
+          <h2 className="text-xl font-bold">Ask AI</h2>
         </div>
         <p className="text-2xl text-muted-foreground mb-3">Ask any question about the app and get an instant answer.</p>
         <div className="border rounded-lg overflow-hidden" style={{ height: 520 }}>

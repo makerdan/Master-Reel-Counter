@@ -24,6 +24,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 
 function FeedbackDialog({ page }: { page: string }) {
   const [open, setOpen] = useState(false);
@@ -136,7 +137,7 @@ export function FeatureRow({ icon, label, description }: { icon: React.ReactNode
       <div className="mt-0.5">{icon}</div>
       <div>
         <span className="text-sm font-semibold text-foreground">{label}</span>
-        <p className="text-[11px] text-muted-foreground leading-relaxed">{description}</p>
+        <p className="text-[13px] text-muted-foreground leading-relaxed">{description}</p>
       </div>
     </div>
   );
@@ -145,10 +146,10 @@ export function FeatureRow({ icon, label, description }: { icon: React.ReactNode
 export function OverviewHelp() {
   return (
     <AccordionItem value="overview">
-      <AccordionTrigger className="text-sm font-semibold py-3">
+      <AccordionTrigger className="text-base font-semibold py-3">
         <span className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Master Reel Counter — Overview</span>
       </AccordionTrigger>
-      <AccordionContent className="text-[11px] text-muted-foreground leading-relaxed space-y-2 pb-4">
+      <AccordionContent className="text-[13px] text-muted-foreground leading-relaxed space-y-2 pb-4">
         <p>Master Reel Counter is a warehouse wire reel counting application. It helps you photograph pallet sections, annotate reels with pins, enter wire catalog details, and export professional inventory reports.</p>
         <p>The <HelpBadge>Dashboard</HelpBadge> is your home base for managing sessions and folders, with bulk actions for managing multiple sessions at once. Inside a session, five tabs provide the complete desktop workflow: <HelpBadge>Photos Reel</HelpBadge>, <HelpBadge>Reel IDs</HelpBadge>, <HelpBadge>Flagged</HelpBadge>, <HelpBadge>Review</HelpBadge>, and <HelpBadge>Final Results</HelpBadge>. <HelpBadge>Mobile Flow</HelpBadge> offers a streamlined phone-friendly capture experience — tap the red button in the session header to enter it.</p>
         <p>Each session can have a name, location, and optional <HelpBadge>description</HelpBadge> for documenting context. A built-in <HelpBadge>comments system</HelpBadge> lets your team leave threaded comments on the session, individual entries, or specific photos.</p>
@@ -157,11 +158,11 @@ export function OverviewHelp() {
   );
 }
 
-export function DashboardSections() {
+export function DashboardSections({ isTester }: { isTester?: boolean }) {
   return (
     <>
       <AccordionItem value="dash-header-bar">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Cable className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Header Bar</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
@@ -194,7 +195,7 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-creating-sessions">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Plus className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Creating Sessions</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
@@ -212,11 +213,11 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-folders">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Folder className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Folder Organization</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Organize your sessions into folders and even nest folders inside other folders for complex projects.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Organize your sessions into folders and even nest folders inside other folders for complex projects.</p>
           <FeatureRow
             icon={<HelpIcon icon={FolderPlus} />}
             label="Create Folder"
@@ -241,7 +242,7 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-sorting-search">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Search className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Sorting & Search</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
@@ -259,11 +260,11 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-session-cards">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><MoreVertical className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Card Actions</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Each session card shows the name, location, reel count, total footage, photo count, and time. Tap the three-dot menu for actions:</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Each session card shows the name, location, reel count, total footage, photo count, and time. Tap the three-dot menu for actions:</p>
           <FeatureRow
             icon={<HelpIcon icon={CheckCircle2} />}
             label="Mark Complete / Reopen"
@@ -308,11 +309,11 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-trash">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Trash2 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Trash</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Deleted sessions are moved to the Trash instead of being permanently removed. Toggle the Trash view using the trash icon button in the dashboard header.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Deleted sessions are moved to the Trash instead of being permanently removed. Toggle the Trash view using the trash icon button in the dashboard header.</p>
           <FeatureRow
             icon={<HelpIcon icon={RotateCcw} />}
             label="Restore"
@@ -332,11 +333,11 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-shared-sessions">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Users className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Shared Sessions</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Sessions shared with you by other users appear in a separate 'Shared with You' section below your own sessions.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Sessions shared with you by other users appear in a separate 'Shared with You' section below your own sessions.</p>
           <FeatureRow
             icon={<HelpIcon icon={Users} />}
             label="Shared Session Cards"
@@ -351,11 +352,11 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-session-info">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Card Details</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Each session card displays key information at a glance:</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Each session card displays key information at a glance:</p>
           <FeatureRow
             icon={<HelpIcon icon={Hash} />}
             label="Reel Count"
@@ -385,11 +386,11 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-bulk-actions">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><SquareCheck className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Bulk Actions</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Select multiple sessions to perform actions in bulk. A floating action bar appears at the bottom of the screen when sessions are selected.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Select multiple sessions to perform actions in bulk. A floating action bar appears at the bottom of the screen when sessions are selected.</p>
           <FeatureRow
             icon={<HelpIcon icon={CheckCircle2} />}
             label="Select Sessions"
@@ -419,14 +420,14 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-stats">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Summary Stats Page</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A dedicated statistics page accessible from the dashboard header. Provides a comprehensive breakdown of your counting activity across all sessions.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">A dedicated statistics page accessible from the dashboard header. Provides a comprehensive breakdown of your counting activity across all sessions.</p>
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Overview Metrics</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Overview Metrics</p>
           <FeatureRow
             icon={<HelpIcon icon={BarChart3} />}
             label="Key Counts"
@@ -434,7 +435,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Averages & Records</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Averages & Records</p>
           <FeatureRow
             icon={<HelpIcon icon={Award} />}
             label="Performance Metrics"
@@ -442,7 +443,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Streaks & Activity</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Streaks & Activity</p>
           <FeatureRow
             icon={<HelpIcon icon={Flame} />}
             label="Streaks"
@@ -455,7 +456,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Top Categories & Vendor Codes</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Top Categories & Vendor Codes</p>
           <FeatureRow
             icon={<HelpIcon icon={Layers} />}
             label="Category & Vendor Breakdowns"
@@ -463,7 +464,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Shared Session Performance</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Shared Session Performance</p>
           <FeatureRow
             icon={<HelpIcon icon={Users} />}
             label="Contributor Leaderboard"
@@ -471,7 +472,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Role Comparison</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Role Comparison</p>
           <FeatureRow
             icon={<HelpIcon icon={Shield} />}
             label="Role-Based Metrics"
@@ -481,14 +482,14 @@ export function DashboardSections() {
       </AccordionItem>
 
       <AccordionItem value="dash-settings">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Settings className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Settings</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Configure your profile, preferences, wire categories, and monitor storage usage.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Configure your profile, preferences, wire categories, and monitor storage usage.</p>
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Display & Theme</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Display & Theme</p>
           <FeatureRow
             icon={<HelpIcon icon={Palette} />}
             label="Theme Toggle"
@@ -506,7 +507,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Accessibility</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Accessibility</p>
           <FeatureRow
             icon={<HelpIcon icon={Target} />}
             label="Larger Touch Targets"
@@ -519,7 +520,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Data Entry Preferences</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Data Entry Preferences</p>
           <FeatureRow
             icon={<HelpIcon icon={Pencil} />}
             label="Default Starting Aisle"
@@ -537,7 +538,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Capture Preferences</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Capture Preferences</p>
           <FeatureRow
             icon={<HelpIcon icon={Sliders} />}
             label="Photo Quality"
@@ -550,7 +551,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Export Preferences</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Export Preferences</p>
           <FeatureRow
             icon={<HelpIcon icon={Download} />}
             label="Default Export Format"
@@ -568,12 +569,14 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Security</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Key} />}
-            label="Tester Password"
-            description="Set up a password for tester login. Testers can sign in using a special URL without needing a Replit account. They receive Editor access to your sessions but cannot lock/unlock, delete sessions, or manage collaborators."
-          />
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Security</p>
+          {!isTester && (
+            <FeatureRow
+              icon={<HelpIcon icon={Key} />}
+              label="Tester Password"
+              description="Set up a password for tester login. Testers can sign in using a special URL without needing a Replit account. They receive Editor access to your sessions but cannot lock/unlock, delete sessions, or manage collaborators."
+            />
+          )}
           <FeatureRow
             icon={<HelpIcon icon={Shield} />}
             label="Data Encoding (AES-256)"
@@ -581,7 +584,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Wire Categories</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Wire Categories</p>
           <FeatureRow
             icon={<HelpIcon icon={Cable} />}
             label="Custom Categories"
@@ -599,7 +602,7 @@ export function DashboardSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Storage Usage</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Storage Usage</p>
           <FeatureRow
             icon={<HelpIcon icon={HardDrive} />}
             label="Your Storage"
@@ -620,7 +623,7 @@ export function SessionSections() {
   return (
     <>
       <AccordionItem value="session-header">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Session Header</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
@@ -677,8 +680,8 @@ export function SessionSections() {
           <div className="flex items-start gap-2.5 py-1.5">
             <div className="mt-0.5"><span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-[hsl(18_70%_50%)]" /></div>
             <div>
-              <span className="text-xs font-semibold text-foreground">Dark / Light Mode</span>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">Toggle between dark and light themes using the sun/moon icon in the header.</p>
+              <span className="text-sm font-semibold text-foreground">Dark / Light Mode</span>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">Toggle between dark and light themes using the sun/moon icon in the header.</p>
             </div>
           </div>
           <FeatureRow
@@ -690,11 +693,11 @@ export function SessionSections() {
       </AccordionItem>
 
       <AccordionItem value="session-photos-reel">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(200_70%_45%)]" /> Photos Reel Tab</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A visual grid of every photo in the session, grouped and sorted by aisle then section. Use it to review coverage, manage individual photos, and navigate back to any shot.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">A visual grid of every photo in the session, grouped and sorted by aisle then section. Use it to review coverage, manage individual photos, and navigate back to any shot.</p>
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(200_70%_45%)]">086</span>}
             label="Sequence Badge"
@@ -739,14 +742,14 @@ export function SessionSections() {
       </AccordionItem>
 
       <AccordionItem value="session-photo-mode">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Camera className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Reel IDs Tab</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">The primary workflow. Upload photos of pallet sections, place pins on each reel, then fill in wire details below.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">The primary workflow. Upload photos of pallet sections, place pins on each reel, then fill in wire details below.</p>
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Uploading Photos</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Uploading Photos</p>
           <FeatureRow
             icon={<HelpIcon icon={Camera} />}
             label="Upload Photos / Take Photo"
@@ -759,7 +762,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Navigation</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Navigation</p>
           <FeatureRow
             icon={<HelpIcon icon={ChevronLeft} />}
             label="Previous / Next Photo"
@@ -772,7 +775,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Viewer Controls</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Viewer Controls</p>
           <FeatureRow
             icon={<HelpIcon icon={ZoomIn} />}
             label="Zoom In / Out"
@@ -795,7 +798,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Placing & Managing Pins</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Placing & Managing Pins</p>
           <FeatureRow
             icon={<MapPin className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" />}
             label="Place a Pin"
@@ -824,8 +827,8 @@ export function SessionSections() {
           <div className="flex items-start gap-2.5 py-1.5">
             <div className="mt-0.5"><span className="inline-block w-3 h-3 rounded-full border-2 border-muted-foreground opacity-60" /></div>
             <div>
-              <span className="text-xs font-semibold text-foreground">Committed Pins</span>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">Pins that have been saved as entries appear with a "P" prefix and a muted style. They can still be deleted to remove the entry.</p>
+              <span className="text-sm font-semibold text-foreground">Committed Pins</span>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">Pins that have been saved as entries appear with a "P" prefix and a muted style. They can still be deleted to remove the entry.</p>
             </div>
           </div>
           <FeatureRow
@@ -835,7 +838,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Reel Crop Preview</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Reel Crop Preview</p>
           <FeatureRow
             icon={<HelpIcon icon={Focus} />}
             label="Pin Selection Preview"
@@ -843,7 +846,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Entry Details Table</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Entry Details Table</p>
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
             label="Category Input (Wire Details)"
@@ -876,7 +879,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Notes & Detail Shots</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo Notes & Detail Shots</p>
           <FeatureRow
             icon={<HelpIcon icon={StickyNote} />}
             label="Photo Notes"
@@ -889,7 +892,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Nearby Photos</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Nearby Photos</p>
           <FeatureRow
             icon={<HelpIcon icon={Eye} />}
             label="Nearby Photo Strip"
@@ -897,7 +900,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Quick Entry Panel</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Quick Entry Panel</p>
           <FeatureRow
             icon={<HelpIcon icon={Pencil} />}
             label="Quick Entry Toggle"
@@ -923,91 +926,137 @@ export function SessionSections() {
             label="Receiving Mode"
             description="The Receiving checkbox auto-fills the next sequential Receiving section number, computed from both existing photos and entries in the session."
           />
-        </AccordionContent>
-      </AccordionItem>
 
-      <AccordionItem value="session-ai-scanner">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-[hsl(270_60%_55%)]" /> AI Label Scanner</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A panel within the Reel IDs tab that uses AI vision to read wire reel labels from photo crops. Select a photo, preview cropped regions around pins, analyze labels in batch, review results, and apply them as entries.</p>
+          <Separator className="my-3" />
+          <Accordion type="multiple" className="w-full">
+            <AccordionItem value="session-photo-mode-table-view" className="border rounded-md px-2">
+              <AccordionTrigger className="text-sm font-semibold py-2">
+                <span className="flex items-center gap-2"><Eye className="h-3.5 w-3.5 text-[hsl(18_70%_50%)]" /> Table View</span>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-1 pb-3 pt-1">
+                <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list. Columns (desktop): Pin # → Aisle → Section → Category → Vendor → Reels → Ft/Reel → Total Ft → Photo → Edit.</p>
+                <FeatureRow
+                  icon={<HelpIcon icon={MapPin} />}
+                  label="Clickable Pin #"
+                  description="Tap any Pin # in the table to jump directly to that pin's photo in Reel IDs mode. The target pin flashes with a yellow glow for a few seconds so you can spot it immediately — useful for zooming in on a label you need to verify."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={ChevronLeft} />}
+                  label="Collapsible Sections"
+                  description="Entries are grouped by aisle-section. Tap a section header to expand or collapse it. The header shows the entry count for that section."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={Eye} />}
+                  label="Photo Viewer"
+                  description="Tap the eye icon on any entry to view its linked photo. The photo opens with an orange pulsing ring highlighting the exact pin location, auto-scrolled to center."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={Pencil} />}
+                  label="Edit Entry"
+                  description="Tap the pencil icon to open the entry in an edit dialog with the linked photo and pin highlight visible above the form."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={Trash2} />}
+                  label="Delete Entry"
+                  description="Tap the trash icon to delete an entry. A confirmation dialog appears. Deleted entries can be restored with Undo."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={AlertCircle} />}
+                  label="Validation Warnings"
+                  description="Entries missing a reel tag or footage show a yellow warning badge on the section header. This helps catch incomplete data before exporting."
+                />
+                <FeatureRow
+                  icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
+                  label="Total Footage"
+                  description="The Table View footer shows the total footage across all entries for quick reference."
+                />
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="session-photo-mode-ai-scanner" className="border rounded-md px-2 mt-1">
+              <AccordionTrigger className="text-sm font-semibold py-2">
+                <span className="flex items-center gap-2"><ScanLine className="h-3.5 w-3.5 text-[hsl(270_60%_55%)]" /> AI Label Scanner</span>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-1 pb-3 pt-1">
+                <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">A panel within the Reel IDs tab that uses AI vision to read wire reel labels from photo crops. Select a photo, preview cropped regions around pins, analyze labels in batch, review results, and apply them as entries.</p>
 
-          <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo & Card Selection</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Camera} />}
-            label="Photo Selection"
-            description="Choose a photo from the session. The scanner shows a card for each pin on the photo with a cropped preview of the label area."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={ZoomIn} />}
-            label="Zoom & Pan Controls"
-            description="Each card shows a cropped preview of the pin area. Adjust the zoom level to frame the label, and drag to pan the crop window for the best view of the text."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={SquareCheck} />}
-            label="Include / Exclude Cards"
-            description="Each card has a checkbox to include or exclude it from the analysis batch. Uncheck cards with unreadable or irrelevant labels to save processing time. Your selections are saved automatically and restored if the page refreshes."
-          />
+                <Separator className="my-2" />
+                <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo & Card Selection</p>
+                <FeatureRow
+                  icon={<HelpIcon icon={Camera} />}
+                  label="Photo Selection"
+                  description="Choose a photo from the session. The scanner shows a card for each pin on the photo with a cropped preview of the label area."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={ZoomIn} />}
+                  label="Zoom & Pan Controls"
+                  description="Each card shows a cropped preview of the pin area. Adjust the zoom level to frame the label, and drag to pan the crop window for the best view of the text."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={SquareCheck} />}
+                  label="Include / Exclude Cards"
+                  description="Each card has a checkbox to include or exclude it from the analysis batch. Uncheck cards with unreadable or irrelevant labels to save processing time. Your selections are saved automatically and restored if the page refreshes."
+                />
 
-          <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Single Photo vs All Photos</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Grid3X3} />}
-            label="All Photos Mode"
-            description="Toggle the grid icon to switch to All Photos mode, which shows a dense grid of ALL active pins across the entire session — every photo with draft or incomplete pins. Each card shows a badge with its source photo location. The scanner defaults to this mode when previous results exist."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={ListChecks} />}
-            label="Single Photo Mode"
-            description="The default view shows only pins from the currently selected photo. Use this for focused analysis of one section at a time."
-          />
+                <Separator className="my-2" />
+                <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Single Photo vs All Photos</p>
+                <FeatureRow
+                  icon={<HelpIcon icon={Grid3X3} />}
+                  label="All Photos Mode"
+                  description="Toggle the grid icon to switch to All Photos mode, which shows a dense grid of ALL active pins across the entire session — every photo with draft or incomplete pins. Each card shows a badge with its source photo location. The scanner defaults to this mode when previous results exist."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={ListChecks} />}
+                  label="Single Photo Mode"
+                  description="The default view shows only pins from the currently selected photo. Use this for focused analysis of one section at a time."
+                />
 
-          <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Analysis & Results</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Sparkles} />}
-            label="Analyze Labels"
-            description="Sends the cropped pin images to AI vision for label reading. Cards are batched automatically (up to 20 per request). A progress bar shows the analysis status. Results are cached on the server so re-analyzing the same photo is instant."
-          />
-          <FeatureRow
-            icon={<span className="text-xs font-mono font-bold text-[hsl(270_60%_55%)]">RAW</span>}
-            label="Raw AI Text"
-            description='Each analyzed card displays the literal text the AI read from the label in a monospace block. Shows "unreadable" in italic if the AI could not read the label.'
-          />
-          <FeatureRow
-            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
-            label="Matched Results"
-            description="The raw text is automatically matched against the built-in catalog (~300 entries) plus your custom categories. The best match fills in the category, vendor code, and footage fields. You can edit any field to correct the AI before applying."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Check} />}
-            label="Add Reels from Images"
-            description='Tap "Add Reels from X Images" to commit the scanned results as entries. Draft pins become committed entries with their wire details filled in. Incomplete committed pins get their existing entries updated with the scanned data.'
-          />
+                <Separator className="my-2" />
+                <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Analysis & Results</p>
+                <FeatureRow
+                  icon={<HelpIcon icon={Sparkles} />}
+                  label="Analyze Labels"
+                  description="Sends the cropped pin images to AI vision for label reading. Cards are batched automatically (up to 20 per request). A progress bar shows the analysis status. Results are cached on the server so re-analyzing the same photo is instant."
+                />
+                <FeatureRow
+                  icon={<span className="text-xs font-mono font-bold text-[hsl(270_60%_55%)]">RAW</span>}
+                  label="Raw AI Text"
+                  description='Each analyzed card displays the literal text the AI read from the label in a monospace block. Shows "unreadable" in italic if the AI could not read the label.'
+                />
+                <FeatureRow
+                  icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
+                  label="Matched Results"
+                  description="The raw text is automatically matched against the built-in catalog (~300 entries) plus your custom categories. The best match fills in the category, vendor code, and footage fields. You can edit any field to correct the AI before applying."
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={Check} />}
+                  label="Add Reels from Images"
+                  description='Tap "Add Reels from X Images" to commit the scanned results as entries. Draft pins become committed entries with their wire details filled in. Incomplete committed pins get their existing entries updated with the scanned data.'
+                />
 
-          <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Advanced Features</p>
-          <FeatureRow
-            icon={<span className="text-xs font-mono font-bold text-[hsl(270_60%_55%)]">REC</span>}
-            label="Receiving Pooling"
-            description={`When a photo's location contains "Receiving", the scanner pools pins from all Receiving photos (up to 9 cards) to batch more labels per analysis. Pooled cards from other photos show a purple badge with their source location.`}
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Users} />}
-            label="Real-Time Sync"
-            description="Scan results are saved to the server and synced via WebSocket. Multiple team members can divide scanning work and see each other's results in real time."
-          />
+                <Separator className="my-2" />
+                <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Advanced Features</p>
+                <FeatureRow
+                  icon={<span className="text-xs font-mono font-bold text-[hsl(270_60%_55%)]">REC</span>}
+                  label="Receiving Pooling"
+                  description={`When a photo's location contains "Receiving", the scanner pools pins from all Receiving photos (up to 9 cards) to batch more labels per analysis. Pooled cards from other photos show a purple badge with their source location.`}
+                />
+                <FeatureRow
+                  icon={<HelpIcon icon={Users} />}
+                  label="Real-Time Sync"
+                  description="Scan results are saved to the server and synced via WebSocket. Multiple team members can divide scanning work and see each other's results in real time."
+                />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </AccordionContent>
       </AccordionItem>
 
       <AccordionItem value="session-flagged">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Flag className="h-4 w-4 text-yellow-500" /> Flagged Tab</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Dedicated view for all reels that have been flagged for re-shoot or additional information. Each card shows the flag reason (if provided) and allows inline editing.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Dedicated view for all reels that have been flagged for re-shoot or additional information. Each card shows the flag reason (if provided) and allows inline editing.</p>
           <FeatureRow
             icon={<HelpIcon icon={Eye} />}
             label="Photo Preview"
@@ -1062,14 +1111,14 @@ export function SessionSections() {
       </AccordionItem>
 
       <AccordionItem value="session-review">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Review Tab</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A structured one-by-one review queue that lets your team verify every reel entry. Each entry shows a zoomed crop of its pin location alongside the full photo. Responses are tracked per user and synced in real time.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">A structured one-by-one review queue that lets your team verify every reel entry. Each entry shows a zoomed crop of its pin location alongside the full photo. Responses are tracked per user and synced in real time.</p>
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Review Queue</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Review Queue</p>
           <FeatureRow
             icon={<HelpIcon icon={ChevronLeft} />}
             label="Navigation"
@@ -1092,7 +1141,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Viewing Controls</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Viewing Controls</p>
           <FeatureRow
             icon={<HelpIcon icon={ZoomIn} />}
             label="Pin Crop View"
@@ -1115,7 +1164,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Collaborative Review</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Collaborative Review</p>
           <FeatureRow
             icon={<HelpIcon icon={Users} />}
             label="Cohort Distribution"
@@ -1129,135 +1178,15 @@ export function SessionSections() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="session-ai-scanner">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-[hsl(270_60%_55%)]" /> AI Label Scanner</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A panel within the Reel IDs tab that uses AI vision to read wire reel labels from photo crops. Select a photo, preview cropped regions around pins, analyze labels in batch, review results, and apply them as entries.</p>
-
-          <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Photo & Card Selection</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Camera} />}
-            label="Photo Selection"
-            description="Choose a photo from the session. The scanner shows a card for each pin on the photo with a cropped preview of the label area."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={ZoomIn} />}
-            label="Zoom & Pan Controls"
-            description="Each card shows a cropped preview of the pin area. Adjust the zoom level to frame the label, and drag to pan the crop window for the best view of the text."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={SquareCheck} />}
-            label="Include / Exclude Cards"
-            description="Each card has a checkbox to include or exclude it from the analysis batch. Uncheck cards with unreadable or irrelevant labels to save processing time. Your selections are saved automatically and restored if the page refreshes."
-          />
-
-          <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Single Photo vs All Photos</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Grid3X3} />}
-            label="All Photos Mode"
-            description="Toggle the grid icon to switch to All Photos mode, which shows a dense grid of ALL active pins across the entire session — every photo with draft or incomplete pins. Each card shows a badge with its source photo location. The scanner defaults to this mode when previous results exist."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={ListChecks} />}
-            label="Single Photo Mode"
-            description="The default view shows only pins from the currently selected photo. Use this for focused analysis of one section at a time."
-          />
-
-          <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Analysis & Results</p>
-          <FeatureRow
-            icon={<HelpIcon icon={Sparkles} />}
-            label="Analyze Labels"
-            description="Sends the cropped pin images to AI vision for label reading. Cards are batched automatically (up to 20 per request). A progress bar shows the analysis status. Results are cached on the server so re-analyzing the same photo is instant."
-          />
-          <FeatureRow
-            icon={<span className="text-xs font-mono font-bold text-[hsl(270_60%_55%)]">RAW</span>}
-            label="Raw AI Text"
-            description='Each analyzed card displays the literal text the AI read from the label in a monospace block. Shows "unreadable" in italic if the AI could not read the label.'
-          />
-          <FeatureRow
-            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
-            label="Matched Results"
-            description="The raw text is automatically matched against the built-in catalog (~300 entries) plus your custom categories. The best match fills in the category, vendor code, and footage fields. You can edit any field to correct the AI before applying."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Check} />}
-            label="Add Reels from Images"
-            description='Tap "Add Reels from X Images" to commit the scanned results as entries. Draft pins become committed entries with their wire details filled in. Incomplete committed pins get their existing entries updated with the scanned data.'
-          />
-
-          <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Advanced Features</p>
-          <FeatureRow
-            icon={<span className="text-xs font-mono font-bold text-[hsl(270_60%_55%)]">REC</span>}
-            label="Receiving Pooling"
-            description={`When a photo's location contains "Receiving", the scanner pools pins from all Receiving photos (up to 9 cards) to batch more labels per analysis. Pooled cards from other photos show a purple badge with their source location.`}
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Users} />}
-            label="Real-Time Sync"
-            description="Scan results are saved to the server and synced via WebSocket. Multiple team members can divide scanning work and see each other's results in real time."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
-      <AccordionItem value="session-table-view">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Table View</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list. Columns (desktop): Pin # → Aisle → Section → Category → Vendor → Reels → Ft/Reel → Total Ft → Photo → Edit.</p>
-          <FeatureRow
-            icon={<HelpIcon icon={MapPin} />}
-            label="Clickable Pin #"
-            description="Tap any Pin # in the table to jump directly to that pin's photo in Reel IDs mode. The target pin flashes with a yellow glow for a few seconds so you can spot it immediately — useful for zooming in on a label you need to verify."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={ChevronLeft} />}
-            label="Collapsible Sections"
-            description="Entries are grouped by aisle-section. Tap a section header to expand or collapse it. The header shows the entry count for that section."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Eye} />}
-            label="Photo Viewer"
-            description="Tap the eye icon on any entry to view its linked photo. The photo opens with an orange pulsing ring highlighting the exact pin location, auto-scrolled to center."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Pencil} />}
-            label="Edit Entry"
-            description="Tap the pencil icon to open the entry in an edit dialog with the linked photo and pin highlight visible above the form."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Trash2} />}
-            label="Delete Entry"
-            description="Tap the trash icon to delete an entry. A confirmation dialog appears. Deleted entries can be restored with Undo."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={AlertCircle} />}
-            label="Validation Warnings"
-            description="Entries missing a reel tag or footage show a yellow warning badge on the section header. This helps catch incomplete data before exporting."
-          />
-          <FeatureRow
-            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
-            label="Total Footage"
-            description="The Table View footer shows the total footage across all entries for quick reference."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
       <AccordionItem value="session-final-results">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Final Results Tab</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">A summary view showing review status, a category-level count tally for the entire session, and an optional comparison against a pre-loaded inventory spreadsheet.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">A summary view showing review status, a category-level count tally for the entire session, and an optional comparison against a pre-loaded inventory spreadsheet.</p>
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Review Status Banner</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Review Status Banner</p>
           <FeatureRow
             icon={<HelpIcon icon={CheckCircle2} />}
             label="Not Yet Reviewed"
@@ -1270,7 +1199,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Session Count Tally</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Session Count Tally</p>
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
             label="Category Rows"
@@ -1288,7 +1217,7 @@ export function SessionSections() {
           />
 
           <Separator className="my-2" />
-          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-1">Inventory Comparison</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Inventory Comparison</p>
           <FeatureRow
             icon={<HelpIcon icon={FileSpreadsheet} />}
             label="Upload Inventory"
@@ -1307,56 +1236,12 @@ export function SessionSections() {
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="session-table-view">
-        <AccordionTrigger className="text-sm font-semibold py-3">
-          <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Table View</span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list. Columns (desktop): Pin # → Aisle → Section → Category → Vendor → Reels → Ft/Reel → Total Ft → Photo → Edit.</p>
-          <FeatureRow
-            icon={<HelpIcon icon={MapPin} />}
-            label="Clickable Pin #"
-            description="Tap any Pin # in the table to jump directly to that pin's photo in Reel IDs mode. The target pin flashes with a yellow glow for a few seconds so you can spot it immediately — useful for zooming in on a label you need to verify."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={ChevronLeft} />}
-            label="Collapsible Sections"
-            description="Entries are grouped by aisle-section. Tap a section header to expand or collapse it. The header shows the entry count for that section."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Eye} />}
-            label="Photo Viewer"
-            description="Tap the eye icon on any entry to view its linked photo. The photo opens with an orange pulsing ring highlighting the exact pin location, auto-scrolled to center."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Pencil} />}
-            label="Edit Entry"
-            description="Tap the pencil icon to open the entry in an edit dialog with the linked photo and pin highlight visible above the form."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={Trash2} />}
-            label="Delete Entry"
-            description="Tap the trash icon to delete an entry. A confirmation dialog appears. Deleted entries can be restored with Undo."
-          />
-          <FeatureRow
-            icon={<HelpIcon icon={AlertCircle} />}
-            label="Validation Warnings"
-            description="Entries missing a reel tag or footage show a yellow warning badge on the section header. This helps catch incomplete data before exporting."
-          />
-          <FeatureRow
-            icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
-            label="Total Footage"
-            description="The Table View footer shows the total footage across all entries for quick reference."
-          />
-        </AccordionContent>
-      </AccordionItem>
-
       <AccordionItem value="session-collaboration">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Users className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Collaboration</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Work together with your team in real-time on counting sessions.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Work together with your team in real-time on counting sessions.</p>
           <FeatureRow
             icon={<HelpIcon icon={Users} />}
             label="Three Invite Methods"
@@ -1386,11 +1271,11 @@ export function SessionSections() {
       </AccordionItem>
 
       <AccordionItem value="session-comments">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Comments</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Leave comments on a session, individual entries, or specific photos to communicate with your team. Comments appear in context wherever they are posted.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Leave comments on a session, individual entries, or specific photos to communicate with your team. Comments appear in context wherever they are posted.</p>
           <FeatureRow
             icon={<HelpIcon icon={MessageCircle} />}
             label="Contextual Threads"
@@ -1420,11 +1305,11 @@ export function SessionSections() {
       </AccordionItem>
 
       <AccordionItem value="session-export">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Download className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Export & Sharing</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Export session data in multiple formats. Exports can be triggered from the session header or from the three-dot action menu on session cards in the Dashboard.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Export session data in multiple formats. Exports can be triggered from the session header or from the three-dot action menu on session cards in the Dashboard.</p>
           <FeatureRow
             icon={<HelpIcon icon={FileSpreadsheet} />}
             label="Excel Export (.xlsx)"
@@ -1449,17 +1334,17 @@ export function SessionSections() {
       </AccordionItem>
 
       <AccordionItem value="session-tips">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Tips & Efficiency</span>
         </AccordionTrigger>
-        <AccordionContent className="space-y-2 pb-4 text-[11px] text-muted-foreground leading-relaxed">
-          <p><span className="font-semibold text-foreground">Rapid Data Entry:</span> Type a few letters of a wire category and use <HelpKey>Arrow Down</HelpKey> + <HelpKey>Enter</HelpKey> to select. The cursor auto-advances to the next row.</p>
-          <p><span className="font-semibold text-foreground">Next Reel Navigation:</span> After placing all your pins, use the orange "Next Reel" button to jump through photos that still need details. The entry table auto-scrolls into view.</p>
-          <p><span className="font-semibold text-foreground">Receiving Mode:</span> Type "rec" in the aisle field to auto-fill "Receiving". In Mobile Flow, the Receiving checkbox auto-increments section numbers.</p>
-          <p><span className="font-semibold text-foreground">Pin Scale:</span> For photos with many small reels close together, decrease the pin size using the size controls on the right overlay strip. Pin scale is remembered per-photo.</p>
-          <p><span className="font-semibold text-foreground">Nearby Photos:</span> Use the photo strip below the viewer to preview adjacent sections without losing your pin work on the current photo. A nearby photo may show a different angle on a reel's tag, helping you correctly identify and input wire data you couldn't read from the current photo.</p>
-          <p><span className="font-semibold text-foreground">Flagging Workflow:</span> When you can't read a tag, flag the reel and continue. Later, share the Flagged tab link with someone who can re-photograph those specific reels.</p>
-          <p><span className="font-semibold text-foreground">Undo Safety Net:</span> All entry creates, edits, and deletes can be undone. The undo/redo buttons in the header track your action history for the current session.</p>
+        <AccordionContent className="space-y-2 pb-4">
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Rapid Data Entry:</span> Type a few letters of a wire category and use <HelpKey>Arrow Down</HelpKey> + <HelpKey>Enter</HelpKey> to select. The cursor auto-advances to the next row.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Next Reel Navigation:</span> After placing all your pins, use the orange "Next Reel" button to jump through photos that still need details. The entry table auto-scrolls into view.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Receiving Mode:</span> Type "rec" in the aisle field to auto-fill "Receiving". In Mobile Flow, the Receiving checkbox auto-increments section numbers.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Pin Scale:</span> For photos with many small reels close together, decrease the pin size using the size controls on the right overlay strip. Pin scale is remembered per-photo.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Nearby Photos:</span> Use the photo strip below the viewer to preview adjacent sections without losing your pin work on the current photo. A nearby photo may show a different angle on a reel's tag, helping you correctly identify and input wire data you couldn't read from the current photo.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Flagging Workflow:</span> When you can't read a tag, flag the reel and continue. Later, share the Flagged tab link with someone who can re-photograph those specific reels.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Undo Safety Net:</span> All entry creates, edits, and deletes can be undone. The undo/redo buttons in the header track your action history for the current session.</p>
         </AccordionContent>
       </AccordionItem>
     </>
@@ -1470,7 +1355,7 @@ export function MobileFlowSections() {
   return (
     <>
       <AccordionItem value="mobile-capture">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Camera className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Capturing Photos</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
@@ -1502,19 +1387,19 @@ export function MobileFlowSections() {
           <div className="flex items-start gap-2.5 py-1.5">
             <div className="mt-0.5"><Check className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" /></div>
             <div>
-              <span className="text-xs font-semibold text-foreground">Receiving Checkbox</span>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">Check "Receiving" to auto-set the aisle to "Receiving" and auto-increment the section number (001, 002, 003...) with each new photo. Section becomes optional.</p>
+              <span className="text-sm font-semibold text-foreground">Receiving Checkbox</span>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">Check "Receiving" to auto-set the aisle to "Receiving" and auto-increment the section number (001, 002, 003...) with each new photo. Section becomes optional.</p>
             </div>
           </div>
         </AccordionContent>
       </AccordionItem>
 
       <AccordionItem value="mobile-upload-queue">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><ArrowUpDown className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Upload Queue & Offline</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Photos upload in the background so you can keep capturing without waiting.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Photos upload in the background so you can keep capturing without waiting.</p>
           <FeatureRow
             icon={<span className="inline-flex items-center gap-1"><span className="animate-spin text-[11px]">&#9696;</span></span>}
             label="Background Upload"
@@ -1539,11 +1424,11 @@ export function MobileFlowSections() {
       </AccordionItem>
 
       <AccordionItem value="mobile-review">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Eye className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Photo Review</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Review and manage photos after capture, right from the Mobile Flow.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Review and manage photos after capture, right from the Mobile Flow.</p>
           <FeatureRow
             icon={<HelpIcon icon={ChevronLeft} />}
             label="Photo Navigation"
@@ -1572,19 +1457,19 @@ export function MobileFlowSections() {
           <div className="flex items-start gap-2.5 py-1.5">
             <div className="mt-0.5"><MapPin className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" /></div>
             <div>
-              <span className="text-xs font-semibold text-foreground">Location Labels</span>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">Each photo displays its aisle and section tag below the image. Receiving photos with auto-incremented sections show the padded number (e.g. "Section: 003").</p>
+              <span className="text-sm font-semibold text-foreground">Location Labels</span>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">Each photo displays its aisle and section tag below the image. Receiving photos with auto-incremented sections show the padded number (e.g. "Section: 003").</p>
             </div>
           </div>
         </AccordionContent>
       </AccordionItem>
 
       <AccordionItem value="mobile-offline">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><Globe className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Install App & Offline Mode</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">Master Reel Counter can be installed as a standalone app on your phone, tablet, or desktop. It works offline in warehouses with no signal.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Master Reel Counter can be installed as a standalone app on your phone, tablet, or desktop. It works offline in warehouses with no signal.</p>
           <FeatureRow
             icon={<HelpIcon icon={Download} />}
             label="Install as App (PWA)"
@@ -1614,16 +1499,16 @@ export function MobileFlowSections() {
       </AccordionItem>
 
       <AccordionItem value="mobile-tips">
-        <AccordionTrigger className="text-sm font-semibold py-3">
+        <AccordionTrigger className="text-base font-semibold py-3">
           <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Mobile Tips</span>
         </AccordionTrigger>
-        <AccordionContent className="space-y-2 pb-4 text-[11px] text-muted-foreground leading-relaxed">
-          <p><span className="font-semibold text-foreground">Speed Workflow:</span> Set your aisle and section, then rapidly tap "Take Photo" to capture multiple angles. The upload queue handles everything in the background.</p>
-          <p><span className="font-semibold text-foreground">Section Stepper:</span> Use the +/− buttons below the Section field to quickly move between sections by one. Zero-padding is preserved automatically, and the value can't go below 0.</p>
-          <p><span className="font-semibold text-foreground">Receiving Mode:</span> Check the Receiving box for dock areas. Sections auto-number so you never have to type them — just keep snapping photos.</p>
-          <p><span className="font-semibold text-foreground">Offline Resilience:</span> Head into low-signal warehouse areas with confidence. Photos and entries queue locally and sync when you get back to connectivity. A status indicator shows pending items.</p>
-          <p><span className="font-semibold text-foreground">Batch Capture:</span> Use the gallery upload button to select multiple photos at once from your camera roll — all will be tagged with the current aisle/section.</p>
-          <p><span className="font-semibold text-foreground">Review Later:</span> Mobile Flow is optimized for capturing. Switch to Full Mode on a tablet or desktop to add pins, wire details, and finalize entries.</p>
+        <AccordionContent className="space-y-2 pb-4">
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Speed Workflow:</span> Set your aisle and section, then rapidly tap "Take Photo" to capture multiple angles. The upload queue handles everything in the background.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Section Stepper:</span> Use the +/− buttons below the Section field to quickly move between sections by one. Zero-padding is preserved automatically, and the value can't go below 0.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Receiving Mode:</span> Check the Receiving box for dock areas. Sections auto-number so you never have to type them — just keep snapping photos.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Offline Resilience:</span> Head into low-signal warehouse areas with confidence. Photos and entries queue locally and sync when you get back to connectivity. A status indicator shows pending items.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Batch Capture:</span> Use the gallery upload button to select multiple photos at once from your camera roll — all will be tagged with the current aisle/section.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Review Later:</span> Mobile Flow is optimized for capturing. Switch to Full Mode on a tablet or desktop to add pins, wire details, and finalize entries.</p>
         </AccordionContent>
       </AccordionItem>
     </>
@@ -1872,6 +1757,7 @@ export function AskAIChat() {
 export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" | "dashboard" }) {
   const [open, setOpen] = useState(false);
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
 
   const title = mode === "dashboard" ? "Dashboard Help" : mode === "mobile" ? "Mobile Flow Help" : "Session Help";
   const description = mode === "dashboard"
@@ -1918,7 +1804,7 @@ export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" |
               <div className="px-4">
                 <Accordion type="multiple" className="w-full">
                   <OverviewHelp />
-                  {mode === "dashboard" && <DashboardSections />}
+                  {mode === "dashboard" && <DashboardSections isTester={user?.isTester} />}
                   {mode === "full" && <SessionSections />}
                   {mode === "mobile" && <MobileFlowSections />}
                 </Accordion>
