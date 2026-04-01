@@ -64,6 +64,13 @@
       "when": 1774205171704,
       "tag": "0008_data_consistency_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775013251584,
+      "tag": "0009_fast_maggott",
+      "breakpoints": true
     }
   ]
 }

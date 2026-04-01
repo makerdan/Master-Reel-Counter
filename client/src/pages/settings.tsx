@@ -53,6 +53,8 @@ interface UserSettingsResponse {
   photoQuality: number;
   useReceivingQuality: boolean;
   receivingPhotoQuality: number;
+  useOnFloorQuality: boolean;
+  onFloorPhotoQuality: number;
   defaultAislePrefix: string | null;
   sectionAdvanceStep: number;
   defaultUnit: string;
@@ -81,6 +83,7 @@ export default function SettingsPage() {
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [localPhotoQuality, setLocalPhotoQuality] = useState<number | null>(null);
   const [localReceivingQuality, setLocalReceivingQuality] = useState<number | null>(null);
+  const [localOnFloorQuality, setLocalOnFloorQuality] = useState<number | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [testerPassword, setTesterPassword] = useState("");
   const [testerPasswordConfirm, setTesterPasswordConfirm] = useState("");
@@ -1281,19 +1284,19 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">Reels in Receiving are typically photographed up close, so high zoom clarity isn't needed. Enable this to automatically use a lower quality for Receiving photos, saving bandwidth and storage.</p>
                 </div>
                 <Switch
-                  checked={settings?.useReceivingQuality ?? false}
+                  checked={settings?.useReceivingQuality ?? true}
                   onCheckedChange={(checked) => saveSetting("useReceivingQuality", checked)}
                   data-testid="switch-receiving-quality"
                 />
               </div>
-              {settings?.useReceivingQuality && (
+              {(settings?.useReceivingQuality ?? true) && (
                 <div className="pl-2 border-l-2 border-primary/20 ml-1 mt-2 space-y-1">
                   <div className="flex items-center justify-between gap-4">
                     <Label className="text-xs text-muted-foreground">Receiving photo quality</Label>
-                    <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-receiving-quality-value">{localReceivingQuality ?? settings?.receivingPhotoQuality ?? 50}%</span>
+                    <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-receiving-quality-value">{localReceivingQuality ?? settings?.receivingPhotoQuality ?? 40}%</span>
                   </div>
                   <Slider
-                    value={[localReceivingQuality ?? settings?.receivingPhotoQuality ?? 50]}
+                    value={[localReceivingQuality ?? settings?.receivingPhotoQuality ?? 40]}
                     onValueChange={(val) => setLocalReceivingQuality(val[0])}
                     onValueCommit={(val) => { saveSetting("receivingPhotoQuality", val[0]); setLocalReceivingQuality(null); }}
                     min={30}
@@ -1305,7 +1308,57 @@ export default function SettingsPage() {
                   <div className="relative w-full h-4 mt-0.5">
                     {[30, 40, 50, 60, 70, 80, 90, 100].map((tick) => {
                       const pct = ((tick - 30) / 70) * 100;
-                      const isSelected = (localReceivingQuality ?? settings?.receivingPhotoQuality ?? 50) === tick;
+                      const isSelected = (localReceivingQuality ?? settings?.receivingPhotoQuality ?? 40) === tick;
+                      return (
+                        <div
+                          key={tick}
+                          className="absolute flex flex-col items-center"
+                          style={{ left: `calc(10px + (100% - 20px) * ${pct / 100})`, transform: "translateX(-50%)" }}
+                        >
+                          <div className={`w-px h-1.5 ${isSelected ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                          <span className={`text-[9px] tabular-nums ${isSelected ? "text-primary font-semibold" : "text-muted-foreground/60"}`}>
+                            {tick}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t pt-3 mt-3">
+              <div className="flex items-center justify-between gap-4 mb-2">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium">On Floor, In Front Of — Quality Override</Label>
+                  <p className="text-xs text-muted-foreground">Reels sitting on the floor in front of a section are typically photographed up close, so high zoom clarity isn't needed. Enable this to automatically use a lower quality for these photos, saving bandwidth and storage.</p>
+                </div>
+                <Switch
+                  checked={settings?.useOnFloorQuality ?? true}
+                  onCheckedChange={(checked) => saveSetting("useOnFloorQuality", checked)}
+                  data-testid="switch-on-floor-quality"
+                />
+              </div>
+              {(settings?.useOnFloorQuality ?? true) && (
+                <div className="pl-2 border-l-2 border-primary/20 ml-1 mt-2 space-y-1">
+                  <div className="flex items-center justify-between gap-4">
+                    <Label className="text-xs text-muted-foreground">On Floor photo quality</Label>
+                    <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-on-floor-quality-value">{localOnFloorQuality ?? settings?.onFloorPhotoQuality ?? 40}%</span>
+                  </div>
+                  <Slider
+                    value={[localOnFloorQuality ?? settings?.onFloorPhotoQuality ?? 40]}
+                    onValueChange={(val) => setLocalOnFloorQuality(val[0])}
+                    onValueCommit={(val) => { saveSetting("onFloorPhotoQuality", val[0]); setLocalOnFloorQuality(null); }}
+                    min={30}
+                    max={100}
+                    step={5}
+                    className="w-full"
+                    data-testid="slider-on-floor-quality"
+                  />
+                  <div className="relative w-full h-4 mt-0.5">
+                    {[30, 40, 50, 60, 70, 80, 90, 100].map((tick) => {
+                      const pct = ((tick - 30) / 70) * 100;
+                      const isSelected = (localOnFloorQuality ?? settings?.onFloorPhotoQuality ?? 40) === tick;
                       return (
                         <div
                           key={tick}

@@ -24,6 +24,7 @@ type UploadQueueItem = {
   aisle: string;
   section: string;
   notes: string;
+  isOnFloor: boolean;
   status: "pending" | "uploading" | "failed";
   retries: number;
 };
@@ -42,6 +43,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     photoQuality: number;
     useReceivingQuality: boolean;
     receivingPhotoQuality: number;
+    useOnFloorQuality: boolean;
+    onFloorPhotoQuality: number;
   }>({
     queryKey: ["/api/settings"],
     select: (data: any) => ({
@@ -49,8 +52,10 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       sectionAdvanceStep: data?.sectionAdvanceStep ?? 1,
       largerTouchTargets: data?.largerTouchTargets ?? false,
       photoQuality: data?.photoQuality ?? 85,
-      useReceivingQuality: data?.useReceivingQuality ?? false,
-      receivingPhotoQuality: data?.receivingPhotoQuality ?? 50,
+      useReceivingQuality: data?.useReceivingQuality ?? true,
+      receivingPhotoQuality: data?.receivingPhotoQuality ?? 40,
+      useOnFloorQuality: data?.useOnFloorQuality ?? true,
+      onFloorPhotoQuality: data?.onFloorPhotoQuality ?? 40,
     }),
   });
 
@@ -131,6 +136,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         aisle: item.aisle,
         section: item.section,
         notes: (item as any).notes || "",
+        isOnFloor: item.isOnFloor ?? false,
         status: "pending" as const,
         retries: 0,
       }));
@@ -167,8 +173,11 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     (async () => {
       try {
         const isReceiving = nextItem.aisle.toLowerCase() === "receiving";
+        const isOnFloorItem = nextItem.isOnFloor;
         const baseQuality = isReceiving && captureSettings?.useReceivingQuality
-          ? (captureSettings.receivingPhotoQuality ?? 50)
+          ? (captureSettings.receivingPhotoQuality ?? 40)
+          : isOnFloorItem && captureSettings?.useOnFloorQuality
+          ? (captureSettings.onFloorPhotoQuality ?? 40)
           : (captureSettings?.photoQuality ?? 85);
         const quality = baseQuality / 100;
         let fileToUpload: File | Blob = nextItem.file;
@@ -319,6 +328,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         aisle,
         section: sectionValue,
         notes: captureNotes,
+        isOnFloor: onFloorChecked,
         status: "pending",
         retries: 0,
       });
@@ -333,6 +343,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         section: item.section,
         notes: item.notes,
         isReceiving: item.aisle.toLowerCase() === "receiving",
+        isOnFloor: item.isOnFloor,
         createdAt: Date.now(),
       }).catch(() => {});
     }

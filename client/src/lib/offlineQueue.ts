@@ -22,6 +22,7 @@ export interface QueuedPhoto {
   section: string;
   notes: string;
   isReceiving: boolean;
+  isOnFloor: boolean;
   createdAt: number;
 }
 
