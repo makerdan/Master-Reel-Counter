@@ -1752,14 +1752,36 @@ export async function registerRoutes(
       const { width, height, channels } = info;
 
       const greenMask = new Uint8Array(width * height);
+      let debugSamples: string[] = [];
+      let matchCount = 0;
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
+        // Sample 20 evenly-spaced pixels for diagnostics
+        if (i % Math.floor(width * height / 20) === 0) {
+          debugSamples.push(`rgb(${r},${g},${b})`);
+        }
         if (r >= 50 && r <= 95 && g >= 190 && g <= 245 && b <= 30) {
           greenMask[i] = 1;
+          matchCount++;
         }
       }
+      // Find the top-G pixels to see what the actual green-dominant colors look like
+      const topGPixels: { r: number; g: number; b: number }[] = [];
+      for (let i = 0; i < width * height; i++) {
+        const r = data[i * channels];
+        const g = data[i * channels + 1];
+        const b = data[i * channels + 2];
+        if (g > 150 && g > r && g > b && g - r > 40 && g - b > 40) {
+          topGPixels.push({ r, g, b });
+        }
+      }
+      topGPixels.sort((a, b) => b.g - a.g);
+      const topSamples = topGPixels.slice(0, 30);
+      console.log(`[detect-received] ${width}x${height} px, channels=${channels}, tight-match=${matchCount}, green-dominant pixels=${topGPixels.length}`);
+      console.log(`[detect-received] top-G samples:`, topSamples.map(p => `rgb(${p.r},${p.g},${p.b})`).join(" | "));
+      console.log(`[detect-received] random samples:`, debugSamples.join(" | "));
 
       const CELL = 40;
       const gridW = Math.ceil(width / CELL);
