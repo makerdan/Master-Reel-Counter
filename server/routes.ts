@@ -1746,7 +1746,7 @@ export async function registerRoutes(
       let pipeline = sharp(photoBuffer).rotate();
       const manualRotation = (photo.rotation ?? 0) % 360;
       if (manualRotation !== 0) pipeline = pipeline.rotate(manualRotation);
-      pipeline = (pipeline as any).resize(1200, 1200, { fit: "inside", withoutEnlargement: true });
+      pipeline = pipeline.resize(1200, 1200, { fit: "inside", withoutEnlargement: true });
 
       const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
       const { width, height, channels } = info;
@@ -1765,7 +1765,7 @@ export async function registerRoutes(
         else if (max === b) h = 60 * ((r - g) / delta + 4);
         else h = 60 * (((g - b) / delta + 6) % 6);
         const s = delta / max;
-        if (h >= 80 && h <= 125 && s > 0.20 && max > 0.12) {
+        if (h >= 85 && h <= 120 && s > 0.25 && max > 0.15) {
           greenMask[i] = 1;
         }
       }

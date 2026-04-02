@@ -505,7 +505,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       const data = await res.json();
       const { detections } = data as { detections: { xPercent: number; yPercent: number }[] };
       if (detections.length === 0) {
-        toast({ title: "No green labels found", description: "No bright green RECEIVED labels detected in this photo." });
+        toast({ title: "No RECEIVED labels found", description: "No bright green RECEIVED labels detected in this photo." });
         return;
       }
       const newPins: LocalPin[] = detections.map((d) => {
@@ -539,7 +539,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         });
       } catch { }
       toast({
-        title: `Found ${detections.length} green label${detections.length !== 1 ? "s" : ""}`,
+        title: `Found ${detections.length} RECEIVED label${detections.length !== 1 ? "s" : ""}`,
         description: `${detections.length} pin${detections.length !== 1 ? "s" : ""} placed automatically`,
       });
     } catch {
