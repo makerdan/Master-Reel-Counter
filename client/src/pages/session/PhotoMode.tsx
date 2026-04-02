@@ -259,6 +259,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [panMode, setPanMode] = useState(false);
   const [isDetectingReceived, setIsDetectingReceived] = useState(false);
   const [colorPickMode, setColorPickMode] = useState(false);
+  const [detectedBoxes, setDetectedBoxes] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
   const [pinScale, setPinScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(0.15);
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -504,11 +505,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     try {
       const res = await apiRequest("POST", `/api/photos/${photoId}/detect-received`, {});
       const data = await res.json();
-      const { detections } = data as { detections: { xPercent: number; yPercent: number }[] };
+      type Detection = { xPercent: number; yPercent: number; x1Percent: number; y1Percent: number; x2Percent: number; y2Percent: number };
+      const { detections } = data as { detections: Detection[] };
       if (detections.length === 0) {
         toast({ title: "No RECEIVED labels found", description: "No bright green RECEIVED labels detected in this photo." });
         return;
       }
+      setDetectedBoxes(detections.map(d => ({ x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent })));
       const newPins: LocalPin[] = detections.map((d) => {
         const nextNumber = ++globalMaxPinRef.current;
         return {
@@ -592,6 +595,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       return;
     }
     dismissedDetailWarn.current.clear();
+    setDetectedBoxes([]);
     // Evict the cache for the photo we just left (its pins may have been modified)
     if (prevPhotoDbIdRef.current && prevPhotoDbIdRef.current !== currentPhoto.dbId) {
       pinFetchCache.current.delete(prevPhotoDbIdRef.current);
@@ -1908,6 +1912,21 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               />
               {viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx ? (
                 <>
+                  {photoLoaded && detectedBoxes.map((box, i) => (
+                    <div
+                      key={`det-box-${i}`}
+                      style={{
+                        position: "absolute",
+                        left: `${box.x1}%`,
+                        top: `${box.y1}%`,
+                        width: `${box.x2 - box.x1}%`,
+                        height: `${box.y2 - box.y1}%`,
+                        border: "2px solid #46D700",
+                        boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  ))}
                   {photoLoaded && pinsVisible && localPins.map((pin) => (
                     <div
                       key={pin.id}

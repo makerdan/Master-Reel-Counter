@@ -1838,7 +1838,7 @@ export async function registerRoutes(
       }
 
       const visited = new Uint8Array(gridW * gridH);
-      const blobs: Array<{ count: number; sumX: number; sumY: number }> = [];
+      const blobs: Array<{ count: number; sumX: number; sumY: number; minX: number; maxX: number; minY: number; maxY: number }> = [];
 
       for (let cy = 0; cy < gridH; cy++) {
         for (let cx = 0; cx < gridW; cx++) {
@@ -1847,6 +1847,7 @@ export async function registerRoutes(
           const queue: number[] = [idx];
           visited[idx] = 1;
           let count = 0, sumX = 0, sumY = 0;
+          let minX = cx, maxX = cx, minY = cy, maxY = cy;
           while (queue.length > 0) {
             const cur = queue.shift()!;
             count++;
@@ -1854,6 +1855,10 @@ export async function registerRoutes(
             const curY = Math.floor(cur / gridW);
             sumX += curX;
             sumY += curY;
+            if (curX < minX) minX = curX;
+            if (curX > maxX) maxX = curX;
+            if (curY < minY) minY = curY;
+            if (curY > maxY) maxY = curY;
             const neighbors = [
               curY > 0 ? (curY - 1) * gridW + curX : -1,
               curY < gridH - 1 ? (curY + 1) * gridW + curX : -1,
@@ -1867,17 +1872,32 @@ export async function registerRoutes(
               }
             }
           }
-          blobs.push({ count, sumX, sumY });
+          blobs.push({ count, sumX, sumY, minX, maxX, minY, maxY });
         }
       }
 
+      // Known label: 3"x5". Accept aspect ratios 0.4–4.5 to cover portrait,
+      // landscape, and perspective distortion. Reject obvious false positives.
+      const MIN_ASPECT = 0.4;
+      const MAX_ASPECT = 4.5;
+
       const detections = blobs
-        .filter(b => b.count >= 2)
+        .filter(b => {
+          if (b.count < 2) return false;
+          const blobW = (b.maxX - b.minX + 1) * CELL;
+          const blobH = (b.maxY - b.minY + 1) * CELL;
+          const aspect = blobW / blobH;
+          return aspect >= MIN_ASPECT && aspect <= MAX_ASPECT;
+        })
         .sort((a, b) => b.count - a.count)
         .slice(0, 10)
         .map(b => ({
           xPercent: Math.max(1, Math.min(99, ((b.sumX / b.count * CELL + CELL / 2) / width) * 100)),
           yPercent: Math.max(1, Math.min(99, ((b.sumY / b.count * CELL + CELL / 2) / height) * 100)),
+          x1Percent: Math.max(0, (b.minX * CELL / width) * 100),
+          y1Percent: Math.max(0, (b.minY * CELL / height) * 100),
+          x2Percent: Math.min(100, ((b.maxX + 1) * CELL / width) * 100),
+          y2Percent: Math.min(100, ((b.maxY + 1) * CELL / height) * 100),
         }));
 
       res.json({ detections });
