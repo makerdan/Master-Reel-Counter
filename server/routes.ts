@@ -1733,6 +1733,58 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/photos/:photoId/sample-pixel", isAuthenticated, async (req: any, res) => {
+    try {
+      const photoId = parseInt(req.params.photoId);
+      const photo = await storage.getPhoto(photoId);
+      if (!photo) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+
+      const { xPercent, yPercent } = req.body;
+      if (typeof xPercent !== "number" || typeof yPercent !== "number") {
+        return res.status(400).json({ message: "xPercent and yPercent required" });
+      }
+
+      const photoBuffer = await loadPhotoBuffer(photo.objectStorageKey);
+      let pipeline = sharp(photoBuffer).rotate();
+      const manualRotation = (photo.rotation ?? 0) % 360;
+      if (manualRotation !== 0) pipeline = pipeline.rotate(manualRotation);
+
+      const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
+      const { width, height, channels } = info;
+
+      const px = Math.round((xPercent / 100) * (width - 1));
+      const py = Math.round((yPercent / 100) * (height - 1));
+      const idx = (py * width + px) * channels;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+
+      // Also sample a 5x5 area around the click for a better average
+      const samples: { r: number; g: number; b: number }[] = [];
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const sx = Math.max(0, Math.min(width - 1, px + dx));
+          const sy = Math.max(0, Math.min(height - 1, py + dy));
+          const si = (sy * width + sx) * channels;
+          samples.push({ r: data[si], g: data[si + 1], b: data[si + 2] });
+        }
+      }
+      const avg = {
+        r: Math.round(samples.reduce((s, p) => s + p.r, 0) / samples.length),
+        g: Math.round(samples.reduce((s, p) => s + p.g, 0) / samples.length),
+        b: Math.round(samples.reduce((s, p) => s + p.b, 0) / samples.length),
+      };
+
+      console.log(`[sample-pixel] (${xPercent.toFixed(1)}%, ${yPercent.toFixed(1)}%) → exact rgb(${r},${g},${b}) | 5x5 avg rgb(${avg.r},${avg.g},${avg.b})`);
+      res.json({ exact: { r, g, b }, avg, width, height, px, py });
+    } catch (error) {
+      console.error("Error sampling pixel:", error);
+      res.status(500).json({ message: "Failed to sample pixel" });
+    }
+  });
+
   app.post("/api/photos/:photoId/detect-received", isAuthenticated, async (req: any, res) => {
     try {
       const photoId = parseInt(req.params.photoId);

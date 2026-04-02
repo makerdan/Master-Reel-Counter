@@ -4,7 +4,7 @@ import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye, EyeOff,
   AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp, Lock,
-  ScanLine, X as PanelCloseX,
+  ScanLine, X as PanelCloseX, Pipette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -258,6 +258,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [rotation, setRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
   const [isDetectingReceived, setIsDetectingReceived] = useState(false);
+  const [colorPickMode, setColorPickMode] = useState(false);
   const [pinScale, setPinScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(0.15);
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -838,7 +839,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const handleContainerClick = (e: React.MouseEvent) => {
     if (isPanning || panMode) return;
     if (lastTouchPanRef.current) { lastTouchPanRef.current = false; return; }
-    if (!effectiveCanEdit) return;
+    if (!effectiveCanEdit && !colorPickMode) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -865,6 +866,25 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const y = (rotatedY + cy) * 100;
 
     if (x < 0 || x > 100 || y < 0 || y > 100) return;
+
+    if (colorPickMode) {
+      const photoId = currentPhoto?.dbId;
+      if (!photoId) return;
+      apiRequest("POST", `/api/photos/${photoId}/sample-pixel`, { xPercent: x, yPercent: y })
+        .then(r => r.json())
+        .then((data: { exact: { r: number; g: number; b: number }; avg: { r: number; g: number; b: number } }) => {
+          const { r, g, b } = data.exact;
+          const a = data.avg;
+          toast({
+            title: `Color at (${x.toFixed(1)}%, ${y.toFixed(1)}%)`,
+            description: `Exact: rgb(${r}, ${g}, ${b})  |  5×5 avg: rgb(${a.r}, ${a.g}, ${a.b})`,
+          });
+        })
+        .catch(() => toast({ title: "Could not sample pixel", variant: "destructive" }));
+      return;
+    }
+
+    if (!effectiveCanEdit) return;
 
     let label: string;
     const isDetailWithPin = currentPhoto?.isDetailShot && currentPhoto?.linkedPinLabel;
@@ -1862,7 +1882,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             <div
               ref={containerRef}
               className="photo-viewer-container w-full min-w-0"
-              style={{ cursor: panMode ? "grab" : effectiveCanEdit ? "crosshair" : "not-allowed" }}
+              style={{ cursor: panMode ? "grab" : colorPickMode ? "cell" : effectiveCanEdit ? "crosshair" : "not-allowed" }}
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
               data-testid="photo-viewer"
@@ -2144,6 +2164,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     </button>
                   </>
                 )}
+                <div className="photo-overlay-divider" />
+                <button
+                  className={`photo-overlay-btn ${colorPickMode ? "photo-overlay-btn-active" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); setColorPickMode(m => !m); }}
+                  title={colorPickMode ? "Exit color picker (click to exit)" : "Color picker: click any spot to read its RGB"}
+                  data-testid="button-color-pick-mode"
+                >
+                  <Pipette className="h-4 w-4" />
+                </button>
               </div>
             </div>
               {uploadedPhotos.length > 1 && (
