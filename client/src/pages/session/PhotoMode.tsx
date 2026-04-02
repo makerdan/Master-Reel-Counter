@@ -188,6 +188,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [conflictDialog, setConflictDialog] = useState<{ conflicts: Array<{ label: string; entryId?: number; dbPinId?: number }>; pinsToCommit: LocalPin[] } | null>(null);
   const [detailWarnLabels, setDetailWarnLabels] = useState<string[]>([]);
   const dismissedDetailWarn = useRef<Set<string>>(new Set());
+  const detectedPinIdsRef = useRef<Set<string>>(new Set());
   const [showQuickEntry, setShowQuickEntry] = useState(false);
   const [photoInputValue, setPhotoInputValue] = useState<string | null>(null);
   const [flagPopoverPinId, setFlagPopoverPinId] = useState<string | null>(null);
@@ -502,6 +503,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const photoId = currentPhoto?.dbId;
     if (!photoId || isDetectingReceived) return;
     setIsDetectingReceived(true);
+    setDetectedBoxes([]);
     try {
       const res = await apiRequest("POST", `/api/photos/${photoId}/detect-received`, {});
       const data = await res.json();
@@ -511,17 +513,21 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         toast({ title: "No RECEIVED labels found", description: "No bright green RECEIVED labels detected in this photo." });
         return;
       }
-      setDetectedBoxes(detections.map(d => ({ x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent })));
+      const newPinIds: string[] = [];
       const newPins: LocalPin[] = detections.map((d) => {
         const nextNumber = ++globalMaxPinRef.current;
+        const id = `pin-detect-${Date.now()}-${nextNumber}`;
+        newPinIds.push(id);
         return {
-          id: `pin-detect-${Date.now()}-${nextNumber}`,
+          id,
           x: d.xPercent,
           y: d.yPercent,
           label: String(nextNumber).padStart(3, "0"),
           reelCount: 1,
         };
       });
+      detectedPinIdsRef.current = new Set(newPinIds);
+      setDetectedBoxes(detections.map(d => ({ x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent })));
       const merged = [...localPinsRef.current, ...newPins].sort(
         (a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })
       );
@@ -596,6 +602,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     }
     dismissedDetailWarn.current.clear();
     setDetectedBoxes([]);
+    detectedPinIdsRef.current = new Set();
     // Evict the cache for the photo we just left (its pins may have been modified)
     if (prevPhotoDbIdRef.current && prevPhotoDbIdRef.current !== currentPhoto.dbId) {
       pinFetchCache.current.delete(prevPhotoDbIdRef.current);
@@ -1967,6 +1974,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               });
                             }
                             setLocalPins(afterPins);
+                            if (detectedPinIdsRef.current.size > 0) {
+                              const remaining = afterPins.filter(p => detectedPinIdsRef.current.has(p.id));
+                              if (remaining.length === 0) {
+                                detectedPinIdsRef.current = new Set();
+                                setDetectedBoxes([]);
+                              }
+                            }
                           }}
                           title="Delete pin"
                           data-testid={`button-delete-pin-${pin.id}`}
