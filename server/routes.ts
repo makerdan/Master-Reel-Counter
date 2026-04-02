@@ -1753,19 +1753,10 @@ export async function registerRoutes(
 
       const greenMask = new Uint8Array(width * height);
       for (let i = 0; i < width * height; i++) {
-        const r = data[i * channels] / 255;
-        const g = data[i * channels + 1] / 255;
-        const b = data[i * channels + 2] / 255;
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        const delta = max - min;
-        if (delta === 0 || max === 0) continue;
-        let h = 0;
-        if (max === g) h = 60 * ((b - r) / delta + 2);
-        else if (max === b) h = 60 * ((r - g) / delta + 4);
-        else h = 60 * (((g - b) / delta + 6) % 6);
-        const s = delta / max;
-        if (h >= 90 && h <= 130 && s > 0.30 && max > 0.20) {
+        const r = data[i * channels];
+        const g = data[i * channels + 1];
+        const b = data[i * channels + 2];
+        if (r >= 50 && r <= 95 && g >= 190 && g <= 245 && b <= 30) {
           greenMask[i] = 1;
         }
       }
