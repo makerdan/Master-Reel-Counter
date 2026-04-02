@@ -1762,7 +1762,10 @@ export async function registerRoutes(
         if (i % Math.floor(width * height / 20) === 0) {
           debugSamples.push(`rgb(${r},${g},${b})`);
         }
-        if (r >= 50 && r <= 95 && g >= 190 && g <= 245 && b <= 30) {
+        // Real-world label: G channel saturates at 255 under warehouse lighting,
+        // with R=100-210 and B=70-160. Key signal: G is fully saturated AND
+        // dominates R by >=45 and dominates B by >=90.
+        if (g >= 240 && g - r >= 45 && g - b >= 90) {
           greenMask[i] = 1;
           matchCount++;
         }
