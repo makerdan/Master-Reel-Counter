@@ -1733,6 +1733,115 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/photos/:photoId/detect-received", isAuthenticated, async (req: any, res) => {
+    try {
+      const photoId = parseInt(req.params.photoId);
+      const photo = await storage.getPhoto(photoId);
+      if (!photo) return res.status(404).json({ message: "Photo not found" });
+      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Photo not found" });
+
+      const photoBuffer = await loadPhotoBuffer(photo.objectStorageKey);
+
+      let pipeline = sharp(photoBuffer).rotate();
+      const manualRotation = (photo.rotation ?? 0) % 360;
+      if (manualRotation !== 0) pipeline = pipeline.rotate(manualRotation);
+      pipeline = (pipeline as any).resize(1200, 1200, { fit: "inside", withoutEnlargement: true });
+
+      const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
+      const { width, height, channels } = info;
+
+      const greenMask = new Uint8Array(width * height);
+      for (let i = 0; i < width * height; i++) {
+        const r = data[i * channels] / 255;
+        const g = data[i * channels + 1] / 255;
+        const b = data[i * channels + 2] / 255;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const delta = max - min;
+        if (delta === 0 || max === 0) continue;
+        let h = 0;
+        if (max === g) h = 60 * ((b - r) / delta + 2);
+        else if (max === b) h = 60 * ((r - g) / delta + 4);
+        else h = 60 * (((g - b) / delta + 6) % 6);
+        const s = delta / max;
+        if (h >= 90 && h <= 165 && s > 0.35 && max > 0.20) {
+          greenMask[i] = 1;
+        }
+      }
+
+      const CELL = 40;
+      const gridW = Math.ceil(width / CELL);
+      const gridH = Math.ceil(height / CELL);
+      const greenCells = new Uint8Array(gridW * gridH);
+
+      for (let cy = 0; cy < gridH; cy++) {
+        for (let cx = 0; cx < gridW; cx++) {
+          let greenCount = 0, totalCount = 0;
+          const px0 = cx * CELL, px1 = Math.min((cx + 1) * CELL, width);
+          const py0 = cy * CELL, py1 = Math.min((cy + 1) * CELL, height);
+          for (let py = py0; py < py1; py++) {
+            for (let px = px0; px < px1; px++) {
+              greenCount += greenMask[py * width + px];
+              totalCount++;
+            }
+          }
+          if (totalCount > 0 && greenCount / totalCount > 0.35) {
+            greenCells[cy * gridW + cx] = 1;
+          }
+        }
+      }
+
+      const visited = new Uint8Array(gridW * gridH);
+      const blobs: Array<{ count: number; sumX: number; sumY: number }> = [];
+
+      for (let cy = 0; cy < gridH; cy++) {
+        for (let cx = 0; cx < gridW; cx++) {
+          const idx = cy * gridW + cx;
+          if (!greenCells[idx] || visited[idx]) continue;
+          const queue: number[] = [idx];
+          visited[idx] = 1;
+          let count = 0, sumX = 0, sumY = 0;
+          while (queue.length > 0) {
+            const cur = queue.shift()!;
+            count++;
+            const curX = cur % gridW;
+            const curY = Math.floor(cur / gridW);
+            sumX += curX;
+            sumY += curY;
+            const neighbors = [
+              curY > 0 ? (curY - 1) * gridW + curX : -1,
+              curY < gridH - 1 ? (curY + 1) * gridW + curX : -1,
+              curX > 0 ? curY * gridW + (curX - 1) : -1,
+              curX < gridW - 1 ? curY * gridW + (curX + 1) : -1,
+            ];
+            for (const n of neighbors) {
+              if (n >= 0 && greenCells[n] && !visited[n]) {
+                visited[n] = 1;
+                queue.push(n);
+              }
+            }
+          }
+          blobs.push({ count, sumX, sumY });
+        }
+      }
+
+      const detections = blobs
+        .filter(b => b.count >= 3)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+        .map(b => ({
+          xPercent: Math.max(1, Math.min(99, ((b.sumX / b.count * CELL + CELL / 2) / width) * 100)),
+          yPercent: Math.max(1, Math.min(99, ((b.sumY / b.count * CELL + CELL / 2) / height) * 100)),
+        }));
+
+      res.json({ detections });
+    } catch (error) {
+      console.error("Error detecting received labels:", error);
+      res.status(500).json({ message: "Failed to detect labels" });
+    }
+  });
+
   app.get("/api/photos/:photoId/label-cache", isAuthenticated, async (req: any, res) => {
     try {
       const photoId = parseInt(req.params.photoId);

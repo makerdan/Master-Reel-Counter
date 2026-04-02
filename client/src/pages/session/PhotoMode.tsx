@@ -257,6 +257,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [panY, setPanY] = useState(0);
   const [rotation, setRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
+  const [isDetectingReceived, setIsDetectingReceived] = useState(false);
   const [pinScale, setPinScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(0.15);
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -494,6 +495,59 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     if (flushRef) flushRef.current = flushSavePins;
     return () => { if (flushRef) flushRef.current = null; };
   }, [flushRef, flushSavePins]);
+
+  const detectReceivedLabels = useCallback(async () => {
+    const photoId = currentPhoto?.dbId;
+    if (!photoId || isDetectingReceived) return;
+    setIsDetectingReceived(true);
+    try {
+      const res = await apiRequest("POST", `/api/photos/${photoId}/detect-received`, {});
+      const data = await res.json();
+      const { detections } = data as { detections: { xPercent: number; yPercent: number }[] };
+      if (detections.length === 0) {
+        toast({ title: "No green labels found", description: "No bright green RECEIVED labels detected in this photo." });
+        return;
+      }
+      const newPins: LocalPin[] = detections.map((d) => {
+        const nextNumber = ++globalMaxPinRef.current;
+        return {
+          id: `pin-detect-${Date.now()}-${nextNumber}`,
+          x: d.xPercent,
+          y: d.yPercent,
+          label: String(nextNumber).padStart(3, "0"),
+          reelCount: 1,
+        };
+      });
+      const merged = [...localPinsRef.current, ...newPins].sort(
+        (a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })
+      );
+      localPinsRef.current = merged;
+      _setLocalPins(merged);
+      try {
+        await apiRequest("PUT", `/api/photos/${photoId}/draft-pins`, {
+          pins: merged.map(p => ({
+            xPercent: p.x,
+            yPercent: p.y,
+            label: p.label,
+            reelCount: p.reelCount,
+            wireDetails: p.wireDetails || null,
+            vendorCode: p.vendorCode || null,
+            footage: p.footage || null,
+            flagged: p.flagged || false,
+            flagReason: p.flagReason || null,
+          })),
+        });
+      } catch { }
+      toast({
+        title: `Found ${detections.length} green label${detections.length !== 1 ? "s" : ""}`,
+        description: `${detections.length} pin${detections.length !== 1 ? "s" : ""} placed automatically`,
+      });
+    } catch {
+      toast({ title: "Detection failed", description: "Could not analyze the photo. Please try again.", variant: "destructive" });
+    } finally {
+      setIsDetectingReceived(false);
+    }
+  }, [currentPhoto?.dbId, isDetectingReceived, toast]);
 
   const applyPins = useCallback((dbPins: Pin[]) => {
     const draftPins = dbPins.filter(p => !p.entryId);
@@ -2074,6 +2128,22 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 >
                   <span className="inline-block w-2.5 h-2.5 border-2 border-current rounded-sm" />
                 </button>
+                {!currentPhoto?.isDetailShot && effectiveCanEdit && (
+                  <>
+                    <div className="photo-overlay-divider" />
+                    <button
+                      className="photo-overlay-btn"
+                      onClick={(e) => { e.stopPropagation(); detectReceivedLabels(); }}
+                      disabled={isDetectingReceived}
+                      title="Auto-detect green RECEIVED labels"
+                      data-testid="button-detect-received"
+                    >
+                      {isDetectingReceived
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <span className="inline-block w-3 h-3 rounded-sm bg-green-500" />}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
               {uploadedPhotos.length > 1 && (
