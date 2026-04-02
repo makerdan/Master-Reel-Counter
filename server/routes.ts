@@ -1765,7 +1765,7 @@ export async function registerRoutes(
         else if (max === b) h = 60 * ((r - g) / delta + 4);
         else h = 60 * (((g - b) / delta + 6) % 6);
         const s = delta / max;
-        if (h >= 90 && h <= 165 && s > 0.35 && max > 0.20) {
+        if (h >= 80 && h <= 125 && s > 0.20 && max > 0.12) {
           greenMask[i] = 1;
         }
       }

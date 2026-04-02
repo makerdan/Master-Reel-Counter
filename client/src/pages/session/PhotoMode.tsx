@@ -2140,7 +2140,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     >
                       {isDetectingReceived
                         ? <Loader2 className="h-4 w-4 animate-spin" />
-                        : <span className="inline-block w-3 h-3 rounded-sm bg-green-500" />}
+                        : <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#46D700" }} />}
                     </button>
                   </>
                 )}
