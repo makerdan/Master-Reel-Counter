@@ -1803,42 +1803,19 @@ export async function registerRoutes(
       const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
       const { width, height, channels } = info;
 
+      // Actual RECEIVED label color from real photos:
+      // R: 57–75, G: 206–219, B: 0–3. B≈0 is the key fingerprint.
       const greenMask = new Uint8Array(width * height);
-      let debugSamples: string[] = [];
-      let matchCount = 0;
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
-        // Sample 20 evenly-spaced pixels for diagnostics
-        if (i % Math.floor(width * height / 20) === 0) {
-          debugSamples.push(`rgb(${r},${g},${b})`);
-        }
-        // Real-world label: G channel saturates at 255 under warehouse lighting,
-        // with R=100-210 and B=70-160. Key signal: G is fully saturated AND
-        // dominates R by >=45 and dominates B by >=90.
-        if (g >= 240 && g - r >= 45 && g - b >= 90) {
+        if (r >= 45 && r <= 90 && g >= 190 && g <= 235 && b <= 12) {
           greenMask[i] = 1;
-          matchCount++;
         }
       }
-      // Find the top-G pixels to see what the actual green-dominant colors look like
-      const topGPixels: { r: number; g: number; b: number }[] = [];
-      for (let i = 0; i < width * height; i++) {
-        const r = data[i * channels];
-        const g = data[i * channels + 1];
-        const b = data[i * channels + 2];
-        if (g > 150 && g > r && g > b && g - r > 40 && g - b > 40) {
-          topGPixels.push({ r, g, b });
-        }
-      }
-      topGPixels.sort((a, b) => b.g - a.g);
-      const topSamples = topGPixels.slice(0, 30);
-      console.log(`[detect-received] ${width}x${height} px, channels=${channels}, tight-match=${matchCount}, green-dominant pixels=${topGPixels.length}`);
-      console.log(`[detect-received] top-G samples:`, topSamples.map(p => `rgb(${p.r},${p.g},${p.b})`).join(" | "));
-      console.log(`[detect-received] random samples:`, debugSamples.join(" | "));
 
-      const CELL = 40;
+      const CELL = 20;
       const gridW = Math.ceil(width / CELL);
       const gridH = Math.ceil(height / CELL);
       const greenCells = new Uint8Array(gridW * gridH);
@@ -1854,7 +1831,7 @@ export async function registerRoutes(
               totalCount++;
             }
           }
-          if (totalCount > 0 && greenCount / totalCount > 0.35) {
+          if (totalCount > 0 && greenCount / totalCount > 0.20) {
             greenCells[cy * gridW + cx] = 1;
           }
         }
@@ -1895,7 +1872,7 @@ export async function registerRoutes(
       }
 
       const detections = blobs
-        .filter(b => b.count >= 3)
+        .filter(b => b.count >= 2)
         .sort((a, b) => b.count - a.count)
         .slice(0, 10)
         .map(b => ({
