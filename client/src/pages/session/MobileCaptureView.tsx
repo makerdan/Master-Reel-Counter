@@ -517,18 +517,18 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 ref={aisleInputRef}
                 value={aisle}
                 onChange={(e) => setAisle(e.target.value)}
-                className={`border-red-500 text-center text-lg w-20${captureSettings?.largerTouchTargets ? " h-[5.5rem]" : " h-[4.5rem]"}`}
+                className={`border-red-500 text-center text-lg${captureSettings?.largerTouchTargets ? " w-[6ch] h-[5.5rem]" : " w-[5ch] h-[4.5rem]"}`}
                 disabled={isReceiving}
                 tabIndex={1}
                 enterKeyHint="next"
                 data-testid="input-mobile-aisle"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sectionInputRef.current?.focus(); } }}
               />
-              <div className="flex gap-1">
+              <div className={`flex gap-1${captureSettings?.largerTouchTargets ? " w-[6ch]" : " w-[5ch]"}`}>
                 <Button
                   variant="outline"
                   size="icon"
-                  className={`rounded-full !border-blue-600/50 dark:!border-blue-400/50${captureSettings?.largerTouchTargets ? " h-11 w-11" : " h-9 w-9"}`}
+                  className="flex-1 aspect-square rounded-full !border-blue-600/50 dark:!border-blue-400/50 p-0 min-w-0"
                   data-testid="button-aisle-decrement"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -543,7 +543,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="icon"
-                  className={`rounded-full !border-blue-600/50 dark:!border-blue-400/50${captureSettings?.largerTouchTargets ? " h-11 w-11" : " h-9 w-9"}`}
+                  className="flex-1 aspect-square rounded-full !border-blue-600/50 dark:!border-blue-400/50 p-0 min-w-0"
                   data-testid="button-aisle-increment"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -588,17 +588,17 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 ref={sectionInputRef}
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
-                className={`text-center text-lg w-20${captureSettings?.largerTouchTargets ? " h-[5.5rem]" : " h-[4.5rem]"}${isReceiving ? "" : " border-red-500"}`}
+                className={`text-center text-lg${captureSettings?.largerTouchTargets ? " w-[6ch] h-[5.5rem]" : " w-[5ch] h-[4.5rem]"}${isReceiving ? "" : " border-red-500"}`}
                 tabIndex={2}
                 enterKeyHint="done"
                 data-testid="input-mobile-section"
                 onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.blur(); } }}
               />
-              <div className="flex gap-1">
+              <div className={`flex gap-1${captureSettings?.largerTouchTargets ? " w-[6ch]" : " w-[5ch]"}`}>
                 <Button
                   variant="outline"
                   size="icon"
-                  className={`rounded-full !border-blue-600/50 dark:!border-blue-400/50${captureSettings?.largerTouchTargets ? " h-11 w-11" : " h-9 w-9"}`}
+                  className="flex-1 aspect-square rounded-full !border-blue-600/50 dark:!border-blue-400/50 p-0 min-w-0"
                   data-testid="button-section-decrement"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -612,7 +612,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Button
                   variant="outline"
                   size="icon"
-                  className={`rounded-full !border-blue-600/50 dark:!border-blue-400/50${captureSettings?.largerTouchTargets ? " h-11 w-11" : " h-9 w-9"}`}
+                  className="flex-1 aspect-square rounded-full !border-blue-600/50 dark:!border-blue-400/50 p-0 min-w-0"
                   data-testid="button-section-increment"
                   onPointerDown={(e) => {
                     e.preventDefault();
