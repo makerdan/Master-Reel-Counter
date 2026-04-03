@@ -597,22 +597,20 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <div className="flex gap-1">
                 <Button
                   variant="outline"
-                  size="default"
-                  className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)]"
+                  className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)] !h-[0.5in] !w-[0.5in] !p-0"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={!aisle.trim()}
                   data-testid="button-mobile-upload"
                 >
-                  <ImagePlus className="h-4 w-4" />
+                  <ImagePlus className="h-5 w-5" />
                 </Button>
                 <Button
                   variant="outline"
-                  size="default"
-                  className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)]"
+                  className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)] !h-[0.5in] !w-[0.5in] !p-0"
                   onClick={() => setShowQuickEntry(prev => !prev)}
                   data-testid="button-mobile-quick-entry-toggle"
                 >
-                  <ListPlus className="h-4 w-4" />
+                  <ListPlus className="h-5 w-5" />
                 </Button>
               </div>
             </div>
