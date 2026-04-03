@@ -517,17 +517,17 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 ref={aisleInputRef}
                 value={aisle}
                 onChange={(e) => setAisle(e.target.value)}
-                className={`border-red-500 text-center text-lg${captureSettings?.largerTouchTargets ? " w-24 h-[5.5rem]" : " w-20 h-[4.5rem]"}`}
+                className="border-red-500 text-center text-lg w-[148px] h-[4.5rem] !py-0"
                 disabled={isReceiving}
                 tabIndex={1}
                 enterKeyHint="next"
                 data-testid="input-mobile-aisle"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sectionInputRef.current?.focus(); } }}
               />
-              <div className={`flex gap-1${captureSettings?.largerTouchTargets ? " w-24" : " w-20"}`}>
+              <div className="flex gap-1 w-[148px]">
                 <Button
                   variant="outline"
-                  className={`rounded-full !border-blue-600/50 dark:!border-blue-400/50 !p-0${captureSettings?.largerTouchTargets ? " !h-10 !w-10" : " !h-9 !w-9"}`}
+                  className="rounded-lg !border-blue-600/50 dark:!border-blue-400/50 !p-0 !h-[1in] !w-[0.75in]"
                   data-testid="button-aisle-decrement"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -537,11 +537,11 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setAisle(String(val).padStart(Math.max(aisle.length, 1), "0"));
                   }}
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-5 w-5" />
                 </Button>
                 <Button
                   variant="outline"
-                  className={`rounded-full !border-blue-600/50 dark:!border-blue-400/50 !p-0${captureSettings?.largerTouchTargets ? " !h-10 !w-10" : " !h-9 !w-9"}`}
+                  className="rounded-lg !border-blue-600/50 dark:!border-blue-400/50 !p-0 !h-[1in] !w-[0.75in]"
                   data-testid="button-aisle-increment"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -551,7 +551,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setAisle(String(val).padStart(Math.max(aisle.length, 1), "0"));
                   }}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-5 w-5" />
                 </Button>
               </div>
               <div className="flex items-center gap-3 pt-1 flex-wrap">
@@ -586,16 +586,16 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 ref={sectionInputRef}
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
-                className={`text-center text-lg${captureSettings?.largerTouchTargets ? " w-24 h-[5.5rem]" : " w-20 h-[4.5rem]"}${isReceiving ? "" : " border-red-500"}`}
+                className={`text-center text-lg w-[148px] h-[4.5rem] !py-0${isReceiving ? "" : " border-red-500"}`}
                 tabIndex={2}
                 enterKeyHint="done"
                 data-testid="input-mobile-section"
                 onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.blur(); } }}
               />
-              <div className={`flex gap-1${captureSettings?.largerTouchTargets ? " w-24" : " w-20"}`}>
+              <div className="flex gap-1 w-[148px]">
                 <Button
                   variant="outline"
-                  className={`rounded-full !border-blue-600/50 dark:!border-blue-400/50 !p-0${captureSettings?.largerTouchTargets ? " !h-10 !w-10" : " !h-9 !w-9"}`}
+                  className="rounded-lg !border-blue-600/50 dark:!border-blue-400/50 !p-0 !h-[1in] !w-[0.75in]"
                   data-testid="button-section-decrement"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -604,11 +604,11 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setSection(String(val).padStart(Math.max(section.length, 1), "0"));
                   }}
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-5 w-5" />
                 </Button>
                 <Button
                   variant="outline"
-                  className={`rounded-full !border-blue-600/50 dark:!border-blue-400/50 !p-0${captureSettings?.largerTouchTargets ? " !h-10 !w-10" : " !h-9 !w-9"}`}
+                  className="rounded-lg !border-blue-600/50 dark:!border-blue-400/50 !p-0 !h-[1in] !w-[0.75in]"
                   data-testid="button-section-increment"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -617,7 +617,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setSection(String(val).padStart(Math.max(section.length, 1), "0"));
                   }}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-5 w-5" />
                 </Button>
               </div>
             </div>
