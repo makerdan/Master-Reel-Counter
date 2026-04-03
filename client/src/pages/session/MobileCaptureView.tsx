@@ -510,9 +510,12 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <span className="text-red-500 font-bold">✱</span>{" "}<span className="underline text-red-500">Enter an aisle below to start capturing photos</span>{" "}<span className="text-red-500 font-bold">✱</span>
             </div>
           )}
-          <form onSubmit={(e) => e.preventDefault()} className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className={`text-xs underline${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Aisle: <span className="text-destructive">*</span></Label>
+          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
+
+          <form onSubmit={(e) => e.preventDefault()} className="grid grid-cols-3 gap-2 items-start justify-items-center">
+            <div className="flex flex-col items-center gap-1">
+              <Label className={`text-xs underline self-start${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Aisle: <span className="text-destructive">*</span></Label>
               <Input
                 ref={aisleInputRef}
                 value={aisle}
@@ -554,7 +557,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                   <Plus className="h-5 w-5" />
                 </Button>
               </div>
-              <div className="flex items-center gap-3 pt-1 flex-wrap">
+              <div className="flex flex-col gap-1 pt-1 w-[148px]">
                 <label className="flex items-center gap-2 cursor-pointer" data-testid="checkbox-receiving">
                   <Checkbox
                     checked={isReceiving}
@@ -580,8 +583,42 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </label>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className={`text-xs underline${!isReceiving && !section.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Section:</Label>
+
+            <div className="flex flex-col items-center justify-center gap-2 pt-5">
+              <Button
+                className={`flex flex-col gap-1.5 !h-[1.5in] !w-[1in] text-sm${captureSettings?.largerTouchTargets ? " text-base" : ""}`}
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={!aisle.trim()}
+                data-testid="button-mobile-camera"
+              >
+                <Camera className="h-7 w-7" />
+                <span>Take<br/>Photo</span>
+              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)]"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!aisle.trim()}
+                  data-testid="button-mobile-upload"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)]"
+                  onClick={() => setShowQuickEntry(prev => !prev)}
+                  data-testid="button-mobile-quick-entry-toggle"
+                >
+                  <ListPlus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <Label className={`text-xs underline self-start${!isReceiving && !section.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Section:</Label>
               <Input
                 ref={sectionInputRef}
                 value={section}
@@ -622,41 +659,6 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               </div>
             </div>
           </form>
-
-          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
-          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
-
-          <div className="flex gap-2 sm:gap-3 justify-start">
-            <Button
-              className={captureSettings?.largerTouchTargets ? "min-h-[48px] text-sm" : "text-sm"}
-              size="default"
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={!aisle.trim()}
-              data-testid="button-mobile-camera"
-            >
-              <Camera className="h-4 w-4 mr-1.5" />
-              Take Photo
-            </Button>
-            <Button
-              variant="outline"
-              size="default"
-              className={`!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)] ${captureSettings?.largerTouchTargets ? "min-h-[48px]" : ""}`}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!aisle.trim()}
-              data-testid="button-mobile-upload"
-            >
-              <ImagePlus className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="default"
-              className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)]"
-              onClick={() => setShowQuickEntry(prev => !prev)}
-              data-testid="button-mobile-quick-entry-toggle"
-            >
-              <ListPlus className="h-4 w-4" />
-            </Button>
-          </div>
           {showQuickEntry && (
             <div className="p-3 rounded-md border border-[hsl(200_50%_40%/0.3)] bg-[hsl(25_10%_95%)] dark:bg-[hsl(25_10%_12%)]" data-testid="mobile-quick-entry-panel">
               <div className="flex items-center justify-between mb-2">
