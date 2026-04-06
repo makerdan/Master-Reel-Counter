@@ -607,7 +607,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </Button>
                 <Button
                   variant="outline"
-                  className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)] !h-[0.5in] !w-[0.5in] !p-0"
+                  className="!border-orange-500 dark:!border-orange-400 text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 !h-[0.5in] !w-[0.5in] !p-0"
                   onClick={() => setShowQuickEntry(prev => !prev)}
                   data-testid="button-mobile-quick-entry-toggle"
                 >
