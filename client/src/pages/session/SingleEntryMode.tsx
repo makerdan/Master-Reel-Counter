@@ -682,8 +682,7 @@ export default function SingleEntryMode({
                   reelCount: "1",
                   conductors: "",
                 }));
-                setOnFloor(false);
-                setInFrontOf(false);
+                setOnFloorInFront(false);
                 setReceivingChecked(false);
                 setFootageOverride(false);
                 lastMatchedCatalog.current = null;
