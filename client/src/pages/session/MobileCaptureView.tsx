@@ -514,23 +514,23 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
 
           <form onSubmit={(e) => e.preventDefault()} className={`grid grid-cols-3 gap-2 items-start justify-items-center transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
-            <div className="flex flex-col items-center gap-1">
-              <Label className={`text-2xl self-start${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}><span className="underline">Aisle:</span> <span className="text-red-500 font-bold">✱</span></Label>
+            <div className="flex flex-col items-center gap-1 w-full">
+              <Label className={`text-lg self-start${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}><span className="underline">Aisle:</span> <span className="text-red-500 font-bold">✱</span></Label>
               <Input
                 ref={aisleInputRef}
                 value={aisle}
                 onChange={(e) => setAisle(e.target.value)}
-                className="border-red-500 text-center text-lg w-[148px] h-[4.5rem] !py-0"
+                className="border-red-500 text-center text-lg w-full h-14 !py-0"
                 disabled={isReceiving}
                 tabIndex={1}
                 enterKeyHint="next"
                 data-testid="input-mobile-aisle"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sectionInputRef.current?.focus(); } }}
               />
-              <div className="flex gap-1 w-[148px]">
+              <div className="flex gap-1 w-full">
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-[1in] !w-[0.75in]"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-14 flex-1"
                   data-testid="button-aisle-decrement"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -544,7 +544,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-[1in] !w-[0.75in]"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-14 flex-1"
                   data-testid="button-aisle-increment"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -557,7 +557,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                   <Plus className="h-5 w-5" />
                 </Button>
               </div>
-              <div className="flex flex-col gap-1 pt-1 w-[148px]">
+              <div className="flex flex-col gap-1 pt-1 w-full">
                 <label className="flex items-center gap-2 cursor-pointer" data-testid="checkbox-receiving">
                   <Checkbox
                     checked={isReceiving}
@@ -584,10 +584,10 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center gap-2 pt-5">
+            <div className="flex flex-col items-center justify-center gap-2 pt-5 w-full">
               <Button
                 variant="destructive"
-                className={`flex flex-col gap-1.5 !h-[1.5in] !w-[1in] text-sm${captureSettings?.largerTouchTargets ? " text-base" : ""}`}
+                className={`flex flex-col gap-1.5 !h-20 !w-[4.5rem] text-sm${captureSettings?.largerTouchTargets ? " text-base" : ""}`}
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={!aisle.trim()}
                 data-testid="button-mobile-camera"
@@ -598,7 +598,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <div className="flex gap-1">
                 <Button
                   variant="destructive"
-                  className="!h-[0.5in] !w-[0.5in] !p-0"
+                  className="!h-10 !w-10 !p-0"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={!aisle.trim()}
                   data-testid="button-mobile-upload"
@@ -607,7 +607,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </Button>
                 <Button
                   variant="outline"
-                  className="!border-orange-500 dark:!border-orange-400 text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 !h-[0.5in] !w-[0.5in] !p-0"
+                  className="!border-orange-500 dark:!border-orange-400 text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 !h-10 !w-10 !p-0"
                   onClick={() => setShowQuickEntry(prev => !prev)}
                   data-testid="button-mobile-quick-entry-toggle"
                 >
@@ -616,22 +616,22 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               </div>
             </div>
 
-            <div className="flex flex-col items-center gap-1">
-              <Label className={`text-2xl underline self-start${!isReceiving && !section.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Section:</Label>
+            <div className="flex flex-col items-center gap-1 w-full">
+              <Label className={`text-lg underline self-start${!isReceiving && !section.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Section:</Label>
               <Input
                 ref={sectionInputRef}
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
-                className={`text-center text-lg w-[148px] h-[4.5rem] !py-0${isReceiving ? "" : " border-red-500"}`}
+                className={`text-center text-lg w-full h-14 !py-0${isReceiving ? "" : " border-red-500"}`}
                 tabIndex={2}
                 enterKeyHint="done"
                 data-testid="input-mobile-section"
                 onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.blur(); } }}
               />
-              <div className="flex gap-1 w-[148px]">
+              <div className="flex gap-1 w-full">
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-[1in] !w-[0.75in]"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-14 flex-1"
                   data-testid="button-section-decrement"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -644,7 +644,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-[1in] !w-[0.75in]"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-14 flex-1"
                   data-testid="button-section-increment"
                   onPointerDown={(e) => {
                     e.preventDefault();
