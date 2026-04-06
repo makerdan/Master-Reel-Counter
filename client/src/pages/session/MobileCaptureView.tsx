@@ -513,7 +513,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
 
-          <form onSubmit={(e) => e.preventDefault()} className="grid grid-cols-3 gap-2 items-start justify-items-center">
+          <form onSubmit={(e) => e.preventDefault()} className={`grid grid-cols-3 gap-2 items-start justify-items-center transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
             <div className="flex flex-col items-center gap-1">
               <Label className={`text-xs underline self-start${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Aisle: <span className="text-destructive">*</span></Label>
               <Input
@@ -586,6 +586,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
             <div className="flex flex-col items-center justify-center gap-2 pt-5">
               <Button
+                variant="destructive"
                 className={`flex flex-col gap-1.5 !h-[1.5in] !w-[1in] text-sm${captureSettings?.largerTouchTargets ? " text-base" : ""}`}
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={!aisle.trim()}
@@ -596,8 +597,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               </Button>
               <div className="flex gap-1">
                 <Button
-                  variant="outline"
-                  className="!border-[hsl(215_50%_45%/0.5)] text-[hsl(215_50%_45%)] dark:text-[hsl(215_60%_60%)] dark:!border-[hsl(215_50%_45%/0.4)] !h-[0.5in] !w-[0.5in] !p-0"
+                  variant="destructive"
+                  className="!h-[0.5in] !w-[0.5in] !p-0"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={!aisle.trim()}
                   data-testid="button-mobile-upload"
@@ -658,16 +659,16 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             </div>
           </form>
           {showQuickEntry && (
-            <div className="p-3 rounded-md border border-[hsl(200_50%_40%/0.3)] bg-[hsl(25_10%_95%)] dark:bg-[hsl(25_10%_12%)]" data-testid="mobile-quick-entry-panel">
+            <div className="p-3 rounded-md border border-red-500 bg-[hsl(25_10%_95%)] dark:bg-[hsl(25_10%_12%)]" data-testid="mobile-quick-entry-panel">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-[hsl(200_60%_35%)] dark:text-[hsl(200_60%_70%)] flex items-center gap-1.5">
                   <ListPlus className="h-4 w-4" />
-                  Quick Entry (no pin)
+                  Quick Entry (1 Reel)
                 </h3>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground border border-black dark:border-white"
                   onClick={() => setShowQuickEntry(false)}
                   data-testid="button-mobile-quick-entry-close"
                 >
@@ -692,12 +693,11 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               />
             </div>
           )}
-          <div className="space-y-1">
+          <div className={`space-y-1 transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
             <Label className="text-xs underline">Notes:</Label>
             <Textarea
               value={captureNotes}
               onChange={(e) => setCaptureNotes(e.target.value)}
-
               rows={2}
               data-testid="input-mobile-capture-notes"
             />
