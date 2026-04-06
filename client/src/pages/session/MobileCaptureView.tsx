@@ -530,7 +530,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <div className="flex gap-1 w-[148px]">
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-blue-600/50 dark:!border-blue-400/50 !p-0 !h-[1in] !w-[0.75in]"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-[1in] !w-[0.75in]"
                   data-testid="button-aisle-decrement"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -544,7 +544,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-blue-600/50 dark:!border-blue-400/50 !p-0 !h-[1in] !w-[0.75in]"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-[1in] !w-[0.75in]"
                   data-testid="button-aisle-increment"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -631,7 +631,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <div className="flex gap-1 w-[148px]">
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-blue-600/50 dark:!border-blue-400/50 !p-0 !h-[1in] !w-[0.75in]"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-[1in] !w-[0.75in]"
                   data-testid="button-section-decrement"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -644,7 +644,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-blue-600/50 dark:!border-blue-400/50 !p-0 !h-[1in] !w-[0.75in]"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-[1in] !w-[0.75in]"
                   data-testid="button-section-increment"
                   onPointerDown={(e) => {
                     e.preventDefault();
