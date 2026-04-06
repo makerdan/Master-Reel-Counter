@@ -695,13 +695,29 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           )}
           <div className={`space-y-1 transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
             <Label className="text-xs underline">Notes:</Label>
-            <Textarea
-              value={captureNotes}
-              onChange={(e) => setCaptureNotes(e.target.value)}
-              rows={2}
-              className="w-1/2"
-              data-testid="input-mobile-capture-notes"
-            />
+            <div className="flex items-stretch gap-2">
+              <Textarea
+                value={captureNotes}
+                onChange={(e) => setCaptureNotes(e.target.value)}
+                rows={2}
+                className="w-1/2"
+                data-testid="input-mobile-capture-notes"
+              />
+              <Button
+                variant="outline"
+                size="lg"
+                className="!border !border-black dark:!border-white self-stretch h-auto text-base"
+                onClick={() => {
+                  setAisle("");
+                  setSection("");
+                  setCaptureNotes("");
+                  setOnFloorChecked(false);
+                }}
+                data-testid="button-mobile-clear"
+              >
+                Clear
+              </Button>
+            </div>
           </div>
           {(pendingCount > 0 || failedCount > 0) && (
             <div className="space-y-2" data-testid="upload-queue-status">
@@ -729,22 +745,6 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               )}
             </div>
           )}
-          <div className="flex justify-end pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs text-muted-foreground"
-              onClick={() => {
-                setAisle("");
-                setSection("");
-                setCaptureNotes("");
-                setOnFloorChecked(false);
-              }}
-              data-testid="button-mobile-clear"
-            >
-              Clear
-            </Button>
-          </div>
         </CardContent>
       </Card>
       )}
