@@ -513,7 +513,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleCapture} data-testid="input-mobile-file" />
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} data-testid="input-mobile-camera" />
 
-          <form onSubmit={(e) => e.preventDefault()} className={`grid grid-cols-3 gap-2 items-stretch justify-items-center transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
+          <form onSubmit={(e) => e.preventDefault()} className={`grid grid-cols-3 gap-2 items-start justify-items-center transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
             <div className="flex flex-col items-center gap-1 w-full">
               <Label className={`text-lg self-start${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}><span className="underline">Aisle:</span> <span className="text-red-500 font-bold">✱</span></Label>
               <Input
@@ -584,10 +584,10 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               </div>
             </div>
 
-            <div className="flex flex-col items-center w-full h-full">
+            <div className="flex flex-col items-center justify-center gap-2 pt-5 w-full">
               <Button
                 variant="destructive"
-                className={`flex flex-col gap-1.5 w-full h-full !min-h-[5rem] text-sm${captureSettings?.largerTouchTargets ? " text-base" : ""}`}
+                className={`flex flex-col gap-1.5 !h-20 !w-[4.5rem] text-sm${captureSettings?.largerTouchTargets ? " text-base" : ""}`}
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={!aisle.trim()}
                 data-testid="button-mobile-camera"
@@ -595,6 +595,25 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 <Camera className="h-7 w-7" />
                 <span>Take<br/>Photo</span>
               </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="destructive"
+                  className="!h-10 !w-10 !p-0"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!aisle.trim()}
+                  data-testid="button-mobile-upload"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="!border-orange-500 dark:!border-orange-400 text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 !h-10 !w-10 !p-0"
+                  onClick={() => setShowQuickEntry(prev => !prev)}
+                  data-testid="button-mobile-quick-entry-toggle"
+                >
+                  <ListPlus className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-col items-center gap-1 w-full">
@@ -674,28 +693,20 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               />
             </div>
           )}
-          <div className={`flex gap-2 transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
-            <div className="flex flex-col gap-1 w-14 flex-shrink-0">
-              <Button
-                variant="destructive"
-                className="!h-10 !w-full !p-0"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={!aisle.trim()}
-                data-testid="button-mobile-upload"
-              >
-                <ImagePlus className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="outline"
-                className="!border-orange-500 dark:!border-orange-400 text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 !h-10 !w-full !p-0"
-                onClick={() => setShowQuickEntry(prev => !prev)}
-                data-testid="button-mobile-quick-entry-toggle"
-              >
-                <ListPlus className="h-5 w-5" />
-              </Button>
+          <div className={`space-y-1 transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
+            <Label className="text-xs underline">Notes:</Label>
+            <div className="flex items-stretch gap-2">
+              <Textarea
+                value={captureNotes}
+                onChange={(e) => setCaptureNotes(e.target.value)}
+                rows={2}
+                className="w-1/2"
+                data-testid="input-mobile-capture-notes"
+              />
               <Button
                 variant="outline"
-                className="!border !border-black dark:!border-white !w-full flex-1 text-base"
+                size="lg"
+                className="!border !border-black dark:!border-white self-stretch h-auto text-base"
                 onClick={() => {
                   setAisle("");
                   setSection("");
@@ -706,16 +717,6 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               >
                 Clear
               </Button>
-            </div>
-            <div className="flex-1 space-y-1">
-              <Label className="text-xs underline">Notes:</Label>
-              <Textarea
-                value={captureNotes}
-                onChange={(e) => setCaptureNotes(e.target.value)}
-                rows={2}
-                className="w-full"
-                data-testid="input-mobile-capture-notes"
-              />
             </div>
           </div>
           {(pendingCount > 0 || failedCount > 0) && (
