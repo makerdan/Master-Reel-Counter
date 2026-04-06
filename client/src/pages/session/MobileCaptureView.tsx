@@ -515,7 +515,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
           <form onSubmit={(e) => e.preventDefault()} className={`grid grid-cols-3 gap-2 items-start justify-items-center transition-opacity${showQuickEntry ? " opacity-40 pointer-events-none select-none" : ""}`}>
             <div className="flex flex-col items-center gap-1">
-              <Label className={`text-xs underline self-start${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}>Aisle: <span className="text-destructive">*</span></Label>
+              <Label className={`text-xs self-start${!aisle.trim() ? " !text-[hsl(18,85%,40%)]" : ""}`}><span className="underline">Aisle:</span> <span className="text-destructive text-sm font-bold">*</span></Label>
               <Input
                 ref={aisleInputRef}
                 value={aisle}
