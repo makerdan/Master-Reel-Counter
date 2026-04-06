@@ -699,6 +699,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               value={captureNotes}
               onChange={(e) => setCaptureNotes(e.target.value)}
               rows={2}
+              className="w-1/2"
               data-testid="input-mobile-capture-notes"
             />
           </div>
@@ -728,6 +729,22 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               )}
             </div>
           )}
+          <div className="flex justify-end pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs text-muted-foreground"
+              onClick={() => {
+                setAisle("");
+                setSection("");
+                setCaptureNotes("");
+                setOnFloorChecked(false);
+              }}
+              data-testid="button-mobile-clear"
+            >
+              Clear
+            </Button>
+          </div>
         </CardContent>
       </Card>
       )}
