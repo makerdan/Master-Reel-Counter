@@ -1808,12 +1808,14 @@ export async function registerRoutes(
       // Widened to account for JPEG compression artifacts, lighting variation,
       // shadows, camera white-balance shifts, and shooting angle.
       const greenMask = new Uint8Array(width * height);
+      let totalGreenPixels = 0;
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
         if (r >= 8 && r <= 120 && g >= 100 && g <= 255 && b <= 60 && g > r + 30 && g > b + 40) {
           greenMask[i] = 1;
+          totalGreenPixels++;
         }
       }
 
@@ -1821,6 +1823,7 @@ export async function registerRoutes(
       const gridW = Math.ceil(width / CELL);
       const gridH = Math.ceil(height / CELL);
       const greenCells = new Uint8Array(gridW * gridH);
+      let greenCellCount = 0;
 
       for (let cy = 0; cy < gridH; cy++) {
         for (let cx = 0; cx < gridW; cx++) {
@@ -1835,6 +1838,7 @@ export async function registerRoutes(
           }
           if (totalCount > 0 && greenCount / totalCount > 0.12) {
             greenCells[cy * gridW + cx] = 1;
+            greenCellCount++;
           }
         }
       }
@@ -1892,14 +1896,18 @@ export async function registerRoutes(
       const MAX_BLOB_FRACTION = 0.35;
       const maxBlobPixels = Math.min(width, height) * MAX_BLOB_FRACTION;
 
+      let blobsRejectedBySize = 0;
+      let blobsRejectedByAspect = 0;
+
       const detections = blobs
         .filter(b => {
           if (b.count < 1) return false;
           const blobW = (b.maxX - b.minX + 1) * CELL;
           const blobH = (b.maxY - b.minY + 1) * CELL;
-          if (blobW > maxBlobPixels || blobH > maxBlobPixels) return false;
+          if (blobW > maxBlobPixels || blobH > maxBlobPixels) { blobsRejectedBySize++; return false; }
           const aspect = blobW / blobH;
-          return aspect >= MIN_ASPECT && aspect <= MAX_ASPECT;
+          if (aspect < MIN_ASPECT || aspect > MAX_ASPECT) { blobsRejectedByAspect++; return false; }
+          return true;
         })
         .sort((a, b) => b.count - a.count)
         .slice(0, 10)
@@ -1960,7 +1968,16 @@ export async function registerRoutes(
           };
         });
 
-      res.json({ detections });
+      res.json({
+        detections,
+        debug: {
+          totalGreenPixels,
+          greenCellCount,
+          rawBlobCount: blobs.length,
+          blobsRejectedBySize,
+          blobsRejectedByAspect,
+        },
+      });
     } catch (error) {
       console.error("Error detecting received labels:", error);
       res.status(500).json({ message: "Failed to detect labels" });

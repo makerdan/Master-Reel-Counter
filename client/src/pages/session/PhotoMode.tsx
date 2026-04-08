@@ -506,9 +506,26 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       const res = await apiRequest("POST", `/api/photos/${photoId}/detect-received`, {});
       const data = await res.json();
       type Detection = { xPercent: number; yPercent: number; x1Percent: number; y1Percent: number; x2Percent: number; y2Percent: number };
-      const { detections } = data as { detections: Detection[] };
+      type DebugInfo = { totalGreenPixels: number; greenCellCount: number; rawBlobCount: number; blobsRejectedBySize: number; blobsRejectedByAspect: number };
+      const { detections, debug } = data as { detections: Detection[]; debug?: DebugInfo };
       if (detections.length === 0) {
-        toast({ title: "No RECEIVED labels found", description: "No bright green RECEIVED labels detected in this photo." });
+        let description = "No bright green RECEIVED labels detected in this photo.";
+        if (debug) {
+          if (debug.totalGreenPixels === 0) {
+            description = "No green-colored pixels found — the label may be outside the expected color range or very faint.";
+          } else if (debug.greenCellCount === 0) {
+            description = `Green pixels found (${debug.totalGreenPixels.toLocaleString()} total) but too sparse to form a region — the label may be small or partially visible.`;
+          } else if (debug.rawBlobCount === 0) {
+            description = `${debug.greenCellCount} green cell(s) found but no connected regions formed.`;
+          } else if (debug.blobsRejectedBySize > 0 && debug.blobsRejectedByAspect === 0) {
+            description = `${debug.rawBlobCount} green region(s) found but rejected as too large — likely a reel or other large green object.`;
+          } else if (debug.blobsRejectedByAspect > 0 && debug.blobsRejectedBySize === 0) {
+            description = `${debug.rawBlobCount} green region(s) found but wrong shape — aspect ratio outside expected range (0.4–4.5).`;
+          } else if (debug.blobsRejectedBySize > 0 || debug.blobsRejectedByAspect > 0) {
+            description = `${debug.rawBlobCount} green region(s) found: ${debug.blobsRejectedBySize} too large, ${debug.blobsRejectedByAspect} wrong shape.`;
+          }
+        }
+        toast({ title: "No RECEIVED labels found", description });
         return;
       }
       const newPinIds: string[] = [];
