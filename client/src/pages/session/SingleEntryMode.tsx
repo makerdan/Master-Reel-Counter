@@ -306,7 +306,6 @@ export default function SingleEntryMode({
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!form.aisle.trim()) newErrors.aisle = "Aisle is required";
-    if (!isReceiving && !form.section.trim()) newErrors.section = "Section is required";
     if (form.footage && (isNaN(parseInt(form.footage)) || parseInt(form.footage) < 1)) newErrors.footage = "Must be a positive number";
     setErrors(newErrors);
     setTouched({ aisle: true, section: true, footage: true });
@@ -318,7 +317,7 @@ export default function SingleEntryMode({
       const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
       const displayFootage = form.footage ? parseInt(form.footage) : null;
       const totalFootage = displayFootage !== null ? toBaseFeet(displayFootage, currentUnit) : null;
-      const sectionValue = isReceiving && !form.section.trim() ? "000" : form.section;
+      const sectionValue = !form.section.trim() ? "000" : form.section;
       const body: Record<string, unknown> = {
         aisle: form.aisle,
         section: sectionValue,
@@ -387,7 +386,7 @@ export default function SingleEntryMode({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
-      toast({ title: "Missing required fields", description: "Aisle and Section are required", variant: "destructive" });
+      toast({ title: "Missing required fields", description: "Aisle is required", variant: "destructive" });
       return;
     }
     saveEntry.mutate();

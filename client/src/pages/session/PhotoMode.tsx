@@ -29,7 +29,7 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { lookupCategory, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { lookupCategory, userWireCategoryToParsedEntry, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { useWireCategories } from "@/hooks/use-wire-categories";
@@ -1329,7 +1329,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const createEntries = useMutation({
     mutationFn: async ({ overwrite = false }: { overwrite?: boolean } = {}) => {
       const allPins = [...localPinsRef.current];
-      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && p.footage && p.footage > 0 && !p.flagged);
+      const exactCatalogFootage = (wireDetails: string): number | undefined => {
+        const upper = wireDetails.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        const combined = userParsedCatalog.length > 0 ? [...userParsedCatalog, ...PARSED_CATALOG] : PARSED_CATALOG;
+        const exact = combined.filter(e => e.catalog === upper && e.footage != null);
+        if (exact.length === 0) return undefined;
+        const footages = [...new Set(exact.map(e => e.footage))];
+        return footages.length === 1 ? footages[0] : undefined;
+      };
+      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && (p.footage && p.footage > 0 || exactCatalogFootage(p.wireDetails!) != null) && !p.flagged);
       if (pinsToCommit.length === 0) {
         const withDetails = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && !p.flagged);
         if (withDetails.length > 0 && withDetails.some(p => !p.footage || p.footage <= 0)) {
@@ -1373,7 +1381,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       for (const pin of pinsToCommit) {
         try {
           const reelLabel = pin.wireDetails || `Pin ${pin.label}`;
-          const totalFootage = pin.footage ? pin.footage * pin.reelCount : undefined;
+          const resolvedFootage = (pin.footage && pin.footage > 0)
+            ? pin.footage
+            : (pin.wireDetails ? exactCatalogFootage(pin.wireDetails) : undefined);
+          const totalFootage = resolvedFootage ? resolvedFootage * pin.reelCount : undefined;
           const noteParts: string[] = [];
           if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
           const { entry, queued: entryQueued } = await withRetry(async () => {
