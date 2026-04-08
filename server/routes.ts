@@ -1900,19 +1900,20 @@ export async function registerRoutes(
           const rawXCenter = Math.max(1, Math.min(99, ((b.sumX / b.count * CELL + CELL / 2) / width) * 100));
           const rawYCenter = Math.max(1, Math.min(99, ((b.sumY / b.count * CELL + CELL / 2) / height) * 100));
 
-          // The green label is a 3"×5" sticker on a landscape 8.5"×11" paper tag.
+          // The green label is a 3"×5" sticker on a paper tag.
           // The label sits at the far-left or far-right edge of the tag, so the black
           // reel-info text occupies the remaining tag width on the opposite side.
-          // Estimate full tag width from the detected label's pixel dimensions:
-          //   portrait label (aspect < 1): ~3" wide × 5" tall → 3/11 of tag width
-          //   landscape label (aspect > 1): ~5" wide × 3" tall → 5/11 of tag width
+          // Estimate full tag width from the detected label's pixel dimensions,
+          // modeled as a 17"-wide tag:
+          //   portrait label (aspect < 1): ~3" wide × 5" tall → 3/17 of tag width
+          //   landscape label (aspect > 1): ~5" wide × 3" tall → 5/17 of tag width
           // Use pixel-space blob dimensions (not %-space) so the aspect ratio is
           // independent of the image's own width/height ratio.
           const labelWidthPct = rawX2 - rawX1;
           const blobPixelW = (b.maxX - b.minX + 1) * CELL;
           const blobPixelH = (b.maxY - b.minY + 1) * CELL;
           const labelAspect = blobPixelH > 0 ? blobPixelW / blobPixelH : 1;
-          const labelFractionOfTagWidth = labelAspect > 1 ? (5 / 11) : (3 / 11);
+          const labelFractionOfTagWidth = labelAspect > 1 ? (5 / 17) : (3 / 17);
           const tagWidthPct = Math.min(100, labelWidthPct / labelFractionOfTagWidth);
 
           // Expand bounding box to cover the full estimated tag and move pin to text center
@@ -1929,13 +1930,22 @@ export async function registerRoutes(
             pinX = Math.max(1, Math.min(99, (tagX1 + rawX1) / 2));
           }
 
+          // Expand bounding box vertically: treat tag as 10" tall.
+          //   portrait label (aspect < 1): ~5" tall → 5/10 of tag height
+          //   landscape label (aspect > 1): ~3" tall → 3/10 of tag height
+          const labelHeightPct = rawY2 - rawY1;
+          const labelFractionOfTagHeight = labelAspect > 1 ? (3 / 10) : (5 / 10);
+          const tagHeightPct = Math.min(100, labelHeightPct / labelFractionOfTagHeight);
+          const tagY1 = Math.max(0, rawYCenter - tagHeightPct / 2);
+          const tagY2 = Math.min(100, rawYCenter + tagHeightPct / 2);
+
           return {
             xPercent: pinX,
             yPercent: rawYCenter,
             x1Percent: tagX1,
-            y1Percent: rawY1,
+            y1Percent: tagY1,
             x2Percent: tagX2,
-            y2Percent: rawY2,
+            y2Percent: tagY2,
           };
         });
 
