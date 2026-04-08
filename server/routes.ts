@@ -1891,14 +1891,49 @@ export async function registerRoutes(
         })
         .sort((a, b) => b.count - a.count)
         .slice(0, 10)
-        .map(b => ({
-          xPercent: Math.max(1, Math.min(99, ((b.sumX / b.count * CELL + CELL / 2) / width) * 100)),
-          yPercent: Math.max(1, Math.min(99, ((b.sumY / b.count * CELL + CELL / 2) / height) * 100)),
-          x1Percent: Math.max(0, (b.minX * CELL / width) * 100),
-          y1Percent: Math.max(0, (b.minY * CELL / height) * 100),
-          x2Percent: Math.min(100, ((b.maxX + 1) * CELL / width) * 100),
-          y2Percent: Math.min(100, ((b.maxY + 1) * CELL / height) * 100),
-        }));
+        .map(b => {
+          const rawX1 = Math.max(0, (b.minX * CELL / width) * 100);
+          const rawY1 = Math.max(0, (b.minY * CELL / height) * 100);
+          const rawX2 = Math.min(100, ((b.maxX + 1) * CELL / width) * 100);
+          const rawY2 = Math.min(100, ((b.maxY + 1) * CELL / height) * 100);
+          const rawXCenter = Math.max(1, Math.min(99, ((b.sumX / b.count * CELL + CELL / 2) / width) * 100));
+          const rawYCenter = Math.max(1, Math.min(99, ((b.sumY / b.count * CELL + CELL / 2) / height) * 100));
+
+          // The green label is a 3"×5" sticker on a landscape 8.5"×11" paper tag.
+          // The label sits at the far-left or far-right edge of the tag, so the black
+          // reel-info text occupies the remaining tag width on the opposite side.
+          // Estimate full tag width from the detected label's pixel dimensions:
+          //   portrait label (aspect < 1): ~3" wide × 5" tall → 3/11 of tag width
+          //   landscape label (aspect > 1): ~5" wide × 3" tall → 5/11 of tag width
+          const labelWidthPct = rawX2 - rawX1;
+          const labelHeightPct = rawY2 - rawY1;
+          const labelAspect = labelHeightPct > 0 ? labelWidthPct / labelHeightPct : 1;
+          const labelFractionOfTagWidth = labelAspect > 1 ? (5 / 11) : (3 / 11);
+          const tagWidthPct = Math.min(100, labelWidthPct / labelFractionOfTagWidth);
+
+          // Expand bounding box to cover the full estimated tag and move pin to text center
+          let tagX1: number, tagX2: number, pinX: number;
+          if (rawXCenter < 50) {
+            // Label is on the LEFT → text extends to the right
+            tagX1 = rawX1;
+            tagX2 = Math.min(100, rawX1 + tagWidthPct);
+            pinX = Math.max(1, Math.min(99, (rawX2 + tagX2) / 2));
+          } else {
+            // Label is on the RIGHT → text extends to the left
+            tagX2 = rawX2;
+            tagX1 = Math.max(0, rawX2 - tagWidthPct);
+            pinX = Math.max(1, Math.min(99, (tagX1 + rawX1) / 2));
+          }
+
+          return {
+            xPercent: pinX,
+            yPercent: rawYCenter,
+            x1Percent: tagX1,
+            y1Percent: rawY1,
+            x2Percent: tagX2,
+            y2Percent: rawY2,
+          };
+        });
 
       res.json({ detections });
     } catch (error) {
