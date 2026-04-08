@@ -404,7 +404,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEntry(id: number): Promise<void> {
-    await db.delete(entries).where(eq(entries.id, id));
+    await db.transaction(async (tx) => {
+      await tx.delete(pins).where(eq(pins.entryId, id));
+      await tx.delete(entries).where(eq(entries.id, id));
+    });
   }
 
   async createPin(pin: InsertPin): Promise<Pin> {

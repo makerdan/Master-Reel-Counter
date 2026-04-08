@@ -244,6 +244,7 @@ function EntryTable({
     },
     onSuccess: (entry) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       if (onUndoableDelete) {
         const { id, ...rest } = entry;
         onUndoableDelete({

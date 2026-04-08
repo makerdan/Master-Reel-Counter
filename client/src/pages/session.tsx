@@ -322,6 +322,7 @@ function SessionWorkspace({
     },
     onSuccess: (entry) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       const { id, ...rest } = entry;
       pushUndo({
         type: "delete-entry",
