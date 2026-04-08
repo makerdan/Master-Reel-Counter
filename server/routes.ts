@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
@@ -10,12 +10,12 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCategorySchema, countingSessions } from "@shared/schema";
 import { z } from "zod";
-import { eq, isNull, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
 import PDFDocument from "pdfkit";
-import { toDisplayUnit, unitLabel, unitLabelFull, type UnitType } from "./unit-conversion";
+import { toDisplayUnit, unitLabel, type UnitType } from "./unit-conversion";
 import sharp from "sharp";
 import { randomUUID, randomBytes, createHash } from "crypto";
 import bcrypt from "bcrypt";
@@ -2276,11 +2276,9 @@ export async function registerRoutes(
       const key = await getEncryptionKey(userId);
       const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries);
       const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
-      const generatedAt = new Date().toISOString();
       const userSettings = await storage.getUserSettings(userId);
       const pdfUnit: UnitType = (userSettings?.defaultUnit as UnitType) || "feet";
       const pdfULabel = unitLabel(pdfUnit);
-      const pdfUFull = unitLabelFull(pdfUnit);
       const fmtFootage = (ft: number) => toDisplayUnit(ft, pdfUnit).toLocaleString();
       const photoStats = await storage.getSessionPhotoStats([session.id]);
       const pt = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
@@ -3949,7 +3947,6 @@ export async function registerRoutes(
       const key = await getEncryptionKey(userId);
       const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries);
       const sessionPhotos = await storage.getSessionPhotos(session.id);
-      const photoMap = new Map(sessionPhotos.map((p: any) => [p.id, p]));
       const allFlaggedPins = await storage.getSessionFlaggedPins(session.id);
       const flaggedEntryIds = new Set<number>(
         allFlaggedPins.filter((p: any) => p.entryId != null).map((p: any) => p.entryId as number)

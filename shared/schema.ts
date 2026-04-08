@@ -9,7 +9,6 @@ import {
   real,
   timestamp,
   boolean,
-  jsonb,
   uniqueIndex,
   index,
   foreignKey,

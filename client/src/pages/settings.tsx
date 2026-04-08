@@ -4,8 +4,8 @@ import { useLocation } from "wouter";
 import {
   ArrowLeft, Settings, Shield, ShieldOff, AlertTriangle, Lock,
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
-  Download, Camera, Keyboard, Sun, Moon, Monitor, Image, Target,
-  ChevronDown, Ruler, Building2, FileText, Globe, Upload, Trash2,
+  Download, Camera, Keyboard, Sun, Moon, Monitor, Target,
+  ChevronDown, FileText, Globe, Upload, Trash2,
   HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
   Users, UserCheck, UserX,
 } from "lucide-react";

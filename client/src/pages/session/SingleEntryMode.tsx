@@ -301,14 +301,6 @@ export default function SingleEntryMode({
     setShowCategorySuggestions(false);
   };
 
-  const toggleNoteTag = (tag: string, checked: boolean) => {
-    setForm((f) => {
-      const parts = f.notes.split("; ").filter(p => p.trim() && p.trim() !== tag);
-      if (checked) parts.unshift(tag);
-      return { ...f, notes: parts.join("; ") };
-    });
-  };
-
   const isReceiving = form.aisle.trim().toLowerCase() === "receiving";
 
   const validate = (): boolean => {
@@ -345,7 +337,7 @@ export default function SingleEntryMode({
 
       let result;
       if (editingEntry) {
-        const res = await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
+        await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
         result = { type: "update" as const, body, previousData: editingEntry, queued: false };
       } else {
         const { entry: created, queued } = await createEntryWithOfflineFallback(sessionId, body);

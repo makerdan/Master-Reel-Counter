@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useIsMutating } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import {
-  ArrowLeft, ArrowUp, Camera, Download, FileText, Mail, Undo2, Redo2, History,
-  Lock, Unlock, Check, Loader2, AlertTriangle, Flag, Users, TabletSmartphone, Monitor, Trash2, LayoutGrid, X, ClipboardCheck, BarChart2,
+  ArrowLeft, ArrowUp, Camera, Download, FileText, Mail, Undo2, Redo2,
+  Lock, Check, Loader2, AlertTriangle, Flag, Users, TabletSmartphone, Monitor, Trash2, LayoutGrid, X, ClipboardCheck, BarChart2,
 } from "lucide-react";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
@@ -54,8 +54,6 @@ import { useAuth } from "@/hooks/use-auth";
 export default function SessionPage() {
   const [, params] = useRoute("/session/:id");
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const tz = useTimezone();
   const sessionId = params?.id ? parseInt(params.id) : 0;
 
   useEffect(() => {
@@ -69,7 +67,7 @@ export default function SessionPage() {
     enabled: sessionId > 0,
   });
 
-  const { data: entries = [], isLoading: entriesLoading } = useQuery<Entry[]>({
+  const { data: entries = [] } = useQuery<Entry[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "entries"],
     enabled: sessionId > 0,
   });
@@ -139,7 +137,6 @@ export default function SessionPage() {
     <SessionWorkspace
       session={session}
       entries={entries}
-      entriesLoading={entriesLoading}
       photos={photos}
       sessionId={sessionId}
       userSettings={userSettings}
@@ -148,11 +145,10 @@ export default function SessionPage() {
 }
 
 function SessionWorkspace({
-  session, entries, entriesLoading, photos, sessionId, userSettings,
+  session, entries, photos, sessionId, userSettings,
 }: {
   session: SessionWithStats;
   entries: Entry[];
-  entriesLoading: boolean;
   photos: Photo[];
   sessionId: number;
   userSettings?: { defaultExportFormat: string; companyName: string | null; exportFooterText: string | null; defaultUnit: string; testerPassword?: string | null };
@@ -253,27 +249,6 @@ function SessionWorkspace({
   const isLocked = !!(session as any).isLocked;
   const isOwner = (session as any).role === "owner";
   const canEditSession = !isLocked || isOwner;
-
-  const toggleLock = useMutation({
-    mutationFn: async () => {
-      const wasLocked = isLocked;
-      const res = await apiRequest("POST", `/api/sessions/${sessionId}/lock`, { locked: !isLocked });
-      return { result: await res.json(), wasLocked };
-    },
-    onSuccess: ({ wasLocked }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
-      toast({ title: wasLocked ? "Session unlocked" : "Session locked" });
-      pushUndo({
-        type: "lock-session",
-        sessionId,
-        entityId: 0,
-        data: { locked: !wasLocked },
-        previousData: { locked: wasLocked },
-      });
-    },
-  });
-
 
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
@@ -869,7 +844,6 @@ function SessionWorkspace({
               <TabsContent value="flagged">
                 <FlaggedReels
                   sessionId={sessionId}
-                  onBack={() => setMode("photo")}
                   pushUndo={pushUndo}
                   onReshoot={(aisleVal, sectionVal, parentPhotoId) => {
                     setMobileFlowInitialAisle(aisleVal);

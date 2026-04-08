@@ -100,7 +100,6 @@ export function parseCatalogEntry(entry: CatalogEntry): ParsedCatalogEntry {
         conductors = parts.length.toString();
       }
     } else {
-      const slashNotation = entry.catalog.match(/(\d+)\/(\d+)/);
       const descSlash = desc.match(/(\d+)\/(\d)\s/);
       if (descSlash && !desc.match(/\d+\/0/)) {
         conductors = descSlash[2];
@@ -1102,8 +1101,6 @@ export function userWireCategoryToParsedEntry(cat: {
     wireType: cat.wireType || undefined,
   };
 }
-
-const CATALOG_CODES = CATALOG.map(c => c.catalog);
 
 function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length;

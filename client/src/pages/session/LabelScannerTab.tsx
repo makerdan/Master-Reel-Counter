@@ -400,7 +400,6 @@ export default function LabelScannerTab({
     select: (data: any) => ({ defaultUnit: data?.defaultUnit ?? "feet" }),
   });
   const currentUnit: UnitType = (scannerSettings?.defaultUnit as UnitType) || "feet";
-  const uLabel = unitLabel(currentUnit);
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
   const lastInitialPhotoIdRef = useRef(initialPhotoId);
   const [cards, setCards] = useState<PinCard[]>([]);

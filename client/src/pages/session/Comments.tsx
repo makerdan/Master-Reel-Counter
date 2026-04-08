@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Send, Trash2, Pencil, Reply, X, MessageSquare, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";

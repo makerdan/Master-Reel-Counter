@@ -1,4 +1,4 @@
-import { Wifi, WifiOff, Loader2, CloudUpload } from "lucide-react";
+import { WifiOff, Loader2, CloudUpload } from "lucide-react";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 
 export function NetworkStatusIndicator() {

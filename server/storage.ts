@@ -659,7 +659,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async transferSessionOwnership(sessionId: number, newOwnerId: string, newOwnerUsername: string): Promise<void> {
+  async transferSessionOwnership(sessionId: number, newOwnerId: string, _newOwnerUsername: string): Promise<void> {
     const session = await this.getSession(sessionId);
     if (!session) throw new Error("Session not found");
     const oldOwnerId = session.userId;
@@ -1459,7 +1459,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getEnhancedStats(userId: string, sessionIds: number[]): Promise<{
+  async getEnhancedStats(_userId: string, sessionIds: number[]): Promise<{
     dataQuality: {
       totalFlaggedPins: number;
       totalPins: number;
