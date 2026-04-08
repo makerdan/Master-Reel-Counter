@@ -517,12 +517,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             description = `Green pixels found (${debug.totalGreenPixels.toLocaleString()} total) but too sparse to form a region — the label may be small or partially visible.`;
           } else if (debug.rawBlobCount === 0) {
             description = `${debug.greenCellCount} green cell(s) found but no connected regions formed.`;
-          } else if (debug.blobsRejectedBySize > 0 && debug.blobsRejectedByAspect === 0) {
+          } else if (debug.blobsRejectedBySize > 0) {
             description = `${debug.rawBlobCount} green region(s) found but rejected as too large — likely a reel or other large green object.`;
-          } else if (debug.blobsRejectedByAspect > 0 && debug.blobsRejectedBySize === 0) {
+          } else if (debug.blobsRejectedByAspect > 0) {
             description = `${debug.rawBlobCount} green region(s) found but wrong shape — aspect ratio outside expected range (0.4–4.5).`;
-          } else if (debug.blobsRejectedBySize > 0 || debug.blobsRejectedByAspect > 0) {
-            description = `${debug.rawBlobCount} green region(s) found: ${debug.blobsRejectedBySize} too large, ${debug.blobsRejectedByAspect} wrong shape.`;
           }
         }
         toast({ title: "No RECEIVED labels found", description });
