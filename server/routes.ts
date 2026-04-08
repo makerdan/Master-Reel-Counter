@@ -1905,9 +1905,12 @@ export async function registerRoutes(
           // Estimate full tag width from the detected label's pixel dimensions:
           //   portrait label (aspect < 1): ~3" wide × 5" tall → 3/11 of tag width
           //   landscape label (aspect > 1): ~5" wide × 3" tall → 5/11 of tag width
+          // Use pixel-space blob dimensions (not %-space) so the aspect ratio is
+          // independent of the image's own width/height ratio.
           const labelWidthPct = rawX2 - rawX1;
-          const labelHeightPct = rawY2 - rawY1;
-          const labelAspect = labelHeightPct > 0 ? labelWidthPct / labelHeightPct : 1;
+          const blobPixelW = (b.maxX - b.minX + 1) * CELL;
+          const blobPixelH = (b.maxY - b.minY + 1) * CELL;
+          const labelAspect = blobPixelH > 0 ? blobPixelW / blobPixelH : 1;
           const labelFractionOfTagWidth = labelAspect > 1 ? (5 / 11) : (3 / 11);
           const tagWidthPct = Math.min(100, labelWidthPct / labelFractionOfTagWidth);
 
