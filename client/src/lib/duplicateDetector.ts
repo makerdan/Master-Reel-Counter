@@ -16,7 +16,7 @@ export interface DuplicatePinInfo {
   wireDetails: string | null;
   vendorCode: string | null;
   footage: number | null;
-  reelCount: number;
+  reelCount: number | null;
   xPercent: number;
   yPercent: number;
   photoAisle: string | null;

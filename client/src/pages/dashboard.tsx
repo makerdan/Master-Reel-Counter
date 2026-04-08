@@ -1492,7 +1492,7 @@ export default function Dashboard() {
                       });
                       return;
                     }
-                    createFolder.mutate();
+                    createFolder.mutate(newFolderName.trim());
                   }}
                   className="space-y-4"
                 >

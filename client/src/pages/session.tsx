@@ -31,7 +31,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import type { Session, Entry, Photo, Pin } from "@shared/schema";
+import type { SessionWithStats, Entry, Photo, Pin } from "@shared/schema";
 import PhotoMode from "./session/PhotoMode";
 import TeamDialog from "./session/TeamDialog";
 import EntryTable from "./session/EntryTable";
@@ -64,7 +64,7 @@ export default function SessionPage() {
     }
   }, [sessionId]);
 
-  const { data: session, isLoading: sessionLoading, isError: sessionError } = useQuery<Session & { firstPhotoAt: string | null; lastPhotoAt: string | null; role: "owner" | "editor" | "viewer"; collaboratorCount: number }>({
+  const { data: session, isLoading: sessionLoading, isError: sessionError } = useQuery<SessionWithStats>({
     queryKey: ["/api/sessions", sessionId.toString()],
     enabled: sessionId > 0,
   });
@@ -150,7 +150,7 @@ export default function SessionPage() {
 function SessionWorkspace({
   session, entries, entriesLoading, photos, sessionId, userSettings,
 }: {
-  session: Session & { role?: "owner" | "editor" | "viewer"; collaboratorCount?: number };
+  session: SessionWithStats;
   entries: Entry[];
   entriesLoading: boolean;
   photos: Photo[];
