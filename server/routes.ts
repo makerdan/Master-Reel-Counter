@@ -1805,12 +1805,14 @@ export async function registerRoutes(
 
       // Actual RECEIVED label color from real photo samples:
       // R: 21–59, G: 155–202, B: 4–26.
+      // Widened to account for JPEG compression artifacts, lighting variation,
+      // shadows, camera white-balance shifts, and shooting angle.
       const greenMask = new Uint8Array(width * height);
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
-        if (r >= 15 && r <= 95 && g >= 125 && g <= 250 && b <= 30) {
+        if (r >= 8 && r <= 120 && g >= 100 && g <= 255 && b <= 60 && g > r + 30 && g > b + 40) {
           greenMask[i] = 1;
         }
       }
@@ -1831,7 +1833,7 @@ export async function registerRoutes(
               totalCount++;
             }
           }
-          if (totalCount > 0 && greenCount / totalCount > 0.20) {
+          if (totalCount > 0 && greenCount / totalCount > 0.12) {
             greenCells[cy * gridW + cx] = 1;
           }
         }
@@ -1881,11 +1883,21 @@ export async function registerRoutes(
       const MIN_ASPECT = 0.4;
       const MAX_ASPECT = 4.5;
 
+      // Maximum blob size: a 3"×5" label on a photo taken at normal shooting
+      // distance should occupy at most ~35% of the shorter image dimension in
+      // either direction. Blobs exceeding this in either width OR height are
+      // almost certainly master reels or other large green objects — discard
+      // them as false positives. Using either-dimension ensures even elongated
+      // or perspective-distorted large blobs are caught.
+      const MAX_BLOB_FRACTION = 0.35;
+      const maxBlobPixels = Math.min(width, height) * MAX_BLOB_FRACTION;
+
       const detections = blobs
         .filter(b => {
-          if (b.count < 2) return false;
+          if (b.count < 1) return false;
           const blobW = (b.maxX - b.minX + 1) * CELL;
           const blobH = (b.maxY - b.minY + 1) * CELL;
+          if (blobW > maxBlobPixels || blobH > maxBlobPixels) return false;
           const aspect = blobW / blobH;
           return aspect >= MIN_ASPECT && aspect <= MAX_ASPECT;
         })
