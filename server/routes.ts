@@ -1805,12 +1805,13 @@ export async function registerRoutes(
 
       // Actual RECEIVED label color from real photos:
       // R: 57–75, G: 206–219, B: 0–3. B≈0 is the key fingerprint.
+      // Range expanded to catch shadowed/angled labels (G as low as 129 in shadow).
       const greenMask = new Uint8Array(width * height);
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
-        if (r >= 45 && r <= 90 && g >= 190 && g <= 235 && b <= 12) {
+        if (r >= 45 && r <= 95 && g >= 125 && g <= 250 && b <= 12) {
           greenMask[i] = 1;
         }
       }
