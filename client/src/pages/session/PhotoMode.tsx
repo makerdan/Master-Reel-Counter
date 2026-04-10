@@ -513,8 +513,21 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         toast({ title: "No RECEIVED labels found", description: "No bright green RECEIVED labels detected in this photo." });
         return;
       }
+      const PROXIMITY_THRESHOLD = 3; // percent — detections within this distance of an existing pin are skipped
+      const existingPins = localPinsRef.current;
+      const uniqueDetections = detections.filter(d =>
+        !existingPins.some(p =>
+          Math.abs(p.x - d.xPercent) < PROXIMITY_THRESHOLD &&
+          Math.abs(p.y - d.yPercent) < PROXIMITY_THRESHOLD
+        )
+      );
+      const skipped = detections.length - uniqueDetections.length;
+      if (uniqueDetections.length === 0) {
+        toast({ title: "No new pins added", description: `All ${detections.length} detected label${detections.length !== 1 ? "s" : ""} already ${detections.length !== 1 ? "have" : "has"} a pin nearby.` });
+        return;
+      }
       const newPinIds: string[] = [];
-      const newPins: LocalPin[] = detections.map((d) => {
+      const newPins: LocalPin[] = uniqueDetections.map((d) => {
         const nextNumber = ++globalMaxPinRef.current;
         const id = `pin-detect-${Date.now()}-${nextNumber}`;
         newPinIds.push(id);
@@ -527,7 +540,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         };
       });
       detectedPinIdsRef.current = new Set(newPinIds);
-      setDetectedBoxes(detections.map(d => ({ x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent })));
+      setDetectedBoxes(uniqueDetections.map(d => ({ x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent })));
       const merged = [...localPinsRef.current, ...newPins].sort(
         (a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })
       );
@@ -549,8 +562,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         });
       } catch { }
       toast({
-        title: `Found ${detections.length} RECEIVED label${detections.length !== 1 ? "s" : ""}`,
-        description: `${detections.length} pin${detections.length !== 1 ? "s" : ""} placed automatically`,
+        title: `Placed ${uniqueDetections.length} pin${uniqueDetections.length !== 1 ? "s" : ""} automatically`,
+        description: skipped > 0
+          ? `${skipped} detection${skipped !== 1 ? "s" : ""} skipped — pin already nearby`
+          : `${uniqueDetections.length} RECEIVED label${uniqueDetections.length !== 1 ? "s" : ""} detected`,
       });
     } catch {
       toast({ title: "Detection failed", description: "Could not analyze the photo. Please try again.", variant: "destructive" });
