@@ -258,7 +258,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [panMode, setPanMode] = useState(false);
   const [isDetectingReceived, setIsDetectingReceived] = useState(false);
   const [colorPickMode, setColorPickMode] = useState(false);
-  const [detectedBoxes, setDetectedBoxes] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
+  const detectedBoxMapRef = useRef<Map<string, { x1: number; y1: number; x2: number; y2: number }>>(new Map());
   const [pinScale, setPinScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(0.15);
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -501,7 +501,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const photoId = currentPhoto?.dbId;
     if (!photoId || isDetectingReceived) return;
     setIsDetectingReceived(true);
-    setDetectedBoxes([]);
+    detectedBoxMapRef.current.clear();
     try {
       const res = await apiRequest("POST", `/api/photos/${photoId}/detect-received`, {});
       const data = await res.json();
@@ -527,10 +527,12 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         return;
       }
       const newPinIds: string[] = [];
+      detectedBoxMapRef.current.clear();
       const newPins: LocalPin[] = detections.map((d) => {
         const nextNumber = ++globalMaxPinRef.current;
         const id = `pin-detect-${Date.now()}-${nextNumber}`;
         newPinIds.push(id);
+        detectedBoxMapRef.current.set(id, { x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent });
         return {
           id,
           x: d.xPercent,
@@ -540,7 +542,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         };
       });
       detectedPinIdsRef.current = new Set(newPinIds);
-      setDetectedBoxes(detections.map(d => ({ x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent })));
       const merged = [...localPinsRef.current, ...newPins].sort(
         (a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })
       );
@@ -614,7 +615,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       return;
     }
     dismissedDetailWarn.current.clear();
-    setDetectedBoxes([]);
+    detectedBoxMapRef.current.clear();
     detectedPinIdsRef.current = new Set();
     // Evict the cache for the photo we just left (its pins may have been modified)
     if (prevPhotoDbIdRef.current && prevPhotoDbIdRef.current !== currentPhoto.dbId) {
@@ -1941,26 +1942,23 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               />
               {viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx ? (
                 <>
-                  {photoLoaded && detectedBoxes.map((box, i) => (
-                    <div
-                      key={`det-box-${i}`}
-                      style={{
-                        position: "absolute",
-                        left: `${box.x1}%`,
-                        top: `${box.y1}%`,
-                        width: `${box.x2 - box.x1}%`,
-                        height: `${box.y2 - box.y1}%`,
-                        border: "2px solid #46D700",
-                        boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
-                        pointerEvents: "none",
-                      }}
-                    />
-                  ))}
-                  {photoLoaded && pinsVisible && localPins.map((pin) => (
+                  {photoLoaded && pinsVisible && localPins.map((pin) => {
+                    const detectedBox = detectedBoxMapRef.current.get(pin.id);
+                    let detectedScale: number | undefined;
+                    if (detectedBox && containerRef.current) {
+                      const cW = containerRef.current.clientWidth;
+                      const cH = containerRef.current.clientHeight;
+                      const boxWpx = (detectedBox.x2 - detectedBox.x1) / 100 * cW;
+                      const boxHpx = (detectedBox.y2 - detectedBox.y1) / 100 * cH;
+                      const PIN_BASE_W = 54;
+                      const PIN_BASE_H = 50;
+                      detectedScale = Math.max(boxWpx / PIN_BASE_W, boxHpx / PIN_BASE_H, pinScale);
+                    }
+                    return (
                     <div
                       key={pin.id}
                       className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""} ${pin.flagged ? "flagged" : ""}`}
-                      style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
+                      style={{ left: `${pin.x}%`, top: `${pin.y}%`, ...(detectedScale !== undefined && { ["--pin-scale" as string]: detectedScale }) }}
                       data-pin-id={pin.id}
                       onMouseDown={(e) => {
                         if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
@@ -1997,10 +1995,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             }
                             setLocalPins(afterPins);
                             if (detectedPinIdsRef.current.size > 0) {
+                              detectedBoxMapRef.current.delete(pin.id);
                               const remaining = afterPins.filter(p => detectedPinIdsRef.current.has(p.id));
                               if (remaining.length === 0) {
                                 detectedPinIdsRef.current = new Set();
-                                setDetectedBoxes([]);
+                                detectedBoxMapRef.current.clear();
                               }
                             }
                           }}
@@ -2048,7 +2047,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         </button>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                   {photoLoaded && pinsVisible && committedPins.map((pin) => {
                     const shadeIdx = isDisplayedPhotoDetail ? detailShadeIndexForPhoto : linkedPinShadeMapForPhoto.get(pin.label);
                     const hasShade = shadeIdx !== undefined && shadeIdx >= 0;
