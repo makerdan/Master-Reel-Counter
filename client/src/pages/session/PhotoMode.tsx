@@ -1952,7 +1952,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                       const boxHpx = (detectedBox.y2 - detectedBox.y1) / 100 * cH;
                       const PIN_BASE_W = 54;
                       const PIN_BASE_H = 50;
-                      detectedScale = Math.max(boxWpx / PIN_BASE_W, boxHpx / PIN_BASE_H, pinScale);
+                      detectedScale = Math.min(Math.max(boxWpx / PIN_BASE_W, boxHpx / PIN_BASE_H), pinScale);
                     }
                     return (
                     <div
