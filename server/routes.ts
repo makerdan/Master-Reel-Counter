@@ -1803,14 +1803,14 @@ export async function registerRoutes(
       const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
       const { width, height, channels } = info;
 
-      // Green pixel filter: R 55–90, G 90–255, B 0–10.
+      // Green pixel filter: R 55–90, G 90–255, B 0–10, with relaxed dominance guards.
       const greenMask = new Uint8Array(width * height);
       let totalGreenPixels = 0;
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
-        if (r >= 55 && r <= 90 && g >= 90 && g <= 255 && b <= 10) {
+        if (r >= 55 && r <= 90 && g >= 90 && g <= 255 && b <= 10 && g > r + 10 && g > b + 10) {
           greenMask[i] = 1;
           totalGreenPixels++;
         }
