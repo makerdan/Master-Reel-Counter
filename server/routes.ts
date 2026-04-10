@@ -1803,17 +1803,14 @@ export async function registerRoutes(
       const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
       const { width, height, channels } = info;
 
-      // Actual RECEIVED label color from real photo samples:
-      // R: 21–59, G: 155–202, B: 4–26.
-      // Widened to account for JPEG compression artifacts, lighting variation,
-      // shadows, camera white-balance shifts, and shooting angle.
+      // Green pixel filter: R 60–120, G 45–255, B 0–10, with dominance guards.
       const greenMask = new Uint8Array(width * height);
       let totalGreenPixels = 0;
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
-        if (r >= 8 && r <= 120 && g >= 100 && g <= 255 && b <= 60 && g > r + 30 && g > b + 40) {
+        if (r >= 60 && r <= 120 && g >= 45 && g <= 255 && b <= 10 && g > r + 30 && g > b + 40) {
           greenMask[i] = 1;
           totalGreenPixels++;
         }
