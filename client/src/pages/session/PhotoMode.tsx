@@ -901,9 +901,25 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         .then((data: { exact: { r: number; g: number; b: number }; avg: { r: number; g: number; b: number } }) => {
           const { r, g, b } = data.exact;
           const a = data.avg;
+          // RGB → HSV (same algorithm used by detect-received)
+          const rn = r / 255, gn = g / 255, bn = b / 255;
+          const cmax = Math.max(rn, gn, bn);
+          const cmin = Math.min(rn, gn, bn);
+          const delta = cmax - cmin;
+          let hue = 0;
+          if (delta > 0) {
+            if (cmax === rn) hue = 60 * (((gn - bn) / delta) % 6);
+            else if (cmax === gn) hue = 60 * ((bn - rn) / delta + 2);
+            else hue = 60 * ((rn - gn) / delta + 4);
+          }
+          if (hue < 0) hue += 360;
+          const sat = cmax === 0 ? 0 : delta / cmax;
+          const val = cmax;
+          const wouldDetect =
+            hue >= 100 && hue <= 160 && sat > 0.40 && val > 0.25;
           toast({
-            title: `Color at (${x.toFixed(1)}%, ${y.toFixed(1)}%)`,
-            description: `Exact: rgb(${r}, ${g}, ${b})  |  5×5 avg: rgb(${a.r}, ${a.g}, ${a.b})`,
+            title: `Color at (${x.toFixed(1)}%, ${y.toFixed(1)}%) — ${wouldDetect ? "✓ Green label MATCH" : "✗ No green label match"}`,
+            description: `RGB (${r}, ${g}, ${b}) · 5×5 avg (${a.r}, ${a.g}, ${a.b}) · HSV H:${hue.toFixed(0)}° S:${(sat * 100).toFixed(0)}% V:${(val * 100).toFixed(0)}%  [need H:100–160° S>40% V>25%]`,
           });
         })
         .catch(() => toast({ title: "Could not sample pixel", variant: "destructive" }));
