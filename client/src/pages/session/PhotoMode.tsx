@@ -2181,7 +2181,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <RotateCcw className="h-4 w-4" />
                 </button>
                 <div className="photo-overlay-divider" />
-                {!currentPhoto?.isDetailShot && effectiveCanEdit && (
+                {effectiveCanEdit && (
                   <button
                     className="photo-overlay-btn"
                     onClick={(e) => { e.stopPropagation(); detectReceivedLabels(); }}
