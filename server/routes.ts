@@ -1803,14 +1803,50 @@ export async function registerRoutes(
       const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
       const { width, height, channels } = info;
 
-      // Actual RECEIVED label color from real photos:
-      // R: 57–75, G: 206–219, B: 0–3. B≈0 is the key fingerprint.
-      const greenMask = new Uint8Array(width * height);
-      for (let i = 0; i < width * height; i++) {
+      // --- Lighting normalization: per-channel min/max stretch ---
+      const totalPixels = width * height;
+      let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
+      for (let i = 0; i < totalPixels; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
-        if (r >= 45 && r <= 90 && g >= 190 && g <= 235 && b <= 12) {
+        if (r < rMin) rMin = r; if (r > rMax) rMax = r;
+        if (g < gMin) gMin = g; if (g > gMax) gMax = g;
+        if (b < bMin) bMin = b; if (b > bMax) bMax = b;
+      }
+      const rRange = rMax - rMin || 1;
+      const gRange = gMax - gMin || 1;
+      const bRange = bMax - bMin || 1;
+
+      // --- HSV green detection (hue ~100–160°, sat >40%, val >25%) ---
+      const greenMask = new Uint8Array(totalPixels);
+      for (let i = 0; i < totalPixels; i++) {
+        const rn = ((data[i * channels]     - rMin) / rRange) * 255;
+        const gn = ((data[i * channels + 1] - gMin) / gRange) * 255;
+        const bn = ((data[i * channels + 2] - bMin) / bRange) * 255;
+
+        const rf = rn / 255, gf = gn / 255, bf = bn / 255;
+        const cmax = Math.max(rf, gf, bf);
+        const cmin = Math.min(rf, gf, bf);
+        const delta = cmax - cmin;
+
+        const val = cmax;
+        const sat = cmax === 0 ? 0 : delta / cmax;
+
+        if (val < 0.25 || sat < 0.40) continue;
+
+        let hue = 0;
+        if (delta === 0) continue;
+        if (cmax === rf) {
+          hue = 60 * (((gf - bf) / delta) % 6);
+          if (hue < 0) hue += 360;
+        } else if (cmax === gf) {
+          hue = 60 * ((bf - rf) / delta + 2);
+        } else {
+          hue = 60 * ((rf - gf) / delta + 4);
+        }
+
+        if (hue >= 100 && hue <= 160) {
           greenMask[i] = 1;
         }
       }
@@ -1831,7 +1867,7 @@ export async function registerRoutes(
               totalCount++;
             }
           }
-          if (totalCount > 0 && greenCount / totalCount > 0.20) {
+          if (totalCount > 0 && greenCount / totalCount > 0.08) {
             greenCells[cy * gridW + cx] = 1;
           }
         }
