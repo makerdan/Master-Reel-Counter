@@ -1818,7 +1818,7 @@ export async function registerRoutes(
       const gRange = gMax - gMin || 1;
       const bRange = bMax - bMin || 1;
 
-      // --- HSV green detection (hue ~100–160°, sat >40%, val >25%) ---
+      // --- HSV green detection (hue ~90–160°, sat >40%, val >25%) ---
       const greenMask = new Uint8Array(totalPixels);
       for (let i = 0; i < totalPixels; i++) {
         const rn = ((data[i * channels]     - rMin) / rRange) * 255;
@@ -1846,7 +1846,7 @@ export async function registerRoutes(
           hue = 60 * ((rf - gf) / delta + 4);
         }
 
-        if (hue >= 100 && hue <= 160) {
+        if (hue >= 90 && hue <= 160) {
           greenMask[i] = 1;
         }
       }

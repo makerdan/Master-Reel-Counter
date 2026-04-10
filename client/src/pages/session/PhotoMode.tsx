@@ -916,11 +916,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           const sat = cmax === 0 ? 0 : delta / cmax;
           const val = cmax;
           const wouldDetect =
-            hue >= 100 && hue <= 160 && sat > 0.40 && val > 0.25;
+            hue >= 90 && hue <= 160 && sat > 0.40 && val > 0.25;
           console.log(`[ColorPicker] xy=(${x.toFixed(1)}%,${y.toFixed(1)}%) RGB=(${r},${g},${b}) HSV H:${hue.toFixed(1)}° S:${(sat*100).toFixed(1)}% V:${(val*100).toFixed(1)}% match=${wouldDetect}`);
           toast({
             title: `Color at (${x.toFixed(1)}%, ${y.toFixed(1)}%) — ${wouldDetect ? "✓ Green label MATCH" : "✗ No green label match"}`,
-            description: `RGB (${r}, ${g}, ${b}) · 5×5 avg (${a.r}, ${a.g}, ${a.b}) · HSV H:${hue.toFixed(0)}° S:${(sat * 100).toFixed(0)}% V:${(val * 100).toFixed(0)}%  [need H:100–160° S>40% V>25%]`,
+            description: `RGB (${r}, ${g}, ${b}) · 5×5 avg (${a.r}, ${a.g}, ${a.b}) · HSV H:${hue.toFixed(0)}° S:${(sat * 100).toFixed(0)}% V:${(val * 100).toFixed(0)}%  [need H:90–160° S>40% V>25%]`,
           });
         })
         .catch(() => toast({ title: "Could not sample pixel", variant: "destructive" }));
