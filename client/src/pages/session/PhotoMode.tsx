@@ -3,12 +3,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye, EyeOff,
-  AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp,
+  AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp, Lock,
   ScanLine, X as PanelCloseX, Pipette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -29,7 +30,7 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { lookupCategory, userWireCategoryToParsedEntry, PARSED_CATALOG, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { lookupCategory, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { useWireCategories } from "@/hooks/use-wire-categories";
@@ -75,7 +76,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const currentUnit: UnitType = (photoSettings?.defaultUnit as UnitType) || "feet";
   const uLabel = unitLabel(currentUnit);
   const [customCodeInput, setCustomCodeInput] = useState("");
-  const [customCodePinId, setCustomCodePinId] = useState<string | null>(null);
+  const [customCodePinId, setCustomCodePinId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
@@ -150,6 +151,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       return next;
     });
   }, []);
+  const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [highlightedCommittedPinDbId, setHighlightedCommittedPinDbId] = useState<number | null>(null);
   const [pinsVisible, setPinsVisible] = useState(true);
@@ -165,7 +167,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const globalMaxPinRef = useRef<number>(0);
   const pinFetchCache = useRef<Map<number, Pin[]>>(new Map());
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
-  const previewRef = useRef<HTMLDivElement | null>(null) as { current: HTMLDivElement | null };
+  const previewRef = useRef<HTMLDivElement>(null);
   const prevPhotoDbIdRef = useRef<number | undefined>(undefined);
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
@@ -258,7 +260,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [panMode, setPanMode] = useState(false);
   const [isDetectingReceived, setIsDetectingReceived] = useState(false);
   const [colorPickMode, setColorPickMode] = useState(false);
-  const detectedBoxMapRef = useRef<Map<string, { x1: number; y1: number; x2: number; y2: number }>>(new Map());
+  const [detectedBoxes, setDetectedBoxes] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
   const [pinScale, setPinScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(0.15);
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -501,38 +503,21 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const photoId = currentPhoto?.dbId;
     if (!photoId || isDetectingReceived) return;
     setIsDetectingReceived(true);
-    detectedBoxMapRef.current.clear();
+    setDetectedBoxes([]);
     try {
       const res = await apiRequest("POST", `/api/photos/${photoId}/detect-received`, {});
       const data = await res.json();
       type Detection = { xPercent: number; yPercent: number; x1Percent: number; y1Percent: number; x2Percent: number; y2Percent: number };
-      type DebugInfo = { totalGreenPixels: number; greenCellCount: number; rawBlobCount: number; blobsRejectedBySize: number; blobsRejectedByAspect: number };
-      const { detections, debug } = data as { detections: Detection[]; debug?: DebugInfo };
+      const { detections } = data as { detections: Detection[] };
       if (detections.length === 0) {
-        let description = "No bright green RECEIVED labels detected in this photo.";
-        if (debug) {
-          if (debug.totalGreenPixels === 0) {
-            description = "No green-colored pixels found — the label may be outside the expected color range or very faint.";
-          } else if (debug.greenCellCount === 0) {
-            description = `Green pixels found (${debug.totalGreenPixels.toLocaleString()} total) but too sparse to form a region — the label may be small or partially visible.`;
-          } else if (debug.rawBlobCount === 0) {
-            description = `${debug.greenCellCount} green cell(s) found but no connected regions formed.`;
-          } else if (debug.blobsRejectedBySize > 0) {
-            description = `${debug.rawBlobCount} green region(s) found but rejected as too large — likely a reel or other large green object.`;
-          } else if (debug.blobsRejectedByAspect > 0) {
-            description = `${debug.rawBlobCount} green region(s) found but wrong shape — aspect ratio outside expected range (0.4–4.5).`;
-          }
-        }
-        toast({ title: "No RECEIVED labels found", description });
+        toast({ title: "No RECEIVED labels found", description: "No bright green RECEIVED labels detected in this photo." });
         return;
       }
       const newPinIds: string[] = [];
-      detectedBoxMapRef.current.clear();
       const newPins: LocalPin[] = detections.map((d) => {
         const nextNumber = ++globalMaxPinRef.current;
         const id = `pin-detect-${Date.now()}-${nextNumber}`;
         newPinIds.push(id);
-        detectedBoxMapRef.current.set(id, { x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent });
         return {
           id,
           x: d.xPercent,
@@ -542,6 +527,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         };
       });
       detectedPinIdsRef.current = new Set(newPinIds);
+      setDetectedBoxes(detections.map(d => ({ x1: d.x1Percent, y1: d.y1Percent, x2: d.x2Percent, y2: d.y2Percent })));
       const merged = [...localPinsRef.current, ...newPins].sort(
         (a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })
       );
@@ -615,7 +601,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       return;
     }
     dismissedDetailWarn.current.clear();
-    detectedBoxMapRef.current.clear();
+    setDetectedBoxes([]);
     detectedPinIdsRef.current = new Set();
     // Evict the cache for the photo we just left (its pins may have been modified)
     if (prevPhotoDbIdRef.current && prevPhotoDbIdRef.current !== currentPhoto.dbId) {
@@ -811,7 +797,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             let sectionVal = "";
             if (isRec) { sectionVal = String(nextRecNum).padStart(3, "0"); nextRecNum++; }
-            await saveToQueue({ id: queueId, sessionId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, isOnFloor: false, createdAt: Date.now() });
+            await saveToQueue({ id: queueId, sessionId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, createdAt: Date.now() });
             toast({ title: "Photo queued", description: `${file.name} will upload when back online` });
           } else {
             toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
@@ -1345,15 +1331,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const createEntries = useMutation({
     mutationFn: async ({ overwrite = false }: { overwrite?: boolean } = {}) => {
       const allPins = [...localPinsRef.current];
-      const exactCatalogFootage = (wireDetails: string): number | undefined => {
-        const upper = wireDetails.toUpperCase().replace(/[^A-Z0-9]/g, "");
-        const combined = userParsedCatalog.length > 0 ? [...userParsedCatalog, ...PARSED_CATALOG] : PARSED_CATALOG;
-        const exact = combined.filter(e => e.catalog === upper && e.footage != null);
-        if (exact.length === 0) return undefined;
-        const footages = [...new Set(exact.map(e => e.footage))];
-        return footages.length === 1 ? footages[0] : undefined;
-      };
-      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && (p.footage && p.footage > 0 || exactCatalogFootage(p.wireDetails!) != null) && !p.flagged);
+      const pinsToCommit = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && p.footage && p.footage > 0 && !p.flagged);
       if (pinsToCommit.length === 0) {
         const withDetails = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && !p.flagged);
         if (withDetails.length > 0 && withDetails.some(p => !p.footage || p.footage <= 0)) {
@@ -1397,10 +1375,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       for (const pin of pinsToCommit) {
         try {
           const reelLabel = pin.wireDetails || `Pin ${pin.label}`;
-          const resolvedFootage = (pin.footage && pin.footage > 0)
-            ? pin.footage
-            : (pin.wireDetails ? exactCatalogFootage(pin.wireDetails) : undefined);
-          const totalFootage = resolvedFootage ? resolvedFootage * pin.reelCount : undefined;
+          const totalFootage = pin.footage ? pin.footage * pin.reelCount : undefined;
           const noteParts: string[] = [];
           if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
           const { entry, queued: entryQueued } = await withRetry(async () => {
@@ -1560,6 +1535,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     }
     toast({ title: "Last remaining entry", description: "This is the only uncommitted reel — use Add Reel(s) from Image to commit it." });
   };
+
+  const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
   const scrollInputIntoView = useCallback((el: HTMLElement) => {
     if (!isMobile) return;
@@ -1860,7 +1837,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   const parentFilename = parentPhoto?.filename || (parentPhoto?.dbId ? `S${sessionId}_P${String(parentPhoto.dbId).padStart(4, "0")}.jpg` : null);
                   return (
                     <span className="inline-flex items-center gap-1 text-[hsl(200_70%_55%)]">
-                      <Focus className="h-3 w-3" aria-label="Detail Shot" />
+                      <Focus className="h-3 w-3" title="Detail Shot" />
                       {parentFilename && onJumpToStripPhoto && parentPhoto?.dbId ? (
                         <button
                           className="text-[hsl(200_70%_55%)] hover:text-[hsl(200_70%_65%)] underline transition-colors cursor-pointer"
@@ -1942,23 +1919,26 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               />
               {viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx ? (
                 <>
-                  {photoLoaded && pinsVisible && localPins.map((pin) => {
-                    const detectedBox = detectedBoxMapRef.current.get(pin.id);
-                    let detectedScale: number | undefined;
-                    if (detectedBox && containerRef.current) {
-                      const cW = containerRef.current.clientWidth;
-                      const cH = containerRef.current.clientHeight;
-                      const boxWpx = (detectedBox.x2 - detectedBox.x1) / 100 * cW;
-                      const boxHpx = (detectedBox.y2 - detectedBox.y1) / 100 * cH;
-                      const PIN_BASE_W = 54;
-                      const PIN_BASE_H = 50;
-                      detectedScale = Math.min(Math.max(boxWpx / PIN_BASE_W, boxHpx / PIN_BASE_H), pinScale);
-                    }
-                    return (
+                  {photoLoaded && detectedBoxes.map((box, i) => (
+                    <div
+                      key={`det-box-${i}`}
+                      style={{
+                        position: "absolute",
+                        left: `${box.x1}%`,
+                        top: `${box.y1}%`,
+                        width: `${box.x2 - box.x1}%`,
+                        height: `${box.y2 - box.y1}%`,
+                        border: "2px solid #46D700",
+                        boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  ))}
+                  {photoLoaded && pinsVisible && localPins.map((pin) => (
                     <div
                       key={pin.id}
                       className={`pin-marker ${selectedPinId === pin.id ? "selected" : ""} ${pin.flagged ? "flagged" : ""}`}
-                      style={{ left: `${pin.x}%`, top: `${pin.y}%`, ...(detectedScale !== undefined && { ["--pin-scale" as string]: detectedScale }) }}
+                      style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
                       data-pin-id={pin.id}
                       onMouseDown={(e) => {
                         if ((e.target as HTMLElement).closest(".pin-label, .pin-delete-btn, .pin-count-btn")) return;
@@ -1995,11 +1975,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             }
                             setLocalPins(afterPins);
                             if (detectedPinIdsRef.current.size > 0) {
-                              detectedBoxMapRef.current.delete(pin.id);
                               const remaining = afterPins.filter(p => detectedPinIdsRef.current.has(p.id));
                               if (remaining.length === 0) {
                                 detectedPinIdsRef.current = new Set();
-                                detectedBoxMapRef.current.clear();
+                                setDetectedBoxes([]);
                               }
                             }
                           }}
@@ -2047,8 +2026,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         </button>
                       </div>
                     </div>
-                  );
-                  })}
+                  ))}
                   {photoLoaded && pinsVisible && committedPins.map((pin) => {
                     const shadeIdx = isDisplayedPhotoDetail ? detailShadeIndexForPhoto : linkedPinShadeMapForPhoto.get(pin.label);
                     const hasShade = shadeIdx !== undefined && shadeIdx >= 0;

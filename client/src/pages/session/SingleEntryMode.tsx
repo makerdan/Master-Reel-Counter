@@ -236,7 +236,6 @@ export default function SingleEntryMode({
             section: form.section,
             notes: "",
             isReceiving: form.aisle.trim().toLowerCase() === "receiving",
-            isOnFloor: false,
             createdAt: Date.now(),
           });
           toast({ title: "Photo queued for upload when back online" });
@@ -301,11 +300,20 @@ export default function SingleEntryMode({
     setShowCategorySuggestions(false);
   };
 
+  const toggleNoteTag = (tag: string, checked: boolean) => {
+    setForm((f) => {
+      const parts = f.notes.split("; ").filter(p => p.trim() && p.trim() !== tag);
+      if (checked) parts.unshift(tag);
+      return { ...f, notes: parts.join("; ") };
+    });
+  };
+
   const isReceiving = form.aisle.trim().toLowerCase() === "receiving";
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!form.aisle.trim()) newErrors.aisle = "Aisle is required";
+    if (!isReceiving && !form.section.trim()) newErrors.section = "Section is required";
     if (form.footage && (isNaN(parseInt(form.footage)) || parseInt(form.footage) < 1)) newErrors.footage = "Must be a positive number";
     setErrors(newErrors);
     setTouched({ aisle: true, section: true, footage: true });
@@ -317,7 +325,7 @@ export default function SingleEntryMode({
       const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
       const displayFootage = form.footage ? parseInt(form.footage) : null;
       const totalFootage = displayFootage !== null ? toBaseFeet(displayFootage, currentUnit) : null;
-      const sectionValue = !form.section.trim() ? "000" : form.section;
+      const sectionValue = isReceiving && !form.section.trim() ? "000" : form.section;
       const body: Record<string, unknown> = {
         aisle: form.aisle,
         section: sectionValue,
@@ -336,7 +344,7 @@ export default function SingleEntryMode({
 
       let result;
       if (editingEntry) {
-        await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
+        const res = await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
         result = { type: "update" as const, body, previousData: editingEntry, queued: false };
       } else {
         const { entry: created, queued } = await createEntryWithOfflineFallback(sessionId, body);
@@ -386,7 +394,7 @@ export default function SingleEntryMode({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
-      toast({ title: "Missing required fields", description: "Aisle is required", variant: "destructive" });
+      toast({ title: "Missing required fields", description: "Aisle and Section are required", variant: "destructive" });
       return;
     }
     saveEntry.mutate();

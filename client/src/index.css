@@ -395,15 +395,9 @@
   pointer-events: none;
 }
 .photo-overlay-controls.right-strip {
-  top: 8px;
-  bottom: 8px;
+  top: 50%;
   right: 8px;
-  overflow-y: auto;
-  scrollbar-width: none;
-  justify-content: center;
-}
-.photo-overlay-controls.right-strip::-webkit-scrollbar {
-  display: none;
+  transform: translateY(-50%);
 }
 .photo-overlay-btn {
   pointer-events: auto;

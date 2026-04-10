@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { type Server } from "http";
+import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
@@ -10,12 +10,12 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCategorySchema, countingSessions } from "@shared/schema";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
 import multer from "multer";
 import PDFDocument from "pdfkit";
-import { toDisplayUnit, unitLabel, type UnitType } from "./unit-conversion";
+import { toDisplayUnit, unitLabel, unitLabelFull, type UnitType } from "./unit-conversion";
 import sharp from "sharp";
 import { randomUUID, randomBytes, createHash } from "crypto";
 import bcrypt from "bcrypt";
@@ -1803,16 +1803,15 @@ export async function registerRoutes(
       const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
       const { width, height, channels } = info;
 
-      // Green pixel filter: R 55–90, G 90–255, B 0–10, with relaxed dominance guards.
+      // Actual RECEIVED label color from real photos:
+      // R: 57–75, G: 206–219, B: 0–3. B≈0 is the key fingerprint.
       const greenMask = new Uint8Array(width * height);
-      let totalGreenPixels = 0;
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
-        if (r >= 55 && r <= 90 && g >= 90 && g <= 255 && b <= 10 && g > r + 10 && g > b + 10) {
+        if (r >= 45 && r <= 90 && g >= 190 && g <= 235 && b <= 12) {
           greenMask[i] = 1;
-          totalGreenPixels++;
         }
       }
 
@@ -1820,7 +1819,6 @@ export async function registerRoutes(
       const gridW = Math.ceil(width / CELL);
       const gridH = Math.ceil(height / CELL);
       const greenCells = new Uint8Array(gridW * gridH);
-      let greenCellCount = 0;
 
       for (let cy = 0; cy < gridH; cy++) {
         for (let cx = 0; cx < gridW; cx++) {
@@ -1833,9 +1831,8 @@ export async function registerRoutes(
               totalCount++;
             }
           }
-          if (totalCount > 0 && greenCount / totalCount > 0.12) {
+          if (totalCount > 0 && greenCount / totalCount > 0.20) {
             greenCells[cy * gridW + cx] = 1;
-            greenCellCount++;
           }
         }
       }
@@ -1884,97 +1881,26 @@ export async function registerRoutes(
       const MIN_ASPECT = 0.4;
       const MAX_ASPECT = 4.5;
 
-      // Maximum blob size: a 3"×5" label on a photo taken at normal shooting
-      // distance should occupy at most ~35% of the shorter image dimension in
-      // either direction. Blobs exceeding this in either width OR height are
-      // almost certainly master reels or other large green objects — discard
-      // them as false positives. Using either-dimension ensures even elongated
-      // or perspective-distorted large blobs are caught.
-      const MAX_BLOB_FRACTION = 0.35;
-      const maxBlobPixels = Math.min(width, height) * MAX_BLOB_FRACTION;
-
-      let blobsRejectedBySize = 0;
-      let blobsRejectedByAspect = 0;
-
       const detections = blobs
         .filter(b => {
-          if (b.count < 1) return false;
+          if (b.count < 2) return false;
           const blobW = (b.maxX - b.minX + 1) * CELL;
           const blobH = (b.maxY - b.minY + 1) * CELL;
-          if (blobW > maxBlobPixels || blobH > maxBlobPixels) { blobsRejectedBySize++; return false; }
           const aspect = blobW / blobH;
-          if (aspect < MIN_ASPECT || aspect > MAX_ASPECT) { blobsRejectedByAspect++; return false; }
-          return true;
+          return aspect >= MIN_ASPECT && aspect <= MAX_ASPECT;
         })
         .sort((a, b) => b.count - a.count)
         .slice(0, 10)
-        .map(b => {
-          const rawX1 = Math.max(0, (b.minX * CELL / width) * 100);
-          const rawY1 = Math.max(0, (b.minY * CELL / height) * 100);
-          const rawX2 = Math.min(100, ((b.maxX + 1) * CELL / width) * 100);
-          const rawY2 = Math.min(100, ((b.maxY + 1) * CELL / height) * 100);
-          const rawXCenter = Math.max(1, Math.min(99, ((b.sumX / b.count * CELL + CELL / 2) / width) * 100));
-          const rawYCenter = Math.max(1, Math.min(99, ((b.sumY / b.count * CELL + CELL / 2) / height) * 100));
+        .map(b => ({
+          xPercent: Math.max(1, Math.min(99, ((b.sumX / b.count * CELL + CELL / 2) / width) * 100)),
+          yPercent: Math.max(1, Math.min(99, ((b.sumY / b.count * CELL + CELL / 2) / height) * 100)),
+          x1Percent: Math.max(0, (b.minX * CELL / width) * 100),
+          y1Percent: Math.max(0, (b.minY * CELL / height) * 100),
+          x2Percent: Math.min(100, ((b.maxX + 1) * CELL / width) * 100),
+          y2Percent: Math.min(100, ((b.maxY + 1) * CELL / height) * 100),
+        }));
 
-          // The green label is a 3"×5" sticker on a paper tag.
-          // The label sits at the far-left or far-right edge of the tag, so the black
-          // reel-info text occupies the remaining tag width on the opposite side.
-          // Estimate full tag width from the detected label's pixel dimensions,
-          // modeled as a 17"-wide tag:
-          //   portrait label (aspect < 1): ~3" wide × 5" tall → 3/17 of tag width
-          //   landscape label (aspect > 1): ~5" wide × 3" tall → 5/17 of tag width
-          // Use pixel-space blob dimensions (not %-space) so the aspect ratio is
-          // independent of the image's own width/height ratio.
-          const labelWidthPct = rawX2 - rawX1;
-          const blobPixelW = (b.maxX - b.minX + 1) * CELL;
-          const blobPixelH = (b.maxY - b.minY + 1) * CELL;
-          const labelAspect = blobPixelH > 0 ? blobPixelW / blobPixelH : 1;
-          const labelFractionOfTagWidth = labelAspect > 1 ? (5 / 17) : (3 / 17);
-          const tagWidthPct = Math.min(100, labelWidthPct / labelFractionOfTagWidth);
-
-          // Expand bounding box to cover the full estimated tag and move pin to text center
-          let tagX1: number, tagX2: number, pinX: number;
-          if (rawXCenter < 50) {
-            // Label is on the LEFT → text extends to the right
-            tagX1 = rawX1;
-            tagX2 = Math.min(100, rawX1 + tagWidthPct);
-            pinX = Math.max(1, Math.min(99, (rawX2 + tagX2) / 2));
-          } else {
-            // Label is on the RIGHT → text extends to the left
-            tagX2 = rawX2;
-            tagX1 = Math.max(0, rawX2 - tagWidthPct);
-            pinX = Math.max(1, Math.min(99, (tagX1 + rawX1) / 2));
-          }
-
-          // Expand bounding box vertically: treat tag as 10" tall.
-          //   portrait label (aspect < 1): ~5" tall → 5/10 of tag height
-          //   landscape label (aspect > 1): ~3" tall → 3/10 of tag height
-          const labelHeightPct = rawY2 - rawY1;
-          const labelFractionOfTagHeight = labelAspect > 1 ? (3 / 10) : (5 / 10);
-          const tagHeightPct = Math.min(100, labelHeightPct / labelFractionOfTagHeight);
-          const tagY1 = Math.max(0, rawYCenter - tagHeightPct / 2);
-          const tagY2 = Math.min(100, rawYCenter + tagHeightPct / 2);
-
-          return {
-            xPercent: pinX,
-            yPercent: rawYCenter,
-            x1Percent: tagX1,
-            y1Percent: tagY1,
-            x2Percent: tagX2,
-            y2Percent: tagY2,
-          };
-        });
-
-      res.json({
-        detections,
-        debug: {
-          totalGreenPixels,
-          greenCellCount,
-          rawBlobCount: blobs.length,
-          blobsRejectedBySize,
-          blobsRejectedByAspect,
-        },
-      });
+      res.json({ detections });
     } catch (error) {
       console.error("Error detecting received labels:", error);
       res.status(500).json({ message: "Failed to detect labels" });
@@ -2311,9 +2237,11 @@ export async function registerRoutes(
       const key = await getEncryptionKey(userId);
       const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries);
       const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
+      const generatedAt = new Date().toISOString();
       const userSettings = await storage.getUserSettings(userId);
       const pdfUnit: UnitType = (userSettings?.defaultUnit as UnitType) || "feet";
       const pdfULabel = unitLabel(pdfUnit);
+      const pdfUFull = unitLabelFull(pdfUnit);
       const fmtFootage = (ft: number) => toDisplayUnit(ft, pdfUnit).toLocaleString();
       const photoStats = await storage.getSessionPhotoStats([session.id]);
       const pt = photoStats.get(session.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
@@ -2884,7 +2812,7 @@ export async function registerRoutes(
           }
           const { data: orientedBuffer, info } = await sharpPipeline
             .toBuffer({ resolveWithObject: true });
-          const img = (doc as any).openImage(orientedBuffer);
+          const img = doc.openImage(orientedBuffer);
           return { photo, buffer: orientedBuffer, imgW: img.width, imgH: img.height, origW: info.width, origH: info.height };
         } catch {
           return null;
@@ -3982,6 +3910,7 @@ export async function registerRoutes(
       const key = await getEncryptionKey(userId);
       const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries);
       const sessionPhotos = await storage.getSessionPhotos(session.id);
+      const photoMap = new Map(sessionPhotos.map((p: any) => [p.id, p]));
       const allFlaggedPins = await storage.getSessionFlaggedPins(session.id);
       const flaggedEntryIds = new Set<number>(
         allFlaggedPins.filter((p: any) => p.entryId != null).map((p: any) => p.entryId as number)

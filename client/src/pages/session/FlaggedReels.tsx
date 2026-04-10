@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, ScanSearch, ArrowUpDown, CheckCircle2, ImageIcon } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch, ArrowUpDown, CheckCircle2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,6 @@ import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useWireCategories } from "@/hooks/use-wire-categories";
-import type { UndoAction } from "@/hooks/use-undo";
 
 interface FlaggedPin {
   id: number;
@@ -50,9 +49,10 @@ interface EditingState {
 
 interface FlaggedReelsProps {
   sessionId: number;
+  onBack: () => void;
   onReshoot?: (aisle: string, section: string, parentPhotoId: number) => void;
   onViewInPhoto?: (photoId: number, pinId?: number) => void;
-  pushUndo?: (action: UndoAction) => void;
+  pushUndo?: (action: { type: string; sessionId: number; entityId: number; data: any; previousData?: any }) => void;
 }
 
 function photoUrl(key: string): string {
@@ -273,7 +273,7 @@ function DupPinTile({
   );
 }
 
-export default function FlaggedReels({ sessionId, onReshoot, onViewInPhoto, pushUndo }: FlaggedReelsProps) {
+export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPhoto, pushUndo }: FlaggedReelsProps) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
   const { categories: userCategories } = useWireCategories();

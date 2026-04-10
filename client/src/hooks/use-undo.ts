@@ -3,7 +3,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 
 type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
 
-export interface UndoAction {
+interface UndoAction {
   type: ActionType;
   sessionId: number;
   entityId: number;

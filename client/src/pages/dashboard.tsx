@@ -5,7 +5,7 @@ import {
   Cable, Plus, LogOut, MapPin, Clock, Trash2, ChevronRight, Settings, BarChart3,
   Pencil, Hash, Ruler, CheckCircle2, RotateCcw, Camera, Layers, Users,
   FolderPlus, FolderOpen, Folder, MoreVertical, Copy, FolderInput,
-  Search, X, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
+  Search, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
   Lock, Unlock, History, Download, FileText, FileSpreadsheet, Loader2, RotateCw,
   SlidersHorizontal, Lightbulb,
 } from "lucide-react";
@@ -32,7 +32,7 @@ import {
   DropdownMenuSubContent, DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Collapsible, CollapsibleContent,
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ThemeToggle } from "@/components/theme-toggle";
 import HelpMenu from "@/components/HelpMenu";
@@ -156,6 +156,7 @@ export default function Dashboard() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+  const [moveSessionTarget, setMoveSessionTarget] = useState<SessionWithStats | null>(null);
   const [createFolderForSession, setCreateFolderForSession] = useState<SessionWithStats | null>(null);
   const [inlineFolderName, setInlineFolderName] = useState("");
   const [selectedSessions, setSelectedSessions] = useState<Set<number>>(new Set());
@@ -569,6 +570,7 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       invalidateAll();
+      setMoveSessionTarget(null);
       toast({ title: "Session moved" });
     },
     onError: () => {
@@ -597,7 +599,7 @@ export default function Dashboard() {
   const handleFolderConflictResolution = useCallback(
     (resolution: ConflictResolution) => {
       if (!folderConflict) return;
-      const { mode, sessionId } = folderConflict;
+      const { mode, proposedName, sessionId } = folderConflict;
 
       switch (resolution.type) {
         case "rename": {
@@ -1490,7 +1492,7 @@ export default function Dashboard() {
                       });
                       return;
                     }
-                    createFolder.mutate(newFolderName.trim());
+                    createFolder.mutate();
                   }}
                   className="space-y-4"
                 >
