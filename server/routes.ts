@@ -1803,29 +1803,13 @@ export async function registerRoutes(
       const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
       const { width, height, channels } = info;
 
-      // --- Lighting normalization: per-channel min/max stretch ---
+      // --- HSV green detection on raw pixels (hue ~90–160°, sat >40%, val >25%) ---
       const totalPixels = width * height;
-      let rMin = 255, rMax = 0, gMin = 255, gMax = 0, bMin = 255, bMax = 0;
-      for (let i = 0; i < totalPixels; i++) {
-        const r = data[i * channels];
-        const g = data[i * channels + 1];
-        const b = data[i * channels + 2];
-        if (r < rMin) rMin = r; if (r > rMax) rMax = r;
-        if (g < gMin) gMin = g; if (g > gMax) gMax = g;
-        if (b < bMin) bMin = b; if (b > bMax) bMax = b;
-      }
-      const rRange = rMax - rMin || 1;
-      const gRange = gMax - gMin || 1;
-      const bRange = bMax - bMin || 1;
-
-      // --- HSV green detection (hue ~90–160°, sat >40%, val >25%) ---
       const greenMask = new Uint8Array(totalPixels);
       for (let i = 0; i < totalPixels; i++) {
-        const rn = ((data[i * channels]     - rMin) / rRange) * 255;
-        const gn = ((data[i * channels + 1] - gMin) / gRange) * 255;
-        const bn = ((data[i * channels + 2] - bMin) / bRange) * 255;
-
-        const rf = rn / 255, gf = gn / 255, bf = bn / 255;
+        const rf = data[i * channels]     / 255;
+        const gf = data[i * channels + 1] / 255;
+        const bf = data[i * channels + 2] / 255;
         const cmax = Math.max(rf, gf, bf);
         const cmin = Math.min(rf, gf, bf);
         const delta = cmax - cmin;
