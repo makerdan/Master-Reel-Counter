@@ -2181,6 +2181,28 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <RotateCcw className="h-4 w-4" />
                 </button>
                 <div className="photo-overlay-divider" />
+                {!currentPhoto?.isDetailShot && effectiveCanEdit && (
+                  <button
+                    className="photo-overlay-btn"
+                    onClick={(e) => { e.stopPropagation(); detectReceivedLabels(); }}
+                    disabled={isDetectingReceived}
+                    title="Auto-detect green RECEIVED labels"
+                    data-testid="button-detect-received"
+                  >
+                    {isDetectingReceived
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#46D700" }} />}
+                  </button>
+                )}
+                <button
+                  className={`photo-overlay-btn ${colorPickMode ? "photo-overlay-btn-active" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); setColorPickMode(m => !m); }}
+                  title={colorPickMode ? "Exit color picker (click to exit)" : "Color picker: click any spot to read its RGB"}
+                  data-testid="button-color-pick-mode"
+                >
+                  <Pipette className="h-4 w-4" />
+                </button>
+                <div className="photo-overlay-divider" />
                 <button
                   className="photo-overlay-btn"
                   onClick={(e) => { e.stopPropagation(); savePinScale(Math.min(7, +(pinScale + 0.25).toFixed(2))); }}
@@ -2196,31 +2218,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   data-testid="button-pin-size-down"
                 >
                   <span className="inline-block w-2.5 h-2.5 border-2 border-current rounded-sm" />
-                </button>
-                {!currentPhoto?.isDetailShot && effectiveCanEdit && (
-                  <>
-                    <div className="photo-overlay-divider" />
-                    <button
-                      className="photo-overlay-btn"
-                      onClick={(e) => { e.stopPropagation(); detectReceivedLabels(); }}
-                      disabled={isDetectingReceived}
-                      title="Auto-detect green RECEIVED labels"
-                      data-testid="button-detect-received"
-                    >
-                      {isDetectingReceived
-                        ? <Loader2 className="h-4 w-4 animate-spin" />
-                        : <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: "#46D700" }} />}
-                    </button>
-                  </>
-                )}
-                <div className="photo-overlay-divider" />
-                <button
-                  className={`photo-overlay-btn ${colorPickMode ? "photo-overlay-btn-active" : ""}`}
-                  onClick={(e) => { e.stopPropagation(); setColorPickMode(m => !m); }}
-                  title={colorPickMode ? "Exit color picker (click to exit)" : "Color picker: click any spot to read its RGB"}
-                  data-testid="button-color-pick-mode"
-                >
-                  <Pipette className="h-4 w-4" />
                 </button>
               </div>
             </div>
