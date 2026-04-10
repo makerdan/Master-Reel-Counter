@@ -1803,18 +1803,17 @@ export async function registerRoutes(
       const { data, info } = await pipeline.raw().toBuffer({ resolveWithObject: true });
       const { width, height, channels } = info;
 
-      // Broad dominant-channel green check: green must be strictly greater than
-      // both red and blue, and above a minimum brightness to exclude near-black pixels.
-      // This covers bright, dark, warm, cool, and muted green shades regardless of
-      // lighting, white-balance, or shooting distance.
-      const MIN_GREEN_BRIGHTNESS = 30;
+      // Actual RECEIVED label color from real photo samples:
+      // R: 21–59, G: 155–202, B: 4–26.
+      // Widened to account for JPEG compression artifacts, lighting variation,
+      // shadows, camera white-balance shifts, and shooting angle.
       const greenMask = new Uint8Array(width * height);
       let totalGreenPixels = 0;
       for (let i = 0; i < width * height; i++) {
         const r = data[i * channels];
         const g = data[i * channels + 1];
         const b = data[i * channels + 2];
-        if (g > r && g > b && g >= MIN_GREEN_BRIGHTNESS) {
+        if (r >= 8 && r <= 120 && g >= 100 && g <= 255 && b <= 60 && g > r + 30 && g > b + 40) {
           greenMask[i] = 1;
           totalGreenPixels++;
         }
