@@ -832,19 +832,19 @@ export default function ReviewTab({
               )}
             </div>
 
-            {/* Final category — large, visibly colored */}
+            {/* Final catalog — large, visibly colored */}
             {(() => {
               const catalogCode = (currentEntry.reelTag || currentPin?.wireDetails)?.trim().toUpperCase() || null;
               const vendorCode = (currentPin?.vendorCode || currentEntry.manufacturer)?.trim().toUpperCase() || null;
               if (!catalogCode && !vendorCode) {
                 return (
-                  <p className="text-muted-foreground text-base italic" data-testid="text-review-category">
-                    No category assigned
+                  <p className="text-muted-foreground text-base italic" data-testid="text-review-catalog">
+                    No catalog assigned
                   </p>
                 );
               }
               return (
-                <div className="flex items-baseline gap-3 flex-wrap" data-testid="text-review-category">
+                <div className="flex items-baseline gap-3 flex-wrap" data-testid="text-review-catalog">
                   {catalogCode && (
                     <span className="text-xl font-bold text-[hsl(18_85%_55%)] leading-tight font-mono">
                       {catalogCode}

@@ -26,7 +26,7 @@ const coreFeatures = [
   {
     icon: Search,
     title: "Catalog Autocomplete",
-    description: "Type a few characters and auto-fill vendor, footage, wire type, and size from a built-in 180+ entry wire catalog with custom category support.",
+    description: "Type a few characters and auto-fill vendor, footage, wire type, and size from a built-in 180+ entry wire catalog with custom catalog entry support.",
   },
   {
     icon: Flag,

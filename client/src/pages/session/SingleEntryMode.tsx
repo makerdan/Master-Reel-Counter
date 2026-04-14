@@ -14,9 +14,9 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { lookupCategory, PARSED_CATALOG, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { lookupCatalog, PARSED_CATALOG, userWireCatalogToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
-import { useWireCategories } from "@/hooks/use-wire-categories";
+import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 import type { Entry, Pin } from "@shared/schema";
 
 export default function SingleEntryMode({
@@ -41,10 +41,10 @@ export default function SingleEntryMode({
   const [keepLocation, setKeepLocation] = useState(false);
   const prevDefaultsRef = useRef({ aisle: defaultAisle || "", section: defaultSection || "" });
 
-  const { categories: userCategories } = useWireCategories();
+  const { catalogs: userCatalogs } = useWireCatalogs();
   const userParsedCatalog = useMemo(
-    () => userCategories.map(userWireCategoryToParsedEntry),
-    [userCategories]
+    () => userCatalogs.map(userWireCatalogToParsedEntry),
+    [userCatalogs]
   );
 
   const { data: entrySettings } = useQuery<{
@@ -83,8 +83,8 @@ export default function SingleEntryMode({
   const [receivingChecked, setReceivingChecked] = useState(editingEntry?.aisle?.toLowerCase() === "receiving" || false);
   const [footageOverride, setFootageOverride] = useState(!!editingEntry);
   const lastMatchedCatalog = useRef<string | null>(null);
-  const [categorySuggestions, setCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
-  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const [catalogSuggestions, setCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [showCatalogSuggestions, setShowCatalogSuggestions] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -170,7 +170,7 @@ export default function SingleEntryMode({
 
   const getCatalogMatch = (reelTag: string): ParsedCatalogEntry | null => {
     if (!reelTag || reelTag.length < 2) return null;
-    const matches = lookupCategory(reelTag, userParsedCatalog);
+    const matches = lookupCatalog(reelTag, userParsedCatalog);
     const normalized = reelTag.toUpperCase().replace(/[^A-Z0-9]/g, "");
     const exact = matches.find(m => m.catalog === normalized);
     return exact || (matches.length === 1 ? matches[0] : null);
@@ -296,8 +296,8 @@ export default function SingleEntryMode({
       footage: match.footage ? (toDisplayUnit(match.footage, currentUnit) * reelCount).toString() : f.footage,
       conductors: f.conductors || match.conductors || "",
     }));
-    setCategorySuggestions([]);
-    setShowCategorySuggestions(false);
+    setCatalogSuggestions([]);
+    setShowCatalogSuggestions(false);
   };
 
   const toggleNoteTag = (tag: string, checked: boolean) => {
@@ -525,30 +525,30 @@ export default function SingleEntryMode({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1 relative">
-          <Label className="text-xs underline">Category:</Label>
+          <Label className="text-xs underline">Catalog:</Label>
           <Input
             value={form.reelTag}
             onChange={(e) => {
               const val = e.target.value.toUpperCase();
               update("reelTag", val);
               if (val.length >= 2) {
-                const matches = lookupCategory(val, userParsedCatalog);
-                setCategorySuggestions(matches);
-                setShowCategorySuggestions(matches.length > 0);
+                const matches = lookupCatalog(val, userParsedCatalog);
+                setCatalogSuggestions(matches);
+                setShowCatalogSuggestions(matches.length > 0);
               } else {
-                setCategorySuggestions([]);
-                setShowCategorySuggestions(false);
+                setCatalogSuggestions([]);
+                setShowCatalogSuggestions(false);
               }
             }}
             onFocus={() => {
               if (form.reelTag && form.reelTag.length >= 2) {
-                const matches = lookupCategory(form.reelTag, userParsedCatalog);
-                setCategorySuggestions(matches);
-                setShowCategorySuggestions(matches.length > 0);
+                const matches = lookupCatalog(form.reelTag, userParsedCatalog);
+                setCatalogSuggestions(matches);
+                setShowCatalogSuggestions(matches.length > 0);
               }
             }}
             onBlur={() => {
-              setTimeout(() => setShowCategorySuggestions(false), 200);
+              setTimeout(() => setShowCatalogSuggestions(false), 200);
               const match = getCatalogMatch(form.reelTag);
               if (match) applyCatalogMatch(match);
             }}
@@ -556,9 +556,9 @@ export default function SingleEntryMode({
             autoComplete="off"
             data-testid="input-reel-tag"
           />
-          {showCategorySuggestions && categorySuggestions.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="category-suggestions">
-              {categorySuggestions.map((s) => (
+          {showCatalogSuggestions && catalogSuggestions.length > 0 && (
+            <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="catalog-suggestions">
+              {catalogSuggestions.map((s) => (
                 <button
                   key={s.catalog}
                   type="button"

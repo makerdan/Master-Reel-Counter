@@ -1691,12 +1691,12 @@ export default function LabelScannerTab({
                               </div>
                             ) : (
                               <div>
-                                <label className="text-[10px] text-white/40">Category</label>
+                                <label className="text-[10px] text-white/40">Catalog</label>
                                 <FitTextInput
                                   value={card.editCatalog}
                                   onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                                   className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
-                                  placeholder="Enter category..."
+                                  placeholder="Enter catalog..."
                                   data-testid={`input-catalog-${card.pin.id}`}
                                 />
                               </div>
@@ -1720,12 +1720,12 @@ export default function LabelScannerTab({
                               Not analyzed — enter manually
                             </Badge>
                             <div>
-                              <label className="text-[10px] text-white/40">Category</label>
+                              <label className="text-[10px] text-white/40">Catalog</label>
                               <FitTextInput
                                 value={card.editCatalog}
                                 onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                                 className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
-                                placeholder="Enter category..."
+                                placeholder="Enter catalog..."
                                 data-testid={`input-catalog-manual-${card.pin.id}`}
                               />
                             </div>
@@ -1943,12 +1943,12 @@ export default function LabelScannerTab({
                     </div>
                   ) : (
                     <div>
-                      <label className="text-[10px] text-white/40">Category</label>
+                      <label className="text-[10px] text-white/40">Catalog</label>
                       <FitTextInput
                         value={card.editCatalog}
                         onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                         className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
-                        placeholder="Enter category..."
+                        placeholder="Enter catalog..."
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
                     </div>
@@ -1974,12 +1974,12 @@ export default function LabelScannerTab({
                     Not analyzed — enter manually
                   </Badge>
                   <div>
-                    <label className="text-[10px] text-white/40">Category</label>
+                    <label className="text-[10px] text-white/40">Catalog</label>
                     <FitTextInput
                       value={card.editCatalog}
                       onChange={(e) => setCardField(card.pin.id, "editCatalog", e.target.value)}
                       className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
-                      placeholder="Enter category..."
+                      placeholder="Enter catalog..."
                       data-testid={`input-catalog-manual-${card.pin.id}`}
                     />
                   </div>

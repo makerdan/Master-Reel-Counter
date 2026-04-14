@@ -338,7 +338,7 @@ export const dismissedDuplicates = pgTable("dismissed_duplicates", {
 
 export type DismissedDuplicate = typeof dismissedDuplicates.$inferSelect;
 
-export const userWireCategories = pgTable("user_wire_categories", {
+export const userWireCatalogs = pgTable("user_wire_categories", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull(),
   catalog: text("catalog").notNull(),
@@ -354,12 +354,12 @@ export const userWireCategories = pgTable("user_wire_categories", {
   index("user_wire_categories_user_id_idx").on(table.userId),
 ]);
 
-export const insertUserWireCategorySchema = createInsertSchema(userWireCategories).omit({
+export const insertUserWireCatalogSchema = createInsertSchema(userWireCatalogs).omit({
   id: true,
 });
 
-export type UserWireCategory = typeof userWireCategories.$inferSelect;
-export type InsertUserWireCategory = z.infer<typeof insertUserWireCategorySchema>;
+export type UserWireCatalog = typeof userWireCatalogs.$inferSelect;
+export type InsertUserWireCatalog = z.infer<typeof insertUserWireCatalogSchema>;
 
 export const reviewResponses = pgTable("review_responses", {
   id: serial("id").primaryKey(),

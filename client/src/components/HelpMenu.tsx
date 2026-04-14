@@ -184,7 +184,7 @@ export function DashboardSections({ isTester }: { isTester?: boolean }) {
           <FeatureRow
             icon={<HelpIcon icon={Settings} />}
             label="Settings"
-            description="Opens your profile and app settings. Upload a custom profile avatar, edit your display name, manage encryption keys, configure preferences for display, accessibility, data entry, photo capture, and export. Also manage custom wire categories (add individually or bulk import CSV), browse the built-in wire catalog, and view your storage usage dashboard with backfill tools."
+            description="Opens your profile and app settings. Upload a custom profile avatar, edit your display name, manage encryption keys, configure preferences for display, accessibility, data entry, photo capture, and export. Also manage custom wire catalog entries (add individually or bulk import CSV), browse the built-in wire catalog, and view your storage usage dashboard with backfill tools."
           />
           <FeatureRow
             icon={<HelpIcon icon={LogOut} />}
@@ -456,11 +456,11 @@ export function DashboardSections({ isTester }: { isTester?: boolean }) {
           />
 
           <Separator className="my-2" />
-          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Top Categories & Vendor Codes</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Top Catalogs & Vendor Codes</p>
           <FeatureRow
             icon={<HelpIcon icon={Layers} />}
-            label="Category & Vendor Breakdowns"
-            description="Bar charts showing your most frequently counted wire categories (with footage totals) and most common vendor codes. Helps identify the most prevalent wire types across your sessions."
+            label="Catalog & Vendor Breakdowns"
+            description="Bar charts showing your most frequently counted wire catalog entries (with footage totals) and most common vendor codes. Helps identify the most prevalent wire types across your sessions."
           />
 
           <Separator className="my-2" />
@@ -486,7 +486,7 @@ export function DashboardSections({ isTester }: { isTester?: boolean }) {
           <span className="flex items-center gap-2"><Settings className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Settings</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Configure your profile, preferences, wire categories, and monitor storage usage.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Configure your profile, preferences, wire catalog entries, and monitor storage usage.</p>
 
           <Separator className="my-2" />
           <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Display & Theme</p>
@@ -584,11 +584,11 @@ export function DashboardSections({ isTester }: { isTester?: boolean }) {
           />
 
           <Separator className="my-2" />
-          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Wire Categories</p>
+          <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Wire Catalogs</p>
           <FeatureRow
             icon={<HelpIcon icon={Cable} />}
-            label="Custom Categories"
-            description="Add your own wire categories that appear in autocomplete alongside the built-in catalog. Add them one at a time with the Add Category form, or use Bulk Import to paste or upload a CSV file with multiple entries at once."
+            label="Custom Catalog Entries"
+            description="Add your own wire catalog entries that appear in autocomplete alongside the built-in catalog. Add them one at a time with the Add Catalog form, or use Bulk Import to paste or upload a CSV file with multiple entries at once."
           />
           <FeatureRow
             icon={<HelpIcon icon={Search} />}
@@ -597,8 +597,8 @@ export function DashboardSections({ isTester }: { isTester?: boolean }) {
           />
           <FeatureRow
             icon={<HelpIcon icon={Trash2} />}
-            label="Delete Custom Categories"
-            description="Remove individual custom categories using the trash icon on each row. Built-in catalog entries cannot be deleted."
+            label="Delete Custom Catalog Entries"
+            description="Remove individual custom catalog entries using the trash icon on each row. Built-in catalog entries cannot be deleted."
           />
 
           <Separator className="my-2" />
@@ -849,8 +849,8 @@ export function SessionSections() {
           <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Entry Details Table</p>
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
-            label="Category Input (Wire Details)"
-            description="Type a wire category and the system searches the built-in catalog (~300 entries) plus any custom categories you've added in Settings. Use arrow keys to navigate suggestions and Enter to select. Selecting a category auto-fills the vendor code and footage fields. The suggestion dropdown scrolls when there are many matches."
+            label="Catalog Input (Wire Details)"
+            description="Type a wire catalog number and the system searches the built-in catalog (~300 entries) plus any custom entries you've added in Settings. Use arrow keys to navigate suggestions and Enter to select. Selecting a catalog entry auto-fills the vendor code and footage fields. The suggestion dropdown scrolls when there are many matches."
           />
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">VND</span>}
@@ -860,7 +860,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">FT</span>}
             label="Footage"
-            description="Enter the total footage for this reel position. Auto-calculated from catalog data when a category is selected. While not focused the value displays with comma formatting (e.g. 2,500) for readability."
+            description="Enter the total footage for this reel position. Auto-calculated from catalog data when a catalog entry is selected. While not focused the value displays with comma formatting (e.g. 2,500) for readability."
           />
           <FeatureRow
             icon={<X className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" />}
@@ -914,7 +914,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
             label="Catalog Autocomplete"
-            description="The category field searches the built-in catalog (~300 entries) plus your custom categories from Settings. Selecting a match auto-fills the vendor code and footage fields."
+            description="The catalog field searches the built-in catalog (~300 entries) plus your custom entries from Settings. Selecting a match auto-fills the vendor code and footage fields."
           />
           <FeatureRow
             icon={<HelpIcon icon={Check} />}
@@ -934,7 +934,7 @@ export function SessionSections() {
                 <span className="flex items-center gap-2"><Eye className="h-3.5 w-3.5 text-[hsl(18_70%_50%)]" /> Table View</span>
               </AccordionTrigger>
               <AccordionContent className="space-y-1 pb-3 pt-1">
-                <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list. Columns (desktop): Pin # → Aisle → Section → Category → Vendor → Reels → Ft/Reel → Total Ft → Photo → Edit.</p>
+                <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">Displayed below the tabs, the Table View shows all committed entries grouped by aisle/section. It provides the master inventory list. Columns (desktop): Pin # → Aisle → Section → Catalog → Vendor → Reels → Ft/Reel → Total Ft → Photo → Edit.</p>
                 <FeatureRow
                   icon={<HelpIcon icon={MapPin} />}
                   label="Clickable Pin #"
@@ -1025,7 +1025,7 @@ export function SessionSections() {
                 <FeatureRow
                   icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
                   label="Matched Results"
-                  description="The raw text is automatically matched against the built-in catalog (~300 entries) plus your custom categories. The best match fills in the category, vendor code, and footage fields. You can edit any field to correct the AI before applying."
+                  description="The raw text is automatically matched against the built-in catalog (~300 entries) plus your custom entries. The best match fills in the catalog, vendor code, and footage fields. You can edit any field to correct the AI before applying."
                 />
                 <FeatureRow
                   icon={<HelpIcon icon={Check} />}
@@ -1095,12 +1095,12 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={Pencil} />}
             label="Edit Flagged Reel"
-            description="Tap the pencil icon on a flagged card to open an inline edit form. Edit wire details (category, vendor, footage, reel count), notes, and the flag reason. Changes save when you tap Save."
+            description="Tap the pencil icon on a flagged card to open an inline edit form. Edit wire details (catalog, vendor, footage, reel count), notes, and the flag reason. Changes save when you tap Save."
           />
           <FeatureRow
             icon={<HelpIcon icon={Copy} />}
             label="Duplicate Detection"
-            description="The Flagged tab automatically detects potential duplicate entries — reels with the same aisle, section, category, vendor code, footage, and reel count. Duplicate groups are highlighted with an amber warning. You can dismiss false positives, and dismissals are saved to the server so they persist across browsers and devices."
+            description="The Flagged tab automatically detects potential duplicate entries — reels with the same aisle, section, catalog, vendor code, footage, and reel count. Duplicate groups are highlighted with an amber warning. You can dismiss false positives, and dismissals are saved to the server so they persist across browsers and devices."
           />
           <FeatureRow
             icon={<AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
@@ -1183,7 +1183,7 @@ export function SessionSections() {
           <span className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Final Results Tab</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-1 pb-4">
-          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">A summary view showing review status, a category-level count tally for the entire session, and an optional comparison against a pre-loaded inventory spreadsheet.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">A summary view showing review status, a catalog-level count tally for the entire session, and an optional comparison against a pre-loaded inventory spreadsheet.</p>
 
           <Separator className="my-2" />
           <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Review Status Banner</p>
@@ -1202,18 +1202,18 @@ export function SessionSections() {
           <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Session Count Tally</p>
           <FeatureRow
             icon={<span className="text-xs font-mono font-bold text-[hsl(18_70%_50%)]">CAT</span>}
-            label="Category Rows"
-            description="Every unique wire category in the session appears as its own row with vendor code, reel count, and total footage. On desktop, Category and Vendor are separate columns. On mobile, they are combined into a single 'Category-Vendor' value (e.g. RX43WG2500-COP) and the Reels column is hidden to save space."
+            label="Catalog Rows"
+            description="Every unique wire catalog entry in the session appears as its own row with vendor code, reel count, and total footage. On desktop, Catalog and Vendor are separate columns. On mobile, they are combined into a single 'Catalog-Vendor' value (e.g. RX43WG2500-COP) and the Reels column is hidden to save space."
           />
           <FeatureRow
-            icon={<span className="text-muted-foreground italic text-[11px]">(uncategorized)</span>}
-            label="Uncategorized Pins"
+            icon={<span className="text-muted-foreground italic text-[11px]">(uncataloged)</span>}
+            label="Uncataloged Pins"
             description="Pins without any wire details entered appear in a special row. On mobile, tap a location link to jump directly to that pin's photo in the Reel IDs tab so you can fill in the missing data."
           />
           <FeatureRow
             icon={<HelpIcon icon={MapPin} />}
             label="Locations"
-            description="Expand the Locations column for any category row to see which aisle/section combinations contain that wire type and how many reels are at each location."
+            description="Expand the Locations column for any catalog row to see which aisle/section combinations contain that wire type and how many reels are at each location."
           />
 
           <Separator className="my-2" />
@@ -1221,12 +1221,12 @@ export function SessionSections() {
           <FeatureRow
             icon={<HelpIcon icon={FileSpreadsheet} />}
             label="Upload Inventory"
-            description="Drag-and-drop or tap to upload a CSV or Excel spreadsheet of expected inventory. The file should have columns for wire category, vendor code, reel count, and footage."
+            description="Drag-and-drop or tap to upload a CSV or Excel spreadsheet of expected inventory. The file should have columns for wire catalog, vendor code, reel count, and footage."
           />
           <FeatureRow
             icon={<HelpIcon icon={CheckCircle2} />}
             label="Match / Mismatch Badges"
-            description="Each tally row gets a status badge after an inventory file is loaded — Match (counts agree), Discrepancy (counts differ), or Unmatched (category not in inventory). Rows are color-coded for quick scanning."
+            description="Each tally row gets a status badge after an inventory file is loaded — Match (counts agree), Discrepancy (counts differ), or Unmatched (catalog entry not in inventory). Rows are color-coded for quick scanning."
           />
           <FeatureRow
             icon={<HelpIcon icon={Trash2} />}
@@ -1338,7 +1338,7 @@ export function SessionSections() {
           <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 text-[hsl(18_70%_50%)]" /> Tips & Efficiency</span>
         </AccordionTrigger>
         <AccordionContent className="space-y-2 pb-4">
-          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Rapid Data Entry:</span> Type a few letters of a wire category and use <HelpKey>Arrow Down</HelpKey> + <HelpKey>Enter</HelpKey> to select. The cursor auto-advances to the next row.</p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Rapid Data Entry:</span> Type a few letters of a wire catalog number and use <HelpKey>Arrow Down</HelpKey> + <HelpKey>Enter</HelpKey> to select. The cursor auto-advances to the next row.</p>
           <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Next Reel Navigation:</span> After placing all your pins, use the orange "Next Reel" button to jump through photos that still need details. The entry table auto-scrolls into view.</p>
           <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Receiving Mode:</span> Type "rec" in the aisle field to auto-fill "Receiving". In Mobile Flow, the Receiving checkbox auto-increments section numbers.</p>
           <p className="text-[13px] text-muted-foreground leading-relaxed"><span className="text-sm font-semibold text-foreground">Pin Scale:</span> For photos with many small reels close together, decrease the pin size using the size controls on the right overlay strip. Pin scale is remembered per-photo.</p>
@@ -1382,7 +1382,7 @@ export function MobileFlowSections() {
           <FeatureRow
             icon={<HelpIcon icon={Pencil} />}
             label="Quick Entry"
-            description="Create entries without taking a photo. Enter wire details (category, vendor, footage, reel count) with the current aisle and section. Useful for quick manual counts."
+            description="Create entries without taking a photo. Enter wire details (catalog, vendor, footage, reel count) with the current aisle and section. Useful for quick manual counts."
           />
           <div className="flex items-start gap-2.5 py-1.5">
             <div className="mt-0.5"><Check className="h-3.5 w-3.5 shrink-0 text-[hsl(18_70%_50%)]" /></div>

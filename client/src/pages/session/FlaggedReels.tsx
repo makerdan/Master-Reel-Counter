@@ -10,11 +10,11 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { useToast } from "@/hooks/use-toast";
 import type { Entry, Pin, Photo, ReviewResponse } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
-import { lookupCategory, type ParsedCatalogEntry, PARSED_CATALOG, userWireCategoryToParsedEntry } from "@/lib/wireReference";
+import { lookupCatalog, type ParsedCatalogEntry, PARSED_CATALOG, userWireCatalogToParsedEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
-import { useWireCategories } from "@/hooks/use-wire-categories";
+import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 
 interface FlaggedPin {
   id: number;
@@ -276,10 +276,10 @@ function DupPinTile({
 export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPhoto, pushUndo }: FlaggedReelsProps) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
-  const { categories: userCategories } = useWireCategories();
+  const { catalogs: userCatalogs } = useWireCatalogs();
   const userParsedCatalog = useMemo(
-    () => userCategories.map(userWireCategoryToParsedEntry),
-    [userCategories]
+    () => userCatalogs.map(userWireCatalogToParsedEntry),
+    [userCatalogs]
   );
   const { data: flagSettings } = useQuery<{ defaultUnit: string }>({
     queryKey: ["/api/settings"],
@@ -293,12 +293,12 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
   const [copied, setCopied] = useState(false);
   const [editingPinId, setEditingPinId] = useState<number | null>(null);
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
-  const [categorySuggestions, setCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
-  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const [catalogSuggestions, setCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [showCatalogSuggestions, setShowCatalogSuggestions] = useState(false);
   const [editingReviewEntryId, setEditingReviewEntryId] = useState<number | null>(null);
   const [reviewEditState, setReviewEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
-  const [reviewCategorySuggestions, setReviewCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
-  const [showReviewCategorySuggestions, setShowReviewCategorySuggestions] = useState(false);
+  const [reviewCatalogSuggestions, setReviewCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [showReviewCatalogSuggestions, setShowReviewCatalogSuggestions] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [dupsOpen, setDupsOpen] = useState(true);
   const { data: dismissedKeysFromDb = [] } = useQuery<string[]>({
@@ -484,8 +484,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       flagReason: pin.flagReason || "",
       reelCount: String(pin.reelCount || 1),
     });
-    setCategorySuggestions([]);
-    setShowCategorySuggestions(false);
+    setCatalogSuggestions([]);
+    setShowCatalogSuggestions(false);
   }, [currentUnit]);
 
   const openReviewEditor = useCallback((entry: Entry, response: ReviewResponse) => {
@@ -501,8 +501,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       flagReason: response.flagReason || "",
       reelCount: String(rc),
     });
-    setReviewCategorySuggestions([]);
-    setShowReviewCategorySuggestions(false);
+    setReviewCatalogSuggestions([]);
+    setShowReviewCatalogSuggestions(false);
   }, [currentUnit]);
 
   const applyReviewCatalogMatch = useCallback((match: ParsedCatalogEntry) => {
@@ -516,8 +516,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       }
       return { ...s, ...updates };
     });
-    setReviewCategorySuggestions([]);
-    setShowReviewCategorySuggestions(false);
+    setReviewCatalogSuggestions([]);
+    setShowReviewCatalogSuggestions(false);
   }, [currentUnit]);
 
   const saveReviewEntryMutation = useMutation({
@@ -598,8 +598,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
       }
       return { ...s, ...updates };
     });
-    setCategorySuggestions([]);
-    setShowCategorySuggestions(false);
+    setCatalogSuggestions([]);
+    setShowCatalogSuggestions(false);
   }, [currentUnit]);
 
   const { data: sessionEntries = [] } = useQuery<Entry[]>({
@@ -1025,36 +1025,36 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                         )}
                         <div className="grid grid-cols-4 gap-3 mb-3">
                           <div className="relative">
-                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Catalog / Wire Details</label>
                             <Input
                               value={editState.wireDetails}
                               onChange={(e) => {
                                 const val = e.target.value.toUpperCase();
                                 setEditState(s => ({ ...s, wireDetails: val }));
                                 if (val.length >= 2) {
-                                  const matches = lookupCategory(val, userParsedCatalog);
-                                  setCategorySuggestions(matches);
-                                  setShowCategorySuggestions(matches.length > 0);
+                                  const matches = lookupCatalog(val, userParsedCatalog);
+                                  setCatalogSuggestions(matches);
+                                  setShowCatalogSuggestions(matches.length > 0);
                                 } else {
-                                  setCategorySuggestions([]);
-                                  setShowCategorySuggestions(false);
+                                  setCatalogSuggestions([]);
+                                  setShowCatalogSuggestions(false);
                                 }
                               }}
                               onFocus={() => {
                                 if (editState.wireDetails.length >= 2) {
-                                  const matches = lookupCategory(editState.wireDetails, userParsedCatalog);
-                                  setCategorySuggestions(matches);
-                                  setShowCategorySuggestions(matches.length > 0);
+                                  const matches = lookupCatalog(editState.wireDetails, userParsedCatalog);
+                                  setCatalogSuggestions(matches);
+                                  setShowCatalogSuggestions(matches.length > 0);
                                 }
                               }}
-                              onBlur={() => setTimeout(() => setShowCategorySuggestions(false), 200)}
+                              onBlur={() => setTimeout(() => setShowCatalogSuggestions(false), 200)}
                               className="uppercase"
                               autoComplete="off"
                               data-testid={`input-wire-details-${pin.id}`}
                             />
-                            {showCategorySuggestions && categorySuggestions.length > 0 && (
-                              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="category-suggestions-desktop">
-                                {categorySuggestions.map((s) => (
+                            {showCatalogSuggestions && catalogSuggestions.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="catalog-suggestions-desktop">
+                                {catalogSuggestions.map((s) => (
                                   <button
                                     key={s.catalog}
                                     type="button"
@@ -1276,36 +1276,36 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                             </Button>
                           )}
                           <div className="relative">
-                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
+                            <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Catalog / Wire Details</label>
                             <Input
                               value={editState.wireDetails}
                               onChange={(e) => {
                                 const val = e.target.value.toUpperCase();
                                 setEditState(s => ({ ...s, wireDetails: val }));
                                 if (val.length >= 2) {
-                                  const matches = lookupCategory(val, userParsedCatalog);
-                                  setCategorySuggestions(matches);
-                                  setShowCategorySuggestions(matches.length > 0);
+                                  const matches = lookupCatalog(val, userParsedCatalog);
+                                  setCatalogSuggestions(matches);
+                                  setShowCatalogSuggestions(matches.length > 0);
                                 } else {
-                                  setCategorySuggestions([]);
-                                  setShowCategorySuggestions(false);
+                                  setCatalogSuggestions([]);
+                                  setShowCatalogSuggestions(false);
                                 }
                               }}
                               onFocus={() => {
                                 if (editState.wireDetails.length >= 2) {
-                                  const matches = lookupCategory(editState.wireDetails, userParsedCatalog);
-                                  setCategorySuggestions(matches);
-                                  setShowCategorySuggestions(matches.length > 0);
+                                  const matches = lookupCatalog(editState.wireDetails, userParsedCatalog);
+                                  setCatalogSuggestions(matches);
+                                  setShowCatalogSuggestions(matches.length > 0);
                                 }
                               }}
-                              onBlur={() => setTimeout(() => setShowCategorySuggestions(false), 200)}
+                              onBlur={() => setTimeout(() => setShowCatalogSuggestions(false), 200)}
                               className="uppercase"
                               autoComplete="off"
                               data-testid={`input-wire-details-mobile-${pin.id}`}
                             />
-                            {showCategorySuggestions && categorySuggestions.length > 0 && (
-                              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="category-suggestions-mobile">
-                                {categorySuggestions.map((s) => (
+                            {showCatalogSuggestions && catalogSuggestions.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="catalog-suggestions-mobile">
+                                {catalogSuggestions.map((s) => (
                                   <button
                                     key={s.catalog}
                                     type="button"
@@ -1595,36 +1595,36 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                   <div className="border-t border-yellow-600/30 pt-3 mt-2">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
                       <div className="relative">
-                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Category / Wire Details</label>
+                        <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Catalog / Wire Details</label>
                         <Input
                           value={reviewEditState.wireDetails}
                           onChange={(e) => {
                             const val = e.target.value.toUpperCase();
                             setReviewEditState(s => ({ ...s, wireDetails: val }));
                             if (val.length >= 2) {
-                              const matches = lookupCategory(val, userParsedCatalog);
-                              setReviewCategorySuggestions(matches);
-                              setShowReviewCategorySuggestions(matches.length > 0);
+                              const matches = lookupCatalog(val, userParsedCatalog);
+                              setReviewCatalogSuggestions(matches);
+                              setShowReviewCatalogSuggestions(matches.length > 0);
                             } else {
-                              setReviewCategorySuggestions([]);
-                              setShowReviewCategorySuggestions(false);
+                              setReviewCatalogSuggestions([]);
+                              setShowReviewCatalogSuggestions(false);
                             }
                           }}
                           onFocus={() => {
                             if (reviewEditState.wireDetails.length >= 2) {
-                              const matches = lookupCategory(reviewEditState.wireDetails, userParsedCatalog);
-                              setReviewCategorySuggestions(matches);
-                              setShowReviewCategorySuggestions(matches.length > 0);
+                              const matches = lookupCatalog(reviewEditState.wireDetails, userParsedCatalog);
+                              setReviewCatalogSuggestions(matches);
+                              setShowReviewCatalogSuggestions(matches.length > 0);
                             }
                           }}
-                          onBlur={() => setTimeout(() => setShowReviewCategorySuggestions(false), 200)}
+                          onBlur={() => setTimeout(() => setShowReviewCatalogSuggestions(false), 200)}
                           className="uppercase"
                           autoComplete="off"
                           data-testid={`input-review-wire-details-${entry!.id}`}
                         />
-                        {showReviewCategorySuggestions && reviewCategorySuggestions.length > 0 && (
-                          <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="review-category-suggestions">
-                            {reviewCategorySuggestions.map((s) => (
+                        {showReviewCatalogSuggestions && reviewCatalogSuggestions.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="review-catalog-suggestions">
+                            {reviewCatalogSuggestions.map((s) => (
                               <button
                                 key={s.catalog}
                                 type="button"

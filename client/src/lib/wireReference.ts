@@ -1055,7 +1055,7 @@ function dedup(entries: ParsedCatalogEntry[]): ParsedCatalogEntry[] {
   });
 }
 
-export function lookupCategory(query: string, userCatalog?: ParsedCatalogEntry[]): ParsedCatalogEntry[] {
+export function lookupCatalog(query: string, userCatalog?: ParsedCatalogEntry[]): ParsedCatalogEntry[] {
   if (!query || query.length < 2) return [];
   const upper = query.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -1075,7 +1075,7 @@ export function lookupCategory(query: string, userCatalog?: ParsedCatalogEntry[]
   return dedup(contains).slice(0, 15);
 }
 
-export function userWireCategoryToParsedEntry(cat: {
+export function userWireCatalogToParsedEntry(cat: {
   catalog: string;
   vendor: string;
   reelLength: number;

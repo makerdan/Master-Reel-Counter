@@ -30,10 +30,10 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
-import { lookupCategory, userWireCategoryToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
+import { lookupCatalog, userWireCatalogToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
-import { useWireCategories } from "@/hooks/use-wire-categories";
+import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 import type { Photo, Pin, Entry } from "@shared/schema";
 import ReelCropPreview from "./ReelCropPreview";
 import type { LocalPin } from "./types";
@@ -64,10 +64,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const { allCodes: vendorCodes, addCustomCode } = useVendorCodes();
-  const { categories: userCategories } = useWireCategories();
+  const { catalogs: userCatalogs } = useWireCatalogs();
   const userParsedCatalog = useMemo(
-    () => userCategories.map(userWireCategoryToParsedEntry),
-    [userCategories]
+    () => userCatalogs.map(userWireCatalogToParsedEntry),
+    [userCatalogs]
   );
   const { data: photoSettings } = useQuery<{ defaultUnit: string }>({
     queryKey: ["/api/settings"],
@@ -174,8 +174,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [relabelIsCommitted, setRelabelIsCommitted] = useState(false);
   const [editingCommittedPinId, setEditingCommittedPinId] = useState<string | null>(null);
   const [committedEditState, setCommittedEditState] = useState<{ label: string; wireDetails: string; vendorCode: string; footage: string; reelCount: string }>({ label: "", wireDetails: "", vendorCode: "", footage: "", reelCount: "1" });
-  const [committedCategorySuggestions, setCommittedCategorySuggestions] = useState<ParsedCatalogEntry[]>([]);
-  const [showCommittedCategorySuggestions, setShowCommittedCategorySuggestions] = useState(false);
+  const [committedCatalogSuggestions, setCommittedCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
+  const [showCommittedCatalogSuggestions, setShowCommittedCatalogSuggestions] = useState(false);
   const dragRef = useRef<{
     isDragging: boolean;
     pinId: string | null;
@@ -1216,8 +1216,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         footage: perReelFt !== null ? String(toDisplayUnit(perReelFt, currentUnit)) : "",
         reelCount: String(rc),
       });
-      setCommittedCategorySuggestions([]);
-      setShowCommittedCategorySuggestions(false);
+      setCommittedCatalogSuggestions([]);
+      setShowCommittedCatalogSuggestions(false);
     }
   }, [localPins, committedPins, sessionEntries, currentUnit]);
 
@@ -1254,8 +1254,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       }
       return { ...s, ...updates };
     });
-    setCommittedCategorySuggestions([]);
-    setShowCommittedCategorySuggestions(false);
+    setCommittedCatalogSuggestions([]);
+    setShowCommittedCatalogSuggestions(false);
   }, [currentUnit]);
 
   const saveCommittedPinEdit = useCallback(async () => {
@@ -1339,7 +1339,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const pin = localPinsRef.current.find(p => p.id === pinId);
     if (!pin?.wireDetails) return;
     const normalized = pin.wireDetails.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const matches = lookupCategory(pin.wireDetails, userParsedCatalog);
+    const matches = lookupCatalog(pin.wireDetails, userParsedCatalog);
     if (matches.length === 0) return;
     const exactMatch = matches.find(m => m.catalog === normalized);
     const match = exactMatch || (matches.length === 1 ? matches[0] : null);
@@ -1366,11 +1366,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       if (pinsToCommit.length === 0) {
         const withDetails = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && !p.flagged);
         if (withDetails.length > 0 && withDetails.some(p => !p.footage || p.footage <= 0)) {
-          throw new Error("All pins with categories are missing footage. Fill in footage before committing.");
+          throw new Error("All pins with catalog entries are missing footage. Fill in footage before committing.");
         }
         const flaggedWithDetails = allPins.filter(p => p.wireDetails && p.wireDetails.trim().length > 0 && p.flagged);
         if (flaggedWithDetails.length > 0) {
-          throw new Error(`${flaggedWithDetails.length} pin(s) with categories are flagged for re-shoot. Unflag them first to commit.`);
+          throw new Error(`${flaggedWithDetails.length} pin(s) with catalog entries are flagged for re-shoot. Unflag them first to commit.`);
         }
         return { successful: [], errors: [] };
       }
@@ -1473,7 +1473,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     },
     onSuccess: ({ successful, errors: commitErrors }, variables) => {
       if (successful.length === 0 && commitErrors.length === 0) {
-        toast({ title: "No pins have category details entered yet" });
+        toast({ title: "No pins have catalog details entered yet" });
         return;
       }
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -2525,7 +2525,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <thead>
                     <tr>
                       <th style={{ width: 70, textAlign: "center" }}>PIN #:</th>
-                      <th style={{ minWidth: 140 }}>Category:</th>
+                      <th style={{ minWidth: 140 }}>Catalog:</th>
                       <th style={{ width: 80, textAlign: "center" }}><span className="hidden sm:inline">Vendor Code:</span><span className="sm:hidden">VEN:</span></th>
                       <th style={{ width: 80 }}><span className="hidden sm:inline">Reel Footage:</span><span className="sm:hidden">LENGTH:</span></th>
                       <th style={{ width: 60, textAlign: "center" }}># of Reels:</th>
@@ -2559,7 +2559,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             onChange={(e) => {
                               const val = e.target.value.toUpperCase();
                               updatePinField(pin.id, "wireDetails", val);
-                              const matches = lookupCategory(val, userParsedCatalog);
+                              const matches = lookupCatalog(val, userParsedCatalog);
                               setSuggestions(matches);
                               setSuggestionIndex(-1);
                               if (matches.length > 0) {
@@ -2576,7 +2576,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               setSuggestionIndex(-1);
                               scrollInputIntoView(e.currentTarget);
                               if (pin.wireDetails) {
-                                const matches = lookupCategory(pin.wireDetails, userParsedCatalog);
+                                const matches = lookupCatalog(pin.wireDetails, userParsedCatalog);
                                 setSuggestions(matches);
                                 if (matches.length > 0) {
                                   const rect = e.currentTarget.getBoundingClientRect();
@@ -2627,7 +2627,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="characters"
-                            placeholder="Type category..."
+                            placeholder="Type catalog..."
                             data-testid={`input-wire-details-${index}`}
                           />
                           {activeSuggestionPin === pin.id && suggestions.length > 0 && suggestionPos && (() => {
@@ -3102,36 +3102,36 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               />
             </div>
             <div className="relative">
-              <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">Category:</label>
+              <label className="text-[11px] font-medium text-muted-foreground mb-0.5 block">Catalog:</label>
               <Input
                 value={committedEditState.wireDetails}
                 onChange={(e) => {
                   const val = e.target.value.toUpperCase();
                   setCommittedEditState(s => ({ ...s, wireDetails: val }));
                   if (val.length >= 2) {
-                    const matches = lookupCategory(val, userParsedCatalog);
-                    setCommittedCategorySuggestions(matches);
-                    setShowCommittedCategorySuggestions(matches.length > 0);
+                    const matches = lookupCatalog(val, userParsedCatalog);
+                    setCommittedCatalogSuggestions(matches);
+                    setShowCommittedCatalogSuggestions(matches.length > 0);
                   } else {
-                    setCommittedCategorySuggestions([]);
-                    setShowCommittedCategorySuggestions(false);
+                    setCommittedCatalogSuggestions([]);
+                    setShowCommittedCatalogSuggestions(false);
                   }
                 }}
                 onFocus={() => {
                   if (committedEditState.wireDetails.length >= 2) {
-                    const matches = lookupCategory(committedEditState.wireDetails, userParsedCatalog);
-                    setCommittedCategorySuggestions(matches);
-                    setShowCommittedCategorySuggestions(matches.length > 0);
+                    const matches = lookupCatalog(committedEditState.wireDetails, userParsedCatalog);
+                    setCommittedCatalogSuggestions(matches);
+                    setShowCommittedCatalogSuggestions(matches.length > 0);
                   }
                 }}
-                onBlur={() => setTimeout(() => setShowCommittedCategorySuggestions(false), 200)}
+                onBlur={() => setTimeout(() => setShowCommittedCatalogSuggestions(false), 200)}
                 className="h-8 text-sm uppercase"
                 autoComplete="off"
-                data-testid="input-committed-category"
+                data-testid="input-committed-catalog"
               />
-              {showCommittedCategorySuggestions && committedCategorySuggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-36 overflow-y-auto" data-testid="committed-category-suggestions">
-                  {committedCategorySuggestions.map((s) => (
+              {showCommittedCatalogSuggestions && committedCatalogSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-36 overflow-y-auto" data-testid="committed-catalog-suggestions">
+                  {committedCatalogSuggestions.map((s) => (
                     <button
                       key={s.catalog}
                       type="button"

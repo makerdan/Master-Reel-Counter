@@ -13,7 +13,7 @@ import type { UnitType } from "@/lib/unit-conversion";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface TallyRow {
-  category: string;
+  catalog: string;
   vendorCode: string;
   totalReels: number;
   totalFootage: number;
@@ -21,7 +21,7 @@ interface TallyRow {
 }
 
 interface InventoryRow {
-  category: string;
+  catalog: string;
   vendorCode: string;
   reelCount: number;
   footage: number;
@@ -58,12 +58,12 @@ function parseInventorySheet(rows: any[][]): InventoryRow[] {
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.every(c => c == null || c === "")) continue;
-    const category = catIdx >= 0 ? (row[catIdx] ?? "").toString().trim() : "";
+    const catalog = catIdx >= 0 ? (row[catIdx] ?? "").toString().trim() : "";
     const vendorCode = vendorIdx >= 0 ? (row[vendorIdx] ?? "").toString().trim() : "";
     const reelCount = reelIdx >= 0 ? Number(row[reelIdx]) || 0 : 0;
     const footage = footageIdx >= 0 ? Number(row[footageIdx]) || 0 : 0;
-    if (!category && !vendorCode) continue;
-    results.push({ category, vendorCode, reelCount, footage });
+    if (!catalog && !vendorCode) continue;
+    results.push({ catalog, vendorCode, reelCount, footage });
   }
   return results;
 }
@@ -107,7 +107,7 @@ function LocationList({ locations, currentUnit, onPinClick }: {
                   <button
                     className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-left"
                     onClick={() => onPinClick!(loc.photoId!, loc.pinId!)}
-                    data-testid={`link-uncategorized-location-${i}`}
+                    data-testid={`link-uncataloged-location-${i}`}
                   >
                     {label}
                   </button>
@@ -247,11 +247,11 @@ export default function FinalResultsTab({
       const entry = pin.entryId ? entryMap.get(pin.entryId) : undefined;
       const pinWire = (pin.wireDetails || "").trim();
       const entryWire = (entry?.reelTag || "").trim() || (entry?.wireType || "").trim();
-      const category = pinWire || entryWire || "(uncategorized)";
+      const catalog = pinWire || entryWire || "(uncataloged)";
       const pinVendor = (pin.vendorCode || "").trim();
       const entryVendor = (entry?.manufacturer || "").trim();
       const vendorCode = pinVendor || entryVendor || "";
-      const key = `${category}|||${vendorCode}`;
+      const key = `${catalog}|||${vendorCode}`;
       const photo = photoMap.get(pin.photoId);
       const aisle = photo?.aisle || "";
       const section = photo?.section || "";
@@ -259,18 +259,18 @@ export default function FinalResultsTab({
       const footage = pin.footage ?? entry?.footage ?? null;
 
       if (!map.has(key)) {
-        map.set(key, { category, vendorCode, totalReels: 0, totalFootage: 0, locations: [] });
+        map.set(key, { catalog, vendorCode, totalReels: 0, totalFootage: 0, locations: [] });
       }
       const row = map.get(key)!;
       row.totalReels += reelCount;
       row.totalFootage += (footage != null ? footage * reelCount : 0);
-      const pinLabel = category === "(uncategorized)" && pin.label ? `Pin ${pin.label}` : undefined;
-      const locExtra = category === "(uncategorized)" ? { photoId: pin.photoId, pinId: pin.id } : {};
+      const pinLabel = catalog === "(uncataloged)" && pin.label ? `Pin ${pin.label}` : undefined;
+      const locExtra = catalog === "(uncataloged)" ? { photoId: pin.photoId, pinId: pin.id } : {};
       row.locations.push({ aisle, section, reelCount, footage, ...(pinLabel !== undefined ? { pinLabel } : {}), ...locExtra });
     }
 
     return Array.from(map.values()).sort((a, b) => {
-      const cc = a.category.localeCompare(b.category);
+      const cc = a.catalog.localeCompare(b.catalog);
       if (cc !== 0) return cc;
       return a.vendorCode.localeCompare(b.vendorCode);
     });
@@ -313,13 +313,13 @@ export default function FinalResultsTab({
 
     const invMap = new Map<string, InventoryRow>();
     for (const inv of inventoryRows) {
-      const key = `${inv.category.trim()}|||${inv.vendorCode.trim()}`;
+      const key = `${inv.catalog.trim()}|||${inv.vendorCode.trim()}`;
       invMap.set(key, inv);
     }
 
     const sessionKeys = new Set<string>();
     const result: ComparedRow[] = tallyRows.map(row => {
-      const key = `${row.category}|||${row.vendorCode}`;
+      const key = `${row.catalog}|||${row.vendorCode}`;
       sessionKeys.add(key);
       const inv = invMap.get(key);
       if (!inv) return { ...row, status: "unmatched" };
@@ -336,10 +336,10 @@ export default function FinalResultsTab({
     });
 
     for (const inv of inventoryRows) {
-      const key = `${inv.category.trim()}|||${inv.vendorCode.trim()}`;
+      const key = `${inv.catalog.trim()}|||${inv.vendorCode.trim()}`;
       if (!sessionKeys.has(key)) {
         result.push({
-          category: inv.category,
+          catalog: inv.catalog,
           vendorCode: inv.vendorCode,
           totalReels: 0,
           totalFootage: 0,
@@ -438,7 +438,7 @@ export default function FinalResultsTab({
         <div className="flex items-center gap-2">
           <BarChart2 className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Session Count Tally</h2>
-          <Badge variant="outline" className="text-xs">{tallyRows.length} categories</Badge>
+          <Badge variant="outline" className="text-xs">{tallyRows.length} catalog entries</Badge>
         </div>
 
         {tallyRows.length === 0 ? (
@@ -450,7 +450,7 @@ export default function FinalResultsTab({
             <table className="w-full text-xs" data-testid="table-tally">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left p-2 font-medium underline sm:no-underline after:content-[':'] sm:after:content-['']">Category</th>
+                  <th className="text-left p-2 font-medium underline sm:no-underline after:content-[':'] sm:after:content-['']">Catalog</th>
                   <th className="hidden sm:table-cell text-left p-2 font-medium">Vendor</th>
                   <th className="hidden sm:table-cell text-right p-2 font-medium">Reels</th>
                   <th className="text-right p-2 font-medium whitespace-nowrap underline sm:no-underline">
@@ -470,10 +470,10 @@ export default function FinalResultsTab({
                     className={`border-b border-border last:border-0 ${rowBg(row.status)}`}
                     data-testid={`row-tally-${i}`}
                   >
-                    <td className="p-2 font-mono font-medium" data-testid={`text-category-${i}`}>
-                      {row.category === "(uncategorized)" ? (
+                    <td className="p-2 font-mono font-medium" data-testid={`text-catalog-${i}`}>
+                      {row.catalog === "(uncataloged)" ? (
                         <span className="flex items-center gap-1">
-                          <span className="text-muted-foreground italic">(uncategorized)</span>
+                          <span className="text-muted-foreground italic">(uncataloged)</span>
                           <span
                             title="Reels where the Wire Details field was left blank during counting"
                             className="inline-flex items-center text-muted-foreground/60 hover:text-muted-foreground"
@@ -483,8 +483,8 @@ export default function FinalResultsTab({
                         </span>
                       ) : (
                         <>
-                          <span className="sm:hidden">{row.category}{row.vendorCode ? `-${row.vendorCode}` : ""}</span>
-                          <span className="hidden sm:inline">{row.category}</span>
+                          <span className="sm:hidden">{row.catalog}{row.vendorCode ? `-${row.vendorCode}` : ""}</span>
+                          <span className="hidden sm:inline">{row.catalog}</span>
                         </>
                       )}
                     </td>
@@ -513,7 +513,7 @@ export default function FinalResultsTab({
                         <LocationList
                           locations={row.locations}
                           currentUnit={currentUnit}
-                          onPinClick={row.category === "(uncategorized)" ? onJumpToPin : undefined}
+                          onPinClick={row.catalog === "(uncataloged)" ? onJumpToPin : undefined}
                         />
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>

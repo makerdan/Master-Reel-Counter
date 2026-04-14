@@ -38,9 +38,9 @@ import {
   type InsertScanResult,
   dismissedDuplicates,
   type DismissedDuplicate,
-  userWireCategories,
-  type UserWireCategory,
-  type InsertUserWireCategory,
+  userWireCatalogs,
+  type UserWireCatalog,
+  type InsertUserWireCatalog,
   reviewResponses,
   type ReviewResponse,
   type InsertReviewResponse,
@@ -144,10 +144,10 @@ export interface IStorage {
   getSessionScanResults(sessionId: number): Promise<ScanResult[]>;
   deleteSessionScanResults(sessionId: number): Promise<void>;
 
-  createUserWireCategory(data: InsertUserWireCategory): Promise<UserWireCategory>;
-  createUserWireCategoriesBulk(data: InsertUserWireCategory[]): Promise<UserWireCategory[]>;
-  getUserWireCategories(userId: string): Promise<UserWireCategory[]>;
-  deleteUserWireCategory(id: number, userId: string): Promise<void>;
+  createUserWireCatalog(data: InsertUserWireCatalog): Promise<UserWireCatalog>;
+  createUserWireCatalogsBulk(data: InsertUserWireCatalog[]): Promise<UserWireCatalog[]>;
+  getUserWireCatalogs(userId: string): Promise<UserWireCatalog[]>;
+  deleteUserWireCatalog(id: number, userId: string): Promise<void>;
 
   getDismissedDuplicates(sessionId: number): Promise<string[]>;
   addDismissedDuplicate(sessionId: number, key: string): Promise<DismissedDuplicate>;
@@ -188,7 +188,7 @@ export interface IStorage {
     totalReels: number;
     totalFootage: number;
     totalPhotos: number;
-    topCategories: { category: string; count: number; footage: number }[];
+    topCatalogs: { catalog: string; count: number; footage: number }[];
     topManufacturers: { manufacturer: string; count: number }[];
     weeklyStats: { week: string; entries: number; footage: number }[];
     bestSessionFootage: number;
@@ -1301,7 +1301,7 @@ export class DatabaseStorage implements IStorage {
     totalReels: number;
     totalFootage: number;
     totalPhotos: number;
-    topCategories: { category: string; count: number; footage: number }[];
+    topCatalogs: { catalog: string; count: number; footage: number }[];
     topManufacturers: { manufacturer: string; count: number }[];
     weeklyStats: { week: string; entries: number; footage: number }[];
     bestSessionFootage: number;
@@ -1322,7 +1322,7 @@ export class DatabaseStorage implements IStorage {
       return {
         totalSessions: 0, activeSessions: 0, completedSessions: 0,
         totalEntries: 0, totalReels: 0, totalFootage: 0, totalPhotos: 0,
-        topCategories: [], topManufacturers: [], weeklyStats: [],
+        topCatalogs: [], topManufacturers: [], weeklyStats: [],
         bestSessionFootage: 0, currentStreak: 0, longestStreak: 0, busiestDay: null,
       };
     }
@@ -1337,8 +1337,8 @@ export class DatabaseStorage implements IStorage {
       totalPhotos: count(),
     }).from(photos).where(inArray(photos.sessionId, sessionIds));
 
-    const topCategoriesRaw = await db.select({
-      category: entries.reelTag,
+    const topCatalogsRaw = await db.select({
+      catalog: entries.reelTag,
       count: count(),
       footage: sum(entries.footage),
     }).from(entries)
@@ -1438,8 +1438,8 @@ export class DatabaseStorage implements IStorage {
       totalReels: Number(entryStats.totalReels) || 0,
       totalFootage: Number(entryStats.totalFootage) || 0,
       totalPhotos: Number(photoStats.totalPhotos) || 0,
-      topCategories: topCategoriesRaw.map(c => ({
-        category: c.category!,
+      topCatalogs: topCatalogsRaw.map(c => ({
+        catalog: c.catalog!,
         count: Number(c.count),
         footage: Number(c.footage) || 0,
       })),
@@ -1973,22 +1973,22 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async createUserWireCategory(data: InsertUserWireCategory): Promise<UserWireCategory> {
-    const [result] = await db.insert(userWireCategories).values(data).returning();
+  async createUserWireCatalog(data: InsertUserWireCatalog): Promise<UserWireCatalog> {
+    const [result] = await db.insert(userWireCatalogs).values(data).returning();
     return result;
   }
 
-  async createUserWireCategoriesBulk(data: InsertUserWireCategory[]): Promise<UserWireCategory[]> {
+  async createUserWireCatalogsBulk(data: InsertUserWireCatalog[]): Promise<UserWireCatalog[]> {
     if (data.length === 0) return [];
-    return db.insert(userWireCategories).values(data).returning();
+    return db.insert(userWireCatalogs).values(data).returning();
   }
 
-  async getUserWireCategories(userId: string): Promise<UserWireCategory[]> {
-    return db.select().from(userWireCategories).where(eq(userWireCategories.userId, userId));
+  async getUserWireCatalogs(userId: string): Promise<UserWireCatalog[]> {
+    return db.select().from(userWireCatalogs).where(eq(userWireCatalogs.userId, userId));
   }
 
-  async deleteUserWireCategory(id: number, userId: string): Promise<void> {
-    await db.delete(userWireCategories).where(and(eq(userWireCategories.id, id), eq(userWireCategories.userId, userId)));
+  async deleteUserWireCatalog(id: number, userId: string): Promise<void> {
+    await db.delete(userWireCatalogs).where(and(eq(userWireCatalogs.id, id), eq(userWireCatalogs.userId, userId)));
   }
 
   async getDismissedDuplicates(sessionId: number): Promise<string[]> {

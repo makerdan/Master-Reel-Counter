@@ -36,12 +36,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/lib/theme-provider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useWireCategories } from "@/hooks/use-wire-categories";
+import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 import { CATALOG, parseCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel, unitLabelFull } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import * as XLSX from "xlsx";
-import type { UserWireCategory } from "@shared/schema";
+import type { UserWireCatalog } from "@shared/schema";
 
 interface UserSettingsResponse {
   userId: string;
@@ -356,22 +356,22 @@ export default function SettingsPage() {
   });
 
   const {
-    categories: wireCategories,
-    isLoading: wireCategoriesLoading,
-    addCategory,
-    isAdding: isAddingCategory,
-    bulkAddCategories,
+    catalogs: wireCatalogs,
+    isLoading: wireCatalogsLoading,
+    addCatalog,
+    isAdding: isAddingCatalog,
+    bulkAddCatalogs,
     isBulkAdding,
-    deleteCategory,
-  } = useWireCategories();
+    deleteCatalog,
+  } = useWireCatalogs();
 
   const [wireCatSearch, setWireCatSearch] = useState("");
-  const [showAddCategoryForm, setShowAddCategoryForm] = useState(false);
+  const [showAddCatalogForm, setShowAddCatalogForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [showBuiltInCatalog, setShowBuiltInCatalog] = useState(false);
   const [builtInSearch, setBuiltInSearch] = useState("");
   const [bulkCsvText, setBulkCsvText] = useState("");
-  const [bulkPreview, setBulkPreview] = useState<Omit<UserWireCategory, "id" | "userId">[] | null>(null);
+  const [bulkPreview, setBulkPreview] = useState<Omit<UserWireCatalog, "id" | "userId">[] | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   const [newCat, setNewCat] = useState({
@@ -379,16 +379,16 @@ export default function SettingsPage() {
     color: "", jacketType: "", conductors: "", groundSize: "", wireType: "",
   });
 
-  const filteredWireCategories = useMemo(() => {
-    if (!wireCatSearch.trim()) return wireCategories;
+  const filteredWireCatalogs = useMemo(() => {
+    if (!wireCatSearch.trim()) return wireCatalogs;
     const q = wireCatSearch.toLowerCase();
-    return wireCategories.filter(c =>
+    return wireCatalogs.filter(c =>
       c.catalog.toLowerCase().includes(q) ||
       c.vendor.toLowerCase().includes(q) ||
       (c.description || "").toLowerCase().includes(q) ||
       (c.wireType || "").toLowerCase().includes(q)
     );
-  }, [wireCategories, wireCatSearch]);
+  }, [wireCatalogs, wireCatSearch]);
 
   const filteredBuiltIn = useMemo(() => {
     if (!builtInSearch.trim()) return CATALOG;
@@ -433,7 +433,7 @@ export default function SettingsPage() {
       setBulkPreview(null);
       return;
     }
-    const rows: Omit<UserWireCategory, "id" | "userId">[] = [];
+    const rows: Omit<UserWireCatalog, "id" | "userId">[] = [];
     const errors: string[] = [];
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(sep).map(c => c.trim().replace(/^["']|["']$/g, ""));
@@ -488,13 +488,13 @@ export default function SettingsPage() {
     reader.readAsArrayBuffer(file);
   };
 
-  const exportWireCategories = (format: "csv" | "xlsx") => {
+  const exportWireCatalogs = (format: "csv" | "xlsx") => {
     const headers = ["Catalog", "Vendor", `Reel Length (${unitLabelFull(currentUnit)})`, "Description", "Color", "Jacket Type", "Conductors", "Ground Size", "Wire Type", "Source"];
     const builtInRows = CATALOG.map(c => {
       const parsed = parseCatalogEntry(c);
       return [c.catalog, c.vendor, parsed.footage ? String(toDisplayUnit(parsed.footage, currentUnit)) : "", c.description, "", "", "", "", parsed.wireType || "", "Built-in"];
     });
-    const customRows = wireCategories.map(c => [
+    const customRows = wireCatalogs.map(c => [
       c.catalog, c.vendor, String(toDisplayUnit(c.reelLength, currentUnit)), c.description || "", c.color || "",
       c.jacketType || "", c.conductors || "", c.groundSize || "", c.wireType || "", "Custom",
     ]);
@@ -506,16 +506,16 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "wire-categories.csv";
+      a.download = "wire-catalogs.csv";
       a.click();
       URL.revokeObjectURL(url);
     } else {
       const ws = XLSX.utils.aoa_to_sheet(allRows);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Wire Categories");
-      XLSX.writeFile(wb, "wire-categories.xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, "Wire Catalogs");
+      XLSX.writeFile(wb, "wire-catalogs.xlsx");
     }
-    toast({ title: `Exported ${CATALOG.length + wireCategories.length} categories as ${format.toUpperCase()}` });
+    toast({ title: `Exported ${CATALOG.length + wireCatalogs.length} catalog entries as ${format.toUpperCase()}` });
   };
 
   const currentUnit: UnitType = (settings?.defaultUnit as UnitType) || "feet";
@@ -892,10 +892,10 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Cable className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Wire Categories</CardTitle>
-                {wireCategories.length > 0 && (
-                  <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-wire-category-count">
-                    {wireCategories.length}
+                <CardTitle className="text-base">Wire Catalogs</CardTitle>
+                {wireCatalogs.length > 0 && (
+                  <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate" data-testid="badge-wire-catalog-count">
+                    {wireCatalogs.length}
                   </Badge>
                 )}
               </div>
@@ -903,29 +903,29 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              Add custom wire categories that appear in autocomplete alongside the built-in catalog.
+              Add custom wire catalog entries that appear in autocomplete alongside the built-in catalog.
             </p>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => { setShowAddCategoryForm(!showAddCategoryForm); setShowBulkImport(false); }} data-testid="button-toggle-add-category">
+              <Button size="sm" variant="outline" onClick={() => { setShowAddCatalogForm(!showAddCatalogForm); setShowBulkImport(false); }} data-testid="button-toggle-add-catalog">
                 <Plus className="h-3.5 w-3.5 mr-1" />
-                Add Category
+                Add Catalog
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { setShowBulkImport(!showBulkImport); setShowAddCategoryForm(false); setBulkPreview(null); setBulkError(null); setBulkCsvText(""); }} data-testid="button-toggle-bulk-import">
+              <Button size="sm" variant="outline" onClick={() => { setShowBulkImport(!showBulkImport); setShowAddCatalogForm(false); setBulkPreview(null); setBulkError(null); setBulkCsvText(""); }} data-testid="button-toggle-bulk-import">
                 <FileUp className="h-3.5 w-3.5 mr-1" />
                 Bulk Import
               </Button>
-              <Button size="sm" variant="outline" onClick={() => exportWireCategories("csv")} data-testid="button-export-csv">
+              <Button size="sm" variant="outline" onClick={() => exportWireCatalogs("csv")} data-testid="button-export-csv">
                 <Download className="h-3.5 w-3.5 mr-1" />
                 Export CSV
               </Button>
-              <Button size="sm" variant="outline" onClick={() => exportWireCategories("xlsx")} data-testid="button-export-xlsx">
+              <Button size="sm" variant="outline" onClick={() => exportWireCatalogs("xlsx")} data-testid="button-export-xlsx">
                 <Download className="h-3.5 w-3.5 mr-1" />
                 Export Excel
               </Button>
             </div>
 
-            {showAddCategoryForm && (
+            {showAddCatalogForm && (
               <div className="border rounded-md p-3 space-y-3 bg-muted/20">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -968,10 +968,10 @@ export default function SettingsPage() {
                 <div className="flex gap-2">
                   <Button
                     size="sm"
-                    disabled={!newCat.catalog.trim() || !newCat.vendor.trim() || !newCat.reelLength || isAddingCategory}
+                    disabled={!newCat.catalog.trim() || !newCat.vendor.trim() || !newCat.reelLength || isAddingCatalog}
                     onClick={async () => {
                       try {
-                        await addCategory({
+                        await addCatalog({
                           catalog: newCat.catalog.trim(),
                           vendor: newCat.vendor.trim(),
                           reelLength: toBaseFeet(parseInt(newCat.reelLength), currentUnit),
@@ -983,17 +983,17 @@ export default function SettingsPage() {
                           wireType: newCat.wireType.trim() || null,
                         });
                         setNewCat({ catalog: "", vendor: "", reelLength: "", description: "", color: "", jacketType: "", conductors: "", groundSize: "", wireType: "" });
-                        toast({ title: "Category added" });
+                        toast({ title: "Catalog entry added" });
                       } catch {
-                        toast({ title: "Failed to add category", variant: "destructive" });
+                        toast({ title: "Failed to add catalog entry", variant: "destructive" });
                       }
                     }}
-                    data-testid="button-save-category"
+                    data-testid="button-save-catalog"
                   >
-                    {isAddingCategory ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                    {isAddingCatalog ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
                     Save
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowAddCategoryForm(false)} data-testid="button-cancel-add-category">
+                  <Button size="sm" variant="ghost" onClick={() => setShowAddCatalogForm(false)} data-testid="button-cancel-add-catalog">
                     Cancel
                   </Button>
                 </div>
@@ -1055,7 +1055,7 @@ export default function SettingsPage() {
                 )}
                 {bulkPreview && bulkPreview.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium">{bulkPreview.length} categories ready to import:</p>
+                    <p className="text-xs font-medium">{bulkPreview.length} catalog entries ready to import:</p>
                     <div className="max-h-40 overflow-y-auto border rounded">
                       <table className="w-full text-xs">
                         <thead className="bg-muted/50 sticky top-0">
@@ -1088,37 +1088,37 @@ export default function SettingsPage() {
                       disabled={isBulkAdding}
                       onClick={async () => {
                         try {
-                          await bulkAddCategories(bulkPreview);
-                          toast({ title: `${bulkPreview.length} categories imported` });
+                          await bulkAddCatalogs(bulkPreview);
+                          toast({ title: `${bulkPreview.length} catalog entries imported` });
                           setBulkPreview(null);
                           setBulkCsvText("");
                           setBulkError(null);
                           setShowBulkImport(false);
                         } catch {
-                          toast({ title: "Failed to import categories", variant: "destructive" });
+                          toast({ title: "Failed to import catalog entries", variant: "destructive" });
                         }
                       }}
                       data-testid="button-confirm-bulk-import"
                     >
                       {isBulkAdding ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
-                      Import {bulkPreview.length} Categories
+                      Import {bulkPreview.length} Catalog Entries
                     </Button>
                   </div>
                 )}
               </div>
             )}
 
-            {wireCategories.length > 0 && (
+            {wireCatalogs.length > 0 && (
               <>
-                {wireCategories.length > 5 && (
+                {wireCatalogs.length > 5 && (
                   <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input
-                      placeholder="Search categories..."
+                      placeholder="Search catalog entries..."
                       value={wireCatSearch}
                       onChange={(e) => setWireCatSearch(e.target.value)}
                       className="h-8 text-sm pl-8"
-                      data-testid="input-search-wire-categories"
+                      data-testid="input-search-wire-catalogs"
                     />
                   </div>
                 )}
@@ -1135,8 +1135,8 @@ export default function SettingsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredWireCategories.map((cat) => (
-                        <tr key={cat.id} className="hover:bg-muted/30" data-testid={`row-wire-category-${cat.id}`}>
+                      {filteredWireCatalogs.map((cat) => (
+                        <tr key={cat.id} className="hover:bg-muted/30" data-testid={`row-wire-catalog-${cat.id}`}>
                           <td className="p-1.5 font-mono font-medium">{cat.catalog}</td>
                           <td className="p-1.5">{cat.vendor}</td>
                           <td className="p-1.5 text-right tabular-nums">{toDisplayUnit(cat.reelLength, currentUnit)} {uLabel}</td>
@@ -1149,16 +1149,16 @@ export default function SettingsPage() {
                               size="icon"
                               variant="ghost"
                               className="h-6 w-6"
-                              onClick={() => deleteCategory(cat.id)}
-                              data-testid={`button-delete-category-${cat.id}`}
+                              onClick={() => deleteCatalog(cat.id)}
+                              data-testid={`button-delete-catalog-${cat.id}`}
                             >
                               <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
                             </Button>
                           </td>
                         </tr>
                       ))}
-                      {filteredWireCategories.length === 0 && (
-                        <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">No matching categories found.</td></tr>
+                      {filteredWireCatalogs.length === 0 && (
+                        <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">No matching catalog entries found.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1166,9 +1166,9 @@ export default function SettingsPage() {
               </>
             )}
 
-            {wireCategories.length === 0 && !wireCategoriesLoading && !showAddCategoryForm && !showBulkImport && (
-              <p className="text-xs text-muted-foreground italic" data-testid="text-no-wire-categories">
-                No custom categories yet. Add categories individually or import them in bulk.
+            {wireCatalogs.length === 0 && !wireCatalogsLoading && !showAddCatalogForm && !showBulkImport && (
+              <p className="text-xs text-muted-foreground italic" data-testid="text-no-wire-catalogs">
+                No custom catalog entries yet. Add entries individually or import them in bulk.
               </p>
             )}
 
@@ -1705,7 +1705,7 @@ export default function SettingsPage() {
                     <div>
                       <p className="text-sm font-medium">Manual entry and catalog autocomplete unaffected</p>
                       <p className="text-xs text-muted-foreground">
-                        Category autocomplete and catalog lookup work from a built-in reference, not from stored entries. 
+                        Catalog autocomplete and catalog lookup work from a built-in reference, not from stored entries. 
                         Any values you save will be encoded before storage.
                       </p>
                     </div>

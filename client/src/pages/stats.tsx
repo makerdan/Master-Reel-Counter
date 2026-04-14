@@ -48,7 +48,7 @@ interface UserStats {
   totalReels: number;
   totalFootage: number;
   totalPhotos: number;
-  topCategories: { category: string; count: number; footage: number }[];
+  topCatalogs: { catalog: string; count: number; footage: number }[];
   topManufacturers: { manufacturer: string; count: number }[];
   weeklyStats: { week: string; entries: number; footage: number }[];
   bestSessionFootage: number;
@@ -147,7 +147,7 @@ export default function StatsPage() {
   const hasNoData = hasNoPersonalData && stats.sharedPerformance.length === 0;
 
   const maxWeeklyEntries = Math.max(...stats.weeklyStats.map(w => w.entries), 1);
-  const maxCatCount = Math.max(...stats.topCategories.map(c => c.count), 1);
+  const maxCatCount = Math.max(...stats.topCatalogs.map(c => c.count), 1);
   const maxMfgCount = Math.max(...stats.topManufacturers.map(m => m.count), 1);
 
   const avgEntriesPerSession = stats.totalSessions > 0 ? Math.round(stats.totalEntries / stats.totalSessions) : 0;
@@ -268,22 +268,22 @@ export default function StatsPage() {
                   </section>
                 )}
 
-                {(stats.topCategories.length > 0 || stats.topManufacturers.length > 0) && (
-                  <section data-testid="section-top-categories-vendors">
-                    <SectionHeading icon={<Layers className="h-4 w-4" />} title="Top Categories & Vendors" testId="heading-categories-vendors" />
+                {(stats.topCatalogs.length > 0 || stats.topManufacturers.length > 0) && (
+                  <section data-testid="section-top-catalogs-vendors">
+                    <SectionHeading icon={<Layers className="h-4 w-4" />} title="Top Catalogs & Vendors" testId="heading-catalogs-vendors" />
                     <div className="grid md:grid-cols-2 gap-4">
-                      {stats.topCategories.length > 0 && (
+                      {stats.topCatalogs.length > 0 && (
                         <Card>
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-semibold">Top Categories:</CardTitle>
+                            <CardTitle className="text-sm font-semibold">Top Catalogs:</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="space-y-2">
-                              {stats.topCategories.map((c, i) => (
-                                <div key={c.category} className="flex items-center gap-2" data-testid={`stat-category-${i}`}>
+                              {stats.topCatalogs.map((c, i) => (
+                                <div key={c.catalog} className="flex items-center gap-2" data-testid={`stat-catalog-${i}`}>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-0.5">
-                                      <span className="text-xs mono truncate">{c.category}</span>
+                                      <span className="text-xs mono truncate">{c.catalog}</span>
                                       <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{c.count} ({c.footage.toLocaleString()} ft)</span>
                                     </div>
                                     <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -325,7 +325,7 @@ export default function StatsPage() {
                   </section>
                 )}
 
-                {stats.topCategories.length === 0 && stats.topManufacturers.length === 0 && stats.weeklyStats.length === 0 && (
+                {stats.topCatalogs.length === 0 && stats.topManufacturers.length === 0 && stats.weeklyStats.length === 0 && (
                   <Card>
                     <CardContent className="py-8 text-center">
                       <BarChart3 className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />

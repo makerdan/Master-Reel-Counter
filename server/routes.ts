@@ -8,7 +8,7 @@ import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/route
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCategorySchema, countingSessions } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions } from "@shared/schema";
 import { z } from "zod";
 import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -2565,7 +2565,7 @@ export async function registerRoutes(
       }
 
       const secEntryCols = [
-        { header: "Category:", width: 110 },
+        { header: "Catalog:", width: 110 },
         { header: "Vendor:", width: 70 },
         { header: "# of Reels:", width: 45, centered: true },
         { header: `Total (${pdfULabel}):`, width: 65, centered: true },
@@ -3573,7 +3573,7 @@ export async function registerRoutes(
           }
 
           const infoLines: [string, string][] = [
-            ["Category:", e.reelTag || "Unknown"],
+            ["Catalog:", e.reelTag || "Unknown"],
             ["Vendor:", e.manufacturer || "Unknown"],
             ["Reels:", String(e.reelCount || 1)],
             ["Footage:", e.footage ? `${fmtFootage(e.footage)} ${pdfULabel}` : `0 ${pdfULabel}`],
@@ -3624,12 +3624,12 @@ export async function registerRoutes(
         if (color) entryBlueShadeMap.set(pin.entryId, color);
       }
 
-      const categoryMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: { text: string; color?: string }[] }>();
+      const catalogMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: { text: string; color?: string }[] }>();
       for (const e of activeEntries) {
         const cat = e.reelTag || e.wireType || "Uncategorized";
         const vendor = e.manufacturer || "";
         const groupKey = `${cat}|||${vendor}`;
-        const existing = categoryMap.get(groupKey);
+        const existing = catalogMap.get(groupKey);
         const pinLabel = entryPinLabelMap.get(e.id);
         const locParts = [e.aisle, e.section, pinLabel].filter(Boolean);
         const loc = locParts.join("-");
@@ -3639,7 +3639,7 @@ export async function registerRoutes(
           existing.reelCount += (e.reelCount || 1);
           if (loc) existing.locations.push({ text: loc, color: locColor });
         } else {
-          categoryMap.set(groupKey, {
+          catalogMap.set(groupKey, {
             vendorCode: vendor,
             totalFootage: e.footage || 0,
             reelCount: e.reelCount || 1,
@@ -3660,10 +3660,10 @@ export async function registerRoutes(
         return cat.replace(/\d+$/, "").trim();
       };
 
-      const allCategories = Array.from(categoryMap.entries())
+      const allCatalogs = Array.from(catalogMap.entries())
         .map(([groupKey, data]) => {
-          const category = groupKey.split("|||")[0];
-          const wireTypeGroup = extractWireType(category);
+          const catalog = groupKey.split("|||")[0];
+          const wireTypeGroup = extractWireType(catalog);
           const wtu = wireTypeGroup.toUpperCase().trim();
           const vendor = data.vendorCode.toUpperCase().trim() || "?";
           const displayGroup =
@@ -3671,7 +3671,7 @@ export async function registerRoutes(
             wtu.startsWith("RX")  ? `RX--${vendor}`  :
             wtu.startsWith("TC")  ? `TC--${vendor}`  :
             wireTypeGroup;
-          return { category, wireTypeGroup, displayGroup, reelSizeIdx: extractReelSize(category), ...data };
+          return { catalog, wireTypeGroup, displayGroup, reelSizeIdx: extractReelSize(catalog), ...data };
         });
 
       const displayGroupPriority = (dg: string): number => {
@@ -3680,7 +3680,7 @@ export async function registerRoutes(
         if (g === "XHHW") return 1;
         return 2;
       };
-      allCategories.sort((a, b) => {
+      allCatalogs.sort((a, b) => {
         const pa = displayGroupPriority(a.displayGroup);
         const pb = displayGroupPriority(b.displayGroup);
         if (pa !== pb) return pa - pb;
@@ -3689,16 +3689,16 @@ export async function registerRoutes(
         return a.reelSizeIdx - b.reelSizeIdx;
       });
 
-      const sortedCategories = allCategories;
+      const sortedCatalogs = allCatalogs;
 
       const groupReelCounts = new Map<string, number>();
-      for (const cat of sortedCategories) {
+      for (const cat of sortedCatalogs) {
         const g = cat.displayGroup;
         groupReelCounts.set(g, (groupReelCounts.get(g) || 0) + cat.reelCount);
       }
 
       const sumCols = [
-        { header: "Category:", width: 140, align: "left" as const },
+        { header: "Catalog:", width: 140, align: "left" as const },
         { header: "Vendor Code:", width: 100, align: "center" as const },
         { header: "# of Reels:", width: 50, align: "center" as const },
         { header: `Total (${pdfULabel}):`, width: 80, align: "center" as const },
@@ -3729,9 +3729,9 @@ export async function registerRoutes(
 
       let lastWireTypeGroup = "";
       let altIdx = 0;
-      for (let i = 0; i < sortedCategories.length; i++) {
+      for (let i = 0; i < sortedCatalogs.length; i++) {
         const rowH = 16;
-        const cat = sortedCategories[i];
+        const cat = sortedCatalogs[i];
 
         if (cat.displayGroup !== lastWireTypeGroup) {
           const groupH = 18;
@@ -3769,7 +3769,7 @@ export async function registerRoutes(
         doc.fontSize(6.5).fillColor("#333333");
         let x = tableLeft;
         const vals = [
-          `    ${cat.category}`,
+          `    ${cat.catalog}`,
           cat.vendorCode,
           String(cat.reelCount),
           `${fmtFootage(cat.totalFootage)} ${pdfULabel}`,
@@ -3816,7 +3816,7 @@ export async function registerRoutes(
       doc.rect(tableLeft, currentY, pageWidth, rowHeight).fill(headerBg);
       doc.font('Helvetica-Bold').fontSize(7).fillColor("#333333");
       let tx = tableLeft;
-      const totalVals = ["GRAND TOTAL", "", `${sortedCategories.reduce((s, c) => s + c.reelCount, 0)} reels`, `${fmtFootage(activeTotalFootage)} total ${pdfULabel}`, `${sortedCategories.length} total categories`];
+      const totalVals = ["GRAND TOTAL", "", `${sortedCatalogs.reduce((s, c) => s + c.reelCount, 0)} reels`, `${fmtFootage(activeTotalFootage)} total ${pdfULabel}`, `${sortedCatalogs.length} total catalogs`];
       const totalAligns: ("left" | "center")[] = ["left", "center", "center", "center", "left"];
       for (let j = 0; j < sumScaled.length; j++) {
         doc.text(totalVals[j], tx + 3, currentY + 4, { width: sumScaled[j].width - 6, lineBreak: false, align: totalAligns[j] });
@@ -3859,7 +3859,7 @@ export async function registerRoutes(
         auditLabel("Elapsed Time:", "N/A");
       }
       if (session.completedAt) { auditLabel("Completed:", formatCT(new Date(session.completedAt))); }
-      auditLabel("Total Number of Reels:", String(sortedCategories.reduce((s, c) => s + c.reelCount, 0)));
+      auditLabel("Total Number of Reels:", String(sortedCatalogs.reduce((s, c) => s + c.reelCount, 0)));
       auditLabel("Data Encoding:", key ? "Active (entries decrypted for export)" : "Off");
       currentY += 5;
 
@@ -4004,7 +4004,7 @@ export async function registerRoutes(
         { key: "pin", width: 8 },
         { key: "aisle", width: 10 },
         { key: "section", width: 10 },
-        { key: "category", width: 22 },
+        { key: "catalog", width: 22 },
         { key: "vendor", width: 14 },
         { key: "reels", width: 10 },
         { key: "footage", width: 14 },
@@ -4119,7 +4119,7 @@ export async function registerRoutes(
         }
       }
 
-      const entryHeaders = ["Pin:", "Aisle:", "Section:", "Category:", "Vendor:", "# Reels:", `Footage (${xlULabel}):`, "Color:", "Notes:", "Flagged:", "Flag Reason:", "Detail Of:"];
+      const entryHeaders = ["Pin:", "Aisle:", "Section:", "Catalog:", "Vendor:", "# Reels:", `Footage (${xlULabel}):`, "Color:", "Notes:", "Flagged:", "Flag Reason:", "Detail Of:"];
       const headerRow = ws.getRow(row);
       const centeredHeaderCols = new Set([1, 2, 4, 5, 6, 7, 9]);
       entryHeaders.forEach((h, i) => {
@@ -4247,7 +4247,7 @@ export async function registerRoutes(
       }
       row++;
 
-      const sumHeaders = ["Category", "Vendor Code", "# Reels", `Total Footage (${xlULabel})`, "Reel Location(s)"];
+      const sumHeaders = ["Catalog", "Vendor Code", "# Reels", `Total Footage (${xlULabel})`, "Reel Location(s)"];
       const sumHeaderRow = ws.getRow(row);
       sumHeaders.forEach((h, i) => {
         const cell = sumHeaderRow.getCell(i + 1);
@@ -4269,12 +4269,12 @@ export async function registerRoutes(
         return idx >= 0 ? idx : reelSizeOrder.length;
       };
 
-      const categoryMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
+      const catalogMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
       for (const e of activeEntries) {
         const cat = e.reelTag || e.wireType || "Uncategorized";
         const vendor = e.manufacturer || "";
         const groupKey = `${cat}|||${vendor}`;
-        const existing = categoryMap.get(groupKey);
+        const existing = catalogMap.get(groupKey);
         const pin = entryPinMap.get(e.id);
         const pinLabel = pin?.label ? formatPinLabel(String(pin.label)) : undefined;
         const locParts = [e.aisle, e.section, pinLabel].filter(Boolean);
@@ -4284,17 +4284,17 @@ export async function registerRoutes(
           existing.reelCount += (e.reelCount || 1);
           if (loc) existing.locations.push(loc);
         } else {
-          categoryMap.set(groupKey, { vendorCode: vendor, totalFootage: e.footage || 0, reelCount: e.reelCount || 1, locations: loc ? [loc] : [] });
+          catalogMap.set(groupKey, { vendorCode: vendor, totalFootage: e.footage || 0, reelCount: e.reelCount || 1, locations: loc ? [loc] : [] });
         }
       }
 
-      const allCategories = Array.from(categoryMap.entries()).map(([groupKey, data]) => {
-        const category = groupKey.split("|||")[0];
-        const wireTypeGroup = extractWireType(category);
+      const allCatalogs = Array.from(catalogMap.entries()).map(([groupKey, data]) => {
+        const catalog = groupKey.split("|||")[0];
+        const wireTypeGroup = extractWireType(catalog);
         const wtu = wireTypeGroup.toUpperCase().trim();
         const vendor = data.vendorCode.toUpperCase().trim() || "?";
         const displayGroup = wtu === "SER" ? `SER--${vendor}` : wtu.startsWith("RX") ? `RX--${vendor}` : wtu.startsWith("TC") ? `TC--${vendor}` : wireTypeGroup;
-        return { category, wireTypeGroup, displayGroup, reelSizeIdx: extractReelSize(category), ...data };
+        return { catalog, wireTypeGroup, displayGroup, reelSizeIdx: extractReelSize(catalog), ...data };
       });
 
       const displayGroupPriority = (dg: string): number => {
@@ -4303,7 +4303,7 @@ export async function registerRoutes(
         if (g === "XHHW") return 1;
         return 2;
       };
-      allCategories.sort((a, b) => {
+      allCatalogs.sort((a, b) => {
         const pa = displayGroupPriority(a.displayGroup);
         const pb = displayGroupPriority(b.displayGroup);
         if (pa !== pb) return pa - pb;
@@ -4313,13 +4313,13 @@ export async function registerRoutes(
       });
 
       const groupReelCounts = new Map<string, number>();
-      for (const cat of allCategories) {
+      for (const cat of allCatalogs) {
         groupReelCounts.set(cat.displayGroup, (groupReelCounts.get(cat.displayGroup) || 0) + cat.reelCount);
       }
 
       let lastDisplayGroup = "";
       let sumAltIdx = 0;
-      for (const cat of allCategories) {
+      for (const cat of allCatalogs) {
         if (cat.displayGroup !== lastDisplayGroup) {
           const isRx = cat.displayGroup.startsWith("RX--");
           const isTc = cat.displayGroup.startsWith("TC--");
@@ -4343,7 +4343,7 @@ export async function registerRoutes(
         }
 
         const r = ws.getRow(row);
-        const catVals: any[] = [safeStr(cat.category), safeStr(cat.vendorCode), cat.reelCount, xlFmt(cat.totalFootage), safeStr(cat.locations.join(", "))];
+        const catVals: any[] = [safeStr(cat.catalog), safeStr(cat.vendorCode), cat.reelCount, xlFmt(cat.totalFootage), safeStr(cat.locations.join(", "))];
         catVals.forEach((v, i) => {
           const cell = r.getCell(i + 1);
           cell.value = v;
@@ -4360,7 +4360,7 @@ export async function registerRoutes(
       }
 
       const grandRow = ws.getRow(row);
-      const grandVals = ["GRAND TOTAL", "", allCategories.reduce((s, c) => s + c.reelCount, 0), xlFmt(activeTotalFootage), `${allCategories.length} categories`];
+      const grandVals = ["GRAND TOTAL", "", allCatalogs.reduce((s, c) => s + c.reelCount, 0), xlFmt(activeTotalFootage), `${allCatalogs.length} catalogs`];
       const thickBorder: Partial<ExcelJS.Borders> = {
         top: { style: "medium", color: { argb: "000000" } },
         bottom: { style: "medium", color: { argb: "000000" } },
@@ -4947,46 +4947,46 @@ export async function registerRoutes(
   });
 
   // Feedback
-  app.get("/api/wire-categories", isAuthenticated, async (req: any, res) => {
+  app.get("/api/wire-catalogs", isAuthenticated, async (req: any, res) => {
     try {
       const userId = resolveUserId(req);
-      const categories = await storage.getUserWireCategories(userId);
-      res.json(categories);
+      const catalogs = await storage.getUserWireCatalogs(userId);
+      res.json(catalogs);
     } catch (error) {
-      console.error("Error fetching wire categories:", error);
-      res.status(500).json({ message: "Failed to fetch wire categories" });
+      console.error("Error fetching wire catalogs:", error);
+      res.status(500).json({ message: "Failed to fetch wire catalogs" });
     }
   });
 
-  app.post("/api/wire-categories", isAuthenticated, async (req: any, res) => {
+  app.post("/api/wire-catalogs", isAuthenticated, async (req: any, res) => {
     try {
       const userId = resolveUserId(req);
-      const parsed = insertUserWireCategorySchema.safeParse({ ...req.body, userId });
+      const parsed = insertUserWireCatalogSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid wire category data", details: parsed.error.flatten() });
+        return res.status(400).json({ error: "Invalid wire catalog data", details: parsed.error.flatten() });
       }
-      const category = await storage.createUserWireCategory(parsed.data);
-      res.status(201).json(category);
+      const entry = await storage.createUserWireCatalog(parsed.data);
+      res.status(201).json(entry);
     } catch (error) {
-      console.error("Error creating wire category:", error);
-      res.status(500).json({ message: "Failed to create wire category" });
+      console.error("Error creating wire catalog:", error);
+      res.status(500).json({ message: "Failed to create wire catalog" });
     }
   });
 
-  app.post("/api/wire-categories/bulk", isAuthenticated, async (req: any, res) => {
+  app.post("/api/wire-catalogs/bulk", isAuthenticated, async (req: any, res) => {
     try {
       const userId = resolveUserId(req);
-      const { categories } = req.body;
-      if (!Array.isArray(categories) || categories.length === 0) {
-        return res.status(400).json({ error: "categories must be a non-empty array" });
+      const { catalogs } = req.body;
+      if (!Array.isArray(catalogs) || catalogs.length === 0) {
+        return res.status(400).json({ error: "catalogs must be a non-empty array" });
       }
-      if (categories.length > 500) {
-        return res.status(400).json({ error: "Maximum 500 categories per import" });
+      if (catalogs.length > 500) {
+        return res.status(400).json({ error: "Maximum 500 catalogs per import" });
       }
       const validated: any[] = [];
       const errors: { index: number; errors: any }[] = [];
-      for (let i = 0; i < categories.length; i++) {
-        const parsed = insertUserWireCategorySchema.safeParse({ ...categories[i], userId });
+      for (let i = 0; i < catalogs.length; i++) {
+        const parsed = insertUserWireCatalogSchema.safeParse({ ...catalogs[i], userId });
         if (parsed.success) {
           validated.push(parsed.data);
         } else {
@@ -4994,26 +4994,26 @@ export async function registerRoutes(
         }
       }
       if (errors.length > 0) {
-        return res.status(400).json({ error: "Some categories failed validation", errors, validCount: validated.length });
+        return res.status(400).json({ error: "Some catalogs failed validation", errors, validCount: validated.length });
       }
-      const results = await storage.createUserWireCategoriesBulk(validated);
+      const results = await storage.createUserWireCatalogsBulk(validated);
       res.status(201).json(results);
     } catch (error) {
-      console.error("Error bulk creating wire categories:", error);
-      res.status(500).json({ message: "Failed to bulk import wire categories" });
+      console.error("Error bulk creating wire catalogs:", error);
+      res.status(500).json({ message: "Failed to bulk import wire catalogs" });
     }
   });
 
-  app.delete("/api/wire-categories/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/wire-catalogs/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
       const userId = resolveUserId(req);
-      await storage.deleteUserWireCategory(id, userId);
+      await storage.deleteUserWireCatalog(id, userId);
       res.json({ success: true });
     } catch (error) {
-      console.error("Error deleting wire category:", error);
-      res.status(500).json({ message: "Failed to delete wire category" });
+      console.error("Error deleting wire catalog:", error);
+      res.status(500).json({ message: "Failed to delete wire catalog" });
     }
   });
 
@@ -5047,7 +5047,7 @@ export async function registerRoutes(
   const HELP_SYSTEM_PROMPT = `You are a helpful assistant for "Master Reel Counter," a warehouse wire reel counting application. Answer questions clearly and concisely based on the following app knowledge. If you don't know, say so honestly.
 
 ## App Overview
-Master Reel Counter helps users photograph pallet sections in warehouses, annotate reels with pins, enter wire catalog details (category, vendor code, footage), and export professional inventory reports (CSV, PDF, email).
+Master Reel Counter helps users photograph pallet sections in warehouses, annotate reels with pins, enter wire catalog details (catalog, vendor code, footage), and export professional inventory reports (CSV, PDF, email).
 
 ## Dashboard
 - **Sessions**: Create, rename, duplicate, lock/unlock, mark complete/reopen, delete sessions. Each card shows name, location, reel count, total footage, photo count, and thumbnail.
@@ -5061,7 +5061,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 - **Section Photo Tab**: Upload/capture photos tagged with aisle & section. Navigate photos with prev/next or type a number. "Next Reel" button jumps to photos with incomplete pins. Zoom (up to 5x), pan, reset, pin placement mode.
 - **Pins**: Click photo in pin mode to place numbered pins. Drag to reposition. Delete with × button. Committed pins show "P" prefix. Draft pins auto-save.
 - **Reel Crop Preview**: Tap a pin to see zoomed crop. Image on the left with vertical button column on the right (Close-up, Wide, Zoom +/-, Rotate, Close). Toggle close-up vs wide view.
-- **Entry Details Table**: Category input searches ~300 catalog entries (arrow keys + Enter to select, auto-fills vendor & footage). Vendor code dropdown (COP, ALU, COR, ALF). Footage field. Clear row, flag for re-shoot (with optional reason), commit pins as entries.
+- **Entry Details Table**: Catalog input searches ~300 catalog entries (arrow keys + Enter to select, auto-fills vendor & footage). Vendor code dropdown (COP, ALU, COR, ALF). Footage field. Clear row, flag for re-shoot (with optional reason), commit pins as entries.
 - **Photo Notes & Detail Shots**: Add notes to photos (auto-save). Mark as detail/close-up shot linked to parent photo.
 - **Nearby Photo Strip**: Horizontal strip of photos sorted by location. Orange badge shows incomplete pin count.
 - **Quick Entry Panel**: Create entries without pins. Auto-fills aisle/section from current photo. Catalog autocomplete. "On Floor / In Front Of" checkbox. Receiving mode auto-increments sections.
@@ -5079,7 +5079,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 - **Photo Review**: Navigate with prev/next. Sort by aisle or latest. Add notes, mark as detail shot, delete photos. Location labels shown.
 
 ## Tips
-- Type a few letters of wire category + arrow down + Enter for rapid data entry.
+- Type a few letters of wire catalog + arrow down + Enter for rapid data entry.
 - Use "Next Reel" button to jump through incomplete photos.
 - Type "rec" in aisle to auto-fill "Receiving".
 - Flag reels you can't read and share the Flagged tab link with someone who can re-photograph.

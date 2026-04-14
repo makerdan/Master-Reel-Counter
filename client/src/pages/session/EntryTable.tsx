@@ -410,7 +410,7 @@ function EntryTable({
                   </th>
                   <th className="hidden sm:table-cell" style={{ textAlign: "center" }}>Aisle:</th>
                   <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Section:</th>
-                  <th style={{ textAlign: "center" }}>Category:</th>
+                  <th style={{ textAlign: "center" }}>Catalog:</th>
                   <th className="hidden sm:table-cell" style={{ textAlign: "center", whiteSpace: "nowrap", width: "auto" }}>Vendor:</th>
                   <th className="hidden" style={{ textAlign: "center", whiteSpace: "nowrap" }}>VEN:</th>
                   <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>
@@ -464,7 +464,7 @@ function EntryTable({
                             {entry.reelTag ? <HighlightText text={entry.reelTag} query={debouncedQuery} /> : "-"}
                             {entry.manufacturer && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
                             {!entry.reelTag && (
-                              <span className="inline-flex items-center ml-1" title="No category">
+                              <span className="inline-flex items-center ml-1" title="No catalog">
                                 <AlertTriangle className="h-3 w-3 text-amber-500" />
                               </span>
                             )}
