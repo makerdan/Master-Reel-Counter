@@ -3626,7 +3626,7 @@ export async function registerRoutes(
 
       const catalogMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: { text: string; color?: string }[] }>();
       for (const e of activeEntries) {
-        const cat = e.reelTag || e.wireType || "Uncategorized";
+        const cat = e.reelTag || e.wireType || "Uncataloged";
         const vendor = e.manufacturer || "";
         const groupKey = `${cat}|||${vendor}`;
         const existing = catalogMap.get(groupKey);
@@ -4271,7 +4271,7 @@ export async function registerRoutes(
 
       const catalogMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
       for (const e of activeEntries) {
-        const cat = e.reelTag || e.wireType || "Uncategorized";
+        const cat = e.reelTag || e.wireType || "Uncataloged";
         const vendor = e.manufacturer || "";
         const groupKey = `${cat}|||${vendor}`;
         const existing = catalogMap.get(groupKey);
