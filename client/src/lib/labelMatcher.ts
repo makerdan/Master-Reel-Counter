@@ -182,6 +182,7 @@ export function matchLabelText(rawText: string): LabelMatchResult {
 function attemptMatch(text: string): LabelMatchResult {
   let normalized = normalize(text);
   normalized = normalized.replace(/400R(\d)/g, "40OR$1").replace(/300R(\d)/g, "30OR$1");
+  normalized = normalized.replace(/[S5](BK|RD|WH|BL|GR|GN|YL|OR|GY|BR|PK|VI|TN)/g, "8$1");
   const tokens = extractTokens(text);
 
   const exactMatch = tryExactCatalogMatch(normalized);
