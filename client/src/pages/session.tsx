@@ -74,10 +74,25 @@ export default function SessionPage() {
     enabled: sessionId > 0,
   });
 
-  const { data: photos = [] } = useQuery<Photo[]>({
+  const { data: photos = [], isFetching: photosFetching } = useQuery<Photo[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "photos"],
     enabled: sessionId > 0,
   });
+
+  const retriedMissingPhotoIdsRef = useRef<string>("");
+  useEffect(() => {
+    if (!entries.length || !sessionId || photosFetching) return;
+    const photoIds = new Set(photos.map((p) => p.id));
+    const missingIds = entries
+      .filter((e) => e.photoId && !photoIds.has(e.photoId))
+      .map((e) => e.photoId!)
+      .sort((a, b) => a - b);
+    if (missingIds.length === 0) return;
+    const signature = missingIds.join(",");
+    if (signature === retriedMissingPhotoIdsRef.current) return;
+    retriedMissingPhotoIdsRef.current = signature;
+    queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+  }, [entries, photos, sessionId, photosFetching]);
 
   const { data: userSettings } = useQuery<{
     defaultExportFormat: string;

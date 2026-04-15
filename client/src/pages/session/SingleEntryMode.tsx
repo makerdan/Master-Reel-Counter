@@ -355,6 +355,7 @@ export default function SingleEntryMode({
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       if (editingEntry?.id) {
         queryClient.invalidateQueries({ queryKey: ["/api/entries", editingEntry.id.toString(), "pin"] });
       }

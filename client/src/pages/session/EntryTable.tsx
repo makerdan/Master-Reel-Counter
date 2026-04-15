@@ -502,6 +502,10 @@ function EntryTable({
                                   </div>
                                 </DialogContent>
                               </Dialog>
+                            ) : entry.photoId && !photoMap.get(entry.photoId) ? (
+                              <Button size="icon" variant="ghost" title="Photo loading..." disabled className="opacity-50" data-testid={`button-photo-loading-${entry.id}`}>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              </Button>
                             ) : isUnpinned ? (
                               <span className="flex justify-center" title="No linked photo" data-testid={`icon-no-photo-${entry.id}`}>
                                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
