@@ -998,11 +998,11 @@ export function SessionSections() {
                 />
 
                 <Separator className="my-2" />
-                <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Single Photo vs All Photos</p>
+                <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Single Photo vs All Remaining Photos</p>
                 <FeatureRow
                   icon={<HelpIcon icon={Grid3X3} />}
-                  label="All Photos Mode"
-                  description="Toggle the grid icon to switch to All Photos mode, which shows a dense grid of ALL active pins across the entire session — every photo with draft or incomplete pins. Each card shows a badge with its source photo location. The scanner defaults to this mode when previous results exist."
+                  label="All Remaining Photos Mode"
+                  description="Toggle the grid icon to switch to All Remaining Photos mode, which shows a dense grid of ALL active pins across the entire session — every photo with draft or incomplete pins. Each card shows a badge with its source photo location. The scanner defaults to this mode when previous results exist."
                 />
                 <FeatureRow
                   icon={<HelpIcon icon={ListChecks} />}

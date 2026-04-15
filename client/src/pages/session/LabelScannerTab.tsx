@@ -1496,7 +1496,7 @@ export default function LabelScannerTab({
             data-testid="btn-mode-batch"
           >
             <Grid3X3 className="h-3.5 w-3.5" />
-            All Photos
+            All Remaining Photos
             {batchMode && allSessionActivePins.length > 0 && (
               <Badge className="text-[9px] bg-white/15 text-white/80 border-0 py-0 px-1.5 ml-0.5">{allSessionActivePins.length} pins</Badge>
             )}
