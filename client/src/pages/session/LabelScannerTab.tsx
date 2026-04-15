@@ -867,6 +867,8 @@ export default function LabelScannerTab({
         } else if (catalogCode.startsWith("XHHW") && !rawUpper.includes("COP")) {
           vendor = "ALU";
         }
+        const isHighConfidence = matchResult?.confidence === "high";
+        const included = isHighConfidence ? true : card.included;
         const updated = {
           ...card,
           result,
@@ -874,9 +876,11 @@ export default function LabelScannerTab({
           editCatalog: catalogCode,
           editFootage: parsed?.footage ? String(toDisplayUnit(parsed.footage, currentUnit)) : "",
           editVendor: vendor,
-          included: false,
+          included,
         };
-        saveSelectionState(sessionId, card.pin.id, false);
+        if (isHighConfidence) {
+          saveSelectionState(sessionId, card.pin.id, true);
+        }
         return updated;
       })
     );
