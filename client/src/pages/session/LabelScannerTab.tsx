@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
+import { useSessionWebSocket } from "@/hooks/use-websocket";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, Grid3X3, List, Flag, Users, CheckCircle2,
@@ -411,6 +412,13 @@ export default function LabelScannerTab({
   const [phase, setPhase] = useState<"preview" | "results">("preview");
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
+  const analyzingRef = useRef(false);
+  useEffect(() => { analyzingRef.current = analyzing; }, [analyzing]);
+  useSessionWebSocket(analyzing ? sessionId : null, useCallback((msg: any) => {
+    if (msg.type === "label_progress" && analyzingRef.current) {
+      setAnalyzeProgress({ done: msg.done, total: msg.total });
+    }
+  }, []));
   const [batchMode, setBatchModeRaw] = useState(() => {
     try {
       const saved = sessionStorage.getItem(`scanner-batch-${sessionId}`);
@@ -992,34 +1000,57 @@ export default function LabelScannerTab({
     if ((!currentPhotoId && !batchMode) || !includedCards.length) return;
     setAnalyzing(true);
     try {
-      const byPhoto = new Map<number, typeof includedCards>();
-      for (const c of includedCards) {
-        const pid = c.pin.photoId;
-        if (!byPhoto.has(pid)) byPhoto.set(pid, []);
-        byPhoto.get(pid)!.push(c);
-      }
-
-      const totalBatches = byPhoto.size;
-      let doneBatches = 0;
-      setAnalyzeProgress({ done: 0, total: totalBatches });
       let totalResults = 0;
 
-      for (const [photoId, photoCards] of byPhoto) {
-        const pinData = photoCards.map((c) => ({
+      if (batchMode) {
+        const pinData = includedCards.map((c) => ({
+          photoId: c.pin.photoId,
           pinId: c.pin.id,
           pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
           x: c.pin.xPercent,
           y: c.pin.yPercent,
           zoomLevel: c.zoomLevel,
         }));
-        const res = await apiRequest("POST", `/api/photos/${photoId}/analyze-labels`, { pins: pinData });
+        const totalCrops = pinData.length;
+        const MAX_BATCH = 20;
+        const estimatedBatches = Math.ceil(totalCrops / MAX_BATCH);
+        setAnalyzeProgress({ done: 0, total: estimatedBatches });
+        const res = await apiRequest("POST", `/api/sessions/${sessionId}/analyze-labels`, { pins: pinData });
         const data = await res.json();
         if (data.results) {
           applyResults(data.results);
           totalResults += data.results.length;
         }
-        doneBatches++;
-        setAnalyzeProgress({ done: doneBatches, total: totalBatches });
+        setAnalyzeProgress({ done: data.totalBatches ?? estimatedBatches, total: data.totalBatches ?? estimatedBatches });
+      } else {
+        const byPhoto = new Map<number, typeof includedCards>();
+        for (const c of includedCards) {
+          const pid = c.pin.photoId;
+          if (!byPhoto.has(pid)) byPhoto.set(pid, []);
+          byPhoto.get(pid)!.push(c);
+        }
+
+        const totalBatches = byPhoto.size;
+        let doneBatches = 0;
+        setAnalyzeProgress({ done: 0, total: totalBatches });
+
+        for (const [photoId, photoCards] of byPhoto) {
+          const pinData = photoCards.map((c) => ({
+            pinId: c.pin.id,
+            pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
+            x: c.pin.xPercent,
+            y: c.pin.yPercent,
+            zoomLevel: c.zoomLevel,
+          }));
+          const res = await apiRequest("POST", `/api/photos/${photoId}/analyze-labels`, { pins: pinData });
+          const data = await res.json();
+          if (data.results) {
+            applyResults(data.results);
+            totalResults += data.results.length;
+          }
+          doneBatches++;
+          setAnalyzeProgress({ done: doneBatches, total: totalBatches });
+        }
       }
 
       if (totalResults > 0) {

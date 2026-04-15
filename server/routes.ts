@@ -1735,6 +1735,143 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/sessions/:sessionId/analyze-labels", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.sessionId);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to analyze labels" });
+
+      const { pins: pinData } = req.body;
+      if (!Array.isArray(pinData) || pinData.length === 0) {
+        return res.status(400).json({ message: "pins array is required" });
+      }
+
+      const uniquePhotoIds = [...new Set(pinData.map((p: any) => p.photoId as number))];
+      const photoBufferMap = new Map<number, Buffer>();
+      for (const photoId of uniquePhotoIds) {
+        const photo = await storage.getPhoto(photoId);
+        if (!photo || photo.sessionId !== sessionId) continue;
+        const raw = await loadPhotoBuffer(photo.objectStorageKey);
+        const manualRotation = (photo.rotation ?? 0) % 360;
+        let pipeline = sharp(raw).rotate();
+        if (manualRotation !== 0) pipeline = pipeline.rotate(manualRotation);
+        photoBufferMap.set(photoId, await pipeline.toBuffer());
+      }
+
+      const allCropRequests: Array<{ photoId: number; pinId: number; pinLabel: string; x: number; y: number; zoomLevel: number }> = [];
+      for (const p of pinData) {
+        if (!photoBufferMap.has(p.photoId)) continue;
+        allCropRequests.push({
+          photoId: p.photoId,
+          pinId: p.pinId,
+          pinLabel: p.pinLabel || `P${String(p.pinId).padStart(3, "0")}`,
+          x: p.x,
+          y: p.y,
+          zoomLevel: p.zoomLevel ?? 1,
+        });
+      }
+
+      const MAX_BATCH = 20;
+      const allResults: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> = [];
+      const totalBatches = Math.ceil(allCropRequests.length / MAX_BATCH);
+
+      for (let i = 0; i < allCropRequests.length; i += MAX_BATCH) {
+        const batch = allCropRequests.slice(i, i + MAX_BATCH);
+        const cropsByPhoto = new Map<number, typeof batch>();
+        for (const item of batch) {
+          if (!cropsByPhoto.has(item.photoId)) cropsByPhoto.set(item.photoId, []);
+          cropsByPhoto.get(item.photoId)!.push(item);
+        }
+
+        const crops: Array<{ pinId: number; base64: string }> = [];
+        for (const [photoId, items] of cropsByPhoto) {
+          const buf = photoBufferMap.get(photoId)!;
+          const photoCrops = await cropPhoto(buf, items.map((it) => ({
+            pinId: it.pinId,
+            x: it.x,
+            y: it.y,
+            zoomLevel: it.zoomLevel,
+          })));
+          crops.push(...photoCrops);
+        }
+
+        const cropOrder = batch.map((b) => b.pinId);
+        const orderedCrops = cropOrder.map((pid) => crops.find((c) => c.pinId === pid)!).filter(Boolean);
+
+        const imageMessages = orderedCrops.map((crop) => ({
+          type: "image_url" as const,
+          image_url: { url: `data:image/jpeg;base64,${crop.base64}`, detail: "high" as const },
+        }));
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content: "You are reading wire reel labels in a warehouse. The labels may be printed on curved cylindrical reel surfaces, at various angles, upside down, or partially obscured. Read all visible text regardless of orientation. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: `Read the text on each of these ${orderedCrops.length} wire reel label images. Return the result as a JSON object: {"labels": ["text from image 1", "text from image 2", ...]}` },
+                ...imageMessages,
+              ],
+            },
+          ],
+          max_tokens: 2000,
+        });
+
+        const content = response.choices?.[0]?.message?.content ?? "{}";
+        let parsed: { labels?: (string | null)[] } = {};
+        try {
+          parsed = JSON.parse(content);
+        } catch {
+          console.error("[session-analyze-labels] Failed to parse OpenAI response:", content);
+        }
+
+        const labels = parsed.labels ?? [];
+        for (let j = 0; j < batch.length; j++) {
+          const rawText = labels[j] ?? null;
+          allResults.push({
+            pinId: batch[j].pinId,
+            pinLabel: batch[j].pinLabel,
+            rawText,
+            readable: rawText !== null,
+          });
+        }
+
+        const batchIndex = Math.floor(i / MAX_BATCH) + 1;
+        broadcastToSession(sessionId, { type: "label_progress", sessionId, done: batchIndex, total: totalBatches });
+      }
+
+      try {
+        const scanResultRows = allResults.map((r) => {
+          const pinEntry = pinData.find((p: any) => p.pinId === r.pinId);
+          return {
+            sessionId,
+            photoId: pinEntry?.photoId ?? 0,
+            pinId: r.pinId,
+            pinLabel: r.pinLabel,
+            rawText: r.rawText,
+            readable: r.readable,
+            scannedBy: req.user?.claims?.sub || null,
+          };
+        });
+        await storage.upsertScanResults(scanResultRows);
+        broadcastToSession(sessionId, { type: "sync", entity: "scan_results", sessionId });
+      } catch (e) {
+        console.error("[session-analyze-labels] Failed to persist scan results:", e);
+      }
+
+      res.json({ results: allResults, totalBatches });
+    } catch (error) {
+      console.error("Error analyzing session labels:", error);
+      res.status(500).json({ message: "Failed to analyze labels" });
+    }
+  });
+
   app.post("/api/photos/:photoId/sample-pixel", isAuthenticated, async (req: any, res) => {
     try {
       const photoId = parseInt(req.params.photoId);
