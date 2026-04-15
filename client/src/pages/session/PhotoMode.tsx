@@ -1569,14 +1569,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
   const scrollInputIntoView = useCallback((el: HTMLElement) => {
-    if (!isMobile) return;
     const fixedOffset = 53 + previewHeight + 8;
     const rect = el.getBoundingClientRect();
     if (rect.top < fixedOffset) {
       const scrollTop = window.scrollY + rect.top - fixedOffset;
       window.scrollTo({ top: scrollTop, behavior: "smooth" });
     }
-  }, [isMobile, previewHeight]);
+  }, [previewHeight]);
 
   return (
     <div className="rounded-lg border border-blue-500 sm:!border-blue-600/50 bg-[hsl(210_10%_96%)] dark:bg-[hsl(215_10%_13%)] p-4 overflow-hidden">
