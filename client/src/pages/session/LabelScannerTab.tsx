@@ -1525,7 +1525,7 @@ export default function LabelScannerTab({
                 ) : (
                   <>
                     <Check className="h-4 w-4" />
-                    Add Reels from {selectedForApply.length} Images
+                    Add-{selectedForApply.length} Reels from Images
                   </>
                 )}
               </Button>
@@ -2146,7 +2146,7 @@ export default function LabelScannerTab({
               ) : (
                 <>
                   <Check className="h-4 w-4" />
-                  Add Reels from {selectedForApply.length} Images
+                  Add-{selectedForApply.length} Reels from Images
                 </>
               )}
             </Button>
