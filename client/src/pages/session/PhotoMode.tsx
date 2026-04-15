@@ -156,7 +156,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [highlightedCommittedPinDbId, setHighlightedCommittedPinDbId] = useState<number | null>(null);
   const [pinsVisible, setPinsVisible] = useState(true);
   const [photoLoadedKey, setPhotoLoadedKey] = useState("");
-  const [previewHeight, setPreviewHeight] = useState(0);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
   const [pinLoadKey, setPinLoadKey] = useState(0);
@@ -167,7 +166,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const globalMaxPinRef = useRef<number>(0);
   const pinFetchCache = useRef<Map<number, Pin[]>>(new Map());
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
-  const previewRef = useRef<HTMLDivElement>(null);
   const prevPhotoDbIdRef = useRef<number | undefined>(undefined);
   const [relabelPinId, setRelabelPinId] = useState<string | null>(null);
   const [relabelValue, setRelabelValue] = useState("");
@@ -1571,13 +1569,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   const scrollInputIntoView = useCallback((el: HTMLElement) => {
     if (!isMobile) return;
-    const fixedOffset = 53 + previewHeight + 8;
+    const fixedOffset = 53 + 8;
     const rect = el.getBoundingClientRect();
     if (rect.top < fixedOffset) {
       const scrollTop = window.scrollY + rect.top - fixedOffset;
       window.scrollTo({ top: scrollTop, behavior: "smooth" });
     }
-  }, [isMobile, previewHeight]);
+  }, [isMobile]);
 
   return (
     <div className="rounded-lg border border-blue-500 sm:!border-blue-600/50 bg-[hsl(210_10%_96%)] dark:bg-[hsl(215_10%_13%)] p-4 overflow-hidden">
@@ -2494,29 +2492,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 const selectedPin = localPins.find(p => p.id === selectedPinId);
                 if (!selectedPin) return null;
                 return (
-                  <>
-                    <div
-                      ref={(el) => {
-                        previewRef.current = el;
-                        if (el) {
-                          const h = el.offsetHeight;
-                          if (h !== previewHeight) setPreviewHeight(h);
-                        }
-                      }}
-                      className="fixed top-[53px] left-0 right-0 z-[40] bg-background/95 backdrop-blur px-4 py-1 border-b shadow-sm"
-                    >
-                      <ReelCropPreview
-                        photoUrl={currentPhoto.url}
-                        pinX={selectedPin.x}
-                        pinY={selectedPin.y}
-                        label={formatPinLabel(selectedPin.label)}
-                        zoomLevel={zoomLevel}
-                        onZoomChange={setZoomLevel}
-                        onClose={() => setSelectedPinId(null)}
-                      />
-                    </div>
-                    <div style={{ height: previewHeight }} />
-                  </>
+                  <ReelCropPreview
+                    photoUrl={currentPhoto.url}
+                    pinX={selectedPin.x}
+                    pinY={selectedPin.y}
+                    label={formatPinLabel(selectedPin.label)}
+                    zoomLevel={zoomLevel}
+                    onZoomChange={setZoomLevel}
+                    onClose={() => setSelectedPinId(null)}
+                  />
                 );
               })()}
               <div className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Pin #</div>
