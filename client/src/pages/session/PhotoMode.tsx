@@ -1430,6 +1430,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   label: pin.label,
                   reelCount: pin.reelCount,
                   entryId: entry.id,
+                  wireDetails: pin.wireDetails || null,
+                  vendorCode: pin.vendorCode || null,
+                  footage: pin.footage || null,
                   flagged: false,
                 });
                 return await pinRes.json();
