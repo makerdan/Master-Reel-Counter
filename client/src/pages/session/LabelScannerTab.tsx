@@ -1782,7 +1782,6 @@ export default function LabelScannerTab({
                                 value={card.editVendor}
                                 onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                                 maxLength={3}
-                                list="vendor-code-suggestions-scanner"
                                 className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                                 data-testid={`input-vendor-${card.pin.id}`}
                               />
@@ -1810,7 +1809,6 @@ export default function LabelScannerTab({
                                 value={card.editVendor}
                                 onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                                 maxLength={3}
-                                list="vendor-code-suggestions-scanner"
                                 className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                                 data-testid={`input-vendor-manual-${card.pin.id}`}
                               />
@@ -2035,7 +2033,6 @@ export default function LabelScannerTab({
                       value={card.editVendor}
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       maxLength={3}
-                      list="vendor-code-suggestions-scanner"
                       className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                       data-testid={`input-vendor-${card.pin.id}`}
                     />
@@ -2064,7 +2061,6 @@ export default function LabelScannerTab({
                       value={card.editVendor}
                       onChange={(e) => setCardField(card.pin.id, "editVendor", e.target.value)}
                       maxLength={3}
-                      list="vendor-code-suggestions-scanner"
                       className="w-full rounded-md border bg-[hsl(25_12%_20%)] border-[hsl(215_30%_50%/0.25)] text-white uppercase outline-none px-2 py-1"
                       data-testid={`input-vendor-manual-${card.pin.id}`}
                     />
