@@ -81,8 +81,9 @@ function tryDescriptionMatch(tokens: string[]): { entry: ParsedCatalogEntry; sco
     let score = 0;
 
     for (const token of upperTokens) {
-      if (token.length < 2) continue;
-      if (descUpper.includes(token)) score += token.length;
+      const isSingleDigit = token.length === 1 && /^\d$/.test(token);
+      if (token.length < 2 && !isSingleDigit) continue;
+      if (!isSingleDigit && descUpper.includes(token)) score += token.length;
       if (catUpper.includes(token)) score += token.length * 1.5;
     }
 
