@@ -62,29 +62,65 @@ function tryCorrectionMatch(raw: string): { entry: ParsedCatalogEntry; confident
   return null;
 }
 
+const DESCRIPTION_MATCH_STOPWORDS = new Set([
+  "OR", "AND", "IN", "A", "THE", "OF", "FOR", "WITH", "BY", "AT", "TO",
+  "WIRE", "CABLE", "BRAND",
+]);
+
+const COLOR_NAME_TO_CODE: Record<string, string> = {
+  BLACK: "BK", WHITE: "WH", GRAY: "GY", BLUE: "BL", RED: "RD",
+  YELLOW: "YL", ORANGE: "OR", GREEN: "GN", BROWN: "BR", PURPLE: "PR",
+  PINK: "PK",
+};
+
 function tryDescriptionMatch(tokens: string[]): { entry: ParsedCatalogEntry; score: number } | null {
   let bestEntry: CatalogEntry | null = null;
   let bestScore = 0;
 
   const upperTokens = tokens.map(t => t.toUpperCase());
-  const preferredType = WIRE_TYPES.find(wt =>
+
+  let preferredType = WIRE_TYPES.find(wt =>
     upperTokens.some(t => t === wt || t.startsWith(wt + "/") || t.startsWith(wt + "-"))
   ) ?? null;
+  if (!preferredType) {
+    const hasThwn = upperTokens.some(t => t === "THWN" || t.startsWith("THWN-"));
+    if (hasThwn) preferredType = "THHN";
+  }
 
   const candidates = preferredType
     ? CATALOG.filter(e => e.catalog.startsWith(preferredType))
     : CATALOG;
+
+  const scoringTokens: string[] = [];
+  for (const t of upperTokens) {
+    const parts = t.split("-");
+    if (parts.length > 1) {
+      scoringTokens.push(...parts.filter(p => p.length > 0));
+    } else {
+      scoringTokens.push(t);
+    }
+  }
 
   for (const entry of candidates) {
     const descUpper = entry.description.toUpperCase();
     const catUpper = entry.catalog.toUpperCase();
     let score = 0;
 
-    for (const token of upperTokens) {
+    for (let token of scoringTokens) {
+      const ftStripped = token.replace(/^(\d+)FT$/, "$1");
+      if (ftStripped !== token) token = ftStripped;
+
+      if (DESCRIPTION_MATCH_STOPWORDS.has(token)) continue;
+
       const isSingleDigit = token.length === 1 && /^\d$/.test(token);
       if (token.length < 2 && !isSingleDigit) continue;
       if (!isSingleDigit && descUpper.includes(token)) score += token.length;
       if (catUpper.includes(token)) score += token.length * 1.5;
+
+      const colorCode = COLOR_NAME_TO_CODE[token];
+      if (colorCode && catUpper.includes(colorCode)) {
+        score += colorCode.length * 1.5;
+      }
     }
 
     if (score > bestScore) {
