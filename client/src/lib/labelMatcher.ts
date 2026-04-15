@@ -170,7 +170,16 @@ function downgradedResult(result: LabelMatchResult): LabelMatchResult {
   return result;
 }
 
-export function matchLabelText(rawText: string): LabelMatchResult {
+function confidenceRank(c: MatchConfidence): number {
+  return { none: 0, low: 1, medium: 2, high: 3 }[c];
+}
+
+function stripDatePatterns(text: string): string {
+  // Matches MM-DD-YY, MM-DD-YYYY, MM/DD/YY, MM/DD/YYYY with optional leading zeros
+  return text.replace(/\b\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}\b/g, " ").replace(/\s{2,}/g, " ").trim();
+}
+
+function coreMatchLabelText(rawText: string): LabelMatchResult {
   if (!rawText || rawText.trim().length === 0) {
     return { match: null, confidence: "none", normalizedInput: "", matchMethod: "none" };
   }
@@ -289,4 +298,20 @@ function attemptMatch(text: string): LabelMatchResult {
   }
 
   return { match: null, confidence: "none", normalizedInput: normalized, matchMethod: "none" };
+}
+
+export function matchLabelText(rawText: string): LabelMatchResult {
+  const result = coreMatchLabelText(rawText);
+
+  if (result.confidence !== "high") {
+    const dateStripped = stripDatePatterns(rawText);
+    if (dateStripped !== rawText.trim()) {
+      const strippedResult = coreMatchLabelText(dateStripped);
+      if (confidenceRank(strippedResult.confidence) > confidenceRank(result.confidence)) {
+        return strippedResult;
+      }
+    }
+  }
+
+  return result;
 }
