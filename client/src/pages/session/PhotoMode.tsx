@@ -2492,15 +2492,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 const selectedPin = localPins.find(p => p.id === selectedPinId);
                 if (!selectedPin) return null;
                 return (
-                  <ReelCropPreview
-                    photoUrl={currentPhoto.url}
-                    pinX={selectedPin.x}
-                    pinY={selectedPin.y}
-                    label={formatPinLabel(selectedPin.label)}
-                    zoomLevel={zoomLevel}
-                    onZoomChange={setZoomLevel}
-                    onClose={() => setSelectedPinId(null)}
-                  />
+                  <div className="sticky top-[53px] z-30 w-fit bg-background/95 backdrop-blur-sm rounded-md pb-1">
+                    <ReelCropPreview
+                      photoUrl={currentPhoto.url}
+                      pinX={selectedPin.x}
+                      pinY={selectedPin.y}
+                      label={formatPinLabel(selectedPin.label)}
+                      zoomLevel={zoomLevel}
+                      onZoomChange={setZoomLevel}
+                      onClose={() => setSelectedPinId(null)}
+                    />
+                  </div>
                 );
               })()}
               <div className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[hsl(18_60%_40%)] dark:text-[hsl(25_70%_60%)]" data-testid="text-pin-table-title">Enter Details for Each Pin #</div>
