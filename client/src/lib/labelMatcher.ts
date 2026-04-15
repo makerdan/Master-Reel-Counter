@@ -158,24 +158,56 @@ function extractPrimaryLine(rawText: string): string {
   return lines[0];
 }
 
+function lineHasWireType(line: string): boolean {
+  const upper = line.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return WIRE_TYPES.some(wt => upper.startsWith(wt));
+}
+
+function downgradedResult(result: LabelMatchResult): LabelMatchResult {
+  if (result.confidence === "high") {
+    return { ...result, confidence: "medium" };
+  }
+  return result;
+}
+
 export function matchLabelText(rawText: string): LabelMatchResult {
   if (!rawText || rawText.trim().length === 0) {
     return { match: null, confidence: "none", normalizedInput: "", matchMethod: "none" };
   }
 
-  const primaryLine = extractPrimaryLine(rawText);
-  const useFullText = primaryLine !== rawText;
+  const lines = rawText.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
 
-  const result = attemptMatch(primaryLine);
-  if (result.match) return result;
+  if (lines.length <= 1) {
+    return attemptMatch(rawText);
+  }
 
-  if (useFullText) {
-    const fallback = attemptMatch(rawText);
-    if (fallback.match) {
-      if (fallback.confidence === "high") fallback.confidence = "medium";
-      return fallback;
+  // Step 1: Per-line wire type scanning — try each line that starts with a known wire type
+  for (const line of lines) {
+    if (lineHasWireType(line)) {
+      const result = attemptMatch(line);
+      if (result.match) return result;
     }
   }
+
+  // Step 2: Existing primary line heuristic (first line with letters+digits+length>=6)
+  const primaryLine = extractPrimaryLine(rawText);
+  const primaryResult = attemptMatch(primaryLine);
+  if (primaryResult.match) return primaryResult;
+
+  // Step 3: Adjacent-line combination — try merging consecutive line pairs
+  for (let i = 0; i < lines.length - 1; i++) {
+    const withSpace = lines[i] + " " + lines[i + 1];
+    const withSpaceResult = attemptMatch(withSpace);
+    if (withSpaceResult.match) return downgradedResult(withSpaceResult);
+
+    const noSpace = lines[i] + lines[i + 1];
+    const noSpaceResult = attemptMatch(noSpace);
+    if (noSpaceResult.match) return downgradedResult(noSpaceResult);
+  }
+
+  // Step 4: Full text fallback
+  const fallback = attemptMatch(rawText);
+  if (fallback.match) return downgradedResult(fallback);
 
   return { match: null, confidence: "none", normalizedInput: normalize(primaryLine), matchMethod: "none" };
 }
