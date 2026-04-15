@@ -413,6 +413,7 @@ export default function LabelScannerTab({
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const analyzingRef = useRef(false);
+  const cancelRequested = useRef(false);
   useEffect(() => { analyzingRef.current = analyzing; }, [analyzing]);
   useSessionWebSocket(analyzing ? sessionId : null, useCallback((msg: any) => {
     if (msg.type === "label_progress" && analyzingRef.current) {
@@ -998,30 +999,44 @@ export default function LabelScannerTab({
 
   async function handleAnalyze() {
     if ((!currentPhotoId && !batchMode) || !includedCards.length) return;
+    cancelRequested.current = false;
     setAnalyzing(true);
     try {
       let totalResults = 0;
 
       if (batchMode) {
-        const pinData = includedCards.map((c) => ({
-          photoId: c.pin.photoId,
-          pinId: c.pin.id,
-          pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
-          x: c.pin.xPercent,
-          y: c.pin.yPercent,
-          zoomLevel: c.zoomLevel,
-        }));
-        const totalCrops = pinData.length;
-        const MAX_BATCH = 20;
-        const estimatedBatches = Math.ceil(totalCrops / MAX_BATCH);
-        setAnalyzeProgress({ done: 0, total: estimatedBatches });
-        const res = await apiRequest("POST", `/api/sessions/${sessionId}/analyze-labels`, { pins: pinData });
-        const data = await res.json();
-        if (data.results) {
-          applyResults(data.results);
-          totalResults += data.results.length;
+        const byPhoto = new Map<number, typeof includedCards>();
+        for (const c of includedCards) {
+          const pid = c.pin.photoId;
+          if (!byPhoto.has(pid)) byPhoto.set(pid, []);
+          byPhoto.get(pid)!.push(c);
         }
-        setAnalyzeProgress({ done: data.totalBatches ?? estimatedBatches, total: data.totalBatches ?? estimatedBatches });
+
+        const totalBatches = byPhoto.size;
+        let doneBatches = 0;
+        setAnalyzeProgress({ done: 0, total: totalBatches });
+
+        for (const [photoId, photoCards] of byPhoto) {
+          if (cancelRequested.current) {
+            toast({ title: "Analysis cancelled", description: `Completed ${doneBatches} of ${totalBatches} batch${totalBatches !== 1 ? "es" : ""}` });
+            return;
+          }
+          const pinData = photoCards.map((c) => ({
+            pinId: c.pin.id,
+            pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
+            x: c.pin.xPercent,
+            y: c.pin.yPercent,
+            zoomLevel: c.zoomLevel,
+          }));
+          const res = await apiRequest("POST", `/api/photos/${photoId}/analyze-labels`, { pins: pinData });
+          const data = await res.json();
+          if (data.results) {
+            applyResults(data.results);
+            totalResults += data.results.length;
+          }
+          doneBatches++;
+          setAnalyzeProgress({ done: doneBatches, total: totalBatches });
+        }
       } else {
         const byPhoto = new Map<number, typeof includedCards>();
         for (const c of includedCards) {
@@ -1441,7 +1456,19 @@ export default function LabelScannerTab({
           </div>
         </div>
         {(phase === "preview" || isAdmin) && (
-          <div className="pt-1 flex justify-end">
+          <div className="pt-1 flex items-center justify-end gap-2">
+            {analyzing && batchMode && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { cancelRequested.current = true; }}
+                className="gap-2 border-red-700/50 text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                data-testid="btn-cancel-analyze-labels"
+              >
+                <X className="h-4 w-4" />
+                Cancel AI Analyses
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={handleAnalyze}
@@ -2052,7 +2079,19 @@ export default function LabelScannerTab({
 
       <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
         {(phase === "preview" || isAdmin) && (
-          <div className="flex w-full justify-end">
+          <div className="flex w-full items-center justify-end gap-2">
+            {analyzing && batchMode && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { cancelRequested.current = true; }}
+                className="gap-2 border-red-700/50 text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                data-testid="btn-cancel-analyze-labels-bottom"
+              >
+                <X className="h-4 w-4" />
+                Cancel AI Analyses
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={handleAnalyze}
