@@ -159,8 +159,10 @@ function extractPrimaryLine(rawText: string): string {
 }
 
 function lineHasWireType(line: string): boolean {
-  const upper = line.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return WIRE_TYPES.some(wt => upper.startsWith(wt));
+  const tokens = extractTokens(line);
+  return tokens.some(token =>
+    WIRE_TYPES.some(wt => token === wt || token.startsWith(wt + "/") || token.startsWith(wt + "-"))
+  );
 }
 
 function downgradedResult(result: LabelMatchResult): LabelMatchResult {
@@ -190,7 +192,7 @@ function coreMatchLabelText(rawText: string): LabelMatchResult {
     return attemptMatch(rawText);
   }
 
-  // Step 1: Per-line wire type scanning — try each line that starts with a known wire type
+  // Step 1: Per-line wire type scanning — try each line that contains a known wire type as any token
   for (const line of lines) {
     if (lineHasWireType(line)) {
       const result = attemptMatch(line);
@@ -199,9 +201,17 @@ function coreMatchLabelText(rawText: string): LabelMatchResult {
   }
 
   // Step 2: Existing primary line heuristic (first line with letters+digits+length>=6)
+  // If the primary line matches via description only, keep it as a fallback so Steps 3 and 4
+  // can still run — they may find a better match by combining lines (e.g. gauge-prefixed wire type).
   const primaryLine = extractPrimaryLine(rawText);
   const primaryResult = attemptMatch(primaryLine);
-  if (primaryResult.match) return primaryResult;
+  let descriptionFallback: LabelMatchResult | null = null;
+  if (primaryResult.match) {
+    if (primaryResult.matchMethod !== "description") {
+      return primaryResult;
+    }
+    descriptionFallback = primaryResult;
+  }
 
   // Step 3: Adjacent-line combination — try merging consecutive line pairs
   for (let i = 0; i < lines.length - 1; i++) {
@@ -217,6 +227,9 @@ function coreMatchLabelText(rawText: string): LabelMatchResult {
   // Step 4: Full text fallback
   const fallback = attemptMatch(rawText);
   if (fallback.match) return downgradedResult(fallback);
+
+  // Fall back to the description-only primary result (downgraded confidence)
+  if (descriptionFallback) return downgradedResult(descriptionFallback);
 
   return { match: null, confidence: "none", normalizedInput: normalize(primaryLine), matchMethod: "none" };
 }
