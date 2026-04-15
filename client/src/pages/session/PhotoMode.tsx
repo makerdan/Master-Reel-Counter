@@ -233,6 +233,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       return localStorage.getItem(getScanPanelStorageKey(sessionId)) === "true";
     } catch { return false; }
   });
+  const [scanBatchMode, setScanBatchMode] = useState(() => {
+    try { return sessionStorage.getItem(`scanner-batch-${sessionId}`) === "true"; } catch { return false; }
+  });
   const [scanPanelCurrentPhotoId, setScanPanelCurrentPhotoId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
 
@@ -2233,22 +2236,24 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 </button>
               )}
               {scanPanelOpen && (
-                <div className="hidden sm:flex flex-col gap-0 absolute top-0 right-0 w-1/2 h-full z-[25] overflow-y-auto bg-[hsl(25_8%_13%)] border-l border-[hsl(280_50%_30%/0.4)] p-4" data-testid="scan-panel-desktop">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <ScanLine className="h-4 w-4 text-[hsl(280_60%_55%)]" />
-                      <span className="text-sm font-semibold text-[hsl(280_60%_70%)]">Scan Panel</span>
+                <div className={`hidden sm:flex flex-col gap-0 absolute top-0 right-0 ${scanBatchMode ? "w-full" : "w-1/2"} h-full z-[25] overflow-y-auto bg-[hsl(25_8%_13%)] border-l border-[hsl(280_50%_30%/0.4)] p-4`} data-testid="scan-panel-desktop">
+                  {!scanBatchMode && (
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <ScanLine className="h-4 w-4 text-[hsl(280_60%_55%)]" />
+                        <span className="text-sm font-semibold text-[hsl(280_60%_70%)]">Scan Panel</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                        onClick={toggleScanPanel}
+                        data-testid="button-scan-panel-close-desktop"
+                      >
+                        <PanelCloseX className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                      onClick={toggleScanPanel}
-                      data-testid="button-scan-panel-close-desktop"
-                    >
-                      <PanelCloseX className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  )}
                   <LabelScannerTab
                     sessionId={sessionId}
                     photos={photos}
@@ -2259,6 +2264,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     onlineUsers={onlineUsers}
                     pushUndo={onPushUndo}
                     onApplied={onScanApplied}
+                    onBatchModeChange={setScanBatchMode}
+                    onClose={toggleScanPanel}
                   />
                 </div>
               )}
@@ -3074,6 +3081,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               onlineUsers={onlineUsers}
               pushUndo={onPushUndo}
               onApplied={onScanApplied}
+              onBatchModeChange={setScanBatchMode}
+              onClose={toggleScanPanel}
             />
           </SheetContent>
         </Sheet>

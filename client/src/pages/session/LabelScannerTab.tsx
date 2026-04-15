@@ -381,6 +381,8 @@ export default function LabelScannerTab({
   onlineUsers = [],
   pushUndo,
   onApplied,
+  onBatchModeChange,
+  onClose,
 }: {
   sessionId: number;
   photos: Photo[];
@@ -392,6 +394,8 @@ export default function LabelScannerTab({
   onlineUsers?: OnlineUser[];
   pushUndo?: (action: { type: string; sessionId: number; entityId: number; data: any; previousData?: any }) => void;
   onApplied?: (sectionKey: string) => void;
+  onBatchModeChange?: (isBatchMode: boolean) => void;
+  onClose?: () => void;
 }) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
@@ -416,7 +420,8 @@ export default function LabelScannerTab({
   const setBatchMode = useCallback((v: boolean) => {
     setBatchModeRaw(v);
     try { sessionStorage.setItem(`scanner-batch-${sessionId}`, String(v)); } catch {}
-  }, [sessionId]);
+    onBatchModeChange?.(v);
+  }, [sessionId, onBatchModeChange]);
   const batchModeInitRef = useRef(batchMode || sessionStorage.getItem(`scanner-batch-${sessionId}`) !== null);
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
@@ -1380,17 +1385,29 @@ export default function LabelScannerTab({
               </Badge>
             )}
           </div>
-          {!batchMode && nextPhoto && (
-            <Button
-              size="sm"
-              onClick={advanceToNextPhoto}
-              className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
-              data-testid="btn-next-photo"
-            >
-              <AlertCircle className="h-3.5 w-3.5 mr-1" />
-              <span className="text-xs font-semibold">Go To Next Photo ({availablePhotos.length - currentPhotoIndex - 1})</span>
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {!batchMode && nextPhoto && (
+              <Button
+                size="sm"
+                onClick={advanceToNextPhoto}
+                className="bg-[hsl(30_90%_45%)] text-white border border-[hsl(30_90%_35%)]"
+                data-testid="btn-next-photo"
+              >
+                <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                <span className="text-xs font-semibold">Go To Next Photo ({availablePhotos.length - currentPhotoIndex - 1})</span>
+              </Button>
+            )}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-1 rounded text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors"
+                title="Close panel"
+                data-testid="btn-scanner-close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
         {(phase === "preview" || isAdmin) && (
           <div className="pt-1 flex justify-end">
@@ -1551,7 +1568,7 @@ export default function LabelScannerTab({
                 </div>
                 <div className={`grid gap-3 ${
                   phase === "preview"
-                    ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+                    ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
                     : "grid-cols-1 sm:grid-cols-2"
                 }`}>
                   {batch.cards.map((card) => {
@@ -1649,7 +1666,7 @@ export default function LabelScannerTab({
                                 panX={card.panX}
                                 panY={card.panY}
                                 onPan={(px, py) => setCardPan(card.pin.id, px, py)}
-                                size={isBatch ? 200 : 180}
+                                size={isBatch ? 300 : 180}
                               />
                             </div>
                             <div className="flex items-center gap-1.5 px-1">
