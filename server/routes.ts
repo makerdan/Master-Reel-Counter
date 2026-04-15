@@ -1285,6 +1285,7 @@ export async function registerRoutes(
           if (safeBody.reelTag !== undefined) pinSync.wireDetails = safeBody.reelTag;
           if (safeBody.footage !== undefined) pinSync.footage = safeBody.footage;
           if (safeBody.reelCount !== undefined) pinSync.reelCount = safeBody.reelCount;
+          if (safeBody.manufacturer !== undefined) pinSync.vendorCode = safeBody.manufacturer;
           if (Object.keys(pinSync).length > 0) {
             await storage.updatePin(linkedPin.id, pinSync);
             broadcastToSession(entry.sessionId, { type: "sync", entity: "pins", sessionId: entry.sessionId });
@@ -1348,6 +1349,7 @@ export async function registerRoutes(
       const username = req.user.claims.first_name || req.user.claims.email || userId;
       logActivity(entry.sessionId, userId, username, "entry_deleted", "entry", entry.id);
       broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
+      broadcastToSession(entry.sessionId, { type: "sync", entity: "pins", sessionId: entry.sessionId });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete entry" });

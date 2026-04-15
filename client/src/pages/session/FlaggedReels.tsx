@@ -443,7 +443,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
         } else {
           const notesWithMarker = data.notes ? `${data.notes}\n${resolvedMarker}` : resolvedMarker;
           await apiRequest("PATCH", `/api/entries/${resolvedEntryId}`, {
-            wireType: data.wireDetails || undefined,
+            reelTag: data.wireDetails || undefined,
             manufacturer: data.vendorCode || undefined,
             footage: parsedFootage ? parsedFootage * (parsedReelCount > 0 ? parsedReelCount : 1) : undefined,
             reelCount: parsedReelCount > 0 ? parsedReelCount : 1,

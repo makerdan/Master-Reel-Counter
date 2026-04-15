@@ -31,7 +31,7 @@ export function useUndoRedo(sessionId: number) {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
     }
-    if (actionType === "delete-photo" || actionType === "duplicate-photo") {
+    if (actionType === "delete-photo" || actionType === "duplicate-photo" || actionType === "create-entry" || actionType === "delete-entry" || actionType === "update-entry") {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
     }
