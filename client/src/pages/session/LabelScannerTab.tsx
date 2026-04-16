@@ -973,7 +973,7 @@ export default function LabelScannerTab({
               if (!updated.editFootage.trim() && unambiguous.footage) {
                 updated.editFootage = String(toDisplayUnit(unambiguous.footage, currentUnit));
               }
-              if (!updated.matchResult) {
+              if (!updated.matchResult && exactMatches.length === 1) {
                 updated.matchResult = {
                   match: unambiguous,
                   confidence: "high",
