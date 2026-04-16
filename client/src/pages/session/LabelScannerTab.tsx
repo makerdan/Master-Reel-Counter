@@ -1636,7 +1636,7 @@ export default function LabelScannerTab({
                         key={card.pin.id}
                         className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors ${
                           card.included
-                            ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)] opacity-60"
+                            ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)]"
                             : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)]"
                         }`}
                         data-testid={`card-pin-${card.pin.id}`}
@@ -1862,7 +1862,7 @@ export default function LabelScannerTab({
               key={card.pin.id}
               className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors ${
                 card.included
-                  ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)] opacity-60"
+                  ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)]"
                   : "bg-[hsl(25_8%_14%)] border-[hsl(18_20%_25%/0.2)]"
               }`}
               data-testid={`card-pin-${card.pin.id}`}
