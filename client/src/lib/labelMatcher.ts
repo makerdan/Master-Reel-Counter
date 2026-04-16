@@ -51,6 +51,43 @@ function tryExactCatalogMatch(normalized: string): ParsedCatalogEntry | null {
   return entry ? parseCatalogEntry(entry) : null;
 }
 
+const CME_COLOR_CODES = ["BK", "WH", "GY", "BL", "RD", "YL", "OR", "GN", "BR", "PR", "PK"] as const;
+const CME_VALID_SIZES = new Set([
+  "1", "2", "3", "4", "6", "8",
+  "10", "20", "30", "40",
+  "250", "300", "350", "400", "500", "600", "700", "750", "900",
+]);
+
+const CME_BRAND_MAP: Record<string, { wireType: string; vendor: string }> = {
+  "01": { wireType: "THHN", vendor: "COP" },
+};
+
+const CME_PATTERN = new RegExp(`^1(\\d+)(${CME_COLOR_CODES.join("|")})(\\d{2})(\\d+)$`);
+
+export function translateCmeCode(normalized: string): { catalog: string; vendor: string } | null {
+  if (!normalized || normalized.length < 8) return null;
+  if (normalized[0] !== "1") return null;
+
+  const m = normalized.match(CME_PATTERN);
+  if (!m) return null;
+
+  const [, size, color, brandCode, footage] = m;
+  if (!CME_VALID_SIZES.has(size)) return null;
+
+  const brand = CME_BRAND_MAP[brandCode];
+  if (!brand) return null;
+
+  const catalog = `${brand.wireType}${size}${color}${footage}`;
+  return { catalog, vendor: brand.vendor };
+}
+
+function tryCmeTranslation(normalized: string): ParsedCatalogEntry | null {
+  const translated = translateCmeCode(normalized);
+  if (!translated) return null;
+  const entry = CATALOG.find(e => e.catalog === translated.catalog && e.vendor === translated.vendor);
+  return entry ? parseCatalogEntry(entry) : null;
+}
+
 function tryCorrectionMatch(raw: string): { entry: ParsedCatalogEntry; confident: boolean } | null {
   const result = correctWireDetails(raw);
   if (result.catalogMatch) {
@@ -279,6 +316,11 @@ function attemptMatch(text: string): LabelMatchResult {
   const exactMatch = tryExactCatalogMatch(normalized);
   if (exactMatch) {
     return { match: exactMatch, confidence: "high", normalizedInput: normalized, matchMethod: "exact" };
+  }
+
+  const cmeMatch = tryCmeTranslation(normalized);
+  if (cmeMatch) {
+    return { match: cmeMatch, confidence: "high", normalizedInput: normalized, matchMethod: "exact" };
   }
 
   const correctionResult = tryCorrectionMatch(text);
