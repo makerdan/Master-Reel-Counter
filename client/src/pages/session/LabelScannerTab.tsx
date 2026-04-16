@@ -1679,7 +1679,7 @@ export default function LabelScannerTab({
                                     <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"}`} />
                                   </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-64 p-3 space-y-2" onClick={(e) => e.stopPropagation()} data-testid={`popover-flag-${card.pin.id}`}>
+                                <PopoverContent className="w-64 p-3 space-y-2" onClick={(e) => e.stopPropagation()} onCloseAutoFocus={(e) => e.preventDefault()} data-testid={`popover-flag-${card.pin.id}`}>
                                   <p className="text-xs font-medium">Flag for re-shoot</p>
                                   <Input
                                     placeholder="Reason (optional)"
@@ -1905,7 +1905,7 @@ export default function LabelScannerTab({
                           <Flag className={`${isBatch ? "h-3 w-3" : "h-3.5 w-3.5"}`} />
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-64 p-3 space-y-2" onClick={(e) => e.stopPropagation()} data-testid={`popover-flag-${card.pin.id}`}>
+                      <PopoverContent className="w-64 p-3 space-y-2" onClick={(e) => e.stopPropagation()} onCloseAutoFocus={(e) => e.preventDefault()} data-testid={`popover-flag-${card.pin.id}`}>
                         <p className="text-xs font-medium">Flag for re-shoot</p>
                         <Input
                           placeholder="Reason (optional)"
