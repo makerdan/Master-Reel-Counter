@@ -18,6 +18,8 @@ import { Slider } from "@/components/ui/slider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
+import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
+import { lookupCatalog, userWireCatalogToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { matchLabelText, type LabelMatchResult } from "@/lib/labelMatcher";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
@@ -400,6 +402,11 @@ export default function LabelScannerTab({
 }) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
+  const { catalogs: userCatalogs } = useWireCatalogs();
+  const userParsedCatalog = useMemo<ParsedCatalogEntry[]>(
+    () => (userCatalogs ?? []).map(userWireCatalogToParsedEntry),
+    [userCatalogs]
+  );
   const { data: scannerSettings } = useQuery<{ defaultUnit: string }>({
     queryKey: ["/api/settings"],
     select: (data: any) => ({ defaultUnit: data?.defaultUnit ?? "feet" }),
@@ -652,6 +659,9 @@ export default function LabelScannerTab({
     let builtHasResults = false;
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
+      const stableKey = (p: { photoId: number; xPercent: number; yPercent: number; label: string | null }) =>
+        `${p.photoId}|${p.xPercent.toFixed(5)}|${p.yPercent.toFixed(5)}|${p.label ?? ""}`;
+      const existingByStableKey = new Map(prev.map((c) => [stableKey(c.pin), c]));
       const savedZooms = loadSavedZooms(sessionId);
       const savedSelections = loadSavedSelections(sessionId);
       const localResults = loadSavedResults(sessionId);
@@ -681,10 +691,25 @@ export default function LabelScannerTab({
         };
       }
 
+      function applyPinSeed<T extends { editCatalog: string; editVendor: string; editFootage: string }>(seed: T, pin: Pin): T {
+        return {
+          ...seed,
+          editCatalog: pin.wireDetails && pin.wireDetails.trim() ? pin.wireDetails.toUpperCase() : seed.editCatalog,
+          editVendor: pin.vendorCode && pin.vendorCode.trim() ? pin.vendorCode.toUpperCase() : seed.editVendor,
+          editFootage: pin.footage != null ? String(toDisplayUnit(pin.footage, currentUnit)) : seed.editFootage,
+        };
+      }
+
       const built = effectivePins.map((pin) => {
         const sr = serverResultsMap.get(pin.id);
-        const ex = existing.get(pin.id);
-        if (ex && ex.pin.id === pin.id) {
+        let ex = existing.get(pin.id);
+        if (!ex) {
+          const byKey = existingByStableKey.get(stableKey(pin));
+          if (byKey && byKey.pin.id !== pin.id) {
+            ex = byKey;
+          }
+        }
+        if (ex) {
           if (sr) {
             const serverTime = new Date(sr.updatedAt || sr.createdAt).getTime();
             const hasNewerServer = !ex.result || serverTime > (ex._serverTs ?? 0);
@@ -700,21 +725,23 @@ export default function LabelScannerTab({
         const savedIncluded = hasSavedSelection ? savedSelections[String(pin.id)] : undefined;
         const base = { pin, zoomLevel: savedZoom ?? smartZoom, panX: 0, panY: 0, included: savedIncluded ?? true, isDraft: !pin.entryId };
         if (sr) {
-          return { ...base, included: savedIncluded ?? true, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...buildResultFromServer(sr, pin) };
+          return { ...base, included: savedIncluded ?? true, _serverTs: new Date(sr.updatedAt || sr.createdAt).getTime(), ...applyPinSeed(buildResultFromServer(sr, pin), pin) };
         }
         const local = localResultsMap.get(pin.id);
         if (local && local.rawText !== null) {
           return {
             ...base,
             included: savedIncluded ?? true,
-            editCatalog: local.editCatalog ?? "",
-            editFootage: local.editFootage ?? "",
-            editVendor: local.editVendor ?? "",
+            ...applyPinSeed({
+              editCatalog: local.editCatalog ?? "",
+              editFootage: local.editFootage ?? "",
+              editVendor: local.editVendor ?? "",
+            }, pin),
             result: { pinId: pin.id, pinLabel: pin.label || "", rawText: local.rawText, readable: local.readable } as AnalysisResult,
             matchResult: local.rawText ? matchLabelText(local.rawText) : undefined,
           };
         }
-        return { ...base, included: savedIncluded ?? true, editCatalog: "", editFootage: "", editVendor: "" };
+        return { ...base, included: savedIncluded ?? true, ...applyPinSeed({ editCatalog: "", editFootage: "", editVendor: "" }, pin) };
       });
       builtHasResults = built.some((c) => c.result);
       return builtHasResults ? sortCardsByCatalog(built) : built;
@@ -924,7 +951,36 @@ export default function LabelScannerTab({
 
   const setCardField = (pinId: number, field: "editCatalog" | "editVendor", value: string) => {
     setCards((prev) =>
-      prev.map((c) => (c.pin.id === pinId ? { ...c, [field]: value } : c))
+      prev.map((c) => {
+        if (c.pin.id !== pinId) return c;
+        const updated: PinCard = { ...c, [field]: value };
+        if (field === "editCatalog") {
+          const cleaned = value.trim();
+          if (cleaned.length >= 2) {
+            const results = lookupCatalog(cleaned, userParsedCatalog);
+            const upper = cleaned.toUpperCase().replace(/[^A-Z0-9]/g, "");
+            const exact = results.find((r) => r.catalog === upper);
+            const unambiguous = exact ?? (results.length === 1 ? results[0] : null);
+            if (unambiguous) {
+              if (!updated.editVendor.trim() && unambiguous.vendor) {
+                updated.editVendor = unambiguous.vendor.toUpperCase();
+              }
+              if (!updated.editFootage.trim() && unambiguous.footage) {
+                updated.editFootage = String(toDisplayUnit(unambiguous.footage, currentUnit));
+              }
+              if (!updated.matchResult) {
+                updated.matchResult = {
+                  match: unambiguous,
+                  confidence: "high",
+                  normalizedInput: upper,
+                  matchMethod: "exact",
+                };
+              }
+            }
+          }
+        }
+        return updated;
+      })
     );
   };
 
