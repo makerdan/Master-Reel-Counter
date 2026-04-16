@@ -109,8 +109,9 @@ export function useUndoRedo(sessionId: number) {
         return { type: "update-photo", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
       }
       case "update-session": {
-        await apiRequest("PATCH", `/api/sessions/${action.sessionId}`, action.previousData);
-        return { type: "update-session", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
+        const res = await apiRequest("PATCH", `/api/sessions/${action.sessionId}`, { ...action.previousData, expectedLastUpdatedAt: action.data?.expectedLastUpdatedAt });
+        const updated = await res.json().catch(() => null);
+        return { type: "update-session", sessionId: action.sessionId, entityId: action.entityId, data: { ...action.previousData, expectedLastUpdatedAt: updated?.lastUpdatedAt }, previousData: action.data };
       }
       case "lock-session": {
         const newLocked = !action.data.locked;

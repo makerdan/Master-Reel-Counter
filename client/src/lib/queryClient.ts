@@ -7,6 +7,18 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+export function parseApiErrorPayload(err: unknown): Record<string, unknown> | null {
+  if (!(err instanceof Error) || typeof err.message !== "string") return null;
+  const idx = err.message.indexOf("{");
+  if (idx < 0) return null;
+  try {
+    const parsed = JSON.parse(err.message.slice(idx));
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function apiRequest(
   method: string,
   url: string,

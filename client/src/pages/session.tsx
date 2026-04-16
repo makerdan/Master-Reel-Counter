@@ -28,7 +28,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import type { Session, Entry, Photo, Pin } from "@shared/schema";
@@ -334,10 +334,11 @@ function SessionWorkspace({
         name,
         location: location || null,
         ...(description !== undefined ? { description: description || null } : {}),
+        expectedLastUpdatedAt: session?.lastUpdatedAt,
       });
       return { result: await res.json(), _previous, newValues: { name, location: location || null, description: description || null } };
     },
-    onSuccess: async ({ _previous, newValues }) => {
+    onSuccess: async ({ result, _previous, newValues }) => {
       await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
       queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
       if (_previous) {
@@ -345,13 +346,19 @@ function SessionWorkspace({
           type: "update-session",
           sessionId,
           entityId: sessionId,
-          data: { name: newValues.name, location: newValues.location, description: newValues.description },
+          data: { name: newValues.name, location: newValues.location, description: newValues.description, expectedLastUpdatedAt: result?.lastUpdatedAt },
           previousData: { name: _previous.name, location: _previous.location || null, description: _previous.description || null },
         });
       }
     },
-    onError: () => {
-      toast({ title: "Failed to update session", variant: "destructive" });
+    onError: async (err: unknown) => {
+      let message = "Failed to update session";
+      const parsed = parseApiErrorPayload(err);
+      if (parsed?.code === "SESSION_VERSION_CONFLICT") {
+        if (typeof parsed.message === "string") message = parsed.message;
+        await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+      }
+      toast({ title: message, variant: "destructive" });
     },
   });
 

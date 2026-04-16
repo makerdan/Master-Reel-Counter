@@ -37,7 +37,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatTimestamp } from "@/lib/timezone";
@@ -439,16 +439,26 @@ export default function Dashboard() {
     },
   });
 
+  const editingSessionVersionRef = useRef<string | Date | null | undefined>(undefined);
+
   const updateSession = useMutation({
-    mutationFn: async ({ id, name, location }: { id: number; name: string; location: string }) => {
-      const res = await apiRequest("PATCH", `/api/sessions/${id}`, { name, location: location || null });
+    mutationFn: async ({ id, name, location, expectedLastUpdatedAt }: { id: number; name: string; location: string; expectedLastUpdatedAt?: string | Date | null }) => {
+      const res = await apiRequest("PATCH", `/api/sessions/${id}`, { name, location: location || null, expectedLastUpdatedAt });
       return res.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      if (result?.lastUpdatedAt) editingSessionVersionRef.current = result.lastUpdatedAt;
       await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
     },
-    onError: () => {
-      toast({ title: "Failed to update session", variant: "destructive" });
+    onError: async (err: unknown) => {
+      let message = "Failed to update session";
+      const parsed = parseApiErrorPayload(err);
+      if (parsed?.code === "SESSION_VERSION_CONFLICT") {
+        if (typeof parsed.message === "string") message = parsed.message;
+        if (typeof parsed.currentLastUpdatedAt === "string") editingSessionVersionRef.current = parsed.currentLastUpdatedAt;
+        await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
+      }
+      toast({ title: message, variant: "destructive" });
     },
   });
 
@@ -459,14 +469,18 @@ export default function Dashboard() {
     if (editName === editingSession.name && (editLocation || "") === (editingSession.location || "")) return;
     clearTimeout(sessionAutoSaveRef.current);
     sessionAutoSaveRef.current = setTimeout(() => {
-      updateSession.mutate({ id: editingSession.id, name: editName, location: editLocation });
+      updateSession.mutate({ id: editingSession.id, name: editName, location: editLocation, expectedLastUpdatedAt: editingSessionVersionRef.current ?? editingSession.lastUpdatedAt });
     }, 1000);
     return () => clearTimeout(sessionAutoSaveRef.current);
   }, [editName, editLocation, editingSession]);
 
+  useEffect(() => {
+    editingSessionVersionRef.current = editingSession?.lastUpdatedAt;
+  }, [editingSession?.id]);
+
   const toggleStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const body: any = { status };
+    mutationFn: async ({ id, status, expectedLastUpdatedAt }: { id: number; status: string; expectedLastUpdatedAt?: string | Date | null }) => {
+      const body: any = { status, expectedLastUpdatedAt };
       if (status === "completed") body.completedAt = new Date().toISOString();
       else body.completedAt = null;
       const res = await apiRequest("PATCH", `/api/sessions/${id}`, body);
@@ -475,8 +489,14 @@ export default function Dashboard() {
     onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
     },
-    onError: () => {
-      toast({ title: "Failed to update session status", variant: "destructive" });
+    onError: async (err: unknown) => {
+      let message = "Failed to update session status";
+      const parsed = parseApiErrorPayload(err);
+      if (parsed?.code === "SESSION_VERSION_CONFLICT") {
+        if (typeof parsed.message === "string") message = parsed.message;
+        await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });
+      }
+      toast({ title: message, variant: "destructive" });
     },
   });
 
@@ -1061,6 +1081,7 @@ export default function Dashboard() {
                         toggleStatus.mutate({
                           id: session.id,
                           status: session.status === "active" ? "completed" : "active",
+                          expectedLastUpdatedAt: session.lastUpdatedAt,
                         });
                       }}
                       data-testid={`menu-toggle-status-${session.id}`}
@@ -1963,6 +1984,7 @@ export default function Dashboard() {
                         toggleStatus.mutate({
                           id: lastSession.id,
                           status: lastSession.status === "active" ? "completed" : "active",
+                          expectedLastUpdatedAt: lastSession.lastUpdatedAt,
                         });
                       }}
                       data-testid="menu-continue-toggle-status"
@@ -2159,7 +2181,7 @@ export default function Dashboard() {
 
       <Dialog open={!!editingSession} onOpenChange={(o) => {
         if (!o && editingSession && editName.trim() && (editName !== editingSession.name || (editLocation || "") !== (editingSession.location || ""))) {
-          updateSession.mutate({ id: editingSession.id, name: editName, location: editLocation });
+          updateSession.mutate({ id: editingSession.id, name: editName, location: editLocation, expectedLastUpdatedAt: editingSessionVersionRef.current ?? editingSession.lastUpdatedAt });
         }
         if (!o) setEditingSession(null);
       }}>

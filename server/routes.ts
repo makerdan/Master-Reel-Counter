@@ -8,7 +8,7 @@ import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/route
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
 import { z } from "zod";
 import { eq, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -166,6 +166,7 @@ const patchSessionSchema = z.object({
   completedAt: z.union([z.string().datetime(), z.null()]).optional(),
   lastPhotoIndex: z.number().int().min(0).optional(),
   folderId: z.number().int().nullable().optional(),
+  expectedLastUpdatedAt: z.union([z.string().datetime(), z.number()]).optional(),
 }).strict();
 
 export async function registerRoutes(
@@ -338,7 +339,7 @@ export async function registerRoutes(
   app.get("/uploads/:filename", isAuthenticated, async (req: any, res) => {
     try {
       const filename = req.params.filename;
-      if (filename.includes("..") || filename.includes("/")) {
+      if (typeof filename !== "string" || !/^[A-Za-z0-9._-]+$/.test(filename) || filename.length > 255 || filename === "." || filename === "..") {
         return res.status(400).json({ error: "Invalid filename" });
       }
 
@@ -494,12 +495,38 @@ export async function registerRoutes(
       }
       const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      const data: any = { ...parsed.data };
-      const isLastPhotoIndexOnly = Object.keys(data).length === 1 && "lastPhotoIndex" in data;
+      const { expectedLastUpdatedAt, completedAt, ...rest } = parsed.data;
+      const data: Partial<Session> = { ...rest };
+      if (completedAt !== undefined) {
+        data.completedAt = completedAt === null ? null : new Date(completedAt);
+      }
+      const mutatingKeys = Object.keys(data);
+      const isLastPhotoIndexOnly = mutatingKeys.length === 1 && "lastPhotoIndex" in data;
       if (!isLastPhotoIndexOnly && !isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can edit session details" });
-      if (data.completedAt) data.completedAt = new Date(data.completedAt);
-      else if (data.completedAt === null) data.completedAt = null;
-      const updated = await storage.updateSession(access.session.id, data);
+      // Optimistic locking: required for all session detail edits to prevent silent
+      // concurrent overwrites. The `lastPhotoIndex`-only fast path (used by the
+      // capture flow to record scroll position) is intentionally exempt.
+      let updated: Session | undefined;
+      if (isLastPhotoIndexOnly) {
+        updated = await storage.updateSession(access.session.id, data);
+      } else {
+        if (expectedLastUpdatedAt === undefined) {
+          return res.status(400).json({ message: "expectedLastUpdatedAt is required for session edits" });
+        }
+        const expectedDate = new Date(expectedLastUpdatedAt);
+        if (isNaN(expectedDate.getTime())) {
+          return res.status(400).json({ message: "Invalid expectedLastUpdatedAt" });
+        }
+        updated = await storage.updateSessionIfUnchanged(access.session.id, expectedDate, data);
+        if (!updated) {
+          const current = await storage.getSession(access.session.id);
+          return res.status(409).json({
+            message: "This session was updated by someone else. Please reload to see the latest changes before saving again.",
+            code: "SESSION_VERSION_CONFLICT",
+            currentLastUpdatedAt: current?.lastUpdatedAt ?? null,
+          });
+        }
+      }
       if (!isLastPhotoIndexOnly) {
         const changedFields = Object.keys(data).filter(k => k !== "lastPhotoIndex").join(", ");
         logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "session_updated", "session", access.session.id, changedFields);
@@ -5294,8 +5321,27 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // WebSocket
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
+  const wsAlive = new WeakMap<WebSocket, boolean>();
+
+  const cleanupWs = (ws: WebSocket) => {
+    const info = wsUserMap.get(ws);
+    if (info?.sessionId !== null && info?.sessionId !== undefined) {
+      const room = sessionRooms.get(info.sessionId);
+      if (room) { room.delete(ws); if (room.size === 0) sessionRooms.delete(info.sessionId); }
+      broadcastPresence(info.sessionId);
+    }
+    wsUserMap.delete(ws);
+    wsAlive.delete(ws);
+  };
+
   wss.on("connection", (ws) => {
     wsUserMap.set(ws, { sessionId: null, userId: null, username: null, role: null });
+    wsAlive.set(ws, true);
+    ws.on("pong", () => { wsAlive.set(ws, true); });
+    ws.on("error", () => {
+      try { ws.terminate(); } catch {}
+      cleanupWs(ws);
+    });
 
     ws.on("message", async (raw) => {
       try {
@@ -5330,15 +5376,26 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     });
 
     ws.on("close", () => {
-      const info = wsUserMap.get(ws);
-      if (info?.sessionId !== null && info?.sessionId !== undefined) {
-        const room = sessionRooms.get(info.sessionId);
-        if (room) { room.delete(ws); if (room.size === 0) sessionRooms.delete(info.sessionId); }
-        broadcastPresence(info.sessionId);
-      }
-      wsUserMap.delete(ws);
+      cleanupWs(ws);
     });
   });
+
+  const WS_HEARTBEAT_INTERVAL_MS = 30_000;
+  const wsHeartbeat = setInterval(() => {
+    wss.clients.forEach((ws: WebSocket) => {
+      if (wsAlive.get(ws) === false) {
+        try { ws.terminate(); } catch {}
+        cleanupWs(ws);
+        return;
+      }
+      wsAlive.set(ws, false);
+      try { ws.ping(); } catch {
+        try { ws.terminate(); } catch {}
+        cleanupWs(ws);
+      }
+    });
+  }, WS_HEARTBEAT_INTERVAL_MS);
+  wss.on("close", () => { clearInterval(wsHeartbeat); });
 
   const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000;
   const TRASH_MAX_AGE_DAYS = 30;

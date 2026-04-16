@@ -51,6 +51,7 @@ export interface IStorage {
   getSession(id: number): Promise<Session | undefined>;
   getUserSessions(userId: string, options?: { trash?: boolean; limit?: number; offset?: number }): Promise<{ sessions: Session[]; total: number }>;
   updateSession(id: number, data: Partial<Session>): Promise<Session | undefined>;
+  updateSessionIfUnchanged(id: number, expectedLastUpdatedAt: Date, data: Partial<Session>): Promise<Session | undefined>;
   softDeleteSession(id: number): Promise<void>;
   restoreSession(id: number): Promise<void>;
   deleteSession(id: number): Promise<void>;
@@ -279,6 +280,17 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.update(countingSessions)
       .set({ ...data, lastUpdatedAt: new Date() })
       .where(eq(countingSessions.id, id))
+      .returning();
+    return result;
+  }
+
+  async updateSessionIfUnchanged(id: number, expectedLastUpdatedAt: Date, data: Partial<Session>): Promise<Session | undefined> {
+    const [result] = await db.update(countingSessions)
+      .set({ ...data, lastUpdatedAt: new Date() })
+      .where(and(
+        eq(countingSessions.id, id),
+        eq(countingSessions.lastUpdatedAt, expectedLastUpdatedAt),
+      ))
       .returning();
     return result;
   }
