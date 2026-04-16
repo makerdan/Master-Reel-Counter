@@ -714,7 +714,7 @@ export default function LabelScannerTab({
             const serverTime = new Date(sr.updatedAt || sr.createdAt).getTime();
             const hasNewerServer = !ex.result || serverTime > (ex._serverTs ?? 0);
             if (hasNewerServer) {
-              return { ...ex, pin, isDraft: !pin.entryId, _serverTs: serverTime, ...buildResultFromServer(sr, pin) };
+              return { ...ex, pin, isDraft: !pin.entryId, _serverTs: serverTime, ...applyPinSeed(buildResultFromServer(sr, pin), pin) };
             }
           }
           return { ...ex, pin, isDraft: !pin.entryId };
@@ -959,8 +959,13 @@ export default function LabelScannerTab({
           if (cleaned.length >= 2) {
             const results = lookupCatalog(cleaned, userParsedCatalog);
             const upper = cleaned.toUpperCase().replace(/[^A-Z0-9]/g, "");
-            const exact = results.find((r) => r.catalog === upper);
-            const unambiguous = exact ?? (results.length === 1 ? results[0] : null);
+            const exactMatches = results.filter((r) => r.catalog === upper);
+            const unambiguous =
+              exactMatches.length === 1
+                ? exactMatches[0]
+                : exactMatches.length === 0 && results.length === 1
+                ? results[0]
+                : null;
             if (unambiguous) {
               if (!updated.editVendor.trim() && unambiguous.vendor) {
                 updated.editVendor = unambiguous.vendor.toUpperCase();
