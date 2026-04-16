@@ -868,7 +868,7 @@ export default function LabelScannerTab({
           vendor = "ALU";
         }
         const isHighConfidence = matchResult?.confidence === "high";
-        const included = isHighConfidence ? true : card.included;
+        const included = isHighConfidence;
         const updated = {
           ...card,
           result,
@@ -878,9 +878,7 @@ export default function LabelScannerTab({
           editVendor: vendor,
           included,
         };
-        if (isHighConfidence) {
-          saveSelectionState(sessionId, card.pin.id, true);
-        }
+        saveSelectionState(sessionId, card.pin.id, included);
         return updated;
       })
     );
@@ -1077,14 +1075,7 @@ export default function LabelScannerTab({
         setCards((prev) => {
           const sorted = sortCardsByCatalog(prev);
           saveAnalysisResults(sessionId, sorted);
-          const updated = sorted.map((c) => {
-            if (c.result?.rawText && !c.editCatalog.trim() && !c.editVendor.trim()) {
-              saveSelectionState(sessionId, c.pin.id, false);
-              return { ...c, included: false };
-            }
-            return c;
-          });
-          return updated;
+          return sorted;
         });
         toast({ title: "Analysis complete", description: `Read ${totalResults} label(s)` });
       }
