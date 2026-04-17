@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 
 type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
 
@@ -13,10 +15,28 @@ interface UndoAction {
 
 const MAX_STACK = 20;
 
+function isNetworkFailure(err: unknown): boolean {
+  if (!navigator.onLine) return true;
+  if (err instanceof TypeError) {
+    return (
+      err.message === "Failed to fetch" ||
+      err.message === "Load failed" ||
+      err.message === "NetworkError when attempting to fetch resource."
+    );
+  }
+  return false;
+}
+
+function errorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 export function useUndoRedo(sessionId: number) {
   const [undoStack, setUndoStack] = useState<UndoAction[]>([]);
   const [redoStack, setRedoStack] = useState<UndoAction[]>([]);
   const busyRef = useRef(false);
+  const { toast } = useToast();
 
   const invalidateSession = useCallback((actionType?: ActionType) => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
@@ -134,39 +154,157 @@ export function useUndoRedo(sessionId: number) {
     }
   }, []);
 
+  // Action types whose reverse operation is safe to route through the existing
+  // offline queue. Today only entry create/restore is queue-safe, because the
+  // shared offline queue (offlineQueue.ts) is built around POST /entries.
+  const isQueueSafeOffline = (action: UndoAction): boolean =>
+    action.type === "delete-entry" && !!action.previousData;
+
+  const optimisticallyApplyOffline = useCallback((action: UndoAction) => {
+    if (action.type === "delete-entry" && action.previousData) {
+      // Restore the deleted entry locally with a placeholder id so the UI
+      // reflects the undo immediately while offline. The real id arrives
+      // when the queued create replays after reconnect.
+      const entriesKey = ["/api/sessions", action.sessionId.toString(), "entries"];
+      const placeholder = {
+        ...action.previousData,
+        id: -Math.floor(Date.now() % 2147483647),
+        sessionId: action.sessionId,
+      };
+      queryClient.setQueryData<any[]>(entriesKey, (prev) => {
+        if (!Array.isArray(prev)) return prev;
+        return [...prev, placeholder];
+      });
+    }
+  }, []);
+
+  const tryQueueOffline = useCallback(async (action: UndoAction): Promise<boolean> => {
+    if (!isQueueSafeOffline(action)) return false;
+    if (action.type === "delete-entry") {
+      await createEntryWithOfflineFallback(action.sessionId, action.previousData);
+      optimisticallyApplyOffline(action);
+      return true;
+    }
+    return false;
+  }, [optimisticallyApplyOffline]);
+
+  const performStep = useCallback(async (
+    action: UndoAction,
+    direction: "undo" | "redo",
+  ) => {
+    const verb = direction === "undo" ? "Undo" : "Redo";
+
+    if (!navigator.onLine) {
+      try {
+        const queued = await tryQueueOffline(action);
+        if (queued) {
+          // Pop the action from its source stack. We don't push onto the opposite
+          // stack because the queued create returns a placeholder id; any reverse
+          // step held now would target an id that doesn't yet exist server-side.
+          if (direction === "undo") {
+            setUndoStack(prev => prev.slice(0, -1));
+            setRedoStack([]);
+          } else {
+            setRedoStack(prev => prev.slice(0, -1));
+          }
+          invalidateSession(action.type);
+          toast({
+            title: `${verb} queued`,
+            description: "You're offline. The change will sync when you're back online.",
+          });
+        } else {
+          toast({
+            title: `Can't ${verb.toLowerCase()} while offline`,
+            description: "This action can't be queued. Reconnect and try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        toast({
+          title: `${verb} failed`,
+          description: errorMessage(err, "Could not queue this action."),
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    try {
+      const reversed = await applyReverse(action);
+      if (direction === "undo") {
+        setUndoStack(prev => prev.slice(0, -1));
+        setRedoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reversed]);
+      } else {
+        setRedoStack(prev => prev.slice(0, -1));
+        setUndoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reversed]);
+      }
+      invalidateSession(action.type);
+    } catch (err) {
+      if (isNetworkFailure(err)) {
+        try {
+          const queued = await tryQueueOffline(action);
+          if (queued) {
+            if (direction === "undo") {
+              setUndoStack(prev => prev.slice(0, -1));
+              setRedoStack([]);
+            } else {
+              setRedoStack(prev => prev.slice(0, -1));
+            }
+            invalidateSession(action.type);
+            toast({
+              title: `${verb} queued`,
+              description: "You're offline. The change will sync when you're back online.",
+            });
+            return;
+          }
+        } catch (queueErr) {
+          toast({
+            title: `${verb} failed`,
+            description: errorMessage(queueErr, "Could not queue this action."),
+            variant: "destructive",
+          });
+          return;
+        }
+        toast({
+          title: `Can't ${verb.toLowerCase()} while offline`,
+          description: "This action can't be queued. Reconnect and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Server-side or other failure: leave the stacks unchanged so the
+      // action remains available to retry, and inform the user.
+      toast({
+        title: `${verb} failed`,
+        description: errorMessage(err, "The server rejected this change."),
+        variant: "destructive",
+      });
+    }
+  }, [applyReverse, invalidateSession, toast, tryQueueOffline]);
+
   const undo = useCallback(async () => {
     if (busyRef.current) return;
     const action = undoStack[undoStack.length - 1];
     if (!action) return;
     busyRef.current = true;
-
     try {
-      const reversed = await applyReverse(action);
-      setUndoStack(prev => prev.slice(0, -1));
-      setRedoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reversed]);
-      invalidateSession(action.type);
-    } catch {
+      await performStep(action, "undo");
     } finally {
       busyRef.current = false;
     }
-  }, [undoStack, invalidateSession, applyReverse]);
+  }, [undoStack, performStep]);
 
   const redo = useCallback(async () => {
     if (busyRef.current) return;
     const action = redoStack[redoStack.length - 1];
     if (!action) return;
     busyRef.current = true;
-
     try {
-      const reversed = await applyReverse(action);
-      setRedoStack(prev => prev.slice(0, -1));
-      setUndoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reversed]);
-      invalidateSession(action.type);
-    } catch {
+      await performStep(action, "redo");
     } finally {
       busyRef.current = false;
     }
-  }, [redoStack, invalidateSession, applyReverse]);
+  }, [redoStack, performStep]);
 
   return {
     pushUndo,
