@@ -60,20 +60,33 @@ export function useUndoRedo(sessionId: number) {
   const busyRef = useRef(false);
   const { toast } = useToast();
 
-  // Persist stacks to sessionStorage whenever they change.
+  // Rehydrate stacks when sessionId changes (guards against a component instance
+  // being reused with a different sessionId without unmounting first).
   useEffect(() => {
-    saveStack(undoKey(sessionId), undoStack);
-  }, [sessionId, undoStack]);
+    setUndoStack(loadStack(undoKey(sessionId)));
+    setRedoStack(loadStack(redoKey(sessionId)));
+  }, [sessionId]);
 
+  // Persist stacks to sessionStorage on every change.
+  // Guard: if any action in either stack carries a different sessionId, the
+  // stacks are still settling after a session transition (React's setState from
+  // the rehydration effect above hasn't propagated yet). Skip the write so we
+  // never persist stale cross-session data under the new session's key.
   useEffect(() => {
-    saveStack(redoKey(sessionId), redoStack);
-  }, [sessionId, redoStack]);
+    const mismatch =
+      undoStack.some(a => a.sessionId !== sessionId) ||
+      redoStack.some(a => a.sessionId !== sessionId);
+    if (!mismatch) {
+      saveStack(undoKey(sessionId), undoStack);
+      saveStack(redoKey(sessionId), redoStack);
+    }
+  }, [sessionId, undoStack, redoStack]);
 
   // Clear persisted stacks when leaving the session (component unmount).
   useEffect(() => {
     return () => {
-      sessionStorage.removeItem(undoKey(sessionId));
-      sessionStorage.removeItem(redoKey(sessionId));
+      try { sessionStorage.removeItem(undoKey(sessionId)); } catch {}
+      try { sessionStorage.removeItem(redoKey(sessionId)); } catch {}
     };
   }, [sessionId]);
 
