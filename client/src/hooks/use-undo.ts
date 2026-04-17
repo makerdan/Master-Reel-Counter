@@ -15,6 +15,28 @@ interface UndoAction {
 
 const MAX_STACK = 20;
 
+function undoKey(sessionId: number) { return `reelcounter:undo-stack:${sessionId}`; }
+function redoKey(sessionId: number) { return `reelcounter:redo-stack:${sessionId}`; }
+
+function loadStack(key: string): UndoAction[] {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStack(key: string, stack: UndoAction[]) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(stack));
+  } catch {
+    // Ignore quota or access errors gracefully
+  }
+}
+
 function isNetworkFailure(err: unknown): boolean {
   if (!navigator.onLine) return true;
   if (err instanceof TypeError) {
@@ -33,10 +55,27 @@ function errorMessage(err: unknown, fallback: string): string {
 }
 
 export function useUndoRedo(sessionId: number) {
-  const [undoStack, setUndoStack] = useState<UndoAction[]>([]);
-  const [redoStack, setRedoStack] = useState<UndoAction[]>([]);
+  const [undoStack, setUndoStack] = useState<UndoAction[]>(() => loadStack(undoKey(sessionId)));
+  const [redoStack, setRedoStack] = useState<UndoAction[]>(() => loadStack(redoKey(sessionId)));
   const busyRef = useRef(false);
   const { toast } = useToast();
+
+  // Persist stacks to sessionStorage whenever they change.
+  useEffect(() => {
+    saveStack(undoKey(sessionId), undoStack);
+  }, [sessionId, undoStack]);
+
+  useEffect(() => {
+    saveStack(redoKey(sessionId), redoStack);
+  }, [sessionId, redoStack]);
+
+  // Clear persisted stacks when leaving the session (component unmount).
+  useEffect(() => {
+    return () => {
+      sessionStorage.removeItem(undoKey(sessionId));
+      sessionStorage.removeItem(redoKey(sessionId));
+    };
+  }, [sessionId]);
 
   const invalidateSession = useCallback((actionType?: ActionType) => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
@@ -300,6 +339,8 @@ export function useUndoRedo(sessionId: number) {
   // When the offline queue replays a queued entry create and gets the real
   // server-assigned id, update any undo/redo action that still holds the
   // placeholder id so subsequent redo (or undo) targets the correct entry.
+  // sessionStorage is updated via the persistence useEffects that run after
+  // the state setters are called.
   useEffect(() => {
     const handler = (e: Event) => {
       const { placeholderId, realId } = (
