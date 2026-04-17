@@ -263,6 +263,7 @@ function DupPinTile({
             disabled={keepMutation.isPending || deletePhotoMutation.isPending}
             data-testid={`button-keep-mobile-${pin.pinId}`}
             title="Keep this pin, delete others"
+            aria-label="Keep this pin, delete others"
           >
             {keepMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
           </Button>
@@ -275,6 +276,7 @@ function DupPinTile({
           disabled={keepMutation.isPending || deletePhotoMutation.isPending}
           data-testid={`button-delete-photo-mobile-${pin.pinId}`}
           title="Delete this photo entirely"
+          aria-label="Delete this photo entirely"
         >
           {deletePhotoMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
         </Button>
@@ -858,6 +860,7 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
                       onClick={() => handleDisregard(group)}
                       data-testid={`button-disregard-${groupKey}`}
                       title="Dismiss this duplicate warning"
+                      aria-label="Dismiss this duplicate warning"
                     >
                       <X className="h-4 w-4" />
                     </Button>

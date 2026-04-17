@@ -602,6 +602,7 @@ function PhotoCard({
                   onClick={() => handleUnlink()}
                   disabled={unlinkMutation.isPending}
                   title="Unlink from parent"
+                  aria-label="Unlink from parent photo"
                   data-testid={`button-strip-unlink-${photo.id}`}
                 >
                   <X className="h-2.5 w-2.5" />
@@ -616,6 +617,7 @@ function PhotoCard({
                 className="text-muted-foreground hover:text-primary transition-colors"
                 onClick={() => setLinkPickerOpen((o) => !o)}
                 title="Link to a parent photo"
+                aria-label="Link to a parent photo"
                 data-testid={`button-strip-link-${photo.id}`}
               >
                 <Link2 className="h-3.5 w-3.5" />
@@ -689,6 +691,7 @@ function PhotoCard({
                 return next;
               })}
               title={hasNotes ? "View/edit notes" : "Add notes"}
+              aria-label={hasNotes ? "View/edit notes" : "Add notes"}
               data-testid={`button-strip-notes-${photo.id}`}
             >
               <Pencil className={`h-3.5 w-3.5 ${hasNotes ? "text-primary fill-primary/20" : "text-muted-foreground"}`} />
@@ -698,7 +701,7 @@ function PhotoCard({
           <div className="sm:hidden ml-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="p-1 rounded hover:bg-muted transition-colors" data-testid={`button-strip-actions-${photo.id}`}>
+                <button className="p-1 rounded hover:bg-muted transition-colors" aria-label="More photo actions" data-testid={`button-strip-actions-${photo.id}`}>
                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
@@ -1041,6 +1044,7 @@ function Lightbox({
           onClick={onClose}
           data-testid="button-lightbox-close"
           title="Close (Esc)"
+          aria-label="Close image lightbox (Escape)"
         >
           <X className="h-5 w-5" />
         </button>
@@ -1052,6 +1056,7 @@ function Lightbox({
           onClick={(e) => { e.stopPropagation(); prev(); }}
           data-testid="button-lightbox-prev"
           title="Previous (←)"
+          aria-label="Previous image"
         >
           <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
         </button>
@@ -1097,6 +1102,7 @@ function Lightbox({
           onClick={(e) => { e.stopPropagation(); next(); }}
           data-testid="button-lightbox-next"
           title="Next (→)"
+          aria-label="Next image"
         >
           <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
         </button>
@@ -1110,6 +1116,8 @@ function Lightbox({
               className={`w-2 h-2 rounded-full transition-colors ${i === index ? "bg-white" : "bg-white/30 hover:bg-white/60"}`}
               onClick={(e) => { e.stopPropagation(); onNavigate(i); }}
               data-testid={`button-lightbox-dot-${i}`}
+              aria-label={`Go to image ${i + 1} of ${total}`}
+              aria-current={i === index ? "true" : undefined}
             />
           ))}
         </div>
