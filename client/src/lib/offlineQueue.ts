@@ -31,6 +31,15 @@ export interface QueuedEntry {
   sessionId: number;
   data: Record<string, unknown>;
   createdAt: number;
+  placeholderId?: number;
+}
+
+export function dispatchEntrySynced(placeholderId: number, realId: number, sessionId: number): void {
+  window.dispatchEvent(
+    new CustomEvent("reelcounter:entry-synced", {
+      detail: { placeholderId, realId, sessionId },
+    }),
+  );
 }
 
 function openDB(): Promise<IDBDatabase> {

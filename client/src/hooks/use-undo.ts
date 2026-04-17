@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
@@ -160,15 +160,15 @@ export function useUndoRedo(sessionId: number) {
   const isQueueSafeOffline = (action: UndoAction): boolean =>
     action.type === "delete-entry" && !!action.previousData;
 
-  const optimisticallyApplyOffline = useCallback((action: UndoAction) => {
+  const optimisticallyApplyOffline = useCallback((action: UndoAction, placeholderId: number) => {
     if (action.type === "delete-entry" && action.previousData) {
-      // Restore the deleted entry locally with a placeholder id so the UI
+      // Restore the deleted entry locally with the placeholder id so the UI
       // reflects the undo immediately while offline. The real id arrives
       // when the queued create replays after reconnect.
       const entriesKey = ["/api/sessions", action.sessionId.toString(), "entries"];
       const placeholder = {
         ...action.previousData,
-        id: -Math.floor(Date.now() % 2147483647),
+        id: placeholderId,
         sessionId: action.sessionId,
       };
       queryClient.setQueryData<any[]>(entriesKey, (prev) => {
@@ -178,12 +178,13 @@ export function useUndoRedo(sessionId: number) {
     }
   }, []);
 
-  const tryQueueOffline = useCallback(async (action: UndoAction): Promise<boolean> => {
+  const tryQueueOffline = useCallback(async (action: UndoAction): Promise<number | false> => {
     if (!isQueueSafeOffline(action)) return false;
     if (action.type === "delete-entry") {
-      await createEntryWithOfflineFallback(action.sessionId, action.previousData);
-      optimisticallyApplyOffline(action);
-      return true;
+      const result = await createEntryWithOfflineFallback(action.sessionId, action.previousData);
+      const placeholderId = result.placeholderId ?? result.entry.id;
+      optimisticallyApplyOffline(action, placeholderId);
+      return placeholderId;
     }
     return false;
   }, [optimisticallyApplyOffline]);
@@ -196,16 +197,23 @@ export function useUndoRedo(sessionId: number) {
 
     if (!navigator.onLine) {
       try {
-        const queued = await tryQueueOffline(action);
-        if (queued) {
-          // Pop the action from its source stack. We don't push onto the opposite
-          // stack because the queued create returns a placeholder id; any reverse
-          // step held now would target an id that doesn't yet exist server-side.
+        const placeholderId = await tryQueueOffline(action);
+        if (placeholderId !== false) {
+          // Push a placeholder reverse action onto the opposite stack so the
+          // user can redo once the queue syncs and the placeholder id is patched
+          // to the real server-assigned id via the reelcounter:entry-synced event.
+          const reverseAction: UndoAction = {
+            type: "create-entry",
+            sessionId: action.sessionId,
+            entityId: placeholderId,
+            data: action.previousData,
+          };
           if (direction === "undo") {
             setUndoStack(prev => prev.slice(0, -1));
-            setRedoStack([]);
+            setRedoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reverseAction]);
           } else {
             setRedoStack(prev => prev.slice(0, -1));
+            setUndoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reverseAction]);
           }
           invalidateSession(action.type);
           toast({
@@ -242,13 +250,20 @@ export function useUndoRedo(sessionId: number) {
     } catch (err) {
       if (isNetworkFailure(err)) {
         try {
-          const queued = await tryQueueOffline(action);
-          if (queued) {
+          const placeholderId = await tryQueueOffline(action);
+          if (placeholderId !== false) {
+            const reverseAction: UndoAction = {
+              type: "create-entry",
+              sessionId: action.sessionId,
+              entityId: placeholderId,
+              data: action.previousData,
+            };
             if (direction === "undo") {
               setUndoStack(prev => prev.slice(0, -1));
-              setRedoStack([]);
+              setRedoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reverseAction]);
             } else {
               setRedoStack(prev => prev.slice(0, -1));
+              setUndoStack(prev => [...prev.slice(-(MAX_STACK - 1)), reverseAction]);
             }
             invalidateSession(action.type);
             toast({
@@ -281,6 +296,33 @@ export function useUndoRedo(sessionId: number) {
       });
     }
   }, [applyReverse, invalidateSession, toast, tryQueueOffline]);
+
+  // When the offline queue replays a queued entry create and gets the real
+  // server-assigned id, update any undo/redo action that still holds the
+  // placeholder id so subsequent redo (or undo) targets the correct entry.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { placeholderId, realId } = (
+        e as CustomEvent<{ placeholderId: number; realId: number; sessionId: number }>
+      ).detail;
+      const patch = (a: UndoAction): UndoAction =>
+        a.entityId === placeholderId ? { ...a, entityId: realId } : a;
+      setUndoStack(prev => prev.map(patch));
+      setRedoStack(prev => prev.map(patch));
+      // Also update the optimistic cache entry so the row id matches the real one.
+      queryClient.setQueryData<any[]>(
+        ["/api/sessions", sessionId.toString(), "entries"],
+        (prev) => {
+          if (!Array.isArray(prev)) return prev;
+          return prev.map(entry =>
+            entry.id === placeholderId ? { ...entry, id: realId } : entry,
+          );
+        },
+      );
+    };
+    window.addEventListener("reelcounter:entry-synced", handler);
+    return () => window.removeEventListener("reelcounter:entry-synced", handler);
+  }, [sessionId]);
 
   const undo = useCallback(async () => {
     if (busyRef.current) return;

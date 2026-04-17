@@ -6,6 +6,7 @@ import {
   removeEntryFromQueue,
   getPendingCount,
   onQueueChange,
+  dispatchEntrySynced,
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
 
@@ -39,7 +40,11 @@ export function useNetworkStatus() {
             credentials: "include",
           });
           if (res.ok) {
+            const created = await res.json().catch(() => null);
             await removeEntryFromQueue(entry.id);
+            if (entry.placeholderId != null && created?.id != null) {
+              dispatchEntrySynced(entry.placeholderId, created.id, entry.sessionId);
+            }
             queryClient.invalidateQueries({
               queryKey: ["/api/sessions", entry.sessionId.toString(), "entries"],
             });

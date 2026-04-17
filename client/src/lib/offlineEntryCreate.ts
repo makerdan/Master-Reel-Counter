@@ -1,9 +1,10 @@
 import { apiRequest } from "@/lib/queryClient";
 import { saveEntryToQueue } from "@/lib/offlineQueue";
 
-interface OfflineEntryResult {
+export interface OfflineEntryResult {
   entry: { id: number; sessionId: number; [key: string]: unknown };
   queued: boolean;
+  placeholderId?: number;
 }
 
 function isNetworkFailure(err: unknown): boolean {
@@ -18,14 +19,20 @@ function isNetworkFailure(err: unknown): boolean {
   return false;
 }
 
+let _placeholderCounter = 0;
+function nextPlaceholderId(): number {
+  return -(++_placeholderCounter);
+}
+
 export async function createEntryWithOfflineFallback(
   sessionId: number,
   data: Record<string, unknown>,
 ): Promise<OfflineEntryResult> {
   if (!navigator.onLine) {
     const id = `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    await saveEntryToQueue({ id, sessionId, data, createdAt: Date.now() });
-    return { entry: { ...data, id: -1, sessionId }, queued: true };
+    const placeholderId = nextPlaceholderId();
+    await saveEntryToQueue({ id, sessionId, data, createdAt: Date.now(), placeholderId });
+    return { entry: { ...data, id: placeholderId, sessionId }, queued: true, placeholderId };
   }
 
   try {
@@ -35,8 +42,9 @@ export async function createEntryWithOfflineFallback(
   } catch (err) {
     if (isNetworkFailure(err)) {
       const id = `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      await saveEntryToQueue({ id, sessionId, data, createdAt: Date.now() });
-      return { entry: { ...data, id: -1, sessionId }, queued: true };
+      const placeholderId = nextPlaceholderId();
+      await saveEntryToQueue({ id, sessionId, data, createdAt: Date.now(), placeholderId });
+      return { entry: { ...data, id: placeholderId, sessionId }, queued: true, placeholderId };
     }
     throw err;
   }
