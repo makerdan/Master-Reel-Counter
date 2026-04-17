@@ -404,6 +404,9 @@ export function useUndoRedo(sessionId: number) {
     }
   }, [redoStack, performStep]);
 
+  const topUndo = undoStack[undoStack.length - 1];
+  const topRedo = redoStack[redoStack.length - 1];
+
   return {
     pushUndo,
     clearHistory,
@@ -413,5 +416,7 @@ export function useUndoRedo(sessionId: number) {
     canRedo: redoStack.length > 0,
     undoCount: undoStack.length,
     redoCount: redoStack.length,
+    undoPendingSync: !!topUndo && topUndo.entityId < 0,
+    redoPendingSync: !!topRedo && topRedo.entityId < 0,
   };
 }

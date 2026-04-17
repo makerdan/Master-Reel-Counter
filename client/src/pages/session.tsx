@@ -252,7 +252,7 @@ function SessionWorkspace({
   });
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
-  const { pushUndo, clearHistory, undo, redo, canUndo, canRedo } = useUndoRedo(sessionId);
+  const { pushUndo, clearHistory, undo, redo, canUndo, canRedo, undoPendingSync, redoPendingSync } = useUndoRedo(sessionId);
   const [undoRedoSignal, setUndoRedoSignal] = useState(0);
   const [tableExpandKey, setTableExpandKey] = useState<string | null>(null);
   const [exclusiveExpandKey, setExclusiveExpandKey] = useState<string | undefined>(undefined);
@@ -682,19 +682,41 @@ function SessionWorkspace({
             )}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={undoWithSignal} disabled={!canUndo} data-testid="button-undo" className="hidden sm:inline-flex h-8 w-8">
-                  <Undo2 className="h-4 w-4" />
-                </Button>
+                <span className="hidden sm:inline-flex relative">
+                  <Button size="icon" variant="ghost" onClick={undoWithSignal} disabled={!canUndo} data-testid="button-undo" className="h-8 w-8">
+                    <Undo2 className="h-4 w-4" />
+                  </Button>
+                  {undoPendingSync && (
+                    <span
+                      className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-400 border border-background pointer-events-none"
+                      data-testid="badge-undo-pending-sync"
+                      aria-label="pending sync"
+                    />
+                  )}
+                </span>
               </TooltipTrigger>
-              <TooltipContent>Undo</TooltipContent>
+              <TooltipContent>
+                {undoPendingSync ? "Undo (pending sync)" : "Undo"}
+              </TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={redoWithSignal} disabled={!canRedo} data-testid="button-redo" className="hidden sm:inline-flex h-8 w-8">
-                  <Redo2 className="h-4 w-4" />
-                </Button>
+                <span className="hidden sm:inline-flex relative">
+                  <Button size="icon" variant="ghost" onClick={redoWithSignal} disabled={!canRedo} data-testid="button-redo" className="h-8 w-8">
+                    <Redo2 className="h-4 w-4" />
+                  </Button>
+                  {redoPendingSync && (
+                    <span
+                      className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-400 border border-background pointer-events-none"
+                      data-testid="badge-redo-pending-sync"
+                      aria-label="pending sync"
+                    />
+                  )}
+                </span>
               </TooltipTrigger>
-              <TooltipContent>Redo</TooltipContent>
+              <TooltipContent>
+                {redoPendingSync ? "Redo (pending sync)" : "Redo"}
+              </TooltipContent>
             </Tooltip>
             {onlineUsers.length > 0 && (
               <div className="hidden sm:flex items-center gap-0.5 mr-1" data-testid="online-users">
