@@ -475,9 +475,19 @@ function PhotoCard({
           alt={`Photo ${photo.id}`}
           className="w-full h-full object-contain cursor-zoom-in"
           loading="lazy"
+          role="button"
+          tabIndex={0}
+          aria-label={`View photo ${[photo.aisle, photo.section].filter(Boolean).join(" / ") || `#${photo.id}`} full size`}
           onClick={() => {
             const label = [photo.aisle, photo.section].filter(Boolean).join(" / ") || `Photo #${photo.id}`;
             onLightbox(photoUrl(photo.objectStorageKey), label);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              const label = [photo.aisle, photo.section].filter(Boolean).join(" / ") || `Photo #${photo.id}`;
+              onLightbox(photoUrl(photo.objectStorageKey), label);
+            }
           }}
           onLoad={(e) => {
             const img = e.currentTarget;

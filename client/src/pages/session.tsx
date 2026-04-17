@@ -655,7 +655,14 @@ function SessionWorkspace({
               </TooltipTrigger>
               <TooltipContent>Back to dashboard</TooltipContent>
             </Tooltip>
-            <div className="min-w-0 cursor-pointer" onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditDescription((session as any).description || ""); setEditSessionOpen(true); }}>
+            <div
+              className="min-w-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+              role="button"
+              tabIndex={0}
+              aria-label="Edit session details"
+              onClick={() => { setEditName(session.name); setEditLocation(session.location || ""); setEditDescription((session as any).description || ""); setEditSessionOpen(true); }}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditName(session.name); setEditLocation(session.location || ""); setEditDescription((session as any).description || ""); setEditSessionOpen(true); } }}
+            >
               <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
               <span className="mono text-xs text-muted-foreground hidden sm:inline" data-testid="text-session-time">{formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz, captureMode)}</span>
             </div>

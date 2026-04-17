@@ -83,8 +83,18 @@ function PinLocationPhoto({
 }) {
   const [loaded, setLoaded] = useState(false);
   useEffect(() => { setLoaded(false); }, [photoUrl]);
+  const isInteractive = !!onClick;
   return (
-    <div className={`relative ${containerClass ?? ""}`} onClick={onClick}>
+    <div
+      className={`relative ${containerClass ?? ""}`}
+      onClick={onClick}
+      {...(isInteractive ? {
+        role: "button",
+        tabIndex: 0,
+        "aria-label": photoFilename ? `View photo ${photoFilename}` : "View photo",
+        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick!(); } },
+      } : {})}
+    >
       <img
         src={photoUrl}
         alt={photoFilename || "Photo"}
@@ -785,6 +795,8 @@ export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPho
               className="flex items-center gap-2 w-full pt-2 border-t border-blue-600/50 text-left"
               onClick={() => setDupsOpen((o) => !o)}
               data-testid="button-toggle-duplicates"
+              aria-expanded={dupsOpen}
+              aria-label={`${dupsOpen ? "Collapse" : "Expand"} possible duplicates (${visibleDupGroups.length})`}
             >
               <Copy className="h-4 w-4 text-orange-500 shrink-0" />
               <h3 className="text-sm font-semibold text-orange-600 dark:text-orange-400 flex-1">
