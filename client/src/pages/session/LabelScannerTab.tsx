@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } fr
 import { useSessionWebSocket } from "@/hooks/use-websocket";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, Grid3X3, List, Flag, Users, CheckCircle2,
+  ScanLine, ZoomIn, ZoomOut, Loader2, Check, X, AlertTriangle, AlertCircle, Sparkles, Grid3X3, List, Flag, Users, CheckCircle2, RotateCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -214,6 +214,8 @@ interface AnalysisResult {
   readable: boolean;
 }
 
+type NotAnalyzedReason = "excluded" | "cancelled" | "failed" | "new";
+
 interface PinCard {
   pin: Pin;
   zoomLevel: number;
@@ -226,7 +228,32 @@ interface PinCard {
   editCatalog: string;
   editFootage: string;
   editVendor: string;
+  notAnalyzedReason?: NotAnalyzedReason;
   _serverTs?: number;
+}
+
+function notAnalyzedCopy(reason: NotAnalyzedReason | undefined): string {
+  switch (reason) {
+    case "excluded": return "Not sent — was excluded before analysis";
+    case "cancelled": return "Cancelled before this photo was scanned";
+    case "failed": return "Analysis failed — tap Retry";
+    case "new":
+    default: return "Not analyzed yet";
+  }
+}
+
+function parseStatusFromError(err: unknown): number | null {
+  if (!err || !(err instanceof Error) || typeof err.message !== "string") return null;
+  const m = err.message.match(/^(\d{3})/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function isRetryableAnalyzeError(err: unknown): boolean {
+  const status = parseStatusFromError(err);
+  if (status === null) return true; // network/timeout/abort
+  if (status === 408 || status === 429) return true;
+  if (status >= 500 && status < 600) return true;
+  return false;
 }
 
 const imageCache = new Map<string, HTMLImageElement>();
@@ -904,6 +931,7 @@ export default function LabelScannerTab({
           editFootage: parsed?.footage ? String(toDisplayUnit(parsed.footage, currentUnit)) : "",
           editVendor: vendor,
           included,
+          notAnalyzedReason: undefined,
         };
         saveSelectionState(sessionId, card.pin.id, included);
         return updated;
@@ -953,7 +981,7 @@ export default function LabelScannerTab({
     setCards((prev) =>
       prev.map((c) => {
         if (c.pin.id !== pinId) return c;
-        const updated: PinCard = { ...c, [field]: value };
+        const updated: PinCard = { ...c, [field]: value, notAnalyzedReason: undefined };
         if (field === "editCatalog") {
           const cleaned = value.trim();
           if (cleaned.length >= 2) {
@@ -1060,75 +1088,111 @@ export default function LabelScannerTab({
     });
   }
 
-  async function handleAnalyze() {
-    if ((!currentPhotoId && !batchMode) || !includedCards.length) return;
+  async function attemptPhotoAnalyze(photoId: number, photoCards: PinCard[]): Promise<any> {
+    const pinData = photoCards.map((c) => ({
+      pinId: c.pin.id,
+      pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
+      x: c.pin.xPercent,
+      y: c.pin.yPercent,
+      zoomLevel: c.zoomLevel,
+    }));
+    const MAX_ATTEMPTS = 3;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      if (cancelRequested.current) {
+        const e = new Error("__cancelled__");
+        throw e;
+      }
+      try {
+        const res = await apiRequest("POST", `/api/photos/${photoId}/analyze-labels`, { pins: pinData });
+        return await res.json();
+      } catch (err) {
+        lastErr = err;
+        if (!isRetryableAnalyzeError(err)) throw err;
+        if (attempt === MAX_ATTEMPTS - 1) throw err;
+        const base = 500 * Math.pow(2, attempt);
+        const jitter = Math.random() * 250;
+        await new Promise((r) => setTimeout(r, base + jitter));
+      }
+    }
+    throw lastErr;
+  }
+
+  async function runAnalyze(targets: PinCard[], opts: { isRetry: boolean }) {
+    if (!targets.length) return;
     cancelRequested.current = false;
     setAnalyzing(true);
+
+    const targetIds = new Set(targets.map((c) => c.pin.id));
+    const displayIdSet = new Set(displayCards.map((c) => c.pin.id));
+
+    setCards((prev) => prev.map((c) => {
+      if (c.result) return c;
+      if (targetIds.has(c.pin.id)) return { ...c, notAnalyzedReason: "new" };
+      if (!opts.isRetry && displayIdSet.has(c.pin.id) && !c.included) {
+        return { ...c, notAnalyzedReason: "excluded" };
+      }
+      return c;
+    }));
+
+    let totalResults = 0;
+    let succeededPhotos = 0;
+    let failedPhotos = 0;
+
     try {
-      let totalResults = 0;
+      const byPhoto = new Map<number, PinCard[]>();
+      for (const c of targets) {
+        const pid = c.pin.photoId;
+        if (!byPhoto.has(pid)) byPhoto.set(pid, []);
+        byPhoto.get(pid)!.push(c);
+      }
+      const totalBatches = byPhoto.size;
+      let doneBatches = 0;
+      setAnalyzeProgress({ done: 0, total: totalBatches });
 
-      if (batchMode) {
-        const byPhoto = new Map<number, typeof includedCards>();
-        for (const c of includedCards) {
-          const pid = c.pin.photoId;
-          if (!byPhoto.has(pid)) byPhoto.set(pid, []);
-          byPhoto.get(pid)!.push(c);
+      const photoOrder = Array.from(byPhoto.keys());
+      for (let pIdx = 0; pIdx < photoOrder.length; pIdx++) {
+        const photoId = photoOrder[pIdx];
+        const photoCards = byPhoto.get(photoId)!;
+        if (cancelRequested.current) {
+          const remainingPhotoIds = new Set(photoOrder.slice(pIdx));
+          setCards((prev) => prev.map((c) =>
+            remainingPhotoIds.has(c.pin.photoId) && targetIds.has(c.pin.id) && !c.result
+              ? { ...c, notAnalyzedReason: "cancelled" }
+              : c
+          ));
+          toast({ title: "Analysis cancelled", description: `Completed ${doneBatches} of ${totalBatches} batch${totalBatches !== 1 ? "es" : ""}` });
+          return;
         }
-
-        const totalBatches = byPhoto.size;
-        let doneBatches = 0;
-        setAnalyzeProgress({ done: 0, total: totalBatches });
-
-        for (const [photoId, photoCards] of byPhoto) {
-          if (cancelRequested.current) {
+        try {
+          const data = await attemptPhotoAnalyze(photoId, photoCards);
+          if (data?.results) {
+            applyResults(data.results);
+            totalResults += data.results.length;
+          }
+          succeededPhotos++;
+        } catch (err: any) {
+          if (err?.message === "__cancelled__") {
+            const remainingPhotoIds = new Set(photoOrder.slice(pIdx));
+            setCards((prev) => prev.map((c) =>
+              remainingPhotoIds.has(c.pin.photoId) && targetIds.has(c.pin.id) && !c.result
+                ? { ...c, notAnalyzedReason: "cancelled" }
+                : c
+            ));
             toast({ title: "Analysis cancelled", description: `Completed ${doneBatches} of ${totalBatches} batch${totalBatches !== 1 ? "es" : ""}` });
             return;
           }
-          const pinData = photoCards.map((c) => ({
-            pinId: c.pin.id,
-            pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
-            x: c.pin.xPercent,
-            y: c.pin.yPercent,
-            zoomLevel: c.zoomLevel,
-          }));
-          const res = await apiRequest("POST", `/api/photos/${photoId}/analyze-labels`, { pins: pinData });
-          const data = await res.json();
-          if (data.results) {
-            applyResults(data.results);
-            totalResults += data.results.length;
-          }
-          doneBatches++;
-          setAnalyzeProgress({ done: doneBatches, total: totalBatches });
+          failedPhotos++;
+          const failedPinIds = new Set(photoCards.map((c) => c.pin.id));
+          setCards((prev) => prev.map((c) =>
+            failedPinIds.has(c.pin.id) && !c.result
+              ? { ...c, notAnalyzedReason: "failed" }
+              : c
+          ));
+          console.error(`[analyze] photo ${photoId} failed:`, err);
         }
-      } else {
-        const byPhoto = new Map<number, typeof includedCards>();
-        for (const c of includedCards) {
-          const pid = c.pin.photoId;
-          if (!byPhoto.has(pid)) byPhoto.set(pid, []);
-          byPhoto.get(pid)!.push(c);
-        }
-
-        const totalBatches = byPhoto.size;
-        let doneBatches = 0;
-        setAnalyzeProgress({ done: 0, total: totalBatches });
-
-        for (const [photoId, photoCards] of byPhoto) {
-          const pinData = photoCards.map((c) => ({
-            pinId: c.pin.id,
-            pinLabel: c.pin.label || `P${String(c.pin.id).padStart(3, "0")}`,
-            x: c.pin.xPercent,
-            y: c.pin.yPercent,
-            zoomLevel: c.zoomLevel,
-          }));
-          const res = await apiRequest("POST", `/api/photos/${photoId}/analyze-labels`, { pins: pinData });
-          const data = await res.json();
-          if (data.results) {
-            applyResults(data.results);
-            totalResults += data.results.length;
-          }
-          doneBatches++;
-          setAnalyzeProgress({ done: doneBatches, total: totalBatches });
-        }
+        doneBatches++;
+        setAnalyzeProgress({ done: doneBatches, total: totalBatches });
       }
 
       if (totalResults > 0) {
@@ -1138,15 +1202,38 @@ export default function LabelScannerTab({
           saveAnalysisResults(sessionId, sorted);
           return sorted;
         });
+      }
+
+      if (failedPhotos > 0) {
+        const totalPhotos = succeededPhotos + failedPhotos;
+        toast({
+          title: `Analyzed ${succeededPhotos} of ${totalPhotos} photo${totalPhotos !== 1 ? "s" : ""}`,
+          description: `${failedPhotos} failed — tap Retry on affected cards.`,
+          variant: "destructive",
+        });
+      } else if (totalResults > 0) {
         toast({ title: "Analysis complete", description: `Read ${totalResults} label(s)` });
       }
     } catch (error: any) {
-      toast({ title: "Analysis failed", description: error.message, variant: "destructive" });
+      toast({ title: "Analysis failed", description: error?.message ?? "Unknown error", variant: "destructive" });
     } finally {
       setAnalyzing(false);
       setAnalyzeProgress(null);
     }
   }
+
+  async function handleAnalyze() {
+    if ((!currentPhotoId && !batchMode) || !includedCards.length) return;
+    await runAnalyze(includedCards, { isRetry: false });
+  }
+
+  const handleRetryPhoto = useCallback((photoId: number) => {
+    const photoCards = cards.filter(
+      (c) => c.pin.photoId === photoId && c.included && !c.result && !c.pin.flagged
+    );
+    if (!photoCards.length) return;
+    runAnalyze(photoCards, { isRetry: true });
+  }, [cards]);
 
   const retryRequest = async (method: string, url: string, body: any, retries = 2): Promise<any> => {
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -1846,9 +1933,35 @@ export default function LabelScannerTab({
                         )}
                         {!card.result && phase === "results" && (
                           <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]">
-                            <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap text-[11px]" data-testid={`badge-manual-${card.pin.id}`}>
-                              Not analyzed — enter manually
-                            </Badge>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge
+                                className={`py-1 px-2 text-wrap text-[11px] ${
+                                  card.notAnalyzedReason === "failed"
+                                    ? "bg-red-900/40 text-red-300 border-red-700/50"
+                                    : card.notAnalyzedReason === "cancelled"
+                                    ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
+                                    : card.notAnalyzedReason === "excluded"
+                                    ? "bg-zinc-800 text-zinc-400 border-zinc-700"
+                                    : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                                }`}
+                                data-testid={`badge-manual-${card.pin.id}`}
+                              >
+                                {notAnalyzedCopy(card.notAnalyzedReason)}
+                              </Badge>
+                              {card.notAnalyzedReason === "failed" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRetryPhoto(card.pin.photoId)}
+                                  disabled={analyzing}
+                                  className="h-6 gap-1 px-2 text-[11px] border-red-700/50 text-red-300 hover:text-red-200 hover:bg-red-900/20"
+                                  data-testid={`btn-retry-${card.pin.id}`}
+                                >
+                                  <RotateCw className="h-3 w-3" />
+                                  Retry
+                                </Button>
+                              )}
+                            </div>
                             <div>
                               <label className="text-[10px] text-white/40">Catalog</label>
                               <FitTextInput
@@ -2098,9 +2211,33 @@ export default function LabelScannerTab({
 
               {!card.result && phase === "results" && (
                 <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]">
-                  <Badge className="py-1 px-2 bg-zinc-800 text-zinc-400 border-zinc-700 text-wrap text-[11px]" data-testid={`badge-manual-${card.pin.id}`}>
-                    Not analyzed — enter manually
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      className={`py-1 px-2 text-wrap text-[11px] ${
+                        card.notAnalyzedReason === "failed"
+                          ? "bg-red-900/40 text-red-300 border-red-700/50"
+                          : card.notAnalyzedReason === "cancelled"
+                          ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
+                          : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                      }`}
+                      data-testid={`badge-manual-${card.pin.id}`}
+                    >
+                      {notAnalyzedCopy(card.notAnalyzedReason)}
+                    </Badge>
+                    {card.notAnalyzedReason === "failed" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRetryPhoto(card.pin.photoId)}
+                        disabled={analyzing}
+                        className="h-6 gap-1 px-2 text-[11px] border-red-700/50 text-red-300 hover:text-red-200 hover:bg-red-900/20"
+                        data-testid={`btn-retry-${card.pin.id}`}
+                      >
+                        <RotateCw className="h-3 w-3" />
+                        Retry
+                      </Button>
+                    )}
+                  </div>
                   <div>
                     <label className="text-[10px] text-white/40">Catalog</label>
                     <FitTextInput

@@ -1685,54 +1685,68 @@ export async function registerRoutes(
 
       for (let i = 0; i < pinData.length; i += MAX_BATCH) {
         const batch = pinData.slice(i, i + MAX_BATCH);
-        const crops = await cropPhoto(orientedBuffer, batch.map((p: any) => ({
-          pinId: p.pinId,
-          x: p.x,
-          y: p.y,
-          zoomLevel: p.zoomLevel ?? 1,
-        })));
-
-        const imageMessages = crops.map((crop) => ({
-          type: "image_url" as const,
-          image_url: { url: `data:image/jpeg;base64,${crop.base64}`, detail: "high" as const },
-        }));
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o",
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: "You are reading wire reel labels in a warehouse. The labels may be printed on curved cylindrical reel surfaces, at various angles, upside down, or partially obscured. Read all visible text regardless of orientation. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
-            },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: `Read the text on each of these ${crops.length} wire reel label images. Return the result as a JSON object: {"labels": ["text from image 1", "text from image 2", ...]}` },
-                ...imageMessages,
-              ],
-            },
-          ],
-          max_tokens: 2000,
-        });
-
-        const content = response.choices?.[0]?.message?.content ?? "{}";
-        let parsed: { labels?: (string | null)[] } = {};
         try {
-          parsed = JSON.parse(content);
-        } catch {
-          console.error("[analyze-labels] Failed to parse OpenAI response:", content);
-        }
+          const crops = await cropPhoto(orientedBuffer, batch.map((p: any) => ({
+            pinId: p.pinId,
+            x: p.x,
+            y: p.y,
+            zoomLevel: p.zoomLevel ?? 1,
+          })));
 
-        const labels = parsed.labels ?? [];
-        for (let j = 0; j < batch.length; j++) {
-          const rawText = labels[j] ?? null;
-          allResults.push({
-            pinId: batch[j].pinId,
-            pinLabel: batch[j].pinLabel || `P${String(j + i + 1).padStart(3, "0")}`,
-            rawText,
-            readable: rawText !== null,
+          const imageMessages = crops.map((crop) => ({
+            type: "image_url" as const,
+            image_url: { url: `data:image/jpeg;base64,${crop.base64}`, detail: "high" as const },
+          }));
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content: "You are reading wire reel labels in a warehouse. The labels may be printed on curved cylindrical reel surfaces, at various angles, upside down, or partially obscured. Read all visible text regardless of orientation. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: `Read the text on each of these ${crops.length} wire reel label images. Return the result as a JSON object: {"labels": ["text from image 1", "text from image 2", ...]}` },
+                  ...imageMessages,
+                ],
+              },
+            ],
+            max_tokens: 2000,
           });
+
+          const content = response.choices?.[0]?.message?.content ?? "{}";
+          let parsed: { labels?: (string | null)[] } = {};
+          let parseFailed = false;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            parseFailed = true;
+            console.error("[analyze-labels] Failed to parse OpenAI response:", content);
+          }
+
+          const labels = parseFailed ? [] : (parsed.labels ?? []);
+          for (let j = 0; j < batch.length; j++) {
+            const rawText = parseFailed ? null : (labels[j] ?? null);
+            allResults.push({
+              pinId: batch[j].pinId,
+              pinLabel: batch[j].pinLabel || `P${String(j + i + 1).padStart(3, "0")}`,
+              rawText,
+              readable: rawText !== null,
+            });
+          }
+        } catch (subErr) {
+          console.error(`[analyze-labels] sub-batch starting at ${i} failed:`, subErr);
+          for (let j = 0; j < batch.length; j++) {
+            allResults.push({
+              pinId: batch[j].pinId,
+              pinLabel: batch[j].pinLabel || `P${String(j + i + 1).padStart(3, "0")}`,
+              rawText: null,
+              readable: false,
+            });
+          }
         }
       }
 
@@ -1805,68 +1819,82 @@ export async function registerRoutes(
 
       for (let i = 0; i < allCropRequests.length; i += MAX_BATCH) {
         const batch = allCropRequests.slice(i, i + MAX_BATCH);
-        const cropsByPhoto = new Map<number, typeof batch>();
-        for (const item of batch) {
-          if (!cropsByPhoto.has(item.photoId)) cropsByPhoto.set(item.photoId, []);
-          cropsByPhoto.get(item.photoId)!.push(item);
-        }
-
-        const crops: Array<{ pinId: number; base64: string }> = [];
-        for (const [photoId, items] of cropsByPhoto) {
-          const buf = photoBufferMap.get(photoId)!;
-          const photoCrops = await cropPhoto(buf, items.map((it) => ({
-            pinId: it.pinId,
-            x: it.x,
-            y: it.y,
-            zoomLevel: it.zoomLevel,
-          })));
-          crops.push(...photoCrops);
-        }
-
-        const cropOrder = batch.map((b) => b.pinId);
-        const orderedCrops = cropOrder.map((pid) => crops.find((c) => c.pinId === pid)!).filter(Boolean);
-
-        const imageMessages = orderedCrops.map((crop) => ({
-          type: "image_url" as const,
-          image_url: { url: `data:image/jpeg;base64,${crop.base64}`, detail: "high" as const },
-        }));
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o",
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: "You are reading wire reel labels in a warehouse. The labels may be printed on curved cylindrical reel surfaces, at various angles, upside down, or partially obscured. Read all visible text regardless of orientation. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
-            },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: `Read the text on each of these ${orderedCrops.length} wire reel label images. Return the result as a JSON object: {"labels": ["text from image 1", "text from image 2", ...]}` },
-                ...imageMessages,
-              ],
-            },
-          ],
-          max_tokens: 2000,
-        });
-
-        const content = response.choices?.[0]?.message?.content ?? "{}";
-        let parsed: { labels?: (string | null)[] } = {};
         try {
-          parsed = JSON.parse(content);
-        } catch {
-          console.error("[session-analyze-labels] Failed to parse OpenAI response:", content);
-        }
+          const cropsByPhoto = new Map<number, typeof batch>();
+          for (const item of batch) {
+            if (!cropsByPhoto.has(item.photoId)) cropsByPhoto.set(item.photoId, []);
+            cropsByPhoto.get(item.photoId)!.push(item);
+          }
 
-        const labels = parsed.labels ?? [];
-        for (let j = 0; j < batch.length; j++) {
-          const rawText = labels[j] ?? null;
-          allResults.push({
-            pinId: batch[j].pinId,
-            pinLabel: batch[j].pinLabel,
-            rawText,
-            readable: rawText !== null,
+          const crops: Array<{ pinId: number; base64: string }> = [];
+          for (const [photoId, items] of cropsByPhoto) {
+            const buf = photoBufferMap.get(photoId)!;
+            const photoCrops = await cropPhoto(buf, items.map((it) => ({
+              pinId: it.pinId,
+              x: it.x,
+              y: it.y,
+              zoomLevel: it.zoomLevel,
+            })));
+            crops.push(...photoCrops);
+          }
+
+          const cropOrder = batch.map((b) => b.pinId);
+          const orderedCrops = cropOrder.map((pid) => crops.find((c) => c.pinId === pid)!).filter(Boolean);
+
+          const imageMessages = orderedCrops.map((crop) => ({
+            type: "image_url" as const,
+            image_url: { url: `data:image/jpeg;base64,${crop.base64}`, detail: "high" as const },
+          }));
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content: "You are reading wire reel labels in a warehouse. The labels may be printed on curved cylindrical reel surfaces, at various angles, upside down, or partially obscured. Read all visible text regardless of orientation. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: `Read the text on each of these ${orderedCrops.length} wire reel label images. Return the result as a JSON object: {"labels": ["text from image 1", "text from image 2", ...]}` },
+                  ...imageMessages,
+                ],
+              },
+            ],
+            max_tokens: 2000,
           });
+
+          const content = response.choices?.[0]?.message?.content ?? "{}";
+          let parsed: { labels?: (string | null)[] } = {};
+          let parseFailed = false;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            parseFailed = true;
+            console.error("[session-analyze-labels] Failed to parse OpenAI response:", content);
+          }
+
+          const labels = parseFailed ? [] : (parsed.labels ?? []);
+          for (let j = 0; j < batch.length; j++) {
+            const rawText = parseFailed ? null : (labels[j] ?? null);
+            allResults.push({
+              pinId: batch[j].pinId,
+              pinLabel: batch[j].pinLabel,
+              rawText,
+              readable: rawText !== null,
+            });
+          }
+        } catch (subErr) {
+          console.error(`[session-analyze-labels] sub-batch starting at ${i} failed:`, subErr);
+          for (let j = 0; j < batch.length; j++) {
+            allResults.push({
+              pinId: batch[j].pinId,
+              pinLabel: batch[j].pinLabel,
+              rawText: null,
+              readable: false,
+            });
+          }
         }
 
         const batchIndex = Math.floor(i / MAX_BATCH) + 1;
