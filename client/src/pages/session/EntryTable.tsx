@@ -85,7 +85,9 @@ function FilterChipButton({ label, active, count, onClick, testId }: {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+      aria-pressed={active}
+      aria-label={`${label} filter${count !== undefined && count > 0 ? ` (${count})` : ""}${active ? ", active" : ""}`}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
         active
           ? "bg-blue-600 text-white border-blue-600"
           : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
@@ -140,22 +142,23 @@ function EntryTable({
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  const { data: serverSearchData, isFetching: isSearchFetching } = useQuery<{ matches: { entryId: number; field: string; preview: string }[]; total: number }>({
+  const { data: serverSearchData, isFetching: isSearchFetching, isError: isSearchError, refetch: refetchSearch } = useQuery<{ matches: { entryId: number; field: string; preview: string }[]; total: number }>({
     queryKey: ["/api/sessions", sessionId.toString(), "entries", "search", debouncedQuery],
     queryFn: async () => {
       if (!debouncedQuery.trim()) return { matches: [], total: 0 };
       const res = await fetch(`/api/sessions/${sessionId}/entries/search?q=${encodeURIComponent(debouncedQuery)}`, { credentials: "include" });
-      if (!res.ok) return { matches: [], total: 0 };
+      if (!res.ok) throw new Error(`Search failed: ${res.status}`);
       return res.json();
     },
     enabled: debouncedQuery.trim().length > 0,
     placeholderData: { matches: [], total: 0 },
+    retry: 1,
   });
 
   const serverMatchedIds = useMemo(() => {
-    if (!debouncedQuery.trim() || !serverSearchData?.matches) return null;
+    if (!debouncedQuery.trim() || isSearchError || !serverSearchData?.matches) return null;
     return new Set(serverSearchData.matches.map(m => m.entryId));
-  }, [serverSearchData, debouncedQuery]);
+  }, [serverSearchData, debouncedQuery, isSearchError]);
 
   const toggleFilter = (filter: FilterChip) => {
     setActiveFilters(prev => {
@@ -315,7 +318,7 @@ function EntryTable({
           <CardTitle className="text-sm" data-testid="text-entries-title">
             Table View - {isFiltered ? `${filteredEntries.length} of ${entries.length}` : entries.length} Entries
           </CardTitle>
-          {isSearchActive && (
+          {isSearchActive && !isSearchError && (
             <span
               className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1"
               data-testid="text-search-match-count"
@@ -325,6 +328,17 @@ function EntryTable({
               ) : null}
               {!isSearchFetching && `${filteredEntries.length} of ${entries.length} match "${debouncedQuery}"`}
               {isSearchFetching && "Searching..."}
+            </span>
+          )}
+          {isSearchActive && isSearchError && !isSearchFetching && (
+            <span
+              role="status"
+              aria-live="polite"
+              className="text-xs font-medium px-2 py-0.5 rounded-full bg-destructive/10 text-destructive flex items-center gap-1"
+              data-testid="text-search-error-badge"
+            >
+              <AlertTriangle className="h-3 w-3" />
+              Search failed
             </span>
           )}
         </div>
@@ -397,7 +411,27 @@ function EntryTable({
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {hasActiveFilters && filteredEntries.length === 0 ? (
+        {isSearchActive && isSearchError && !isSearchFetching ? (
+          <div
+            className="py-8 text-center text-sm flex flex-col items-center gap-3"
+            role="alert"
+            aria-live="polite"
+            data-testid="text-search-error"
+          >
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <span>Search failed — try again</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchSearch()}
+              data-testid="btn-retry-search"
+            >
+              Retry search
+            </Button>
+          </div>
+        ) : hasActiveFilters && filteredEntries.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground text-sm" data-testid="text-no-filter-results">
             No entries match the current filters.
           </div>
@@ -445,6 +479,16 @@ function EntryTable({
                       <tr
                         className="section-header-row"
                         onClick={() => toggleSection(sectionKey)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleSection(sectionKey);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        aria-label={`${aisleLabel.toLowerCase() === "receiving" ? "Receiving Area" : `Aisle ${aisleLabel}`} - ${aisleLabel.toLowerCase() === "receiving" && sectionLabel === "000" ? "Section Unknown" : `Section ${sectionLabel}`}, ${sectionEntries.length} ${sectionEntries.length === 1 ? "entry" : "entries"}, ${isExpanded ? "expanded" : "collapsed"}`}
                         data-testid={`section-toggle-${sectionKey}`}
                       >
                         <td colSpan={11}>
