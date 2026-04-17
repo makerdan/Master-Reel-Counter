@@ -564,7 +564,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         sessionId: entries.sessionId,
         entryCount: count(entries.id),
-        totalFootage: sum(entries.footage),
+        totalFootage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
         sectionCount: sql<number>`count(distinct ${entries.section})`,
       })
       .from(entries)
@@ -573,7 +573,7 @@ export class DatabaseStorage implements IStorage {
     for (const row of rows) {
       result.set(row.sessionId, {
         entryCount: Number(row.entryCount),
-        totalFootage: Number(row.totalFootage) || 0,
+        totalFootage: Number(row.totalFootage),
         sectionCount: Number(row.sectionCount) || 0,
       });
     }
@@ -1301,8 +1301,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteComment(id: number): Promise<void> {
-    await db.delete(comments).where(eq(comments.parentCommentId, id));
-    await db.delete(comments).where(eq(comments.id, id));
+    await db.transaction(async (tx) => {
+      await tx.delete(comments).where(eq(comments.parentCommentId, id));
+      await tx.delete(comments).where(eq(comments.id, id));
+    });
   }
 
   async getUserStats(userId: string): Promise<{
@@ -1342,7 +1344,7 @@ export class DatabaseStorage implements IStorage {
     const [entryStats] = await db.select({
       totalEntries: count(),
       totalReels: sum(entries.reelCount),
-      totalFootage: sum(entries.footage),
+      totalFootage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries).where(inArray(entries.sessionId, sessionIds));
 
     const [photoStats] = await db.select({
@@ -1352,7 +1354,7 @@ export class DatabaseStorage implements IStorage {
     const topCatalogsRaw = await db.select({
       catalog: entries.reelTag,
       count: count(),
-      footage: sum(entries.footage),
+      footage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries)
       .where(and(inArray(entries.sessionId, sessionIds), sql`${entries.reelTag} IS NOT NULL AND ${entries.reelTag} != ''`))
       .groupBy(entries.reelTag)
@@ -1371,7 +1373,7 @@ export class DatabaseStorage implements IStorage {
     const weeklyStatsRaw = await db.select({
       week: sql<string>`to_char(date_trunc('week', ${entries.createdAt}), 'YYYY-MM-DD')`,
       entries: count(),
-      footage: sum(entries.footage),
+      footage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries)
       .where(inArray(entries.sessionId, sessionIds))
       .groupBy(sql`date_trunc('week', ${entries.createdAt})`)
@@ -1379,13 +1381,13 @@ export class DatabaseStorage implements IStorage {
       .limit(12);
 
     const bestSessionRows = await db.select({
-      totalFootage: sum(entries.footage),
+      totalFootage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries)
       .where(inArray(entries.sessionId, sessionIds))
       .groupBy(entries.sessionId)
-      .orderBy(desc(sum(entries.footage)))
+      .orderBy(desc(sql<string>`COALESCE(SUM(${entries.footage}), 0)`))
       .limit(1);
-    const bestSessionFootage = bestSessionRows.length > 0 ? Number(bestSessionRows[0].totalFootage) || 0 : 0;
+    const bestSessionFootage = bestSessionRows.length > 0 ? Number(bestSessionRows[0].totalFootage) : 0;
 
     const entryDatesRaw = await db.select({
       day: sql<string>`to_char(${entries.createdAt}::date, 'YYYY-MM-DD')`,
@@ -1448,12 +1450,12 @@ export class DatabaseStorage implements IStorage {
       completedSessions,
       totalEntries: Number(entryStats.totalEntries) || 0,
       totalReels: Number(entryStats.totalReels) || 0,
-      totalFootage: Number(entryStats.totalFootage) || 0,
+      totalFootage: Number(entryStats.totalFootage),
       totalPhotos: Number(photoStats.totalPhotos) || 0,
       topCatalogs: topCatalogsRaw.map(c => ({
         catalog: c.catalog!,
         count: Number(c.count),
-        footage: Number(c.footage) || 0,
+        footage: Number(c.footage),
       })),
       topManufacturers: topManufacturersRaw.map(m => ({
         manufacturer: m.manufacturer!,
@@ -1462,7 +1464,7 @@ export class DatabaseStorage implements IStorage {
       weeklyStats: weeklyStatsRaw.map(w => ({
         week: w.week,
         entries: Number(w.entries),
-        footage: Number(w.footage) || 0,
+        footage: Number(w.footage),
       })),
       bestSessionFootage,
       currentStreak,
@@ -1559,7 +1561,7 @@ export class DatabaseStorage implements IStorage {
     const topWireTypesRaw = await db.select({
       wireType: entries.wireType,
       count: count(),
-      footage: sum(entries.footage),
+      footage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries)
       .where(and(inArray(entries.sessionId, sessionIds), sql`${entries.wireType} IS NOT NULL AND ${entries.wireType} != ''`))
       .groupBy(entries.wireType)
@@ -1569,7 +1571,7 @@ export class DatabaseStorage implements IStorage {
     const topGaugesRaw = await db.select({
       gauge: entries.gauge,
       count: count(),
-      footage: sum(entries.footage),
+      footage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries)
       .where(and(inArray(entries.sessionId, sessionIds), sql`${entries.gauge} IS NOT NULL AND ${entries.gauge} != ''`))
       .groupBy(entries.gauge)
@@ -1610,12 +1612,12 @@ export class DatabaseStorage implements IStorage {
         topWireTypes: topWireTypesRaw.map(w => ({
           wireType: w.wireType!,
           count: Number(w.count),
-          footage: Number(w.footage) || 0,
+          footage: Number(w.footage),
         })),
         topGauges: topGaugesRaw.map(g => ({
           gauge: g.gauge!,
           count: Number(g.count),
-          footage: Number(g.footage) || 0,
+          footage: Number(g.footage),
         })),
       },
       dailyActivity: dailyActivityRaw.map(d => ({
@@ -1707,7 +1709,7 @@ export class DatabaseStorage implements IStorage {
       eUserId: entries.userId,
       entryCount: count(),
       reelCount: sum(entries.reelCount),
-      footage: sum(entries.footage),
+      footage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries)
       .where(inArray(entries.sessionId, sharedSessionIds))
       .groupBy(entries.sessionId, entries.userId);
@@ -1756,7 +1758,7 @@ export class DatabaseStorage implements IStorage {
           const u = addUser(e.eUserId);
           u.entryCount = Number(e.entryCount);
           u.reelCount = Number(e.reelCount) || 0;
-          u.footage = Number(e.footage) || 0;
+          u.footage = Number(e.footage);
         }
       }
 
@@ -1861,7 +1863,7 @@ export class DatabaseStorage implements IStorage {
       eUserId: entries.userId,
       entryCount: count(),
       reelCount: sum(entries.reelCount),
-      footage: sum(entries.footage),
+      footage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries)
       .where(inArray(entries.sessionId, allSessionIds))
       .groupBy(entries.sessionId, entries.userId);
@@ -1870,7 +1872,7 @@ export class DatabaseStorage implements IStorage {
       const role = determineRole(e.eUserId, e.sessionId);
       result[role].entries += Number(e.entryCount) || 0;
       result[role].reels += Number(e.reelCount) || 0;
-      result[role].footage += Number(e.footage) || 0;
+      result[role].footage += Number(e.footage);
     }
 
     const photoAgg = await db.select({
