@@ -14,16 +14,27 @@ interface UndoAction {
 }
 
 const MAX_STACK = 20;
+const TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 function undoKey(sessionId: number) { return `reelcounter:undo-stack:${sessionId}`; }
 function redoKey(sessionId: number) { return `reelcounter:redo-stack:${sessionId}`; }
 
+interface PersistedStack {
+  storedAt: number;
+  stack: UndoAction[];
+}
+
 function loadStack(key: string): UndoAction[] {
   try {
-    const raw = sessionStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: PersistedStack = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.stack)) return [];
+    if (typeof parsed.storedAt !== "number" || isNaN(parsed.storedAt) || Date.now() - parsed.storedAt > TTL_MS) {
+      localStorage.removeItem(key);
+      return [];
+    }
+    return parsed.stack;
   } catch {
     return [];
   }
@@ -31,9 +42,35 @@ function loadStack(key: string): UndoAction[] {
 
 function saveStack(key: string, stack: UndoAction[]) {
   try {
-    sessionStorage.setItem(key, JSON.stringify(stack));
+    const payload: PersistedStack = { storedAt: Date.now(), stack };
+    localStorage.setItem(key, JSON.stringify(payload));
   } catch {
     // Ignore quota or access errors gracefully
+  }
+}
+
+function pruneStaleSessionKeys(currentSessionId: number) {
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (!key.startsWith("reelcounter:undo-stack:") && !key.startsWith("reelcounter:redo-stack:")) continue;
+      const idStr = key.replace("reelcounter:undo-stack:", "").replace("reelcounter:redo-stack:", "");
+      const id = parseInt(idStr, 10);
+      if (id === currentSessionId) continue;
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) { toRemove.push(key); continue; }
+        const parsed: PersistedStack = JSON.parse(raw);
+        if (!parsed || typeof parsed.storedAt !== "number" || isNaN(parsed.storedAt) || Date.now() - parsed.storedAt > TTL_MS) toRemove.push(key);
+      } catch {
+        toRemove.push(key);
+      }
+    }
+    for (const key of toRemove) localStorage.removeItem(key);
+  } catch {
+    // Ignore errors
   }
 }
 
@@ -62,12 +99,14 @@ export function useUndoRedo(sessionId: number) {
 
   // Rehydrate stacks when sessionId changes (guards against a component instance
   // being reused with a different sessionId without unmounting first).
+  // Also prune stale keys from other sessions on sessionId change.
   useEffect(() => {
     setUndoStack(loadStack(undoKey(sessionId)));
     setRedoStack(loadStack(redoKey(sessionId)));
+    pruneStaleSessionKeys(sessionId);
   }, [sessionId]);
 
-  // Persist stacks to sessionStorage on every change.
+  // Persist stacks to localStorage on every change.
   // Guard: if any action in either stack carries a different sessionId, the
   // stacks are still settling after a session transition (React's setState from
   // the rehydration effect above hasn't propagated yet). Skip the write so we
@@ -82,13 +121,9 @@ export function useUndoRedo(sessionId: number) {
     }
   }, [sessionId, undoStack, redoStack]);
 
-  // Clear persisted stacks when leaving the session (component unmount).
-  useEffect(() => {
-    return () => {
-      try { sessionStorage.removeItem(undoKey(sessionId)); } catch {}
-      try { sessionStorage.removeItem(redoKey(sessionId)); } catch {}
-    };
-  }, [sessionId]);
+  // Intentionally no unmount cleanup: stacks are left in localStorage so
+  // the user's undo/redo history survives navigating away and returning
+  // to the same session within the 2-hour TTL.
 
   const invalidateSession = useCallback((actionType?: ActionType) => {
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
@@ -117,7 +152,10 @@ export function useUndoRedo(sessionId: number) {
   const clearHistory = useCallback(() => {
     setUndoStack([]);
     setRedoStack([]);
-  }, []);
+    try { localStorage.removeItem(undoKey(sessionId)); } catch {}
+    try { localStorage.removeItem(redoKey(sessionId)); } catch {}
+    pruneStaleSessionKeys(sessionId);
+  }, [sessionId]);
 
   const applyReverse = useCallback(async (action: UndoAction): Promise<UndoAction> => {
     switch (action.type) {
@@ -352,7 +390,7 @@ export function useUndoRedo(sessionId: number) {
   // When the offline queue replays a queued entry create and gets the real
   // server-assigned id, update any undo/redo action that still holds the
   // placeholder id so subsequent redo (or undo) targets the correct entry.
-  // sessionStorage is updated via the persistence useEffects that run after
+  // localStorage is updated via the persistence useEffects that run after
   // the state setters are called.
   useEffect(() => {
     const handler = (e: Event) => {
