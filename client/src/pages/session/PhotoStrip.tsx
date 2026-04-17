@@ -542,9 +542,10 @@ function PhotoCard({
           size="icon"
           variant="ghost"
           className="absolute top-1 right-1 h-6 w-6 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
-          onPointerDown={(e) => { e.preventDefault(); onJumpToPhoto(photo.id); }}
+          onClick={() => onJumpToPhoto(photo.id)}
           data-testid={`button-strip-jump-${photo.id}`}
           title="Open in Reel IDs"
+          aria-label="Open in Reel IDs"
         >
           <ExternalLink className="h-3 w-3" />
         </Button>
@@ -626,9 +627,11 @@ function PhotoCard({
                 <button
                   className="text-[10px] font-medium text-primary border border-primary/50 rounded px-1 py-0 h-4 hover:bg-primary/10 transition-colors disabled:opacity-50"
                   onPointerDown={(e) => { e.preventDefault(); duplicateMutation.mutate(); setConfirmDuplicate(false); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); duplicateMutation.mutate(); setConfirmDuplicate(false); } }}
                   onBlur={() => setConfirmDuplicate(false)}
                   disabled={duplicateMutation.isPending}
                   title="Confirm duplicate"
+                  aria-label="Confirm duplicate photo"
                   data-testid={`button-strip-duplicate-confirm-${photo.id}`}
                   autoFocus
                 >
@@ -637,9 +640,10 @@ function PhotoCard({
               ) : (
                 <button
                   className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                  onPointerDown={(e) => { e.preventDefault(); setConfirmDuplicate(true); }}
+                  onClick={() => setConfirmDuplicate(true)}
                   disabled={duplicateMutation.isPending}
                   title="Duplicate this photo"
+                  aria-label="Duplicate this photo"
                   data-testid={`button-strip-duplicate-${photo.id}`}
                 >
                   <Copy className="h-3.5 w-3.5" />
@@ -652,9 +656,11 @@ function PhotoCard({
                 <button
                   className="text-[10px] font-medium text-destructive border border-destructive/50 rounded px-1 py-0 h-4 hover:bg-destructive/10 transition-colors disabled:opacity-50"
                   onPointerDown={(e) => { e.preventDefault(); deleteMutation.mutate(); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); deleteMutation.mutate(); } }}
                   onBlur={() => setConfirmDelete(false)}
                   disabled={deleteMutation.isPending}
                   title="Confirm delete"
+                  aria-label="Confirm delete photo"
                   data-testid={`button-strip-delete-confirm-${photo.id}`}
                   autoFocus
                 >
@@ -663,9 +669,10 @@ function PhotoCard({
               ) : (
                 <button
                   className="text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
-                  onPointerDown={(e) => { e.preventDefault(); setConfirmDelete(true); }}
+                  onClick={() => setConfirmDelete(true)}
                   disabled={deleteMutation.isPending}
                   title="Delete this photo"
+                  aria-label="Delete this photo"
                   data-testid={`button-strip-delete-${photo.id}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
