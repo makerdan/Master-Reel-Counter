@@ -356,9 +356,11 @@ export function useUndoRedo(sessionId: number) {
   // the state setters are called.
   useEffect(() => {
     const handler = (e: Event) => {
-      const { placeholderId, realId } = (
+      const { placeholderId, realId, sessionId: eventSessionId } = (
         e as CustomEvent<{ placeholderId: number; realId: number; sessionId: number }>
       ).detail;
+      // Guard: ignore events for a different session to prevent cross-session patching.
+      if (eventSessionId !== sessionId) return;
       const patch = (a: UndoAction): UndoAction =>
         a.entityId === placeholderId ? { ...a, entityId: realId } : a;
       setUndoStack(prev => prev.map(patch));
