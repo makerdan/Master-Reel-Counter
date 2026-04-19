@@ -21,7 +21,7 @@ import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 import { lookupCatalog, userWireCatalogToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { matchLabelText, type LabelMatchResult } from "@/lib/labelMatcher";
-import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
+import { toDisplayUnit, toBaseFeet } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { formatPinLabel } from "./utils";
 import type { Photo, Pin } from "@shared/schema";
@@ -439,7 +439,6 @@ export default function LabelScannerTab({
     select: (data: any) => ({ defaultUnit: data?.defaultUnit ?? "feet" }),
   });
   const currentUnit: UnitType = (scannerSettings?.defaultUnit as UnitType) || "feet";
-  const uLabel = unitLabel(currentUnit);
   const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(initialPhotoId);
   const lastInitialPhotoIdRef = useRef(initialPhotoId);
   const [cards, setCards] = useState<PinCard[]>([]);

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, EyeOff, ScanSearch, ArrowUpDown, CheckCircle2, ImageIcon } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, ScanSearch, ArrowUpDown, CheckCircle2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -286,7 +286,7 @@ function DupPinTile({
   );
 }
 
-export default function FlaggedReels({ sessionId, onBack, onReshoot, onViewInPhoto, pushUndo }: FlaggedReelsProps) {
+export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, onViewInPhoto, pushUndo }: FlaggedReelsProps) {
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
   const { catalogs: userCatalogs } = useWireCatalogs();

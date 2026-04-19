@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Camera, X, Loader2, AlertTriangle, Check,
   ImagePlus, RotateCw, ChevronLeft, Smartphone, Plus, Minus,
-  ListPlus, ChevronUp, ChevronDown,
+  ListPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { saveToQueue, removeFromQueue, getQueuedPhotos, type QueuedPhoto } from "@/lib/offlineQueue";
+import { saveToQueue, removeFromQueue, getQueuedPhotos } from "@/lib/offlineQueue";
 import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
 
@@ -361,7 +361,6 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     };
   }, []);
 
-  const isUploading = uploadQueue.some(q => q.status === "uploading");
   const pendingCount = uploadQueue.filter(q => q.status === "pending" || q.status === "uploading").length;
   const failedCount = uploadQueue.filter(q => q.status === "failed").length;
 

@@ -3,13 +3,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye, EyeOff,
-  AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp, Lock,
+  AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp,
   ScanLine, X as PanelCloseX, Pipette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -151,7 +150,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       return next;
     });
   }, []);
-  const localUnfilledCount = localPins.filter(p => !p.wireDetails?.trim()).length;
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [highlightedCommittedPinDbId, setHighlightedCommittedPinDbId] = useState<number | null>(null);
   const [pinsVisible, setPinsVisible] = useState(true);
@@ -262,7 +260,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [panMode, setPanMode] = useState(false);
   const [isDetectingReceived, setIsDetectingReceived] = useState(false);
   const [colorPickMode, setColorPickMode] = useState(false);
-  const [detectedBoxes, setDetectedBoxes] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
+  const [, setDetectedBoxes] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
   const [pinScale, setPinScale] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(0.15);
   const pinScaleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1571,8 +1569,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     }
     toast({ title: "Last remaining entry", description: "This is the only uncommitted reel — use Add Reel(s) from Image to commit it." });
   };
-
-  const currentPhotoIncompleteCount = currentPhoto?.dbId ? (incompletePinsMap.get(currentPhoto.dbId) || 0) : 0;
 
   const scrollInputIntoView = useCallback((el: HTMLElement) => {
     const fixedOffset = 53 + previewHeight + 8;

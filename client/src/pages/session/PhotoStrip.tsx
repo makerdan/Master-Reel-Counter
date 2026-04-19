@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -308,7 +307,7 @@ function PhotoCard({
       if (doRelabel) {
         try {
           const existingLabels: string[] = [];
-          const newLabels = dialog.pinsToRelabel.map(p => {
+          const newLabels = dialog.pinsToRelabel.map(_p => {
             const label = generateDetailPinLabel(dialog.parentPinLabel, existingLabels);
             existingLabels.push(label);
             return label;
@@ -928,7 +927,7 @@ function PhotoCard({
             <AlertDialogDescription>
               {relabelLinkDialog && (() => {
                 const existingLabels: string[] = [];
-                const newLabels = relabelLinkDialog.pinsToRelabel.map(p => {
+                const newLabels = relabelLinkDialog.pinsToRelabel.map(_p => {
                   const label = generateDetailPinLabel(relabelLinkDialog.parentPinLabel, existingLabels);
                   existingLabels.push(label);
                   return label;
