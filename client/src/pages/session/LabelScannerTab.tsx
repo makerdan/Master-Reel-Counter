@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -1535,6 +1536,13 @@ export default function LabelScannerTab({
   };
 
   return (
+    <ErrorBoundary fallback={
+      <div className="flex flex-col items-center justify-center p-8 gap-3 text-center text-sm">
+        <AlertTriangle className="h-8 w-8 text-destructive" />
+        <p className="font-medium">The scanner encountered an unexpected error.</p>
+        <button className="underline text-muted-foreground" onClick={() => window.location.reload()}>Reload page</button>
+      </div>
+    }>
     <div className="space-y-4" data-testid="label-scanner-tab">
       <div className="bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(215_30%_50%/0.25)] space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -2347,5 +2355,6 @@ export default function LabelScannerTab({
         ))}
       </datalist>
     </div>
+  </ErrorBoundary>
   );
 }

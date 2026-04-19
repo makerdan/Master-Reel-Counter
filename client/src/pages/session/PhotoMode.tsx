@@ -560,7 +560,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             flagReason: p.flagReason || null,
           })),
         });
-      } catch { }
+      } catch (err) {
+        console.error("Failed to save auto-detected draft pins:", err);
+      }
       toast({
         title: `Placed ${uniqueDetections.length} pin${uniqueDetections.length !== 1 ? "s" : ""} automatically`,
         description: skipped > 0
@@ -708,7 +710,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     pinScaleSaveTimer.current = setTimeout(async () => {
       try {
         await apiRequest("PATCH", `/api/photos/${photoId}`, { pinScale: clamped });
-      } catch {}
+      } catch (err) {
+        console.error("Failed to save pin scale:", err);
+      }
     }, 500);
   }, [displayedPhoto?.dbId]);
 
@@ -769,8 +773,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           i === currentPhotoIdx ? { ...p, notes } : p
         )
       );
-    } catch {}
-  }, [currentPhoto?.dbId, currentPhotoIdx]);
+    } catch (err) {
+      console.error("Failed to save photo notes:", err);
+      toast({ title: "Could not save photo notes", variant: "destructive" });
+    }
+  }, [currentPhoto?.dbId, currentPhotoIdx, toast]);
 
   const handleNotesChange = useCallback((val: string) => {
     setPhotoNotes(val);
@@ -1378,7 +1385,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         const conflicting = committedPins.filter(cp => pinsToCommit.some(p => p.label === cp.label));
         for (const cp of conflicting) {
           if (cp.entryId) {
-            try { await apiRequest("DELETE", `/api/entries/${cp.entryId}`); } catch {}
+            try { await apiRequest("DELETE", `/api/entries/${cp.entryId}`); } catch (err) {
+              console.error(`Failed to delete conflicting entry ${cp.entryId}:`, err);
+            }
           }
         }
       }
@@ -1439,8 +1448,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 return await pinRes.json();
               });
               (pin as any)._dbPinId = savedPin.id;
-            } catch {
-              try { await apiRequest("DELETE", `/api/entries/${entry.id}`); } catch {}
+            } catch (pinErr) {
+              console.error(`Failed to create pin for entry ${entry.id}, rolling back entry:`, pinErr);
+              try { await apiRequest("DELETE", `/api/entries/${entry.id}`); } catch (deleteErr) {
+                console.error(`Failed to roll back entry ${entry.id} after pin creation failure:`, deleteErr);
+              }
               throw new Error("pin-creation-failed");
             }
           }
@@ -1470,7 +1482,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               flagReason: p.flagReason || null,
             })),
           });
-        } catch {}
+        } catch (err) {
+          console.error("Failed to save remaining draft pins after commit:", err);
+        }
       }
       return { successful: successfulPins, errors };
     },
@@ -1616,7 +1630,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   aisleSaveTimer.current = setTimeout(async () => {
                     try {
                       await apiRequest("PATCH", `/api/photos/${photoDbId}`, { aisle: val });
-                    } catch {}
+                    } catch (err) {
+                      console.error("Failed to save photo aisle:", err);
+                      toast({ title: "Could not save aisle", variant: "destructive" });
+                    }
                   }, 800);
                 }
               }}
@@ -1642,7 +1659,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   sectionSaveTimer.current = setTimeout(async () => {
                     try {
                       await apiRequest("PATCH", `/api/photos/${photoDbId}`, { section: val });
-                    } catch {}
+                    } catch (err) {
+                      console.error("Failed to save photo section:", err);
+                      toast({ title: "Could not save section", variant: "destructive" });
+                    }
                   }, 800);
                 }
               }}
@@ -1845,7 +1865,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                         sectionSaveTimer.current = setTimeout(async () => {
                           try {
                             await apiRequest("PATCH", `/api/photos/${photoDbId}`, { section: val });
-                          } catch {}
+                          } catch (err) {
+                            console.error("Failed to save photo section:", err);
+                            toast({ title: "Could not save section", variant: "destructive" });
+                          }
                         }, 800);
                       }
                     }}
@@ -2153,7 +2176,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     setUploadedPhotos(prev => prev.map(p => p.dbId === photoId ? { ...p, rotation: newRot } : p));
                     if (rotationSaveTimer.current) clearTimeout(rotationSaveTimer.current);
                     rotationSaveTimer.current = setTimeout(async () => {
-                      try { await apiRequest("PATCH", `/api/photos/${photoId}`, { rotation: newRot }); } catch {}
+                      try { await apiRequest("PATCH", `/api/photos/${photoId}`, { rotation: newRot }); } catch (err) {
+                        console.error("Failed to save photo rotation:", err);
+                      }
                     }, 80);
                   }}
                   title="Rotate clockwise"
@@ -2172,7 +2197,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                     setUploadedPhotos(prev => prev.map(p => p.dbId === photoId ? { ...p, rotation: newRot } : p));
                     if (rotationSaveTimer.current) clearTimeout(rotationSaveTimer.current);
                     rotationSaveTimer.current = setTimeout(async () => {
-                      try { await apiRequest("PATCH", `/api/photos/${photoId}`, { rotation: newRot }); } catch {}
+                      try { await apiRequest("PATCH", `/api/photos/${photoId}`, { rotation: newRot }); } catch (err) {
+                        console.error("Failed to save photo rotation:", err);
+                      }
                     }, 80);
                   }}
                   title="Rotate counter-clockwise"

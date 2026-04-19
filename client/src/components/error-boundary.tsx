@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 interface Props {
   children: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -28,6 +29,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <Card className="w-full max-w-sm border border-destructive/30">

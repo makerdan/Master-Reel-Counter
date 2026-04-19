@@ -145,6 +145,10 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         const existingIds = new Set(prev.map(q => q.queueId));
         return [...prev, ...restored.filter(r => !existingIds.has(r.queueId))];
       });
+    }).catch(err => {
+      if (cancelled) return;
+      console.error("Failed to restore queued photos from IndexedDB:", err);
+      toast({ title: "Could not restore queued photos", variant: "destructive" });
     });
     return () => { cancelled = true; };
   }, [sessionId]);
@@ -164,11 +168,19 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   }, [photos]);
 
   useEffect(() => {
-    if (processingRef.current || !isOnline) return;
-    const nextItem = uploadQueue.find(q => q.status === "pending");
-    if (!nextItem) return;
-    processingRef.current = true;
-    setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "uploading" as const } : q));
+    if (!isOnline) return;
+
+    let itemToProcess: UploadQueueItem | undefined;
+    setUploadQueue(prev => {
+      if (processingRef.current) return prev;
+      const nextItem = prev.find(q => q.status === "pending");
+      if (!nextItem) return prev;
+      processingRef.current = true;
+      itemToProcess = nextItem;
+      return prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "uploading" as const } : q);
+    });
+    if (!itemToProcess) return;
+    const nextItem = itemToProcess;
 
     (async () => {
       try {

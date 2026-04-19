@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Check, Flag, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
@@ -709,6 +710,13 @@ export default function ReviewTab({
   }, [scrubTo]);
 
   return (
+    <ErrorBoundary fallback={
+      <div className="flex flex-col items-center justify-center p-8 gap-3 text-center text-sm">
+        <AlertTriangle className="h-8 w-8 text-destructive" />
+        <p className="font-medium">The review tab encountered an unexpected error.</p>
+        <button className="underline text-muted-foreground" onClick={() => window.location.reload()}>Reload page</button>
+      </div>
+    }>
     <div className="space-y-4" data-testid="review-tab-container">
       <h2 className="text-lg font-bold underline text-center" data-testid="heading-review">Review</h2>
       {showFlagBanner && (
@@ -1100,5 +1108,6 @@ export default function ReviewTab({
         </Button>
       </div>
     </div>
+  </ErrorBoundary>
   );
 }
