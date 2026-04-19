@@ -1,7 +1,7 @@
 import { useState } from "react";
 import reelIconPath from "@assets/Master_Reel_Counter_-_i001_1776633528982.png";
 import {
-  Cable, Camera, Search, FileText, Users, Link2, Shield,
+  Camera, Search, FileText, Users, Link2, Shield,
   ImagePlus, Download, Flag, ScanLine, GalleryHorizontalEnd, FileSpreadsheet,
   Layers, AlertTriangle, Mail, Send, Globe, WifiOff, Smartphone,
   FolderOpen, Trash2, BarChart3, Lock, MessageSquare, Undo2,
@@ -308,7 +308,7 @@ export default function Landing() {
           <div className="max-w-3xl w-full text-center space-y-8" style={{ animation: "slideIn 0.5s ease-out" }}>
             <div className="flex items-center justify-center gap-3 mb-2">
               <div className="p-4 rounded-xl bg-amber-500/20 border border-amber-500/30 shadow-lg shadow-amber-500/10">
-                <Cable className="h-12 w-12 text-amber-400" />
+                <img src={reelIconPath} className="h-12 w-12 rounded-lg" alt="Master Reel Counter" />
               </div>
             </div>
 
