@@ -142,18 +142,20 @@ function EntryTable({
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  const { data: serverSearchData, isFetching: isSearchFetching, isError: isSearchError, refetch: refetchSearch } = useQuery<{ matches: { entryId: number; field: string; preview: string }[]; total: number }>({
+  const { data: serverSearchData, isFetching: isSearchFetching, isError: isSearchError, refetch: refetchSearch } = useQuery<{ matches: { entryId: number; field: string; preview: string }[]; total: number; encryptionActive?: boolean }>({
     queryKey: ["/api/sessions", sessionId.toString(), "entries", "search", debouncedQuery],
     queryFn: async () => {
-      if (!debouncedQuery.trim()) return { matches: [], total: 0 };
+      if (!debouncedQuery.trim()) return { matches: [], total: 0, encryptionActive: false };
       const res = await fetch(`/api/sessions/${sessionId}/entries/search?q=${encodeURIComponent(debouncedQuery)}`, { credentials: "include" });
       if (!res.ok) throw new Error(`Search failed: ${res.status}`);
       return res.json();
     },
     enabled: debouncedQuery.trim().length > 0,
-    placeholderData: { matches: [], total: 0 },
+    placeholderData: { matches: [], total: 0, encryptionActive: false },
     retry: 1,
   });
+
+  const isSearchEncryptionActive = !!(serverSearchData?.encryptionActive && debouncedQuery.trim());
 
   const serverMatchedIds = useMemo(() => {
     if (!debouncedQuery.trim() || isSearchError || !serverSearchData?.matches) return null;
@@ -339,6 +341,17 @@ function EntryTable({
             >
               <AlertTriangle className="h-3 w-3" />
               Search failed
+            </span>
+          )}
+          {isSearchEncryptionActive && (
+            <span
+              role="status"
+              aria-live="polite"
+              className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1"
+              data-testid="text-search-encryption-notice"
+            >
+              <AlertTriangle className="h-3 w-3" />
+              Encryption on — searching location fields only
             </span>
           )}
         </div>

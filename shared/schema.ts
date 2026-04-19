@@ -116,6 +116,8 @@ export const photos = pgTable("photos", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("photos_session_id_idx").on(table.sessionId),
+  index("photos_parent_photo_id_idx").on(table.parentPhotoId),
+  index("photos_object_storage_key_idx").on(table.objectStorageKey),
   foreignKey({ columns: [table.parentPhotoId], foreignColumns: [table.id] }).onDelete("set null"),
 ]);
 
@@ -166,6 +168,7 @@ export const pins = pgTable("pins", {
 }, (table) => [
   index("pins_photo_id_idx").on(table.photoId),
   index("pins_entry_id_idx").on(table.entryId),
+  index("pins_label_idx").on(table.label),
 ]);
 
 
@@ -236,6 +239,7 @@ export const activityLogs = pgTable("activity_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("activity_logs_session_id_idx").on(table.sessionId),
+  index("activity_logs_user_id_idx").on(table.userId),
 ]);
 
 export const comments = pgTable("comments", {

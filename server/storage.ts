@@ -65,6 +65,7 @@ export interface IStorage {
   getExpiredTrashSessions(olderThanDays: number): Promise<Session[]>;
 
   createPhoto(photo: InsertPhoto): Promise<Photo>;
+  atomicCreatePhoto(photo: InsertPhoto, ext: string): Promise<Photo>;
   getPhoto(id: number): Promise<Photo | undefined>;
   getPhotoByStorageKey(key: string): Promise<Photo | undefined>;
   getSessionPhotos(sessionId: number): Promise<Photo[]>;
@@ -166,8 +167,8 @@ export interface IStorage {
     dateMonth?: number;
     dateYear?: number;
     wireType?: string;
-  }): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]>; entrySnippets?: Record<number, { field: string; preview: string }[]> }>;
-  searchSessionEntries(sessionId: number, query: string): Promise<{ entryId: number; field: string; preview: string }[]>;
+  }): Promise<{ ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]>; entrySnippets?: Record<number, { field: string; preview: string }[]>; encryptionActive?: boolean }>;
+  searchSessionEntries(sessionId: number, query: string, encodingEnabled?: boolean): Promise<{ matches: { entryId: number; field: string; preview: string }[]; encryptionActive: boolean }>;
 
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
   getSessionActivityLogs(sessionId: number, limit?: number, offset?: number, userId?: string): Promise<{ logs: ActivityLog[]; total: number }>;
@@ -378,6 +379,18 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async atomicCreatePhoto(photo: InsertPhoto, ext: string): Promise<Photo> {
+    return db.transaction(async (tx) => {
+      const [inserted] = await tx.insert(photos).values(photo).returning();
+      const uniqueFilename = `S${inserted.sessionId}_P${String(inserted.id).padStart(4, "0")}${ext}`;
+      const [updated] = await tx.update(photos)
+        .set({ originalFilename: uniqueFilename })
+        .where(eq(photos.id, inserted.id))
+        .returning();
+      return updated;
+    });
+  }
+
   async getPhoto(id: number): Promise<Photo | undefined> {
     const [result] = await db.select().from(photos).where(eq(photos.id, id));
     return result;
@@ -421,7 +434,7 @@ export class DatabaseStorage implements IStorage {
 
   async deletePhoto(id: number): Promise<void> {
     await db.transaction(async (tx) => {
-      await tx.update(photos).set({ isDetailShot: false }).where(eq(photos.parentPhotoId, id));
+      await tx.update(photos).set({ isDetailShot: false, parentPhotoId: null }).where(eq(photos.parentPhotoId, id));
       const committedPinRows = await tx.select({ entryId: pins.entryId }).from(pins)
         .where(and(eq(pins.photoId, id), sql`${pins.entryId} IS NOT NULL`));
       const pinnedEntryIds = committedPinRows.map(r => r.entryId as number);
@@ -935,25 +948,37 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async searchSessionEntries(sessionId: number, query: string): Promise<{ entryId: number; field: string; preview: string }[]> {
+  async searchSessionEntries(sessionId: number, query: string, encodingEnabled?: boolean): Promise<{ matches: { entryId: number; field: string; preview: string }[]; encryptionActive: boolean }> {
     const pattern = `%${query}%`;
     const lowerQuery = query.toLowerCase();
+
+    const plaintextConditions = or(
+      ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
+      ilike(sql`COALESCE(${entries.section}, '')`, pattern),
+    );
+
+    const allFieldConditions = or(
+      ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
+      ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
+      ilike(sql`COALESCE(${entries.gauge}, '')`, pattern),
+      ilike(sql`COALESCE(${entries.color}, '')`, pattern),
+      ilike(sql`COALESCE(${entries.manufacturer}, '')`, pattern),
+      ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
+      ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
+      ilike(sql`COALESCE(${entries.section}, '')`, pattern),
+    );
+
+    const whereConditions = encodingEnabled ? plaintextConditions : allFieldConditions;
+
     const matchingEntries = await db.select().from(entries)
-      .where(and(
-        eq(entries.sessionId, sessionId),
-        or(
-          ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
-          ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
-          ilike(sql`COALESCE(${entries.gauge}, '')`, pattern),
-          ilike(sql`COALESCE(${entries.color}, '')`, pattern),
-          ilike(sql`COALESCE(${entries.manufacturer}, '')`, pattern),
-          ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
-          ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
-          ilike(sql`COALESCE(${entries.section}, '')`, pattern),
-        )
-      ));
-    const results: { entryId: number; field: string; preview: string }[] = [];
-    const fieldOrder: { field: string; val: (e: typeof matchingEntries[0]) => string | null }[] = [
+      .where(and(eq(entries.sessionId, sessionId), whereConditions));
+
+    const plaintextFieldOrder: { field: string; val: (e: typeof matchingEntries[0]) => string | null }[] = [
+      { field: "Aisle", val: e => e.aisle },
+      { field: "Section", val: e => e.section },
+    ];
+
+    const allFieldOrder: { field: string; val: (e: typeof matchingEntries[0]) => string | null }[] = [
       { field: "Reel Tag", val: e => e.reelTag },
       { field: "Wire Type", val: e => e.wireType },
       { field: "Gauge", val: e => e.gauge },
@@ -963,6 +988,9 @@ export class DatabaseStorage implements IStorage {
       { field: "Aisle", val: e => e.aisle },
       { field: "Section", val: e => e.section },
     ];
+
+    const fieldOrder = encodingEnabled ? plaintextFieldOrder : allFieldOrder;
+    const results: { entryId: number; field: string; preview: string }[] = [];
     for (const entry of matchingEntries) {
       for (const { field, val } of fieldOrder) {
         const v = val(entry);
@@ -976,7 +1004,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
     }
-    return results;
+    return { matches: results, encryptionActive: !!encodingEnabled };
   }
 
   async searchUserSessions(userId: string, query: string, searchInside: boolean, filters?: {
@@ -991,9 +1019,12 @@ export class DatabaseStorage implements IStorage {
     sharedIds: number[];
     reasons: Record<number, string[]>;
     entrySnippets?: Record<number, { field: string; preview: string }[]>;
+    encryptionActive?: boolean;
   }> {
     const lowerQuery = query.trim().toLowerCase();
     const pattern = `%${query}%`;
+    const userSettings = await this.getUserSettings(userId);
+    const encryptionActive = !!(userSettings?.encodingEnabled);
     const reasons: Record<number, string[]> = {};
     const addReason = (id: number, reason: string) => {
       if (!reasons[id]) reasons[id] = [];
@@ -1124,16 +1155,21 @@ export class DatabaseStorage implements IStorage {
         if (!targetSet.has(entry.sessionId)) continue;
         const count = sessionSnippetCount[entry.sessionId] ?? 0;
         if (count >= 2) continue;
-        const fieldValues: { field: string; val: string | null }[] = [
-          { field: "Notes", val: entry.notes },
-          { field: "Wire Type", val: entry.wireType },
-          { field: "Reel Tag", val: entry.reelTag },
-          { field: "Gauge", val: entry.gauge },
-          { field: "Color", val: entry.color },
-          { field: "Manufacturer", val: entry.manufacturer },
-          { field: "Aisle", val: entry.aisle },
-          { field: "Section", val: entry.section },
-        ];
+        const fieldValues: { field: string; val: string | null }[] = encryptionActive
+          ? [
+              { field: "Aisle", val: entry.aisle },
+              { field: "Section", val: entry.section },
+            ]
+          : [
+              { field: "Notes", val: entry.notes },
+              { field: "Wire Type", val: entry.wireType },
+              { field: "Reel Tag", val: entry.reelTag },
+              { field: "Gauge", val: entry.gauge },
+              { field: "Color", val: entry.color },
+              { field: "Manufacturer", val: entry.manufacturer },
+              { field: "Aisle", val: entry.aisle },
+              { field: "Section", val: entry.section },
+            ];
         for (const { field, val } of fieldValues) {
           if (val && val.toLowerCase().includes(lowerQuery)) {
             const idx = val.toLowerCase().indexOf(lowerQuery);
@@ -1176,10 +1212,12 @@ export class DatabaseStorage implements IStorage {
     let entryMatchedOwned = new Set<number>();
     let ownedEntryMatches: (typeof entries.$inferSelect)[] = [];
     if (searchInside && allSessionIds.length > 0 && lowerQuery) {
-      ownedEntryMatches = await db.select().from(entries)
-        .where(and(
-          inArray(entries.sessionId, allSessionIds),
-          or(
+      const entrySearchConditions = encryptionActive
+        ? or(
+            ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
+            ilike(sql`COALESCE(${entries.section}, '')`, pattern),
+          )
+        : or(
             ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
             ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
             ilike(sql`COALESCE(${entries.gauge}, '')`, pattern),
@@ -1188,8 +1226,9 @@ export class DatabaseStorage implements IStorage {
             ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
             ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
             ilike(sql`COALESCE(${entries.section}, '')`, pattern),
-          )
-        ));
+          );
+      ownedEntryMatches = await db.select().from(entries)
+        .where(and(inArray(entries.sessionId, allSessionIds), entrySearchConditions));
       for (const entry of ownedEntryMatches) { entryMatchedOwned.add(entry.sessionId); addReason(entry.sessionId, "entries"); }
     }
 
@@ -1244,10 +1283,12 @@ export class DatabaseStorage implements IStorage {
       let sharedEntryMatches: (typeof entries.$inferSelect)[] = [];
       const entryMatchedShared = new Set<number>();
       if (searchInside && sharedSessionIds.length > 0 && lowerQuery) {
-        sharedEntryMatches = await db.select().from(entries)
-          .where(and(
-            inArray(entries.sessionId, sharedSessionIds),
-            or(
+        const sharedEntrySearchConditions = encryptionActive
+          ? or(
+              ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
+              ilike(sql`COALESCE(${entries.section}, '')`, pattern),
+            )
+          : or(
               ilike(sql`COALESCE(${entries.reelTag}, '')`, pattern),
               ilike(sql`COALESCE(${entries.wireType}, '')`, pattern),
               ilike(sql`COALESCE(${entries.gauge}, '')`, pattern),
@@ -1256,8 +1297,9 @@ export class DatabaseStorage implements IStorage {
               ilike(sql`COALESCE(${entries.notes}, '')`, pattern),
               ilike(sql`COALESCE(${entries.aisle}, '')`, pattern),
               ilike(sql`COALESCE(${entries.section}, '')`, pattern),
-            )
-          ));
+            );
+        sharedEntryMatches = await db.select().from(entries)
+          .where(and(inArray(entries.sessionId, sharedSessionIds), sharedEntrySearchConditions));
         for (const entry of sharedEntryMatches) { entryMatchedShared.add(entry.sessionId); addReason(entry.sessionId, "entries"); }
       }
 
@@ -1298,6 +1340,7 @@ export class DatabaseStorage implements IStorage {
       sharedIds: Array.from(sharedMatched),
       reasons,
       entrySnippets,
+      encryptionActive,
     };
   }
 

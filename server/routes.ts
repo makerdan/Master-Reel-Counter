@@ -939,9 +939,11 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const query = String(req.query.q || "").trim();
-      if (!query) return res.json({ matches: [], total: 0 });
-      const matches = await storage.searchSessionEntries(access.session.id, query);
-      res.json({ matches, total: matches.length });
+      if (!query) return res.json({ matches: [], total: 0, encryptionActive: false });
+      const userSettings = await storage.getUserSettings(userId);
+      const encodingEnabled = !!(userSettings?.encodingEnabled);
+      const result = await storage.searchSessionEntries(access.session.id, query, encodingEnabled);
+      res.json({ matches: result.matches, total: result.matches.length, encryptionActive: result.encryptionActive });
     } catch (error) {
       res.status(500).json({ message: "Entry search failed" });
     }
@@ -978,18 +980,15 @@ export async function registerRoutes(
       const displayName = req.user.claims.first_name
         ? `${req.user.claims.first_name} ${req.user.claims.last_name || ""}`.trim()
         : req.user.claims.email || userId;
-      const photo = await storage.createPhoto({
+      const ext = (req.body.originalFilename || "photo.jpg").match(/\.[^.]+$/)?.[0] || ".jpg";
+      const photo = await storage.atomicCreatePhoto({
         ...req.body,
         sessionId: access.session.id,
         userId,
         uploadedBy: displayName,
-      });
-      const ext = (req.body.originalFilename || "photo.jpg").match(/\.[^.]+$/)?.[0] || ".jpg";
-      const uniqueFilename = `S${access.session.id}_P${String(photo.id).padStart(4, "0")}${ext}`;
-      await storage.updatePhoto(photo.id, { originalFilename: uniqueFilename });
-      photo.originalFilename = uniqueFilename;
-      console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${access.session.id}, filename="${uniqueFilename}", at=${photo.createdAt.toISOString()}`);
-      logActivity(access.session.id, userId, displayName, "photo_uploaded", "photo", photo.id, uniqueFilename);
+      }, ext);
+      console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${access.session.id}, filename="${photo.originalFilename}", at=${photo.createdAt.toISOString()}`);
+      logActivity(access.session.id, userId, displayName, "photo_uploaded", "photo", photo.id, photo.originalFilename || undefined);
       broadcastToSession(access.session.id, { type: "sync", entity: "photos", sessionId: access.session.id });
       res.json(photo);
     } catch (error) {

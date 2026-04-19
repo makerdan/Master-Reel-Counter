@@ -277,8 +277,8 @@ export default function Dashboard() {
     placeholderData: [],
   });
 
-  type SearchResult = { ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]>; entrySnippets?: Record<number, { field: string; preview: string }[]> };
-  const emptySearch: SearchResult = { ownedIds: [], sharedIds: [], reasons: {}, entrySnippets: {} };
+  type SearchResult = { ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]>; entrySnippets?: Record<number, { field: string; preview: string }[]>; encryptionActive?: boolean };
+  const emptySearch: SearchResult = { ownedIds: [], sharedIds: [], reasons: {}, entrySnippets: {}, encryptionActive: false };
 
   const activeFilters = {
     status: filterStatus || undefined,
@@ -1720,16 +1720,28 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2" data-testid="toggle-search-inside">
-              <Switch
-                id="search-inside"
-                checked={searchInside}
-                onCheckedChange={setSearchInside}
-                data-testid="switch-search-inside"
-              />
-              <label htmlFor="search-inside" className="text-sm font-medium cursor-pointer select-none">
-                Search inside sessions
-              </label>
+            <div className="flex items-center gap-2 flex-wrap" data-testid="toggle-search-inside">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="search-inside"
+                  checked={searchInside}
+                  onCheckedChange={setSearchInside}
+                  data-testid="switch-search-inside"
+                />
+                <label htmlFor="search-inside" className="text-sm font-medium cursor-pointer select-none">
+                  Search inside sessions
+                </label>
+              </div>
+              {searchInside && searchResults?.encryptionActive && searchQuery.trim() && (
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1"
+                  data-testid="text-dashboard-search-encryption-notice"
+                >
+                  Encryption on — entry search limited to location fields
+                </span>
+              )}
             </div>
             {(hasActiveFilters) && (
               <div className="flex items-center gap-1 flex-wrap">
