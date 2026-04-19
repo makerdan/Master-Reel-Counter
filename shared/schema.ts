@@ -18,6 +18,33 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ─── Table relationships overview ────────────────────────────────────────────
+//
+// folders
+//   └─ countingSessions (folderId → folders.id, SET NULL on delete)
+//        ├─ sessionCollaborators (sessionId → countingSessions.id, CASCADE)
+//        ├─ sessionInviteLinks   (sessionId → countingSessions.id, CASCADE)
+//        ├─ activityLogs         (sessionId → countingSessions.id, CASCADE)
+//        ├─ comments             (sessionId → countingSessions.id, CASCADE)
+//        ├─ scanResults          (sessionId → countingSessions.id, CASCADE)
+//        ├─ dismissedDuplicates  (sessionId → countingSessions.id, CASCADE)
+//        ├─ reviewResponses      (sessionId → countingSessions.id, CASCADE)
+//        └─ photos (sessionId → countingSessions.id, CASCADE)
+//             ├─ photos.parentPhotoId → photos.id (SET NULL) — detail-shot link (see below)
+//             ├─ pins  (photoId → photos.id, CASCADE)
+//             │    └─ pins.entryId → entries.id (SET NULL) — pin committed once entry saved
+//             └─ entries (photoId → photos.id, SET NULL)
+//
+// Detail-shot pattern: a "detail shot" is a close-up photo taken to clarify a
+// specific reel on a wider overview photo. photos.isDetailShot = true on the
+// close-up; photos.parentPhotoId points back to the overview photo it belongs
+// to; photos.linkedPinLabel names the pin on the overview that this detail
+// shot resolves. When an entry is saved for a detail shot, storage
+// automatically finds the matching pin on the parent photo and sets its
+// entryId (resolveParentPinForDetailShot), completing the pin-entry link.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const folders = pgTable("folders", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull(),
@@ -29,6 +56,14 @@ export const folders = pgTable("folders", {
   index("folders_user_id_idx").on(table.userId),
 ]);
 
+// status: "active" | "completed" — toggled by the user; drives badge display
+//   and stats bucketing. Enforced by a DB CHECK constraint.
+// isLocked: prevents entry edits when true; the owner can still unlock.
+// deletedAt: soft-delete timestamp. NULL = live session; non-NULL = in trash.
+//   Sessions with deletedAt older than the configured retention window are
+//   permanently purged by a scheduled job (getExpiredTrashSessions).
+// lastPhotoIndex: monotonically increasing counter used to generate sequential
+//   "Photo #N" labels; incremented on each photo upload, never decremented.
 export const countingSessions = pgTable("counting_sessions", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull(),
@@ -48,6 +83,14 @@ export const countingSessions = pgTable("counting_sessions", {
   check("counting_sessions_status_check", sql`${table.status} IN ('active', 'completed')`),
 ]);
 
+// isDetailShot / parentPhotoId / linkedPinLabel:
+//   These three fields together implement the detail-shot feature. See the
+//   table relationships overview at the top of this file for the full pattern.
+//   parentPhotoId is a self-referential FK (SET NULL on delete) so removing the
+//   overview photo demotes the detail shot to a standalone photo rather than
+//   cascading a delete.
+// pinScale: user-controlled zoom factor for the pin overlay canvas (default 1×).
+// rotation: degrees clockwise applied in the UI (0, 90, 180, 270).
 export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
@@ -101,6 +144,12 @@ export const entries = pgTable("entries", {
   index("entries_photo_id_idx").on(table.photoId),
 ]);
 
+// Pins are positioned markers overlaid on a photo (xPercent/yPercent are 0–100
+// relative to the image dimensions). A pin starts "uncommitted" (entryId IS
+// NULL) and becomes committed once the user saves an inventory entry for it.
+// Uncommitted pins appear in the "incomplete pins" count and alert badge.
+// flagged / flagReason: a reviewer can flag a pin for follow-up; flagged pins
+//   with no entryId are surfaced in the data-quality stats dashboard.
 export const pins = pgTable("pins", {
   id: serial("id").primaryKey(),
   photoId: integer("photo_id").notNull().references(() => photos.id, { onDelete: "cascade" }),

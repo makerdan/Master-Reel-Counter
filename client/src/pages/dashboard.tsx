@@ -445,6 +445,14 @@ export default function Dashboard() {
     },
   });
 
+  // Tracks the authoritative lastUpdatedAt timestamp for the session currently
+  // being edited inline. Stored as a ref (not state) so that the auto-save
+  // effect can read the latest value without being listed as a dependency —
+  // adding it to deps would cause the effect to re-fire and reset the debounce
+  // timer every time a save completes, making rapid edits unreliable. The ref
+  // is seeded from editingSession on open and updated on every successful save
+  // or SESSION_VERSION_CONFLICT response so the next auto-save always sends the
+  // most recent timestamp to updateSessionIfUnchanged.
   const editingSessionVersionRef = useRef<string | Date | null | undefined>(undefined);
 
   const updateSession = useMutation({
@@ -460,6 +468,11 @@ export default function Dashboard() {
       let message = "Failed to update session";
       const parsed = parseApiErrorPayload(err);
       if (parsed?.code === "SESSION_VERSION_CONFLICT") {
+        // Another client (or browser tab) saved the session between when we
+        // loaded it and when we tried to save. The server returns the current
+        // lastUpdatedAt so we can update our ref and retry on the next
+        // auto-save without a full page reload. We also refetch the session
+        // list so the displayed data is consistent with the DB state.
         if (typeof parsed.message === "string") message = parsed.message;
         if (typeof parsed.currentLastUpdatedAt === "string") editingSessionVersionRef.current = parsed.currentLastUpdatedAt;
         await queryClient.refetchQueries({ queryKey: ["/api/sessions"] });

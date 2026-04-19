@@ -51,6 +51,13 @@ export interface IStorage {
   getSession(id: number): Promise<Session | undefined>;
   getUserSessions(userId: string, options?: { trash?: boolean; limit?: number; offset?: number }): Promise<{ sessions: Session[]; total: number }>;
   updateSession(id: number, data: Partial<Session>): Promise<Session | undefined>;
+  /**
+   * Optimistic-locking update: only writes if `lastUpdatedAt` on the row still
+   * matches `expectedLastUpdatedAt`. Returns the updated row on success, or
+   * `undefined` if the row was concurrently modified (timestamp mismatch).
+   * The caller should surface this as a SESSION_VERSION_CONFLICT error so the
+   * client can reload and retry.
+   */
   updateSessionIfUnchanged(id: number, expectedLastUpdatedAt: Date, data: Partial<Session>): Promise<Session | undefined>;
   softDeleteSession(id: number): Promise<void>;
   restoreSession(id: number): Promise<void>;
@@ -63,6 +70,18 @@ export interface IStorage {
   getSessionPhotos(sessionId: number): Promise<Photo[]>;
   getSessionPhotosPaginated(sessionId: number, limit: number, offset: number): Promise<{ photos: Photo[]; total: number }>;
   updatePhoto(id: number, data: Partial<Photo>): Promise<Photo | undefined>;
+  /**
+   * Deletes a photo and its transitive dependents in a single transaction:
+   * 1. Detail shots that referenced this photo as their parent are demoted to
+   *    standalone photos (parentPhotoId cleared, isDetailShot = false).
+   * 2. Any entries that were linked to a committed pin on this photo are hard-
+   *    deleted (pin → entryId was non-null), removing the inventory record.
+   * 3. Remaining entries directly attached to the photo (photoId FK) are also
+   *    deleted.
+   * 4. The photo row itself is deleted (cascades remove its pins via FK).
+   * NOTE: object-storage cleanup (deleting the actual file) is the caller's
+   * responsibility and happens outside this method.
+   */
   deletePhoto(id: number): Promise<void>;
   isObjectKeyShared(key: string, excludePhotoId: number): Promise<boolean>;
 
@@ -116,8 +135,30 @@ export interface IStorage {
   getFolder(id: number): Promise<Folder | undefined>;
   updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined>;
   deleteFolder(id: number): Promise<void>;
+  /**
+   * Deep-copies a session into a new row owned by `userId`.
+   * Copies all photos, entries, and pins, updating foreign-key references to
+   * point at the new rows. If `copyFileCallback` is provided it is called for
+   * each photo's objectStorageKey so the caller can duplicate the underlying
+   * file in object storage; otherwise the new photo rows share the same key as
+   * the originals (shallow copy of storage objects).
+   * The duplicate is placed in `targetFolderId` (null = no folder).
+   */
   duplicateSession(sessionId: number, userId: string, targetFolderId: number | null, name?: string, copyFileCallback?: (srcKey: string) => Promise<string>): Promise<Session>;
   resetSessionToPhotos(sessionId: number): Promise<void>;
+  /**
+   * Full-text + structured filter search across sessions the user owns or
+   * collaborates on. `query` is matched against session name, location,
+   * description, and (when `searchInside` is true) against entry fields.
+   * Filters are applied on the server and combined with AND semantics.
+   * Returns two separate ID lists (ownedIds / sharedIds) so the dashboard can
+   * preserve its owned-vs-shared display grouping. `reasons` maps each matched
+   * session ID to a human-readable list of why it matched (e.g. "name", "aisle
+   * A-12"). `entrySnippets` provides a short field+value preview for inside-
+   * search matches, used to render match highlights in the UI.
+   * NOTE: when encoding (encryption) is enabled, entry-level fields are stored
+   * ciphertext and cannot be searched; wire-type filters are also limited.
+   */
   searchUserSessions(userId: string, query: string, searchInside: boolean, filters?: {
     status?: string;
     collaborator?: string;
@@ -198,6 +239,18 @@ export interface IStorage {
     busiestDay: string | null;
   }>;
 
+  /**
+   * Returns aggregate stats for the Stats page that require joining across
+   * multiple tables and can be expensive at scale. `sessionIds` should be the
+   * caller's pre-filtered set (owned sessions only, or a subset) so the query
+   * scope is bounded. Covers four independent stat groups:
+   *   - dataQuality:   flagged pins, review-response outcomes, dismissed dupes
+   *   - aiScanner:     total scans and readable/unreadable breakdown (null if no
+   *                    scan_results rows exist for the given sessions)
+   *   - photoInsights: detail-shot count, avg photos/session, linked-pin rate
+   *   - wireBreakdown: top wire types and gauges by entry count and footage
+   *   - dailyActivity: entry counts grouped by calendar date (last 90 days)
+   */
   getEnhancedStats(userId: string, sessionIds: number[]): Promise<{
     dataQuality: {
       totalFlaggedPins: number;
