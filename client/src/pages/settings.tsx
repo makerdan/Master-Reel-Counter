@@ -1970,16 +1970,6 @@ export default function SettingsPage() {
               </div>
             )}
             <Separator />
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Or email Dan directly:</p>
-              <a
-                href="mailto:makerdantheman@gmail.com"
-                className="text-sm font-medium text-primary hover:underline"
-                data-testid="link-contact-email"
-              >
-                makerdantheman@gmail.com
-              </a>
-            </div>
           </CardContent>
         </Card>
 
