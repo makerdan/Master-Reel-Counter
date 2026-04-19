@@ -248,7 +248,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     setSessionsOffset(0);
-    setAllLoadedSessions([]);
+    // Do NOT clear allLoadedSessions here. When showTrash changes, sessionsOffset
+    // resets to 0 and a fresh query fires. The sessionsData effect above will
+    // replace the list (offset === 0 branch) once the response arrives, keeping
+    // the previous list visible in the meantime instead of showing a blank flash.
+    // Clearing here also races with the sessionsData effect on every remount,
+    // wiping cache-rehydrated data and causing the empty-dashboard-on-back bug.
   }, [showTrash]);
 
   const sessions = allLoadedSessions;
