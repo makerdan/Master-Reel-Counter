@@ -314,18 +314,26 @@ export async function registerRoutes(
   };
 
   const ALLOWED_IMAGE_MIMETYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-  // Reject files whose MIME type is not in the allow-list. Using cb(null, false)
-  // (rather than cb(Error)) keeps the error in route-handler territory so each
-  // endpoint can return a well-formed 400 JSON response instead of an unhandled
-  // Express error. The caller sees "No file provided" from the existing guard.
-  const imageFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
-    cb(null, ALLOWED_IMAGE_MIMETYPES.has(file.mimetype));
+  // Reject files whose MIME type is not in the allow-list. cb(null, false) is
+  // used so multer does not call next(err), keeping the error in route-handler
+  // territory. The rejected MIME type is annotated on the request so each
+  // handler can return a descriptive 400 JSON payload.
+  const imageFileFilter: multer.Options["fileFilter"] = (req: any, file, cb) => {
+    if (ALLOWED_IMAGE_MIMETYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      req._rejectedMimetype = file.mimetype;
+      cb(null, false);
+    }
   };
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 }, fileFilter: imageFileFilter });
 
   app.post("/api/uploads/direct", isAuthenticated, resourceRateLimiter, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) {
+        if (req._rejectedMimetype) {
+          return res.status(400).json({ error: `Invalid file type: ${req._rejectedMimetype}. Allowed: image/jpeg, image/png, image/webp.` });
+        }
         return res.status(400).json({ error: "No file provided" });
       }
 
@@ -798,8 +806,13 @@ export async function registerRoutes(
       if (!Array.isArray(folderIds)) return res.status(400).json({ message: "folderIds array required" });
       const userFolders = await storage.getUserFolders(userId);
       const ownedIds = new Set(userFolders.map(f => f.id));
+      // Reject requests that include folder IDs the caller does not own.
+      for (const id of folderIds) {
+        if (!ownedIds.has(id)) {
+          return res.status(403).json({ message: "Access denied: one or more folder IDs do not belong to you" });
+        }
+      }
       for (let i = 0; i < folderIds.length; i++) {
-        if (!ownedIds.has(folderIds[i])) continue;
         await storage.updateFolder(folderIds[i], { sortOrder: i });
       }
       const updated = await storage.getUserFolders(userId);
@@ -4689,7 +4702,7 @@ export async function registerRoutes(
   // Upload user avatar
   app.post("/api/user/profile/avatar", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
-      if (!req.file) return res.status(400).json({ message: "No file provided" });
+      if (!req.file) return res.status(400).json({ message: req._rejectedMimetype ? `Invalid file type: ${req._rejectedMimetype}. Allowed: image/jpeg, image/png, image/webp.` : "No file provided" });
       const userId = resolveUserId(req);
       const resizedBuffer = await sharp(req.file.buffer)
         .rotate()
@@ -4729,7 +4742,7 @@ export async function registerRoutes(
 
   app.post("/api/settings/logo", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
-      if (!req.file) return res.status(400).json({ message: "No file provided" });
+      if (!req.file) return res.status(400).json({ message: req._rejectedMimetype ? `Invalid file type: ${req._rejectedMimetype}. Allowed: image/jpeg, image/png, image/webp.` : "No file provided" });
       const userId = resolveUserId(req);
       const existing = await storage.getUserSettings(userId);
       if (existing?.companyLogoKey) {
