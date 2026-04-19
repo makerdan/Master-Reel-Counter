@@ -795,7 +795,9 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     <div key={item.queueId} className="flex items-center gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-2" data-testid={`upload-retrying-${item.queueId}`}>
                       <Loader2 className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 animate-spin" />
                       <span className="text-xs flex-1 truncate">
-                        {`Retrying ${item.file.name} (attempt ${item.retries + 1} of ${MAX_AUTO_RETRIES})...`}
+                        {item.status === "failed"
+                          ? `Retry scheduled for ${item.file.name} (attempt ${item.retries + 1} of ${MAX_AUTO_RETRIES})...`
+                          : `Retrying ${item.file.name} (attempt ${item.retries + 1} of ${MAX_AUTO_RETRIES})...`}
                       </span>
                     </div>
                   ))}
