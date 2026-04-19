@@ -10,11 +10,19 @@ import {
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
 
+const MAX_ENTRY_RETRIES = 3;
+
 export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [entryRetryAttempt, setEntryRetryAttempt] = useState<number | null>(null);
+  const [permanentlyFailedCount, setPermanentlyFailedCount] = useState(0);
+
   const syncingRef = useRef(false);
+  const entryRetryCountsRef = useRef<Map<string, number>>(new Map());
+  const permanentlyFailedRef = useRef<Set<string>>(new Set());
+  const entryRetryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const refreshPendingCount = useCallback(async () => {
     try {
@@ -31,7 +39,14 @@ export function useNetworkStatus() {
     try {
       const entries = await getQueuedEntries();
       for (const entry of entries) {
+        if (permanentlyFailedRef.current.has(entry.id)) continue;
         if (!navigator.onLine) break;
+
+        const currentRetries = entryRetryCountsRef.current.get(entry.id) ?? 0;
+        if (currentRetries > 0) {
+          setEntryRetryAttempt(currentRetries + 1);
+        }
+
         try {
           const res = await fetch(`/api/sessions/${entry.sessionId}/entries`, {
             method: "POST",
@@ -41,6 +56,12 @@ export function useNetworkStatus() {
           });
           if (res.ok) {
             const created = await res.json().catch(() => null);
+            entryRetryCountsRef.current.delete(entry.id);
+            const timer = entryRetryTimersRef.current.get(entry.id);
+            if (timer !== undefined) {
+              clearTimeout(timer);
+              entryRetryTimersRef.current.delete(entry.id);
+            }
             await removeEntryFromQueue(entry.id);
             if (entry.placeholderId != null && created?.id != null) {
               dispatchEntrySynced(entry.placeholderId, created.id, entry.sessionId);
@@ -48,6 +69,20 @@ export function useNetworkStatus() {
             queryClient.invalidateQueries({
               queryKey: ["/api/sessions", entry.sessionId.toString(), "entries"],
             });
+          } else {
+            const nextRetries = currentRetries + 1;
+            entryRetryCountsRef.current.set(entry.id, nextRetries);
+            if (nextRetries >= MAX_ENTRY_RETRIES) {
+              permanentlyFailedRef.current.add(entry.id);
+              setPermanentlyFailedCount(permanentlyFailedRef.current.size);
+            } else {
+              const backoffMs = Math.pow(4, nextRetries) * 500;
+              const timer = setTimeout(() => {
+                entryRetryTimersRef.current.delete(entry.id);
+                syncQueue();
+              }, backoffMs);
+              entryRetryTimersRef.current.set(entry.id, timer);
+            }
           }
         } catch {
           break;
@@ -97,13 +132,31 @@ export function useNetworkStatus() {
     } finally {
       syncingRef.current = false;
       setIsSyncing(false);
+      setEntryRetryAttempt(null);
       await refreshPendingCount();
     }
   }, [refreshPendingCount]);
 
+  const retryAllFailedEntries = useCallback(() => {
+    for (const timer of entryRetryTimersRef.current.values()) {
+      clearTimeout(timer);
+    }
+    entryRetryTimersRef.current.clear();
+    permanentlyFailedRef.current.clear();
+    entryRetryCountsRef.current.clear();
+    setPermanentlyFailedCount(0);
+    syncQueue();
+  }, [syncQueue]);
+
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
+      for (const [id, timer] of entryRetryTimersRef.current.entries()) {
+        if (!permanentlyFailedRef.current.has(id)) {
+          clearTimeout(timer);
+          entryRetryTimersRef.current.delete(id);
+        }
+      }
       syncQueue();
     };
     const handleOffline = () => setIsOnline(false);
@@ -124,8 +177,20 @@ export function useNetworkStatus() {
       window.removeEventListener("offline", handleOffline);
       clearInterval(interval);
       unsubQueue();
+      for (const timer of entryRetryTimersRef.current.values()) {
+        clearTimeout(timer);
+      }
     };
   }, [syncQueue, refreshPendingCount]);
 
-  return { isOnline, pendingCount, isSyncing, syncQueue, refreshPendingCount };
+  return {
+    isOnline,
+    pendingCount,
+    isSyncing,
+    syncQueue,
+    refreshPendingCount,
+    entryRetryAttempt,
+    permanentlyFailedCount,
+    retryAllFailedEntries,
+  };
 }

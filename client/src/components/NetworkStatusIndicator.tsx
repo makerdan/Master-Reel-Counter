@@ -1,10 +1,13 @@
-import { WifiOff, Loader2, CloudUpload } from "lucide-react";
+import { WifiOff, Loader2, CloudUpload, AlertTriangle, RefreshCw } from "lucide-react";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 
 export function NetworkStatusIndicator() {
-  const { isOnline, pendingCount, isSyncing } = useNetworkStatus();
+  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries } = useNetworkStatus();
 
-  if (isOnline && pendingCount === 0 && !isSyncing) {
+  const hasRetryingEntries = isSyncing && entryRetryAttempt !== null;
+  const hasPermanentFailures = !isSyncing && permanentlyFailedCount > 0;
+
+  if (isOnline && pendingCount === 0 && !isSyncing && !hasPermanentFailures) {
     return null;
   }
 
@@ -12,7 +15,9 @@ export function NetworkStatusIndicator() {
     <div
       data-testid="network-status-indicator"
       className={`fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg transition-all ${
-        isOnline
+        hasPermanentFailures
+          ? "bg-destructive text-destructive-foreground"
+          : isOnline
           ? "bg-primary text-primary-foreground"
           : "bg-destructive text-destructive-foreground"
       }`}
@@ -23,13 +28,37 @@ export function NetworkStatusIndicator() {
           <span data-testid="text-offline-status">Offline</span>
         </>
       )}
-      {isOnline && isSyncing && (
+      {isOnline && hasRetryingEntries && (
+        <>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span data-testid="text-retrying-entry-status">
+            Retrying entry sync (attempt {entryRetryAttempt} of {3})...
+          </span>
+        </>
+      )}
+      {isOnline && isSyncing && !hasRetryingEntries && (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           <span data-testid="text-syncing-status">Syncing...</span>
         </>
       )}
-      {isOnline && !isSyncing && pendingCount > 0 && (
+      {isOnline && hasPermanentFailures && (
+        <>
+          <AlertTriangle className="h-3.5 w-3.5" />
+          <span data-testid="text-entry-sync-failed">
+            {permanentlyFailedCount} entr{permanentlyFailedCount === 1 ? "y" : "ies"} failed to sync
+          </span>
+          <button
+            onClick={retryAllFailedEntries}
+            className="ml-1 flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] hover:bg-white/30 transition-colors"
+            data-testid="button-retry-failed-entries"
+          >
+            <RefreshCw className="h-2.5 w-2.5" />
+            Retry
+          </button>
+        </>
+      )}
+      {isOnline && !isSyncing && !hasPermanentFailures && pendingCount > 0 && (
         <>
           <CloudUpload className="h-3.5 w-3.5" />
           <span data-testid="text-pending-status">
