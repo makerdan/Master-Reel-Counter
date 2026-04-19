@@ -1,4 +1,5 @@
 import { useState } from "react";
+import reelIconPath from "@assets/Master_Reel_Counter_-_i001_1776633528982.png";
 import {
   Cable, Camera, Search, FileText, Users, Link2, Shield,
   ImagePlus, Download, Flag, ScanLine, GalleryHorizontalEnd, FileSpreadsheet,
@@ -292,7 +293,7 @@ export default function Landing() {
 
         <header className="relative z-10 flex items-center justify-between gap-2 p-4 max-w-6xl mx-auto w-full">
           <div className="flex items-center gap-2">
-            <Cable className="h-5 w-5 text-amber-400" />
+            <img src={reelIconPath} className="h-5 w-5 rounded" alt="" />
             <span className="text-sm font-semibold text-amber-100/80 tracking-wide">Master Reel Counter</span>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm text-amber-100/60">
@@ -444,7 +445,7 @@ export default function Landing() {
       <footer className="bg-muted/50 border-t py-8 px-4">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
-            <Cable className="h-3.5 w-3.5" />
+            <img src={reelIconPath} className="h-3.5 w-3.5 rounded" alt="" />
             <span className="font-medium">Master Reel Counter</span>
           </div>
           <div className="flex items-center gap-6">

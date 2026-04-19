@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import reelIconPath from "@assets/Master_Reel_Counter_-_i001_1776633528982.png";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -1375,7 +1376,7 @@ export default function Dashboard() {
             data-testid="button-home-nav"
             title="Go to Sessions Dashboard"
           >
-            <Cable className="h-5 w-5 text-primary shrink-0" />
+            <img src={reelIconPath} className="h-5 w-5 rounded-md shrink-0" alt="" />
             <span className="font-semibold text-sm truncate max-w-[80px] sm:max-w-none" data-testid="text-user-name">
               {user?.firstName || "User"}
             </span>
