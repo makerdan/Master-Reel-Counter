@@ -232,6 +232,11 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  // Pagination accumulator: when the user loads the first page (offset 0) the
+  // list is replaced wholesale (handles remount with cached data and trash-mode
+  // toggle). For subsequent "load more" pages (offset > 0) new sessions are
+  // appended with ID-based deduplication so a concurrent server-side insert
+  // between pages doesn't produce a duplicate row in the displayed list.
   useEffect(() => {
     if (sessionsData) {
       if (sessionsOffset === 0) {

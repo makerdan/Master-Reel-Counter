@@ -243,7 +243,7 @@ export interface IStorage {
    * Returns aggregate stats for the Stats page that require joining across
    * multiple tables and can be expensive at scale. `sessionIds` should be the
    * caller's pre-filtered set (owned sessions only, or a subset) so the query
-   * scope is bounded. Covers four independent stat groups:
+   * scope is bounded. Covers five independent stat groups:
    *   - dataQuality:   flagged pins, review-response outcomes, dismissed dupes
    *   - aiScanner:     total scans and readable/unreadable breakdown (null if no
    *                    scan_results rows exist for the given sessions)
