@@ -1969,7 +1969,6 @@ export default function SettingsPage() {
                 </Button>
               </div>
             )}
-            <Separator />
           </CardContent>
         </Card>
 
