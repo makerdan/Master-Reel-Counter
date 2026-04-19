@@ -163,6 +163,7 @@ export default function Dashboard() {
   const [selectedSessions, setSelectedSessions] = useState<Set<number>>(new Set());
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<{ id: number; name: string; sessionCount: number } | null>(null);
+  const [permanentDeleteFolderTarget, setPermanentDeleteFolderTarget] = useState<{ id: number; name: string } | null>(null);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<{ id: number; name: string } | null>(null);
   const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [resetSessionTarget, setResetSessionTarget] = useState<{ id: number; name: string } | null>(null);
@@ -274,6 +275,12 @@ export default function Dashboard() {
   const { data: userFolders } = useQuery<FolderType[]>({
     queryKey: ["/api/folders"],
     enabled: !!user,
+    placeholderData: [],
+  });
+
+  const { data: trashedFolders } = useQuery<FolderType[]>({
+    queryKey: ["/api/folders/trash"],
+    enabled: !!user && showTrash,
     placeholderData: [],
   });
 
@@ -600,10 +607,39 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       invalidateAll();
-      toast({ title: "Folder deleted (sessions moved to main list)" });
+      queryClient.invalidateQueries({ queryKey: ["/api/folders/trash"] });
+      toast({ title: "Folder moved to trash (sessions moved to main list)" });
     },
     onError: () => {
       toast({ title: "Failed to delete folder", variant: "destructive" });
+    },
+  });
+
+  const restoreFolder = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("POST", `/api/folders/${id}/restore`);
+    },
+    onSuccess: () => {
+      invalidateAll();
+      queryClient.invalidateQueries({ queryKey: ["/api/folders/trash"] });
+      toast({ title: "Folder restored" });
+    },
+    onError: () => {
+      toast({ title: "Failed to restore folder", variant: "destructive" });
+    },
+  });
+
+  const permanentDeleteFolder = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/folders/${id}/permanent`);
+    },
+    onSuccess: () => {
+      invalidateAll();
+      queryClient.invalidateQueries({ queryKey: ["/api/folders/trash"] });
+      toast({ title: "Folder permanently deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to permanently delete folder", variant: "destructive" });
     },
   });
 
@@ -1985,6 +2021,60 @@ export default function Dashboard() {
                 )}
               </div>
             )}
+
+            {(trashedFolders ?? []).length > 0 && (
+              <div className="space-y-2 mt-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Folder className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-base font-semibold" data-testid="text-trash-folders-title">Trashed Folders</h3>
+                  <span className="text-sm text-muted-foreground">({(trashedFolders ?? []).length})</span>
+                </div>
+                {(trashedFolders ?? []).map(folder => (
+                  <Card key={folder.id} className="border border-border hover:border-primary/40 transition-colors" data-testid={`card-trash-folder-${folder.id}`}>
+                    <CardContent className="py-3 px-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate" data-testid={`text-trash-folder-name-${folder.id}`}>{folder.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Deleted {folder.deletedAt ? formatTimestamp(folder.deletedAt, tz) : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => restoreFolder.mutate(folder.id)}
+                                disabled={restoreFolder.isPending}
+                                data-testid={`button-restore-folder-${folder.id}`}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5 mr-1" /> Restore
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Restore this folder</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => setPermanentDeleteFolderTarget({ id: folder.id, name: folder.name })}
+                                disabled={permanentDeleteFolder.isPending}
+                                data-testid={`button-permanent-delete-folder-${folder.id}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Permanently delete</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
         <>
@@ -2481,11 +2571,11 @@ export default function Dashboard() {
       <AlertDialog open={!!deleteFolderTarget} onOpenChange={(o) => { if (!o) setDeleteFolderTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete folder "{deleteFolderTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>Move folder "{deleteFolderTarget?.name}" to trash?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteFolderTarget?.sessionCount
-                ? `This folder contains ${deleteFolderTarget.sessionCount} session${deleteFolderTarget.sessionCount !== 1 ? "s" : ""}. The sessions will not be deleted — they will be moved to the main Sessions list.`
-                : "This empty folder will be permanently removed."}
+                ? `This folder contains ${deleteFolderTarget.sessionCount} session${deleteFolderTarget.sessionCount !== 1 ? "s" : ""}. The sessions will be moved to the main Sessions list. The folder can be restored from trash.`
+                : "This empty folder will be moved to trash and can be restored later."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2497,7 +2587,31 @@ export default function Dashboard() {
               }}
               data-testid="button-confirm-delete-folder"
             >
-              Delete Folder
+              Move to Trash
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!permanentDeleteFolderTarget} onOpenChange={(o) => { if (!o) setPermanentDeleteFolderTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete "{permanentDeleteFolderTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This folder will be permanently removed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-permanent-delete-folder">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (permanentDeleteFolderTarget) permanentDeleteFolder.mutate(permanentDeleteFolderTarget.id);
+                setPermanentDeleteFolderTarget(null);
+              }}
+              data-testid="button-confirm-permanent-delete-folder"
+            >
+              Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

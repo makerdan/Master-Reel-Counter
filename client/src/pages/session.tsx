@@ -210,6 +210,50 @@ function SessionWorkspace({
     });
   }, []);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const editingEntryDirtyRef = useRef(false);
+
+  useEffect(() => {
+    if (!editingEntry) return;
+    const origPushState = history.pushState.bind(history);
+    history.pushState = (...args: Parameters<typeof history.pushState>) => {
+      if (editingEntryDirtyRef.current) {
+        const confirmed = window.confirm("You have unsaved changes. Discard them?");
+        if (!confirmed) return;
+        editingEntryDirtyRef.current = false;
+      }
+      return origPushState(...args);
+    };
+    const trackedHref = { value: window.location.href };
+    const guardActive = { value: false };
+    const handlePopState = () => {
+      if (guardActive.value || !editingEntryDirtyRef.current) {
+        trackedHref.value = window.location.href;
+        return;
+      }
+      const navigatedToHref = window.location.href;
+      const prevHref = trackedHref.value;
+      if (navigatedToHref === prevHref) return;
+      origPushState(null, "", prevHref);
+      guardActive.value = true;
+      window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      guardActive.value = false;
+      const confirmed = window.confirm("You have unsaved changes. Discard them?");
+      if (confirmed) {
+        editingEntryDirtyRef.current = false;
+        trackedHref.value = navigatedToHref;
+        origPushState(null, "", navigatedToHref);
+        guardActive.value = true;
+        window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+        guardActive.value = false;
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      history.pushState = origPushState;
+    };
+  }, [editingEntry?.id]);
+
   const [editPhotoLoaded, setEditPhotoLoaded] = useState(false);
   useEffect(() => { setEditPhotoLoaded(false); }, [editingEntry?.id]);
   const [pinRefreshSignal, setPinRefreshSignal] = useState(0);
@@ -414,7 +458,6 @@ function SessionWorkspace({
 
   const [exportWarningOpen, setExportWarningOpen] = useState(false);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
-  const [pendingExportType, setPendingExportType] = useState<"pdf" | "excel" | null>(null);
   const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
   const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
     () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
@@ -465,11 +508,6 @@ function SessionWorkspace({
   };
 
   const exportExcel = async () => {
-    if (unpinnedEntries.length > 0) {
-      setPendingExportType("excel");
-      setExportWarningOpen(true);
-      return;
-    }
     await doExportExcel();
   };
 
@@ -607,7 +645,6 @@ function SessionWorkspace({
 
   const exportPdf = () => {
     if (unpinnedEntries.length > 0) {
-      setPendingExportType("pdf");
       setExportWarningOpen(true);
       return;
     }
@@ -625,7 +662,7 @@ function SessionWorkspace({
           <div className="flex items-center gap-2 min-w-0">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={() => setLocation("/")} data-testid="button-back" className="!border !border-[hsl(215_40%_35%)]">
+                <Button size="icon" variant="ghost" onClick={() => { if (editingEntryDirtyRef.current) { if (!window.confirm("You have unsaved changes. Discard them?")) return; editingEntryDirtyRef.current = false; } setLocation("/"); }} data-testid="button-back" className="!border !border-[hsl(215_40%_35%)]">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -1003,8 +1040,8 @@ function SessionWorkspace({
       </div>
 
       {editingEntry && (
-        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) { setEditingEntry(null); } }}>
-          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) { if (editingEntryDirtyRef.current) { if (!window.confirm("You have unsaved changes. Discard them?")) return; editingEntryDirtyRef.current = false; } setEditingEntry(null); } }}>
+          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-4 pb-2 shrink-0">
               <DialogTitle>Edit Entry #{editingEntry.id}</DialogTitle>
             </DialogHeader>
@@ -1041,7 +1078,7 @@ function SessionWorkspace({
               );
             })()}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
-              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => { setEditingEntry(null); }} onUndoableSave={pushUndo} canEdit={canEditSession} />
+              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => { editingEntryDirtyRef.current = false; setEditingEntry(null); }} onUndoableSave={pushUndo} canEdit={canEditSession} onIsDirtyChange={(dirty) => { editingEntryDirtyRef.current = dirty; }} />
               {canEditSession && (
                 <div className="mt-4 pt-4 border-t border-destructive/20">
                   <AlertDialog>
@@ -1134,15 +1171,14 @@ function SessionWorkspace({
         hasTesterPassword={userSettings?.testerPassword === "********"}
       />
 
-      <AlertDialog open={exportWarningOpen} onOpenChange={(open) => { setExportWarningOpen(open); if (!open) setPendingExportType(null); }}>
+      <AlertDialog open={exportWarningOpen} onOpenChange={setExportWarningOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Entries Without Photos</AlertDialogTitle>
+            <AlertDialogTitle>Entries Without Photos (PDF Export)</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div>
                 <p className="mb-3">
-                  {unpinnedEntries.length} {unpinnedEntries.length === 1 ? "entry has" : "entries have"} no linked photo
-                  {pendingExportType === "pdf" ? " and will appear in the \"Entries Without Photos\" section of the PDF." : "."}
+                  {unpinnedEntries.length} {unpinnedEntries.length === 1 ? "entry has" : "entries have"} no linked photo and will appear in the &quot;Entries Without Photos&quot; section of the PDF.
                 </p>
                 <div className="space-y-1 max-h-48 overflow-y-auto text-sm">
                   {unpinnedEntries.slice(0, 10).map((e) => (
@@ -1159,15 +1195,12 @@ function SessionWorkspace({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingExportType(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               data-testid="button-export-anyway"
               onClick={async () => {
                 setExportWarningOpen(false);
-                const type = pendingExportType;
-                setPendingExportType(null);
-                if (type === "pdf") await openQualityDialogDirect();
-                else if (type === "excel") await doExportExcel();
+                await openQualityDialogDirect();
               }}
             >
               Export Anyway

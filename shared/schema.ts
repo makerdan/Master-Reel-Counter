@@ -51,6 +51,7 @@ export const folders = pgTable("folders", {
   parentFolderId: integer("parent_folder_id"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
 }, (table) => [
   index("folders_user_id_idx").on(table.userId),
 ]);
@@ -262,6 +263,7 @@ export const comments = pgTable("comments", {
 export const insertFolderSchema = createInsertSchema(folders).omit({
   id: true,
   createdAt: true,
+  deletedAt: true,
 });
 
 export const insertSessionSchema = createInsertSchema(countingSessions).omit({

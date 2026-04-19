@@ -20,7 +20,7 @@ import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 import type { Entry, Pin } from "@shared/schema";
 
 export default function SingleEntryMode({
-  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true, defaultAisle, defaultSection, getNextReceivingSection,
+  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true, defaultAisle, defaultSection, getNextReceivingSection, onIsDirtyChange,
 }: {
   sessionId: number;
   editingEntry: Entry | null;
@@ -31,6 +31,7 @@ export default function SingleEntryMode({
   defaultAisle?: string;
   defaultSection?: string;
   getNextReceivingSection?: () => string;
+  onIsDirtyChange?: (isDirty: boolean) => void;
 }) {
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -87,6 +88,7 @@ export default function SingleEntryMode({
   const [showCatalogSuggestions, setShowCatalogSuggestions] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const formDirtyRef = useRef(false);
 
   const { data: linkedPin } = useQuery<Pin>({
     queryKey: ["/api/entries", editingEntry?.id?.toString(), "pin"],
@@ -219,6 +221,22 @@ export default function SingleEntryMode({
     }
   }, [form.reelCount, footageOverride]);
 
+  const markDirty = (isDirty: boolean) => {
+    formDirtyRef.current = isDirty;
+    onIsDirtyChange?.(isDirty);
+  };
+
+  useEffect(() => {
+    const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+      if (formDirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
+  }, []);
+
   const handleSinglePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -275,6 +293,7 @@ export default function SingleEntryMode({
   };
 
   const update = (field: string, value: string) => {
+    markDirty(true);
     setForm((f) => ({ ...f, [field]: value }));
     if (errors[field]) {
       setErrors((e) => { const n = { ...e }; delete n[field]; return n; });
@@ -286,6 +305,7 @@ export default function SingleEntryMode({
   };
 
   const applyCatalogMatch = (match: ParsedCatalogEntry) => {
+    markDirty(true);
     const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
     lastMatchedCatalog.current = match.catalog;
     setFootageOverride(false);
@@ -346,6 +366,7 @@ export default function SingleEntryMode({
       return result;
     },
     onSuccess: (result) => {
+      markDirty(false);
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
@@ -504,6 +525,7 @@ export default function SingleEntryMode({
             checked={onFloorInFront}
             onCheckedChange={(c) => {
               const checked = !!c;
+              markDirty(true);
               setOnFloorInFront(checked);
               setForm((f) => {
                 const parts = f.notes.split("; ").filter(p => p.trim() && p.trim() !== "On the floor, in front of." && p.trim() !== "On Floor" && p.trim() !== "In Front Of");
@@ -653,7 +675,19 @@ export default function SingleEntryMode({
         )}
         <div className="flex items-center gap-2 ml-auto">
           {editingEntry && (
-            <Button type="button" variant="outline" onClick={onDoneEditing} data-testid="button-cancel-edit">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (formDirtyRef.current) {
+                  const confirmed = window.confirm("You have unsaved changes. Discard them?");
+                  if (!confirmed) return;
+                }
+                markDirty(false);
+                onDoneEditing();
+              }}
+              data-testid="button-cancel-edit"
+            >
               Cancel
             </Button>
           )}
@@ -662,6 +696,7 @@ export default function SingleEntryMode({
               type="button"
               variant="outline"
               onClick={() => {
+                markDirty(false);
                 setForm(f => ({
                   aisle: keepLocation ? f.aisle : "",
                   section: keepLocation ? f.section : "",

@@ -672,7 +672,7 @@ export async function registerRoutes(
       }
       if (folderId !== null && folderId !== undefined) {
         const folder = await storage.getFolder(folderId);
-        if (!folder || folder.userId !== userId) {
+        if (!folder || folder.userId !== userId || folder.deletedAt !== null) {
           return res.status(404).json({ message: "Folder not found" });
         }
       }
@@ -756,6 +756,7 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
+      if (folder.deletedAt) return res.status(400).json({ message: "Cannot modify a trashed folder" });
       const { name, sortOrder, parentFolderId } = req.body;
       const updates: any = {};
       if (name !== undefined) updates.name = name;
@@ -792,10 +793,45 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
-      await storage.deleteFolder(folder.id);
+      await storage.softDeleteFolder(folder.id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete folder" });
+    }
+  });
+
+  app.post("/api/folders/:id/restore", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = resolveUserId(req);
+      const folder = await storage.getFolder(parseInt(req.params.id));
+      if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
+      await storage.restoreFolder(folder.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to restore folder" });
+    }
+  });
+
+  app.delete("/api/folders/:id/permanent", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = resolveUserId(req);
+      const folder = await storage.getFolder(parseInt(req.params.id));
+      if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
+      if (!folder.deletedAt) return res.status(400).json({ message: "Folder must be in trash before permanent delete" });
+      await storage.permanentDeleteFolder(folder.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to permanently delete folder" });
+    }
+  });
+
+  app.get("/api/folders/trash", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = resolveUserId(req);
+      const trashedFolders = await storage.getTrashedFolders(userId);
+      res.json(trashedFolders);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get trashed folders" });
     }
   });
 
@@ -830,7 +866,7 @@ export async function registerRoutes(
       const { folderId } = req.body;
       if (folderId !== null && folderId !== undefined) {
         const folder = await storage.getFolder(folderId);
-        if (!folder || folder.userId !== userId) return res.status(403).json({ message: "Target folder not found or access denied" });
+        if (!folder || folder.userId !== userId || folder.deletedAt !== null) return res.status(403).json({ message: "Target folder not found or access denied" });
       }
       const updated = await storage.updateSession(session.id, { folderId: folderId ?? null });
       res.json(updated);
@@ -848,7 +884,7 @@ export async function registerRoutes(
       const targetFolderId = folderId ?? access.session.folderId ?? null;
       if (targetFolderId) {
         const folder = await storage.getFolder(targetFolderId);
-        if (!folder || folder.userId !== userId) return res.status(403).json({ message: "Target folder not found or access denied" });
+        if (!folder || folder.userId !== userId || folder.deletedAt !== null) return res.status(403).json({ message: "Target folder not found or access denied" });
       }
       const copyFileCallback = async (srcKey: string): Promise<string> => {
         const ext = path.extname(srcKey || "");

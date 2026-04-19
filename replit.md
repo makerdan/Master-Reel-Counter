@@ -19,6 +19,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 
 **Technical Implementations & Feature Specifications:**
 - **Session Management:** Users can create, duplicate, move, and organize counting sessions. Sessions support soft delete (moved to trash with `deletedAt` timestamp). Trashed sessions can be restored within 30 days or permanently deleted. A background interval auto-purges expired trash hourly. The dashboard includes a "Trash" toggle to view/restore/permanently delete trashed sessions.
+- **Folder Management:** Folders support soft-delete (trash) mirroring the session trash flow. Deleting a folder moves it to trash, removing its sessions to the main list. Trashed folders can be restored or permanently deleted from the existing trash view. Folder `deletedAt` column added to schema; `getUserFolders` filters out soft-deleted folders.
 - **Entry Management:** Manual entry of reel data with category autocomplete, auto-calculation of total footage, and quick entry panels.
 - **Photo Management:** Photo annotation with pin placement, background uploads, offline photo queue (IndexedDB), per-photo pin scaling, notes, and nearby photo viewer. Photos are stored in Replit Object Storage.
 - **Collaboration:** Real-time collaborative sessions with role-based permissions (owner, editor, viewer), multiple invitation methods, and online presence tracking via WebSockets.

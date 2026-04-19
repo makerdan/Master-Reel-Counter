@@ -133,8 +133,12 @@ export interface IStorage {
 
   createFolder(folder: InsertFolder): Promise<Folder>;
   getUserFolders(userId: string): Promise<Folder[]>;
+  getTrashedFolders(userId: string): Promise<Folder[]>;
   getFolder(id: number): Promise<Folder | undefined>;
   updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined>;
+  softDeleteFolder(id: number): Promise<void>;
+  restoreFolder(id: number): Promise<void>;
+  permanentDeleteFolder(id: number): Promise<void>;
   deleteFolder(id: number): Promise<void>;
   /**
    * Deep-copies a session into a new row owned by `userId`.
@@ -807,8 +811,14 @@ export class DatabaseStorage implements IStorage {
 
   async getUserFolders(userId: string): Promise<Folder[]> {
     return db.select().from(folders)
-      .where(eq(folders.userId, userId))
+      .where(and(eq(folders.userId, userId), isNull(folders.deletedAt)))
       .orderBy(asc(folders.sortOrder), asc(folders.createdAt));
+  }
+
+  async getTrashedFolders(userId: string): Promise<Folder[]> {
+    return db.select().from(folders)
+      .where(and(eq(folders.userId, userId), isNotNull(folders.deletedAt)))
+      .orderBy(asc(folders.deletedAt));
   }
 
   async getFolder(id: number): Promise<Folder | undefined> {
@@ -822,6 +832,25 @@ export class DatabaseStorage implements IStorage {
       .where(eq(folders.id, id))
       .returning();
     return result;
+  }
+
+  async softDeleteFolder(id: number): Promise<void> {
+    await db.update(folders)
+      .set({ deletedAt: new Date() })
+      .where(eq(folders.id, id));
+    await db.update(countingSessions)
+      .set({ folderId: null })
+      .where(eq(countingSessions.folderId, id));
+  }
+
+  async restoreFolder(id: number): Promise<void> {
+    await db.update(folders)
+      .set({ deletedAt: null })
+      .where(eq(folders.id, id));
+  }
+
+  async permanentDeleteFolder(id: number): Promise<void> {
+    await db.delete(folders).where(eq(folders.id, id));
   }
 
   async deleteFolder(id: number): Promise<void> {
