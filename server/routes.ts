@@ -157,6 +157,14 @@ const authRateLimiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
+const resourceRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later." },
+});
+
 const patchSessionSchema = z.object({
   name: z.string().min(1).max(500).optional(),
   description: z.string().max(5000).nullable().optional(),
@@ -188,7 +196,6 @@ export async function registerRoutes(
     const skipPaths = [
       "/api/login", "/api/callback", "/api/logout",
       "/api/auth/user", "/api/auth/tester-login", "/api/auth/tester-logout",
-      "/api/admin/users",
     ];
     const matchesSkip = skipPaths.some(p => req.originalUrl === p || req.originalUrl.startsWith(p + "/") || req.originalUrl.startsWith(p + "?"));
     if (matchesSkip) return next();
@@ -306,9 +313,17 @@ export async function registerRoutes(
     }
   };
 
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+  const ALLOWED_IMAGE_MIMETYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+  // Reject files whose MIME type is not in the allow-list. Using cb(null, false)
+  // (rather than cb(Error)) keeps the error in route-handler territory so each
+  // endpoint can return a well-formed 400 JSON response instead of an unhandled
+  // Express error. The caller sees "No file provided" from the existing guard.
+  const imageFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+    cb(null, ALLOWED_IMAGE_MIMETYPES.has(file.mimetype));
+  };
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 }, fileFilter: imageFileFilter });
 
-  app.post("/api/uploads/direct", isAuthenticated, upload.single("file"), async (req: any, res) => {
+  app.post("/api/uploads/direct", isAuthenticated, resourceRateLimiter, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file provided" });
@@ -499,6 +514,15 @@ export async function registerRoutes(
       const data: Partial<Session> = { ...rest };
       if (completedAt !== undefined) {
         data.completedAt = completedAt === null ? null : new Date(completedAt);
+      }
+      // IDOR guard: if the caller is moving the session to a folder, verify
+      // that folder belongs to the requesting user before proceeding.
+      if (data.folderId != null) {
+        const userId = resolveUserId(req);
+        const targetFolder = await storage.getFolder(data.folderId);
+        if (!targetFolder || targetFolder.userId !== userId) {
+          return res.status(403).json({ message: "Target folder not found or access denied" });
+        }
       }
       const mutatingKeys = Object.keys(data);
       const isLastPhotoIndexOnly = mutatingKeys.length === 1 && "lastPhotoIndex" in data;
@@ -1656,7 +1680,7 @@ export async function registerRoutes(
     return fs.readFile(path.join(UPLOADS_DIR, photoFilename));
   }
 
-  app.post("/api/photos/:photoId/analyze-labels", isAuthenticated, async (req: any, res) => {
+  app.post("/api/photos/:photoId/analyze-labels", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
     try {
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
@@ -2441,7 +2465,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/sessions/:id/export/pdf", isAuthenticated, async (req: any, res) => {
+  app.get("/api/sessions/:id/export/pdf", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
     try {
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
