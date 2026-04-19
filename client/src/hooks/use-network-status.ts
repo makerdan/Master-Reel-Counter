@@ -12,6 +12,22 @@ import { queryClient } from "@/lib/queryClient";
 
 const MAX_ENTRY_RETRIES = 3;
 
+function scheduleEntryRetry(
+  entryId: string,
+  nextRetries: number,
+  timersRef: React.MutableRefObject<Map<string, ReturnType<typeof setTimeout>>>,
+  syncQueue: () => void,
+) {
+  const existing = timersRef.current.get(entryId);
+  if (existing !== undefined) clearTimeout(existing);
+  const backoffMs = Math.pow(4, nextRetries) * 500;
+  const timer = setTimeout(() => {
+    timersRef.current.delete(entryId);
+    syncQueue();
+  }, backoffMs);
+  timersRef.current.set(entryId, timer);
+}
+
 export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
@@ -47,6 +63,7 @@ export function useNetworkStatus() {
           setEntryRetryAttempt(currentRetries + 1);
         }
 
+        let fetchFailed = false;
         try {
           const res = await fetch(`/api/sessions/${entry.sessionId}/entries`, {
             method: "POST",
@@ -54,12 +71,13 @@ export function useNetworkStatus() {
             body: JSON.stringify(entry.data),
             credentials: "include",
           });
+
           if (res.ok) {
             const created = await res.json().catch(() => null);
             entryRetryCountsRef.current.delete(entry.id);
-            const timer = entryRetryTimersRef.current.get(entry.id);
-            if (timer !== undefined) {
-              clearTimeout(timer);
+            const existingTimer = entryRetryTimersRef.current.get(entry.id);
+            if (existingTimer !== undefined) {
+              clearTimeout(existingTimer);
               entryRetryTimersRef.current.delete(entry.id);
             }
             await removeEntryFromQueue(entry.id);
@@ -76,17 +94,22 @@ export function useNetworkStatus() {
               permanentlyFailedRef.current.add(entry.id);
               setPermanentlyFailedCount(permanentlyFailedRef.current.size);
             } else {
-              const backoffMs = Math.pow(4, nextRetries) * 500;
-              const timer = setTimeout(() => {
-                entryRetryTimersRef.current.delete(entry.id);
-                syncQueue();
-              }, backoffMs);
-              entryRetryTimersRef.current.set(entry.id, timer);
+              scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
             }
           }
         } catch {
-          break;
+          fetchFailed = true;
+          const nextRetries = currentRetries + 1;
+          entryRetryCountsRef.current.set(entry.id, nextRetries);
+          if (nextRetries >= MAX_ENTRY_RETRIES) {
+            permanentlyFailedRef.current.add(entry.id);
+            setPermanentlyFailedCount(permanentlyFailedRef.current.size);
+          } else {
+            scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
+          }
         }
+
+        if (fetchFailed) break;
       }
 
       const photos = await getQueuedPhotos();
