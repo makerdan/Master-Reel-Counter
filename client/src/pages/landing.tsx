@@ -307,9 +307,7 @@ export default function Landing() {
         <main className="relative z-10 flex flex-col items-center justify-center px-4 py-20 md:py-28">
           <div className="max-w-3xl w-full text-center space-y-8" style={{ animation: "slideIn 0.5s ease-out" }}>
             <div className="flex items-center justify-center gap-3 mb-2">
-              <div className="p-3 rounded-2xl bg-amber-500/20 border border-amber-500/30 shadow-lg shadow-amber-500/10">
-                <img src={reelIconPath} className="h-24 w-24 rounded-xl" alt="Master Reel Counter" />
-              </div>
+              <img src={reelIconPath} className="h-72 w-72 rounded-2xl" alt="Master Reel Counter" />
             </div>
 
             <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight leading-tight" data-testid="text-app-title">
