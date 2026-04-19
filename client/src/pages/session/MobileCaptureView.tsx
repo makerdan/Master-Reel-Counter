@@ -17,6 +17,8 @@ import { saveToQueue, removeFromQueue, getQueuedPhotos } from "@/lib/offlineQueu
 import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
 
+const MAX_AUTO_RETRIES = 3;
+
 type UploadQueueItem = {
   queueId: string;
   file: File;
@@ -80,6 +82,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
   const blobUrlsRef = useRef<Set<string>>(new Set());
+  const retryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
@@ -115,7 +118,28 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   }, [aisle, section, onFloorChecked]);
 
   useEffect(() => {
-    const goOnline = () => setIsOnline(true);
+    const goOnline = () => {
+      setIsOnline(true);
+      setUploadQueue(prev => {
+        const retryable = prev.filter(q => q.status === "failed" && q.retries < MAX_AUTO_RETRIES);
+        if (retryable.length === 0) return prev;
+        for (const item of retryable) {
+          const timer = retryTimersRef.current.get(item.queueId);
+          if (timer !== undefined) {
+            clearTimeout(timer);
+            retryTimersRef.current.delete(item.queueId);
+          }
+        }
+        setTimeout(() => toast({
+          title: `Reconnected — retrying ${retryable.length} failed upload${retryable.length > 1 ? "s" : ""}`,
+        }), 0);
+        return prev.map(q =>
+          q.status === "failed" && q.retries < MAX_AUTO_RETRIES
+            ? { ...q, status: "pending" as const }
+            : q
+        );
+      });
+    };
     const goOffline = () => setIsOnline(false);
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
@@ -123,7 +147,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
     };
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,8 +301,24 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       } catch {
         if (!mountedRef.current) return;
-        setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "failed" as const, retries: q.retries + 1 } : q));
-        toast({ title: "Photo upload failed — tap to retry", variant: "destructive" });
+        const nextRetries = nextItem.retries + 1;
+        setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "failed" as const, retries: nextRetries } : q));
+        if (nextRetries < MAX_AUTO_RETRIES) {
+          const backoffMs = Math.pow(4, nextRetries) * 500;
+          toast({ title: `Upload failed — retrying automatically (attempt ${nextRetries + 1} of ${MAX_AUTO_RETRIES})...`, variant: "destructive" });
+          const timer = setTimeout(() => {
+            if (!mountedRef.current) return;
+            retryTimersRef.current.delete(nextItem.queueId);
+            setUploadQueue(prev => prev.map(q =>
+              q.queueId === nextItem.queueId && q.status === "failed"
+                ? { ...q, status: "pending" as const }
+                : q
+            ));
+          }, backoffMs);
+          retryTimersRef.current.set(nextItem.queueId, timer);
+        } else {
+          toast({ title: `Photo upload failed after ${MAX_AUTO_RETRIES} attempts — tap to retry`, variant: "destructive" });
+        }
       } finally {
         processingRef.current = false;
       }
@@ -286,10 +326,15 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   }, [uploadQueue, sessionId, toast, isOnline]);
 
   const retryUpload = useCallback((queueId: string) => {
-    setUploadQueue(prev => prev.map(q => q.queueId === queueId ? { ...q, status: "pending" as const } : q));
+    setUploadQueue(prev => prev.map(q => q.queueId === queueId ? { ...q, status: "pending" as const, retries: 0 } : q));
   }, []);
 
   const dismissFailedUpload = useCallback((queueId: string) => {
+    const timer = retryTimersRef.current.get(queueId);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      retryTimersRef.current.delete(queueId);
+    }
     setUploadQueue(prev => {
       const item = prev.find(q => q.queueId === queueId);
       if (item) {
@@ -370,11 +415,17 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       mountedRef.current = false;
       blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
       blobUrlsRef.current.clear();
+      for (const timer of retryTimersRef.current.values()) clearTimeout(timer);
+      retryTimersRef.current.clear();
     };
   }, []);
 
-  const pendingCount = uploadQueue.filter(q => q.status === "pending" || q.status === "uploading").length;
-  const failedCount = uploadQueue.filter(q => q.status === "failed").length;
+  const freshPendingCount = uploadQueue.filter(q => (q.status === "pending" || q.status === "uploading") && q.retries === 0).length;
+  const retryingItems = uploadQueue.filter(q =>
+    ((q.status === "pending" || q.status === "uploading") && q.retries > 0) ||
+    (q.status === "failed" && q.retries < MAX_AUTO_RETRIES)
+  );
+  const permanentlyFailedItems = uploadQueue.filter(q => q.status === "failed" && q.retries >= MAX_AUTO_RETRIES);
 
   const handleOnFloorToggle = useCallback((checked: boolean) => {
     setOnFloorChecked(checked);
@@ -730,17 +781,29 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               </Button>
             </div>
           </div>
-          {(pendingCount > 0 || failedCount > 0) && (
+          {(freshPendingCount > 0 || retryingItems.length > 0 || permanentlyFailedItems.length > 0) && (
             <div className="space-y-2" data-testid="upload-queue-status">
-              {pendingCount > 0 && (
+              {freshPendingCount > 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Uploading {pendingCount} photo{pendingCount > 1 ? "s" : ""} in background...</span>
+                  <span>Uploading {freshPendingCount} photo{freshPendingCount > 1 ? "s" : ""} in background...</span>
                 </div>
               )}
-              {failedCount > 0 && (
+              {retryingItems.length > 0 && (
                 <div className="space-y-1">
-                  {uploadQueue.filter(q => q.status === "failed").map(item => (
+                  {retryingItems.map(item => (
+                    <div key={item.queueId} className="flex items-center gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 px-3 py-2" data-testid={`upload-retrying-${item.queueId}`}>
+                      <Loader2 className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 animate-spin" />
+                      <span className="text-xs flex-1 truncate">
+                        {`Retrying ${item.file.name} (attempt ${item.retries + 1} of ${MAX_AUTO_RETRIES})...`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {permanentlyFailedItems.length > 0 && (
+                <div className="space-y-1">
+                  {permanentlyFailedItems.map(item => (
                     <div key={item.queueId} className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2" data-testid={`upload-failed-${item.queueId}`}>
                       <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
                       <span className="text-xs flex-1 truncate">{item.file.name} failed</span>
