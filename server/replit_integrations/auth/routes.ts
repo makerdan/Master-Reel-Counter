@@ -60,7 +60,7 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/admin/users", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/users", isAuthenticated, isApproved, async (req: any, res) => {
     try {
       if (!isAppOwner(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
@@ -73,7 +73,7 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/admin/users/clear-rejected", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/users/clear-rejected", isAuthenticated, isApproved, async (req: any, res) => {
     try {
       if (!isAppOwner(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
@@ -86,7 +86,7 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.delete("/api/admin/users/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/admin/users/:id", isAuthenticated, isApproved, async (req: any, res) => {
     try {
       if (!isAppOwner(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
@@ -108,7 +108,7 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.patch("/api/admin/users/:id/approval", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/admin/users/:id/approval", isAuthenticated, isApproved, async (req: any, res) => {
     try {
       if (!isAppOwner(req.user)) {
         return res.status(403).json({ message: "Forbidden" });

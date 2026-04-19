@@ -764,7 +764,7 @@ export async function registerRoutes(
         if (parentFolderId !== null) {
           if (parentFolderId === folder.id) return res.status(400).json({ message: "Cannot move folder into itself" });
           const parentFolder = await storage.getFolder(parentFolderId);
-          if (!parentFolder || parentFolder.userId !== userId) return res.status(400).json({ message: "Parent folder not found" });
+          if (!parentFolder || parentFolder.userId !== userId) return res.status(403).json({ message: "Parent folder not found or access denied" });
           const visited = new Set<number>([folder.id, parentFolder.id]);
           let ancestor: typeof parentFolder | undefined = parentFolder;
           let depth = 0;
@@ -830,7 +830,7 @@ export async function registerRoutes(
       const { folderId } = req.body;
       if (folderId !== null && folderId !== undefined) {
         const folder = await storage.getFolder(folderId);
-        if (!folder || folder.userId !== userId) return res.status(400).json({ message: "Folder not found" });
+        if (!folder || folder.userId !== userId) return res.status(403).json({ message: "Target folder not found or access denied" });
       }
       const updated = await storage.updateSession(session.id, { folderId: folderId ?? null });
       res.json(updated);
@@ -848,7 +848,7 @@ export async function registerRoutes(
       const targetFolderId = folderId ?? access.session.folderId ?? null;
       if (targetFolderId) {
         const folder = await storage.getFolder(targetFolderId);
-        if (!folder || folder.userId !== userId) return res.status(400).json({ message: "Invalid folder" });
+        if (!folder || folder.userId !== userId) return res.status(403).json({ message: "Target folder not found or access denied" });
       }
       const copyFileCallback = async (srcKey: string): Promise<string> => {
         const ext = path.extname(srcKey || "");
