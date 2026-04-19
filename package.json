@@ -46,6 +46,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/memoizee": "^0.4.12",
     "@types/multer": "^2.0.0",
+    "@types/pdfkit": "^0.17.6",
     "@uppy/aws-s3": "^5.1.0",
     "@uppy/core": "^5.2.0",
     "@uppy/dashboard": "^5.1.1",

@@ -165,7 +165,7 @@ export default function SessionPage() {
 function SessionWorkspace({
   session, entries, entriesLoading, photos, sessionId, userSettings,
 }: {
-  session: Session & { role?: "owner" | "editor" | "viewer"; collaboratorCount?: number };
+  session: Session & { role?: "owner" | "editor" | "viewer"; collaboratorCount?: number; firstPhotoAt?: string | null; lastPhotoAt?: string | null };
   entries: Entry[];
   entriesLoading: boolean;
   photos: Photo[];
@@ -409,7 +409,7 @@ function SessionWorkspace({
     lines.push(`Total Footage: ${displayTotalFootage.toLocaleString()} ${uLabel}`);
     lines.push(`Photos: ${photos.length}`);
     if (session.firstPhotoAt) {
-      lines.push(`Time: ${formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz)}`);
+      lines.push(`Time: ${formatSessionTimeWithTz(session.firstPhotoAt ?? null, session.lastPhotoAt ?? null, tz)}`);
     }
     lines.push("");
 
@@ -664,7 +664,7 @@ function SessionWorkspace({
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditName(session.name); setEditLocation(session.location || ""); setEditDescription((session as any).description || ""); setEditSessionOpen(true); } }}
             >
               <h1 className="text-sm font-semibold truncate" data-testid="text-session-name">{session.name}</h1>
-              <span className="mono text-xs text-muted-foreground hidden sm:inline" data-testid="text-session-time">{formatSessionTimeWithTz(session.firstPhotoAt, session.lastPhotoAt, tz, captureMode)}</span>
+              <span className="mono text-xs text-muted-foreground hidden sm:inline" data-testid="text-session-time">{formatSessionTimeWithTz(session.firstPhotoAt ?? null, session.lastPhotoAt ?? null, tz, captureMode)}</span>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -798,7 +798,7 @@ function SessionWorkspace({
           </div>
         </div>
         <div className="sm:hidden border-t border-border/50 px-4 py-1 flex items-center justify-center gap-1" data-testid="header-mobile-date">
-          <span className="mono text-xs text-muted-foreground">{formatSessionTimeMobile(session.firstPhotoAt, session.lastPhotoAt, tz)}</span>
+          <span className="mono text-xs text-muted-foreground">{formatSessionTimeMobile(session.firstPhotoAt ?? null, session.lastPhotoAt ?? null, tz)}</span>
         </div>
       </header>
 

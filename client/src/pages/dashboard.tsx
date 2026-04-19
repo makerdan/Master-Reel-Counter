@@ -1514,7 +1514,7 @@ export default function Dashboard() {
                       });
                       return;
                     }
-                    createFolder.mutate();
+                    createFolder.mutate(undefined);
                   }}
                   className="space-y-4"
                 >

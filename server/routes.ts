@@ -3026,8 +3026,7 @@ export async function registerRoutes(
           }
           const { data: orientedBuffer, info } = await sharpPipeline
             .toBuffer({ resolveWithObject: true });
-          const img = doc.openImage(orientedBuffer);
-          return { photo, buffer: orientedBuffer, imgW: img.width, imgH: img.height, origW: info.width, origH: info.height };
+          return { photo, buffer: orientedBuffer, imgW: info.width, imgH: info.height, origW: info.width, origH: info.height };
         } catch {
           return null;
         }

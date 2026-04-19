@@ -76,7 +76,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const currentUnit: UnitType = (photoSettings?.defaultUnit as UnitType) || "feet";
   const uLabel = unitLabel(currentUnit);
   const [customCodeInput, setCustomCodeInput] = useState("");
-  const [customCodePinId, setCustomCodePinId] = useState<number | null>(null);
+  const [customCodePinId, setCustomCodePinId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [aisle, setAisle] = useState("");
@@ -814,7 +814,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             let sectionVal = "";
             if (isRec) { sectionVal = String(nextRecNum).padStart(3, "0"); nextRecNum++; }
-            await saveToQueue({ id: queueId, sessionId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, createdAt: Date.now() });
+            await saveToQueue({ id: queueId, sessionId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, isOnFloor: false, createdAt: Date.now() });
             toast({ title: "Photo queued", description: `${file.name} will upload when back online` });
           } else {
             toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
@@ -1872,7 +1872,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   const parentFilename = parentPhoto?.filename || (parentPhoto?.dbId ? `S${sessionId}_P${String(parentPhoto.dbId).padStart(4, "0")}.jpg` : null);
                   return (
                     <span className="inline-flex items-center gap-1 text-[hsl(200_70%_55%)]">
-                      <Focus className="h-3 w-3" title="Detail Shot" />
+                      <Focus className="h-3 w-3" aria-label="Detail Shot" />
                       {parentFilename && onJumpToStripPhoto && parentPhoto?.dbId ? (
                         <button
                           className="text-[hsl(200_70%_55%)] hover:text-[hsl(200_70%_65%)] underline transition-colors cursor-pointer"

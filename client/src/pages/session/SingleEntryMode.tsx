@@ -236,6 +236,7 @@ export default function SingleEntryMode({
             section: form.section,
             notes: "",
             isReceiving: form.aisle.trim().toLowerCase() === "receiving",
+            isOnFloor: false,
             createdAt: Date.now(),
           });
           toast({ title: "Photo queued for upload when back online" });

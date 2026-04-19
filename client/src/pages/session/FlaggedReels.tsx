@@ -15,6 +15,7 @@ import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
+import type { UndoAction } from "@/hooks/use-undo";
 
 interface FlaggedPin {
   id: number;
@@ -52,7 +53,7 @@ interface FlaggedReelsProps {
   onBack: () => void;
   onReshoot?: (aisle: string, section: string, parentPhotoId: number) => void;
   onViewInPhoto?: (photoId: number, pinId?: number) => void;
-  pushUndo?: (action: { type: string; sessionId: number; entityId: number; data: any; previousData?: any }) => void;
+  pushUndo?: (action: UndoAction) => void;
 }
 
 function photoUrl(key: string): string {

@@ -62,7 +62,7 @@ export function detectDuplicatePins(
       wireDetails: pin.wireDetails,
       vendorCode: pin.vendorCode,
       footage: pin.footage,
-      reelCount: pin.reelCount,
+      reelCount: pin.reelCount ?? 1,
       xPercent: pin.xPercent,
       yPercent: pin.yPercent,
       photoAisle: aisle,
@@ -172,17 +172,17 @@ export function detectSameReelDuplicates(
     const parent = new Map<number, number>();
     for (const pin of photoPins) parent.set(pin.id, pin.id);
 
-    function find(x: number): number {
+    const find = (x: number): number => {
       while (parent.get(x) !== x) {
         parent.set(x, parent.get(parent.get(x)!)!);
         x = parent.get(x)!;
       }
       return x;
-    }
-    function union(a: number, b: number) {
+    };
+    const union = (a: number, b: number) => {
       const ra = find(a), rb = find(b);
       if (ra !== rb) parent.set(ra, rb);
-    }
+    };
 
     for (let i = 0; i < photoPins.length; i++) {
       for (let j = i + 1; j < photoPins.length; j++) {
@@ -216,7 +216,7 @@ export function detectSameReelDuplicates(
           wireDetails: pin.wireDetails,
           vendorCode: pin.vendorCode,
           footage: pin.footage,
-          reelCount: pin.reelCount,
+          reelCount: pin.reelCount ?? 1,
           xPercent: pin.xPercent,
           yPercent: pin.yPercent,
           photoAisle: aisle,
