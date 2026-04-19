@@ -216,14 +216,6 @@ function ContactSection() {
       <div className="max-w-xl mx-auto text-center space-y-6">
         <h2 className="text-2xl font-bold text-foreground">Get In Touch</h2>
         <p className="text-sm text-muted-foreground">Have questions or want to learn more? Drop us a line.</p>
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <Mail className="h-4 w-4" />
-          <span data-testid="text-contact-name">Dan</span>
-          <span className="mx-1">—</span>
-          <a href="mailto:makerdantheman@gmail.com" className="text-amber-600 dark:text-amber-400 hover:underline" data-testid="link-contact-email">
-            makerdantheman@gmail.com
-          </a>
-        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
           <div>
