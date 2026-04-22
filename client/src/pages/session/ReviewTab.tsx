@@ -503,6 +503,17 @@ export default function ReviewTab({
     setOrderedEntries([...reviewed, ...unreviewed]);
   }, [assignedEntries, myResponses, responsesLoading]);
 
+  // Prune entries removed from assignedEntries after the order was computed, and clamp currentIndex.
+  useEffect(() => {
+    if (!hasComputedOrder.current || orderedEntries.length === 0) return;
+    const assignedIds = new Set(assignedEntries.map(e => e.id));
+    const pruned = orderedEntries.filter(e => assignedIds.has(e.id));
+    if (pruned.length !== orderedEntries.length) {
+      setOrderedEntries(pruned);
+      setCurrentIndex(prev => (pruned.length === 0 ? 0 : Math.min(prev, pruned.length - 1)));
+    }
+  }, [assignedEntries, orderedEntries]);
+
   // Use the stable ordered list for display; fall back to assignedEntries before it's ready.
   const displayEntries = orderedEntries.length > 0 ? orderedEntries : assignedEntries;
 
