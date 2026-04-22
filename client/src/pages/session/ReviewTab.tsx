@@ -791,7 +791,7 @@ export default function ReviewTab({
             <p className="text-sm font-semibold text-green-600 dark:text-green-400">
               You've reviewed all your assigned entries!
             </p>
-            {allReviewerStatus.some(s => s.userId !== currentUserId && !s.complete) && (
+            {sortedUsers.length > 1 && allReviewerStatus.some(s => s.userId !== currentUserId && !s.complete) && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 Waiting for other reviewers to finish…
               </p>
