@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -541,6 +540,7 @@ export default function ReviewTab({
   const timerRefs = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
   const [flagReason, setFlagReason] = useState("");
   const [showFlagInput, setShowFlagInput] = useState(false);
+  const [justActed, setJustActed] = useState(false);
 
   useEffect(() => {
     const immediateReveal = new Set<number>();
@@ -601,6 +601,7 @@ export default function ReviewTab({
     resetView();
     setShowFlagInput(false);
     setFlagReason("");
+    setJustActed(false);
   }, [currentIndex, resetView]);
 
   const setCardZoom = (zoom: number) => {
@@ -624,6 +625,7 @@ export default function ReviewTab({
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "review-responses"] });
       setShowFlagInput(false); setFlagReason("");
+      setJustActed(true);
       if (variables.verdict === "flagged") {
         setShowFlagBanner(true);
         if (flagBannerTimerRef.current) clearTimeout(flagBannerTimerRef.current);
@@ -830,13 +832,13 @@ export default function ReviewTab({
       {/* Entry card */}
       {currentEntry && (
         <div className="border border-blue-500 sm:!border-blue-600/50 rounded-lg p-4 space-y-4" data-testid={`card-review-entry-${currentEntry.id}`}>
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div className="relative text-sm text-muted-foreground text-center">
               <span>
                 {currentEntry.aisle && `Aisle ${currentEntry.aisle}`}
                 {currentEntry.section && ` - Section ${currentEntry.section}`}
               </span>
               {currentEntry.reelCount && currentEntry.reelCount > 1 && (
-                <span>{currentEntry.reelCount} reels</span>
+                <span className="absolute right-0 top-0">{currentEntry.reelCount} reels</span>
               )}
             </div>
 
@@ -846,13 +848,13 @@ export default function ReviewTab({
               const vendorCode = (currentPin?.vendorCode || currentEntry.manufacturer)?.trim().toUpperCase() || null;
               if (!catalogCode && !vendorCode) {
                 return (
-                  <p className="text-muted-foreground text-base italic" data-testid="text-review-catalog">
+                  <p className="text-muted-foreground text-base italic text-center" data-testid="text-review-catalog">
                     No catalog assigned
                   </p>
                 );
               }
               return (
-                <div className="flex items-baseline gap-3 flex-wrap" data-testid="text-review-catalog">
+                <div className="flex items-baseline gap-3 flex-wrap justify-center" data-testid="text-review-catalog">
                   {catalogCode && (
                     <span className="text-xl font-bold text-[hsl(18_85%_55%)] leading-tight font-mono">
                       {catalogCode}
@@ -878,89 +880,90 @@ export default function ReviewTab({
                 </div>
               ) : isPinEntry && detailPhoto ? (
                 /* ── Detail photo cropped view (linked detail shot, centered) ── */
-                <div className="w-full space-y-2">
-                  <div className="relative">
-                    <CropCanvas
-                      photoUrl={getPhotoUrl(detailPhoto)}
-                      xPercent={50}
-                      yPercent={50}
-                      zoomLevel={pinZoom}
-                      panX={pinPanX}
-                      panY={pinPanY}
-                      onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
-                      onReady={() => setPhotoReadyForKey(photoReadyKey)}
-                      size={260}
-                    />
-                    {!photoReady && (
-                      <div
-                        className="absolute inset-0 rounded-md bg-muted animate-pulse"
-                        style={{ width: 260, height: 260 }}
-                        data-testid="photo-skeleton"
+                <div className="w-full">
+                  <div className="flex justify-center">
+                    <div className="relative inline-block">
+                      <CropCanvas
+                        photoUrl={getPhotoUrl(detailPhoto)}
+                        xPercent={50}
+                        yPercent={50}
+                        zoomLevel={pinZoom}
+                        panX={pinPanX}
+                        panY={pinPanY}
+                        onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
+                        onReady={() => setPhotoReadyForKey(photoReadyKey)}
+                        size={260}
                       />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 px-1">
-                    <ZoomOut
-                      className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => setCardZoom(Math.min(ZOOM_MAX, pinZoom + ZOOM_CLICK_STEP))}
-                      data-testid="btn-review-detail-zoom-out"
-                    />
-                    <Slider
-                      value={[ZOOM_MAX - pinZoom + ZOOM_MIN]}
-                      min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP}
-                      onValueChange={([v]) => setCardZoom(ZOOM_MAX - v + ZOOM_MIN)}
-                      className="flex-1"
-                      data-testid="slider-review-detail-zoom"
-                    />
-                    <ZoomIn
-                      className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => setCardZoom(Math.max(ZOOM_MIN, pinZoom - ZOOM_CLICK_STEP))}
-                      data-testid="btn-review-detail-zoom-in"
-                    />
+                      {!photoReady && (
+                        <div
+                          className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                          style={{ width: 260, height: 260 }}
+                          data-testid="photo-skeleton"
+                        />
+                      )}
+                      <div className="photo-overlay-controls right-strip">
+                        <button
+                          className="photo-overlay-btn"
+                          onClick={() => setCardZoom(Math.max(ZOOM_MIN, pinZoom - ZOOM_CLICK_STEP))}
+                          title="Zoom in"
+                          data-testid="btn-review-detail-zoom-in"
+                        >
+                          <ZoomIn className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="photo-overlay-btn"
+                          onClick={() => setCardZoom(Math.min(ZOOM_MAX, pinZoom + ZOOM_CLICK_STEP))}
+                          title="Zoom out"
+                          data-testid="btn-review-detail-zoom-out"
+                        >
+                          <ZoomOut className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : isPinEntry && currentPhoto ? (
                 /* ── Pin / AI Scanner view (cropped) ── */
-                <div className="w-full space-y-2">
-                  <div className="relative">
-                    <CropCanvas
-                      photoUrl={getPhotoUrl(currentPhoto)}
-                      xPercent={currentPin!.xPercent}
-                      yPercent={currentPin!.yPercent}
-                      zoomLevel={pinZoom}
-                      panX={pinPanX}
-                      panY={pinPanY}
-                      onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
-                      onReady={() => setPhotoReadyForKey(photoReadyKey)}
-                      size={260}
-                    />
-                    {!photoReady && (
-                      <div
-                        className="absolute inset-0 rounded-md bg-muted animate-pulse"
-                        style={{ width: 260, height: 260 }}
-                        data-testid="photo-skeleton"
+                <div className="w-full">
+                  <div className="flex justify-center">
+                    <div className="relative inline-block">
+                      <CropCanvas
+                        photoUrl={getPhotoUrl(currentPhoto)}
+                        xPercent={currentPin!.xPercent}
+                        yPercent={currentPin!.yPercent}
+                        zoomLevel={pinZoom}
+                        panX={pinPanX}
+                        panY={pinPanY}
+                        onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
+                        onReady={() => setPhotoReadyForKey(photoReadyKey)}
+                        size={260}
                       />
-                    )}
-                  </div>
-                  {/* Zoom controls — mirrors AI Scanner */}
-                  <div className="flex items-center gap-1.5 px-1">
-                    <ZoomOut
-                      className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => setCardZoom(Math.min(ZOOM_MAX, pinZoom + ZOOM_CLICK_STEP))}
-                      data-testid="btn-review-zoom-out"
-                    />
-                    <Slider
-                      value={[ZOOM_MAX - pinZoom + ZOOM_MIN]}
-                      min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP}
-                      onValueChange={([v]) => setCardZoom(ZOOM_MAX - v + ZOOM_MIN)}
-                      className="flex-1"
-                      data-testid="slider-review-zoom"
-                    />
-                    <ZoomIn
-                      className="h-5 w-5 text-muted-foreground flex-shrink-0 cursor-pointer hover:text-foreground transition-colors"
-                      onClick={() => setCardZoom(Math.max(ZOOM_MIN, pinZoom - ZOOM_CLICK_STEP))}
-                      data-testid="btn-review-zoom-in"
-                    />
+                      {!photoReady && (
+                        <div
+                          className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                          style={{ width: 260, height: 260 }}
+                          data-testid="photo-skeleton"
+                        />
+                      )}
+                      <div className="photo-overlay-controls right-strip">
+                        <button
+                          className="photo-overlay-btn"
+                          onClick={() => setCardZoom(Math.max(ZOOM_MIN, pinZoom - ZOOM_CLICK_STEP))}
+                          title="Zoom in"
+                          data-testid="btn-review-zoom-in"
+                        >
+                          <ZoomIn className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="photo-overlay-btn"
+                          onClick={() => setCardZoom(Math.min(ZOOM_MAX, pinZoom + ZOOM_CLICK_STEP))}
+                          title="Zoom out"
+                          data-testid="btn-review-zoom-out"
+                        >
+                          <ZoomOut className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : currentPhoto ? (
@@ -1101,7 +1104,7 @@ export default function ReviewTab({
           onClick={() => setCurrentIndex(i => Math.min(assignedEntries.length - 1, i + 1))}
           disabled={currentIndex >= assignedEntries.length - 1}
           data-testid="button-review-next"
-          className="border-primary text-primary"
+          className={`border-primary text-primary transition-all${justActed ? " ring-2 ring-primary ring-offset-1 bg-primary/10 animate-pulse" : ""}`}
         >
           Next
           <ChevronRight className="h-4 w-4 ml-1" />
