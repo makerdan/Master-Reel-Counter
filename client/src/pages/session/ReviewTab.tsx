@@ -489,6 +489,23 @@ export default function ReviewTab({
     return map;
   }, [reviewResponses, currentUserId]);
 
+  // Stable ordering: reviewed entries first (preserving original order), then unreviewed.
+  // Computed once when data is ready; does not reshuffle as the user reviews mid-session.
+  const [orderedEntries, setOrderedEntries] = useState<Entry[]>([]);
+  const hasComputedOrder = useRef(false);
+
+  useEffect(() => {
+    if (hasComputedOrder.current) return;
+    if (assignedEntries.length === 0 || responsesLoading) return;
+    const reviewed = assignedEntries.filter(e => myResponses.has(e.id));
+    const unreviewed = assignedEntries.filter(e => !myResponses.has(e.id));
+    hasComputedOrder.current = true;
+    setOrderedEntries([...reviewed, ...unreviewed]);
+  }, [assignedEntries, myResponses, responsesLoading]);
+
+  // Use the stable ordered list for display; fall back to assignedEntries before it's ready.
+  const displayEntries = orderedEntries.length > 0 ? orderedEntries : assignedEntries;
+
   const reviewedCount = useMemo(() => assignedEntries.filter(e => myResponses.has(e.id)).length, [assignedEntries, myResponses]);
 
   const allReviewerStatus = useMemo(() => {
@@ -526,14 +543,14 @@ export default function ReviewTab({
   const scrubBarRef = useRef<HTMLDivElement>(null);
   const isScrubbing = useRef(false);
 
-  // On first load, jump straight to the first unreviewed entry
+  // On first load, jump straight to the first unreviewed entry in the reordered list
   useEffect(() => {
     if (hasAutoAdvanced.current) return;
-    if (assignedEntries.length === 0 || responsesLoading) return;
-    const firstUnreviewed = assignedEntries.findIndex(e => !myResponses.has(e.id));
+    if (orderedEntries.length === 0 || responsesLoading) return;
+    const firstUnreviewed = orderedEntries.findIndex(e => !myResponses.has(e.id));
     if (firstUnreviewed > 0) setCurrentIndex(firstUnreviewed);
     hasAutoAdvanced.current = true;
-  }, [assignedEntries, myResponses, responsesLoading]);
+  }, [orderedEntries, myResponses, responsesLoading]);
 
   const [revealedEntries, setRevealedEntries] = useState<Set<number>>(new Set());
   const [timers, setTimers] = useState<Map<number, number>>(new Map());
@@ -647,7 +664,7 @@ export default function ReviewTab({
   });
 
   // ── Derived values ─────────────────────────────────────────────────────────
-  const currentEntry = assignedEntries[currentIndex] ?? null;
+  const currentEntry = displayEntries[currentIndex] ?? null;
   const currentPin = currentEntry ? pinByEntryId.get(currentEntry.id) : null;
   const currentPhoto = currentPin?.photoId
     ? photoMap.get(currentPin.photoId) ?? (currentEntry?.photoId ? photoMap.get(currentEntry.photoId) : null)
@@ -682,15 +699,15 @@ export default function ReviewTab({
     );
   }
 
-  const thumbPercent = assignedEntries.length > 1 ? (currentIndex / (assignedEntries.length - 1)) * 100 : 0;
+  const thumbPercent = displayEntries.length > 1 ? (currentIndex / (displayEntries.length - 1)) * 100 : 0;
 
   const scrubTo = useCallback((clientX: number) => {
     const bar = scrubBarRef.current;
-    if (!bar || assignedEntries.length === 0) return;
+    if (!bar || displayEntries.length === 0) return;
     const rect = bar.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    setCurrentIndex(Math.round(ratio * (assignedEntries.length - 1)));
-  }, [assignedEntries.length]);
+    setCurrentIndex(Math.round(ratio * (displayEntries.length - 1)));
+  }, [displayEntries.length]);
 
   const handleScrubMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -734,14 +751,14 @@ export default function ReviewTab({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Badge variant="outline" data-testid="badge-review-progress">
-            {reviewedCount} of {assignedEntries.length} reviewed
+            {reviewedCount} of {displayEntries.length} reviewed
           </Badge>
           {sortedUsers.length > 1 && (
             <Badge variant="secondary" data-testid="badge-review-users">{sortedUsers.length} reviewers</Badge>
           )}
         </div>
         <div className="text-xs text-muted-foreground" data-testid="text-review-entry-counter">
-          Entry {currentIndex + 1} of {assignedEntries.length}
+          Entry {currentIndex + 1} of {displayEntries.length}
         </div>
       </div>
 
@@ -751,7 +768,7 @@ export default function ReviewTab({
         role="slider"
         aria-label="Entry position"
         aria-valuemin={0}
-        aria-valuemax={assignedEntries.length - 1}
+        aria-valuemax={displayEntries.length - 1}
         aria-valuenow={currentIndex}
         className="relative h-5 flex items-center cursor-pointer select-none"
         data-testid="scrub-bar-review"
@@ -760,13 +777,13 @@ export default function ReviewTab({
       >
         {/* Track — contiguous bands per entry */}
         <div className="absolute inset-x-0 h-3 rounded-full overflow-hidden top-1/2 -translate-y-1/2 flex">
-          {assignedEntries.map((entry, idx) => {
+          {displayEntries.map((entry, idx) => {
             const response = myResponses.get(entry.id);
-            const bandColor = !response ? "bg-muted" : response.verdict === "flagged" ? "bg-yellow-600" : "bg-red-500";
+            const bandColor = !response ? "bg-muted" : response.verdict === "flagged" ? "bg-yellow-600" : "bg-green-500";
             return (
               <div
                 key={entry.id}
-                className={`flex-1 ${bandColor} ${idx === 0 ? "rounded-l-full" : ""} ${idx === assignedEntries.length - 1 ? "rounded-r-full" : ""}`}
+                className={`flex-1 ${bandColor} ${idx === 0 ? "rounded-l-full" : ""} ${idx === displayEntries.length - 1 ? "rounded-r-full" : ""}`}
                 style={{ minWidth: 0 }}
               />
             );
@@ -781,7 +798,7 @@ export default function ReviewTab({
       </div>
 
       {/* My completion banner */}
-      {reviewedCount >= assignedEntries.length && assignedEntries.length > 0 && (
+      {reviewedCount >= displayEntries.length && displayEntries.length > 0 && (
         <div
           className="flex items-center gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3"
           data-testid="banner-review-complete"
@@ -1101,8 +1118,8 @@ export default function ReviewTab({
         </Button>
         <Button
           variant="outline" size="sm"
-          onClick={() => setCurrentIndex(i => Math.min(assignedEntries.length - 1, i + 1))}
-          disabled={currentIndex >= assignedEntries.length - 1}
+          onClick={() => setCurrentIndex(i => Math.min(displayEntries.length - 1, i + 1))}
+          disabled={currentIndex >= displayEntries.length - 1}
           data-testid="button-review-next"
           className={`border-primary text-primary transition-all${justActed ? " ring-2 ring-primary ring-offset-1 bg-primary/10 animate-pulse" : ""}`}
         >
