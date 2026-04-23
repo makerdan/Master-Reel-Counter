@@ -3,12 +3,13 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Check, Flag, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
-  ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, CheckCircle2, Clock, X,
+  ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, CheckCircle2, Clock, X, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -765,8 +766,26 @@ export default function ReviewTab({
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" data-testid="badge-review-progress">
-            {reviewedCount} of {displayEntries.length} reviewed
+          <Badge variant="outline" data-testid="badge-review-progress" className="flex items-center gap-1">
+            {reviewedCount} of {displayEntries.length}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-full p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label="Why this count may differ from other totals"
+                    data-testid="icon-review-count-info"
+                  >
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs" side="bottom">
+                  Flagged and resolved entries are excluded from this count. If multiple reviewers are active, this total reflects only your assigned subset.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {" reviewed"}
           </Badge>
           {sortedUsers.length > 1 && (
             <Badge variant="secondary" data-testid="badge-review-users">{sortedUsers.length} reviewers</Badge>
