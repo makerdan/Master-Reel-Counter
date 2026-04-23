@@ -2168,14 +2168,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertReviewResponse(data: InsertReviewResponse): Promise<ReviewResponse> {
-    const [result] = await db.insert(reviewResponses)
-      .values(data)
-      .onConflictDoUpdate({
-        target: [reviewResponses.sessionId, reviewResponses.entryId, reviewResponses.userId],
-        set: { verdict: data.verdict, flagReason: data.flagReason ?? null, username: data.username ?? null },
-      })
-      .returning();
-    return result;
+    // Fast path: atomic INSERT … ON CONFLICT DO UPDATE using the unique index.
+    // Falls back to explicit select-then-update when that index is absent in
+    // the target DB (e.g. production environments where duplicates existed
+    // before the index was created and prevented its application).
+    try {
+      const [result] = await db.insert(reviewResponses)
+        .values(data)
+        .onConflictDoUpdate({
+          target: [reviewResponses.sessionId, reviewResponses.entryId, reviewResponses.userId],
+          set: { verdict: data.verdict, flagReason: data.flagReason ?? null, username: data.username ?? null },
+        })
+        .returning();
+      return result;
+    } catch (err: any) {
+      if (!String(err?.message ?? "").includes("no unique or exclusion constraint")) throw err;
+      // Unique index not yet present — safe fallback to check-then-insert/update.
+      const existing = await db.select().from(reviewResponses)
+        .where(and(
+          eq(reviewResponses.sessionId, data.sessionId),
+          eq(reviewResponses.entryId, data.entryId),
+          eq(reviewResponses.userId, data.userId),
+        ));
+      if (existing.length > 0) {
+        const [result] = await db.update(reviewResponses)
+          .set({ verdict: data.verdict, flagReason: data.flagReason ?? null, username: data.username ?? null })
+          .where(eq(reviewResponses.id, existing[0].id))
+          .returning();
+        return result;
+      }
+      const [result] = await db.insert(reviewResponses).values(data).returning();
+      return result;
+    }
   }
 
   async deleteReviewResponse(sessionId: number, entryId: number, userId: string): Promise<void> {
