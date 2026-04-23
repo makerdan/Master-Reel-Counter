@@ -370,7 +370,7 @@ export default function FinalResultsTab({
   };
 
   const incompleteCount = useMemo(
-    () => entries.filter(e => !e.reelTag || !e.footage).length,
+    () => entries.filter(e => (!e.reelTag && !e.wireType) || !e.footage).length,
     [entries],
   );
 
