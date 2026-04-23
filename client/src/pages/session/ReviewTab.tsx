@@ -503,14 +503,18 @@ export default function ReviewTab({
     setOrderedEntries([...reviewed, ...unreviewed]);
   }, [assignedEntries, myResponses, responsesLoading]);
 
-  // Prune entries removed from assignedEntries after the order was computed, and clamp currentIndex.
+  // Prune entries removed from assignedEntries after the order was computed, clamp currentIndex,
+  // and append any entries that arrived in assignedEntries after the initial snapshot was taken.
   useEffect(() => {
     if (!hasComputedOrder.current || orderedEntries.length === 0) return;
     const assignedIds = new Set(assignedEntries.map(e => e.id));
+    const orderedIds = new Set(orderedEntries.map(e => e.id));
     const pruned = orderedEntries.filter(e => assignedIds.has(e.id));
-    if (pruned.length !== orderedEntries.length) {
-      setOrderedEntries(pruned);
-      setCurrentIndex(prev => (pruned.length === 0 ? 0 : Math.min(prev, pruned.length - 1)));
+    const incoming = assignedEntries.filter(e => !orderedIds.has(e.id));
+    if (pruned.length !== orderedEntries.length || incoming.length > 0) {
+      const updated = [...pruned, ...incoming];
+      setOrderedEntries(updated);
+      setCurrentIndex(prev => (updated.length === 0 ? 0 : Math.min(prev, updated.length - 1)));
     }
   }, [assignedEntries, orderedEntries]);
 
@@ -809,7 +813,7 @@ export default function ReviewTab({
       </div>
 
       {/* My completion banner */}
-      {reviewedCount >= displayEntries.length && displayEntries.length > 0 && (
+      {reviewedCount >= assignedEntries.length && assignedEntries.length > 0 && (
         <div
           className="flex items-center gap-3 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3"
           data-testid="banner-review-complete"
