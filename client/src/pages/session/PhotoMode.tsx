@@ -1350,10 +1350,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     if (matches.length === 0) return;
     const exactMatch = matches.find(m => m.catalog === normalized);
     const match = exactMatch || (matches.length === 1 ? matches[0] : null);
-    if (!match) return;
+    if (!match) {
+      toast({ title: "Ambiguous catalog entry", description: "Multiple matches found — select one from the dropdown.", variant: "destructive" });
+      return;
+    }
     updatePinField(pinId, "wireDetails", match.catalog);
     if (!pin.vendorCode && match.vendor) updatePinField(pinId, "vendorCode", match.vendor);
-    if (!pin.footage && match.footage) updatePinField(pinId, "footage", match.footage);
+    if (match.footage) updatePinField(pinId, "footage", match.footage);
   }, [updatePinField, userParsedCatalog]);
 
   const clearRow = useCallback((pinId: string) => {
@@ -2634,18 +2637,27 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                 } else if (e.key === "ArrowUp") {
                                   e.preventDefault();
                                   setSuggestionIndex(prev => Math.max(prev - 1, -1));
-                                } else if (e.key === "Enter" && suggestionIndex >= 0) {
+                                } else if (e.key === "Enter") {
                                   e.preventDefault();
-                                  const s = suggestions[suggestionIndex];
-                                  updatePinField(pin.id, "wireDetails", s.catalog);
-                                  if (s.vendor) updatePinField(pin.id, "vendorCode", s.vendor);
-                                  if (s.footage) updatePinField(pin.id, "footage", s.footage);
-                                  setActiveSuggestionPin(null);
-                                  setSuggestions([]);
-                                  setSuggestionIndex(-1);
-                                  setSuggestionPos(null);
-                                  const nextInput = document.querySelector(`[data-testid="input-wire-details-${index + 1}"]`) as HTMLInputElement | null;
-                                  if (nextInput) setTimeout(() => nextInput.focus(), 0);
+                                  let s = suggestionIndex >= 0 ? suggestions[suggestionIndex] : null;
+                                  if (!s) {
+                                    if (suggestions.length === 1) {
+                                      s = suggestions[0];
+                                    } else {
+                                      toast({ title: "Ambiguous catalog entry", description: "Multiple matches found — select one from the dropdown.", variant: "destructive" });
+                                    }
+                                  }
+                                  if (s) {
+                                    updatePinField(pin.id, "wireDetails", s.catalog);
+                                    if (s.vendor) updatePinField(pin.id, "vendorCode", s.vendor);
+                                    if (s.footage) updatePinField(pin.id, "footage", s.footage);
+                                    setActiveSuggestionPin(null);
+                                    setSuggestions([]);
+                                    setSuggestionIndex(-1);
+                                    setSuggestionPos(null);
+                                    const nextInput = document.querySelector(`[data-testid="input-wire-details-${index + 1}"]`) as HTMLInputElement | null;
+                                    if (nextInput) setTimeout(() => nextInput.focus(), 0);
+                                  }
                                 } else if (e.key === "Escape") {
                                   setActiveSuggestionPin(null);
                                   setSuggestions([]);

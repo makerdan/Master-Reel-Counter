@@ -566,7 +566,14 @@ export default function SingleEntryMode({
             onBlur={() => {
               setTimeout(() => setShowCatalogSuggestions(false), 200);
               const match = getCatalogMatch(form.reelTag);
-              if (match) applyCatalogMatch(match);
+              if (match) {
+                applyCatalogMatch(match);
+              } else if (form.reelTag && form.reelTag.length >= 2) {
+                const allMatches = lookupCatalog(form.reelTag, userParsedCatalog);
+                if (allMatches.length > 1) {
+                  toast({ title: "Ambiguous catalog entry", description: "Multiple matches found — select one from the dropdown.", variant: "destructive" });
+                }
+              }
             }}
             enterKeyHint="next"
             autoComplete="off"
