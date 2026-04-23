@@ -370,11 +370,16 @@ export default function FinalResultsTab({
   };
 
   const incompleteCount = useMemo(
-    () => entries.filter(e => (!e.reelTag && !e.wireType) || !e.footage).length,
+    () => entries.filter(e =>
+      (!(e.reelTag ?? "").trim() && !(e.wireType ?? "").trim()) || !e.footage
+    ).length,
     [entries],
   );
 
-  const [incompleteNoticeDismissed, setIncompleteNoticeDismissed] = useState(false);
+  // Track which count value was dismissed so the notice re-appears if new
+  // incomplete entries are introduced (i.e. the count grows or resets to >0).
+  const [dismissedForCount, setDismissedForCount] = useState<number | null>(null);
+  const incompleteNoticeDismissed = dismissedForCount === incompleteCount && incompleteCount > 0;
 
   return (
     <div className="p-3 sm:p-4 space-y-6" data-testid="final-results-tab">
@@ -466,7 +471,7 @@ export default function FinalResultsTab({
             </button>
           </div>
           <button
-            onClick={() => setIncompleteNoticeDismissed(true)}
+            onClick={() => setDismissedForCount(incompleteCount)}
             className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 transition-colors shrink-0"
             aria-label="Dismiss"
             data-testid="button-dismiss-incomplete-notice"
