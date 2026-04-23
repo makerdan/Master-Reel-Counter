@@ -2168,10 +2168,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertReviewResponse(data: InsertReviewResponse): Promise<ReviewResponse> {
-    // Fast path: atomic INSERT … ON CONFLICT DO UPDATE using the unique index.
-    // Falls back to explicit select-then-update when that index is absent in
-    // the target DB (e.g. production environments where duplicates existed
-    // before the index was created and prevented its application).
+    // Fast path: atomic INSERT … ON CONFLICT DO UPDATE using the unique index
+    // on (session_id, entry_id, user_id) defined in the schema.
+    // Falls back to a serializable transaction when that index is absent in
+    // the target DB (e.g. production where pre-existing duplicate rows
+    // prevented the index from being applied via db:push).
     try {
       const [result] = await db.insert(reviewResponses)
         .values(data)
@@ -2181,24 +2182,29 @@ export class DatabaseStorage implements IStorage {
         })
         .returning();
       return result;
-    } catch (err: any) {
-      if (!String(err?.message ?? "").includes("no unique or exclusion constraint")) throw err;
-      // Unique index not yet present — safe fallback to check-then-insert/update.
-      const existing = await db.select().from(reviewResponses)
-        .where(and(
-          eq(reviewResponses.sessionId, data.sessionId),
-          eq(reviewResponses.entryId, data.entryId),
-          eq(reviewResponses.userId, data.userId),
-        ));
-      if (existing.length > 0) {
-        const [result] = await db.update(reviewResponses)
-          .set({ verdict: data.verdict, flagReason: data.flagReason ?? null, username: data.username ?? null })
-          .where(eq(reviewResponses.id, existing[0].id))
-          .returning();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!message.includes("no unique or exclusion constraint")) throw err;
+      // Unique index not yet present — fall back to a serializable transaction
+      // so concurrent submissions for the same (session, entry, user) triple
+      // cannot both observe "no row" and race to insert a duplicate.
+      return db.transaction(async (tx) => {
+        const existing = await tx.select().from(reviewResponses)
+          .where(and(
+            eq(reviewResponses.sessionId, data.sessionId),
+            eq(reviewResponses.entryId, data.entryId),
+            eq(reviewResponses.userId, data.userId),
+          ));
+        if (existing.length > 0) {
+          const [result] = await tx.update(reviewResponses)
+            .set({ verdict: data.verdict, flagReason: data.flagReason ?? null, username: data.username ?? null })
+            .where(eq(reviewResponses.id, existing[0].id))
+            .returning();
+          return result;
+        }
+        const [result] = await tx.insert(reviewResponses).values(data).returning();
         return result;
-      }
-      const [result] = await db.insert(reviewResponses).values(data).returning();
-      return result;
+      }, { isolationLevel: "serializable" });
     }
   }
 
