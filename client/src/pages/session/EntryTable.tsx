@@ -74,29 +74,43 @@ function EntryPhotoDialogContent({ src, entryId, pin }: {
   );
 }
 
-function FilterChipButton({ label, active, count, onClick, testId }: {
+function FilterChipButton({ label, active, count, onClick, testId, warning }: {
   label: string;
   active: boolean;
   count?: number;
   onClick: () => void;
   testId: string;
+  warning?: boolean;
 }) {
+  let colorClasses: string;
+  if (warning) {
+    colorClasses = active
+      ? "bg-amber-500 text-white border-amber-500"
+      : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-400 hover:bg-amber-500/20";
+  } else {
+    colorClasses = active
+      ? "bg-blue-600 text-white border-blue-600"
+      : "bg-muted/50 text-muted-foreground border-border hover:bg-muted";
+  }
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
       aria-label={`${label} filter${count !== undefined && count > 0 ? ` (${count})` : ""}${active ? ", active" : ""}`}
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
-        active
-          ? "bg-blue-600 text-white border-blue-600"
-          : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
-      }`}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${colorClasses}`}
       data-testid={testId}
     >
       {label}
       {count !== undefined && count > 0 && (
-        <Badge variant="secondary" className={`h-4 min-w-[16px] px-1 text-[10px] ${active ? "bg-blue-800 text-white" : ""}`}>
+        <Badge
+          variant="secondary"
+          className={`h-4 min-w-[16px] px-1 text-[10px] ${
+            warning
+              ? active ? "bg-amber-700 text-white" : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+              : active ? "bg-blue-800 text-white" : ""
+          }`}
+        >
           {count}
         </Badge>
       )}
@@ -356,6 +370,20 @@ function EntryTable({
           )}
         </div>
 
+        {incompleteCount > 0 && (
+          <div
+            role="alert"
+            onClick={() => toggleFilter("incomplete")}
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-md bg-amber-500/10 border border-amber-400 text-amber-700 dark:text-amber-400 cursor-pointer hover:bg-amber-500/20 transition-colors"
+            data-testid="banner-incomplete-entries"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="text-xs font-medium">
+              {incompleteCount} {incompleteCount === 1 ? "entry is" : "entries are"} missing required data — click to review
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 max-w-xs min-w-[180px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -392,6 +420,7 @@ function EntryTable({
               count={incompleteCount}
               onClick={() => toggleFilter("incomplete")}
               testId="chip-incomplete"
+              warning
             />
           )}
           {noPhotoCount > 0 && (
