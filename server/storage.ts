@@ -2183,8 +2183,17 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return result;
     } catch (err: unknown) {
+      // Detect the specific PostgreSQL error raised when ON CONFLICT specifies a
+      // target that has no matching unique/exclusion constraint in the DB.
+      // node-postgres surfaces the SQLSTATE as err.code; the relevant class is
+      // "42xxx" (syntax/access-rule violations). We check the code first and
+      // fall back to message text for drivers that don't expose a numeric code.
       const message = err instanceof Error ? err.message : String(err);
-      if (!message.includes("no unique or exclusion constraint")) throw err;
+      const pgCode = (err as { code?: string }).code;
+      const isConstraintMissing =
+        (pgCode !== undefined ? /^42/.test(pgCode) : true) &&
+        message.includes("no unique or exclusion constraint");
+      if (!isConstraintMissing) throw err;
       // Unique index not yet present — fall back to a serializable transaction
       // so concurrent submissions for the same (session, entry, user) triple
       // cannot both observe "no row" and race to insert a duplicate.
