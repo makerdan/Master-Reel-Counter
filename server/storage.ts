@@ -2168,20 +2168,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertReviewResponse(data: InsertReviewResponse): Promise<ReviewResponse> {
-    const existing = await db.select().from(reviewResponses)
-      .where(and(
-        eq(reviewResponses.sessionId, data.sessionId),
-        eq(reviewResponses.entryId, data.entryId),
-        eq(reviewResponses.userId, data.userId),
-      ));
-    if (existing.length > 0) {
-      const [result] = await db.update(reviewResponses)
-        .set({ verdict: data.verdict, flagReason: data.flagReason ?? null, username: data.username ?? null })
-        .where(eq(reviewResponses.id, existing[0].id))
-        .returning();
-      return result;
-    }
-    const [result] = await db.insert(reviewResponses).values(data).returning();
+    const [result] = await db.insert(reviewResponses)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [reviewResponses.sessionId, reviewResponses.entryId, reviewResponses.userId],
+        set: { verdict: data.verdict, flagReason: data.flagReason ?? null, username: data.username ?? null },
+      })
+      .returning();
     return result;
   }
 
