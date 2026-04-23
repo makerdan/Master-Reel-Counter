@@ -314,6 +314,15 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
   const [showReviewCatalogSuggestions, setShowReviewCatalogSuggestions] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [dupsOpen, setDupsOpen] = useState(true);
+  const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
+  const toggleSection = useCallback((photoId: number) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(photoId)) next.delete(photoId);
+      else next.add(photoId);
+      return next;
+    });
+  }, []);
   const { data: dismissedKeysFromDb = [] } = useQuery<string[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "dismissed-duplicates"],
   });
@@ -903,9 +912,19 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
               className="border !border-blue-600/50 rounded-lg overflow-hidden bg-card"
               data-testid={`flagged-group-${group.photoId}`}
             >
-              <div className="bg-muted/50 px-3 py-2 flex items-center gap-2 border-b !border-blue-600/50 flex-wrap" data-testid={`flagged-group-header-${group.photoId}`}>
+              <div
+                className="bg-muted/50 px-3 py-2 flex items-center gap-2 border-b !border-blue-600/50 flex-wrap cursor-pointer select-none"
+                role="button"
+                aria-expanded={!collapsedSections.has(group.photoId)}
+                onClick={() => toggleSection(group.photoId)}
+                data-testid={`flagged-group-header-${group.photoId}`}
+              >
+                {collapsedSections.has(group.photoId)
+                  ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  : <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                }
                 <MapPin className="h-4 w-4 text-orange-500 shrink-0" />
-                <span className="font-mono text-sm font-semibold">
+                <span className="font-mono text-sm font-semibold text-amber-600 dark:text-amber-400">
                   {[group.photoAisle && `Aisle ${group.photoAisle}`, group.photoSection && `Section ${group.photoSection}`].filter(Boolean).join(" · ") || "No location"}
                 </span>
                 <Badge variant="secondary" className="text-[10px]" data-testid={`badge-group-count-${group.photoId}`}>
@@ -914,7 +933,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                 {group.photoFilename && (
                   <span className="text-xs text-muted-foreground truncate max-w-[200px] hidden sm:inline">{group.photoFilename}</span>
                 )}
-                <div className="flex gap-2 ml-auto shrink-0 [--button-outline:black]">
+                <div className="flex gap-2 ml-auto shrink-0 [--button-outline:black]" onClick={e => e.stopPropagation()}>
                   {onViewInPhoto && (
                     <Button
                       variant="outline"
@@ -942,6 +961,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                   </Button>
                 </div>
               </div>
+              {!collapsedSections.has(group.photoId) && (
               <div className="grid gap-2 p-3">
                 {group.pins.map((pin) => (
                   <div
@@ -1433,6 +1453,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                   </div>
                 ))}
               </div>
+              )}
             </div>
           ))}
         </div>
