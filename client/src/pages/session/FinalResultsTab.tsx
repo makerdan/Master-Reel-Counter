@@ -369,6 +369,13 @@ export default function FinalResultsTab({
     return "bg-red-500/8 dark:bg-red-500/10";
   };
 
+  const incompleteCount = useMemo(
+    () => entries.filter(e => !e.reelTag || !e.footage).length,
+    [entries],
+  );
+
+  const [incompleteNoticeDismissed, setIncompleteNoticeDismissed] = useState(false);
+
   return (
     <div className="p-3 sm:p-4 space-y-6" data-testid="final-results-tab">
       <h2 className="text-lg font-bold underline text-center" data-testid="heading-final-results">Final Results</h2>
@@ -430,6 +437,42 @@ export default function FinalResultsTab({
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Incomplete Data Notice ───────────────────────────────────────── */}
+      {incompleteCount > 0 && !incompleteNoticeDismissed && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-md border border-amber-400 bg-amber-500/10 px-4 py-3"
+          data-testid="banner-final-results-incomplete"
+        >
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+              {incompleteCount} {incompleteCount === 1 ? "entry is" : "entries are"} missing a wire type or footage
+            </p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">
+              These entries may appear as "(uncataloged)" in the tally below. Edit them in the Entry Table to complete the data.
+            </p>
+            <button
+              onClick={() => {
+                document.getElementById("section-entry-table")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400 underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-300 transition-colors"
+              data-testid="button-goto-entry-table"
+            >
+              Go to Entry Table ↓
+            </button>
+          </div>
+          <button
+            onClick={() => setIncompleteNoticeDismissed(true)}
+            className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200 transition-colors shrink-0"
+            aria-label="Dismiss"
+            data-testid="button-dismiss-incomplete-notice"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 

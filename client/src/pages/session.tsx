@@ -1016,25 +1016,27 @@ function SessionWorkspace({
           <>
             <Separator />
 
-            <EntryTable
-              entries={entries}
-              photos={photos}
-              onEdit={(entry) => { setEditingEntry(entry); }}
-              sessionId={sessionId}
-              totalFootage={displayTotalFootage}
-              unitLabel={uLabel}
-              currentUnit={currentUnit}
-              onUndoableDelete={pushUndo}
-              canEdit={canEditSession}
-              forceExpandKey={tableExpandKey ?? undefined}
-              exclusiveExpandKey={exclusiveExpandKey}
-              onJumpToPin={(photoId, pinId) => {
-                setNavigateToPhotoId(photoId);
-                setNavigateToPinId(pinId);
-                setMode("photo");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-            />
+            <div id="section-entry-table">
+              <EntryTable
+                entries={entries}
+                photos={photos}
+                onEdit={(entry) => { setEditingEntry(entry); }}
+                sessionId={sessionId}
+                totalFootage={displayTotalFootage}
+                unitLabel={uLabel}
+                currentUnit={currentUnit}
+                onUndoableDelete={pushUndo}
+                canEdit={canEditSession}
+                forceExpandKey={tableExpandKey ?? undefined}
+                exclusiveExpandKey={exclusiveExpandKey}
+                onJumpToPin={(photoId, pinId) => {
+                  setNavigateToPhotoId(photoId);
+                  setNavigateToPinId(pinId);
+                  setMode("photo");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            </div>
           </>
         )}
       </div>
