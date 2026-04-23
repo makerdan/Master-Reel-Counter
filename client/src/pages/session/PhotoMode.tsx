@@ -2619,15 +2619,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               }
                             }}
                             onBlur={() => {
-                              const hasSuggestionsOpen = activeSuggestionPin === pin.id && suggestions.length > 0;
                               setTimeout(() => {
                                 setActiveSuggestionPin(null);
                                 setSuggestionIndex(-1);
                                 setSuggestionPos(null);
                               }, 200);
-                              if (!hasSuggestionsOpen || suggestionIndex >= 0) {
-                                applyAutoFill(pin.id);
-                              }
+                              // Always attempt auto-fill on blur/tab so ambiguous-match
+                              // toast fires even when the dropdown was open but nothing
+                              // was highlighted. Suggestion-click race is safe: onMouseDown
+                              // on suggestion items fires before onBlur, so the match is
+                              // already applied and applyAutoFill will find an exact hit.
+                              applyAutoFill(pin.id);
                             }}
                             onKeyDown={(e) => {
                               if (activeSuggestionPin === pin.id && suggestions.length > 0) {
@@ -2641,7 +2643,14 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                   e.preventDefault();
                                   let s = suggestionIndex >= 0 ? suggestions[suggestionIndex] : null;
                                   if (!s) {
-                                    if (suggestions.length === 1) {
+                                    // No arrow-key selection — resolve using same logic as applyAutoFill:
+                                    // exact normalized match first, then sole candidate, else ambiguous.
+                                    const typed = (e.currentTarget as HTMLInputElement).value;
+                                    const normalized = typed.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                                    const exact = suggestions.find(m => m.catalog === normalized);
+                                    if (exact) {
+                                      s = exact;
+                                    } else if (suggestions.length === 1) {
                                       s = suggestions[0];
                                     } else {
                                       toast({ title: "Ambiguous catalog entry", description: "Multiple matches found — select one from the dropdown.", variant: "destructive" });
