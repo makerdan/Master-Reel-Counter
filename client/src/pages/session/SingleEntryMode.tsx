@@ -726,6 +726,8 @@ export default function SingleEntryMode({
           )}
           <Button
             type="submit"
+            size={editingEntry ? "lg" : "default"}
+            className={editingEntry ? "w-full" : undefined}
             disabled={saveEntry.isPending || !canEdit}
             data-testid="button-save-entry"
           >
