@@ -58,10 +58,6 @@ export default function SessionProgress({
     const activePins = pins.filter(p => !p.entryId).length;
     const committedPins = pins.filter(p => !!p.entryId).length;
 
-    const reviewableEntryIds = new Set(
-      pins.filter(p => p.entryId).map(p => p.entryId!)
-    );
-    const totalReviewable = reviewableEntryIds.size;
     const approvedEntryIds = new Set(
       reviewResponses.filter(r => r.verdict === "approved").map(r => r.entryId)
     );
@@ -76,7 +72,7 @@ export default function SessionProgress({
     const flaggedFromReviews = entries.filter(e => flaggedReviewEntryIds.has(e.id)).length;
     const flaggedTotal = flaggedPinIds.size + flaggedFromReviews;
 
-    return { totalPins, activePins, committedPins, totalReviewable, reviewed, flaggedTotal };
+    return { totalPins, activePins, committedPins, reviewed, flaggedTotal };
   }, [entries, pins, reviewResponses]);
 
   const totalPins = metrics.totalPins;
@@ -125,7 +121,7 @@ export default function SessionProgress({
               label="Reviewed"
               icon={CheckCircle2}
               current={metrics.reviewed}
-              total={metrics.totalReviewable}
+              total={metrics.totalPins}
               colorClass="bg-purple-500"
             />
             <MetricBar
