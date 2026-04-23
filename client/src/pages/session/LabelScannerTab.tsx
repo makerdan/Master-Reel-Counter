@@ -71,6 +71,12 @@ function saveSelectionState(sessionId: number, pinId: number, included: boolean)
 }
 
 
+function isIncompleteCard(card: { matchResult?: LabelMatchResult }): boolean {
+  const match = card.matchResult?.match;
+  if (!match) return false;
+  return !match.wireType || !match.wireSize || !match.color;
+}
+
 function parseSortKey(catalog: string): { type: string; color: string; size: number; footage: number } {
   const s = (catalog || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const m = s.match(/^([A-Z]+?)(\d+)([A-Z]{2})(\d+)$/);
@@ -1001,7 +1007,7 @@ export default function LabelScannerTab({
               if (!updated.editFootage.trim() && unambiguous.footage) {
                 updated.editFootage = String(toDisplayUnit(unambiguous.footage, currentUnit));
               }
-              if (!updated.matchResult && exactMatches.length === 1) {
+              if (exactMatches.length === 1) {
                 updated.matchResult = {
                   match: unambiguous,
                   confidence: "high",
@@ -1254,6 +1260,7 @@ export default function LabelScannerTab({
   const applyMutation = useMutation({
     mutationFn: async (cardsToApply: PinCard[]) => {
       const failures: string[] = [];
+      const blocked: string[] = [];
       const succeededPinIds: number[] = [];
       const draftSuccessByPhoto = new Map<number, Set<string>>();
 
@@ -1261,6 +1268,11 @@ export default function LabelScannerTab({
         if (!card.included) continue;
         const hasData = !!(card.result || card.editCatalog || card.editVendor);
         if (!hasData) continue;
+
+        if (isIncompleteCard(card)) {
+          blocked.push(card.pin.label || `Pin ${card.pin.id}`);
+          continue;
+        }
 
         try {
           if (card.isDraft) {
@@ -1375,7 +1387,7 @@ export default function LabelScannerTab({
         } catch {}
       }
 
-      return { successCount: succeededPinIds.length, failures, succeededPinIds };
+      return { successCount: succeededPinIds.length, failures, blocked, succeededPinIds };
     },
     onSuccess: (data, cardsToApply) => {
       if (currentPhotoId) {
@@ -1407,13 +1419,20 @@ export default function LabelScannerTab({
         }
         if (primaryKey) onApplied(primaryKey);
       }
+      if (data.blocked.length > 0) {
+        toast({
+          title: `${data.blocked.length} reel(s) skipped — wire type, gauge, or color could not be read`,
+          description: `Edit these cards before applying: ${data.blocked.join(", ")}`,
+          variant: "destructive",
+        });
+      }
       if (data.failures.length > 0) {
         toast({
           title: `Applied ${data.successCount} of ${data.successCount + data.failures.length}`,
           description: `Failed: ${data.failures.join(", ")}`,
           variant: "destructive",
         });
-      } else {
+      } else if (data.successCount > 0) {
         toast({ title: "Applied", description: `Updated ${data.successCount} pin(s) successfully` });
       }
       const successSet = new Set(data.succeededPinIds);
@@ -1926,6 +1945,14 @@ export default function LabelScannerTab({
                                 />
                               </div>
                             )}
+                            {isIncompleteCard(card) && (
+                              <Badge
+                                className="py-1 px-2 text-[11px] bg-amber-900/40 text-amber-300 border-amber-700/50 w-full justify-center"
+                                data-testid={`badge-incomplete-${card.pin.id}`}
+                              >
+                                Incomplete — fill in wire type, gauge, color
+                              </Badge>
+                            )}
                             <div className="w-24">
                               <label className="text-[10px] text-white/40">Vendor</label>
                               <FitTextInput
@@ -2201,6 +2228,15 @@ export default function LabelScannerTab({
                         data-testid={`input-catalog-${card.pin.id}`}
                       />
                     </div>
+                  )}
+
+                  {isIncompleteCard(card) && (
+                    <Badge
+                      className="py-1 px-2 text-[11px] bg-amber-900/40 text-amber-300 border-amber-700/50 w-full justify-center"
+                      data-testid={`badge-incomplete-${card.pin.id}`}
+                    >
+                      Incomplete — fill in wire type, gauge, color
+                    </Badge>
                   )}
 
                   <div className="w-24">
