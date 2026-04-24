@@ -845,7 +845,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
             >
               <Check className={`h-4 w-4 shrink-0 ${duplicateGroups.length > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} />
               <span>
-                {duplicateGroups.length > 0 ? "No duplicates remaining." : "No duplicates detected"}
+                {duplicateGroups.length > 0 ? "No possible duplicates remaining." : "No duplicates detected"}
               </span>
             </div>
           )}
