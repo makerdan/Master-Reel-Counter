@@ -51,6 +51,7 @@ export interface CatalogAlias {
 export const CATALOG_ALIASES: CatalogAlias[] = [
   { alias: "25001XHHWALOR", catalog: "XHHW250OR1000", vendor: "ALU" },
   { alias: "25001XHHWALBR", catalog: "XHHW250BR1000", vendor: "ALU" },
+  { alias: "25001XHHWALBN", catalog: "XHHW250BR1000", vendor: "ALU" },
 ];
 
 export function parseCatalogEntry(entry: CatalogEntry): ParsedCatalogEntry {
