@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -126,16 +126,17 @@ function CropCanvas({
 
 // ─── ZoomablePhoto (mirrors PhotoMode's photo viewer) ────────────────────────
 
-function ZoomablePhoto({
-  photoUrl, scale, panX, panY, rotation, panMode,
-  onScale, onPan, onRotate, onPanMode, onReady,
-}: {
+type ZoomablePhotoHandle = { clamp: (px: number, py: number, s: number) => { x: number; y: number } };
+
+const ZoomablePhoto = forwardRef<ZoomablePhotoHandle, {
   photoUrl: string; scale: number; panX: number; panY: number;
   rotation: number; panMode: boolean;
   onScale: (s: number) => void; onPan: (x: number, y: number) => void;
-  onRotate: (deg: number) => void; onPanMode: (m: boolean) => void;
   onReady?: () => void;
-}) {
+}>(function ZoomablePhoto({
+  photoUrl, scale, panX, panY, rotation, panMode,
+  onScale, onPan, onReady,
+}, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const isPanningRef = useRef(false);
@@ -156,6 +157,8 @@ function ZoomablePhoto({
     const maxY = (rect.height * (s - 1)) / (2 * s);
     return { x: Math.max(-maxX, Math.min(maxX, px)), y: Math.max(-maxY, Math.min(maxY, py)) };
   }, []);
+
+  useImperativeHandle(ref, () => ({ clamp }), [clamp]);
 
   const zoomAtPoint = useCallback((clientX: number, clientY: number, newScale: number) => {
     const el = containerRef.current;
@@ -257,81 +260,35 @@ function ZoomablePhoto({
   const handleMouseUp = () => { isPanningRef.current = false; };
 
   return (
-    <div className="relative w-full" style={{ position: "relative" }}>
+    <div
+      ref={containerRef}
+      className="relative w-full overflow-hidden rounded border border-border bg-black"
+      style={{ cursor: panMode || scale > 1 ? "grab" : "default", maxHeight: "360px" }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      data-testid="review-photo-viewer"
+    >
       <div
-        ref={containerRef}
-        className="relative w-full overflow-hidden rounded border border-border bg-black"
-        style={{ cursor: panMode || scale > 1 ? "grab" : "default", maxHeight: "360px" }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        data-testid="review-photo-viewer"
+        style={{
+          transform: `scale(${scale}) translate(${panX}px, ${panY}px) rotate(${rotation}deg)`,
+          transformOrigin: "center center",
+          transition: "transform 0.05s",
+        }}
       >
-        <div
-          style={{
-            transform: `scale(${scale}) translate(${panX}px, ${panY}px) rotate(${rotation}deg)`,
-            transformOrigin: "center center",
-            transition: "transform 0.05s",
-          }}
-        >
-          <img
-            src={photoUrl}
-            alt="Section photo"
-            draggable={false}
-            className="w-full select-none block"
-            data-testid="img-review-photo"
-            onLoad={onReady}
-          />
-        </div>
-      </div>
-
-      {/* Overlay controls — right strip */}
-      <div className="photo-overlay-controls right-strip">
-        <button
-          className="photo-overlay-btn"
-          onClick={() => { const s = Math.min(12, scale + 0.5); onScale(s); const c = clamp(panX, panY, s); onPan(c.x, c.y); }}
-          title="Zoom in"
-          data-testid="button-review-zoom-in"
-        >
-          <ZoomIn className="h-4 w-4" />
-        </button>
-        <button
-          className="photo-overlay-btn"
-          onClick={() => { const s = Math.max(1, scale - 0.5); onScale(s); const c = clamp(panX, panY, s); onPan(c.x, c.y); }}
-          title="Zoom out"
-          data-testid="button-review-zoom-out"
-        >
-          <ZoomOut className="h-4 w-4" />
-        </button>
-        <button
-          className={`photo-overlay-btn ${panMode ? "photo-overlay-btn-active" : ""}`}
-          onClick={() => onPanMode(!panMode)}
-          title={panMode ? "Exit pan mode" : "Pan mode"}
-          data-testid="button-review-pan-mode"
-        >
-          <Move className="h-4 w-4" />
-        </button>
-        <button
-          className="photo-overlay-btn"
-          onClick={() => onRotate((rotation + 90) % 360)}
-          title="Rotate clockwise"
-          data-testid="button-review-rotate-cw"
-        >
-          <RotateCw className="h-4 w-4" />
-        </button>
-        <button
-          className="photo-overlay-btn"
-          onClick={() => onRotate((rotation - 90 + 360) % 360)}
-          title="Rotate counter-clockwise"
-          data-testid="button-review-rotate-ccw"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </button>
+        <img
+          src={photoUrl}
+          alt="Section photo"
+          draggable={false}
+          className="w-full select-none block"
+          data-testid="img-review-photo"
+          onLoad={onReady}
+        />
       </div>
     </div>
   );
-}
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -622,6 +579,7 @@ export default function ReviewTab({
   const [photoPanY, setPhotoPanY] = useState(0);
   const [photoRotation, setPhotoRotation] = useState(0);
   const [panMode, setPanMode] = useState(false);
+  const zoomablePhotoRef = useRef<ZoomablePhotoHandle>(null);
   const [photoReadyForKey, setPhotoReadyForKey] = useState("");
 
   const resetView = useCallback(() => {
@@ -933,26 +891,28 @@ export default function ReviewTab({
                 /* ── Detail photo cropped view (linked detail shot, centered) ── */
                 <div className="w-full">
                   <div className="flex justify-center">
-                    <div className="relative inline-block">
-                      <CropCanvas
-                        photoUrl={getPhotoUrl(detailPhoto)}
-                        xPercent={50}
-                        yPercent={50}
-                        zoomLevel={pinZoom}
-                        panX={pinPanX}
-                        panY={pinPanY}
-                        onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
-                        onReady={() => setPhotoReadyForKey(photoReadyKey)}
-                        size={260}
-                      />
-                      {!photoReady && (
-                        <div
-                          className="absolute inset-0 rounded-md bg-muted animate-pulse"
-                          style={{ width: 260, height: 260 }}
-                          data-testid="photo-skeleton"
+                    <div className="flex gap-2 items-center">
+                      <div className="relative inline-block">
+                        <CropCanvas
+                          photoUrl={getPhotoUrl(detailPhoto)}
+                          xPercent={50}
+                          yPercent={50}
+                          zoomLevel={pinZoom}
+                          panX={pinPanX}
+                          panY={pinPanY}
+                          onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
+                          onReady={() => setPhotoReadyForKey(photoReadyKey)}
+                          size={260}
                         />
-                      )}
-                      <div className="photo-overlay-controls right-strip">
+                        {!photoReady && (
+                          <div
+                            className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                            style={{ width: 260, height: 260 }}
+                            data-testid="photo-skeleton"
+                          />
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
                         <button
                           className="photo-overlay-btn"
                           onClick={() => setCardZoom(Math.max(ZOOM_MIN, pinZoom - ZOOM_CLICK_STEP))}
@@ -977,26 +937,28 @@ export default function ReviewTab({
                 /* ── Pin / AI Scanner view (cropped) ── */
                 <div className="w-full">
                   <div className="flex justify-center">
-                    <div className="relative inline-block">
-                      <CropCanvas
-                        photoUrl={getPhotoUrl(currentPhoto)}
-                        xPercent={currentPin!.xPercent}
-                        yPercent={currentPin!.yPercent}
-                        zoomLevel={pinZoom}
-                        panX={pinPanX}
-                        panY={pinPanY}
-                        onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
-                        onReady={() => setPhotoReadyForKey(photoReadyKey)}
-                        size={260}
-                      />
-                      {!photoReady && (
-                        <div
-                          className="absolute inset-0 rounded-md bg-muted animate-pulse"
-                          style={{ width: 260, height: 260 }}
-                          data-testid="photo-skeleton"
+                    <div className="flex gap-2 items-center">
+                      <div className="relative inline-block">
+                        <CropCanvas
+                          photoUrl={getPhotoUrl(currentPhoto)}
+                          xPercent={currentPin!.xPercent}
+                          yPercent={currentPin!.yPercent}
+                          zoomLevel={pinZoom}
+                          panX={pinPanX}
+                          panY={pinPanY}
+                          onPan={(px, py) => { setPinPanX(px); setPinPanY(py); }}
+                          onReady={() => setPhotoReadyForKey(photoReadyKey)}
+                          size={260}
                         />
-                      )}
-                      <div className="photo-overlay-controls right-strip">
+                        {!photoReady && (
+                          <div
+                            className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                            style={{ width: 260, height: 260 }}
+                            data-testid="photo-skeleton"
+                          />
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
                         <button
                           className="photo-overlay-btn"
                           onClick={() => setCardZoom(Math.max(ZOOM_MIN, pinZoom - ZOOM_CLICK_STEP))}
@@ -1019,26 +981,69 @@ export default function ReviewTab({
                 </div>
               ) : currentPhoto ? (
                 /* ── Reel IDs view ── */
-                <div className="w-full relative">
-                  <ZoomablePhoto
-                    photoUrl={getPhotoUrl(currentPhoto)}
-                    scale={photoScale}
-                    panX={photoPanX}
-                    panY={photoPanY}
-                    rotation={photoRotation}
-                    panMode={panMode}
-                    onScale={setPhotoScale}
-                    onPan={(x, y) => { setPhotoPanX(x); setPhotoPanY(y); }}
-                    onRotate={setPhotoRotation}
-                    onPanMode={setPanMode}
-                    onReady={() => setPhotoReadyForKey(photoReadyKey)}
-                  />
-                  {!photoReady && (
-                    <div
-                      className="absolute inset-0 rounded-md bg-muted animate-pulse"
-                      data-testid="photo-skeleton"
+                <div className="w-full flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    <ZoomablePhoto
+                      ref={zoomablePhotoRef}
+                      photoUrl={getPhotoUrl(currentPhoto)}
+                      scale={photoScale}
+                      panX={photoPanX}
+                      panY={photoPanY}
+                      rotation={photoRotation}
+                      panMode={panMode}
+                      onScale={setPhotoScale}
+                      onPan={(x, y) => { setPhotoPanX(x); setPhotoPanY(y); }}
+                      onReady={() => setPhotoReadyForKey(photoReadyKey)}
                     />
-                  )}
+                    {!photoReady && (
+                      <div
+                        className="absolute inset-0 rounded-md bg-muted animate-pulse"
+                        data-testid="photo-skeleton"
+                      />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      className="photo-overlay-btn"
+                      onClick={() => { const s = Math.min(12, photoScale + 0.5); setPhotoScale(s); const c = zoomablePhotoRef.current?.clamp(photoPanX, photoPanY, s) ?? { x: 0, y: 0 }; setPhotoPanX(c.x); setPhotoPanY(c.y); }}
+                      title="Zoom in"
+                      data-testid="button-review-zoom-in"
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </button>
+                    <button
+                      className="photo-overlay-btn"
+                      onClick={() => { const s = Math.max(1, photoScale - 0.5); setPhotoScale(s); const c = zoomablePhotoRef.current?.clamp(photoPanX, photoPanY, s) ?? { x: 0, y: 0 }; setPhotoPanX(c.x); setPhotoPanY(c.y); }}
+                      title="Zoom out"
+                      data-testid="button-review-zoom-out"
+                    >
+                      <ZoomOut className="h-4 w-4" />
+                    </button>
+                    <button
+                      className={`photo-overlay-btn ${panMode ? "photo-overlay-btn-active" : ""}`}
+                      onClick={() => setPanMode(!panMode)}
+                      title={panMode ? "Exit pan mode" : "Pan mode"}
+                      data-testid="button-review-pan-mode"
+                    >
+                      <Move className="h-4 w-4" />
+                    </button>
+                    <button
+                      className="photo-overlay-btn"
+                      onClick={() => setPhotoRotation((photoRotation + 90) % 360)}
+                      title="Rotate clockwise"
+                      data-testid="button-review-rotate-cw"
+                    >
+                      <RotateCw className="h-4 w-4" />
+                    </button>
+                    <button
+                      className="photo-overlay-btn"
+                      onClick={() => setPhotoRotation((photoRotation - 90 + 360) % 360)}
+                      title="Rotate counter-clockwise"
+                      data-testid="button-review-rotate-ccw"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
