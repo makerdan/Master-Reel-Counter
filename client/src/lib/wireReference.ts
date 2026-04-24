@@ -1078,7 +1078,6 @@ function sortPrefix(entries: ParsedCatalogEntry[], upper: string): ParsedCatalog
     const prefA = commonPrefixLen(a.catalog, upper);
     const prefB = commonPrefixLen(b.catalog, upper);
     if (prefB !== prefA) return prefB - prefA;
-    if (a.catalog.length !== b.catalog.length) return a.catalog.length - b.catalog.length;
     return a.catalog < b.catalog ? -1 : a.catalog > b.catalog ? 1 : 0;
   });
 }
@@ -1103,20 +1102,32 @@ export function lookupCatalog(query: string, userCatalog?: ParsedCatalogEntry[])
     ? [...userCatalog, ...PARSED_CATALOG]
     : PARSED_CATALOG;
 
-  const aliasPrefix: ParsedCatalogEntry[] = [];
-  const aliasContains: ParsedCatalogEntry[] = [];
-  for (const a of CATALOG_ALIASES) {
-    const isPrefix = a.alias.startsWith(upper);
-    const isContain = !isPrefix && a.alias.includes(upper);
-    if (!isPrefix && !isContain) continue;
-    const real = combined.find(e => e.catalog === a.catalog && e.vendor === a.vendor);
-    if (!real) continue;
-    const entry = { ...real, aliasLabel: a.alias };
-    if (isPrefix) aliasPrefix.push(entry);
-    else aliasContains.push(entry);
-  }
-  const sortedAliasPrefix = sortPrefix(aliasPrefix, upper);
-  const sortedAliasContains = sortContains(aliasContains, upper);
+  const sortedAliasPrefix = CATALOG_ALIASES
+    .filter(a => a.alias.startsWith(upper))
+    .sort((a, b) => {
+      const prefA = commonPrefixLen(a.alias, upper);
+      const prefB = commonPrefixLen(b.alias, upper);
+      if (prefB !== prefA) return prefB - prefA;
+      return a.alias < b.alias ? -1 : a.alias > b.alias ? 1 : 0;
+    })
+    .flatMap(a => {
+      const real = combined.find(e => e.catalog === a.catalog && e.vendor === a.vendor);
+      return real ? [{ ...real, aliasLabel: a.alias }] : [];
+    });
+
+  const sortedAliasContains = CATALOG_ALIASES
+    .filter(a => !a.alias.startsWith(upper) && a.alias.includes(upper))
+    .sort((a, b) => {
+      const posA = a.alias.indexOf(upper);
+      const posB = b.alias.indexOf(upper);
+      if (posA !== posB) return posA - posB;
+      return a.alias < b.alias ? -1 : a.alias > b.alias ? 1 : 0;
+    })
+    .flatMap(a => {
+      const real = combined.find(e => e.catalog === a.catalog && e.vendor === a.vendor);
+      return real ? [{ ...real, aliasLabel: a.alias }] : [];
+    });
+
   const aliasEntries = [...sortedAliasPrefix, ...sortedAliasContains];
 
   const exact = combined.filter(e => e.catalog === upper);
