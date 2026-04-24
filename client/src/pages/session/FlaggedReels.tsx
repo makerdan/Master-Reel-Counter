@@ -308,6 +308,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
   const [editState, setEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
   const [catalogSuggestions, setCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [showCatalogSuggestions, setShowCatalogSuggestions] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const [editingReviewEntryId, setEditingReviewEntryId] = useState<number | null>(null);
   const [reviewEditState, setReviewEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
   const [reviewCatalogSuggestions, setReviewCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
@@ -520,6 +521,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
     });
     setCatalogSuggestions([]);
     setShowCatalogSuggestions(false);
+    setActiveSuggestionIndex(-1);
   }, [currentUnit]);
 
   const openReviewEditor = useCallback((entry: Entry, response: ReviewResponse) => {
@@ -634,6 +636,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
     });
     setCatalogSuggestions([]);
     setShowCatalogSuggestions(false);
+    setActiveSuggestionIndex(-1);
   }, [currentUnit]);
 
   const { data: sessionEntries = [] } = useQuery<Entry[]>({
@@ -1079,6 +1082,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                               onChange={(e) => {
                                 const val = e.target.value.toUpperCase();
                                 setEditState(s => ({ ...s, wireDetails: val }));
+                                setActiveSuggestionIndex(-1);
                                 if (val.length >= 2) {
                                   const matches = lookupCatalog(val, userParsedCatalog);
                                   setCatalogSuggestions(matches);
@@ -1093,21 +1097,42 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                                   const matches = lookupCatalog(editState.wireDetails, userParsedCatalog);
                                   setCatalogSuggestions(matches);
                                   setShowCatalogSuggestions(matches.length > 0);
+                                  setActiveSuggestionIndex(-1);
                                 }
                               }}
-                              onBlur={() => setTimeout(() => setShowCatalogSuggestions(false), 200)}
+                              onBlur={() => setTimeout(() => { setShowCatalogSuggestions(false); setActiveSuggestionIndex(-1); }, 200)}
+                              onKeyDown={(e) => {
+                                if (!showCatalogSuggestions || catalogSuggestions.length === 0) return;
+                                if (e.key === "ArrowDown") {
+                                  e.preventDefault();
+                                  setActiveSuggestionIndex(i => Math.min(i + 1, catalogSuggestions.length - 1));
+                                } else if (e.key === "ArrowUp") {
+                                  e.preventDefault();
+                                  setActiveSuggestionIndex(i => Math.max(i - 1, 0));
+                                } else if (e.key === "Enter") {
+                                  if (activeSuggestionIndex >= 0 && activeSuggestionIndex < catalogSuggestions.length) {
+                                    e.preventDefault();
+                                    applyCatalogMatch(catalogSuggestions[activeSuggestionIndex]);
+                                  }
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  setShowCatalogSuggestions(false);
+                                  setActiveSuggestionIndex(-1);
+                                }
+                              }}
                               className="uppercase"
                               autoComplete="off"
                               data-testid={`input-wire-details-${pin.id}`}
                             />
                             {showCatalogSuggestions && catalogSuggestions.length > 0 && (
                               <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="catalog-suggestions-desktop">
-                                {catalogSuggestions.map((s) => (
+                                {catalogSuggestions.map((s, idx) => (
                                   <button
                                     key={s.catalog}
                                     type="button"
-                                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                                    className={`w-full text-left px-3 py-2 text-sm border-b border-border/30 last:border-0 ${idx === activeSuggestionIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent hover:text-accent-foreground"}`}
                                     onMouseDown={(e) => { e.preventDefault(); applyCatalogMatch(s); }}
+                                    onMouseEnter={() => setActiveSuggestionIndex(idx)}
                                     data-testid={`suggestion-desktop-${s.catalog}`}
                                   >
                                     <span className="font-mono font-semibold">{s.catalog}</span>
@@ -1330,6 +1355,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                               onChange={(e) => {
                                 const val = e.target.value.toUpperCase();
                                 setEditState(s => ({ ...s, wireDetails: val }));
+                                setActiveSuggestionIndex(-1);
                                 if (val.length >= 2) {
                                   const matches = lookupCatalog(val, userParsedCatalog);
                                   setCatalogSuggestions(matches);
@@ -1344,21 +1370,42 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                                   const matches = lookupCatalog(editState.wireDetails, userParsedCatalog);
                                   setCatalogSuggestions(matches);
                                   setShowCatalogSuggestions(matches.length > 0);
+                                  setActiveSuggestionIndex(-1);
                                 }
                               }}
-                              onBlur={() => setTimeout(() => setShowCatalogSuggestions(false), 200)}
+                              onBlur={() => setTimeout(() => { setShowCatalogSuggestions(false); setActiveSuggestionIndex(-1); }, 200)}
+                              onKeyDown={(e) => {
+                                if (!showCatalogSuggestions || catalogSuggestions.length === 0) return;
+                                if (e.key === "ArrowDown") {
+                                  e.preventDefault();
+                                  setActiveSuggestionIndex(i => Math.min(i + 1, catalogSuggestions.length - 1));
+                                } else if (e.key === "ArrowUp") {
+                                  e.preventDefault();
+                                  setActiveSuggestionIndex(i => Math.max(i - 1, 0));
+                                } else if (e.key === "Enter") {
+                                  if (activeSuggestionIndex >= 0 && activeSuggestionIndex < catalogSuggestions.length) {
+                                    e.preventDefault();
+                                    applyCatalogMatch(catalogSuggestions[activeSuggestionIndex]);
+                                  }
+                                } else if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  setShowCatalogSuggestions(false);
+                                  setActiveSuggestionIndex(-1);
+                                }
+                              }}
                               className="uppercase"
                               autoComplete="off"
                               data-testid={`input-wire-details-mobile-${pin.id}`}
                             />
                             {showCatalogSuggestions && catalogSuggestions.length > 0 && (
                               <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="catalog-suggestions-mobile">
-                                {catalogSuggestions.map((s) => (
+                                {catalogSuggestions.map((s, idx) => (
                                   <button
                                     key={s.catalog}
                                     type="button"
-                                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                                    className={`w-full text-left px-3 py-2 text-sm border-b border-border/30 last:border-0 ${idx === activeSuggestionIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent hover:text-accent-foreground"}`}
                                     onMouseDown={(e) => { e.preventDefault(); applyCatalogMatch(s); }}
+                                    onMouseEnter={() => setActiveSuggestionIndex(idx)}
                                     data-testid={`suggestion-mobile-${s.catalog}`}
                                   >
                                     <span className="font-mono font-semibold">{s.catalog}</span>
