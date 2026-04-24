@@ -310,13 +310,21 @@ export default function SingleEntryMode({
     lastMatchedCatalog.current = match.catalog;
     setFootageOverride(false);
     const uniqueVendor = getUniqueVendor(match.catalog);
-    setForm(f => ({
-      ...f,
-      reelTag: match.catalog,
-      manufacturer: f.manufacturer || (uniqueVendor ?? ""),
-      footage: match.footage ? (toDisplayUnit(match.footage, currentUnit) * reelCount).toString() : f.footage,
-      conductors: f.conductors || match.conductors || "",
-    }));
+    setForm(f => {
+      const aliasTag = match.aliasLabel ? `Alias: ${match.aliasLabel}` : null;
+      const currentNotes = f.notes || "";
+      const notes = aliasTag && !currentNotes.includes(aliasTag)
+        ? (currentNotes ? `${currentNotes}\n${aliasTag}` : aliasTag)
+        : currentNotes;
+      return {
+        ...f,
+        reelTag: match.catalog,
+        manufacturer: f.manufacturer || (uniqueVendor ?? ""),
+        footage: match.footage ? (toDisplayUnit(match.footage, currentUnit) * reelCount).toString() : f.footage,
+        conductors: f.conductors || match.conductors || "",
+        notes,
+      };
+    });
     setCatalogSuggestions([]);
     setShowCatalogSuggestions(false);
   };

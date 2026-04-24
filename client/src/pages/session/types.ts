@@ -13,6 +13,7 @@ export interface LocalPin {
   footage?: number;
   flagged?: boolean;
   flagReason?: string;
+  aliasUsed?: string;
 }
 
 export interface SessionWithRole extends Session {

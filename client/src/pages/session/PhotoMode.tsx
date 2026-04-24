@@ -787,6 +787,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     }, 1200);
   }, [savePhotoMeta]);
 
+  const appendAliasToPhotoNotes = useCallback((aliasLabel: string, pinLabel: string) => {
+    const tag = `Alias: ${aliasLabel} (pin ${pinLabel})`;
+    setPhotoNotes(prev => {
+      if (prev.includes(tag)) return prev;
+      const updated = prev ? `${prev}\n${tag}` : tag;
+      if (noteSaveTimer.current) clearTimeout(noteSaveTimer.current);
+      noteSaveTimer.current = setTimeout(() => savePhotoMeta(updated), 1200);
+      return updated;
+    });
+  }, [savePhotoMeta]);
+
   const getNextReceivingSection = useCallback(() => {
     const allReceivingPhotos = [
       ...photos.filter(p => (p.aisle || "").toLowerCase() === "receiving"),
@@ -1357,13 +1368,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     updatePinField(pinId, "wireDetails", match.catalog);
     if (!pin.vendorCode && match.vendor) updatePinField(pinId, "vendorCode", match.vendor);
     if (match.footage) updatePinField(pinId, "footage", match.footage);
-  }, [updatePinField, userParsedCatalog]);
+    if (match.aliasLabel) {
+      updatePinField(pinId, "aliasUsed", match.aliasLabel);
+      appendAliasToPhotoNotes(match.aliasLabel, pin.label);
+    }
+  }, [updatePinField, appendAliasToPhotoNotes, userParsedCatalog]);
 
   const clearRow = useCallback((pinId: string) => {
     setLocalPins((prev) =>
       prev.map((p) =>
         p.id === pinId
-          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, reelCount: 1 }
+          ? { ...p, wireDetails: undefined, vendorCode: undefined, footage: undefined, reelCount: 1, aliasUsed: undefined }
           : p
       )
     );
@@ -1421,6 +1436,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           const totalFootage = pin.footage ? pin.footage * pin.reelCount : undefined;
           const noteParts: string[] = [];
           if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
+          if (pin.aliasUsed) noteParts.push(`Alias: ${pin.aliasUsed}`);
           const { entry, queued: entryQueued } = await withRetry(async () => {
             return await createEntryWithOfflineFallback(sessionId, {
               aisle: entryAisle,
@@ -2660,6 +2676,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                     updatePinField(pin.id, "wireDetails", s.catalog);
                                     if (s.vendor) updatePinField(pin.id, "vendorCode", s.vendor);
                                     if (s.footage) updatePinField(pin.id, "footage", s.footage);
+                                    if (s.aliasLabel) {
+                                      updatePinField(pin.id, "aliasUsed", s.aliasLabel);
+                                      appendAliasToPhotoNotes(s.aliasLabel, pin.label);
+                                    }
                                     setActiveSuggestionPin(null);
                                     setSuggestions([]);
                                     setSuggestionIndex(-1);
@@ -2709,6 +2729,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                       updatePinField(pin.id, "wireDetails", s.catalog);
                                       if (s.vendor) updatePinField(pin.id, "vendorCode", s.vendor);
                                       if (s.footage) updatePinField(pin.id, "footage", s.footage);
+                                      if (s.aliasLabel) {
+                                        updatePinField(pin.id, "aliasUsed", s.aliasLabel);
+                                        appendAliasToPhotoNotes(s.aliasLabel, pin.label);
+                                      }
                                       setActiveSuggestionPin(null);
                                       setSuggestions([]);
                                       setSuggestionIndex(-1);
