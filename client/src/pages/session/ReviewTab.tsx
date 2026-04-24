@@ -907,12 +907,12 @@ export default function ReviewTab({
               return (
                 <div className="flex items-baseline gap-3 flex-wrap justify-center" data-testid="text-review-catalog">
                   {catalogCode && (
-                    <span className="text-xl font-bold text-[hsl(18_85%_55%)] leading-tight font-mono">
+                    <span className="text-[22px] font-bold text-black leading-tight font-mono">
                       {catalogCode}
                     </span>
                   )}
                   {vendorCode && (
-                    <span className="text-base font-semibold text-[hsl(200_70%_55%)]">
+                    <span className="text-[18px] font-bold text-black">
                       {vendorCode}
                     </span>
                   )}
