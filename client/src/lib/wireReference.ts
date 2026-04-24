@@ -1108,7 +1108,7 @@ export function lookupCatalog(query: string, userCatalog?: ParsedCatalogEntry[])
       const prefA = commonPrefixLen(a.alias, upper);
       const prefB = commonPrefixLen(b.alias, upper);
       if (prefB !== prefA) return prefB - prefA;
-      return a.alias < b.alias ? -1 : a.alias > b.alias ? 1 : 0;
+      return a.catalog < b.catalog ? -1 : a.catalog > b.catalog ? 1 : 0;
     })
     .flatMap(a => {
       const real = combined.find(e => e.catalog === a.catalog && e.vendor === a.vendor);
@@ -1122,7 +1122,7 @@ export function lookupCatalog(query: string, userCatalog?: ParsedCatalogEntry[])
       const posB = b.alias.indexOf(upper);
       if (posA !== posB) return posA - posB;
       if (a.alias.length !== b.alias.length) return a.alias.length - b.alias.length;
-      return a.alias < b.alias ? -1 : a.alias > b.alias ? 1 : 0;
+      return a.catalog < b.catalog ? -1 : a.catalog > b.catalog ? 1 : 0;
     })
     .flatMap(a => {
       const real = combined.find(e => e.catalog === a.catalog && e.vendor === a.vendor);
