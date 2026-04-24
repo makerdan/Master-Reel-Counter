@@ -316,6 +316,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewPan, setPreviewPan] = useState({ x: 0, y: 0 });
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const previewImgRef = useRef<HTMLImageElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 });
   const [dupsOpen, setDupsOpen] = useState(true);
@@ -1797,9 +1798,10 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
               if (!isDragging.current) return;
               const dx = e.clientX - dragStart.current.mouseX;
               const dy = e.clientY - dragStart.current.mouseY;
-              const rect = previewContainerRef.current?.getBoundingClientRect();
-              const maxX = rect ? (rect.width * (previewZoom - 1)) / 2 : 400;
-              const maxY = rect ? (rect.height * (previewZoom - 1)) / 2 : 300;
+              const imgRect = previewImgRef.current?.getBoundingClientRect();
+              const containerRect = previewContainerRef.current?.getBoundingClientRect();
+              const maxX = imgRect && containerRect ? Math.max(0, (imgRect.width - containerRect.width) / 2) : 0;
+              const maxY = imgRect && containerRect ? Math.max(0, (imgRect.height - containerRect.height) / 2) : 0;
               setPreviewPan({
                 x: Math.max(-maxX, Math.min(maxX, dragStart.current.panX + dx)),
                 y: Math.max(-maxY, Math.min(maxY, dragStart.current.panY + dy)),
@@ -1817,9 +1819,10 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
               e.preventDefault();
               const dx = e.touches[0].clientX - dragStart.current.mouseX;
               const dy = e.touches[0].clientY - dragStart.current.mouseY;
-              const rect = previewContainerRef.current?.getBoundingClientRect();
-              const maxX = rect ? (rect.width * (previewZoom - 1)) / 2 : 400;
-              const maxY = rect ? (rect.height * (previewZoom - 1)) / 2 : 300;
+              const imgRect = previewImgRef.current?.getBoundingClientRect();
+              const containerRect = previewContainerRef.current?.getBoundingClientRect();
+              const maxX = imgRect && containerRect ? Math.max(0, (imgRect.width - containerRect.width) / 2) : 0;
+              const maxY = imgRect && containerRect ? Math.max(0, (imgRect.height - containerRect.height) / 2) : 0;
               setPreviewPan({
                 x: Math.max(-maxX, Math.min(maxX, dragStart.current.panX + dx)),
                 y: Math.max(-maxY, Math.min(maxY, dragStart.current.panY + dy)),
@@ -1829,6 +1832,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
             style={{ cursor: previewZoom > 1 ? "grab" : "default", touchAction: previewZoom > 1 ? "none" : "auto" }}
           >
             <img
+              ref={previewImgRef}
               src={previewPhotoUrl}
               alt="Detail photo"
               className="w-full h-auto select-none"
@@ -1859,6 +1863,16 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                 onClick={() => {
                   const next = Math.min(5, parseFloat((previewZoom + 0.5).toFixed(1)));
                   setPreviewZoom(next);
+                  const img = previewImgRef.current;
+                  const container = previewContainerRef.current;
+                  if (img && container) {
+                    const maxX = Math.max(0, (img.offsetWidth * next - container.offsetWidth) / 2);
+                    const maxY = Math.max(0, (img.offsetHeight * next - container.offsetHeight) / 2);
+                    setPreviewPan(p => ({
+                      x: Math.max(-maxX, Math.min(maxX, p.x)),
+                      y: Math.max(-maxY, Math.min(maxY, p.y)),
+                    }));
+                  }
                 }}
                 disabled={previewZoom >= 5}
                 data-testid="button-zoom-in"
@@ -1872,7 +1886,20 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                 onClick={() => {
                   const next = Math.max(1, parseFloat((previewZoom - 0.5).toFixed(1)));
                   setPreviewZoom(next);
-                  if (next <= 1) setPreviewPan({ x: 0, y: 0 });
+                  if (next <= 1) {
+                    setPreviewPan({ x: 0, y: 0 });
+                  } else {
+                    const img = previewImgRef.current;
+                    const container = previewContainerRef.current;
+                    if (img && container) {
+                      const maxX = Math.max(0, (img.offsetWidth * next - container.offsetWidth) / 2);
+                      const maxY = Math.max(0, (img.offsetHeight * next - container.offsetHeight) / 2);
+                      setPreviewPan(p => ({
+                        x: Math.max(-maxX, Math.min(maxX, p.x)),
+                        y: Math.max(-maxY, Math.min(maxY, p.y)),
+                      }));
+                    }
+                  }
                 }}
                 disabled={previewZoom <= 1}
                 data-testid="button-zoom-out"
