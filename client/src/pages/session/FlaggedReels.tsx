@@ -313,6 +313,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
   const [reviewEditState, setReviewEditState] = useState<EditingState>({ wireDetails: "", vendorCode: "", footage: "", notes: "", flagReason: "", reelCount: "1" });
   const [reviewCatalogSuggestions, setReviewCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [showReviewCatalogSuggestions, setShowReviewCatalogSuggestions] = useState(false);
+  const [activeReviewSuggestionIndex, setActiveReviewSuggestionIndex] = useState(-1);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [previewPan, setPreviewPan] = useState({ x: 0, y: 0 });
@@ -539,6 +540,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
     });
     setReviewCatalogSuggestions([]);
     setShowReviewCatalogSuggestions(false);
+    setActiveReviewSuggestionIndex(-1);
   }, [currentUnit]);
 
   const applyReviewCatalogMatch = useCallback((match: ParsedCatalogEntry) => {
@@ -554,6 +556,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
     });
     setReviewCatalogSuggestions([]);
     setShowReviewCatalogSuggestions(false);
+    setActiveReviewSuggestionIndex(-1);
   }, [currentUnit]);
 
   const saveReviewEntryMutation = useMutation({
@@ -1701,9 +1704,11 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                               const matches = lookupCatalog(val, userParsedCatalog);
                               setReviewCatalogSuggestions(matches);
                               setShowReviewCatalogSuggestions(matches.length > 0);
+                              setActiveReviewSuggestionIndex(-1);
                             } else {
                               setReviewCatalogSuggestions([]);
                               setShowReviewCatalogSuggestions(false);
+                              setActiveReviewSuggestionIndex(-1);
                             }
                           }}
                           onFocus={() => {
@@ -1713,19 +1718,39 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                               setShowReviewCatalogSuggestions(matches.length > 0);
                             }
                           }}
-                          onBlur={() => setTimeout(() => setShowReviewCatalogSuggestions(false), 200)}
+                          onBlur={() => setTimeout(() => { setShowReviewCatalogSuggestions(false); setActiveReviewSuggestionIndex(-1); }, 200)}
+                          onKeyDown={(e) => {
+                            if (!showReviewCatalogSuggestions || reviewCatalogSuggestions.length === 0) return;
+                            if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              setActiveReviewSuggestionIndex(i => Math.min(i + 1, reviewCatalogSuggestions.length - 1));
+                            } else if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              setActiveReviewSuggestionIndex(i => Math.max(i - 1, 0));
+                            } else if (e.key === "Enter") {
+                              if (activeReviewSuggestionIndex >= 0 && activeReviewSuggestionIndex < reviewCatalogSuggestions.length) {
+                                e.preventDefault();
+                                applyReviewCatalogMatch(reviewCatalogSuggestions[activeReviewSuggestionIndex]);
+                              }
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setShowReviewCatalogSuggestions(false);
+                              setActiveReviewSuggestionIndex(-1);
+                            }
+                          }}
                           className="uppercase"
                           autoComplete="off"
                           data-testid={`input-review-wire-details-${entry!.id}`}
                         />
                         {showReviewCatalogSuggestions && reviewCatalogSuggestions.length > 0 && (
                           <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto" data-testid="review-catalog-suggestions">
-                            {reviewCatalogSuggestions.map((s) => (
+                            {reviewCatalogSuggestions.map((s, idx) => (
                               <button
                                 key={s.catalog}
                                 type="button"
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border/30 last:border-0"
+                                className={`w-full text-left px-3 py-2 text-sm border-b border-border/30 last:border-0 ${idx === activeReviewSuggestionIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent hover:text-accent-foreground"}`}
                                 onMouseDown={(e) => { e.preventDefault(); applyReviewCatalogMatch(s); }}
+                                onMouseEnter={() => setActiveReviewSuggestionIndex(idx)}
                                 data-testid={`review-suggestion-${s.catalog}`}
                               >
                                 <span className="font-mono font-semibold">{s.catalog}</span>
