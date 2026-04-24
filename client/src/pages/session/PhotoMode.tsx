@@ -667,10 +667,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, [undoRedoSignal, currentPhoto?.dbId]);
 
   useEffect(() => {
-    if (localPins.length > 0 && currentPhoto && onDraftPinsHint) {
+    if (currentPhoto && onDraftPinsHint) {
       onDraftPinsHint(currentPhoto.aisle || "—", currentPhoto.section || "—");
     }
-  }, [localPins.length, currentPhoto?.aisle, currentPhoto?.section, onDraftPinsHint]);
+  }, [currentPhoto?.aisle, currentPhoto?.section, onDraftPinsHint]);
 
   // Preload images and prefetch pins for adjacent photos to eliminate navigation lag
   useEffect(() => {

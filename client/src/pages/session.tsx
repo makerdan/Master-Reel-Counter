@@ -295,7 +295,6 @@ function SessionWorkspace({
 
   const { pushUndo, clearHistory, undo, redo, canUndo, canRedo, undoPendingSync, redoPendingSync } = useUndoRedo(sessionId);
   const [undoRedoSignal, setUndoRedoSignal] = useState(0);
-  const [tableExpandKey, setTableExpandKey] = useState<string | null>(null);
   const [exclusiveExpandKey, setExclusiveExpandKey] = useState<string | undefined>(undefined);
   const undoWithSignal = useCallback(async () => { await undo(); setUndoRedoSignal(s => s + 1); }, [undo]);
   const redoWithSignal = useCallback(async () => { await redo(); setUndoRedoSignal(s => s + 1); }, [redo]);
@@ -935,7 +934,7 @@ function SessionWorkspace({
                     <button className="underline text-muted-foreground" onClick={() => window.location.reload()} data-testid="button-photo-mode-reload">Reload page</button>
                   </div>
                 }>
-                  <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setTableExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} onJumpToStripPhoto={(photoId) => { setStripScrollToPhotoId(photoId); setMode("strip"); }} flushRef={photoModeFlushRef} onScanApplied={(sectionKey) => { setExclusiveExpandKey(sectionKey); }} />
+                  <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setExclusiveExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} onJumpToStripPhoto={(photoId) => { setStripScrollToPhotoId(photoId); setMode("strip"); }} flushRef={photoModeFlushRef} onScanApplied={(sectionKey) => { setExclusiveExpandKey(sectionKey); }} />
                 </ErrorBoundary>
               </TabsContent>
 
@@ -1027,7 +1026,6 @@ function SessionWorkspace({
                 currentUnit={currentUnit}
                 onUndoableDelete={pushUndo}
                 canEdit={canEditSession}
-                forceExpandKey={tableExpandKey ?? undefined}
                 exclusiveExpandKey={exclusiveExpandKey}
                 onJumpToPin={(photoId, pinId) => {
                   setNavigateToPhotoId(photoId);
