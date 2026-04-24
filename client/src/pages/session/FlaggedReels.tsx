@@ -1807,7 +1807,26 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
             }}
             onMouseUp={() => { isDragging.current = false; }}
             onMouseLeave={() => { isDragging.current = false; }}
-            style={{ cursor: previewZoom > 1 ? "grab" : "default" }}
+            onTouchStart={(e) => {
+              if (previewZoom <= 1 || e.touches.length !== 1) return;
+              isDragging.current = true;
+              dragStart.current = { mouseX: e.touches[0].clientX, mouseY: e.touches[0].clientY, panX: previewPan.x, panY: previewPan.y };
+            }}
+            onTouchMove={(e) => {
+              if (!isDragging.current || e.touches.length !== 1) return;
+              e.preventDefault();
+              const dx = e.touches[0].clientX - dragStart.current.mouseX;
+              const dy = e.touches[0].clientY - dragStart.current.mouseY;
+              const rect = previewContainerRef.current?.getBoundingClientRect();
+              const maxX = rect ? (rect.width * (previewZoom - 1)) / 2 : 400;
+              const maxY = rect ? (rect.height * (previewZoom - 1)) / 2 : 300;
+              setPreviewPan({
+                x: Math.max(-maxX, Math.min(maxX, dragStart.current.panX + dx)),
+                y: Math.max(-maxY, Math.min(maxY, dragStart.current.panY + dy)),
+              });
+            }}
+            onTouchEnd={() => { isDragging.current = false; }}
+            style={{ cursor: previewZoom > 1 ? "grab" : "default", touchAction: previewZoom > 1 ? "none" : "auto" }}
           >
             <img
               src={previewPhotoUrl}
