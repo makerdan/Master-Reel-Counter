@@ -77,37 +77,10 @@ export default function ReelCropPreview({
     canvas.height = D;
     ctx.clearRect(0, 0, D, D);
 
-    const pinImgX = (pinX / 100) * img.width;
-    const pinImgY = (pinY / 100) * img.height;
-    const pinDisplayX = ((pinImgX - sx) / cropW) * D - D / 2;
-    const pinDisplayY = ((pinImgY - sy) / cropH) * D - D / 2;
-    const markerRadius = 28;
-
     ctx.save();
     ctx.translate(D / 2, D / 2);
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.drawImage(img, sx, sy, cropW, cropH, -D / 2, -D / 2, D, D);
-
-    ctx.save();
-    ctx.translate(pinDisplayX, pinDisplayY);
-    ctx.lineWidth = 8;
-    ctx.strokeStyle = "#f97316";
-    ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    ctx.arc(0, 0, markerRadius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(0, 0, markerRadius + 7, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = "#f97316";
-    ctx.beginPath();
-    ctx.arc(0, 0, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
     ctx.restore();
   }, [pinX, pinY, zoomLevel, rotation]);
 
