@@ -39,7 +39,18 @@ export interface ParsedCatalogEntry extends CatalogEntry {
   color?: string;
   footage?: number;
   conductors?: string;
+  aliasLabel?: string;
 }
+
+export interface CatalogAlias {
+  alias: string;
+  catalog: string;
+  vendor: string;
+}
+
+export const CATALOG_ALIASES: CatalogAlias[] = [
+  { alias: "25001XHHWALOR", catalog: "XHHW250OR1000", vendor: "ALU" },
+];
 
 export function parseCatalogEntry(entry: CatalogEntry): ParsedCatalogEntry {
   const desc = entry.description;
@@ -1062,16 +1073,25 @@ export function lookupCatalog(query: string, userCatalog?: ParsedCatalogEntry[])
     ? [...userCatalog, ...PARSED_CATALOG]
     : PARSED_CATALOG;
 
+  const aliasMatches = CATALOG_ALIASES.filter(a =>
+    a.alias.startsWith(upper) || a.alias.includes(upper)
+  );
+  const aliasEntries: ParsedCatalogEntry[] = aliasMatches.flatMap(a => {
+    const real = combined.find(e => e.catalog === a.catalog && e.vendor === a.vendor);
+    if (!real) return [];
+    return [{ ...real, aliasLabel: a.alias }];
+  });
+
   const exact = combined.filter(e => e.catalog === upper);
-  if (exact.length > 0) return dedup(exact);
+  if (exact.length > 0) return dedup([...aliasEntries, ...exact]);
 
   const prefix = combined.filter(e => e.catalog.startsWith(upper));
-  if (prefix.length > 0) return dedup(prefix).slice(0, 15);
+  if (prefix.length > 0) return dedup([...aliasEntries, ...prefix]).slice(0, 15);
 
   const contains = combined.filter(e =>
     e.catalog.includes(upper) || e.description.toUpperCase().includes(upper)
   );
-  return dedup(contains).slice(0, 15);
+  return dedup([...aliasEntries, ...contains]).slice(0, 15);
 }
 
 export function userWireCatalogToParsedEntry(cat: {

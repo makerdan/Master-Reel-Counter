@@ -1348,7 +1348,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const normalized = pin.wireDetails.toUpperCase().replace(/[^A-Z0-9]/g, "");
     const matches = lookupCatalog(pin.wireDetails, userParsedCatalog);
     if (matches.length === 0) return;
-    const exactMatch = matches.find(m => m.catalog === normalized);
+    const exactMatch = matches.find(m => m.catalog === normalized || m.aliasLabel === normalized);
     const match = exactMatch || (matches.length === 1 ? matches[0] : null);
     if (!match) {
       toast({ title: "Ambiguous catalog entry", description: "Multiple matches found — select one from the dropdown.", variant: "destructive" });
@@ -2647,7 +2647,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                     // exact normalized match first, then sole candidate, else ambiguous.
                                     const typed = (e.currentTarget as HTMLInputElement).value;
                                     const normalized = typed.toUpperCase().replace(/[^A-Z0-9]/g, "");
-                                    const exact = suggestions.find(m => m.catalog === normalized);
+                                    const exact = suggestions.find(m => m.catalog === normalized || m.aliasLabel === normalized);
                                     if (exact) {
                                       s = exact;
                                     } else if (suggestions.length === 1) {
@@ -2718,9 +2718,20 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                     }}
                                     data-testid={`suggestion-${s.catalog}`}
                                   >
-                                    <span className="font-mono font-semibold">{s.catalog}</span>
-                                    <span className="text-muted-foreground ml-2">{s.description}</span>
-                                    {s.footage && <span className="text-muted-foreground ml-1">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
+                                    {s.aliasLabel ? (
+                                      <>
+                                        <span className="font-mono font-semibold">{s.aliasLabel}</span>
+                                        <span className="text-muted-foreground mx-1">→</span>
+                                        <span className="font-mono">{s.catalog}</span>
+                                        <span className="text-muted-foreground ml-1">({s.vendor})</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="font-mono font-semibold">{s.catalog}</span>
+                                        <span className="text-muted-foreground ml-2">{s.description}</span>
+                                        {s.footage && <span className="text-muted-foreground ml-1">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
+                                      </>
+                                    )}
                                   </button>
                                 ))}
                               </div>

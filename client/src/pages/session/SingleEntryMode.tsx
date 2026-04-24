@@ -174,7 +174,7 @@ export default function SingleEntryMode({
     if (!reelTag || reelTag.length < 2) return null;
     const matches = lookupCatalog(reelTag, userParsedCatalog);
     const normalized = reelTag.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const exact = matches.find(m => m.catalog === normalized);
+    const exact = matches.find(m => m.catalog === normalized || m.aliasLabel === normalized);
     return exact || (matches.length === 1 ? matches[0] : null);
   };
 
@@ -592,9 +592,20 @@ export default function SingleEntryMode({
                   }}
                   data-testid={`suggestion-${s.catalog}`}
                 >
-                  <span className="font-mono font-semibold">{s.catalog}</span>
-                  <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
-                  {s.footage && <span className="text-orange-500 ml-1 text-xs">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
+                  {s.aliasLabel ? (
+                    <>
+                      <span className="font-mono font-semibold">{s.aliasLabel}</span>
+                      <span className="text-muted-foreground mx-1 text-xs">→</span>
+                      <span className="font-mono text-xs">{s.catalog}</span>
+                      <span className="text-muted-foreground ml-1 text-xs">({s.vendor})</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-mono font-semibold">{s.catalog}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{s.description}</span>
+                      {s.footage && <span className="text-orange-500 ml-1 text-xs">({toDisplayUnit(s.footage, currentUnit)}{uLabel})</span>}
+                    </>
+                  )}
                 </button>
               ))}
             </div>
