@@ -1121,6 +1121,7 @@ export function lookupCatalog(query: string, userCatalog?: ParsedCatalogEntry[])
       const posA = a.alias.indexOf(upper);
       const posB = b.alias.indexOf(upper);
       if (posA !== posB) return posA - posB;
+      if (a.alias.length !== b.alias.length) return a.alias.length - b.alias.length;
       return a.alias < b.alias ? -1 : a.alias > b.alias ? 1 : 0;
     })
     .flatMap(a => {
