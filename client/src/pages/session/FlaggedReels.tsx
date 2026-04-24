@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, ScanSearch, ArrowUpDown, CheckCircle2, ImageIcon } from "lucide-react";
+import { Flag, Loader2, MapPin, Eye, X, Check, Share2, Camera, AlertTriangle, Pencil, ChevronDown, ChevronUp, Save, Copy, Trash2, ScanSearch, ArrowUpDown, CheckCircle2, ImageIcon, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -313,6 +313,11 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
   const [reviewCatalogSuggestions, setReviewCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [showReviewCatalogSuggestions, setShowReviewCatalogSuggestions] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewPan, setPreviewPan] = useState({ x: 0, y: 0 });
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 });
   const [dupsOpen, setDupsOpen] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
   const toggleSection = useCallback((photoId: number) => {
@@ -332,6 +337,12 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
   useEffect(() => {
     setLocalDismissed(new Set());
   }, [dismissedKeysFromDb]);
+
+  useEffect(() => {
+    setPreviewZoom(1);
+    setPreviewPan({ x: 0, y: 0 });
+    isDragging.current = false;
+  }, [previewPhotoUrl]);
 
   const disregardedKeys = useMemo(() => {
     const merged = new Set(dismissedKeysFromDb);
@@ -1772,21 +1783,89 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
           onClick={() => setPreviewPhotoUrl(null)}
           data-testid="modal-detail-photo-preview"
         >
-          <div className="relative max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+          <div
+            ref={previewContainerRef}
+            className="relative max-w-3xl w-full max-h-[90vh] overflow-hidden rounded-lg shadow-2xl border border-blue-400 bg-black flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              if (previewZoom <= 1) return;
+              e.preventDefault();
+              isDragging.current = true;
+              dragStart.current = { mouseX: e.clientX, mouseY: e.clientY, panX: previewPan.x, panY: previewPan.y };
+            }}
+            onMouseMove={(e) => {
+              if (!isDragging.current) return;
+              const dx = e.clientX - dragStart.current.mouseX;
+              const dy = e.clientY - dragStart.current.mouseY;
+              const rect = previewContainerRef.current?.getBoundingClientRect();
+              const maxX = rect ? (rect.width * (previewZoom - 1)) / 2 : 400;
+              const maxY = rect ? (rect.height * (previewZoom - 1)) / 2 : 300;
+              setPreviewPan({
+                x: Math.max(-maxX, Math.min(maxX, dragStart.current.panX + dx)),
+                y: Math.max(-maxY, Math.min(maxY, dragStart.current.panY + dy)),
+              });
+            }}
+            onMouseUp={() => { isDragging.current = false; }}
+            onMouseLeave={() => { isDragging.current = false; }}
+            style={{ cursor: previewZoom > 1 ? "grab" : "default" }}
+          >
             <img
               src={previewPhotoUrl}
               alt="Detail photo"
-              className="w-full h-auto rounded-lg shadow-2xl border border-blue-400"
+              className="w-full h-auto select-none"
+              draggable={false}
+              style={{
+                transform: `scale(${previewZoom}) translate(${previewPan.x / previewZoom}px, ${previewPan.y / previewZoom}px)`,
+                transformOrigin: "center center",
+                transition: isDragging.current ? "none" : "transform 0.15s ease",
+              }}
+              data-testid="img-detail-preview"
             />
+
             <Button
               size="sm"
               variant="secondary"
-              className="absolute top-2 right-2"
+              className="absolute top-2 right-2 z-10"
               onClick={() => setPreviewPhotoUrl(null)}
               data-testid="button-close-detail-preview"
             >
               <X className="h-4 w-4" />
             </Button>
+
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-10">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="w-8 h-8 p-0"
+                onClick={() => {
+                  const next = Math.min(5, parseFloat((previewZoom + 0.5).toFixed(1)));
+                  setPreviewZoom(next);
+                }}
+                disabled={previewZoom >= 5}
+                data-testid="button-zoom-in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="w-8 h-8 p-0"
+                onClick={() => {
+                  const next = Math.max(1, parseFloat((previewZoom - 0.5).toFixed(1)));
+                  setPreviewZoom(next);
+                  if (next <= 1) setPreviewPan({ x: 0, y: 0 });
+                }}
+                disabled={previewZoom <= 1}
+                data-testid="button-zoom-out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              {previewZoom > 1 && (
+                <span className="text-[10px] text-white/70 text-center font-mono leading-none mt-0.5">
+                  {previewZoom.toFixed(1)}×
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
