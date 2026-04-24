@@ -1067,6 +1067,34 @@ function dedup(entries: ParsedCatalogEntry[]): ParsedCatalogEntry[] {
   });
 }
 
+function commonPrefixLen(a: string, b: string): number {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return i;
+}
+
+function sortPrefix(entries: ParsedCatalogEntry[], upper: string): ParsedCatalogEntry[] {
+  return [...entries].sort((a, b) => {
+    const prefA = commonPrefixLen(a.catalog, upper);
+    const prefB = commonPrefixLen(b.catalog, upper);
+    if (prefB !== prefA) return prefB - prefA;
+    if (a.catalog.length !== b.catalog.length) return a.catalog.length - b.catalog.length;
+    return a.catalog < b.catalog ? -1 : a.catalog > b.catalog ? 1 : 0;
+  });
+}
+
+function sortContains(entries: ParsedCatalogEntry[], upper: string): ParsedCatalogEntry[] {
+  return [...entries].sort((a, b) => {
+    const posA = a.catalog.indexOf(upper);
+    const posB = b.catalog.indexOf(upper);
+    const adjPosA = posA === -1 ? 9999 : posA;
+    const adjPosB = posB === -1 ? 9999 : posB;
+    if (adjPosA !== adjPosB) return adjPosA - adjPosB;
+    if (a.catalog.length !== b.catalog.length) return a.catalog.length - b.catalog.length;
+    return a.catalog < b.catalog ? -1 : a.catalog > b.catalog ? 1 : 0;
+  });
+}
+
 export function lookupCatalog(query: string, userCatalog?: ParsedCatalogEntry[]): ParsedCatalogEntry[] {
   if (!query || query.length < 2) return [];
   const upper = query.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -1075,23 +1103,31 @@ export function lookupCatalog(query: string, userCatalog?: ParsedCatalogEntry[])
     ? [...userCatalog, ...PARSED_CATALOG]
     : PARSED_CATALOG;
 
-  const aliasMatches = CATALOG_ALIASES.filter(a =>
-    a.alias.startsWith(upper) || a.alias.includes(upper)
-  );
-  const aliasEntries: ParsedCatalogEntry[] = aliasMatches.flatMap(a => {
+  const aliasPrefix: ParsedCatalogEntry[] = [];
+  const aliasContains: ParsedCatalogEntry[] = [];
+  for (const a of CATALOG_ALIASES) {
+    const isPrefix = a.alias.startsWith(upper);
+    const isContain = !isPrefix && a.alias.includes(upper);
+    if (!isPrefix && !isContain) continue;
     const real = combined.find(e => e.catalog === a.catalog && e.vendor === a.vendor);
-    if (!real) return [];
-    return [{ ...real, aliasLabel: a.alias }];
-  });
+    if (!real) continue;
+    const entry = { ...real, aliasLabel: a.alias };
+    if (isPrefix) aliasPrefix.push(entry);
+    else aliasContains.push(entry);
+  }
+  const sortedAliasPrefix = sortPrefix(aliasPrefix, upper);
+  const sortedAliasContains = sortContains(aliasContains, upper);
+  const aliasEntries = [...sortedAliasPrefix, ...sortedAliasContains];
 
   const exact = combined.filter(e => e.catalog === upper);
   if (exact.length > 0) return dedup([...aliasEntries, ...exact]);
 
-  const prefix = combined.filter(e => e.catalog.startsWith(upper));
+  const prefix = sortPrefix(combined.filter(e => e.catalog.startsWith(upper)), upper);
   if (prefix.length > 0) return dedup([...aliasEntries, ...prefix]).slice(0, 15);
 
-  const contains = combined.filter(e =>
-    e.catalog.includes(upper) || e.description.toUpperCase().includes(upper)
+  const contains = sortContains(
+    combined.filter(e => e.catalog.includes(upper) || e.description.toUpperCase().includes(upper)),
+    upper,
   );
   return dedup([...aliasEntries, ...contains]).slice(0, 15);
 }
