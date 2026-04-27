@@ -631,7 +631,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 ref={aisleInputRef}
                 value={aisle}
                 onChange={(e) => setAisle(e.target.value)}
-                className="border-red-500 text-center text-[5.25rem] font-bold w-full h-[4.5rem] !py-0"
+                className="border-red-500 text-center text-[4rem] font-bold w-full h-[4.5rem] !py-0"
                 disabled={isReceiving}
                 enterKeyHint="next"
                 data-testid="input-mobile-aisle"
@@ -736,7 +736,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 ref={sectionInputRef}
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
-                className={`text-center text-[5.25rem] font-bold w-full h-[4.5rem] !py-0${isReceiving ? "" : " border-red-500"}`}
+                className={`text-center text-[4rem] font-bold w-full h-[4.5rem] !py-0${isReceiving ? "" : " border-red-500"}`}
                 enterKeyHint="done"
                 data-testid="input-mobile-section"
                 onKeyDown={(e) => { if (e.key === "Enter") { sectionInputRef.current?.blur(); } }}
