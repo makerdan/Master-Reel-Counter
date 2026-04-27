@@ -638,7 +638,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <div className="flex gap-1 w-full">
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 h-20 flex-1"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-20 flex-1"
                   data-testid="button-aisle-decrement"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -652,7 +652,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 h-20 flex-1"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-20 flex-1"
                   data-testid="button-aisle-increment"
                   disabled={isReceiving}
                   onPointerDown={(e) => {
@@ -738,7 +738,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
               <div className="flex gap-1 w-full">
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 h-20 flex-1"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-20 flex-1"
                   data-testid="button-section-decrement"
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -751,7 +751,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                 </Button>
                 <Button
                   variant="outline"
-                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 h-20 flex-1"
+                  className="rounded-lg !border-orange-500 dark:!border-orange-400 !p-0 !h-20 flex-1"
                   data-testid="button-section-increment"
                   onPointerDown={(e) => {
                     e.preventDefault();
