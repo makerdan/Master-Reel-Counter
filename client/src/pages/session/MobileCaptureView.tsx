@@ -648,7 +648,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setAisle(String(val).padStart(Math.max(aisle.length, 1), "0"));
                   }}
                 >
-                  <Minus className="h-5 w-5" />
+                  <Minus className="h-10 w-10" strokeWidth={3} />
                 </Button>
                 <Button
                   variant="outline"
@@ -662,7 +662,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setAisle(String(val).padStart(Math.max(aisle.length, 1), "0"));
                   }}
                 >
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-10 w-10" strokeWidth={3} />
                 </Button>
               </div>
               <div className="flex flex-col gap-1 pt-1 w-full">
@@ -747,7 +747,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setSection(String(val).padStart(Math.max(section.length, 1), "0"));
                   }}
                 >
-                  <Minus className="h-5 w-5" />
+                  <Minus className="h-10 w-10" strokeWidth={3} />
                 </Button>
                 <Button
                   variant="outline"
@@ -760,7 +760,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     setSection(String(val).padStart(Math.max(section.length, 1), "0"));
                   }}
                 >
-                  <Plus className="h-5 w-5" />
+                  <Plus className="h-10 w-10" strokeWidth={3} />
                 </Button>
               </div>
             </div>
