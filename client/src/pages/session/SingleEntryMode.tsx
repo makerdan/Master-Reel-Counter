@@ -83,6 +83,7 @@ export default function SingleEntryMode({
   );
   const [receivingChecked, setReceivingChecked] = useState(editingEntry?.aisle?.toLowerCase() === "receiving" || false);
   const [footageOverride, setFootageOverride] = useState(!!editingEntry);
+  const preReceivingSnapshot = useRef<{ aisle: string; section: string } | null>(null);
   const lastMatchedCatalog = useRef<string | null>(null);
   const [catalogSuggestions, setCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [showCatalogSuggestions, setShowCatalogSuggestions] = useState(false);
@@ -516,12 +517,15 @@ export default function SingleEntryMode({
               const checked = !!c;
               setReceivingChecked(checked);
               if (checked) {
+                preReceivingSnapshot.current = { aisle: form.aisle, section: form.section };
                 update("aisle", "Receiving");
                 const nextSection = getNextReceivingSection ? getNextReceivingSection() : "000";
                 update("section", nextSection);
               } else {
-                update("aisle", "");
-                update("section", "");
+                const snap = preReceivingSnapshot.current;
+                preReceivingSnapshot.current = null;
+                update("aisle", snap ? snap.aisle : "");
+                update("section", snap ? snap.section : "");
               }
             }}
             data-testid="checkbox-receiving"

@@ -113,6 +113,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     }
   }, [captureSettings, prefixApplied, initialAisle, aisle]);
 
+  const preReceivingSnapshot = useRef<{ aisle: string; section: string } | null>(null);
+
   const prevOnFloorTextRef = useRef("");
   useEffect(() => {
     if (!onFloorChecked || !prevOnFloorTextRef.current) return;
@@ -671,10 +673,14 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                     checked={isReceiving}
                     onCheckedChange={(checked) => {
                       if (checked) {
+                        preReceivingSnapshot.current = { aisle, section };
                         setAisle("Receiving");
                         setSection("");
                       } else {
-                        setAisle("");
+                        const snap = preReceivingSnapshot.current;
+                        preReceivingSnapshot.current = null;
+                        setAisle(snap ? snap.aisle : "");
+                        setSection(snap ? snap.section : "");
                       }
                     }}
                     className="h-8 w-8 [&_svg]:h-5 [&_svg]:w-5"
