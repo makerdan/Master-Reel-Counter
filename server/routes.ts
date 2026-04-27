@@ -287,16 +287,24 @@ export async function registerRoutes(
     localFallbackPath?: string
   ): Promise<void> => {
     try {
-      const signRes = await fetch(`${SIDECAR_ENDPOINT}/object-storage/signed-object-url`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bucket_name: bucketName,
-          object_name: objectName,
-          method: "PUT",
-          expires_at: new Date(Date.now() + 900_000).toISOString(),
-        }),
-      });
+      const signController = new AbortController();
+      const signTimeoutId = setTimeout(() => signController.abort(), 5000);
+      let signRes: Response;
+      try {
+        signRes = await fetch(`${SIDECAR_ENDPOINT}/object-storage/signed-object-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bucket_name: bucketName,
+            object_name: objectName,
+            method: "PUT",
+            expires_at: new Date(Date.now() + 900_000).toISOString(),
+          }),
+          signal: signController.signal,
+        });
+      } finally {
+        clearTimeout(signTimeoutId);
+      }
       if (!signRes.ok) throw new Error(`Sidecar sign: ${signRes.status}`);
       const { signed_url: signedUrl } = await signRes.json();
       const uploadRes = await fetch(signedUrl, {
@@ -401,7 +409,10 @@ export async function registerRoutes(
       let servedFromGcs = false;
       try {
         const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(`/uploads/${filename}`));
-        const [existsInGcs] = await gcsFile.exists();
+        const [existsInGcs] = await Promise.race([
+          gcsFile.exists(),
+          new Promise<[boolean]>(resolve => setTimeout(() => resolve([false]), 2000)),
+        ]);
         if (existsInGcs) {
           res.set(headers);
           gcsFile.createReadStream().on("error", (err) => { console.error("GCS stream error:", err); if (!res.headersSent) res.status(500).json({ error: "Stream failed" }); }).pipe(res);
@@ -1719,7 +1730,10 @@ export async function registerRoutes(
     const photoFilename = photoKey.startsWith("/uploads/") ? photoKey.slice("/uploads/".length) : photoKey.replace(/^\/objects\/uploads\//, "");
     try {
       const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
-      const [existsInGcs] = await gcsFile.exists();
+      const [existsInGcs] = await Promise.race([
+        gcsFile.exists(),
+        new Promise<[boolean]>(resolve => setTimeout(() => resolve([false]), 2000)),
+      ]);
       if (existsInGcs) {
         const [downloaded] = await gcsFile.download();
         return downloaded;
