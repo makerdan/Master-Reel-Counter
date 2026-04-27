@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Camera, X, Loader2, AlertTriangle, Check,
   ImagePlus, RotateCw, ChevronLeft, Smartphone, Plus, Minus,
-  ListPlus,
+  ListPlus, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,9 +11,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { saveToQueue, removeFromQueue, getQueuedPhotos } from "@/lib/offlineQueue";
+import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos } from "@/lib/offlineQueue";
 import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
 
@@ -79,10 +89,13 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const [onFloorChecked, setOnFloorChecked] = useState(false);
   const [showQuickEntry, setShowQuickEntry] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
   const blobUrlsRef = useRef<Set<string>>(new Set());
   const retryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const activeUploadAbortRef = useRef<AbortController | null>(null);
+  const discardedIdsRef = useRef<Set<string>>(new Set());
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
@@ -248,11 +261,19 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             fileToUpload = nextItem.file;
           }
         }
+        const abortController = new AbortController();
+        activeUploadAbortRef.current = abortController;
+
         const formData = new FormData();
         formData.append("file", fileToUpload);
-        const uploadRes = await fetch("/api/uploads/direct", { method: "POST", body: formData, credentials: "include" });
+        const uploadRes = await fetch("/api/uploads/direct", { method: "POST", body: formData, credentials: "include", signal: abortController.signal });
         if (!uploadRes.ok) throw new Error("Upload failed");
         const uploadResult = await uploadRes.json();
+
+        if (discardedIdsRef.current.has(nextItem.queueId)) {
+          processingRef.current = false;
+          return;
+        }
 
         const photoPayload: Record<string, any> = {
           objectStorageKey: uploadResult.objectPath,
@@ -269,8 +290,13 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           photoPayload.isDetailShot = true;
           photoPayload.parentPhotoId = detailParent;
         }
-        const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, photoPayload);
+        const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, photoPayload, { signal: abortController.signal });
         const savedPhoto = await res.json();
+
+        if (discardedIdsRef.current.has(nextItem.queueId)) {
+          processingRef.current = false;
+          return;
+        }
 
         if (isDetail) {
           if (!mountedRef.current) { processingRef.current = false; return; }
@@ -299,7 +325,10 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
         removeFromQueue(nextItem.queueId).catch(() => {});
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
-      } catch {
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
         if (!mountedRef.current) return;
         const nextRetries = nextItem.retries + 1;
         setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "failed" as const, retries: nextRetries } : q));
@@ -344,6 +373,24 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       return prev.filter(q => q.queueId !== queueId);
     });
     removeFromQueue(queueId).catch(() => {});
+  }, []);
+
+  const handleDiscardAll = useCallback(() => {
+    activeUploadAbortRef.current?.abort();
+    activeUploadAbortRef.current = null;
+    for (const [, timer] of retryTimersRef.current) {
+      clearTimeout(timer);
+    }
+    retryTimersRef.current.clear();
+    setUploadQueue(prev => {
+      for (const item of prev) {
+        discardedIdsRef.current.add(item.queueId);
+        URL.revokeObjectURL(item.blobUrl);
+        blobUrlsRef.current.delete(item.blobUrl);
+      }
+      return [];
+    });
+    clearAllQueuedPhotos().catch(() => {});
   }, []);
 
   const getNextReceivingSection = useCallback(() => {
@@ -822,6 +869,48 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         </CardContent>
       </Card>
       )}
+
+      {uploadQueue.length > 0 && (
+        <div
+          className="fixed right-4 z-50"
+          style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+        >
+          <Button
+            variant="destructive"
+            size="sm"
+            className="shadow-lg opacity-90 hover:opacity-100"
+            onClick={() => setShowDiscardDialog(true)}
+            data-testid="button-discard-all-queued"
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Discard all queued photos
+          </Button>
+        </div>
+      )}
+
+      <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard all queued photos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {uploadQueue.length} queued photo{uploadQueue.length !== 1 ? "s" : ""} — including any that are uploading, waiting to retry, or have failed. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-discard-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                handleDiscardAll();
+                setShowDiscardDialog(false);
+              }}
+              data-testid="button-discard-confirm"
+            >
+              Discard all
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

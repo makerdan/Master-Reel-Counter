@@ -159,3 +159,13 @@ export async function getPendingCount(): Promise<number> {
   const entries = await getQueuedEntries();
   return photos.length + entries.length;
 }
+
+export async function clearAllQueuedPhotos(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PHOTO_STORE, "readwrite");
+    tx.objectStore(PHOTO_STORE).clear();
+    tx.oncomplete = () => { resolve(); notifyQueueChange(); };
+    tx.onerror = () => reject(tx.error);
+  });
+}
