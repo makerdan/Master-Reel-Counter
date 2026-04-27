@@ -2406,7 +2406,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Photo?</AlertDialogTitle>
-                      <AlertDialogDescription>This photo and all its pins will be permanently removed.</AlertDialogDescription>
+                      <AlertDialogDescription>This photo and all its pins will be removed. You can undo this action afterward.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -2415,7 +2415,15 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                           const photoDbId = currentPhoto?.dbId;
                           if (!photoDbId) return;
                           try {
-                            await apiRequest("DELETE", `/api/photos/${photoDbId}`);
+                            await flushSavePins();
+                            const photoRecord = photos.find(p => p.id === photoDbId);
+                            const capturedPins = [...localPins];
+                            const pinnedEntryIds = capturedPins.filter((p: any) => p.entryId).map((p: any) => p.entryId!);
+                            const cachedEntries: any[] = queryClient.getQueryData<any[]>(["/api/sessions", sessionId.toString(), "entries"]) ?? [];
+                            const capturedEntries = cachedEntries.filter(
+                              (e: any) => pinnedEntryIds.includes(e.id) || e.photoId === photoDbId
+                            );
+                            await apiRequest("DELETE", `/api/photos/${photoDbId}?keepFile=1`);
                             setUploadedPhotos(prev => {
                               const filtered = prev.filter((_, i) => i !== currentPhotoIdx);
                               const newIdx = Math.min(currentPhotoIdx, Math.max(0, filtered.length - 1));
@@ -2430,7 +2438,18 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
                             queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
-                            onClearUndoHistory?.();
+                            if (onPushUndo && photoRecord) {
+                              const { id, createdAt, ...photoData } = photoRecord as any;
+                              onPushUndo({
+                                type: "delete-photo",
+                                sessionId,
+                                entityId: photoDbId,
+                                data: photoData,
+                                previousData: { ...photoData, pins: capturedPins, entries: capturedEntries },
+                              });
+                            } else {
+                              onClearUndoHistory?.();
+                            }
                             toast({ title: "Photo deleted" });
                           } catch {
                             toast({ title: "Failed to delete photo", variant: "destructive" });

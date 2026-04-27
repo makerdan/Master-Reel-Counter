@@ -388,7 +388,6 @@ function PhotoCard({
       invalidateEntries();
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
-      onClearUndoHistory?.();
       if (onPushUndo) {
         onPushUndo({
           type: "delete-photo",
@@ -397,6 +396,8 @@ function PhotoCard({
           data: photoData,
           previousData: { ...photoData, pins: capturedPins, entries: capturedEntries },
         });
+      } else {
+        onClearUndoHistory?.();
       }
       toast({ title: "Photo deleted" });
     },
