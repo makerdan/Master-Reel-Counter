@@ -152,6 +152,14 @@ app.get("/api/health", async (_req, res) => {
     }, 30_000);
     hardTimeout.unref();
 
+    // Exit immediately if no tasks are running at shutdown time.
+    if (taskTracker.count() === 0) {
+      clearTimeout(hardTimeout);
+      log("No active tasks — exiting cleanly", "shutdown");
+      process.exit(0);
+    }
+
+    log(`Waiting for ${taskTracker.count()} active task(s)...`, "shutdown");
     const poll = setInterval(() => {
       const active = taskTracker.count();
       if (active === 0) {
