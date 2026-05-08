@@ -1653,7 +1653,7 @@ export default function LabelScannerTab({
             <Button
               size="sm"
               onClick={handleAnalyze}
-              disabled={analyzing || !includedCards.length || !canEdit}
+              disabled={analyzing || serverScanRunning || !includedCards.length || !canEdit}
               className="gap-2 bg-[hsl(18_85%_32%)] hover:bg-[hsl(18_85%_38%)] text-white"
               data-testid="btn-analyze-labels"
             >
@@ -2345,7 +2345,7 @@ export default function LabelScannerTab({
             <Button
               size="sm"
               onClick={handleAnalyze}
-              disabled={analyzing || !includedCards.length || !canEdit}
+              disabled={analyzing || serverScanRunning || !includedCards.length || !canEdit}
               className="gap-2 bg-[hsl(18_85%_32%)] hover:bg-[hsl(18_85%_38%)] text-white"
               data-testid="btn-analyze-labels-bottom"
             >
