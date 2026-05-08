@@ -25,6 +25,7 @@ import { PassThrough } from "stream";
 import { cropPhoto } from "./lib/cropPhoto";
 import ExcelJS from "exceljs";
 import { openai } from "./replit_integrations/image/client";
+import { taskTracker } from "./lib/taskTracker";
 
 function formatPinLabel(label: string): string {
   if (/^\d+$/.test(label)) {
@@ -1743,6 +1744,7 @@ export async function registerRoutes(
   }
 
   app.post("/api/photos/:photoId/analyze-labels", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
+    taskTracker.increment();
     try {
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
@@ -1859,10 +1861,13 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error analyzing labels:", error);
       res.status(500).json({ message: "Failed to analyze labels" });
+    } finally {
+      taskTracker.decrement();
     }
   });
 
   app.post("/api/sessions/:sessionId/analyze-labels", isAuthenticated, async (req: any, res) => {
+    taskTracker.increment();
     try {
       const sessionId = parseInt(req.params.sessionId);
       const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
@@ -2010,6 +2015,8 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error analyzing session labels:", error);
       res.status(500).json({ message: "Failed to analyze labels" });
+    } finally {
+      taskTracker.decrement();
     }
   });
 
@@ -2528,6 +2535,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
+    taskTracker.increment();
     try {
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
@@ -4177,6 +4185,8 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error generating PDF:", error);
       if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
+    } finally {
+      taskTracker.decrement();
     }
   });
 
@@ -4198,6 +4208,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/sessions/:id/export/excel", isAuthenticated, async (req: any, res) => {
+    taskTracker.increment();
     try {
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
@@ -4726,6 +4737,8 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error generating Excel:", error);
       if (!res.headersSent) res.status(500).json({ message: "Failed to generate Excel report" });
+    } finally {
+      taskTracker.decrement();
     }
   });
 

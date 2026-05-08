@@ -3,9 +3,14 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { taskTracker } from "./lib/taskTracker";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 const app = express();
 const httpServer = createServer(app);
+
+let shuttingDown = false;
 
 declare module "http" {
   interface IncomingMessage {
@@ -78,6 +83,22 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use("/api", (req, res, next) => {
+  if (shuttingDown && req.path !== "/health") {
+    return res.status(503).json({ message: "Server is shutting down, please retry shortly." });
+  }
+  next();
+});
+
+app.get("/api/health", async (_req, res) => {
+  try {
+    await db.execute(sql`SELECT 1`);
+    res.json({ status: "ok", db: "ok", activeTasks: taskTracker.count() });
+  } catch {
+    res.status(503).json({ status: "degraded", db: "error", activeTasks: taskTracker.count() });
+  }
+});
+
 (async () => {
   await registerRoutes(httpServer, app);
 
@@ -119,4 +140,28 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
     },
   );
+
+  process.on("SIGTERM", () => {
+    log("SIGTERM received — draining active tasks before exit", "shutdown");
+    shuttingDown = true;
+    httpServer.close();
+
+    const hardTimeout = setTimeout(() => {
+      log("Drain timeout reached (30 s) — forcing exit", "shutdown");
+      process.exit(1);
+    }, 30_000);
+    hardTimeout.unref();
+
+    const poll = setInterval(() => {
+      const active = taskTracker.count();
+      if (active === 0) {
+        clearInterval(poll);
+        clearTimeout(hardTimeout);
+        log("All tasks complete — exiting cleanly", "shutdown");
+        process.exit(0);
+      } else {
+        log(`Waiting for ${active} active task(s)...`, "shutdown");
+      }
+    }, 500);
+  });
 })();
