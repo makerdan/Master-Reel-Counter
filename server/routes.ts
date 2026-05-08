@@ -1745,6 +1745,7 @@ export async function registerRoutes(
 
   app.post("/api/photos/:photoId/analyze-labels", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
     taskTracker.increment();
+    let _sid: number | null = null;
     try {
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
@@ -1752,6 +1753,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to analyze labels" });
+      _sid = photo.sessionId;
+      taskTracker.startSession(_sid, "scan");
 
       const { pins: pinData } = req.body;
       if (!Array.isArray(pinData) || pinData.length === 0) {
@@ -1863,11 +1866,14 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to analyze labels" });
     } finally {
       taskTracker.decrement();
+      if (_sid !== null) taskTracker.endSession(_sid, "scan");
     }
   });
 
   app.post("/api/sessions/:sessionId/analyze-labels", isAuthenticated, async (req: any, res) => {
+    const _sid = parseInt(req.params.sessionId);
     taskTracker.increment();
+    taskTracker.startSession(_sid, "scan");
     try {
       const sessionId = parseInt(req.params.sessionId);
       const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
@@ -2017,6 +2023,7 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to analyze labels" });
     } finally {
       taskTracker.decrement();
+      taskTracker.endSession(_sid, "scan");
     }
   });
 
@@ -2534,8 +2541,22 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sessions/:id/active-tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const userId = resolveUserId(req);
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      res.json(taskTracker.getSessionTasks(sessionId));
+    } catch {
+      res.status(500).json({ message: "Failed to get active tasks" });
+    }
+  });
+
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
+    const _sid = parseInt(req.params.id);
     taskTracker.increment();
+    taskTracker.startSession(_sid, "pdf");
     try {
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
@@ -4187,6 +4208,7 @@ export async function registerRoutes(
       if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
     } finally {
       taskTracker.decrement();
+      taskTracker.endSession(_sid, "pdf");
     }
   });
 
@@ -4208,7 +4230,9 @@ export async function registerRoutes(
   });
 
   app.get("/api/sessions/:id/export/excel", isAuthenticated, async (req: any, res) => {
+    const _sid = parseInt(req.params.id);
     taskTracker.increment();
+    taskTracker.startSession(_sid, "excel");
     try {
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
@@ -4739,6 +4763,7 @@ export async function registerRoutes(
       if (!res.headersSent) res.status(500).json({ message: "Failed to generate Excel report" });
     } finally {
       taskTracker.decrement();
+      taskTracker.endSession(_sid, "excel");
     }
   });
 

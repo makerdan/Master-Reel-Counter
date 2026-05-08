@@ -305,6 +305,12 @@ function SessionWorkspace({
   });
   const pinByEntryId = new Map(sessionPins.filter(p => p.entryId).map(p => [p.entryId!, p]));
 
+  const { data: serverActiveTasks } = useQuery<{ pdf: boolean; excel: boolean; scan: boolean }>({
+    queryKey: ["/api/sessions", sessionId.toString(), "active-tasks"],
+    enabled: sessionId > 0,
+    refetchInterval: 5000,
+  });
+
   const isLocked = !!(session as any).isLocked;
   const isOwner = (session as any).role === "owner";
   const canEditSession = !isLocked || isOwner;
@@ -457,6 +463,8 @@ function SessionWorkspace({
 
   const [exportWarningOpen, setExportWarningOpen] = useState(false);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
+  const [isExcelExporting, setIsExcelExporting] = useState(false);
+  const isAnyExportRunning = isPdfExporting || isExcelExporting || !!(serverActiveTasks?.pdf) || !!(serverActiveTasks?.excel);
   const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
   const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
     () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
@@ -486,6 +494,7 @@ function SessionWorkspace({
   };
 
   const doExportExcel = async () => {
+    setIsExcelExporting(true);
     try {
       const canProceed = await flushBeforeExport();
       if (!canProceed) return;
@@ -503,6 +512,8 @@ function SessionWorkspace({
       URL.revokeObjectURL(blobUrl);
     } catch {
       toast({ title: "Failed to export Excel", variant: "destructive" });
+    } finally {
+      setIsExcelExporting(false);
     }
   };
 
@@ -770,32 +781,32 @@ function SessionWorkspace({
             </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data" disabled={isPdfExporting} className="!border-[hsl(215_40%_35%)]">
-                  {isPdfExporting ? <Loader2 className="h-4 w-4 sm:mr-1 animate-spin text-orange-600" /> : <Download className="h-4 w-4 sm:mr-1" />}
-                  <span className={`hidden sm:inline${isPdfExporting ? " text-orange-600 animate-pulse [animation-duration:1.8s]" : ""}`}>{isPdfExporting ? "Exporting…" : "Export"}</span>
+                <Button size="sm" variant="outline" data-testid="button-export" title="Export session data" disabled={isAnyExportRunning} className="!border-[hsl(215_40%_35%)]">
+                  {isAnyExportRunning ? <Loader2 className="h-4 w-4 sm:mr-1 animate-spin text-orange-600" /> : <Download className="h-4 w-4 sm:mr-1" />}
+                  <span className={`hidden sm:inline${isAnyExportRunning ? " text-orange-600 animate-pulse [animation-duration:1.8s]" : ""}`}>{isAnyExportRunning ? "Exporting…" : "Export"}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {(userSettings?.defaultExportFormat === "excel") ? (
                   <>
-                    <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isPdfExporting}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Excel
+                    <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isAnyExportRunning}>
+                      {(isExcelExporting || serverActiveTasks?.excel) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                      {(isExcelExporting || serverActiveTasks?.excel) ? "Generating Excel…" : "Excel"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isPdfExporting}>
-                      {isPdfExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                      {isPdfExporting ? "Generating PDF…" : "PDF"}
+                    <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isAnyExportRunning}>
+                      {(isPdfExporting || serverActiveTasks?.pdf) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                      {(isPdfExporting || serverActiveTasks?.pdf) ? "Generating PDF…" : "PDF"}
                     </DropdownMenuItem>
                   </>
                 ) : (
                   <>
-                    <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isPdfExporting}>
-                      {isPdfExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                      {isPdfExporting ? "Generating PDF…" : "PDF"}
+                    <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isAnyExportRunning}>
+                      {(isPdfExporting || serverActiveTasks?.pdf) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                      {(isPdfExporting || serverActiveTasks?.pdf) ? "Generating PDF…" : "PDF"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isPdfExporting}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Excel
+                    <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isAnyExportRunning}>
+                      {(isExcelExporting || serverActiveTasks?.excel) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                      {(isExcelExporting || serverActiveTasks?.excel) ? "Generating Excel…" : "Excel"}
                     </DropdownMenuItem>
                   </>
                 )}

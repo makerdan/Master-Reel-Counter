@@ -460,6 +460,12 @@ export default function LabelScannerTab({
       setAnalyzeProgress({ done: msg.done, total: msg.total });
     }
   }, []));
+  const { data: serverActiveTasks } = useQuery<{ pdf: boolean; excel: boolean; scan: boolean }>({
+    queryKey: ["/api/sessions", sessionId.toString(), "active-tasks"],
+    enabled: sessionId > 0,
+    refetchInterval: analyzing ? false : (5000 as const),
+  });
+  const serverScanRunning = !analyzing && !!(serverActiveTasks?.scan);
   const [batchMode, setBatchModeRaw] = useState(() => {
     try {
       const saved = sessionStorage.getItem(`scanner-batch-${sessionId}`);
@@ -1625,7 +1631,13 @@ export default function LabelScannerTab({
           </div>
         </div>
         {(phase === "preview" || isAdmin) && (
-          <div className="pt-1 flex items-center justify-end gap-2">
+          <div className="pt-1 flex items-center justify-end gap-2 flex-wrap">
+            {serverScanRunning && (
+              <span className="flex items-center gap-1 text-xs text-amber-400/80 mr-auto" data-testid="badge-server-scan-running">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Scan in progress
+              </span>
+            )}
             {analyzing && batchMode && (
               <Button
                 size="sm"
@@ -2311,7 +2323,13 @@ export default function LabelScannerTab({
 
       <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
         {(phase === "preview" || isAdmin) && (
-          <div className="flex w-full items-center justify-end gap-2">
+          <div className="flex w-full items-center justify-end gap-2 flex-wrap">
+            {serverScanRunning && (
+              <span className="flex items-center gap-1 text-xs text-amber-400/80 mr-auto" data-testid="badge-server-scan-running-bottom">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Scan in progress
+              </span>
+            )}
             {analyzing && batchMode && (
               <Button
                 size="sm"
