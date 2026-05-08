@@ -84,6 +84,7 @@ app.use((req, res, next) => {
 });
 
 app.use("/api", (req, res, next) => {
+  // /api/health is intentionally exempt so liveness probes can observe drain progress.
   if (shuttingDown && req.path !== "/health") {
     return res.status(503).json({ message: "Server is shutting down, please retry shortly." });
   }
@@ -141,7 +142,10 @@ app.get("/api/health", async (_req, res) => {
     },
   );
 
+  let drainStarted = false;
   process.on("SIGTERM", () => {
+    if (drainStarted) return; // idempotent: ignore repeated signals
+    drainStarted = true;
     log("SIGTERM received — draining active tasks before exit", "shutdown");
     shuttingDown = true;
     httpServer.close();
