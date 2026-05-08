@@ -1,4 +1,14 @@
+export interface CrashRecord {
+  timestamp: string;
+  type: "uncaughtException" | "unhandledRejection";
+  /** true = process will/did exit; false = non-fatal, process continued running */
+  fatal: boolean;
+  message: string;
+  stack?: string;
+}
+
 let _count = 0;
+let _lastCrash: CrashRecord | null = null;
 
 export type SessionTaskType = "pdf" | "excel" | "scan";
 
@@ -36,4 +46,22 @@ export const taskTracker = {
     if (!cur) return { pdf: false, excel: false, scan: false };
     return { pdf: cur.pdf > 0, excel: cur.excel > 0, scan: cur.scan > 0 };
   },
+
+  recordCrash(type: CrashRecord["type"], err: unknown, fatal: boolean): CrashRecord {
+    const error = err instanceof Error ? err : new Error(String(err));
+    _lastCrash = {
+      timestamp: new Date().toISOString(),
+      type,
+      fatal,
+      message: error.message,
+      stack: error.stack,
+    };
+    return _lastCrash;
+  },
+
+  seedCrash(record: CrashRecord): void {
+    _lastCrash = record;
+  },
+
+  lastCrash(): CrashRecord | null { return _lastCrash; },
 };

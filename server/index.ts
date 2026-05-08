@@ -3,14 +3,29 @@ import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { taskTracker } from "./lib/taskTracker";
+import { taskTracker, type CrashRecord } from "./lib/taskTracker";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
+
+const CRASH_LOG_PATH = path.join(process.cwd(), ".crash_log.json");
+
+// Seed lastCrash from the previous run's persisted file (survives restarts).
+try {
+  if (fs.existsSync(CRASH_LOG_PATH)) {
+    const record: CrashRecord = JSON.parse(fs.readFileSync(CRASH_LOG_PATH, "utf8"));
+    taskTracker.seedCrash(record);
+  }
+} catch {
+  // Malformed or missing file — ignore and start clean.
+}
 
 const app = express();
 const httpServer = createServer(app);
 
 let shuttingDown = false;
+let drainStarted = false;
 
 declare module "http" {
   interface IncomingMessage {
@@ -91,14 +106,69 @@ app.use("/api", (req, res, next) => {
   next();
 });
 
+/** Minimal crash summary safe for public health probes (no stack/message). */
+function crashSummary() {
+  const c = taskTracker.lastCrash();
+  if (!c) return null;
+  return { timestamp: c.timestamp, type: c.type, fatal: c.fatal };
+}
+
 app.get("/api/health", async (_req, res) => {
   try {
     await db.execute(sql`SELECT 1`);
-    res.json({ status: "ok", db: "ok", activeTasks: taskTracker.count() });
+    res.json({
+      status: "ok",
+      db: "ok",
+      activeTasks: taskTracker.count(),
+      lastCrash: crashSummary(),
+    });
   } catch {
-    res.status(503).json({ status: "degraded", db: "error", activeTasks: taskTracker.count() });
+    res.status(503).json({
+      status: "degraded",
+      db: "error",
+      activeTasks: taskTracker.count(),
+      lastCrash: crashSummary(),
+    });
   }
 });
+
+/**
+ * Shared graceful-shutdown path used by both SIGTERM and uncaught crash handlers.
+ * Stops accepting new requests, waits up to 30 s for active tasks to finish, then exits.
+ * Using a single path ensures crashes never skip the in-flight task drain.
+ */
+function beginShutdown(exitCode: number, reason: string) {
+  if (drainStarted) return; // idempotent — only the first caller drives the drain
+  drainStarted = true;
+  shuttingDown = true;
+  log(`${reason} — draining active tasks before exit`, "shutdown");
+  httpServer.close();
+
+  const hardTimeout = setTimeout(() => {
+    log("Drain timeout reached (30 s) — forcing exit", "shutdown");
+    process.exit(exitCode);
+  }, 30_000);
+  hardTimeout.unref();
+
+  if (taskTracker.count() === 0) {
+    clearTimeout(hardTimeout);
+    log("No active tasks — exiting cleanly", "shutdown");
+    process.exit(exitCode);
+  }
+
+  log(`Waiting for ${taskTracker.count()} active task(s)...`, "shutdown");
+  const poll = setInterval(() => {
+    const active = taskTracker.count();
+    if (active === 0) {
+      clearInterval(poll);
+      clearTimeout(hardTimeout);
+      log("All tasks drained — exiting", "shutdown");
+      process.exit(exitCode);
+    } else {
+      log(`Waiting for ${active} active task(s)...`, "shutdown");
+    }
+  }, 500);
+}
 
 (async () => {
   await registerRoutes(httpServer, app);
@@ -142,38 +212,37 @@ app.get("/api/health", async (_req, res) => {
     },
   );
 
-  let drainStarted = false;
-  process.on("SIGTERM", () => {
-    if (drainStarted) return; // idempotent: ignore repeated signals
-    drainStarted = true;
-    log("SIGTERM received — draining active tasks before exit", "shutdown");
-    shuttingDown = true;
-    httpServer.close();
-
-    const hardTimeout = setTimeout(() => {
-      log("Drain timeout reached (30 s) — forcing exit", "shutdown");
-      process.exit(1);
-    }, 30_000);
-    hardTimeout.unref();
-
-    // Exit immediately if no tasks are running at shutdown time.
-    if (taskTracker.count() === 0) {
-      clearTimeout(hardTimeout);
-      log("No active tasks — exiting cleanly", "shutdown");
-      process.exit(0);
+  // Fatal errors: log, persist crash record to disk (survives restart), then drain.
+  // Routing through beginShutdown() ensures in-flight tasks are not abandoned.
+  process.on("uncaughtException", (err) => {
+    const record = taskTracker.recordCrash("uncaughtException", err, true);
+    log(`Uncaught exception: ${err.message}\n${err.stack ?? ""}`, "crash");
+    try {
+      fs.writeFileSync(CRASH_LOG_PATH, JSON.stringify(record), "utf8");
+    } catch {
+      // Best-effort — don't let a write failure prevent the shutdown.
     }
+    beginShutdown(1, "Uncaught exception");
+  });
 
-    log(`Waiting for ${taskTracker.count()} active task(s)...`, "shutdown");
-    const poll = setInterval(() => {
-      const active = taskTracker.count();
-      if (active === 0) {
-        clearInterval(poll);
-        clearTimeout(hardTimeout);
-        log("All tasks complete — exiting cleanly", "shutdown");
-        process.exit(0);
-      } else {
-        log(`Waiting for ${active} active task(s)...`, "shutdown");
-      }
-    }, 500);
+  // Unhandled rejections: non-fatal — process continues running. Record and
+  // persist so /api/health can surface them after a restart. Fatal cases
+  // (--unhandled-rejections=throw) are promoted to uncaughtException by Node.js.
+  process.on("unhandledRejection", (reason) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    const record = taskTracker.recordCrash("unhandledRejection", err, false);
+    log(`Unhandled promise rejection: ${err.message}\n${err.stack ?? ""}`, "crash");
+    try {
+      fs.writeFileSync(CRASH_LOG_PATH, JSON.stringify(record), "utf8");
+    } catch {
+      // Best-effort.
+    }
+  });
+
+  // Graceful shutdown on SIGTERM (e.g. deployment rollover, container stop).
+  // Production auto-restart is handled by the Replit autoscale deployment target;
+  // development auto-restart is handled by the while-loop wrapper in the workflow.
+  process.on("SIGTERM", () => {
+    beginShutdown(0, "SIGTERM received");
   });
 })();
