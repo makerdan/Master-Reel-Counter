@@ -1873,12 +1873,12 @@ export async function registerRoutes(
   app.post("/api/sessions/:sessionId/analyze-labels", isAuthenticated, async (req: any, res) => {
     const _sid = parseInt(req.params.sessionId);
     taskTracker.increment();
-    taskTracker.startSession(_sid, "scan");
     try {
       const sessionId = parseInt(req.params.sessionId);
       const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to analyze labels" });
+      taskTracker.startSession(_sid, "scan");
 
       const { pins: pinData } = req.body;
       if (!Array.isArray(pinData) || pinData.length === 0) {
@@ -2556,11 +2556,11 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
     const _sid = parseInt(req.params.id);
     taskTracker.increment();
-    taskTracker.startSession(_sid, "pdf");
     try {
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
+      taskTracker.startSession(_sid, "pdf");
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
@@ -4232,11 +4232,11 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/export/excel", isAuthenticated, async (req: any, res) => {
     const _sid = parseInt(req.params.id);
     taskTracker.increment();
-    taskTracker.startSession(_sid, "excel");
     try {
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
+      taskTracker.startSession(_sid, "excel");
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
