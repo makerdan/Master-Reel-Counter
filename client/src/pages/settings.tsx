@@ -40,7 +40,6 @@ import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 import { CATALOG, parseCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel, unitLabelFull } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
-import * as XLSX from "xlsx";
 import type { UserWireCatalog } from "@shared/schema";
 
 interface UserSettingsResponse {
@@ -470,25 +469,7 @@ export default function SettingsPage() {
     setBulkPreview(rows);
   };
 
-  const parseExcelForImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const csv = XLSX.utils.sheet_to_csv(sheet);
-        setBulkCsvText(csv);
-        parseCsvForImport(csv);
-      } catch {
-        setBulkError("Failed to parse Excel file. Make sure it's a valid .xlsx or .xls file.");
-        setBulkPreview(null);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  const exportWireCatalogs = (format: "csv" | "xlsx") => {
+  const exportWireCatalogs = () => {
     const headers = ["Catalog", "Vendor", `Reel Length (${unitLabelFull(currentUnit)})`, "Description", "Color", "Jacket Type", "Conductors", "Ground Size", "Wire Type", "Source"];
     const builtInRows = CATALOG.map(c => {
       const parsed = parseCatalogEntry(c);
@@ -499,23 +480,15 @@ export default function SettingsPage() {
       c.jacketType || "", c.conductors || "", c.groundSize || "", c.wireType || "", "Custom",
     ]);
     const allRows = [headers, ...builtInRows, ...customRows];
-
-    if (format === "csv") {
-      const csvContent = allRows.map(row => row.map(cell => `"${(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "wire-catalogs.csv";
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      const ws = XLSX.utils.aoa_to_sheet(allRows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Wire Catalogs");
-      XLSX.writeFile(wb, "wire-catalogs.xlsx");
-    }
-    toast({ title: `Exported ${CATALOG.length + wireCatalogs.length} catalog entries as ${format.toUpperCase()}` });
+    const csvContent = allRows.map(row => row.map(cell => `"${(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wire-catalogs.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: `Exported ${CATALOG.length + wireCatalogs.length} catalog entries as CSV` });
   };
 
   const currentUnit: UnitType = (settings?.defaultUnit as UnitType) || "feet";
@@ -915,13 +888,9 @@ export default function SettingsPage() {
                 <FileUp className="h-3.5 w-3.5 mr-1" />
                 Bulk Import
               </Button>
-              <Button size="sm" variant="outline" onClick={() => exportWireCatalogs("csv")} data-testid="button-export-csv">
+              <Button size="sm" variant="outline" onClick={() => exportWireCatalogs()} data-testid="button-export-csv">
                 <Download className="h-3.5 w-3.5 mr-1" />
                 Export CSV
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => exportWireCatalogs("xlsx")} data-testid="button-export-xlsx">
-                <Download className="h-3.5 w-3.5 mr-1" />
-                Export Excel
               </Button>
             </div>
 
@@ -1003,7 +972,7 @@ export default function SettingsPage() {
             {showBulkImport && (
               <div className="border rounded-md p-3 space-y-3 bg-muted/20">
                 <p className="text-xs text-muted-foreground">
-                  Paste CSV or upload a file (CSV, TSV, or Excel). Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size, Wire Type, Unit.
+                  Paste CSV or upload a file (CSV or TSV — Excel not supported). Required columns: <strong>Catalog</strong> (or SKU/Code), <strong>Vendor</strong>, <strong>Reel Length</strong> (or Footage). Optional: Description, Color, Jacket Type, Conductors, Ground Size, Wire Type, Unit.
                   Reel lengths are assumed to be in {unitLabelFull(currentUnit)} (your current setting) unless a <strong>Unit</strong> column specifies "ft" or "m" per row.
                 </p>
                 <Textarea
@@ -1022,23 +991,18 @@ export default function SettingsPage() {
                   <input
                     ref={csvFileInputRef}
                     type="file"
-                    accept=".csv,.tsv,.txt,.xlsx,.xls"
+                    accept=".csv,.tsv,.txt"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
-                      if (isExcel) {
-                        parseExcelForImport(file);
-                      } else {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => {
-                          const text = ev.target?.result as string;
-                          setBulkCsvText(text);
-                          parseCsvForImport(text);
-                        };
-                        reader.readAsText(file);
-                      }
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const text = ev.target?.result as string;
+                        setBulkCsvText(text);
+                        parseCsvForImport(text);
+                      };
+                      reader.readAsText(file);
                       if (csvFileInputRef.current) csvFileInputRef.current.value = "";
                     }}
                     data-testid="input-csv-file"

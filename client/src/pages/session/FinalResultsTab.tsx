@@ -175,7 +175,7 @@ function DropZone({ onFile }: { onFile: (file: File) => void }) {
       <input
         ref={inputRef}
         type="file"
-        accept=".xlsx,.xls,.csv,.ods"
+        accept=".csv,.tsv,.txt"
         className="hidden"
         onChange={handleChange}
         data-testid="input-inventory-file"
@@ -183,7 +183,7 @@ function DropZone({ onFile }: { onFile: (file: File) => void }) {
       <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
       <p className="text-sm font-medium mb-1">Upload inventory spreadsheet</p>
       <p className="text-xs text-muted-foreground">Drag and drop or click to select</p>
-      <p className="text-xs text-muted-foreground mt-1">Accepts .xlsx, .xls, .csv, .ods</p>
+      <p className="text-xs text-muted-foreground mt-1">Accepts .csv, .tsv, .txt (Excel not supported)</p>
     </div>
   );
 }
@@ -283,11 +283,11 @@ export default function FinalResultsTab({
   const handleFile = useCallback(async (file: File) => {
     setParsing(true);
     try {
-      const XLSX = await import("xlsx");
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      const text = await file.text();
+      const delimiter = text.includes("\t") ? "\t" : ",";
+      const rows: any[][] = text.split(/\r?\n/).map(line =>
+        line.split(delimiter).map(cell => cell.replace(/^"|"$/g, "").replace(/""/g, '"'))
+      ).filter(row => row.some(cell => cell.trim() !== ""));
       const parsed = parseInventorySheet(rows);
       if (!parsed.length) {
         toast({ title: "No data found", description: "Could not detect usable rows in the spreadsheet.", variant: "destructive" });
