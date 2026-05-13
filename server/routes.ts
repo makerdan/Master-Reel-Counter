@@ -4348,7 +4348,7 @@ export async function registerRoutes(
       row++;
 
       const nameRow = ws.getRow(row);
-      nameRow.getCell(1).value = session.name;
+      nameRow.getCell(1).value = safeStr(session.name);
       nameRow.getCell(1).font = { size: 13, color: { argb: "222222" } };
       row++;
 
@@ -4380,13 +4380,13 @@ export async function registerRoutes(
         if (ci < leftCol.length) {
           r.getCell(1).value = leftCol[ci][0];
           r.getCell(1).font = { size: 9, bold: true, color: { argb: "000000" } };
-          r.getCell(2).value = leftCol[ci][1];
+          r.getCell(2).value = safeStr(leftCol[ci][1]);
           r.getCell(2).font = { size: 9, color: { argb: "222222" } };
         }
         if (ci < rightCol.length) {
           r.getCell(5).value = rightCol[ci][0];
           r.getCell(5).font = { size: 9, bold: true, color: { argb: "000000" } };
-          r.getCell(6).value = rightCol[ci][1];
+          r.getCell(6).value = safeStr(rightCol[ci][1]);
           r.getCell(6).font = { size: 9, color: { argb: "222222" } };
         }
         row++;
@@ -4466,7 +4466,7 @@ export async function registerRoutes(
           safeStr(e.notes),
           isFlagged ? "Yes" : "",
           safeStr(flagPin?.flagReason),
-          detailOfText,
+          safeStr(detailOfText),
         ];
         const r = ws.getRow(row);
         r.height = 16;
@@ -4545,7 +4545,7 @@ export async function registerRoutes(
       sumTitleRow.getCell(1).font = { size: 14, bold: true, color: { argb: accentHex } };
       row++;
       const sumSubRow = ws.getRow(row);
-      sumSubRow.getCell(1).value = `${session.name}  |  ${session.location || "N/A"}  |  ${activeEntries.length} entries  |  ${xlFmt(activeTotalFootage).toLocaleString()} ${xlULabel} total`;
+      sumSubRow.getCell(1).value = safeStr(`${session.name}  |  ${session.location || "N/A"}  |  ${activeEntries.length} entries  |  ${xlFmt(activeTotalFootage).toLocaleString()} ${xlULabel} total`);
       sumSubRow.getCell(1).font = { size: 8.5, color: { argb: "666666" } };
       ws.mergeCells(row, 1, row, 8);
       row++;
