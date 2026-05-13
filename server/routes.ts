@@ -4637,7 +4637,7 @@ export async function registerRoutes(
           const headerLabel = isRx ? "RX" : isTc ? "TC" : (cat.displayGroup || "Other");
           const groupCount = groupReelCounts.get(cat.displayGroup) || 0;
           const gRow = ws.getRow(row);
-          gRow.getCell(1).value = headerLabel;
+          gRow.getCell(1).value = safeStr(headerLabel);
           gRow.getCell(1).font = { size: 9, bold: true, color: { argb: accentHex } };
           gRow.getCell(5).value = `${groupCount} reels`;
           gRow.getCell(5).font = { size: 9, color: { argb: accentHex } };
