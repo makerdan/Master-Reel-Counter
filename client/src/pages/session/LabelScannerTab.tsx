@@ -1247,7 +1247,11 @@ export default function LabelScannerTab({
     runAnalyze(photoCards, { isRetry: true });
   }, [cards]);
 
-  const retryRequest = async (method: string, url: string, body: any, retries = 2): Promise<any> => {
+  // Only GET requests are safe to retry (idempotent).  POST / PATCH / DELETE
+  // requests must NOT be retried by default because the server may have already
+  // processed the first attempt — retrying a successful-but-lost POST would
+  // create a duplicate resource (e.g. a second pin at the same position).
+  const retryRequest = async (method: string, url: string, body: any, retries = method === "GET" ? 2 : 0): Promise<any> => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const res = await apiRequest(method, url, body);

@@ -9,7 +9,7 @@ import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/route
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, pins, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -1630,6 +1630,20 @@ export async function registerRoutes(
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
       const data = insertPinSchema.parse({ ...req.body, photoId: photo.id });
+
+      // Idempotency guard: if a pin with the same label already exists on this
+      // photo (e.g. because a network retry re-submitted a request that
+      // previously succeeded), return the existing pin instead of inserting a
+      // duplicate.  Label uniqueness per photo is an invariant of the data model.
+      if (data.label) {
+        const existingPins = await storage.getPhotoPins(photo.id);
+        const existing = existingPins.find((p) => p.label === data.label);
+        if (existing) {
+          broadcastToSession(photo.sessionId, { type: "sync", entity: "pins", sessionId: photo.sessionId });
+          return res.json(existing);
+        }
+      }
+
       const pin = await storage.createPin(data);
       broadcastToSession(photo.sessionId, { type: "sync", entity: "pins", sessionId: photo.sessionId });
       res.json(pin);
@@ -4936,6 +4950,53 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error backfilling photo sizes:", error);
       res.status(500).json({ message: "Failed to backfill photo sizes" });
+    }
+  });
+
+  // One-time cleanup: remove duplicate pins created by network-retry double-submission.
+  // Keeps the lowest-id pin for each (photo_id, label) pair within sessions the
+  // requesting user owns.  Safe to call multiple times (idempotent).
+  app.post("/api/storage/dedupe-pins", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = resolveUserId(req);
+      const { sessions: userSessions } = await storage.getUserSessions(userId);
+      const userSessionIds = userSessions.map(s => s.id);
+      if (userSessionIds.length === 0) return res.json({ removed: 0 });
+
+      // Find all (photo_id, label) pairs that have more than one pin, restricted to
+      // photos that belong to the requesting user's sessions.
+      const dupes = await db
+        .select({
+          photoId: pins.photoId,
+          label: pins.label,
+          minId: sql<number>`MIN(${pins.id})`,
+        })
+        .from(pins)
+        .innerJoin(photos, eq(photos.id, pins.photoId))
+        .where(
+          sql`${photos.sessionId} IN (${sql.join(userSessionIds.map(id => sql`${id}`), sql`, `)})
+              AND ${pins.label} IS NOT NULL`
+        )
+        .groupBy(pins.photoId, pins.label)
+        .having(sql`COUNT(*) > 1`);
+
+      let removed = 0;
+      for (const dupe of dupes) {
+        // Delete all pins with the same (photo_id, label) except the one with the lowest id.
+        const result = await db
+          .delete(pins)
+          .where(
+            sql`${pins.photoId} = ${dupe.photoId}
+                AND ${pins.label} = ${dupe.label}
+                AND ${pins.id} != ${dupe.minId}`
+          );
+        removed += (result as any).rowCount ?? 0;
+      }
+
+      res.json({ dupeGroups: dupes.length, removed });
+    } catch (error) {
+      console.error("Error deduplicating pins:", error);
+      res.status(500).json({ message: "Failed to deduplicate pins" });
     }
   });
 
