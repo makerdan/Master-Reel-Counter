@@ -1,6 +1,25 @@
 import type { Express } from "express";
+import rateLimit from "express-rate-limit";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { isAuthenticated } from "../auth/replitAuth";
+
+// Mirror the upload-rate limit applied to POST /api/uploads/direct so that
+// the presigned-URL flow cannot be used to circumvent per-user quotas.
+const presignedUrlRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later." },
+});
+
+const ALLOWED_CONTENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB — matches POST /api/uploads/direct
 
 /**
  * Register object storage routes for file uploads.
@@ -36,13 +55,30 @@ export function registerObjectStorageRoutes(app: Express): void {
    * IMPORTANT: The client should NOT send the file to this endpoint.
    * Send JSON metadata only, then upload the file directly to uploadURL.
    */
-  app.post("/api/uploads/request-url", isAuthenticated, async (req, res) => {
+  app.post("/api/uploads/request-url", isAuthenticated, presignedUrlRateLimiter, async (req, res) => {
     try {
       const { name, size, contentType } = req.body;
 
       if (!name) {
         return res.status(400).json({
           error: "Missing required field: name",
+        });
+      }
+
+      // Reject declared content types that fall outside the application's
+      // image allowlist (mirrors the MIME filter on POST /api/uploads/direct).
+      if (contentType && !ALLOWED_CONTENT_TYPES.has(contentType)) {
+        return res.status(400).json({
+          error: `Invalid content type: ${contentType}. Allowed: image/jpeg, image/png, image/webp.`,
+        });
+      }
+
+      // Reject files that declare a size above the 50 MB cap enforced by the
+      // direct upload route (multer limit).  Callers omitting size are still
+      // admitted — GCS itself enforces the signed-URL TTL as the outer bound.
+      if (size !== undefined && Number(size) > MAX_UPLOAD_BYTES) {
+        return res.status(400).json({
+          error: `File too large. Maximum allowed size is ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB.`,
         });
       }
 
