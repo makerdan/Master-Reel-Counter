@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import passport from "passport";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
@@ -189,7 +190,7 @@ export async function registerRoutes(
     next();
   });
 
-  await setupAuth(app);
+  const { sessionParser } = await setupAuth(app);
   registerAuthRoutes(app);
   registerObjectStorageRoutes(app);
 
@@ -2406,7 +2407,7 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can remove collaborators" });
       const collabId = parseInt(req.params.collabId);
-      await storage.removeCollaborator(collabId);
+      await storage.removeCollaborator(collabId, access.session.id);
       logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "collaborator_removed", "collaborator", collabId);
       res.json({ success: true });
     } catch (error) {
@@ -2421,7 +2422,7 @@ export async function registerRoutes(
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can change roles" });
       const { role } = req.body;
       if (!role || !["editor", "viewer"].includes(role)) return res.status(400).json({ message: "Role must be editor or viewer" });
-      const updated = await storage.updateCollaboratorRole(parseInt(req.params.collabId), role);
+      const updated = await storage.updateCollaboratorRole(parseInt(req.params.collabId), access.session.id, role);
       if (!updated) return res.status(404).json({ message: "Collaborator not found" });
       await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "changed_role", "collaborator", updated.id, `Changed to ${role}`);
       res.json(updated);
@@ -5482,45 +5483,81 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     wsAlive.delete(ws);
   };
 
-  wss.on("connection", (ws) => {
+  const processWsMessage = async (ws: WebSocket, raw: Buffer | string) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === "join" && typeof msg.sessionId === "number") {
+        const info = wsUserMap.get(ws)!;
+        if (!info.userId) {
+          ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
+          ws.close(1008, "Authentication required");
+          return;
+        }
+        const access = await verifySessionAccess(msg.sessionId, info.userId);
+        if (!access) {
+          ws.send(JSON.stringify({ type: "error", message: "Access denied" }));
+          return;
+        }
+        const prevSessionId = info.sessionId;
+        if (prevSessionId !== null) {
+          const prev = sessionRooms.get(prevSessionId);
+          if (prev) { prev.delete(ws); if (prev.size === 0) sessionRooms.delete(prevSessionId); }
+          broadcastPresence(prevSessionId);
+        }
+        info.sessionId = msg.sessionId;
+        info.role = access.role;
+        if (!sessionRooms.has(msg.sessionId)) sessionRooms.set(msg.sessionId, new Set());
+        sessionRooms.get(msg.sessionId)!.add(ws);
+        ws.send(JSON.stringify({ type: "joined", sessionId: msg.sessionId }));
+        broadcastPresence(msg.sessionId);
+      }
+    } catch {}
+  };
+
+  wss.on("connection", (ws, req: any) => {
     wsUserMap.set(ws, { sessionId: null, userId: null, username: null, role: null });
     wsAlive.set(ws, true);
+
+    let authDone = false;
+    const pendingMessages: (Buffer | string)[] = [];
+
+    sessionParser(req, {} as any, () => {
+      passport.initialize()(req, {} as any, () => {
+        passport.session()(req, {} as any, () => {
+          const user = req.user as any;
+          const now = Math.floor(Date.now() / 1000);
+          const isAuth = user && user.expires_at && now <= user.expires_at;
+          if (!isAuth) {
+            ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
+            ws.close(1008, "Authentication required");
+            return;
+          }
+          const connUserId: string = user.isTester
+            ? (user.claims?.testerOwnerUserId ?? user.claims?.sub)
+            : user.claims?.sub;
+          const connUsername: string = user.claims?.username || user.claims?.name || connUserId;
+          wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null });
+          authDone = true;
+          for (const buffered of pendingMessages) {
+            processWsMessage(ws, buffered);
+          }
+          pendingMessages.length = 0;
+        });
+      });
+    });
+
     ws.on("pong", () => { wsAlive.set(ws, true); });
     ws.on("error", () => {
       try { ws.terminate(); } catch {}
       cleanupWs(ws);
     });
 
-    ws.on("message", async (raw) => {
-      try {
-        const msg = JSON.parse(raw.toString());
-        if (msg.type === "join" && typeof msg.sessionId === "number") {
-          let resolvedRole: string | null = null;
-          if (msg.userId) {
-            const access = await verifySessionAccess(msg.sessionId, msg.userId);
-            if (!access) {
-              ws.send(JSON.stringify({ type: "error", message: "Access denied" }));
-              return;
-            }
-            resolvedRole = access.role;
-          }
-          const info = wsUserMap.get(ws)!;
-          const prevSessionId = info.sessionId;
-          if (prevSessionId !== null) {
-            const prev = sessionRooms.get(prevSessionId);
-            if (prev) { prev.delete(ws); if (prev.size === 0) sessionRooms.delete(prevSessionId); }
-            broadcastPresence(prevSessionId);
-          }
-          info.sessionId = msg.sessionId;
-          info.userId = msg.userId || null;
-          info.username = msg.username || null;
-          info.role = resolvedRole;
-          if (!sessionRooms.has(msg.sessionId)) sessionRooms.set(msg.sessionId, new Set());
-          sessionRooms.get(msg.sessionId)!.add(ws);
-          ws.send(JSON.stringify({ type: "joined", sessionId: msg.sessionId }));
-          broadcastPresence(msg.sessionId);
-        }
-      } catch {}
+    ws.on("message", (raw) => {
+      if (!authDone) {
+        pendingMessages.push(raw as Buffer | string);
+      } else {
+        processWsMessage(ws, raw as Buffer | string);
+      }
     });
 
     ws.on("close", () => {

@@ -70,9 +70,10 @@ async function upsertUser(claims: any) {
   });
 }
 
-export async function setupAuth(app: Express) {
+export async function setupAuth(app: Express): Promise<{ sessionParser: ReturnType<typeof getSession> }> {
   app.set("trust proxy", 1);
-  app.use(getSession());
+  const sessionParser = getSession();
+  app.use(sessionParser);
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -138,6 +139,8 @@ export async function setupAuth(app: Express) {
       );
     });
   });
+
+  return { sessionParser };
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
