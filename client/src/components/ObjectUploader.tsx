@@ -87,7 +87,7 @@ export function ObjectUploader({
 
   useEffect(() => {
     return () => {
-      uppy.close({ reason: "unmount" });
+      uppy.destroy();
     };
   }, [uppy]);
 

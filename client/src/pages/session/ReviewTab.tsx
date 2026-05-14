@@ -19,7 +19,6 @@ const REVEAL_DELAY_MS = 60_000;
 
 const ZOOM_MIN = 0.005;
 const ZOOM_MAX = 1.0;
-const ZOOM_STEP = 0.005;
 const ZOOM_CLICK_STEP = 0.015;
 
 type OnlineUser = { userId: string; username: string };
