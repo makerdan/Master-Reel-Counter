@@ -1249,7 +1249,7 @@ function SessionWorkspace({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={unsavedChangesOpen} onOpenChange={setUnsavedChangesOpen}>
+      <AlertDialog open={unsavedChangesOpen} onOpenChange={(open) => { if (!open) pendingNavActionRef.current = null; setUnsavedChangesOpen(open); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
