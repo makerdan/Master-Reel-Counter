@@ -368,10 +368,18 @@ export async function registerRoutes(
 
       // Track the pending upload so orphan cleanup can delete the file if the
       // client never completes the photo-registration step.
+      // We await this so that a DB failure causes step-1 to surface an error
+      // rather than silently leaving an untracked orphan. On failure, we make
+      // a best-effort attempt to delete the already-uploaded file.
       const uploadUserId = resolveUserId(req);
-      storage.createUploadIntent(objectPath, uploadUserId).catch((err) => {
-        console.warn("createUploadIntent failed (non-fatal):", err?.message);
-      });
+      try {
+        await storage.createUploadIntent(objectPath, uploadUserId);
+      } catch (intentErr: any) {
+        console.error("createUploadIntent failed; rolling back object storage write:", intentErr?.message);
+        objectStorageClient.bucket(BUCKET_NAME).file(objectName).delete({ ignoreNotFound: true }).catch(() => {});
+        fs.unlink(localFallback).catch(() => {});
+        return res.status(500).json({ error: "Failed to record upload intent; upload rolled back" });
+      }
 
       res.json({
         objectPath,
@@ -5776,7 +5784,9 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000;
   const TRASH_MAX_AGE_DAYS = 30;
-  const ORPHAN_INTENT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+  // Configurable via env; defaults to 24 hours. Increase for slower networks
+  // or longer retry windows; decrease in test environments.
+  const ORPHAN_INTENT_MAX_AGE_MS = parseInt(process.env.ORPHAN_INTENT_MAX_AGE_MS ?? "") || 24 * 60 * 60 * 1000;
 
   async function purgeOrphanedUploads() {
     try {
