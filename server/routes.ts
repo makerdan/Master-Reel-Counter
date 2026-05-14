@@ -53,26 +53,6 @@ function deriveAdvisoryLockKeys(userId: string): [number, number] {
   return [h.readInt32BE(0), h.readInt32BE(4)];
 }
 
-/**
- * Check (without acquiring) whether the encoding-toggle advisory lock for
- * a given user is currently held by any backend. Uses the pg_locks catalog
- * view so no transaction is required and no lock is taken.
- * Returns true if a toggle is in progress in any app instance.
- */
-async function isEncodingToggleActive(key1: number, key2: number): Promise<boolean> {
-  const rows = await db.execute(sql`
-    SELECT EXISTS (
-      SELECT 1 FROM pg_locks
-      WHERE locktype = 'advisory'
-        AND classid = ${key1}
-        AND objid   = ${key2}
-        AND objsubid = 2
-        AND granted  = true
-    ) AS active
-  `);
-  return !!(rows as any)[0]?.active;
-}
-
 function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSocket) {
   const room = sessionRooms.get(sessionId);
   if (!room) return;
@@ -1291,12 +1271,6 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to restore photos" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
-      {
-        const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
-        if (encodingToggleInProgress.has(access.session.userId) || await isEncodingToggleActive(lk1, lk2)) {
-          return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
-        }
-      }
 
       const body = req.body;
       if (!body.objectStorageKey || typeof body.objectStorageKey !== "string") {
@@ -1320,38 +1294,53 @@ export async function registerRoutes(
         }
       }
 
-      const photo = await storage.createPhoto(safePhotoData);
-
       const oldPhotoId = body.oldPhotoId ? parseInt(body.oldPhotoId) : null;
       const encKey = await getEncryptionKey(access.session.userId);
+      const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
 
-      const entryIdMap = new Map<number, number>();
-      if (body.entries && Array.isArray(body.entries)) {
-        for (const entryData of body.entries) {
-          const { id: oldId, createdAt: _ca, updatedAt: _ua, ...entryFields } = entryData;
-          let safeEntryData: any = {
-            ...entryFields,
-            sessionId: access.session.id,
-            userId,
-            photoId: (oldPhotoId && entryFields.photoId === oldPhotoId) ? photo.id : (entryFields.photoId || null),
-          };
-          if (encKey) safeEntryData = encryptEntry(safeEntryData, encKey) as any;
-          const parsed = insertEntrySchema.parse(safeEntryData);
-          const newEntry = await storage.createEntry(parsed);
-          if (oldId) entryIdMap.set(oldId, newEntry.id);
+      const { photo } = await db.transaction(async (tx) => {
+        const lockResult = await tx.execute(
+          sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
+        );
+        if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
+          throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
         }
-      }
 
-      if (body.pins && Array.isArray(body.pins)) {
-        for (const pinData of body.pins) {
-          const { id: _id, createdAt: _ca, ...pinFields } = pinData;
-          const restoredEntryId = pinFields.entryId ? (entryIdMap.get(pinFields.entryId) ?? null) : null;
-          await storage.createPin({ ...pinFields, photoId: photo.id, entryId: restoredEntryId });
+        const [insertedPhoto] = await tx.insert(photos).values(safePhotoData).returning();
+        const idMap = new Map<number, number>();
+
+        if (body.entries && Array.isArray(body.entries)) {
+          for (const entryData of body.entries) {
+            const { id: oldId, createdAt: _ca, updatedAt: _ua, ...entryFields } = entryData;
+            let safeEntryData: any = {
+              ...entryFields,
+              sessionId: access.session.id,
+              userId,
+              photoId: (oldPhotoId && entryFields.photoId === oldPhotoId) ? insertedPhoto.id : (entryFields.photoId || null),
+            };
+            if (encKey) safeEntryData = encryptEntry(safeEntryData, encKey) as any;
+            const parsed = insertEntrySchema.parse(safeEntryData);
+            const [newEntry] = await tx.insert(entries).values(parsed).returning();
+            if (oldId) idMap.set(oldId, newEntry.id);
+          }
         }
-      }
+
+        if (body.pins && Array.isArray(body.pins)) {
+          for (const pinData of body.pins) {
+            const { id: _id, createdAt: _ca, ...pinFields } = pinData;
+            const restoredEntryId = pinFields.entryId ? (idMap.get(pinFields.entryId) ?? null) : null;
+            await tx.insert(pins).values({ ...pinFields, photoId: insertedPhoto.id, entryId: restoredEntryId });
+          }
+        }
+
+        return { photo: insertedPhoto, entryIdMap: idMap };
+      });
 
       res.json(photo);
     } catch (error) {
+      if (error instanceof Error && error.message === "ENCODING_TOGGLE_IN_PROGRESS") {
+        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      }
       res.status(500).json({ message: "Failed to restore photo" });
     }
   });
@@ -1407,18 +1396,22 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
-      {
-        const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
-        if (encodingToggleInProgress.has(access.session.userId) || await isEncodingToggleActive(lk1, lk2)) {
-          return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
-        }
-      }
 
       let entryData = { ...req.body, sessionId: access.session.id, userId };
       const encKey = await getEncryptionKey(access.session.userId);
       if (encKey) entryData = encryptEntry(entryData, encKey) as any;
       const data = insertEntrySchema.parse(entryData);
-      const entry = await storage.createEntry(data);
+      const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
+      const entry = await db.transaction(async (tx) => {
+        const lockResult = await tx.execute(
+          sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
+        );
+        if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
+          throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
+        }
+        const [inserted] = await tx.insert(entries).values(data).returning();
+        return inserted;
+      });
       if (data.photoId) {
         try {
           await storage.resolveParentPinForDetailShot(data.photoId, entry.id);
@@ -1433,6 +1426,9 @@ export async function registerRoutes(
       broadcastToSession(access.session.id, { type: "sync", entity: "entries", sessionId: access.session.id });
       res.json(result);
     } catch (error) {
+      if (error instanceof Error && error.message === "ENCODING_TOGGLE_IN_PROGRESS") {
+        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      }
       console.error("Error creating entry:", error);
       res.status(500).json({ message: "Failed to create entry" });
     }
@@ -1448,12 +1444,6 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
-      {
-        const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
-        if (encodingToggleInProgress.has(access.session.userId) || await isEncodingToggleActive(lk1, lk2)) {
-          return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
-        }
-      }
 
       const serverUpdatedAt = req.body?.serverUpdatedAt;
       if (serverUpdatedAt) {
@@ -1472,7 +1462,20 @@ export async function registerRoutes(
       const encKey = await getEncryptionKey(access.session.userId);
       let updateData: any = safeBody;
       if (encKey) updateData = encryptEntry(updateData, encKey) as any;
-      const updated = await storage.updateEntry(entry.id, updateData);
+      const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
+      const updated = await db.transaction(async (tx) => {
+        const lockResult = await tx.execute(
+          sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
+        );
+        if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
+          throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
+        }
+        const [result] = await tx.update(entries)
+          .set({ ...updateData, updatedAt: new Date() })
+          .where(eq(entries.id, entry.id))
+          .returning();
+        return result;
+      });
       const result = encKey && updated ? decryptEntry(updated, encKey) : updated;
 
       {
@@ -1529,6 +1532,9 @@ export async function registerRoutes(
       broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
       res.json(result);
     } catch (error) {
+      if (error instanceof Error && error.message === "ENCODING_TOGGLE_IN_PROGRESS") {
+        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      }
       console.error("Error updating entry:", error);
       res.status(500).json({ message: "Failed to update entry" });
     }
