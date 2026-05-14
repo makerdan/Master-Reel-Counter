@@ -116,12 +116,22 @@ function PinLocationPhoto({
   );
 }
 
+/**
+ * Generates a stable DB key for a duplicate group.
+ * Key format v1 — all string segments are upper-cased and trimmed so that
+ * normalisation changes to aisle/section/label values do not break persisted dismissals.
+ *   label-match:  `label||{LABEL}||{AISLE}||{SECTION}`
+ *   same-reel:    `samereel||{ID}||{ID}||…`  (pin IDs sorted ascending)
+ */
 function dupGroupKey(group: DuplicateGroup): string {
   if (group.groupType === "same-reel") {
     const sortedIds = group.pins.map(p => p.pinId).sort((a, b) => a - b);
     return `samereel||${sortedIds.join("||")}`;
   }
-  return `label||${group.label}||${group.aisle ?? ""}||${group.section ?? ""}`;
+  const normLabel = (group.label ?? "").trim().toUpperCase();
+  const normAisle = (group.aisle ?? "").trim().toUpperCase();
+  const normSection = (group.section ?? "").trim().toUpperCase();
+  return `label||${normLabel}||${normAisle}||${normSection}`;
 }
 
 function DupPinTile({

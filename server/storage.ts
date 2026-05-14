@@ -368,6 +368,18 @@ export interface IStorage {
   }[]>;
 }
 
+/**
+ * Normalises a dismissed-duplicate DB key to the v1 canonical form:
+ * all label||... segment values are upper-cased and trimmed.
+ * Same-reel keys (samereel||...) are returned unchanged.
+ */
+function normalizeDismissedKey(key: string): string {
+  if (!key.startsWith("label||")) return key;
+  const parts = key.split("||");
+  // parts: ["label", label_text, aisle, section]
+  return `label||${parts.slice(1).map(p => p.trim().toUpperCase()).join("||")}`;
+}
+
 export class DatabaseStorage implements IStorage {
   async createSession(session: InsertSession): Promise<Session> {
     const [result] = await db.insert(countingSessions).values(session).returning();
@@ -2478,10 +2490,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDismissedDuplicates(sessionId: number): Promise<string[]> {
-    const rows = await db.select({ key: dismissedDuplicates.key })
+    const rows = await db.select({ id: dismissedDuplicates.id, key: dismissedDuplicates.key })
       .from(dismissedDuplicates)
       .where(eq(dismissedDuplicates.sessionId, sessionId));
-    return rows.map(r => r.key);
+
+    // Lazy-migrate: normalize label||... keys that were stored before the aisle/section/label
+    // upper-case+trim normalisation was applied in detectDuplicatePins (key format v1).
+    const normalizedKeys = new Set<string>();
+    const rowsToDelete: number[] = [];
+
+    for (const row of rows) {
+      const normalized = normalizeDismissedKey(row.key);
+      if (normalized !== row.key) {
+        if (normalizedKeys.has(normalized)) {
+          // A row with the normalized key was already processed — this stale row is a duplicate.
+          rowsToDelete.push(row.id);
+        } else {
+          try {
+            await db.update(dismissedDuplicates).set({ key: normalized }).where(eq(dismissedDuplicates.id, row.id));
+            normalizedKeys.add(normalized);
+          } catch {
+            // Unique constraint or other DB error — just drop the stale row.
+            rowsToDelete.push(row.id);
+          }
+        }
+      } else {
+        normalizedKeys.add(row.key);
+      }
+    }
+
+    if (rowsToDelete.length > 0) {
+      await db.delete(dismissedDuplicates).where(inArray(dismissedDuplicates.id, rowsToDelete));
+    }
+
+    return [...normalizedKeys];
   }
 
   async addDismissedDuplicate(sessionId: number, key: string): Promise<DismissedDuplicate> {
