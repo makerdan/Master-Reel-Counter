@@ -3582,35 +3582,17 @@ export async function registerRoutes(
         const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
         const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
 
-        // Load this section's photos in bounded batches.  Each batch is awaited
-        // before the next starts so at most PDF_PHOTO_BATCH_SIZE raw image buffers
-        // are in flight simultaneously, keeping peak memory proportional to one
-        // batch rather than the whole session.
-        const photoLayoutMap = new Map<number, PhotoLayout>();
-        for (let batchStart = 0; batchStart < allPhotos.length; batchStart += PDF_PHOTO_BATCH_SIZE) {
-          const batch = allPhotos.slice(batchStart, batchStart + PDF_PHOTO_BATCH_SIZE);
-          const batchResults = await Promise.all(batch.map((p: any) => loadPhoto(p)));
-          batch.forEach((p: any, j: number) => {
-            const pl = batchResults[j];
-            if (pl) photoLayoutMap.set(p.id, pl);
-          });
-        }
+        // ── Phase A: classify using metadata only (no image buffers yet) ──────
+        // Classification needs only photo metadata, pins, and entries — not pixel
+        // data.  Separating it from buffer loading lets us determine the render
+        // order and apply section-skip logic without holding any images in memory.
+        type MetaWithEntries = { photoMeta: any; entries: any[] };
+        const metaMatchedEntryIds = new Set<number>();
+        const metaWithEntries: MetaWithEntries[] = [];
+        const metaWithoutEntries: any[] = [];
 
-        const loadedPhotos: PhotoLayout[] = allPhotos
-          .map((photo: any) => photoLayoutMap.get(photo.id))
-          .filter((pl: PhotoLayout | undefined): pl is PhotoLayout => pl !== undefined);
-
-        if (loadedPhotos.length === 0 && sec.entries.length === 0) continue;
-
-        const gap = 10;
-        const minPhotoH = 120;
-
-        const matchedEntryIds = new Set<number>();
-        const photosWithEntries: { pl: PhotoLayout; entries: any[] }[] = [];
-        const photosWithoutEntries: PhotoLayout[] = [];
-
-        for (const pl of loadedPhotos) {
-          const photoPins = allPinsMap.get(pl.photo.id) || [];
+        for (const photoMeta of allPhotos) {
+          const photoPins = allPinsMap.get(photoMeta.id) || [];
           const pinEntryIds = new Set(photoPins.map((p: any) => p.entryId).filter(Boolean));
           const photoEntries = sec.entries.filter((e: any) => pinEntryIds.has(e.id));
           if (photoEntries.length > 0) {
@@ -3619,68 +3601,58 @@ export async function registerRoutes(
               return pin?.label ?? 999;
             };
             photoEntries.sort((a: any, b: any) => pinLabelForEntry(a) - pinLabelForEntry(b));
-            photosWithEntries.push({ pl, entries: photoEntries });
-            photoEntries.forEach((e: any) => matchedEntryIds.add(e.id));
+            metaWithEntries.push({ photoMeta, entries: photoEntries });
+            photoEntries.forEach((e: any) => metaMatchedEntryIds.add(e.id));
           } else {
-            photosWithoutEntries.push(pl);
+            metaWithoutEntries.push(photoMeta);
           }
         }
 
-        const unmatchedEntries = sec.entries.filter((e: any) => !matchedEntryIds.has(e.id));
+        const unmatchedEntries = sec.entries.filter((e: any) => !metaMatchedEntryIds.has(e.id));
 
         if (unmatchedEntries.length > 0) {
           deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: unmatchedEntries });
         }
 
-        const hasPhotoContent = loadedPhotos.length > 0;
+        const hasPhotoContent = allPhotos.length > 0;
         if (!hasPhotoContent && unmatchedEntries.length === sec.entries.length) continue;
 
         const isReceivingSection = (sec.aisle || "").toLowerCase() === "receiving";
 
-        const detailShotsByParent = new Map<number, { pl: PhotoLayout; entries: any[] }[]>();
-        const detailShotsWithoutEntriesByParent = new Map<number, PhotoLayout[]>();
+        const detailMetaByParent = new Map<number, MetaWithEntries[]>();
+        const detailMetaWithoutByParent = new Map<number, any[]>();
 
-        const compactPhotos: { pl: PhotoLayout; entries: any[] }[] = [];
-        const standardPhotos: { pl: PhotoLayout; entries: any[] }[] = [];
-        for (const item of photosWithEntries) {
-          if (item.pl.photo.isDetailShot && item.pl.photo.parentPhotoId) {
-            const parentId = item.pl.photo.parentPhotoId;
-            if (!detailShotsByParent.has(parentId)) detailShotsByParent.set(parentId, []);
-            detailShotsByParent.get(parentId)!.push(item);
+        const compactMeta: MetaWithEntries[] = [];
+        const standardMeta: MetaWithEntries[] = [];
+        for (const item of metaWithEntries) {
+          if (item.photoMeta.isDetailShot && item.photoMeta.parentPhotoId) {
+            const parentId = item.photoMeta.parentPhotoId;
+            if (!detailMetaByParent.has(parentId)) detailMetaByParent.set(parentId, []);
+            detailMetaByParent.get(parentId)!.push(item);
           } else {
-            const isCompact = isReceivingSection;
-            if (isCompact) {
-              compactPhotos.push(item);
-            } else {
-              standardPhotos.push(item);
-            }
+            (isReceivingSection ? compactMeta : standardMeta).push(item);
           }
         }
 
-        const compactWithoutEntries: PhotoLayout[] = [];
-        const standardWithoutEntries: PhotoLayout[] = [];
-        for (const pl of photosWithoutEntries) {
-          if (pl.photo.isDetailShot && pl.photo.parentPhotoId) {
-            const parentId = pl.photo.parentPhotoId;
-            if (!detailShotsWithoutEntriesByParent.has(parentId)) detailShotsWithoutEntriesByParent.set(parentId, []);
-            detailShotsWithoutEntriesByParent.get(parentId)!.push(pl);
+        const compactWithoutMeta: any[] = [];
+        const standardWithoutMeta: any[] = [];
+        for (const photoMeta of metaWithoutEntries) {
+          if (photoMeta.isDetailShot && photoMeta.parentPhotoId) {
+            const parentId = photoMeta.parentPhotoId;
+            if (!detailMetaWithoutByParent.has(parentId)) detailMetaWithoutByParent.set(parentId, []);
+            detailMetaWithoutByParent.get(parentId)!.push(photoMeta);
           } else {
-            const isCompact = isReceivingSection;
-            if (isCompact) {
-              compactWithoutEntries.push(pl);
-            } else {
-              standardWithoutEntries.push(pl);
-            }
+            (isReceivingSection ? compactWithoutMeta : standardWithoutMeta).push(photoMeta);
           }
         }
 
         const isReceivingCompactSingle = isReceivingSection
-          && compactPhotos.length === 1
-          && compactWithoutEntries.length === 0
-          && standardPhotos.length === 0
-          && standardWithoutEntries.length === 0
-          && detailShotsByParent.size === 0
-          && detailShotsWithoutEntriesByParent.size === 0;
+          && compactMeta.length === 1
+          && compactWithoutMeta.length === 0
+          && standardMeta.length === 0
+          && standardWithoutMeta.length === 0
+          && detailMetaByParent.size === 0
+          && detailMetaWithoutByParent.size === 0;
 
         const sectionHeaderH = 28;
         const compactBlockMinH = 100;
@@ -3693,8 +3665,11 @@ export async function registerRoutes(
         }
         doc.addNamedDestination(`sec-${tocSecIdx}`);
         tocSecIdx++;
-        const photoLabel = loadedPhotos.length > 0 ? `${loadedPhotos.length} photo${loadedPhotos.length !== 1 ? "s" : ""}` : undefined;
+        const photoLabel = allPhotos.length > 0 ? `${allPhotos.length} photo${allPhotos.length !== 1 ? "s" : ""}` : undefined;
         drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, photoLabel);
+
+        const gap = 10;
+        const minPhotoH = 120;
 
         const ensureSpace = (needed: number) => {
           if (currentY + needed > maxY) {
@@ -3702,6 +3677,23 @@ export async function registerRoutes(
             currentY = 36;
             drawSectionHeader(sec.aisle, sec.section, sec.entries.length, secReels, secFootage, undefined, " (Continued)");
           }
+        };
+
+        // ── Phase B: load + render + release per render unit ─────────────────
+        // `loadLayouts` loads image buffers for a list of photo metadata objects
+        // in slices of PDF_PHOTO_BATCH_SIZE.  After the caller renders using the
+        // returned map, the map goes out of scope and GC can reclaim the buffers.
+        const loadLayouts = async (metas: any[]): Promise<Map<number, PhotoLayout>> => {
+          const layoutMap = new Map<number, PhotoLayout>();
+          for (let i = 0; i < metas.length; i += PDF_PHOTO_BATCH_SIZE) {
+            const batch = metas.slice(i, i + PDF_PHOTO_BATCH_SIZE);
+            const results = await Promise.all(batch.map((p: any) => loadPhoto(p)));
+            batch.forEach((p: any, j: number) => {
+              const pl = results[j];
+              if (pl) layoutMap.set(p.id, pl);
+            });
+          }
+          return layoutMap;
         };
 
         const renderDetailShotColumnList = (pl: PhotoLayout, photoEntries: any[], x: number, y: number, maxW: number, maxH: number) => {
@@ -3781,59 +3773,83 @@ export async function registerRoutes(
           return { renderedH: totalH };
         };
 
-        const renderDetailShotsForParent = (parentPhotoId: number) => {
-          const detailWithEntries = detailShotsByParent.get(parentPhotoId) || [];
-          const detailWithout = detailShotsWithoutEntriesByParent.get(parentPhotoId) || [];
+        // Renders detail shots for a parent using buffers already in `layouts`.
+        // Called right after the parent is rendered so all buffers for the unit
+        // go out of scope together when the enclosing block exits.
+        const renderDetailShotsWithLayouts = (parentPhotoId: number, layouts: Map<number, PhotoLayout>) => {
           const detailMinH = 90;
-          for (const { pl, entries: photoEntries } of detailWithEntries) {
+          for (const { photoMeta, entries: photoEntries } of (detailMetaByParent.get(parentPhotoId) || [])) {
+            const dpl = layouts.get(photoMeta.id);
+            if (!dpl) continue;
             ensureSpace(detailMinH);
             const availH = Math.min(maxY - currentY, 200);
-            const result = renderDetailShotColumnList(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
+            const result = renderDetailShotColumnList(dpl, photoEntries, tableLeft, currentY, pageWidth, availH);
             currentY += result.renderedH + gap;
           }
-          for (const pl of detailWithout) {
+          for (const photoMeta of (detailMetaWithoutByParent.get(parentPhotoId) || [])) {
+            const dpl = layouts.get(photoMeta.id);
+            if (!dpl) continue;
             ensureSpace(detailMinH);
             const availH = Math.min(maxY - currentY, 200);
-            const result = renderDetailShotColumnList(pl, [], tableLeft, currentY, pageWidth, availH);
+            const result = renderDetailShotColumnList(dpl, [], tableLeft, currentY, pageWidth, availH);
             currentY += result.renderedH + gap;
           }
         };
 
-        if (compactPhotos.length > 0) {
+        // Compact photos (receiving section, with entries): load → render → release.
+        if (compactMeta.length > 0) {
           const compactMinH = 80;
-          for (const { pl, entries: photoEntries } of compactPhotos) {
+          for (const item of compactMeta) {
+            const photosNeeded: any[] = [
+              item.photoMeta,
+              ...(detailMetaByParent.get(item.photoMeta.id) || []).map((d: MetaWithEntries) => d.photoMeta),
+              ...(detailMetaWithoutByParent.get(item.photoMeta.id) || []),
+            ];
+            const layouts = await loadLayouts(photosNeeded);
+            const pl = layouts.get(item.photoMeta.id);
+            if (!pl) continue;
             ensureSpace(compactMinH);
             const availH = Math.min(maxY - currentY, 180);
-            const result = renderCompactPhotoWithEntries(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
+            const result = renderCompactPhotoWithEntries(pl, item.entries, tableLeft, currentY, pageWidth, availH);
             currentY += result.renderedH + gap;
-            renderDetailShotsForParent(pl.photo.id);
+            renderDetailShotsWithLayouts(item.photoMeta.id, layouts);
           }
         }
 
-        if (compactWithoutEntries.length > 0) {
+        // Compact photos without entries: load each row (≤ 4) → render → release.
+        if (compactWithoutMeta.length > 0) {
           let idx = 0;
-          while (idx < compactWithoutEntries.length) {
-            const remaining = compactWithoutEntries.length - idx;
+          while (idx < compactWithoutMeta.length) {
+            const remaining = compactWithoutMeta.length - idx;
             const perRow = Math.min(4, remaining);
+            const rowPhotos: any[] = compactWithoutMeta.slice(idx, idx + perRow);
+            const photosNeeded: any[] = [
+              ...rowPhotos,
+              ...rowPhotos.flatMap((p: any) => [
+                ...(detailMetaByParent.get(p.id) || []).map((d: MetaWithEntries) => d.photoMeta),
+                ...(detailMetaWithoutByParent.get(p.id) || []),
+              ]),
+            ];
+            const layouts = await loadLayouts(photosNeeded);
             const cellW = (pageWidth - gap * (perRow - 1)) / perRow;
-            const rowAspects = [];
-            for (let c = 0; c < perRow; c++) {
-              const pl = compactWithoutEntries[idx + c];
-              rowAspects.push(pl.origW / pl.origH);
-            }
+            const rowAspects: number[] = rowPhotos.map((p: any) => {
+              const pl = layouts.get(p.id);
+              return pl ? pl.origW / pl.origH : 1;
+            });
             const estimatedH = Math.max(...rowAspects.map(a => cellW / a)) + 14;
             ensureSpace(Math.min(estimatedH, 200));
             const availH = maxY - currentY;
             let maxRowH = 0;
             for (let c = 0; c < perRow; c++) {
-              const pl = compactWithoutEntries[idx + c];
+              const pl = layouts.get(rowPhotos[c].id);
+              if (!pl) continue;
               const x = tableLeft + c * (cellW + gap);
               const result = renderPhoto(pl, x, currentY, cellW, availH);
               if (result.renderedH > maxRowH) maxRowH = result.renderedH;
             }
             currentY += maxRowH + gap;
-            for (let c = 0; c < perRow; c++) {
-              renderDetailShotsForParent(compactWithoutEntries[idx + c].photo.id);
+            for (const photoMeta of rowPhotos) {
+              renderDetailShotsWithLayouts(photoMeta.id, layouts);
             }
             idx += perRow;
           }
@@ -3856,65 +3872,106 @@ export async function registerRoutes(
           return { bottomY: Math.max(y + result.renderedH, tblEndY) };
         };
 
-        for (const item of standardPhotos) {
+        // Standard photos (with entries): load parent + its detail shots → render → release.
+        for (const item of standardMeta) {
+          const photosNeeded: any[] = [
+            item.photoMeta,
+            ...(detailMetaByParent.get(item.photoMeta.id) || []).map((d: MetaWithEntries) => d.photoMeta),
+            ...(detailMetaWithoutByParent.get(item.photoMeta.id) || []),
+          ];
+          const layouts = await loadLayouts(photosNeeded);
+          const pl = layouts.get(item.photoMeta.id);
+          if (!pl) continue;
           ensureSpace(minPhotoH);
           const photoW = pageWidth * 0.45;
           const tblW = pageWidth - photoW - gap;
-          const r = renderStandardPhotoAt(item, tableLeft, photoW, tblW, currentY, maxY - currentY);
+          const r = renderStandardPhotoAt({ pl, entries: item.entries }, tableLeft, photoW, tblW, currentY, maxY - currentY);
           currentY = r.bottomY + gap;
-          renderDetailShotsForParent(item.pl.photo.id);
+          renderDetailShotsWithLayouts(item.photoMeta.id, layouts);
+          // `layouts` goes out of scope → GC can collect the image buffers
         }
 
-        if (standardWithoutEntries.length > 0) {
+        // Standard photos without entries: rows of 1 or 2 → load → render → release.
+        if (standardWithoutMeta.length > 0) {
           let idx = 0;
-          while (idx < standardWithoutEntries.length) {
-            const remaining = standardWithoutEntries.length - idx;
+          while (idx < standardWithoutMeta.length) {
+            const remaining = standardWithoutMeta.length - idx;
 
             if (remaining === 1) {
-              ensureSpace(minPhotoH);
-              const pl = standardWithoutEntries[idx];
-              const maxW = pageWidth * 0.6;
-              const availH = maxY - currentY;
-              const centeredX = tableLeft + (pageWidth - maxW) / 2;
-              const result = renderPhoto(pl, centeredX, currentY, maxW, availH);
-              currentY += result.renderedH + gap;
-              renderDetailShotsForParent(pl.photo.id);
+              const photoMeta = standardWithoutMeta[idx];
+              const photosNeeded: any[] = [
+                photoMeta,
+                ...(detailMetaByParent.get(photoMeta.id) || []).map((d: MetaWithEntries) => d.photoMeta),
+                ...(detailMetaWithoutByParent.get(photoMeta.id) || []),
+              ];
+              const layouts = await loadLayouts(photosNeeded);
+              const pl = layouts.get(photoMeta.id);
+              if (pl) {
+                ensureSpace(minPhotoH);
+                const maxW = pageWidth * 0.6;
+                const availH = maxY - currentY;
+                const centeredX = tableLeft + (pageWidth - maxW) / 2;
+                const result = renderPhoto(pl, centeredX, currentY, maxW, availH);
+                currentY += result.renderedH + gap;
+                renderDetailShotsWithLayouts(photoMeta.id, layouts);
+              }
               idx++;
             } else {
+              const photosInRow = Math.min(2, remaining);
+              const rowPhotos: any[] = standardWithoutMeta.slice(idx, idx + photosInRow);
+              const photosNeeded: any[] = [
+                ...rowPhotos,
+                ...rowPhotos.flatMap((p: any) => [
+                  ...(detailMetaByParent.get(p.id) || []).map((d: MetaWithEntries) => d.photoMeta),
+                  ...(detailMetaWithoutByParent.get(p.id) || []),
+                ]),
+              ];
+              const layouts = await loadLayouts(photosNeeded);
               ensureSpace(minPhotoH);
               const cellW = (pageWidth - gap) / 2;
               const availH = maxY - currentY;
-              const photosInRow = Math.min(2, remaining);
               let maxRowH = 0;
-
               for (let c = 0; c < photosInRow; c++) {
-                const pl = standardWithoutEntries[idx + c];
+                const pl = layouts.get(rowPhotos[c].id);
+                if (!pl) continue;
                 const x = tableLeft + c * (cellW + gap);
                 const result = renderPhoto(pl, x, currentY, cellW, availH);
                 if (result.renderedH > maxRowH) maxRowH = result.renderedH;
               }
-
               currentY += maxRowH + gap;
-              for (let c = 0; c < photosInRow; c++) {
-                renderDetailShotsForParent(standardWithoutEntries[idx + c].photo.id);
+              for (const photoMeta of rowPhotos) {
+                renderDetailShotsWithLayouts(photoMeta.id, layouts);
               }
               idx += photosInRow;
             }
           }
         }
 
-        const orphanDetailWithEntries = [...detailShotsByParent.entries()].filter(([parentId]) => !loadedPhotos.some(p => p.photo.id === parentId));
-        const orphanDetailWithout = [...detailShotsWithoutEntriesByParent.entries()].filter(([parentId]) => !loadedPhotos.some(p => p.photo.id === parentId));
-        for (const [, items] of orphanDetailWithEntries) {
-          for (const { pl, entries: photoEntries } of items) {
+        // Orphan detail shots: detail shots whose parent photo is not in allPhotos.
+        const renderedParentIds = new Set<number>([
+          ...standardMeta.map(i => i.photoMeta.id),
+          ...compactMeta.map(i => i.photoMeta.id),
+          ...(standardWithoutMeta as any[]).map((p: any) => p.id),
+          ...(compactWithoutMeta as any[]).map((p: any) => p.id),
+        ]);
+        for (const [parentId, items] of detailMetaByParent) {
+          if (renderedParentIds.has(parentId)) continue;
+          for (const { photoMeta, entries: photoEntries } of items) {
+            const layouts = await loadLayouts([photoMeta]);
+            const pl = layouts.get(photoMeta.id);
+            if (!pl) continue;
             ensureSpace(80);
             const availH = Math.min(maxY - currentY, 180);
             const result = renderCompactPhotoWithEntries(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
             currentY += result.renderedH + gap;
           }
         }
-        for (const [, items] of orphanDetailWithout) {
-          for (const pl of items) {
+        for (const [parentId, photos] of detailMetaWithoutByParent) {
+          if (renderedParentIds.has(parentId)) continue;
+          for (const photoMeta of photos) {
+            const layouts = await loadLayouts([photoMeta]);
+            const pl = layouts.get(photoMeta.id);
+            if (!pl) continue;
             ensureSpace(80);
             const availH = Math.min(maxY - currentY, 180);
             const result = renderPhoto(pl, tableLeft, currentY, pageWidth * 0.35, availH);
