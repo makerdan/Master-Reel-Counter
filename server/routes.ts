@@ -3780,7 +3780,12 @@ export async function registerRoutes(
           const detailMinH = 90;
           for (const { photoMeta, entries: photoEntries } of (detailMetaByParent.get(parentPhotoId) || [])) {
             const dpl = layouts.get(photoMeta.id);
-            if (!dpl) continue;
+            if (!dpl) {
+              if (photoEntries.length > 0) {
+                deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: photoEntries });
+              }
+              continue;
+            }
             ensureSpace(detailMinH);
             const availH = Math.min(maxY - currentY, 200);
             const result = renderDetailShotColumnList(dpl, photoEntries, tableLeft, currentY, pageWidth, availH);
@@ -3812,7 +3817,12 @@ export async function registerRoutes(
             ];
             const layouts = await loadLayouts(photosNeeded);
             const pl = layouts.get(item.photoMeta.id);
-            if (!pl) continue;
+            if (!pl) {
+              if (item.entries.length > 0) {
+                deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: item.entries });
+              }
+              continue;
+            }
             ensureSpace(compactMinH);
             const availH = Math.min(maxY - currentY, 180);
             const result = renderCompactPhotoWithEntries(pl, item.entries, tableLeft, currentY, pageWidth, availH);
@@ -3890,7 +3900,12 @@ export async function registerRoutes(
           ];
           const layouts = await loadLayouts(photosNeeded);
           const pl = layouts.get(item.photoMeta.id);
-          if (!pl) continue;
+          if (!pl) {
+            if (item.entries.length > 0) {
+              deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: item.entries });
+            }
+            continue;
+          }
           ensureSpace(minPhotoH);
           const photoW = pageWidth * 0.45;
           const tblW = pageWidth - photoW - gap;
@@ -3970,7 +3985,12 @@ export async function registerRoutes(
           for (const { photoMeta, entries: photoEntries } of items) {
             const layouts = await loadLayouts([photoMeta]);
             const pl = layouts.get(photoMeta.id);
-            if (!pl) continue;
+            if (!pl) {
+              if (photoEntries.length > 0) {
+                deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: photoEntries });
+              }
+              continue;
+            }
             ensureSpace(80);
             const availH = Math.min(maxY - currentY, 180);
             const result = renderCompactPhotoWithEntries(pl, photoEntries, tableLeft, currentY, pageWidth, availH);
