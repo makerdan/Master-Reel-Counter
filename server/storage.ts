@@ -129,12 +129,13 @@ export interface IStorage {
   deletePin(id: number): Promise<void>;
   /**
    * Atomically keeps one pin and deletes all other pins in a duplicate group.
-   * Runs inside a single DB transaction. Pin IDs that no longer exist (because
-   * a concurrent keep already deleted them) are silently skipped so two users
-   * clicking "Keep" simultaneously never cause data loss.
-   * Also deletes any entries linked to the deleted pins.
+   * Runs inside a single DB transaction. Only pins whose photo belongs to
+   * `sessionId` are touched — any IDs from other sessions are silently
+   * ignored (IDOR protection / defense-in-depth). Pin IDs that no longer
+   * exist (concurrent keep) are also silently skipped. Also deletes any
+   * entries linked to the deleted pins.
    */
-  batchKeepPins(pinIdToKeep: number, pinIdsToDelete: number[]): Promise<{ deletedCount: number }>;
+  batchKeepPins(sessionId: number, pinIdToKeep: number, pinIdsToDelete: number[]): Promise<{ deletedCount: number }>;
 
   getSessionIncompletePins(sessionId: number): Promise<{ photoId: number; incompleteCount: number }[]>;
   resolveParentPinForDetailShot(detailPhotoId: number, entryId: number): Promise<void>;
@@ -825,17 +826,18 @@ export class DatabaseStorage implements IStorage {
     await db.delete(pins).where(eq(pins.id, id));
   }
 
-  async batchKeepPins(pinIdToKeep: number, pinIdsToDelete: number[]): Promise<{ deletedCount: number }> {
+  async batchKeepPins(sessionId: number, pinIdToKeep: number, pinIdsToDelete: number[]): Promise<{ deletedCount: number }> {
     // Extra safety guard: never delete the keeper, even if the caller
     // accidentally included it in the delete list.
     const safeToDelete = pinIdsToDelete.filter(id => id !== pinIdToKeep);
     if (!safeToDelete.length) return { deletedCount: 0 };
     return db.transaction(async (tx) => {
-      // Only operate on pins that still exist — concurrent keeps may have
-      // already removed some of them, and that is not an error.
+      // Only operate on pins that belong to the target session (IDOR guard)
+      // and still exist (concurrent keeps may have removed them already).
       const existing = await tx
         .select({ id: pins.id, entryId: pins.entryId })
         .from(pins)
+        .innerJoin(photos, and(eq(pins.photoId, photos.id), eq(photos.sessionId, sessionId)))
         .where(inArray(pins.id, safeToDelete));
       if (!existing.length) return { deletedCount: 0 };
 

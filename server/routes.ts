@@ -1780,8 +1780,19 @@ export async function registerRoutes(
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
+      // Verify the pin we're keeping actually belongs to this session.
+      // This check also catches invalid pinIdToKeep values before touching the DB.
+      const keeperPin = await storage.getPin(pinIdToKeep);
+      if (!keeperPin) return res.status(404).json({ message: "Pin not found" });
+      const keeperPhoto = await storage.getPhoto(keeperPin.photoId);
+      if (!keeperPhoto || keeperPhoto.sessionId !== sessionId) {
+        return res.status(403).json({ message: "Pin does not belong to this session" });
+      }
+
       const pinIdsToDelete = (pinGroupIds as number[]).filter((id) => id !== pinIdToKeep);
-      const { deletedCount } = await storage.batchKeepPins(pinIdToKeep, pinIdsToDelete);
+      // sessionId is passed to storage so the DELETE is scoped to this session
+      // even if the client submits IDs from another session (defense-in-depth).
+      const { deletedCount } = await storage.batchKeepPins(sessionId, pinIdToKeep, pinIdsToDelete);
 
       broadcastToSession(sessionId, { type: "sync", entity: "pins", sessionId });
       broadcastToSession(sessionId, { type: "sync", entity: "entries", sessionId });
