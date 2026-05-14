@@ -325,7 +325,7 @@ function EntryTable({
       toast({
         title: "Entry deleted",
         action: onTriggerUndoRef.current
-          ? <ToastAction altText="Undo" onClick={() => { if (consumed) return; consumed = true; onTriggerUndoRef.current?.(); }}>Undo</ToastAction>
+          ? <ToastAction altText="Undo" onClick={(e) => { if (consumed) return; consumed = true; (e.currentTarget as HTMLButtonElement).disabled = true; onTriggerUndoRef.current?.(); }}>Undo</ToastAction>
           : undefined,
       });
     },

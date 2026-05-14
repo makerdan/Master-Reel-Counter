@@ -430,7 +430,7 @@ function SessionWorkspace({
       let consumed = false;
       toast({
         title: "Entry deleted",
-        action: <ToastAction altText="Undo" onClick={() => { if (consumed) return; consumed = true; undoWithSignalRef.current(); }}>Undo</ToastAction>,
+        action: <ToastAction altText="Undo" onClick={(e) => { if (consumed) return; consumed = true; (e.currentTarget as HTMLButtonElement).disabled = true; undoWithSignalRef.current(); }}>Undo</ToastAction>,
       });
       setEditingEntry(null);
     },
