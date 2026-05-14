@@ -1006,7 +1006,7 @@ export default function Dashboard() {
         key={session.id}
         className={`hover-elevate cursor-pointer ${isSelected ? "border border-primary ring-2 ring-primary/30" : "border-0"}`}
         data-testid={`card-${prefix}session-${session.id}`}
-        onClick={() => setLocation(`/session/${session.id}`)}
+        onClick={() => { if (inlineRenameId !== session.id) setLocation(`/session/${session.id}`); }}
       >
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2">
