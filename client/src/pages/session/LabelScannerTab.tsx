@@ -497,6 +497,7 @@ export default function LabelScannerTab({
     onPhotoChange?.(selectedPhotoId);
   }, [selectedPhotoId]);
 
+  const [retryingPhotoIds, setRetryingPhotoIds] = useState<Set<number>>(new Set());
   const [useCachedResults, setUseCachedResults] = useState(true);
   const [flagPopoverPinId, setFlagPopoverPinId] = useState<number | null>(null);
   const [flagReasonDraft, setFlagReasonDraft] = useState("");
@@ -1273,12 +1274,21 @@ export default function LabelScannerTab({
     await runAnalyze(includedCards, { isRetry: false });
   }
 
-  const handleRetryPhoto = useCallback((photoId: number) => {
+  const handleRetryPhoto = useCallback(async (photoId: number) => {
     const photoCards = cards.filter(
       (c) => c.pin.photoId === photoId && c.included && !c.result && !c.pin.flagged
     );
     if (!photoCards.length) return;
-    runAnalyze(photoCards, { isRetry: true });
+    setRetryingPhotoIds((prev) => new Set([...prev, photoId]));
+    try {
+      await runAnalyze(photoCards, { isRetry: true });
+    } finally {
+      setRetryingPhotoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(photoId);
+        return next;
+      });
+    }
   }, [cards]);
 
   // Only GET requests are safe to retry (idempotent).  POST / PATCH / DELETE
@@ -2030,33 +2040,53 @@ export default function LabelScannerTab({
                         {!card.result && phase === "results" && (
                           <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <Badge
-                                className={`py-1 px-2 text-wrap text-[11px] ${
-                                  card.notAnalyzedReason === "failed"
-                                    ? "bg-red-900/40 text-red-300 border-red-700/50"
-                                    : card.notAnalyzedReason === "cancelled"
-                                    ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
-                                    : card.notAnalyzedReason === "excluded"
-                                    ? "bg-zinc-800 text-zinc-400 border-zinc-700"
-                                    : "bg-zinc-800 text-zinc-400 border-zinc-700"
-                                }`}
-                                data-testid={`badge-manual-${card.pin.id}`}
-                              >
-                                {notAnalyzedCopy(card.notAnalyzedReason)}
-                              </Badge>
-                              {card.notAnalyzedReason === "failed" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleRetryPhoto(card.pin.photoId)}
-                                  disabled={analyzing}
-                                  className="h-6 gap-1 px-2 text-[11px] border-red-700/50 text-red-300 hover:text-red-200 hover:bg-red-900/20"
-                                  data-testid={`btn-retry-${card.pin.id}`}
-                                >
-                                  <RotateCw className="h-3 w-3" />
-                                  Retry
-                                </Button>
-                              )}
+                              {(() => {
+                                const isRetrying = retryingPhotoIds.has(card.pin.photoId);
+                                return (
+                                  <>
+                                    <Badge
+                                      className={`py-1 px-2 text-wrap text-[11px] ${
+                                        isRetrying
+                                          ? "bg-blue-900/40 text-blue-300 border-blue-700/50"
+                                          : card.notAnalyzedReason === "failed"
+                                          ? "bg-red-900/40 text-red-300 border-red-700/50"
+                                          : card.notAnalyzedReason === "cancelled"
+                                          ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
+                                          : card.notAnalyzedReason === "excluded"
+                                          ? "bg-zinc-800 text-zinc-400 border-zinc-700"
+                                          : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                                      }`}
+                                      data-testid={`badge-manual-${card.pin.id}`}
+                                    >
+                                      {isRetrying ? (
+                                        <span className="flex items-center gap-1">
+                                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                          Retrying…
+                                        </span>
+                                      ) : (
+                                        notAnalyzedCopy(card.notAnalyzedReason)
+                                      )}
+                                    </Badge>
+                                    {card.notAnalyzedReason === "failed" && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleRetryPhoto(card.pin.photoId)}
+                                        disabled={analyzing || isRetrying}
+                                        className="h-6 gap-1 px-2 text-[11px] border-red-700/50 text-red-300 hover:text-red-200 hover:bg-red-900/20 disabled:opacity-50"
+                                        data-testid={`btn-retry-${card.pin.id}`}
+                                      >
+                                        {isRetrying ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <RotateCw className="h-3 w-3" />
+                                        )}
+                                        {isRetrying ? "Retrying…" : "Retry"}
+                                      </Button>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                             <div>
                               <label className="text-[10px] text-white/40">Catalog</label>
@@ -2317,31 +2347,51 @@ export default function LabelScannerTab({
               {!card.result && phase === "results" && (
                 <div className="space-y-2 pt-1 border-t border-[hsl(215_30%_50%/0.15)]">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge
-                      className={`py-1 px-2 text-wrap text-[11px] ${
-                        card.notAnalyzedReason === "failed"
-                          ? "bg-red-900/40 text-red-300 border-red-700/50"
-                          : card.notAnalyzedReason === "cancelled"
-                          ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
-                          : "bg-zinc-800 text-zinc-400 border-zinc-700"
-                      }`}
-                      data-testid={`badge-manual-${card.pin.id}`}
-                    >
-                      {notAnalyzedCopy(card.notAnalyzedReason)}
-                    </Badge>
-                    {card.notAnalyzedReason === "failed" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRetryPhoto(card.pin.photoId)}
-                        disabled={analyzing}
-                        className="h-6 gap-1 px-2 text-[11px] border-red-700/50 text-red-300 hover:text-red-200 hover:bg-red-900/20"
-                        data-testid={`btn-retry-${card.pin.id}`}
-                      >
-                        <RotateCw className="h-3 w-3" />
-                        Retry
-                      </Button>
-                    )}
+                    {(() => {
+                      const isRetrying = retryingPhotoIds.has(card.pin.photoId);
+                      return (
+                        <>
+                          <Badge
+                            className={`py-1 px-2 text-wrap text-[11px] ${
+                              isRetrying
+                                ? "bg-blue-900/40 text-blue-300 border-blue-700/50"
+                                : card.notAnalyzedReason === "failed"
+                                ? "bg-red-900/40 text-red-300 border-red-700/50"
+                                : card.notAnalyzedReason === "cancelled"
+                                ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
+                                : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                            }`}
+                            data-testid={`badge-manual-${card.pin.id}`}
+                          >
+                            {isRetrying ? (
+                              <span className="flex items-center gap-1">
+                                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                Retrying…
+                              </span>
+                            ) : (
+                              notAnalyzedCopy(card.notAnalyzedReason)
+                            )}
+                          </Badge>
+                          {card.notAnalyzedReason === "failed" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRetryPhoto(card.pin.photoId)}
+                              disabled={analyzing || isRetrying}
+                              className="h-6 gap-1 px-2 text-[11px] border-red-700/50 text-red-300 hover:text-red-200 hover:bg-red-900/20 disabled:opacity-50"
+                              data-testid={`btn-retry-${card.pin.id}`}
+                            >
+                              {isRetrying ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <RotateCw className="h-3 w-3" />
+                              )}
+                              {isRetrying ? "Retrying…" : "Retry"}
+                            </Button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div>
                     <label className="text-[10px] text-white/40">Catalog</label>
