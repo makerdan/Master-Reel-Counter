@@ -2,6 +2,14 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { queryClient } from "@/lib/queryClient";
 
 type MessageHandler = (msg: any) => void;
+/**
+ * `"connecting"`   – initial connection attempt before any successful open.
+ *                    No reconnect UI should appear for this state.
+ * `"connected"`    – WebSocket is open and live.
+ * `"reconnecting"` – a prior successful connection was lost; back-off timer
+ *                    is running. This is the state consumers should use to
+ *                    show a "Reconnecting…" indicator.
+ */
 export type WsStatus = "connecting" | "connected" | "reconnecting";
 
 const WS_RECONNECT_BASE_MS = 1_000;
