@@ -83,7 +83,11 @@ export default function SessionPage() {
     retriedMissingPhotoIdsRef.current = "";
   }, [sessionId]);
   useEffect(() => {
-    if (!entries.length || !sessionId || photosFetching) return;
+    if (!sessionId || photosFetching) return;
+    if (!entries.length) {
+      retriedMissingPhotoIdsRef.current = "";
+      return;
+    }
     const photoIds = new Set(photos.map((p) => p.id));
     const missingIds = entries
       .filter((e) => e.photoId && !photoIds.has(e.photoId))
