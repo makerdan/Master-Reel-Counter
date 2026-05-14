@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
 import type { UppyFile, UploadResult } from "@uppy/core";
@@ -41,25 +41,15 @@ interface ObjectUploaderProps {
  *   - File preview
  *   - Upload progress tracking
  *   - Upload status display
- * - Guards against accidental closure mid-upload: closing the modal or navigating
- *   away while an upload is in progress shows a confirmation prompt.
+ * - Guards against accidental closure mid-upload:
+ *   - Closing the modal while uploading requires a confirmation prompt.
+ *   - Full-page navigation (refresh/unload) while uploading triggers the
+ *     browser's built-in "Leave site?" dialog.
+ *   - React component unmount while uploading defers Uppy teardown until
+ *     the in-flight HTTP request completes, so uploads are never silently lost.
  *
  * The component uses Uppy v5 under the hood to handle all file upload functionality.
  * All file management features are automatically handled by the Uppy dashboard modal.
- *
- * @param props - Component props
- * @param props.maxNumberOfFiles - Maximum number of files allowed to be uploaded
- *   (default: 1)
- * @param props.maxFileSize - Maximum file size in bytes (default: 10MB)
- * @param props.onGetUploadParameters - Function to get upload parameters for each file.
- *   Receives the UppyFile object with file.name, file.size, file.type properties.
- *   Use these to request per-file presigned URLs from your backend. Returns method,
- *   url, and optional headers for the upload request.
- * @param props.onComplete - Callback function called when upload is complete. Typically
- *   used to make post-upload API calls to update server state and set object ACL
- *   policies.
- * @param props.buttonClassName - Optional CSS class name for the button
- * @param props.children - Content to be rendered inside the button
  */
 export function ObjectUploader({
   maxNumberOfFiles = 1,
@@ -71,6 +61,15 @@ export function ObjectUploader({
 }: ObjectUploaderProps) {
   const [showModal, setShowModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Keep a stable ref to the latest onComplete callback so the Uppy "complete"
+  // listener (attached once at creation) always invokes the current prop value.
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  // Ref mirrors isUploading state so the unmount cleanup can read the current
+  // value without capturing a stale closure.
+  const isUploadingRef = useRef(false);
 
   const [uppy] = useState(() =>
     new Uppy({
@@ -85,14 +84,20 @@ export function ObjectUploader({
         getUploadParameters: onGetUploadParameters,
       })
       .on("complete", (result) => {
-        onComplete?.(result);
+        onCompleteRef.current?.(result);
       })
   );
 
-  // Track upload state via Uppy events.
+  // Track upload state via Uppy events; keep ref in sync with state.
   useEffect(() => {
-    const onUploadStart = () => setIsUploading(true);
-    const onDone = () => setIsUploading(false);
+    const onUploadStart = () => {
+      setIsUploading(true);
+      isUploadingRef.current = true;
+    };
+    const onDone = () => {
+      setIsUploading(false);
+      isUploadingRef.current = false;
+    };
 
     uppy.on("upload", onUploadStart);
     uppy.on("complete", onDone);
@@ -117,11 +122,19 @@ export function ObjectUploader({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isUploading]);
 
-  // Guard the destroy call: if the component is unmounted while uploading,
-  // cancel so the Uppy instance is left in a clean state.
+  // Teardown: if an upload is active when the component unmounts (e.g. in-app
+  // navigation), defer Uppy destruction until the in-flight request settles so
+  // uploads are never silently discarded. If idle, destroy immediately.
   useEffect(() => {
     return () => {
-      uppy.destroy();
+      if (isUploadingRef.current) {
+        const destroyOnDone = () => { uppy.destroy(); };
+        uppy.once("complete", destroyOnDone);
+        uppy.once("upload-error", destroyOnDone);
+        uppy.once("cancel-all", destroyOnDone);
+      } else {
+        uppy.destroy();
+      }
     };
   }, [uppy]);
 
