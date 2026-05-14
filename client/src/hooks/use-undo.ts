@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 
@@ -90,6 +90,42 @@ function isNetworkFailure(err: unknown): boolean {
 function errorMessage(err: unknown, fallback: string): string {
   if (err instanceof Error && err.message) return err.message;
   return fallback;
+}
+
+function actionLabel(action: UndoAction): string {
+  const d = action.data;
+  const p = action.previousData;
+  switch (action.type) {
+    case "create-entry":
+    case "delete-entry":
+    case "update-entry": {
+      const src = d ?? p ?? {};
+      const aisle: string = src.aisle ?? "";
+      const section: string = src.section ?? "";
+      const wire: string = src.wireDetails ?? "";
+      const loc = [aisle, section].filter(Boolean).join("-");
+      if (loc) return `Entry ${loc}${wire ? ` (${wire})` : ""}`;
+      return `Entry #${action.entityId}`;
+    }
+    case "create-pin":
+    case "delete-pin":
+    case "update-pin": {
+      const label: string = d?.label ?? p?.label ?? "";
+      const wire: string = d?.wireDetails ?? p?.wireDetails ?? "";
+      if (label) return `Pin ${label}${wire ? ` (${wire})` : ""}`;
+      return `Pin #${action.entityId}`;
+    }
+    case "flag-pin":
+    case "unflag-pin":
+      return `Pin #${action.entityId}`;
+    case "update-session":
+    case "lock-session": {
+      const name: string = d?.name ?? p?.name ?? "";
+      return name ? `Session "${name}"` : "Session";
+    }
+    default:
+      return "";
+  }
 }
 
 export function useUndoRedo(sessionId: number) {
@@ -404,9 +440,12 @@ export function useUndoRedo(sessionId: number) {
           setRedoStack(prev => prev.slice(0, -1));
         }
         invalidateSession(action.type);
+        const serverMsg = (parseApiErrorPayload(err)?.message as string | undefined) ?? "already modified by another user";
+        const label = actionLabel(action);
+        const description = label ? `${label} — ${serverMsg}` : serverMsg;
         toast({
           title: direction === "undo" ? "Undo skipped" : "Redo skipped",
-          description: "This change was already modified by another user.",
+          description,
         });
         return;
       }
