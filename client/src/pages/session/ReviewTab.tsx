@@ -303,9 +303,10 @@ const lateJoinerQueueCache = new Map<string, number[]>();
 // ─── ReviewTab ────────────────────────────────────────────────────────────────
 
 export default function ReviewTab({
-  sessionId, entries, photos, onlineUsers = [],
+  sessionId, entries, photos, onlineUsers = [], serverReviewCohort = null,
 }: {
   sessionId: number; entries: Entry[]; photos: Photo[]; onlineUsers?: OnlineUser[];
+  serverReviewCohort?: string | null;
 }) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -362,35 +363,26 @@ export default function ReviewTab({
     return [...onlineUsers].sort((a, b) => a.userId.localeCompare(b.userId));
   }, [onlineUsers, currentUserId, user]);
 
-  const reviewCohort = useMemo(() => {
-    const responderIds = Array.from(new Set(reviewResponses.map(r => r.userId))).sort();
-    if (responderIds.length === 0) return sortedUsers;
-    const cohortIds = responderIds.filter(
-      id => !lateJoinerQueueCache.has(`${sessionId}:${id}`)
-    );
-    if (cohortIds.length === 0) return sortedUsers;
-    const usernameMap = new Map(sortedUsers.map(u => [u.userId, u.username]));
-    for (const r of reviewResponses) {
-      if (!usernameMap.has(r.userId)) usernameMap.set(r.userId, r.userId);
-    }
-    return cohortIds.map(id => ({ userId: id, username: usernameMap.get(id) || id }));
-  }, [reviewResponses, sortedUsers, sessionId]);
+  // Parse the server-anchored cohort from the session record.
+  // The server sets this once on the first review response so that all clients
+  // always compute the same entry→reviewer mappings regardless of join timing.
+  const serverCohort = useMemo<Array<{ userId: string; username: string }> | null>(() => {
+    if (!serverReviewCohort) return null;
+    try {
+      const parsed = JSON.parse(serverReviewCohort);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+    return null;
+  }, [serverReviewCohort]);
 
-  // Freeze the assignment cohort on first non-empty computation so that users
-  // joining or leaving mid-review do not reshuffle entry-to-reviewer mappings.
-  // The ref stores { sid, cohort } to auto-reset when the session changes.
-  const frozenCohortRef = useRef<{ sid: number; cohort: Array<{ userId: string; username: string }> } | null>(null);
-  if (frozenCohortRef.current?.sid !== sessionId) {
-    // Session changed — discard the old snapshot so the next non-empty cohort
-    // for this session is captured fresh.
-    frozenCohortRef.current = null;
-  }
-  if (frozenCohortRef.current === null && reviewCohort.length > 0 && sortedEntries.length > 0) {
-    frozenCohortRef.current = { sid: sessionId, cohort: reviewCohort };
-  }
-  // Use the frozen snapshot when available; fall back to live cohort until it
-  // can be frozen (i.e. before any entries or users are known).
-  const stableCohort = frozenCohortRef.current?.cohort ?? reviewCohort;
+  // Stable cohort:
+  // • When the server has anchored a cohort for this session, use it — every
+  //   client will resolve the same value from the same DB row.
+  // • Before the first response (cohort not yet set), fall back to the current
+  //   sorted online users so reviewers can start immediately. This pre-anchor
+  //   phase is non-deterministic across clients, but it is brief and becomes
+  //   irrelevant once the first submit anchors the permanent cohort.
+  const stableCohort = serverCohort ?? sortedUsers;
 
   const isLateJoiner = useMemo(() => {
     const cacheKey = `${sessionId}:${currentUserId}`;
@@ -665,6 +657,9 @@ export default function ReviewTab({
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "review-responses"] });
+      // Invalidate the session record so serverReviewCohort is refreshed the
+      // first time a review response is submitted (server anchors the cohort then).
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
       setShowFlagInput(false); setFlagReason("");
       setJustActed(true);
       if (variables.verdict === "flagged") {

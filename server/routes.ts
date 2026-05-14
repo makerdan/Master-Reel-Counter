@@ -2330,6 +2330,27 @@ export async function registerRoutes(
         verdict,
         flagReason: verdict === "flagged" ? (flagReason || null) : null,
       });
+
+      // Anchor the review cohort on the first response for this session.
+      // `setSessionReviewCohort` is a conditional UPDATE (WHERE review_cohort IS NULL)
+      // so concurrent first-response requests are safe — only one wins the write.
+      // The cohort is captured from server-side presence so all clients compute
+      // identical entry→reviewer mappings regardless of their join timing.
+      const sessionForCohort = await storage.getSession(sessionId);
+      if (sessionForCohort && !sessionForCohort.reviewCohort) {
+        const onlineNow = getOnlineUsers(sessionId)
+          .sort((a, b) => a.userId.localeCompare(b.userId));
+        // Always include the submitting user even if they aren't in the WS room yet.
+        if (!onlineNow.find(u => u.userId === userId)) {
+          onlineNow.push({ userId, username });
+          onlineNow.sort((a, b) => a.userId.localeCompare(b.userId));
+        }
+        const anchored = await storage.setSessionReviewCohort(sessionId, onlineNow);
+        if (anchored) {
+          broadcastToSession(sessionId, { type: "review_cohort_set", cohort: onlineNow });
+        }
+      }
+
       res.json(response);
     } catch (error) {
       res.status(500).json({ message: "Failed to save review response" });

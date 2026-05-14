@@ -985,6 +985,7 @@ function SessionWorkspace({
                   entries={entries}
                   photos={photos}
                   onlineUsers={onlineUsers}
+                  serverReviewCohort={session?.reviewCohort ?? null}
                 />
               </TabsContent>
 

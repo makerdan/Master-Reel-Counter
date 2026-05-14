@@ -78,6 +78,11 @@ export const countingSessions = pgTable("counting_sessions", {
   completedAt: timestamp("completed_at"),
   lastPhotoIndex: integer("last_photo_index").default(0),
   deletedAt: timestamp("deleted_at"),
+  // reviewCohort: JSON-encoded sorted array of { userId, username } objects.
+  // Set once (server-side) when the first review response is submitted for this
+  // session. All clients read this value so every reviewer computes identical
+  // entry→reviewer mappings regardless of join timing.
+  reviewCohort: text("review_cohort"),
 }, (table) => [
   index("counting_sessions_user_id_idx").on(table.userId),
   check("counting_sessions_status_check", sql`${table.status} IN ('active', 'completed')`),

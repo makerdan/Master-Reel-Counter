@@ -52,6 +52,13 @@ export interface IStorage {
   getUserSessions(userId: string, options?: { trash?: boolean; limit?: number; offset?: number }): Promise<{ sessions: Session[]; total: number }>;
   updateSession(id: number, data: Partial<Session>): Promise<Session | undefined>;
   /**
+   * Atomically sets `reviewCohort` for a session only when it is currently NULL.
+   * Returns the updated session if the write succeeded, or undefined if the
+   * cohort was already set (another request raced and won).
+   * Does NOT touch `lastUpdatedAt` — cohort anchoring is not a content change.
+   */
+  setSessionReviewCohort(id: number, cohort: { userId: string; username: string }[]): Promise<Session | undefined>;
+  /**
    * Optimistic-locking update: only writes if `lastUpdatedAt` on the row still
    * matches `expectedLastUpdatedAt`. Returns the updated row on success, or
    * `undefined` if the row was concurrently modified (timestamp mismatch).
@@ -356,6 +363,14 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.update(countingSessions)
       .set({ ...data, lastUpdatedAt: new Date() })
       .where(eq(countingSessions.id, id))
+      .returning();
+    return result;
+  }
+
+  async setSessionReviewCohort(id: number, cohort: { userId: string; username: string }[]): Promise<Session | undefined> {
+    const [result] = await db.update(countingSessions)
+      .set({ reviewCohort: JSON.stringify(cohort) })
+      .where(and(eq(countingSessions.id, id), isNull(countingSessions.reviewCohort)))
       .returning();
     return result;
   }
