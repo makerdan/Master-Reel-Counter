@@ -319,9 +319,11 @@ function EntryTable({
   };
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setExpandedSections({});
+    setCurrentPage(1);
   }, [activeFilters, debouncedQuery]);
 
   useEffect(() => {
@@ -357,6 +359,14 @@ function EntryTable({
   }, {});
 
   const sectionKeys = Object.keys(grouped).sort();
+
+  const SECTIONS_PER_PAGE = 10;
+  const totalPages = Math.max(1, Math.ceil(sectionKeys.length / SECTIONS_PER_PAGE));
+  const effectivePage = Math.min(currentPage, totalPages);
+  const pagedSectionKeys = sectionKeys.slice(
+    (effectivePage - 1) * SECTIONS_PER_PAGE,
+    effectivePage * SECTIONS_PER_PAGE,
+  );
 
   const toggleSection = (key: string) => {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -548,7 +558,7 @@ function EntryTable({
                 </tr>
               </thead>
               <tbody>
-                {sectionKeys.map((sectionKey) => {
+                {pagedSectionKeys.map((sectionKey) => {
                   const sectionEntries = [...grouped[sectionKey]].sort((a, b) => {
                     const pinA = pinByEntryId.get(a.id);
                     const pinB = pinByEntryId.get(b.id);
@@ -718,6 +728,33 @@ function EntryTable({
               </tfoot>
             </table>
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-border/40" data-testid="pagination-controls">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={effectivePage <= 1}
+                className="h-7 px-2 text-xs"
+                data-testid="button-prev-page"
+              >
+                ‹ Prev
+              </Button>
+              <span className="text-xs text-muted-foreground" data-testid="text-page-indicator">
+                Page {effectivePage} of {totalPages}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={effectivePage >= totalPages}
+                className="h-7 px-2 text-xs"
+                data-testid="button-next-page"
+              >
+                Next ›
+              </Button>
+            </div>
+          )}
         )}
       </CardContent>
     </Card>
