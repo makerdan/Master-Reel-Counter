@@ -422,6 +422,7 @@ export default function ReviewTab({
       if (result.length === cached.length) return result;
     }
 
+    if (stableCohort.length === 0) return [];
     const avgCount = Math.max(1, Math.floor(sortedEntries.length / stableCohort.length));
 
     let hash = 0;
