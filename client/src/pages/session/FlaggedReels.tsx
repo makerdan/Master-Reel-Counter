@@ -388,19 +388,21 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
 
   const unflagMutation = useMutation({
     mutationFn: async ({ pinId, flagReason, entryId, existingNotes }: { pinId: number; flagReason: string | null; entryId: number | null; existingNotes: string | null }) => {
-      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: null });
+      const unflagRes = await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged: false, flagReason: null });
+      const unflagUpdated = await unflagRes.json().catch(() => null);
+      const unflagToken: string | undefined = unflagUpdated?.updatedAt ? new Date(unflagUpdated.updatedAt as unknown as string).toISOString() : undefined;
       if (entryId) {
         const marker = flagReason ? `[Resolved from flag: ${flagReason}]` : "[Resolved from flag]";
         const updatedNotes = existingNotes ? `${existingNotes}\n${marker}` : marker;
         await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: updatedNotes });
       }
-      return { pinId, flagReason };
+      return { pinId, flagReason, unflagToken };
     },
-    onSuccess: ({ pinId, flagReason }) => {
+    onSuccess: ({ pinId, flagReason, unflagToken }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
-      pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason } });
+      pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason }, serverUpdatedAt: unflagToken });
     },
   });
 

@@ -273,7 +273,7 @@ function EntryTable({
           entityId: id,
           data: rest,
           previousData: rest,
-          serverUpdatedAt: entry.updatedAt ? new Date(entry.updatedAt as any).toISOString() : undefined,
+          serverUpdatedAt: entry.updatedAt instanceof Date ? entry.updatedAt.toISOString() : new Date(entry.updatedAt as unknown as string).toISOString(),
         });
       }
       toast({ title: "Entry deleted" });

@@ -156,7 +156,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [photoLoadedKey, setPhotoLoadedKey] = useState("");
   const [previewHeight, setPreviewHeight] = useState(0);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
-  const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean }>>([]);
+  const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean; updatedAt?: string }>>([]);
   const [pinLoadKey, setPinLoadKey] = useState(0);
   const [nearbyCommittedPins, setNearbyCommittedPins] = useState<Array<{ id: string; x: number; y: number; label: string; reelCount: number }>>([]);
   const [pinsLoaded, setPinsLoaded] = useState(false);
@@ -593,6 +593,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       reelCount: p.reelCount || 1,
       entryId: p.entryId ?? undefined,
       flagged: p.flagged || false,
+      updatedAt: p.updatedAt ? (p.updatedAt instanceof Date ? p.updatedAt.toISOString() : new Date(p.updatedAt as unknown as string).toISOString()) : undefined,
     })).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })));
     if (draftPins.length > 0) {
       setLocalPins(draftPins.map(p => ({
@@ -1324,11 +1325,14 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, []);
 
 
-  const deleteCommittedPin = useCallback(async (pin: { id: string; dbId?: number; x?: number; y?: number; label?: string; reelCount?: number; entryId?: number; flagged?: boolean }) => {
+  const deleteCommittedPin = useCallback(async (pin: { id: string; dbId?: number; x?: number; y?: number; label?: string; reelCount?: number; entryId?: number; flagged?: boolean; updatedAt?: string | Date }) => {
     if (pin.dbId) {
       try {
         await apiRequest("DELETE", `/api/pins/${pin.dbId}`);
         if (onPushUndo && currentPhoto?.dbId) {
+          const pinToken: string | undefined = pin.updatedAt
+            ? (pin.updatedAt instanceof Date ? pin.updatedAt.toISOString() : new Date(pin.updatedAt as unknown as string).toISOString())
+            : undefined;
           onPushUndo({
             type: "delete-pin",
             sessionId,
@@ -1342,6 +1346,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               entryId: pin.entryId,
               flagged: pin.flagged || false,
             },
+            serverUpdatedAt: pinToken,
           });
         }
       } catch {

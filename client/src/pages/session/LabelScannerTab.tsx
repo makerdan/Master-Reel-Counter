@@ -429,7 +429,7 @@ export default function LabelScannerTab({
   onPinDataChanged?: () => void;
   onPhotoChange?: (photoId: number | null) => void;
   onlineUsers?: OnlineUser[];
-  pushUndo?: (action: { type: string; sessionId: number; entityId: number; data: any; previousData?: any }) => void;
+  pushUndo?: (action: { type: string; sessionId: number; entityId: number; data: any; previousData?: any; serverUpdatedAt?: string }) => void;
   onApplied?: (sectionKey: string) => void;
   onBatchModeChange?: (isBatchMode: boolean) => void;
   onClose?: () => void;
@@ -1046,13 +1046,15 @@ export default function LabelScannerTab({
       const body: Record<string, unknown> = { flagged: newFlagged };
       if (newFlagged && reason) body.flagReason = reason;
       if (!newFlagged) body.flagReason = null;
-      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, body);
+      const flagRes = await apiRequest("PATCH", `/api/pins/${pinId}/flag`, body);
+      const flagUpdated = await flagRes.json().catch(() => null);
+      const flagToken: string | undefined = flagUpdated?.updatedAt ? new Date(flagUpdated.updatedAt as unknown as string).toISOString() : undefined;
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", String(sessionId), "pins"] });
       onPinDataChanged?.();
       if (newFlagged) {
-        pushUndo?.({ type: "flag-pin", sessionId, entityId: pinId, data: { flagged: true, flagReason: reason ?? null }, previousData: { flagged: prevFlagged, flagReason: prevFlagReason } });
+        pushUndo?.({ type: "flag-pin", sessionId, entityId: pinId, data: { flagged: true, flagReason: reason ?? null }, previousData: { flagged: prevFlagged, flagReason: prevFlagReason }, serverUpdatedAt: flagToken });
       } else {
-        pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason: prevFlagReason } });
+        pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason: prevFlagReason }, serverUpdatedAt: flagToken });
       }
     } catch {
       setCards((prev) =>
