@@ -1295,7 +1295,6 @@ export async function registerRoutes(
       }
 
       const oldPhotoId = body.oldPhotoId ? parseInt(body.oldPhotoId) : null;
-      const encKey = await getEncryptionKey(access.session.userId);
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
 
       const { photo } = await db.transaction(async (tx) => {
@@ -1306,6 +1305,7 @@ export async function registerRoutes(
           throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
         }
 
+        const encKey = await getEncryptionKey(access.session.userId);
         const [insertedPhoto] = await tx.insert(photos).values(safePhotoData).returning();
         const idMap = new Map<number, number>();
 
@@ -1397,24 +1397,24 @@ export async function registerRoutes(
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
-      let entryData = { ...req.body, sessionId: access.session.id, userId };
-      const encKey = await getEncryptionKey(access.session.userId);
-      if (encKey) entryData = encryptEntry(entryData, encKey) as any;
-      const data = insertEntrySchema.parse(entryData);
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
-      const entry = await db.transaction(async (tx) => {
+      const { entry, encKey } = await db.transaction(async (tx) => {
         const lockResult = await tx.execute(
           sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
         );
         if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
           throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
         }
-        const [inserted] = await tx.insert(entries).values(data).returning();
-        return inserted;
+        const key = await getEncryptionKey(access.session.userId);
+        let rawData: any = { ...req.body, sessionId: access.session.id, userId };
+        if (key) rawData = encryptEntry(rawData, key) as any;
+        const parsed = insertEntrySchema.parse(rawData);
+        const [inserted] = await tx.insert(entries).values(parsed).returning();
+        return { entry: inserted, encKey: key };
       });
-      if (data.photoId) {
+      if (entry.photoId) {
         try {
-          await storage.resolveParentPinForDetailShot(data.photoId, entry.id);
+          await storage.resolveParentPinForDetailShot(entry.photoId, entry.id);
         } catch (resolveErr) {
           console.error("Non-fatal: failed to resolve parent pin for detail shot", resolveErr);
         }
@@ -1459,22 +1459,22 @@ export async function registerRoutes(
       for (const key of allowedEntryFields) {
         if (req.body[key] !== undefined) safeBody[key] = req.body[key];
       }
-      const encKey = await getEncryptionKey(access.session.userId);
-      let updateData: any = safeBody;
-      if (encKey) updateData = encryptEntry(updateData, encKey) as any;
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
-      const updated = await db.transaction(async (tx) => {
+      const { updated, encKey } = await db.transaction(async (tx) => {
         const lockResult = await tx.execute(
           sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
         );
         if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
           throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
         }
-        const [result] = await tx.update(entries)
+        const key = await getEncryptionKey(access.session.userId);
+        let updateData: any = safeBody;
+        if (key) updateData = encryptEntry(updateData, key) as any;
+        const [row] = await tx.update(entries)
           .set({ ...updateData, updatedAt: new Date() })
           .where(eq(entries.id, entry.id))
           .returning();
-        return result;
+        return { updated: row, encKey: key };
       });
       const result = encKey && updated ? decryptEntry(updated, encKey) : updated;
 
