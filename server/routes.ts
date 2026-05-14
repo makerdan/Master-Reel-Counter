@@ -3526,17 +3526,16 @@ export async function registerRoutes(
 
       const deferredUnmatchedSections: { aisle: string; section: string; entries: any[] }[] = [];
 
-      // Pre-load ALL photos from all sections in one parallel batch
+      // Photos are loaded in bounded batches (per-section) inside the rendering
+      // loop below rather than all at once, keeping peak memory proportional to
+      // the largest single section rather than the entire session.
       const t0 = Date.now();
       const allPhotosFlat = sortedSections.flatMap((sec: any) => sec.photos || []);
-      const tLoad = Date.now();
-      const allLoadedResults = await Promise.all(allPhotosFlat.map((photo: any) => loadPhoto(photo)));
-      const photoLayoutMap = new Map<number, PhotoLayout>();
-      allPhotosFlat.forEach((photo: any, i: number) => {
-        const pl = allLoadedResults[i];
-        if (pl) photoLayoutMap.set(photo.id, pl);
-      });
-      console.log(`[pdf] preloaded ${photoLayoutMap.size}/${allPhotosFlat.length} photos in ${Date.now() - tLoad}ms`);
+      const PDF_PHOTO_BATCH_SIZE = 15;
+      const LARGE_SESSION_PHOTO_THRESHOLD = 200;
+      if (allPhotosFlat.length > LARGE_SESSION_PHOTO_THRESHOLD) {
+        console.warn(`[pdf] session ${session.id}: ${allPhotosFlat.length} photos exceeds ${LARGE_SESSION_PHOTO_THRESHOLD} — streaming in batches of ${PDF_PHOTO_BATCH_SIZE}; export may take extra time`);
+      }
 
       const originalShadeMap = new Map<number, Map<string, number>>();
       const detailShadeMap = new Map<number, number>();
@@ -3582,6 +3581,20 @@ export async function registerRoutes(
         const allPhotos = sec.photos || [];
         const secFootage = sec.entries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
         const secReels = sec.entries.reduce((s: number, e: any) => s + (e.reelCount || 1), 0);
+
+        // Load this section's photos in bounded batches.  Each batch is awaited
+        // before the next starts so at most PDF_PHOTO_BATCH_SIZE raw image buffers
+        // are in flight simultaneously, keeping peak memory proportional to one
+        // batch rather than the whole session.
+        const photoLayoutMap = new Map<number, PhotoLayout>();
+        for (let batchStart = 0; batchStart < allPhotos.length; batchStart += PDF_PHOTO_BATCH_SIZE) {
+          const batch = allPhotos.slice(batchStart, batchStart + PDF_PHOTO_BATCH_SIZE);
+          const batchResults = await Promise.all(batch.map((p: any) => loadPhoto(p)));
+          batch.forEach((p: any, j: number) => {
+            const pl = batchResults[j];
+            if (pl) photoLayoutMap.set(p.id, pl);
+          });
+        }
 
         const loadedPhotos: PhotoLayout[] = allPhotos
           .map((photo: any) => photoLayoutMap.get(photo.id))
@@ -3945,6 +3958,25 @@ export async function registerRoutes(
         }
       }
 
+      // --- Load photos needed for the Flagged Reels section in batches ---
+      // Each flagged item references a photo that may not have been loaded by
+      // the section loop above (it could belong to a section with no other
+      // entries).  We build a separate bounded-batch map here so the flagged
+      // section also avoids an unbounded parallel load.
+      const flaggedPhotos = flaggedPdfItems
+        .map((item: any) => item.photo)
+        .filter((p: any): p is NonNullable<typeof p> => !!p);
+      const uniqueFlaggedPhotos = Array.from(new Map(flaggedPhotos.map((p: any) => [p.id, p])).values());
+      const flaggedPhotoLayoutMap = new Map<number, PhotoLayout>();
+      for (let batchStart = 0; batchStart < uniqueFlaggedPhotos.length; batchStart += PDF_PHOTO_BATCH_SIZE) {
+        const batch = uniqueFlaggedPhotos.slice(batchStart, batchStart + PDF_PHOTO_BATCH_SIZE);
+        const batchResults = await Promise.all(batch.map((p: any) => loadPhoto(p)));
+        batch.forEach((p: any, j: number) => {
+          const pl = batchResults[j];
+          if (pl) flaggedPhotoLayoutMap.set(p.id, pl);
+        });
+      }
+
       // --- Flagged Reels Section ---
       if (flaggedPdfItems.length > 0) {
         const sortedFlaggedItems = [...flaggedPdfItems].sort((a, b) => {
@@ -4000,7 +4032,7 @@ export async function registerRoutes(
           doc.rect(tableLeft, currentY, pageWidth, 18).stroke(borderColor);
           currentY += 22;
 
-          const pl = photoLayoutMap.get(item.pin.photoId);
+          const pl = flaggedPhotoLayoutMap.get(item.pin.photoId);
           const photoW = Math.min(pageWidth * 0.4, 280);
           const infoX = tableLeft + photoW + 14;
           const infoW = pageWidth - photoW - 14;
