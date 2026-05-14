@@ -455,7 +455,7 @@ export default function ReviewTab({
 
     lateJoinerQueueCache.set(cacheKey, queue.map(e => e.id));
     return queue;
-  }, [sortedEntries, reviewCohort, currentUserId, isLateJoiner, reviewResponses, sessionId]);
+  }, [sortedEntries, stableCohort, currentUserId, isLateJoiner, reviewResponses, sessionId]);
 
   const myResponses = useMemo(() => {
     const map = new Map<number, ReviewResponse>();
@@ -524,7 +524,7 @@ export default function ReviewTab({
     }
 
     return statuses;
-  }, [reviewCohort, sortedEntries, reviewResponses, isLateJoiner, currentUserId, assignedEntries, sortedUsers, user]);
+  }, [stableCohort, sortedEntries, reviewResponses, isLateJoiner, currentUserId, assignedEntries, sortedUsers, user]);
 
   // ── Reveal timer state ─────────────────────────────────────────────────────
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -555,6 +555,16 @@ export default function ReviewTab({
   const [flagReason, setFlagReason] = useState("");
   const [showFlagInput, setShowFlagInput] = useState(false);
   const [justActed, setJustActed] = useState(false);
+
+  // Reset reveal state when the session changes so stale entry IDs from a
+  // previous session never bleed into a newly-opened one.
+  const lastRevealSessionRef = useRef<number | null>(null);
+  if (lastRevealSessionRef.current !== sessionId) {
+    lastRevealSessionRef.current = sessionId;
+    revealStartTimestamps.current.clear();
+    revealedRef.current.clear();
+    // setRevealedEntries will be called by the registration effect below.
+  }
 
   // Register each newly-assigned entry with the timer system.
   // Already-revealed or already-tracked entries are skipped so re-renders
