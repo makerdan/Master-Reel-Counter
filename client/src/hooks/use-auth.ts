@@ -32,6 +32,10 @@ export function useAuth() {
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",
+    // Poll every 5 minutes so an expired session is caught proactively and the
+    // login page appears cleanly instead of leaving the user seeing 401 errors
+    // on individual mutations with no explanation.
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const logoutMutation = useMutation({

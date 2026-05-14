@@ -87,6 +87,12 @@ export function useNetworkStatus() {
             queryClient.invalidateQueries({
               queryKey: ["/api/sessions", entry.sessionId.toString(), "entries"],
             });
+          } else if (res.status === 401) {
+            // Session has expired — retrying won't help.  Force the auth check
+            // to refetch so the app redirects to the login page, preserving the
+            // queued entry in IndexedDB for the next session.
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            fetchFailed = true;
           } else {
             const nextRetries = currentRetries + 1;
             entryRetryCountsRef.current.set(entry.id, nextRetries);
@@ -125,7 +131,16 @@ export function useNetworkStatus() {
             credentials: "include",
           });
 
-          if (!uploadRes.ok) continue;
+          if (uploadRes.status === 401) {
+            // Session expired — stop syncing and force re-auth.
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            break;
+          }
+          if (!uploadRes.ok) {
+            // Server-side error for this photo (e.g. bad file) — skip it and
+            // try the next one rather than blocking the whole queue.
+            continue;
+          }
           const uploadData = await uploadRes.json();
 
           const photoRes = await fetch(`/api/sessions/${photo.sessionId}/photos`, {
@@ -142,6 +157,10 @@ export function useNetworkStatus() {
             credentials: "include",
           });
 
+          if (photoRes.status === 401) {
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            break;
+          }
           if (photoRes.ok) {
             await removeFromQueue(photo.id);
             queryClient.invalidateQueries({
@@ -149,6 +168,7 @@ export function useNetworkStatus() {
             });
           }
         } catch {
+          // True network failure — stop and wait for the next online event.
           break;
         }
       }
