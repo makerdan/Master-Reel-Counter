@@ -363,10 +363,51 @@ export default function ReviewTab({
     return [...onlineUsers].sort((a, b) => a.userId.localeCompare(b.userId));
   }, [onlineUsers, currentUserId, user]);
 
-  // Parse the server-anchored cohort from the session record.
-  // The server sets this once on the first review response so that all clients
-  // always compute the same entry→reviewer mappings regardless of join timing.
-  const serverCohort = useMemo<Array<{ userId: string; username: string }> | null>(() => {
+  // ── Server-anchored cohort ─────────────────────────────────────────────────
+  // The stable cohort is the authoritative source for entry→reviewer mapping.
+  // Priority order:
+  //   1. serverReviewCohort prop  — already-anchored value from the session DB row
+  //      (available immediately when the session has been reviewed before).
+  //   2. anchoredCohort state     — returned by POST /review-cohort called on mount;
+  //      this is the first write for brand-new sessions.
+  // While neither is available we show a brief loading gate so no assignments
+  // are ever derived from the non-deterministic online-presence array.
+  const [anchoredCohort, setAnchoredCohort] = useState<Array<{ userId: string; username: string }> | null>(null);
+  const cohortAnchorRef = useRef<{ sid: number; called: boolean }>({ sid: -1, called: false });
+
+  useEffect(() => {
+    if (!sessionId || !currentUserId) return;
+    // Skip if already anchored from the session prop (fast path for re-visits).
+    if (serverReviewCohort) return;
+    // Skip if we already called for this session.
+    if (cohortAnchorRef.current.sid === sessionId && cohortAnchorRef.current.called) return;
+    cohortAnchorRef.current = { sid: sessionId, called: true };
+
+    apiRequest("POST", `/api/sessions/${sessionId}/review-cohort`)
+      .then(r => r.json())
+      .then((data: { cohort: Array<{ userId: string; username: string }> }) => {
+        if (Array.isArray(data.cohort) && data.cohort.length > 0) {
+          setAnchoredCohort(data.cohort);
+          // Refresh the session record so the parent's serverReviewCohort prop
+          // is populated on subsequent renders (avoids redundant round-trips).
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+        }
+      })
+      .catch(() => {
+        // Non-fatal: fall through to the sortedUsers fallback below.
+      });
+  }, [sessionId, currentUserId, serverReviewCohort]);
+
+  // Reset anchored cohort state when the session changes.
+  const lastAnchorSessionRef = useRef<number | null>(null);
+  if (lastAnchorSessionRef.current !== sessionId) {
+    lastAnchorSessionRef.current = sessionId;
+    // Synchronous reset — React allows state-derived resets during render.
+    if (anchoredCohort !== null) setAnchoredCohort(null);
+  }
+
+  // Parse the prop value (used for sessions that were already reviewed).
+  const propCohort = useMemo<Array<{ userId: string; username: string }> | null>(() => {
     if (!serverReviewCohort) return null;
     try {
       const parsed = JSON.parse(serverReviewCohort);
@@ -375,14 +416,12 @@ export default function ReviewTab({
     return null;
   }, [serverReviewCohort]);
 
-  // Stable cohort:
-  // • When the server has anchored a cohort for this session, use it — every
-  //   client will resolve the same value from the same DB row.
-  // • Before the first response (cohort not yet set), fall back to the current
-  //   sorted online users so reviewers can start immediately. This pre-anchor
-  //   phase is non-deterministic across clients, but it is brief and becomes
-  //   irrelevant once the first submit anchors the permanent cohort.
-  const stableCohort = serverCohort ?? sortedUsers;
+  // The single canonical cohort used everywhere.  Both propCohort and
+  // anchoredCohort originate from the same server-side value (the
+  // review_cohort DB column), so they will always agree once set.
+  const stableCohort = propCohort ?? anchoredCohort;
+  // Flag: true while we're waiting for the server to return the anchored cohort.
+  const cohortPending = stableCohort === null;
 
   const isLateJoiner = useMemo(() => {
     const cacheKey = `${sessionId}:${currentUserId}`;
@@ -704,6 +743,20 @@ export default function ReviewTab({
   })();
   const existingResponse = currentEntry ? myResponses.get(currentEntry.id) : undefined;
   const isPinEntry = !!(currentPin && currentPin.xPercent !== undefined && currentPin.yPercent !== undefined);
+
+  // ── Loading gate: wait for server-anchored cohort ─────────────────────────
+  // Block all assignment rendering until we have the stable cohort from the
+  // server, so entry→reviewer mappings are never based on ephemeral WS presence.
+  if (cohortPending) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground text-sm" data-testid="text-review-cohort-pending">Preparing review assignments…</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // ── Empty states ───────────────────────────────────────────────────────────
   if (entries.length === 0) {

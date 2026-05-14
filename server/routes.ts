@@ -2295,6 +2295,44 @@ export async function registerRoutes(
     }
   });
 
+  // Called by ReviewTab on mount to anchor the review cohort from server-side
+  // presence before any assignments are shown. Uses a conditional UPDATE so
+  // concurrent mounts from multiple clients are safe — only one write wins.
+  app.post("/api/sessions/:id/review-cohort", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+
+      // If already anchored, return the existing cohort.
+      if (access.session.reviewCohort) {
+        return res.json({ cohort: JSON.parse(access.session.reviewCohort) });
+      }
+
+      const userId = req.user.claims.sub;
+      const username = req.user.claims.firstName || req.user.claims.username || userId;
+      const onlineNow = getOnlineUsers(sessionId).sort((a, b) => a.userId.localeCompare(b.userId));
+      // Always include the requesting user (they may not have joined the WS room yet).
+      if (!onlineNow.find(u => u.userId === userId)) {
+        onlineNow.push({ userId, username });
+        onlineNow.sort((a, b) => a.userId.localeCompare(b.userId));
+      }
+
+      const anchored = await storage.setSessionReviewCohort(sessionId, onlineNow);
+      if (anchored) {
+        broadcastToSession(sessionId, { type: "review_cohort_set", cohort: onlineNow });
+        return res.json({ cohort: onlineNow });
+      }
+
+      // Another request raced and won — re-fetch to get the winner's value.
+      const fresh = await storage.getSession(sessionId);
+      const cohort = fresh?.reviewCohort ? JSON.parse(fresh.reviewCohort) : onlineNow;
+      res.json({ cohort });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to anchor review cohort" });
+    }
+  });
+
   app.get("/api/sessions/:id/review-responses", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
