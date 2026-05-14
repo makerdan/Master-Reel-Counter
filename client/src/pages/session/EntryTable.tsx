@@ -592,12 +592,16 @@ function EntryTable({
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}><HighlightText text={entry.aisle || ""} query={debouncedQuery} /></td>
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}><HighlightText text={entry.section || ""} query={debouncedQuery} /></td>
                           <td className="mono font-bold">
-                            {entry.reelTag ? <HighlightText text={entry.reelTag} query={debouncedQuery} /> : "-"}
-                            {entry.manufacturer && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
-                            {!entry.reelTag && (
-                              <span className="inline-flex items-center ml-1" title="No catalog">
-                                <AlertTriangle className="h-3 w-3 text-amber-500" />
-                              </span>
+                            {entry.reelTag ? (
+                              <>
+                                <HighlightText text={entry.reelTag} query={debouncedQuery} />
+                                {entry.manufacturer && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
+                              </>
+                            ) : (
+                              <Badge className="py-0 px-1.5 text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1 font-medium whitespace-nowrap no-default-hover-elevate no-default-active-elevate" data-testid={`badge-missing-catalog-${entry.id}`}>
+                                <AlertTriangle className="h-2.5 w-2.5" />
+                                Missing catalog tag
+                              </Badge>
                             )}
                           </td>
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer ? <HighlightText text={entry.manufacturer} query={debouncedQuery} /> : "-"}</td>
@@ -605,11 +609,13 @@ function EntryTable({
                           <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
                           <td className="hidden sm:table-cell mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()} ${uLabel}` : "-"}</td>
                           <td className="mono font-bold" style={{ textAlign: "center" }}>
-                            {info.totalFootage ? `${info.totalFootage.toLocaleString()} ${uLabel}` : "-"}
-                            {!info.totalFootage && (
-                              <span className="inline-flex items-center ml-1" title="Zero footage">
-                                <AlertTriangle className="h-3 w-3 text-amber-500" />
-                              </span>
+                            {info.totalFootage ? (
+                              `${info.totalFootage.toLocaleString()} ${uLabel}`
+                            ) : (
+                              <Badge className="py-0 px-1.5 text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1 font-medium whitespace-nowrap no-default-hover-elevate no-default-active-elevate" data-testid={`badge-missing-footage-${entry.id}`}>
+                                <AlertTriangle className="h-2.5 w-2.5" />
+                                Missing footage
+                              </Badge>
                             )}
                           </td>
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>
