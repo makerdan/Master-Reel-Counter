@@ -96,14 +96,23 @@ export class DecryptionError extends Error {
   }
 }
 
-export function decryptEntry(entry: Record<string, any>, key: Buffer): Record<string, any> {
+export const UNREADABLE_SENTINEL = "[unreadable]";
+
+export type DecryptOptions = { strict?: boolean };
+
+export function decryptEntry(entry: Record<string, any>, key: Buffer, options: DecryptOptions = {}): Record<string, any> {
+  const strict = options.strict !== false;
   const result = { ...entry };
   for (const field of ENCODABLE_ENTRY_FIELDS) {
     if (result[field] && typeof result[field] === "string" && isEncrypted(result[field])) {
       try {
         result[field] = decrypt(result[field], key);
       } catch (cause) {
-        throw new DecryptionError(field, cause);
+        if (strict) {
+          throw new DecryptionError(field, cause);
+        }
+        console.warn(`[decryptEntry] best-effort: field "${field}" on entry ${entry.id ?? "?"} could not be decrypted — substituting sentinel`);
+        result[field] = UNREADABLE_SENTINEL;
       }
     }
   }

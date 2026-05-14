@@ -1,6 +1,13 @@
 import { useState, useMemo, Fragment, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, Loader2, Search, X } from "lucide-react";
+import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, Loader2, Search, X, ShieldAlert } from "lucide-react";
+
+const UNREADABLE_SENTINEL = "[unreadable]";
+const ENCRYPTED_ENTRY_FIELDS = ["reelTag", "wireType", "gauge", "color", "manufacturer", "notes", "palletId", "position", "conductors"] as const;
+
+function hasUnreadableField(entry: Record<string, any>): boolean {
+  return ENCRYPTED_ENTRY_FIELDS.some(f => entry[f] === UNREADABLE_SENTINEL);
+}
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -237,6 +244,8 @@ function EntryTable({
         result = result.filter(e => !e.reelTag || !e.footage);
       } else if (filter === "no-photo") {
         result = result.filter(e => !pinByEntryId.has(e.id));
+      } else if (filter === "unreadable") {
+        result = result.filter(e => hasUnreadableField(e as any));
       }
     }
 
@@ -285,6 +294,7 @@ function EntryTable({
   };
   const noPhotoCount = useMemo(() => entries.filter(e => !pinByEntryId.has(e.id)).length, [entries, pinByEntryId]);
   const flaggedCount = useMemo(() => entries.filter(e => flaggedEntryIds.has(e.id)).length, [entries, flaggedEntryIds]);
+  const unreadableCount = useMemo(() => entries.filter(e => hasUnreadableField(e as any)).length, [entries]);
 
   const deleteEntry = useMutation({
     mutationFn: async ({ id, entry }: { id: number; entry: Entry }) => {
@@ -426,6 +436,19 @@ function EntryTable({
             </button>
           </div>
         )}
+        {unreadableCount > 0 && (
+          <div
+            role="alert"
+            onClick={() => toggleFilter("unreadable")}
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-md bg-red-500/10 border border-red-400 text-red-700 dark:text-red-400 cursor-pointer hover:bg-red-500/20 transition-colors"
+            data-testid="banner-unreadable-entries"
+          >
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span className="text-xs font-medium flex-1">
+              {unreadableCount} {unreadableCount === 1 ? "entry has" : "entries have"} corrupted encrypted field{unreadableCount === 1 ? "" : "s"} — data cannot be decrypted — click to review
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 max-w-xs min-w-[180px]">
@@ -482,6 +505,16 @@ function EntryTable({
               count={flaggedCount}
               onClick={() => toggleFilter("flagged")}
               testId="chip-flagged"
+            />
+          )}
+          {unreadableCount > 0 && (
+            <FilterChipButton
+              label="Unreadable"
+              active={activeFilters.has("unreadable")}
+              count={unreadableCount}
+              onClick={() => toggleFilter("unreadable")}
+              testId="chip-unreadable"
+              warning
             />
           )}
           {wireTypes.map(wt => (
@@ -587,12 +620,20 @@ function EntryTable({
                       {isExpanded && sectionEntries.map((entry) => {
                         const info = getReelInfo(entry);
                         const isUnpinned = !pinByEntryId.has(entry.id);
-                        return (<tr key={entry.id} data-testid={`row-entry-${entry.id}`}>
+                        const entryHasUnreadable = hasUnreadableField(entry as any);
+                        const isUnreadableTag = entry.reelTag === UNREADABLE_SENTINEL;
+                        const isUnreadableMfg = entry.manufacturer === UNREADABLE_SENTINEL;
+                        return (<tr key={entry.id} className={entryHasUnreadable ? "bg-red-50 dark:bg-red-950/20" : ""} data-testid={`row-entry-${entry.id}`}>
                           <td className={`mono ${isUnpinned ? "" : "text-muted-foreground"}`} style={{ textAlign: "center" }}>{(() => { const pin = pinByEntryId.get(entry.id); if (pin && onJumpToPin && pin.photoId != null && pin.id != null) { return <button className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer" data-testid={`link-pin-${pin.id}`} onClick={() => onJumpToPin(pin.photoId!, pin.id!)}>{pin.label}</button>; } if (pin) return pin.label; if (pinsFetching) return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground mx-auto" data-testid={`spinner-pin-${entry.id}`} />; return <span className="text-muted-foreground">—</span>; })()}</td>
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}><HighlightText text={entry.aisle || ""} query={debouncedQuery} /></td>
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}><HighlightText text={entry.section || ""} query={debouncedQuery} /></td>
                           <td className="mono font-bold">
-                            {entry.reelTag ? (
+                            {isUnreadableTag ? (
+                              <Badge className="py-0 px-1.5 text-[10px] bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 gap-1 font-medium whitespace-nowrap no-default-hover-elevate no-default-active-elevate" data-testid={`badge-unreadable-catalog-${entry.id}`}>
+                                <ShieldAlert className="h-2.5 w-2.5" />
+                                Unreadable
+                              </Badge>
+                            ) : entry.reelTag ? (
                               <HighlightText text={entry.reelTag} query={debouncedQuery} />
                             ) : (
                               <Badge className="py-0 px-1.5 text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1 font-medium whitespace-nowrap no-default-hover-elevate no-default-active-elevate" data-testid={`badge-missing-catalog-${entry.id}`}>
@@ -600,10 +641,23 @@ function EntryTable({
                                 Missing catalog tag
                               </Badge>
                             )}
-                            {entry.manufacturer && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
+                            {entry.manufacturer && !isUnreadableMfg && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
+                            {entryHasUnreadable && <span className="ml-1 inline-flex items-center" title="One or more encrypted fields could not be decrypted" data-testid={`icon-unreadable-${entry.id}`}><ShieldAlert className="h-3 w-3 text-red-500" /></span>}
                           </td>
-                          <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer ? <HighlightText text={entry.manufacturer} query={debouncedQuery} /> : "-"}</td>
-                          <td className="hidden" style={{ textAlign: "center" }}>{entry.manufacturer ? <HighlightText text={entry.manufacturer} query={debouncedQuery} /> : "-"}</td>
+                          <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>
+                            {isUnreadableMfg ? (
+                              <span className="text-red-500 dark:text-red-400 text-xs font-medium" data-testid={`text-unreadable-mfg-${entry.id}`}>—</span>
+                            ) : entry.manufacturer ? (
+                              <HighlightText text={entry.manufacturer} query={debouncedQuery} />
+                            ) : "-"}
+                          </td>
+                          <td className="hidden" style={{ textAlign: "center" }}>
+                            {isUnreadableMfg ? (
+                              <span className="text-red-500 dark:text-red-400 text-xs font-medium">—</span>
+                            ) : entry.manufacturer ? (
+                              <HighlightText text={entry.manufacturer} query={debouncedQuery} />
+                            ) : "-"}
+                          </td>
                           <td className="mono" style={{ textAlign: "center" }}>{info.reelCount}</td>
                           <td className="hidden sm:table-cell mono" style={{ textAlign: "center" }}>{info.perReel ? `${info.perReel.toLocaleString()} ${uLabel}` : "-"}</td>
                           <td className="mono font-bold" style={{ textAlign: "center" }}>

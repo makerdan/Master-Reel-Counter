@@ -1349,11 +1349,11 @@ export async function registerRoutes(
         const limit = parseInt(req.query.limit) || 50;
         const offset = parseInt(req.query.offset) || 0;
         const { entries: rawEntries, total } = await storage.getSessionEntriesPaginated(access.session.id, limit, offset);
-        const result = encKey ? rawEntries.map(e => decryptEntry(e, encKey) as any) : rawEntries;
+        const result = encKey ? rawEntries.map(e => decryptEntry(e, encKey, { strict: false }) as any) : rawEntries;
         res.json({ entries: result, total, limit, offset });
       } else {
         const rawEntries = await storage.getSessionEntries(access.session.id);
-        const result = encKey ? rawEntries.map(e => decryptEntry(e, encKey) as any) : rawEntries;
+        const result = encKey ? rawEntries.map(e => decryptEntry(e, encKey, { strict: false }) as any) : rawEntries;
         res.json(result);
       }
     } catch (error) {
@@ -2738,7 +2738,7 @@ export async function registerRoutes(
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
-      const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries);
+      const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key, { strict: false }) as any) : rawEntries);
       const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
       const userSettings = await storage.getUserSettings(userId);
       const pdfUnit: UnitType = (userSettings?.defaultUnit as UnitType) || "feet";
@@ -4504,7 +4504,7 @@ export async function registerRoutes(
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
-      const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries;
+      const sessionEntries = key ? rawEntries.map(e => decryptEntry(e, key, { strict: false }) as any) : rawEntries;
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       res.json({ session, entries: sessionEntries, photos: sessionPhotos });
     } catch (error) {
@@ -4523,7 +4523,7 @@ export async function registerRoutes(
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
-      const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key) as any) : rawEntries);
+      const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key, { strict: false }) as any) : rawEntries);
       const sessionPhotos = await storage.getSessionPhotos(session.id);
       const allFlaggedPins = await storage.getSessionFlaggedPins(session.id);
       const flaggedEntryIds = new Set<number>(
