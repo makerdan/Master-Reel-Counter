@@ -43,6 +43,36 @@ const sessionRooms = new Map<number, Set<WebSocket>>();
 const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null }>();
 const encodingToggleInProgress = new Set<string>();
 
+/**
+ * Derive a stable pair of signed int32 advisory lock keys from a userId.
+ * Using two int4 values avoids BigInt serialization issues with the Drizzle sql tag.
+ * pg_advisory_xact_lock(key1, key2) stores classid=key1, objid=key2, objsubid=2.
+ */
+function deriveAdvisoryLockKeys(userId: string): [number, number] {
+  const h = createHash("sha256").update(userId).digest();
+  return [h.readInt32BE(0), h.readInt32BE(4)];
+}
+
+/**
+ * Check (without acquiring) whether the encoding-toggle advisory lock for
+ * a given user is currently held by any backend. Uses the pg_locks catalog
+ * view so no transaction is required and no lock is taken.
+ * Returns true if a toggle is in progress in any app instance.
+ */
+async function isEncodingToggleActive(key1: number, key2: number): Promise<boolean> {
+  const rows = await db.execute(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM pg_locks
+      WHERE locktype = 'advisory'
+        AND classid = ${key1}
+        AND objid   = ${key2}
+        AND objsubid = 2
+        AND granted  = true
+    ) AS active
+  `);
+  return !!(rows as any)[0]?.active;
+}
+
 function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSocket) {
   const room = sessionRooms.get(sessionId);
   if (!room) return;
@@ -1261,8 +1291,11 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to restore photos" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
-      if (encodingToggleInProgress.has(access.session.userId)) {
-        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      {
+        const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
+        if (encodingToggleInProgress.has(access.session.userId) || await isEncodingToggleActive(lk1, lk2)) {
+          return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+        }
       }
 
       const body = req.body;
@@ -1374,8 +1407,11 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
-      if (encodingToggleInProgress.has(access.session.userId)) {
-        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      {
+        const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
+        if (encodingToggleInProgress.has(access.session.userId) || await isEncodingToggleActive(lk1, lk2)) {
+          return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+        }
       }
 
       let entryData = { ...req.body, sessionId: access.session.id, userId };
@@ -1412,8 +1448,11 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
-      if (encodingToggleInProgress.has(access.session.userId)) {
-        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      {
+        const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
+        if (encodingToggleInProgress.has(access.session.userId) || await isEncodingToggleActive(lk1, lk2)) {
+          return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+        }
       }
 
       const serverUpdatedAt = req.body?.serverUpdatedAt;
@@ -5379,13 +5418,11 @@ export async function registerRoutes(
     try {
       const { enabled } = req.body;
 
-      // Derive a stable pair of int32 advisory lock keys from userId.
-      // Two int4 values avoid BigInt serialization issues with the Drizzle sql tag.
-      // The lock is acquired FIRST inside every transaction so that all state reads
-      // and key decisions happen under the lock, preventing cross-instance races.
-      const lockHash = createHash("sha256").update(userId).digest();
-      const lockKey1 = lockHash.readInt32BE(0);
-      const lockKey2 = lockHash.readInt32BE(4);
+      // Derive advisory lock keys — same derivation as deriveAdvisoryLockKeys().
+      // Computed outside the transaction (pure CPU, no DB access needed).
+      // The lock itself is acquired FIRST inside every transaction so that all
+      // state reads and key decisions happen under the lock.
+      const [lockKey1, lockKey2] = deriveAdvisoryLockKeys(userId);
 
       // Helper: SQL condition — any encodable field carries an 'enc:' prefix
       const encPrefixCondition = sql`(
