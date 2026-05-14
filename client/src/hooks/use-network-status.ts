@@ -7,9 +7,9 @@ import {
   getPendingCount,
   onQueueChange,
   dispatchEntrySynced,
-  markPhotoInFlight,
+  claimPhotoInFlight,
   clearPhotoInFlight,
-  markEntryInFlight,
+  claimEntryInFlight,
   clearEntryInFlight,
   clearAllInFlight,
 } from "@/lib/offlineQueue";
@@ -60,7 +60,7 @@ export function useNetworkStatus() {
     try {
       const entries = await getQueuedEntries();
       for (const entry of entries) {
-        // Skip items that are already being processed (concurrent drain guard).
+        // Fast path: skip items the snapshot already shows as in-flight.
         if (entry.inFlight) continue;
         if (permanentlyFailedRef.current.has(entry.id)) continue;
         if (!navigator.onLine) break;
@@ -70,8 +70,12 @@ export function useNetworkStatus() {
           setEntryRetryAttempt(currentRetries + 1);
         }
 
-        // Claim the item before submitting so a concurrent drainer skips it.
-        await markEntryInFlight(entry.id);
+        // Atomically claim the item. A concurrent drainer (e.g. another tab)
+        // will have its own readwrite transaction queued behind this one; once
+        // ours commits with inFlight=true, theirs will see the flag and return
+        // false, so it skips the item without double-submitting.
+        const claimed = await claimEntryInFlight(entry.id);
+        if (!claimed) continue;
 
         let fetchFailed = false;
         try {
@@ -90,7 +94,7 @@ export function useNetworkStatus() {
               clearTimeout(existingTimer);
               entryRetryTimersRef.current.delete(entry.id);
             }
-            // Item is removed from IDB — no need to clear inFlight separately.
+            // Item deleted from IDB — the inFlight flag goes with it.
             await removeEntryFromQueue(entry.id);
             if (entry.placeholderId != null && created?.id != null) {
               dispatchEntrySynced(entry.placeholderId, created.id, entry.sessionId);
@@ -99,8 +103,8 @@ export function useNetworkStatus() {
               queryKey: ["/api/sessions", entry.sessionId.toString(), "entries"],
             });
           } else if (res.status === 401) {
-            // Session expired — retrying won't help.  Force re-auth and keep
-            // the item in the queue for the next session.
+            // Session expired — retrying won't help. Force re-auth and keep
+            // the item in the queue for the next authenticated session.
             await clearEntryInFlight(entry.id);
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             fetchFailed = true;
@@ -133,12 +137,13 @@ export function useNetworkStatus() {
 
       const photos = await getQueuedPhotos();
       for (const photo of photos) {
-        // Skip items already claimed by a concurrent drainer.
+        // Fast path: snapshot already shows this item as in-flight.
         if (photo.inFlight) continue;
         if (!navigator.onLine) break;
 
-        // Claim the item before submitting.
-        await markPhotoInFlight(photo.id);
+        // Atomically claim the photo item before submitting.
+        const claimed = await claimPhotoInFlight(photo.id);
+        if (!claimed) continue;
 
         try {
           const formData = new FormData();
@@ -156,8 +161,7 @@ export function useNetworkStatus() {
             break;
           }
           if (!uploadRes.ok) {
-            // Server-side error for this photo — release the claim and try the
-            // next one rather than blocking the whole queue.
+            // Server-side error for this photo — release claim and try the next.
             await clearPhotoInFlight(photo.id);
             continue;
           }
@@ -183,13 +187,13 @@ export function useNetworkStatus() {
             break;
           }
           if (photoRes.ok) {
-            // Item removed from IDB — inFlight flag goes with it.
+            // Item deleted — inFlight flag goes with it.
             await removeFromQueue(photo.id);
             queryClient.invalidateQueries({
               queryKey: ["/api/sessions", photo.sessionId.toString(), "photos"],
             });
           } else {
-            // Photo record creation failed — release claim for retry.
+            // Photo record creation failed — release claim for a future retry.
             await clearPhotoInFlight(photo.id);
           }
         } catch {
@@ -218,10 +222,6 @@ export function useNetworkStatus() {
   }, [syncQueue]);
 
   useEffect(() => {
-    // Clear any inFlight flags left by an interrupted previous session so
-    // those items are retried rather than silently skipped on this page load.
-    clearAllInFlight().catch(() => {});
-
     const handleOnline = () => {
       setIsOnline(true);
       for (const [id, timer] of entryRetryTimersRef.current.entries()) {
@@ -241,9 +241,15 @@ export function useNetworkStatus() {
     const interval = setInterval(refreshPendingCount, 5000);
     const unsubQueue = onQueueChange(refreshPendingCount);
 
-    if (navigator.onLine) {
-      syncQueue();
-    }
+    // Clear stale inFlight flags from a previous interrupted page session
+    // BEFORE running the initial drain, so those items are retried rather
+    // than silently skipped.  syncQueue is only called after the clear
+    // resolves to avoid a race where the drain runs before flags are reset.
+    clearAllInFlight()
+      .catch(() => {})
+      .then(() => {
+        if (navigator.onLine) syncQueue();
+      });
 
     return () => {
       window.removeEventListener("online", handleOnline);

@@ -180,6 +180,54 @@ export async function clearAllQueuedPhotos(): Promise<void> {
 // clearAllInFlight() resets stale inFlight flags left by interrupted page
 // sessions and must be called once on startup.
 
+// Atomically claims an item by setting inFlight=true only if it is currently
+// false (or absent).  Returns true if the claim succeeded, false if another
+// drainer already holds the claim.
+//
+// IDB guarantees that only one readwrite transaction can hold the lock on a
+// given object store at a time, so the get→check→put sequence inside a single
+// readwrite transaction is effectively atomic even under concurrent drainers
+// (e.g. multiple browser tabs or rapid online/offline events).
+
+export async function claimPhotoInFlight(id: string): Promise<boolean> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PHOTO_STORE, "readwrite");
+    const store = tx.objectStore(PHOTO_STORE);
+    const req = store.get(id);
+    let claimed = false;
+    req.onsuccess = () => {
+      const item = req.result as QueuedPhoto | undefined;
+      if (!item || item.inFlight) return; // already claimed or gone
+      store.put({ ...item, inFlight: true });
+      claimed = true;
+    };
+    tx.oncomplete = () => resolve(claimed);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function claimEntryInFlight(id: string): Promise<boolean> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(ENTRY_STORE, "readwrite");
+    const store = tx.objectStore(ENTRY_STORE);
+    const req = store.get(id);
+    let claimed = false;
+    req.onsuccess = () => {
+      const item = req.result as QueuedEntry | undefined;
+      if (!item || item.inFlight) return; // already claimed or gone
+      store.put({ ...item, inFlight: true });
+      claimed = true;
+    };
+    tx.oncomplete = () => resolve(claimed);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Non-atomic release helpers — safe to use because the caller already holds
+// the claim (and is the only one mutating it at this point).
+
 async function patchPhotoRecord(id: string, patch: Partial<QueuedPhoto>): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -208,16 +256,8 @@ async function patchEntryRecord(id: string, patch: Partial<QueuedEntry>): Promis
   });
 }
 
-export async function markPhotoInFlight(id: string): Promise<void> {
-  return patchPhotoRecord(id, { inFlight: true });
-}
-
 export async function clearPhotoInFlight(id: string): Promise<void> {
   return patchPhotoRecord(id, { inFlight: false });
-}
-
-export async function markEntryInFlight(id: string): Promise<void> {
-  return patchEntryRecord(id, { inFlight: true });
 }
 
 export async function clearEntryInFlight(id: string): Promise<void> {
