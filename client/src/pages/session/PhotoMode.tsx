@@ -1192,6 +1192,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
+      onPanStateChangeRef.current?.(false);
     };
   }, [zoomAtPoint, clampPan]);
 

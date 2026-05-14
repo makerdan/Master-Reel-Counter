@@ -302,7 +302,7 @@ function SessionWorkspace({
     }
     window.history.replaceState({}, "", url.toString());
     try { localStorage.setItem(`session-tab-${sessionId}`, mode); } catch {}
-  }, [mode]);
+  }, [mode, sessionId]);
 
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
   const [mobileFlowKey, setMobileFlowKey] = useState(0);
