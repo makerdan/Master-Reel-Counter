@@ -1654,6 +1654,31 @@ export default function SettingsPage() {
               <CollapsibleContent>
                 <div className="space-y-3 mt-3 pl-1">
                   <div className="flex gap-3">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Search and filters are partially limited</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        While encoding is on, server-side search can only match on fields that are stored as plain text.
+                        The following features are affected:
+                      </p>
+                      <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground list-none">
+                        <li className="flex items-start gap-1.5">
+                          <span className="mt-0.5 text-amber-500 dark:text-amber-400 shrink-0">•</span>
+                          <span><span className="font-medium text-foreground">Entry search</span> — only Aisle and Section are searchable. Wire Type, Reel Tag, Gauge, Color, Manufacturer, and Notes are encrypted and will not appear in results.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="mt-0.5 text-amber-500 dark:text-amber-400 shrink-0">•</span>
+                          <span><span className="font-medium text-foreground">Wire Type session filter</span> — the dashboard filter that narrows sessions by wire type cannot match encrypted wire type values and will return no results.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="mt-0.5 text-amber-500 dark:text-amber-400 shrink-0">•</span>
+                          <span><span className="font-medium text-foreground">Exports and in-app views</span> are unaffected — data is decrypted before display and export.</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="flex gap-3">
                     <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">External API returns encoded data</p>
