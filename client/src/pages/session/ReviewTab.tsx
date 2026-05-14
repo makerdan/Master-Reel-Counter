@@ -379,7 +379,7 @@ export default function ReviewTab({
     if (!sessionId || !currentUserId) return;
     // Skip if already anchored from the session prop (fast path for re-visits).
     if (serverReviewCohort) return;
-    // Skip if we already called for this session.
+    // Skip if we already successfully anchored for this session.
     if (cohortAnchorRef.current.sid === sessionId && cohortAnchorRef.current.called) return;
     cohortAnchorRef.current = { sid: sessionId, called: true };
 
@@ -394,8 +394,15 @@ export default function ReviewTab({
         }
       })
       .catch(() => {
-        // Non-fatal: fall through to the sortedUsers fallback below.
+        // The server call failed. Unlock so a subsequent render can retry, and
+        // provide an immediate best-effort fallback using the current online users
+        // so reviewers are never permanently stuck on the loading screen.
+        cohortAnchorRef.current = { sid: sessionId, called: false };
+        setAnchoredCohort(sortedUsers.length > 0 ? sortedUsers : [{ userId: currentUserId, username: currentUserId }]);
       });
+  // sortedUsers and currentUserId are intentionally excluded from deps so a
+  // change in online presence does not re-fire the anchor call after success.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, currentUserId, serverReviewCohort]);
 
   // Reset anchored cohort state when the session changes.
