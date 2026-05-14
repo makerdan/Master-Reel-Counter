@@ -27,9 +27,10 @@ This threat model is production-scoped. Only code paths reachable in a productio
 ## Scan Anchors
 
 - **Production entry points:** `server/index.ts`, `server/routes.ts`, `server/replit_integrations/auth/replitAuth.ts`, `server/replit_integrations/auth/routes.ts`, `server/replit_integrations/object_storage/routes.ts`, `server/storage.ts`
-- **Highest-risk areas:** websocket collaboration in `server/routes.ts`; upload/download and object-storage helpers; tester login and collaboration/invite flows; export and AI-processing endpoints
-- **Public surfaces:** `/api/login`, `/api/callback`, `/api/logout`, `/api/auth/tester-login`, `/api/auth/tester-logout`, `/api/uploads/request-url`, `/ws`
-- **Authenticated/admin surfaces:** most `/api/*` routes in `server/routes.ts`; `/uploads/:filename`; `/objects/{*objectPath}`; `/api/admin/*`
+- **Highest-risk areas:** websocket collaboration in `server/routes.ts`; tester login and tester-link distribution flows in `server/routes.ts`, `client/src/pages/session/TeamDialog.tsx`, and `client/src/pages/tester-login.tsx`; upload/download and object-storage helpers; export and AI-processing endpoints, especially session-wide OCR in `server/routes.ts`
+- **Public surfaces:** `/api/login`, `/api/callback`, `/api/logout`, `/api/auth/tester-login`, `/api/auth/tester-logout`, `/ws`
+- **Authenticated/admin surfaces:** most `/api/*` routes in `server/routes.ts`; `/uploads/:filename`; `/objects/{*objectPath}`; `/api/admin/*`; expensive AI routes such as `/api/photos/:photoId/analyze-labels`, `/api/sessions/:sessionId/analyze-labels`, and `/api/help-chat`
+- **Retired or narrowed surfaces:** `/api/uploads/request-url` is no longer a production upload path and now returns `410 Gone`; `/objects/{*objectPath}` is intended to funnel only `/objects/uploads/<filename>` into the authorized `/uploads/:filename` handler
 - **Usually out of scope unless reachability is proven:** `.agents/`, `attached_assets/`, mockup/dev-only code, and unregistered route modules under `server/replit_integrations/chat/*`, `audio/*`, and `image/*`
 
 ## Threat Categories
@@ -42,6 +43,7 @@ Required guarantees:
 - All protected HTTP endpoints MUST derive actor identity from the authenticated session on the server.
 - WebSocket connections and room joins MUST be authenticated and authorized server-side before session data is exposed.
 - Tester login MUST use strong password hashing and bounded online guessing resistance.
+- Tester-link or invite conveniences MUST NOT disclose reusable tester secrets in URLs, logs, or similar metadata-bearing channels.
 
 ### Tampering
 
@@ -69,6 +71,7 @@ Required guarantees:
 - Public and expensive endpoints MUST have authentication where appropriate, plus rate and size limits.
 - File uploads MUST enforce bounded request sizes and avoid granting arbitrary large direct-to-storage writes to anonymous callers.
 - External API calls and export workloads MUST remain bounded enough that one user cannot easily degrade service for others.
+- Session-wide AI analysis endpoints MUST cap per-request work units and apply comparable throttling to their narrower per-photo equivalents.
 
 ### Elevation of Privilege
 
