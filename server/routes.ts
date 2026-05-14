@@ -9,7 +9,7 @@ import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/route
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, pins, entries, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -1261,6 +1261,9 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to restore photos" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      if (encodingToggleInProgress.has(access.session.userId)) {
+        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      }
 
       const body = req.body;
       if (!body.objectStorageKey || typeof body.objectStorageKey !== "string") {
@@ -5377,30 +5380,31 @@ export async function registerRoutes(
       const { enabled } = req.body;
       const currentSettings = await storage.getUserSettings(userId);
 
-      // SQL condition matching all encodable fields that carry an 'enc:' prefix
+      // Helper: SQL condition — any encodable field carries an 'enc:' prefix
       const encPrefixCondition = sql`(
-        ${entries.reelTag}    LIKE 'enc:%' OR
-        ${entries.wireType}   LIKE 'enc:%' OR
-        ${entries.gauge}      LIKE 'enc:%' OR
-        ${entries.color}      LIKE 'enc:%' OR
+        ${entries.reelTag}      LIKE 'enc:%' OR
+        ${entries.wireType}     LIKE 'enc:%' OR
+        ${entries.gauge}        LIKE 'enc:%' OR
+        ${entries.color}        LIKE 'enc:%' OR
         ${entries.manufacturer} LIKE 'enc:%' OR
-        ${entries.notes}      LIKE 'enc:%' OR
-        ${entries.palletId}   LIKE 'enc:%' OR
-        ${entries.position}   LIKE 'enc:%' OR
-        ${entries.conductors} LIKE 'enc:%'
+        ${entries.notes}        LIKE 'enc:%' OR
+        ${entries.palletId}     LIKE 'enc:%' OR
+        ${entries.position}     LIKE 'enc:%' OR
+        ${entries.conductors}   LIKE 'enc:%'
       )`;
 
-      // SQL condition matching any non-null encodable field that is NOT encrypted
+      // Helper: SQL condition — any non-null, non-empty encodable field is NOT encrypted.
+      // LENGTH > 0 guards against empty strings, which encryptEntry intentionally skips.
       const plainPresentCondition = sql`(
-        (${entries.reelTag}    IS NOT NULL AND ${entries.reelTag}    NOT LIKE 'enc:%') OR
-        (${entries.wireType}   IS NOT NULL AND ${entries.wireType}   NOT LIKE 'enc:%') OR
-        (${entries.gauge}      IS NOT NULL AND ${entries.gauge}      NOT LIKE 'enc:%') OR
-        (${entries.color}      IS NOT NULL AND ${entries.color}      NOT LIKE 'enc:%') OR
-        (${entries.manufacturer} IS NOT NULL AND ${entries.manufacturer} NOT LIKE 'enc:%') OR
-        (${entries.notes}      IS NOT NULL AND ${entries.notes}      NOT LIKE 'enc:%') OR
-        (${entries.palletId}   IS NOT NULL AND ${entries.palletId}   NOT LIKE 'enc:%') OR
-        (${entries.position}   IS NOT NULL AND ${entries.position}   NOT LIKE 'enc:%') OR
-        (${entries.conductors} IS NOT NULL AND ${entries.conductors} NOT LIKE 'enc:%')
+        (${entries.reelTag}      IS NOT NULL AND LENGTH(${entries.reelTag})      > 0 AND ${entries.reelTag}      NOT LIKE 'enc:%') OR
+        (${entries.wireType}     IS NOT NULL AND LENGTH(${entries.wireType})     > 0 AND ${entries.wireType}     NOT LIKE 'enc:%') OR
+        (${entries.gauge}        IS NOT NULL AND LENGTH(${entries.gauge})        > 0 AND ${entries.gauge}        NOT LIKE 'enc:%') OR
+        (${entries.color}        IS NOT NULL AND LENGTH(${entries.color})        > 0 AND ${entries.color}        NOT LIKE 'enc:%') OR
+        (${entries.manufacturer} IS NOT NULL AND LENGTH(${entries.manufacturer}) > 0 AND ${entries.manufacturer} NOT LIKE 'enc:%') OR
+        (${entries.notes}        IS NOT NULL AND LENGTH(${entries.notes})        > 0 AND ${entries.notes}        NOT LIKE 'enc:%') OR
+        (${entries.palletId}     IS NOT NULL AND LENGTH(${entries.palletId})     > 0 AND ${entries.palletId}     NOT LIKE 'enc:%') OR
+        (${entries.position}     IS NOT NULL AND LENGTH(${entries.position})     > 0 AND ${entries.position}     NOT LIKE 'enc:%') OR
+        (${entries.conductors}   IS NOT NULL AND LENGTH(${entries.conductors})   > 0 AND ${entries.conductors}   NOT LIKE 'enc:%')
       )`;
 
       let entriesProcessed = 0;
@@ -5412,13 +5416,26 @@ export async function registerRoutes(
         const wrappedKey = wrapKey(dataKey, kek);
 
         await db.transaction(async (tx) => {
-          // Fetch all entries inside the transaction for a consistent snapshot
+          // Consistent snapshot: all reads and writes share this transaction.
           const allEntries = await tx.select().from(entries).where(eq(entries.userId, userId));
+          entriesProcessed = allEntries.length;
 
-          // encryptEntry is idempotent: already-encrypted fields are left as-is
-          const entriesToUpdate = allEntries.map(entry => ({
-            id: entry.id,
-            data: encryptEntry({
+          // Mixed-key-state guard: if any entries are already encrypted but settings
+          // show encoding is off, a prior partial run used a different key. Proceeding
+          // would encrypt remaining entries with a NEW key, making prior rows undecryptable.
+          const alreadyEncrypted = allEntries.filter(e =>
+            [e.reelTag, e.wireType, e.gauge, e.color, e.manufacturer, e.notes, e.palletId, e.position, e.conductors]
+              .some(v => typeof v === "string" && v.startsWith("enc:"))
+          );
+          if (alreadyEncrypted.length > 0) {
+            const err = new Error("MIXED_KEY_STATE") as Error & { count: number };
+            err.count = alreadyEncrypted.length;
+            throw err;
+          }
+
+          // Encrypt all entries via the same tx — fully atomic with the verification below.
+          for (const entry of allEntries) {
+            const encrypted = encryptEntry({
               reelTag: entry.reelTag,
               wireType: entry.wireType,
               gauge: entry.gauge,
@@ -5428,15 +5445,11 @@ export async function registerRoutes(
               palletId: entry.palletId,
               position: entry.position,
               conductors: entry.conductors,
-            }, dataKey),
-          }));
-          entriesProcessed = entriesToUpdate.length;
-
-          if (entriesToUpdate.length > 0) {
-            await storage.bulkUpdateEntries(entriesToUpdate);
+            }, dataKey);
+            await tx.update(entries).set(encrypted).where(eq(entries.id, entry.id));
           }
 
-          // Verification: no non-null encodable field may remain in plaintext
+          // Verification: no non-null non-empty encodable field may remain in plaintext.
           const unprotected = await tx
             .select({ id: entries.id })
             .from(entries)
@@ -5447,11 +5460,13 @@ export async function registerRoutes(
             throw err;
           }
 
-          await storage.upsertUserSettings(userId, {
-            encodingEnabled: true,
-            encryptionKey: wrappedKey,
-            encryptionSalt: salt,
-          });
+          // Settings update in the same transaction — atomically paired with the bulk encrypt.
+          await tx.insert(userSettings)
+            .values({ userId, encodingEnabled: true, encryptionKey: wrappedKey, encryptionSalt: salt })
+            .onConflictDoUpdate({
+              target: userSettings.userId,
+              set: { encodingEnabled: true, encryptionKey: wrappedKey, encryptionSalt: salt, updatedAt: new Date() },
+            });
         });
 
         res.json({ success: true, encodingEnabled: true, entriesEncoded: entriesProcessed });
@@ -5464,10 +5479,10 @@ export async function registerRoutes(
             const kek = deriveKEK(currentSettings.encryptionSalt);
             const dataKey = unwrapKey(currentSettings.encryptionKey, kek);
 
-            // decryptEntry is idempotent: plaintext fields are left as-is
-            const entriesToUpdate = allEntries.map(entry => ({
-              id: entry.id,
-              data: decryptEntry({
+            // Decrypt all entries via the same tx — fully atomic with the verification below.
+            // decryptEntry is idempotent: plaintext fields (no 'enc:' prefix) are left as-is.
+            for (const entry of allEntries) {
+              const decrypted = decryptEntry({
                 reelTag: entry.reelTag,
                 wireType: entry.wireType,
                 gauge: entry.gauge,
@@ -5477,14 +5492,11 @@ export async function registerRoutes(
                 palletId: entry.palletId,
                 position: entry.position,
                 conductors: entry.conductors,
-              }, dataKey),
-            }));
-
-            if (entriesToUpdate.length > 0) {
-              await storage.bulkUpdateEntries(entriesToUpdate);
+              }, dataKey);
+              await tx.update(entries).set(decrypted).where(eq(entries.id, entry.id));
             }
 
-            // Verification: no enc:-prefixed values may remain
+            // Verification: no enc:-prefixed values may remain.
             const stillEncrypted = await tx
               .select({ id: entries.id })
               .from(entries)
@@ -5496,16 +5508,28 @@ export async function registerRoutes(
             }
           }
 
-          await storage.upsertUserSettings(userId, {
-            encodingEnabled: false,
-            encryptionKey: null,
-            encryptionSalt: null,
-          });
+          // Settings update atomically paired with the bulk decrypt.
+          await tx.insert(userSettings)
+            .values({ userId, encodingEnabled: false, encryptionKey: null, encryptionSalt: null })
+            .onConflictDoUpdate({
+              target: userSettings.userId,
+              set: { encodingEnabled: false, encryptionKey: null, encryptionSalt: null, updatedAt: new Date() },
+            });
         });
 
         res.json({ success: true, encodingEnabled: false, entriesDecoded: entriesProcessed });
       }
     } catch (error) {
+      if (error instanceof Error && error.message === "MIXED_KEY_STATE") {
+        const count = (error as Error & { count?: number }).count ?? 0;
+        console.error(`[encoding toggle] mixed key state: ${count} entries already encrypted with a different key`);
+        return res.status(409).json({
+          success: false,
+          error: "mixed_key_state",
+          message: `${count} ${count === 1 ? "entry appears" : "entries appear"} to have been partially encrypted from a prior attempt. Please disable encryption first to clear the mixed state, then re-enable.`,
+          encryptedCount: count,
+        });
+      }
       if (error instanceof Error && error.message === "VERIFICATION_FAILED") {
         const remaining = (error as Error & { remaining?: number }).remaining ?? 0;
         console.error(`[encoding toggle] verification failed: ${remaining} entries not fully converted`);
