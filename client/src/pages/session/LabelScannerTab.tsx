@@ -1005,8 +1005,8 @@ export default function LabelScannerTab({
   };
 
   const setCardField = (pinId: number, field: "editCatalog" | "editVendor", value: string) => {
-    setCards((prev) =>
-      prev.map((c) => {
+    setCards((prev) => {
+      const next = prev.map((c) => {
         if (c.pin.id !== pinId) return c;
         const updated: PinCard = { ...c, [field]: value, notAnalyzedReason: undefined };
         if (field === "editCatalog") {
@@ -1040,8 +1040,13 @@ export default function LabelScannerTab({
           }
         }
         return updated;
-      })
-    );
+      });
+      // Persist immediately so the cleared notAnalyzedReason survives a reload
+      // (without this, editing a failed card would show the Retry badge again
+      // after a page refresh until another save-triggering action runs).
+      saveAnalysisResults(sessionId, next);
+      return next;
+    });
   };
 
   const includedCards = displayCards.filter((c) => c.included);
