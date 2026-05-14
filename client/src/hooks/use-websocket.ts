@@ -22,19 +22,20 @@ export function useSessionWebSocket(
 
   // Two-level reconnect guard:
   //
-  // 1. shouldReconnectRef  – set to false on intentional teardown (unmount or
-  //    session change). Prevents scheduling any reconnect when the component is
-  //    done with the current socket altogether.
+  // 1. connectionIdRef (primary) – incremented both in connect() AND in the
+  //    effect cleanup. Each WebSocket closure captures its own snapshot (myId).
+  //    The onclose handler returns early if myId !== connectionIdRef.current,
+  //    meaning either a newer connection is already active OR the cleanup has
+  //    already run (including the case where sessionId just became null, where
+  //    the new effect calls connect() which early-returns without incrementing
+  //    the counter — but the cleanup already incremented it, so the old onclose
+  //    is still invalidated).
   //
-  // 2. connectionIdRef     – monotonically incremented each time connect() is
-  //    called. Each WebSocket closure captures its own snapshot (`myId`). The
-  //    onclose handler compares myId to the current ref; if they differ, a new
-  //    socket is already active so the old onclose silently returns without
-  //    scheduling a reconnect. This closes the race where cleanup sets
-  //    shouldReconnectRef=false but the new effect immediately sets it back to
-  //    true before the old socket's async onclose fires.
-  const shouldReconnectRef = useRef(true);
+  // 2. shouldReconnectRef (secondary) – set to false on intentional teardown.
+  //    Belt-and-suspenders safety net; useful in edge cases where the primary
+  //    guard could theoretically collide (counter overflow on very long sessions).
   const connectionIdRef = useRef(0);
+  const shouldReconnectRef = useRef(true);
 
   // Stable refs for callbacks and user info — updated every render so the
   // connect callback always reads the latest values without those values
@@ -65,7 +66,7 @@ export function useSessionWebSocket(
     if (!sessionId) return;
 
     // Capture a connection-specific ID so this socket's onclose can detect
-    // whether it has been superseded by a newer connection.
+    // whether it has been superseded by cleanup or a newer connection.
     const myId = ++connectionIdRef.current;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -114,10 +115,14 @@ export function useSessionWebSocket(
     };
 
     ws.onclose = () => {
-      // Guard 1: if a newer connection has already been established, this
-      // onclose belongs to a superseded socket — do nothing.
+      // Primary guard: if the cleanup has already run (or a newer connection is
+      // active), this onclose belongs to a superseded socket — do nothing.
+      // The cleanup always increments connectionIdRef, so any onclose that fires
+      // after cleanup will see myId !== connectionIdRef.current even when the
+      // next effect calls connect() with sessionId=null (early return, no
+      // further increment).
       if (myId !== connectionIdRef.current) return;
-      // Guard 2: intentional teardown (unmount) — do not reconnect.
+      // Secondary guard: explicit intentional teardown signal.
       if (!shouldReconnectRef.current) return;
 
       const jitter = (Math.random() * 2 - 1) * WS_RECONNECT_JITTER_MS;
@@ -140,9 +145,12 @@ export function useSessionWebSocket(
     shouldReconnectRef.current = true;
     connect();
     return () => {
-      // Signal onclose that this teardown is intentional so it skips reconnect.
-      // connectionIdRef is incremented at the start of the next connect() call,
-      // which invalidates any pending onclose from the socket we close here.
+      // Increment the connection ID *before* closing so that the async onclose
+      // event from the socket we're about to close will always see a stale myId,
+      // regardless of whether the next render calls connect() with a new session
+      // or with sessionId=null (where connect() early-returns without
+      // incrementing the counter itself).
+      connectionIdRef.current++;
       shouldReconnectRef.current = false;
       clearTimeout(reconnectTimerRef.current);
       wsRef.current?.close();
