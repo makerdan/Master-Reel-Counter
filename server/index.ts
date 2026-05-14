@@ -16,11 +16,13 @@ validateSessionSecret();
 
 const CRASH_LOG_PATH = path.join(process.cwd(), ".crash_log.json");
 
-// Seed lastCrash from the previous run's persisted file (survives restarts).
+// Seed crash history from the previous run's persisted file (survives restarts).
+// Supports both the legacy single-record format and the current array format.
 try {
   if (fs.existsSync(CRASH_LOG_PATH)) {
-    const record: CrashRecord = JSON.parse(fs.readFileSync(CRASH_LOG_PATH, "utf8"));
-    taskTracker.seedCrash(record);
+    const raw = JSON.parse(fs.readFileSync(CRASH_LOG_PATH, "utf8"));
+    const records: CrashRecord[] = Array.isArray(raw) ? raw : [raw];
+    taskTracker.seedCrashHistory(records);
   }
 } catch {
   // Malformed or missing file — ignore and start clean.
@@ -210,10 +212,10 @@ function beginShutdown(exitCode: number, reason: string) {
   // Fatal errors: log, persist crash record to disk (survives restart), then drain.
   // Routing through beginShutdown() ensures in-flight tasks are not abandoned.
   process.on("uncaughtException", (err) => {
-    const record = taskTracker.recordCrash("uncaughtException", err, true);
+    taskTracker.recordCrash("uncaughtException", err, true);
     log(`Uncaught exception: ${err.message}\n${err.stack ?? ""}`, "crash");
     try {
-      fs.writeFileSync(CRASH_LOG_PATH, JSON.stringify(record), "utf8");
+      fs.writeFileSync(CRASH_LOG_PATH, JSON.stringify(taskTracker.crashHistory()), "utf8");
     } catch {
       // Best-effort — don't let a write failure prevent the shutdown.
     }
@@ -225,10 +227,10 @@ function beginShutdown(exitCode: number, reason: string) {
   // (--unhandled-rejections=throw) are promoted to uncaughtException by Node.js.
   process.on("unhandledRejection", (reason) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
-    const record = taskTracker.recordCrash("unhandledRejection", err, false);
+    taskTracker.recordCrash("unhandledRejection", err, false);
     log(`Unhandled promise rejection: ${err.message}\n${err.stack ?? ""}`, "crash");
     try {
-      fs.writeFileSync(CRASH_LOG_PATH, JSON.stringify(record), "utf8");
+      fs.writeFileSync(CRASH_LOG_PATH, JSON.stringify(taskTracker.crashHistory()), "utf8");
     } catch {
       // Best-effort.
     }

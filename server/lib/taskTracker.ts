@@ -7,8 +7,11 @@ export interface CrashRecord {
   stack?: string;
 }
 
+const CRASH_HISTORY_MAX = 10;
+
 let _count = 0;
 let _lastCrash: CrashRecord | null = null;
+let _crashHistory: CrashRecord[] = [];
 
 export type SessionTaskType = "pdf" | "excel" | "scan";
 
@@ -56,12 +59,25 @@ export const taskTracker = {
       message: error.message,
       stack: error.stack,
     };
+    _crashHistory = [..._crashHistory, _lastCrash].slice(-CRASH_HISTORY_MAX);
     return _lastCrash;
   },
 
+  /**
+   * Seed the full crash history from persisted storage (called once on startup).
+   * Sets lastCrash to the most recent record in the array.
+   */
+  seedCrashHistory(records: CrashRecord[]): void {
+    _crashHistory = records.slice(-CRASH_HISTORY_MAX);
+    _lastCrash = _crashHistory.length > 0 ? _crashHistory[_crashHistory.length - 1] : null;
+  },
+
+  /** @deprecated Use seedCrashHistory for full history. Kept for compatibility. */
   seedCrash(record: CrashRecord): void {
+    _crashHistory = [..._crashHistory, record].slice(-CRASH_HISTORY_MAX);
     _lastCrash = record;
   },
 
+  crashHistory(): CrashRecord[] { return _crashHistory; },
   lastCrash(): CrashRecord | null { return _lastCrash; },
 };
