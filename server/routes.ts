@@ -3855,8 +3855,10 @@ export async function registerRoutes(
             }
             currentY += maxRowH + gap;
             for (const photoMeta of rowPhotos) {
-              if (layouts.get(photoMeta.id)) renderedParentIds.add(photoMeta.id);
-              renderDetailShotsWithLayouts(photoMeta.id, layouts);
+              if (layouts.get(photoMeta.id)) {
+                renderedParentIds.add(photoMeta.id);
+                renderDetailShotsWithLayouts(photoMeta.id, layouts);
+              }
             }
             idx += perRow;
           }
@@ -3949,8 +3951,10 @@ export async function registerRoutes(
               }
               currentY += maxRowH + gap;
               for (const photoMeta of rowPhotos) {
-                if (layouts.get(photoMeta.id)) renderedParentIds.add(photoMeta.id);
-                renderDetailShotsWithLayouts(photoMeta.id, layouts);
+                if (layouts.get(photoMeta.id)) {
+                  renderedParentIds.add(photoMeta.id);
+                  renderDetailShotsWithLayouts(photoMeta.id, layouts);
+                }
               }
               idx += photosInRow;
             }
