@@ -13,8 +13,23 @@ export function generateDataKey(): Buffer {
   return crypto.randomBytes(KEY_LENGTH);
 }
 
+const MIN_SECRET_LENGTH = 32;
+
+export function validateSessionSecret(): void {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+    const msg = secret
+      ? `SESSION_SECRET is too short (${secret.length} chars); minimum is ${MIN_SECRET_LENGTH}`
+      : "SESSION_SECRET environment variable is not set";
+    throw new Error(`[startup] ${msg}. The server cannot start without a strong SESSION_SECRET.`);
+  }
+}
+
 export function deriveKEK(salt: string): Buffer {
-  const serverSecret = process.env.SESSION_SECRET || "fallback-secret";
+  const serverSecret = process.env.SESSION_SECRET;
+  if (!serverSecret || serverSecret.length < MIN_SECRET_LENGTH) {
+    throw new Error("SESSION_SECRET is missing or too short; cannot derive encryption key.");
+  }
   return crypto.pbkdf2Sync(serverSecret, Buffer.from(salt, "hex"), PBKDF2_ITERATIONS, KEY_LENGTH, "sha512");
 }
 
@@ -74,13 +89,21 @@ export function encryptEntry(entry: Record<string, any>, key: Buffer): Record<st
   return result;
 }
 
+export class DecryptionError extends Error {
+  constructor(public readonly field: string, cause: unknown) {
+    super(`Failed to decrypt field "${field}": ${cause instanceof Error ? cause.message : String(cause)}`);
+    this.name = "DecryptionError";
+  }
+}
+
 export function decryptEntry(entry: Record<string, any>, key: Buffer): Record<string, any> {
   const result = { ...entry };
   for (const field of ENCODABLE_ENTRY_FIELDS) {
     if (result[field] && typeof result[field] === "string" && isEncrypted(result[field])) {
       try {
         result[field] = decrypt(result[field], key);
-      } catch {
+      } catch (cause) {
+        throw new DecryptionError(field, cause);
       }
     }
   }

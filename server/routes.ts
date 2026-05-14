@@ -1329,6 +1329,7 @@ export async function registerRoutes(
         res.json(result);
       }
     } catch (error) {
+      console.error("Error fetching entries:", error);
       res.status(500).json({ message: "Failed to fetch entries" });
     }
   });
@@ -1451,6 +1452,7 @@ export async function registerRoutes(
       broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
       res.json(result);
     } catch (error) {
+      console.error("Error updating entry:", error);
       res.status(500).json({ message: "Failed to update entry" });
     }
   });
