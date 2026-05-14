@@ -406,12 +406,9 @@ export default function ReviewTab({
   }, [sessionId, currentUserId, serverReviewCohort]);
 
   // Reset anchored cohort state when the session changes.
-  const lastAnchorSessionRef = useRef<number | null>(null);
-  if (lastAnchorSessionRef.current !== sessionId) {
-    lastAnchorSessionRef.current = sessionId;
-    // Synchronous reset — React allows state-derived resets during render.
-    if (anchoredCohort !== null) setAnchoredCohort(null);
-  }
+  useEffect(() => {
+    setAnchoredCohort(null);
+  }, [sessionId]);
 
   // Parse the prop value (used for sessions that were already reviewed).
   const propCohort = useMemo<Array<{ userId: string; username: string }> | null>(() => {
@@ -602,16 +599,11 @@ export default function ReviewTab({
 
   // Reset reveal state when the session changes so stale entry IDs from a
   // previous session never bleed into a newly-opened one.
-  const lastRevealSessionRef = useRef<number | null>(null);
-  if (lastRevealSessionRef.current !== sessionId) {
-    lastRevealSessionRef.current = sessionId;
+  useEffect(() => {
     revealStartTimestamps.current.clear();
     revealedRef.current.clear();
-    // Clear the rendering copy synchronously so the UI never briefly shows
-    // stale reveal state from a previous session before the next effect runs.
-    // (This is a render-time side-effect which React allows for derived resets.)
     setRevealedEntries(new Set());
-  }
+  }, [sessionId]);
 
   // Register each newly-assigned entry with the timer system.
   // Already-revealed or already-tracked entries are skipped so re-renders
