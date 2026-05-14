@@ -3,10 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, Loader2, Search, X, ShieldAlert } from "lucide-react";
 
 const UNREADABLE_SENTINEL = "[unreadable]";
-const ENCRYPTED_ENTRY_FIELDS = ["reelTag", "wireType", "gauge", "color", "manufacturer", "notes", "palletId", "position", "conductors"] as const;
+const ENCRYPTED_ENTRY_FIELDS: ReadonlyArray<keyof Entry> = ["reelTag", "wireType", "gauge", "color", "manufacturer", "notes", "palletId", "position", "conductors"];
 
-function hasUnreadableField(entry: Record<string, any>): boolean {
-  return ENCRYPTED_ENTRY_FIELDS.some(f => entry[f] === UNREADABLE_SENTINEL);
+function hasUnreadableField(entry: Entry): boolean {
+  return ENCRYPTED_ENTRY_FIELDS.some(f => (entry[f] as unknown) === UNREADABLE_SENTINEL);
 }
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -230,7 +230,7 @@ function EntryTable({
     const statusFilters: string[] = [];
     const wireTypeFilters: string[] = [];
     for (const filter of Array.from(activeFilters)) {
-      if (filter === "flagged" || filter === "incomplete" || filter === "no-photo") {
+      if (filter === "flagged" || filter === "incomplete" || filter === "no-photo" || filter === "unreadable") {
         statusFilters.push(filter);
       } else {
         wireTypeFilters.push(filter);
@@ -245,7 +245,7 @@ function EntryTable({
       } else if (filter === "no-photo") {
         result = result.filter(e => !pinByEntryId.has(e.id));
       } else if (filter === "unreadable") {
-        result = result.filter(e => hasUnreadableField(e as any));
+        result = result.filter(e => hasUnreadableField(e));
       }
     }
 
@@ -294,7 +294,7 @@ function EntryTable({
   };
   const noPhotoCount = useMemo(() => entries.filter(e => !pinByEntryId.has(e.id)).length, [entries, pinByEntryId]);
   const flaggedCount = useMemo(() => entries.filter(e => flaggedEntryIds.has(e.id)).length, [entries, flaggedEntryIds]);
-  const unreadableCount = useMemo(() => entries.filter(e => hasUnreadableField(e as any)).length, [entries]);
+  const unreadableCount = useMemo(() => entries.filter(e => hasUnreadableField(e)).length, [entries]);
 
   const deleteEntry = useMutation({
     mutationFn: async ({ id, entry }: { id: number; entry: Entry }) => {
@@ -620,7 +620,7 @@ function EntryTable({
                       {isExpanded && sectionEntries.map((entry) => {
                         const info = getReelInfo(entry);
                         const isUnpinned = !pinByEntryId.has(entry.id);
-                        const entryHasUnreadable = hasUnreadableField(entry as any);
+                        const entryHasUnreadable = hasUnreadableField(entry);
                         const isUnreadableTag = entry.reelTag === UNREADABLE_SENTINEL;
                         const isUnreadableMfg = entry.manufacturer === UNREADABLE_SENTINEL;
                         return (<tr key={entry.id} className={entryHasUnreadable ? "bg-red-50 dark:bg-red-950/20" : ""} data-testid={`row-entry-${entry.id}`}>
