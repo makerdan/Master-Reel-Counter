@@ -366,11 +366,12 @@ export default function SingleEntryMode({
 
       let result;
       if (editingEntry) {
-        await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
-        result = { type: "update" as const, body, previousData: editingEntry, queued: false };
+        const patchRes = await apiRequest("PATCH", `/api/entries/${editingEntry.id}`, body);
+        const updated = await patchRes.json().catch(() => null);
+        result = { type: "update" as const, body, previousData: editingEntry, queued: false, serverUpdatedAt: updated?.updatedAt ?? undefined };
       } else {
         const { entry: created, queued } = await createEntryWithOfflineFallback(sessionId, body);
-        result = { type: "create" as const, body, id: created.id, queued };
+        result = { type: "create" as const, body, id: created.id, queued, serverUpdatedAt: queued ? undefined : (created?.updatedAt ?? undefined) };
       }
       return result;
     },
@@ -384,9 +385,9 @@ export default function SingleEntryMode({
       }
       if (onUndoableSave && result) {
         if (result.type === "create") {
-          onUndoableSave({ type: "create-entry", sessionId, entityId: result.id, data: result.body });
+          onUndoableSave({ type: "create-entry", sessionId, entityId: result.id, data: result.body, serverUpdatedAt: result.serverUpdatedAt });
         } else if (result.type === "update" && editingEntry) {
-          onUndoableSave({ type: "update-entry", sessionId, entityId: editingEntry.id, data: result.body, previousData: result.previousData });
+          onUndoableSave({ type: "update-entry", sessionId, entityId: editingEntry.id, data: result.body, previousData: result.previousData, serverUpdatedAt: result.serverUpdatedAt });
         }
       }
       toast({ title: editingEntry ? "Entry updated" : (result?.queued ? "Entry queued for sync" : "Entry saved") });

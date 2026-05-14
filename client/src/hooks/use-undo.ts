@@ -11,6 +11,7 @@ export interface UndoAction {
   entityId: number;
   data: any;
   previousData?: any;
+  serverUpdatedAt?: string;
 }
 
 const MAX_STACK = 20;
@@ -160,30 +161,32 @@ export function useUndoRedo(sessionId: number) {
   const applyReverse = useCallback(async (action: UndoAction): Promise<UndoAction> => {
     switch (action.type) {
       case "create-entry": {
-        await apiRequest("DELETE", `/api/entries/${action.entityId}`);
+        await apiRequest("DELETE", `/api/entries/${action.entityId}`, action.serverUpdatedAt ? { serverUpdatedAt: action.serverUpdatedAt } : undefined);
         return { type: "delete-entry", sessionId: action.sessionId, entityId: action.entityId, data: action.data, previousData: action.data };
       }
       case "delete-entry": {
         const res = await apiRequest("POST", `/api/sessions/${action.sessionId}/entries`, action.previousData);
         const created = await res.json();
-        return { type: "create-entry", sessionId: action.sessionId, entityId: created.id, data: action.previousData };
+        return { type: "create-entry", sessionId: action.sessionId, entityId: created.id, data: action.previousData, serverUpdatedAt: created?.updatedAt ?? undefined };
       }
       case "update-entry": {
-        await apiRequest("PATCH", `/api/entries/${action.entityId}`, action.previousData);
-        return { type: "update-entry", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
+        const res = await apiRequest("PATCH", `/api/entries/${action.entityId}`, { ...action.previousData, serverUpdatedAt: action.serverUpdatedAt });
+        const updated = await res.json().catch(() => null);
+        return { type: "update-entry", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data, serverUpdatedAt: updated?.updatedAt ?? undefined };
       }
       case "create-pin": {
-        await apiRequest("DELETE", `/api/pins/${action.entityId}`);
+        await apiRequest("DELETE", `/api/pins/${action.entityId}`, action.serverUpdatedAt ? { serverUpdatedAt: action.serverUpdatedAt } : undefined);
         return { type: "delete-pin", sessionId: action.sessionId, entityId: action.entityId, data: action.data, previousData: action.data };
       }
       case "delete-pin": {
         const res = await apiRequest("POST", `/api/photos/${action.data.photoId}/pins`, action.previousData);
         const created = await res.json();
-        return { type: "create-pin", sessionId: action.sessionId, entityId: created.id, data: action.previousData };
+        return { type: "create-pin", sessionId: action.sessionId, entityId: created.id, data: action.previousData, serverUpdatedAt: created?.updatedAt ?? undefined };
       }
       case "update-pin": {
-        await apiRequest("PATCH", `/api/pins/${action.entityId}`, action.previousData);
-        return { type: "update-pin", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
+        const res = await apiRequest("PATCH", `/api/pins/${action.entityId}`, { ...action.previousData, serverUpdatedAt: action.serverUpdatedAt });
+        const updated = await res.json().catch(() => null);
+        return { type: "update-pin", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data, serverUpdatedAt: updated?.updatedAt ?? undefined };
       }
       case "restore-draft-pins": {
         await apiRequest("PUT", `/api/photos/${action.previousData.photoId}/draft-pins`, { pins: action.previousData.pins });
@@ -198,12 +201,14 @@ export function useUndoRedo(sessionId: number) {
         return { type: "dismiss-duplicate", sessionId: action.sessionId, entityId: 0, data: action.data, previousData: action.data };
       }
       case "flag-pin": {
-        await apiRequest("PATCH", `/api/pins/${action.entityId}/flag`, { flagged: false, flagReason: null });
-        return { type: "unflag-pin", sessionId: action.sessionId, entityId: action.entityId, data: { flagged: false, flagReason: null }, previousData: action.data };
+        const res = await apiRequest("PATCH", `/api/pins/${action.entityId}/flag`, { flagged: false, flagReason: null, serverUpdatedAt: action.serverUpdatedAt });
+        const updated = await res.json().catch(() => null);
+        return { type: "unflag-pin", sessionId: action.sessionId, entityId: action.entityId, data: { flagged: false, flagReason: null }, previousData: action.data, serverUpdatedAt: updated?.updatedAt ?? undefined };
       }
       case "unflag-pin": {
-        await apiRequest("PATCH", `/api/pins/${action.entityId}/flag`, { flagged: true, flagReason: action.previousData?.flagReason ?? null });
-        return { type: "flag-pin", sessionId: action.sessionId, entityId: action.entityId, data: { flagged: true, flagReason: action.previousData?.flagReason ?? null }, previousData: { flagged: false, flagReason: null } };
+        const res = await apiRequest("PATCH", `/api/pins/${action.entityId}/flag`, { flagged: true, flagReason: action.previousData?.flagReason ?? null, serverUpdatedAt: action.serverUpdatedAt });
+        const updated = await res.json().catch(() => null);
+        return { type: "flag-pin", sessionId: action.sessionId, entityId: action.entityId, data: { flagged: true, flagReason: action.previousData?.flagReason ?? null }, previousData: { flagged: false, flagReason: null }, serverUpdatedAt: updated?.updatedAt ?? undefined };
       }
       case "delete-photo": {
         const res = await apiRequest("POST", `/api/sessions/${action.sessionId}/photos/restore`, { ...action.previousData, oldPhotoId: action.entityId });
@@ -374,6 +379,21 @@ export function useUndoRedo(sessionId: number) {
           title: `Can't ${verb.toLowerCase()} while offline`,
           description: "This action can't be queued. Reconnect and try again.",
           variant: "destructive",
+        });
+        return;
+      }
+      // Conflict: another user modified this entity after the action was
+      // recorded. Remove the stale entry from the stack and inform the user.
+      if (err instanceof Error && err.message.startsWith("409:")) {
+        if (direction === "undo") {
+          setUndoStack(prev => prev.slice(0, -1));
+        } else {
+          setRedoStack(prev => prev.slice(0, -1));
+        }
+        invalidateSession(action.type);
+        toast({
+          title: "Undo skipped",
+          description: "This change was already modified by another user.",
         });
         return;
       }

@@ -165,6 +165,7 @@ export const pins = pgTable("pins", {
   footage: integer("footage"),
   flagged: boolean("flagged").default(false),
   flagReason: text("flag_reason"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("pins_photo_id_idx").on(table.photoId),
   index("pins_entry_id_idx").on(table.entryId),
@@ -287,6 +288,7 @@ export const insertEntrySchema = createInsertSchema(entries).omit({
 
 export const insertPinSchema = createInsertSchema(pins).omit({
   id: true,
+  updatedAt: true,
 });
 
 

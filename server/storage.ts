@@ -574,7 +574,7 @@ export class DatabaseStorage implements IStorage {
 
   async updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined> {
     const [result] = await db.update(pins)
-      .set(data)
+      .set({ ...data, updatedAt: new Date() })
       .where(eq(pins.id, id))
       .returning();
     return result;

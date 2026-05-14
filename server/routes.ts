@@ -1377,6 +1377,15 @@ export async function registerRoutes(
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
+      const serverUpdatedAt = req.body?.serverUpdatedAt;
+      if (serverUpdatedAt) {
+        const current = new Date(entry.updatedAt).toISOString();
+        const expected = new Date(serverUpdatedAt).toISOString();
+        if (current !== expected) {
+          return res.status(409).json({ message: "This entry was modified by another user — undo skipped." });
+        }
+      }
+
       const allowedEntryFields = ['aisle', 'section', 'position', 'palletId', 'reelTag', 'wireType', 'gauge', 'footage', 'reelCount', 'color', 'manufacturer', 'notes', 'conductors', 'photoId'];
       const safeBody: Record<string, any> = {};
       for (const key of allowedEntryFields) {
@@ -1456,6 +1465,15 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+
+      const { serverUpdatedAt: entryToken } = req.body || {};
+      if (entryToken) {
+        const current = new Date(entry.updatedAt).toISOString();
+        const expected = new Date(entryToken).toISOString();
+        if (current !== expected) {
+          return res.status(409).json({ message: "This entry was modified by another user — undo skipped." });
+        }
+      }
 
       await storage.deleteEntry(entry.id);
       const username = req.user.claims.first_name || req.user.claims.email || userId;
@@ -1545,7 +1563,14 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to flag pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
 
-      const { flagged, flagReason } = req.body;
+      const { flagged, flagReason, serverUpdatedAt: flagToken } = req.body;
+      if (flagToken && pin.updatedAt) {
+        const current = new Date(pin.updatedAt).toISOString();
+        const expected = new Date(flagToken).toISOString();
+        if (current !== expected) {
+          return res.status(409).json({ message: "This pin was modified by another user — undo skipped." });
+        }
+      }
       const updated = await storage.updatePin(pin.id, {
         flagged: !!flagged,
         flagReason: flagged ? (flagReason || null) : null,
@@ -1664,6 +1689,15 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
 
+      const { serverUpdatedAt: pinToken } = req.body || {};
+      if (pinToken && pin.updatedAt) {
+        const current = new Date(pin.updatedAt).toISOString();
+        const expected = new Date(pinToken).toISOString();
+        if (current !== expected) {
+          return res.status(409).json({ message: "This pin was modified by another user — undo skipped." });
+        }
+      }
+
       const allowedPinFields = ['xPercent', 'yPercent', 'label', 'reelCount', 'wireDetails', 'vendorCode', 'footage', 'entryId', 'flagged'];
       const safeUpdate: Record<string, any> = {};
       for (const key of allowedPinFields) {
@@ -1686,6 +1720,15 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
+
+      const { serverUpdatedAt: pinDeleteToken } = req.body || {};
+      if (pinDeleteToken && pin.updatedAt) {
+        const current = new Date(pin.updatedAt).toISOString();
+        const expected = new Date(pinDeleteToken).toISOString();
+        if (current !== expected) {
+          return res.status(409).json({ message: "This pin was modified by another user — undo skipped." });
+        }
+      }
 
       if (pin.entryId) {
         await storage.deleteEntry(pin.entryId);
