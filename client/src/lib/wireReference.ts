@@ -271,6 +271,7 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "COP", catalog: "SER44461000", description: "SER 4 AWG 3C WITH 6 AWG GROUND 1000' COPPER" },
   { vendor: "COP", catalog: "SER4446CU1000", description: "SER 4 AWG 3C WITH 6 AWG GROUND 1000' COPPER" },
   { vendor: "COP", catalog: "TC1031000", description: "10/3 WOG TRAY CABLE-1000'" },
+  { vendor: "COP", catalog: "TC103WG500", description: "TC (Tray Cable) 10 AWG 3C 500'" },
   { vendor: "COP", catalog: "TC1041000", description: "10/4 TRAY CABLE-1000'" },
   { vendor: "COP", catalog: "TC1042500", description: "10/4 TRAY CABLE-2500'" },
   { vendor: "COP", catalog: "TC1231000", description: "12/3 TRAY CABLE-1000'" },
