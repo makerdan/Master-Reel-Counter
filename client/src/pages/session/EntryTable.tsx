@@ -1,6 +1,6 @@
 import { useState, useMemo, Fragment, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, Loader2, Search, X, ShieldAlert } from "lucide-react";
+import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, Loader2, Search, X, ShieldAlert, Camera } from "lucide-react";
 
 const UNREADABLE_SENTINEL = "[unreadable]";
 const ENCRYPTED_ENTRY_FIELDS: ReadonlyArray<keyof Entry> = ["reelTag", "wireType", "gauge", "color", "manufacturer", "notes", "palletId", "position", "conductors"];
@@ -126,7 +126,7 @@ function FilterChipButton({ label, active, count, onClick, testId, warning }: {
 }
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, exclusiveExpandKey, onJumpToPin, unitLabel: uLabel = "ft", currentUnit = "feet" as UnitType,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, exclusiveExpandKey, onJumpToPin, unitLabel: uLabel = "ft", currentUnit = "feet" as UnitType, onGoToPhotoMode,
 }: {
   entries: Entry[];
   photos: Photo[];
@@ -140,6 +140,7 @@ function EntryTable({
   onJumpToPin?: (photoId: number, pinId: number) => void;
   unitLabel?: string;
   currentUnit?: UnitType;
+  onGoToPhotoMode?: () => void;
 }) {
   const { toast } = useToast();
   const photoMap = new Map(photos.map(p => [p.id, p]));
@@ -349,9 +350,30 @@ function EntryTable({
   if (!entries || entries.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center">
-          <Cable className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-muted-foreground text-sm">No entries yet. Entries are created by placing and committing pins in Photo Mode.</p>
+        <CardContent className="py-12 text-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted mx-auto">
+              <Cable className="h-7 w-7 text-muted-foreground/50" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium" data-testid="text-entries-empty-heading">No entries yet</p>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                Entries appear here after pins are committed from the Reel IDs tab. Open a photo, place a pin on a reel label, and commit it to create your first entry.
+              </p>
+            </div>
+            {onGoToPhotoMode && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onGoToPhotoMode}
+                data-testid="button-entries-go-to-photo-mode"
+                className="gap-2 border-orange-500/50 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30 hover:border-orange-500"
+              >
+                <Camera className="h-4 w-4" />
+                Go to Reel IDs
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     );

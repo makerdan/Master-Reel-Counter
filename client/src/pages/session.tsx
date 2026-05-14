@@ -221,15 +221,23 @@ function SessionWorkspace({
   }, []);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const editingEntryDirtyRef = useRef(false);
+  const [unsavedChangesOpen, setUnsavedChangesOpen] = useState(false);
+  const pendingNavActionRef = useRef<(() => void) | null>(null);
+
+  const confirmUnsavedNav = (action: () => void) => {
+    if (!editingEntryDirtyRef.current) { action(); return; }
+    pendingNavActionRef.current = action;
+    setUnsavedChangesOpen(true);
+  };
 
   useEffect(() => {
     if (!editingEntry) return;
     const origPushState = history.pushState.bind(history);
     history.pushState = (...args: Parameters<typeof history.pushState>) => {
       if (editingEntryDirtyRef.current) {
-        const confirmed = window.confirm("You have unsaved changes. Discard them?");
-        if (!confirmed) return;
-        editingEntryDirtyRef.current = false;
+        pendingNavActionRef.current = () => origPushState(...args);
+        setUnsavedChangesOpen(true);
+        return;
       }
       return origPushState(...args);
     };
@@ -247,15 +255,14 @@ function SessionWorkspace({
       guardActive.value = true;
       window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
       guardActive.value = false;
-      const confirmed = window.confirm("You have unsaved changes. Discard them?");
-      if (confirmed) {
-        editingEntryDirtyRef.current = false;
+      pendingNavActionRef.current = () => {
         trackedHref.value = navigatedToHref;
         origPushState(null, "", navigatedToHref);
         guardActive.value = true;
         window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
         guardActive.value = false;
-      }
+      };
+      setUnsavedChangesOpen(true);
     };
     window.addEventListener("popstate", handlePopState);
     return () => {
@@ -683,7 +690,7 @@ function SessionWorkspace({
           <div className="flex items-center gap-2 min-w-0">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" onClick={() => { if (editingEntryDirtyRef.current) { if (!window.confirm("You have unsaved changes. Discard them?")) return; editingEntryDirtyRef.current = false; } setLocation("/"); }} data-testid="button-back" className="!border !border-[hsl(215_40%_35%)]">
+                <Button size="icon" variant="ghost" onClick={() => confirmUnsavedNav(() => setLocation("/"))} data-testid="button-back" className="!border !border-[hsl(215_40%_35%)]">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -952,6 +959,7 @@ function SessionWorkspace({
                   onPushUndo={pushUndo}
                   scrollToPhotoId={stripScrollToPhotoId}
                   onScrolled={() => setStripScrollToPhotoId(null)}
+                  onAddPhoto={() => setMode("photo")}
                 />
               </TabsContent>
 
@@ -1064,6 +1072,7 @@ function SessionWorkspace({
                   setMode("photo");
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
+                onGoToPhotoMode={() => { setMode("photo"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
               />
             </div>
           </>
@@ -1071,7 +1080,7 @@ function SessionWorkspace({
       </div>
 
       {editingEntry && (
-        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) { if (editingEntryDirtyRef.current) { if (!window.confirm("You have unsaved changes. Discard them?")) return; editingEntryDirtyRef.current = false; } setEditingEntry(null); } }}>
+        <Dialog open={!!editingEntry} onOpenChange={(o) => { if (!o) confirmUnsavedNav(() => setEditingEntry(null)); }}>
           <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-4 pb-2 shrink-0">
               <DialogTitle>Edit Entry #{editingEntry.id}</DialogTitle>
@@ -1235,6 +1244,31 @@ function SessionWorkspace({
               }}
             >
               Export Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={unsavedChangesOpen} onOpenChange={setUnsavedChangesOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to this entry. If you leave now, your changes will be discarded.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-unsaved-stay">Stay</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-unsaved-leave"
+              onClick={() => {
+                const action = pendingNavActionRef.current;
+                pendingNavActionRef.current = null;
+                editingEntryDirtyRef.current = false;
+                action?.();
+              }}
+            >
+              Leave
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

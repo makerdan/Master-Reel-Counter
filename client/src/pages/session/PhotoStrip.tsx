@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
+import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight, MoreVertical, Camera, ImagePlus } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -1147,6 +1147,7 @@ export default function PhotoStrip({
   onPushUndo,
   scrollToPhotoId,
   onScrolled,
+  onAddPhoto,
 }: {
   sessionId: number;
   canEdit: boolean;
@@ -1155,6 +1156,7 @@ export default function PhotoStrip({
   onPushUndo?: (action: any) => void;
   scrollToPhotoId?: number | null;
   onScrolled?: () => void;
+  onAddPhoto?: () => void;
 }) {
   const [lightbox, setLightbox] = useState<{ photos: LightboxPhoto[]; index: number } | null>(null);
 
@@ -1200,8 +1202,25 @@ export default function PhotoStrip({
 
   if (photos.length === 0) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground text-sm" data-testid="strip-empty">
-        No photos yet — use Mobile Flow or Reel IDs to capture images.
+      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center px-6" data-testid="strip-empty">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+          <Camera className="h-8 w-8 text-muted-foreground/50" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium">No photos yet</p>
+          <p className="text-xs text-muted-foreground max-w-xs">Add your first photo to get started. Photos are the foundation for placing pins and recording reel counts.</p>
+        </div>
+        {canEdit && onAddPhoto && (
+          <Button
+            size="sm"
+            onClick={onAddPhoto}
+            data-testid="button-strip-add-photo"
+            className="gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            <ImagePlus className="h-4 w-4" />
+            Add First Photo
+          </Button>
+        )}
       </div>
     );
   }
