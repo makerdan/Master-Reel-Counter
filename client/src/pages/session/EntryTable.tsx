@@ -593,16 +593,14 @@ function EntryTable({
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}><HighlightText text={entry.section || ""} query={debouncedQuery} /></td>
                           <td className="mono font-bold">
                             {entry.reelTag ? (
-                              <>
-                                <HighlightText text={entry.reelTag} query={debouncedQuery} />
-                                {entry.manufacturer && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
-                              </>
+                              <HighlightText text={entry.reelTag} query={debouncedQuery} />
                             ) : (
                               <Badge className="py-0 px-1.5 text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1 font-medium whitespace-nowrap no-default-hover-elevate no-default-active-elevate" data-testid={`badge-missing-catalog-${entry.id}`}>
                                 <AlertTriangle className="h-2.5 w-2.5" />
                                 Missing catalog tag
                               </Badge>
                             )}
+                            {entry.manufacturer && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
                           </td>
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>{entry.manufacturer ? <HighlightText text={entry.manufacturer} query={debouncedQuery} /> : "-"}</td>
                           <td className="hidden" style={{ textAlign: "center" }}>{entry.manufacturer ? <HighlightText text={entry.manufacturer} query={debouncedQuery} /> : "-"}</td>
