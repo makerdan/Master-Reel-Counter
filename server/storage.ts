@@ -1087,14 +1087,23 @@ export class DatabaseStorage implements IStorage {
     await db.update(folders)
       .set({ deletedAt: null })
       .where(eq(folders.id, id));
-    // Relink active (non-trashed) sessions that were snapshotted from this folder.
+    // Relink active (non-trashed) sessions that were snapshotted from this folder
+    // AND that are still at root (folderId IS NULL). If folderId is non-null the
+    // user explicitly moved the session to a different folder while the original
+    // folder was in trash — we must not override that choice.
     const relinked = await db.update(countingSessions)
       .set({ folderId: id, trashedFromFolderId: null })
       .where(and(
         eq(countingSessions.trashedFromFolderId, id),
         isNull(countingSessions.deletedAt),
+        isNull(countingSessions.folderId),
       ))
       .returning({ id: countingSessions.id });
+    // Clear snapshots for sessions that were moved elsewhere so we don't leave
+    // stale trashedFromFolderId values on rows we decided not to relink.
+    await db.update(countingSessions)
+      .set({ trashedFromFolderId: null })
+      .where(eq(countingSessions.trashedFromFolderId, id));
     return { relinkedCount: relinked.length };
   }
 
