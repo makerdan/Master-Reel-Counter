@@ -3683,6 +3683,19 @@ export async function registerRoutes(
         // `loadLayouts` loads image buffers for a list of photo metadata objects
         // in slices of PDF_PHOTO_BATCH_SIZE.  After the caller renders using the
         // returned map, the map goes out of scope and GC can reclaim the buffers.
+        //
+        // deferFailedEntries: called when a photo fails to load so its matched
+        // entries still appear in "Entries Without Photos" (same as the original
+        // loadedPhotos-based matching behaviour).  Tracks deferred IDs to prevent
+        // duplicates if somehow the same entry is referenced by two failed photos.
+        const deferredEntryIdsForSection = new Set<number>();
+        const deferFailedEntries = (entries: any[]) => {
+          const fresh = entries.filter((e: any) => !deferredEntryIdsForSection.has(e.id));
+          if (fresh.length > 0) {
+            deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: fresh });
+            fresh.forEach((e: any) => deferredEntryIdsForSection.add(e.id));
+          }
+        };
         const loadLayouts = async (metas: any[]): Promise<Map<number, PhotoLayout>> => {
           const layoutMap = new Map<number, PhotoLayout>();
           for (let i = 0; i < metas.length; i += PDF_PHOTO_BATCH_SIZE) {
@@ -3781,9 +3794,7 @@ export async function registerRoutes(
           for (const { photoMeta, entries: photoEntries } of (detailMetaByParent.get(parentPhotoId) || [])) {
             const dpl = layouts.get(photoMeta.id);
             if (!dpl) {
-              if (photoEntries.length > 0) {
-                deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: photoEntries });
-              }
+              deferFailedEntries(photoEntries);
               continue;
             }
             ensureSpace(detailMinH);
@@ -3818,9 +3829,7 @@ export async function registerRoutes(
             const layouts = await loadLayouts(photosNeeded);
             const pl = layouts.get(item.photoMeta.id);
             if (!pl) {
-              if (item.entries.length > 0) {
-                deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: item.entries });
-              }
+              deferFailedEntries(item.entries);
               continue;
             }
             ensureSpace(compactMinH);
@@ -3901,9 +3910,7 @@ export async function registerRoutes(
           const layouts = await loadLayouts(photosNeeded);
           const pl = layouts.get(item.photoMeta.id);
           if (!pl) {
-            if (item.entries.length > 0) {
-              deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: item.entries });
-            }
+            deferFailedEntries(item.entries);
             continue;
           }
           ensureSpace(minPhotoH);
@@ -3986,9 +3993,7 @@ export async function registerRoutes(
             const layouts = await loadLayouts([photoMeta]);
             const pl = layouts.get(photoMeta.id);
             if (!pl) {
-              if (photoEntries.length > 0) {
-                deferredUnmatchedSections.push({ aisle: sec.aisle, section: sec.section, entries: photoEntries });
-              }
+              deferFailedEntries(photoEntries);
               continue;
             }
             ensureSpace(80);
