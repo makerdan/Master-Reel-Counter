@@ -25,6 +25,7 @@ export interface QueuedPhoto {
   isOnFloor: boolean;
   createdAt: number;
   inFlight?: boolean;
+  claimedAt?: number;
 }
 
 export interface QueuedEntry {
@@ -34,6 +35,7 @@ export interface QueuedEntry {
   createdAt: number;
   placeholderId?: number;
   inFlight?: boolean;
+  claimedAt?: number;
 }
 
 export function dispatchEntrySynced(placeholderId: number, realId: number, sessionId: number): void {
@@ -199,7 +201,7 @@ export async function claimPhotoInFlight(id: string): Promise<boolean> {
     req.onsuccess = () => {
       const item = req.result as QueuedPhoto | undefined;
       if (!item || item.inFlight) return; // already claimed or gone
-      store.put({ ...item, inFlight: true });
+      store.put({ ...item, inFlight: true, claimedAt: Date.now() });
       claimed = true;
     };
     tx.oncomplete = () => resolve(claimed);
@@ -217,7 +219,7 @@ export async function claimEntryInFlight(id: string): Promise<boolean> {
     req.onsuccess = () => {
       const item = req.result as QueuedEntry | undefined;
       if (!item || item.inFlight) return; // already claimed or gone
-      store.put({ ...item, inFlight: true });
+      store.put({ ...item, inFlight: true, claimedAt: Date.now() });
       claimed = true;
     };
     tx.oncomplete = () => resolve(claimed);
@@ -264,11 +266,20 @@ export async function clearEntryInFlight(id: string): Promise<void> {
   return patchEntryRecord(id, { inFlight: false });
 }
 
-// Resets all inFlight flags across both stores.  Call once on app startup so
-// that items stranded in-flight by a prior page crash or reload are retried
-// on the next sync rather than silently skipped forever.
-export async function clearAllInFlight(): Promise<void> {
+// How long a claim is considered "fresh" (i.e. likely still being processed).
+// Any inFlight claim stamped within this window is preserved so that a second
+// tab or rapid-reconnect event cannot reset a claim that is actively in use.
+// Chosen to be comfortably longer than a realistic single-item submit cycle
+// (upload + record create).  Crashed-page claims expire after this period.
+const CLAIM_STALENESS_MS = 2 * 60 * 1000; // 2 minutes
+
+// Resets inFlight flags ONLY for claims that are demonstrably stale (older
+// than CLAIM_STALENESS_MS or missing a claimedAt timestamp).
+// Call once on app startup so items stranded by a previous page crash are
+// retried, without disturbing active claims from another tab.
+export async function clearStaleInFlight(): Promise<void> {
   const db = await openDB();
+  const now = Date.now();
 
   const resetStore = (storeName: string) =>
     new Promise<void>((resolve, reject) => {
@@ -277,8 +288,10 @@ export async function clearAllInFlight(): Promise<void> {
       const req = store.getAll();
       req.onsuccess = () => {
         for (const item of req.result as Array<Record<string, unknown>>) {
-          if (item.inFlight) {
-            store.put({ ...item, inFlight: false });
+          if (!item.inFlight) continue;
+          const age = typeof item.claimedAt === "number" ? now - item.claimedAt : Infinity;
+          if (age > CLAIM_STALENESS_MS) {
+            store.put({ ...item, inFlight: false, claimedAt: undefined });
           }
         }
       };

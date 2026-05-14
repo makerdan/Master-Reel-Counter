@@ -11,7 +11,7 @@ import {
   clearPhotoInFlight,
   claimEntryInFlight,
   clearEntryInFlight,
-  clearAllInFlight,
+  clearStaleInFlight,
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
 
@@ -241,11 +241,12 @@ export function useNetworkStatus() {
     const interval = setInterval(refreshPendingCount, 5000);
     const unsubQueue = onQueueChange(refreshPendingCount);
 
-    // Clear stale inFlight flags from a previous interrupted page session
-    // BEFORE running the initial drain, so those items are retried rather
-    // than silently skipped.  syncQueue is only called after the clear
-    // resolves to avoid a race where the drain runs before flags are reset.
-    clearAllInFlight()
+    // Clear STALE inFlight flags (older than 2 min) from a previous page crash
+    // BEFORE the initial drain, so stranded items are retried.  We use a
+    // staleness threshold rather than clearing all flags so that active claims
+    // in another tab are never disturbed.  syncQueue fires only after the clear
+    // completes to prevent a race where the drain skips not-yet-reset items.
+    clearStaleInFlight()
       .catch(() => {})
       .then(() => {
         if (navigator.onLine) syncQueue();
