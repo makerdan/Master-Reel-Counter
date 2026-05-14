@@ -564,7 +564,10 @@ export default function ReviewTab({
     lastRevealSessionRef.current = sessionId;
     revealStartTimestamps.current.clear();
     revealedRef.current.clear();
-    // setRevealedEntries will be called by the registration effect below.
+    // Clear the rendering copy synchronously so the UI never briefly shows
+    // stale reveal state from a previous session before the next effect runs.
+    // (This is a render-time side-effect which React allows for derived resets.)
+    setRevealedEntries(new Set());
   }
 
   // Register each newly-assigned entry with the timer system.
