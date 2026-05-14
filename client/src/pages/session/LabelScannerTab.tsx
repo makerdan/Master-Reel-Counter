@@ -173,21 +173,27 @@ interface SavedCardResult {
   editFootage: string;
   confidence: string;
   timestamp: number;
+  // Persisted so badges + Retry buttons survive a page reload.
+  // Only "excluded" | "cancelled" | "failed" are saved — "new" is
+  // a transient in-progress marker and is never written to storage.
+  notAnalyzedReason?: NotAnalyzedReason;
 }
 
 function saveAnalysisResults(sessionId: number, cards: PinCard[]) {
   try {
     const data: SavedCardResult[] = cards
-      .filter((c) => c.result)
+      .filter((c) => c.result || (c.notAnalyzedReason && c.notAnalyzedReason !== "new"))
       .map((c) => ({
         pinId: c.pin.id,
-        rawText: c.result!.rawText,
-        readable: c.result!.readable,
+        rawText: c.result?.rawText ?? null,
+        readable: c.result?.readable ?? false,
         editCatalog: c.editCatalog,
         editVendor: c.editVendor,
         editFootage: c.editFootage,
         confidence: c.matchResult?.confidence ?? "none",
         timestamp: Date.now(),
+        // Only persist the reason when there is no successful result.
+        notAnalyzedReason: c.result ? undefined : c.notAnalyzedReason,
       }));
     localStorage.setItem(getResultsStorageKey(sessionId), JSON.stringify(data));
   } catch {}
@@ -780,6 +786,11 @@ export default function LabelScannerTab({
             matchResult: local.rawText ? matchLabelText(local.rawText) : undefined,
           };
         }
+        // Restore the persisted failure reason (excluded/cancelled/failed) so
+        // the badge and Retry button survive a page reload or WS re-sync.
+        if (local?.notAnalyzedReason) {
+          return { ...base, included: savedIncluded ?? true, ...applyPinSeed({ editCatalog: "", editFootage: "", editVendor: "" }, pin), notAnalyzedReason: local.notAnalyzedReason };
+        }
         return { ...base, included: savedIncluded ?? true, ...applyPinSeed({ editCatalog: "", editFootage: "", editVendor: "" }, pin) };
       });
       builtHasResults = built.some((c) => c.result);
@@ -919,8 +930,8 @@ export default function LabelScannerTab({
   }, [phase]);
 
   function applyResults(results: AnalysisResult[]) {
-    setCards((prev) =>
-      prev.map((card) => {
+    setCards((prev) => {
+      const updated = prev.map((card) => {
         const result = results.find((r) => r.pinId === card.pin.id);
         if (!result) return card;
         const matchResult = result.rawText ? matchLabelText(result.rawText) : undefined;
@@ -935,7 +946,7 @@ export default function LabelScannerTab({
         }
         const isHighConfidence = matchResult?.confidence === "high";
         const included = isHighConfidence;
-        const updated = {
+        const newCard = {
           ...card,
           result,
           matchResult,
@@ -946,9 +957,13 @@ export default function LabelScannerTab({
           notAnalyzedReason: undefined,
         };
         saveSelectionState(sessionId, card.pin.id, included);
-        return updated;
-      })
-    );
+        return newCard;
+      });
+      // Persist the updated cards so that newly-successful results clear any
+      // previously-persisted failure reason for the same pin.
+      saveAnalysisResults(sessionId, updated);
+      return updated;
+    });
     setPhase("results");
   }
 
@@ -1170,11 +1185,15 @@ export default function LabelScannerTab({
         const photoCards = byPhoto.get(photoId)!;
         if (cancelRequested.current) {
           const remainingPhotoIds = new Set(photoOrder.slice(pIdx));
-          setCards((prev) => prev.map((c) =>
-            remainingPhotoIds.has(c.pin.photoId) && targetIds.has(c.pin.id) && !c.result
-              ? { ...c, notAnalyzedReason: "cancelled" }
-              : c
-          ));
+          setCards((prev) => {
+            const updated = prev.map((c) =>
+              remainingPhotoIds.has(c.pin.photoId) && targetIds.has(c.pin.id) && !c.result
+                ? { ...c, notAnalyzedReason: "cancelled" as const }
+                : c
+            );
+            saveAnalysisResults(sessionId, updated);
+            return updated;
+          });
           toast({ title: "Analysis cancelled", description: `Completed ${doneBatches} of ${totalBatches} batch${totalBatches !== 1 ? "es" : ""}` });
           return;
         }
@@ -1188,21 +1207,29 @@ export default function LabelScannerTab({
         } catch (err: any) {
           if (err?.message === "__cancelled__") {
             const remainingPhotoIds = new Set(photoOrder.slice(pIdx));
-            setCards((prev) => prev.map((c) =>
-              remainingPhotoIds.has(c.pin.photoId) && targetIds.has(c.pin.id) && !c.result
-                ? { ...c, notAnalyzedReason: "cancelled" }
-                : c
-            ));
+            setCards((prev) => {
+              const updated = prev.map((c) =>
+                remainingPhotoIds.has(c.pin.photoId) && targetIds.has(c.pin.id) && !c.result
+                  ? { ...c, notAnalyzedReason: "cancelled" as const }
+                  : c
+              );
+              saveAnalysisResults(sessionId, updated);
+              return updated;
+            });
             toast({ title: "Analysis cancelled", description: `Completed ${doneBatches} of ${totalBatches} batch${totalBatches !== 1 ? "es" : ""}` });
             return;
           }
           failedPhotos++;
           const failedPinIds = new Set(photoCards.map((c) => c.pin.id));
-          setCards((prev) => prev.map((c) =>
-            failedPinIds.has(c.pin.id) && !c.result
-              ? { ...c, notAnalyzedReason: "failed" }
-              : c
-          ));
+          setCards((prev) => {
+            const updated = prev.map((c) =>
+              failedPinIds.has(c.pin.id) && !c.result
+                ? { ...c, notAnalyzedReason: "failed" as const }
+                : c
+            );
+            saveAnalysisResults(sessionId, updated);
+            return updated;
+          });
           console.error(`[analyze] photo ${photoId} failed:`, err);
         }
         doneBatches++;
@@ -1459,6 +1486,9 @@ export default function LabelScannerTab({
       const successSet = new Set(data.succeededPinIds);
       setCards((prev) => {
         const remaining = prev.filter((c) => !successSet.has(c.pin.id));
+        // Clear localStorage entries for applied pins so they don't linger as
+        // "failed" ghosts if the same pin is somehow re-created later.
+        saveAnalysisResults(sessionId, remaining);
         if (remaining.length === 0) {
           setPhase("preview");
         }
