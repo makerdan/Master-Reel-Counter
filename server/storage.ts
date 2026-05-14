@@ -1391,6 +1391,7 @@ export class DatabaseStorage implements IStorage {
     reasons: Record<number, string[]>;
     entrySnippets?: Record<number, { field: string; preview: string }[]>;
     encryptionActive?: boolean;
+    wireTypeFilterDisabled?: boolean;
   }> {
     const lowerQuery = query.trim().toLowerCase();
     const pattern = `%${query}%`;
@@ -1503,17 +1504,20 @@ export class DatabaseStorage implements IStorage {
       }
 
       if (wireTypeFilter && eligible.size > 0) {
-        const eligibleArr = Array.from(eligible);
-        const wirePattern = `%${wireTypeFilter}%`;
-        const wireMatches = await db.select({ sessionId: entries.sessionId })
-          .from(entries)
-          .where(and(
-            inArray(entries.sessionId, eligibleArr),
-            ilike(sql`COALESCE(${entries.wireType}, '')`, wirePattern),
-          ))
-          .groupBy(entries.sessionId);
-        const withWire = new Set(wireMatches.map(m => m.sessionId));
-        eligible = new Set([...eligible].filter(id => withWire.has(id)));
+        if (!encryptionActive) {
+          const eligibleArr = Array.from(eligible);
+          const wirePattern = `%${wireTypeFilter}%`;
+          const wireMatches = await db.select({ sessionId: entries.sessionId })
+            .from(entries)
+            .where(and(
+              inArray(entries.sessionId, eligibleArr),
+              ilike(sql`COALESCE(${entries.wireType}, '')`, wirePattern),
+            ))
+            .groupBy(entries.sessionId);
+          const withWire = new Set(wireMatches.map(m => m.sessionId));
+          eligible = new Set([...eligible].filter(id => withWire.has(id)));
+        }
+        // When encryptionActive, skip the ILIKE — ciphertext cannot be matched
       }
 
       return eligible;
@@ -1712,6 +1716,7 @@ export class DatabaseStorage implements IStorage {
       reasons,
       entrySnippets,
       encryptionActive,
+      wireTypeFilterDisabled: encryptionActive && !!wireTypeFilter,
     };
   }
 

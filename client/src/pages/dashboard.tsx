@@ -307,8 +307,8 @@ export default function Dashboard() {
     placeholderData: [],
   });
 
-  type SearchResult = { ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]>; entrySnippets?: Record<number, { field: string; preview: string }[]>; encryptionActive?: boolean };
-  const emptySearch: SearchResult = { ownedIds: [], sharedIds: [], reasons: {}, entrySnippets: {}, encryptionActive: false };
+  type SearchResult = { ownedIds: number[]; sharedIds: number[]; reasons: Record<number, string[]>; entrySnippets?: Record<number, { field: string; preview: string }[]>; encryptionActive?: boolean; wireTypeFilterDisabled?: boolean };
+  const emptySearch: SearchResult = { ownedIds: [], sharedIds: [], reasons: {}, entrySnippets: {}, encryptionActive: false, wireTypeFilterDisabled: false };
 
   const activeFilters = {
     status: filterStatus || undefined,
@@ -1892,6 +1892,16 @@ export default function Dashboard() {
                     <X className="h-3 w-3" />
                   </Badge>
                 )}
+                {searchResults?.wireTypeFilterDisabled && filterWireType && (
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 flex items-center gap-1"
+                    data-testid="text-wiretype-encryption-notice"
+                  >
+                    Encryption on — wire type filter unavailable
+                  </span>
+                )}
                 {filterMinFootage && (
                   <Badge
                     variant="secondary"
@@ -1957,12 +1967,19 @@ export default function Dashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Wire Type</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Wire Type
+                    {searchResults?.wireTypeFilterDisabled && (
+                      <span className="ml-1 text-amber-600 dark:text-amber-400" title="Encryption is on — wire type values are stored as ciphertext and cannot be searched">
+                        (unavailable)
+                      </span>
+                    )}
+                  </label>
                   <Input
                     value={filterWireType}
                     onChange={e => setFilterWireType(e.target.value)}
-                    placeholder="e.g. THHN"
-                    className="h-7 text-xs"
+                    placeholder={searchResults?.wireTypeFilterDisabled ? "Unavailable with encryption" : "e.g. THHN"}
+                    className={`h-7 text-xs${searchResults?.wireTypeFilterDisabled ? " opacity-50" : ""}`}
                     data-testid="input-filter-wiretype"
                   />
                 </div>
