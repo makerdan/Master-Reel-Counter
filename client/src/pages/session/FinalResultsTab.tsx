@@ -105,9 +105,9 @@ function LocationList({ locations, currentUnit, onPinClick }: {
               <li key={i} className="text-xs font-mono">
                 {canLink ? (
                   <button
-                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-left"
+                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer transition-colors text-left"
                     onClick={() => onPinClick!(loc.photoId!, loc.pinId!)}
-                    data-testid={`link-uncataloged-location-${i}`}
+                    data-testid={`link-pin-location-${i}`}
                   >
                     {label}
                   </button>
@@ -264,8 +264,8 @@ export default function FinalResultsTab({
       const row = map.get(key)!;
       row.totalReels += reelCount;
       row.totalFootage += (footage != null ? footage * reelCount : 0);
-      const pinLabel = catalog === "(uncataloged)" && pin.label ? `Pin ${pin.label}` : undefined;
-      const locExtra = catalog === "(uncataloged)" ? { photoId: pin.photoId, pinId: pin.id } : {};
+      const pinLabel = pin.label ? `Pin ${pin.label}` : undefined;
+      const locExtra = { photoId: pin.photoId, pinId: pin.id };
       row.locations.push({ aisle, section, reelCount, footage, ...(pinLabel !== undefined ? { pinLabel } : {}), ...locExtra });
     }
 
@@ -561,7 +561,7 @@ export default function FinalResultsTab({
                         <LocationList
                           locations={row.locations}
                           currentUnit={currentUnit}
-                          onPinClick={row.catalog === "(uncataloged)" ? onJumpToPin : undefined}
+                          onPinClick={onJumpToPin}
                         />
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
