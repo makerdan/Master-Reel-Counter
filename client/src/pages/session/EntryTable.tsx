@@ -341,7 +341,14 @@ function EntryTable({
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
+  // Only collapse sections when filters/search genuinely *change* from a prior
+  // state. Skipping the initial mount prevents a spurious second render that
+  // creates a new `{}` reference, and prevents sections from collapsing when
+  // the component remounts (e.g. captureMode toggling the conditional render)
+  // while a mutation-driven refetch is in flight.
+  const filterResetMountedRef = useRef(false);
   useEffect(() => {
+    if (!filterResetMountedRef.current) { filterResetMountedRef.current = true; return; }
     setExpandedSections({});
   }, [activeFilters, debouncedQuery]);
 
