@@ -253,6 +253,29 @@ function EntryTable({
   const isSearchActive = debouncedQuery.trim().length > 0;
 
   const incompleteCount = useMemo(() => entries.filter(e => !e.reelTag || !e.footage).length, [entries]);
+
+  const bannerDismissKey = `incomplete-banner-dismissed-${sessionId}`;
+  const [dismissedAt, setDismissedAt] = useState<number>(() => {
+    const stored = sessionStorage.getItem(bannerDismissKey);
+    return stored ? parseInt(stored, 10) : 0;
+  });
+  // Re-show banner when incomplete count grows beyond whatever the user dismissed.
+  const showIncompleteBanner = incompleteCount > 0 && incompleteCount > dismissedAt;
+
+  // When all entries are fixed, reset the dismissal so the banner reappears
+  // the moment any new issue arrives (avoids the count never reaching dismissed value again).
+  useEffect(() => {
+    if (incompleteCount === 0 && dismissedAt > 0) {
+      setDismissedAt(0);
+      sessionStorage.removeItem(bannerDismissKey);
+    }
+  }, [incompleteCount, dismissedAt, bannerDismissKey]);
+
+  const dismissBanner = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDismissedAt(incompleteCount);
+    sessionStorage.setItem(bannerDismissKey, String(incompleteCount));
+  };
   const noPhotoCount = useMemo(() => entries.filter(e => !pinByEntryId.has(e.id)).length, [entries, pinByEntryId]);
   const flaggedCount = useMemo(() => entries.filter(e => flaggedEntryIds.has(e.id)).length, [entries, flaggedEntryIds]);
 
@@ -371,7 +394,7 @@ function EntryTable({
           )}
         </div>
 
-        {incompleteCount > 0 && (
+        {showIncompleteBanner && (
           <div
             role="alert"
             onClick={() => toggleFilter("incomplete")}
@@ -379,9 +402,17 @@ function EntryTable({
             data-testid="banner-incomplete-entries"
           >
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span className="text-xs font-medium">
+            <span className="text-xs font-medium flex-1">
               {incompleteCount} {incompleteCount === 1 ? "entry is" : "entries are"} missing required data — click to review
             </span>
+            <button
+              onClick={dismissBanner}
+              aria-label="Dismiss warning"
+              data-testid="button-dismiss-incomplete-banner"
+              className="ml-auto p-0.5 rounded hover:bg-amber-400/30 transition-colors shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
 
