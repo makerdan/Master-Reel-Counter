@@ -1940,6 +1940,7 @@ export async function registerRoutes(
 
       const MAX_BATCH = 20;
       const allResults: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> = [];
+      let anyTruncated = false;
 
       for (let i = 0; i < pinData.length; i += MAX_BATCH) {
         const batch = pinData.slice(i, i + MAX_BATCH);
@@ -1951,6 +1952,7 @@ export async function registerRoutes(
             zoomLevel: p.zoomLevel ?? 1,
           })));
           if (batchTruncated) {
+            anyTruncated = true;
             console.warn(`[analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}`);
           }
 
@@ -2030,7 +2032,7 @@ export async function registerRoutes(
         console.error("[analyze-labels] Failed to persist scan results:", e);
       }
 
-      res.json(cacheEntry);
+      res.json({ ...cacheEntry, truncated: anyTruncated });
     } catch (error) {
       console.error("Error analyzing labels:", error);
       res.status(500).json({ message: "Failed to analyze labels" });
@@ -2086,6 +2088,7 @@ export async function registerRoutes(
       const MAX_BATCH = 20;
       const allResults: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> = [];
       const totalBatches = Math.ceil(allCropRequests.length / MAX_BATCH);
+      let anyTruncated = false;
 
       for (let i = 0; i < allCropRequests.length; i += MAX_BATCH) {
         const batch = allCropRequests.slice(i, i + MAX_BATCH);
@@ -2106,6 +2109,7 @@ export async function registerRoutes(
               zoomLevel: it.zoomLevel,
             })));
             if (photoTruncated) {
+              anyTruncated = true;
               console.warn(`[session-analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}`);
             }
             crops.push(...photoCrops);
@@ -2193,7 +2197,7 @@ export async function registerRoutes(
         console.error("[session-analyze-labels] Failed to persist scan results:", e);
       }
 
-      res.json({ results: allResults, totalBatches });
+      res.json({ results: allResults, totalBatches, truncated: anyTruncated });
     } catch (error) {
       console.error("Error analyzing session labels:", error);
       res.status(500).json({ message: "Failed to analyze labels" });

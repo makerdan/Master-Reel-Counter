@@ -1173,6 +1173,7 @@ export default function LabelScannerTab({
     let totalResults = 0;
     let succeededPhotos = 0;
     let failedPhotos = 0;
+    let anyTruncated = false;
 
     try {
       const byPhoto = new Map<number, PinCard[]>();
@@ -1209,6 +1210,7 @@ export default function LabelScannerTab({
             applyResults(data.results);
             totalResults += data.results.length;
           }
+          if (data?.truncated) anyTruncated = true;
           succeededPhotos++;
         } catch (err: any) {
           if (err?.message === "__cancelled__") {
@@ -1260,6 +1262,13 @@ export default function LabelScannerTab({
         });
       } else if (totalResults > 0) {
         toast({ title: "Analysis complete", description: `Read ${totalResults} label(s)` });
+      }
+      if (anyTruncated) {
+        toast({
+          title: "Some pins were skipped — batch too large",
+          description: "Try scanning fewer pins at once to get results for all of them.",
+          variant: "destructive",
+        });
       }
     } catch (error: any) {
       toast({ title: "Analysis failed", description: error?.message ?? "Unknown error", variant: "destructive" });
