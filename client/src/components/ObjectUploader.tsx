@@ -89,26 +89,39 @@ export function ObjectUploader({
   );
 
   // Track upload state via Uppy events; keep ref in sync with state.
+  // Uses active-file counting so multi-file uploads don't mark isUploading=false
+  // as soon as one file errors while others are still in progress.
   useEffect(() => {
-    const onUploadStart = () => {
-      setIsUploading(true);
-      isUploadingRef.current = true;
-    };
-    const onDone = () => {
-      setIsUploading(false);
-      isUploadingRef.current = false;
+    let activeCount = 0;
+    const mark = () => {
+      const uploading = activeCount > 0;
+      setIsUploading(uploading);
+      isUploadingRef.current = uploading;
     };
 
-    uppy.on("upload", onUploadStart);
-    uppy.on("complete", onDone);
-    uppy.on("upload-error", onDone);
-    uppy.on("cancel-all", onDone);
+    const onUploadStart = () => {
+      activeCount += 1;
+      mark();
+    };
+    const onFileDone = () => {
+      activeCount = Math.max(0, activeCount - 1);
+      mark();
+    };
+    const onCancelAll = () => {
+      activeCount = 0;
+      mark();
+    };
+
+    uppy.on("upload-start", onUploadStart);
+    uppy.on("upload-success", onFileDone);
+    uppy.on("upload-error", onFileDone);
+    uppy.on("cancel-all", onCancelAll);
 
     return () => {
-      uppy.off("upload", onUploadStart);
-      uppy.off("complete", onDone);
-      uppy.off("upload-error", onDone);
-      uppy.off("cancel-all", onDone);
+      uppy.off("upload-start", onUploadStart);
+      uppy.off("upload-success", onFileDone);
+      uppy.off("upload-error", onFileDone);
+      uppy.off("cancel-all", onCancelAll);
     };
   }, [uppy]);
 
@@ -117,6 +130,7 @@ export function ObjectUploader({
     if (!isUploading) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
+      e.returnValue = "";
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
