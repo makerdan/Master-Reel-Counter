@@ -36,11 +36,6 @@ export async function cropPhoto(
   let truncated = false;
 
   for (const pin of pins) {
-    if (accumulatedBytes >= MAX_OUTPUT_BYTES) {
-      truncated = true;
-      break;
-    }
-
     const fraction = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pin.zoomLevel));
 
     let cropW = Math.round(imgWidth * fraction);
@@ -72,11 +67,15 @@ export async function cropPhoto(
       .toBuffer();
 
     accumulatedBytes += croppedBuffer.length;
-
     results.push({
       pinId: pin.pinId,
       base64: croppedBuffer.toString("base64"),
     });
+
+    if (accumulatedBytes >= MAX_OUTPUT_BYTES) {
+      truncated = true;
+      break;
+    }
   }
 
   return { results, truncated };
