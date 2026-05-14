@@ -905,7 +905,7 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (getTesterOwner(req)) return res.status(403).json({ message: "Testers cannot duplicate sessions" });
-      if (!isOwner(access.role)) return res.status(403).json({ message: "Only session owners can duplicate sessions" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "Viewers cannot duplicate sessions" });
       const { folderId, name } = req.body || {};
       const targetFolderId = folderId ?? access.session.folderId ?? null;
       if (targetFolderId) {
