@@ -43,14 +43,32 @@ const sessionRooms = new Map<number, Set<WebSocket>>();
 const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null }>();
 const encodingToggleInProgress = new Set<string>();
 
-/**
- * Derive a stable pair of signed int32 advisory lock keys from a userId.
- * Using two int4 values avoids BigInt serialization issues with the Drizzle sql tag.
- * pg_advisory_xact_lock(key1, key2) stores classid=key1, objid=key2, objsubid=2.
- */
+/** Derive stable int32 advisory lock keys from a userId (SHA-256, two int4 values). */
 function deriveAdvisoryLockKeys(userId: string): [number, number] {
   const h = createHash("sha256").update(userId).digest();
   return [h.readInt32BE(0), h.readInt32BE(4)];
+}
+
+type EncodingTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Acquire a shared advisory lock for the given user's encoding toggle.
+ * Shared locks coexist with each other (concurrent writes are fine)
+ * but conflict with the exclusive lock held by the toggle transaction.
+ * Throws "ENCODING_TOGGLE_IN_PROGRESS" if the toggle holds the lock.
+ * Must be called as the first statement inside a db.transaction() callback.
+ */
+async function acquireSharedEncodingLock(
+  tx: EncodingTx,
+  lk1: number,
+  lk2: number
+): Promise<void> {
+  const lockResult = await tx.execute(
+    sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
+  );
+  if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
+    throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
+  }
 }
 
 function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSocket) {
@@ -1298,13 +1316,7 @@ export async function registerRoutes(
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
 
       const { photo } = await db.transaction(async (tx) => {
-        const lockResult = await tx.execute(
-          sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
-        );
-        if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
-          throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
-        }
-
+        await acquireSharedEncodingLock(tx, lk1, lk2);
         const encKey = await getEncryptionKey(access.session.userId);
         const [insertedPhoto] = await tx.insert(photos).values(safePhotoData).returning();
         const idMap = new Map<number, number>();
@@ -1399,12 +1411,7 @@ export async function registerRoutes(
 
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
       const { entry, encKey } = await db.transaction(async (tx) => {
-        const lockResult = await tx.execute(
-          sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
-        );
-        if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
-          throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
-        }
+        await acquireSharedEncodingLock(tx, lk1, lk2);
         const key = await getEncryptionKey(access.session.userId);
         let rawData: any = { ...req.body, sessionId: access.session.id, userId };
         if (key) rawData = encryptEntry(rawData, key) as any;
@@ -1461,12 +1468,7 @@ export async function registerRoutes(
       }
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
       const { updated, encKey } = await db.transaction(async (tx) => {
-        const lockResult = await tx.execute(
-          sql`SELECT pg_try_advisory_xact_lock_shared(${lk1}, ${lk2}) AS acquired`
-        );
-        if (!(lockResult.rows[0] as { acquired: boolean }).acquired) {
-          throw new Error("ENCODING_TOGGLE_IN_PROGRESS");
-        }
+        await acquireSharedEncodingLock(tx, lk1, lk2);
         const key = await getEncryptionKey(access.session.userId);
         let updateData: any = safeBody;
         if (key) updateData = encryptEntry(updateData, key) as any;
@@ -5424,13 +5426,8 @@ export async function registerRoutes(
     try {
       const { enabled } = req.body;
 
-      // Derive advisory lock keys — same derivation as deriveAdvisoryLockKeys().
-      // Computed outside the transaction (pure CPU, no DB access needed).
-      // The lock itself is acquired FIRST inside every transaction so that all
-      // state reads and key decisions happen under the lock.
       const [lockKey1, lockKey2] = deriveAdvisoryLockKeys(userId);
 
-      // Helper: SQL condition — any encodable field carries an 'enc:' prefix
       const encPrefixCondition = sql`(
         ${entries.reelTag}      LIKE 'enc:%' OR
         ${entries.wireType}     LIKE 'enc:%' OR
@@ -5443,8 +5440,7 @@ export async function registerRoutes(
         ${entries.conductors}   LIKE 'enc:%'
       )`;
 
-      // Helper: SQL condition — any non-null, non-empty encodable field is NOT encrypted.
-      // LENGTH > 0 guards against empty strings, which encryptEntry intentionally skips.
+      // LENGTH > 0 guards against empty strings (encryptEntry skips them).
       const plainPresentCondition = sql`(
         (${entries.reelTag}      IS NOT NULL AND LENGTH(${entries.reelTag})      > 0 AND ${entries.reelTag}      NOT LIKE 'enc:%') OR
         (${entries.wireType}     IS NOT NULL AND LENGTH(${entries.wireType})     > 0 AND ${entries.wireType}     NOT LIKE 'enc:%') OR
