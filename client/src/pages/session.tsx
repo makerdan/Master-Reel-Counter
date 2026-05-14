@@ -189,6 +189,8 @@ function SessionWorkspace({
       if (tab === "single") return "photo";
       if (tab === "scanner") return "photo";
       if (tab && ["photo", "flagged", "strip", "review", "results"].includes(tab)) return tab;
+      const stored = localStorage.getItem(`session-tab-${sessionId}`);
+      if (stored && ["photo", "flagged", "strip", "review", "results"].includes(stored)) return stored;
     } catch {}
     return "strip";
   })();
@@ -297,6 +299,7 @@ function SessionWorkspace({
       url.searchParams.set("tab", mode);
     }
     window.history.replaceState({}, "", url.toString());
+    try { localStorage.setItem(`session-tab-${sessionId}`, mode); } catch {}
   }, [mode]);
 
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
@@ -920,10 +923,16 @@ function SessionWorkspace({
                 <TabsTrigger value="strip" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-strip-mode" aria-label="Photos Reel">
                   <LayoutGrid className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Photos Reel</span>
+                  {photos.length > 0 && (
+                    <span className="sm:hidden ml-0.5 text-[9px] font-bold leading-none bg-white/25 rounded-full px-1 py-0.5 tabular-nums" data-testid="badge-tab-strip">{photos.length}</span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="photo" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-photo-mode" aria-label="Reel IDs">
                   <Camera className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Reel IDs</span>
+                  {entries.length > 0 && (
+                    <span className="sm:hidden ml-0.5 text-[9px] font-bold leading-none bg-white/25 rounded-full px-1 py-0.5 tabular-nums" data-testid="badge-tab-photo">{entries.length}</span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="flagged" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-flagged-mode" aria-label="Flagged">
                   <Flag className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
@@ -936,6 +945,11 @@ function SessionWorkspace({
                 <TabsTrigger value="results" className="flex-1 py-2.5 sm:py-1.5 text-white/70 data-[state=active]:bg-blue-800 data-[state=active]:text-white data-[state=active]:shadow-md" data-testid="tab-results-mode" aria-label="Final Results">
                   <BarChart2 className="h-6 w-6 sm:h-4 sm:w-4 sm:mr-1" />
                   <span className="hidden sm:inline">Final Results</span>
+                  {displayTotalFootage > 0 && (
+                    <span className="sm:hidden ml-0.5 text-[9px] font-bold leading-none bg-white/25 rounded-full px-1 py-0.5 tabular-nums" data-testid="badge-tab-results">
+                      {displayTotalFootage >= 1000 ? `${(displayTotalFootage / 1000).toFixed(1)}k` : displayTotalFootage}
+                    </span>
+                  )}
                 </TabsTrigger>
               </TabsList>
 
