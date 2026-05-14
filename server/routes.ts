@@ -1781,9 +1781,11 @@ export async function registerRoutes(
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
       // Verify the pin we're keeping actually belongs to this session.
-      // This check also catches invalid pinIdToKeep values before touching the DB.
+      // If the pin no longer exists it was already deleted by a concurrent
+      // keep that won the race — treat this as a successful no-op rather
+      // than an error so both users get a clean result.
       const keeperPin = await storage.getPin(pinIdToKeep);
-      if (!keeperPin) return res.status(404).json({ message: "Pin not found" });
+      if (!keeperPin) return res.json({ success: true, deletedCount: 0 });
       const keeperPhoto = await storage.getPhoto(keeperPin.photoId);
       if (!keeperPhoto || keeperPhoto.sessionId !== sessionId) {
         return res.status(403).json({ message: "Pin does not belong to this session" });

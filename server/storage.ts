@@ -827,26 +827,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async batchKeepPins(sessionId: number, pinIdToKeep: number, pinIdsToDelete: number[]): Promise<{ deletedCount: number }> {
-    // Extra safety guard: never delete the keeper, even if the caller
-    // accidentally included it in the delete list.
+    // Guard: never delete the keeper, even if the caller included it by mistake.
     const safeToDelete = pinIdsToDelete.filter(id => id !== pinIdToKeep);
     if (!safeToDelete.length) return { deletedCount: 0 };
+
+    // Lock ALL group members (keeper + to-delete) in one statement before any
+    // writes.  Two concurrent keeps on different pins in the same group are
+    // now serialized at the DB level: the second transaction blocks until the
+    // first commits, then re-reads the (now smaller) locked set.  If the
+    // keeper was deleted by the first transaction the second sees it is absent
+    // and returns a graceful no-op instead of deleting what the first user
+    // chose to keep.
+    //
+    // The session join also enforces IDOR scoping: pin IDs from other sessions
+    // are not visible to the lock and are silently excluded.
+    const allGroupIds = [pinIdToKeep, ...safeToDelete];
     return db.transaction(async (tx) => {
-      // Only operate on pins that belong to the target session (IDOR guard)
-      // and still exist (concurrent keeps may have removed them already).
-      const existing = await tx
+      const locked = await tx
         .select({ id: pins.id, entryId: pins.entryId })
         .from(pins)
         .innerJoin(photos, and(eq(pins.photoId, photos.id), eq(photos.sessionId, sessionId)))
-        .where(inArray(pins.id, safeToDelete));
-      if (!existing.length) return { deletedCount: 0 };
+        .where(inArray(pins.id, allGroupIds))
+        .for("update");
 
-      const entryIds = existing.map(p => p.entryId).filter((id): id is number => id !== null);
+      // Keeper is gone — a concurrent keep already resolved this group.
+      if (!locked.some(r => r.id === pinIdToKeep)) return { deletedCount: 0 };
+
+      const toDelete = locked.filter(r => r.id !== pinIdToKeep);
+      if (!toDelete.length) return { deletedCount: 0 };
+
+      const entryIds = toDelete.map(r => r.entryId).filter((id): id is number => id !== null);
       if (entryIds.length) {
         await tx.delete(entries).where(inArray(entries.id, entryIds));
       }
-      await tx.delete(pins).where(inArray(pins.id, existing.map(p => p.id)));
-      return { deletedCount: existing.length };
+      await tx.delete(pins).where(inArray(pins.id, toDelete.map(r => r.id)));
+      return { deletedCount: toDelete.length };
     });
   }
 
