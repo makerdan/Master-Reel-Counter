@@ -2473,7 +2473,21 @@ export class DatabaseStorage implements IStorage {
 
   async getExpiredUploadIntents(olderThanMs: number): Promise<UploadIntent[]> {
     const cutoff = new Date(Date.now() - olderThanMs);
-    return db.select().from(uploadIntents).where(lt(uploadIntents.createdAt, cutoff));
+    // Only return rows that are both old enough AND have no matching photos row.
+    // The anti-join guards against deleting a file that was registered via a
+    // code path that skipped intent resolution (e.g. manual inserts or future
+    // non-atomicCreatePhoto paths).
+    return db.select({ id: uploadIntents.id, objectPath: uploadIntents.objectPath, userId: uploadIntents.userId, createdAt: uploadIntents.createdAt })
+      .from(uploadIntents)
+      .where(
+        and(
+          lt(uploadIntents.createdAt, cutoff),
+          sql`NOT EXISTS (
+            SELECT 1 FROM ${photos}
+            WHERE ${photos.objectStorageKey} = ${uploadIntents.objectPath}
+          )`,
+        )
+      );
   }
 
   async deleteUploadIntents(ids: number[]): Promise<void> {
