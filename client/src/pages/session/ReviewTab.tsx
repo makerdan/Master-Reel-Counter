@@ -373,20 +373,38 @@ export default function ReviewTab({
   // While neither is available we show a brief loading gate so no assignments
   // are ever derived from the non-deterministic online-presence array.
   const [anchoredCohort, setAnchoredCohort] = useState<Array<{ userId: string; username: string }> | null>(null);
-  const cohortAnchorRef = useRef<{ sid: number; called: boolean }>({ sid: -1, called: false });
+  // retryToken increments after transient failures so the anchor effect re-fires.
+  const [cohortRetryToken, setCohortRetryToken] = useState(0);
+  const cohortAnchorRef = useRef<{ sid: number; succeeded: boolean; attempts: number }>({ sid: -1, succeeded: false, attempts: 0 });
 
   useEffect(() => {
     if (!sessionId || !currentUserId) return;
-    // Skip if already anchored from the session prop (fast path for re-visits).
-    if (serverReviewCohort) return;
-    // Skip if we already successfully anchored for this session.
-    if (cohortAnchorRef.current.sid === sessionId && cohortAnchorRef.current.called) return;
-    cohortAnchorRef.current = { sid: sessionId, called: true };
+    // Skip if we already have a successfully-anchored value for this session.
+    if (cohortAnchorRef.current.sid === sessionId && cohortAnchorRef.current.succeeded) return;
+    // Treat malformed serverReviewCohort as absent by attempting to parse it
+    // here; only skip if it yields a valid non-empty array.
+    if (serverReviewCohort) {
+      try {
+        const parsed = JSON.parse(serverReviewCohort);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAnchoredCohort(parsed);
+          cohortAnchorRef.current = { sid: sessionId, succeeded: true, attempts: 0 };
+          return;
+        }
+      } catch {}
+      // Fall through: prop was truthy but invalid — re-anchor from server.
+    }
+    // Cap automatic retries to avoid hammering a struggling API.
+    if (cohortAnchorRef.current.sid === sessionId && cohortAnchorRef.current.attempts >= 3) return;
+    cohortAnchorRef.current = { sid: sessionId, succeeded: false, attempts: (cohortAnchorRef.current.sid === sessionId ? cohortAnchorRef.current.attempts : 0) + 1 };
 
+    let cancelled = false;
     apiRequest("POST", `/api/sessions/${sessionId}/review-cohort`)
       .then(r => r.json())
       .then((data: { cohort: Array<{ userId: string; username: string }> }) => {
+        if (cancelled) return;
         if (Array.isArray(data.cohort) && data.cohort.length > 0) {
+          cohortAnchorRef.current.succeeded = true;
           setAnchoredCohort(data.cohort);
           // Refresh the session record so the parent's serverReviewCohort prop
           // is populated on subsequent renders (avoids redundant round-trips).
@@ -394,20 +412,25 @@ export default function ReviewTab({
         }
       })
       .catch(() => {
-        // Server call failed (transient network error). Provide a best-effort
-        // local fallback so reviewers are never permanently stuck on the loading
-        // screen. Once the session prop is eventually refreshed (e.g. on the
-        // next query cycle), propCohort will take priority over this fallback.
+        if (cancelled) return;
+        // Server call failed. Provide an immediate best-effort fallback so
+        // reviewers are never permanently stuck on the loading screen.
         setAnchoredCohort(sortedUsers.length > 0 ? [...sortedUsers] : [{ userId: currentUserId, username: currentUserId }]);
+        // Schedule a retry (capped at 3 total) to recover from transient errors.
+        if ((cohortAnchorRef.current.attempts ?? 0) < 3) {
+          setTimeout(() => { if (!cancelled) setCohortRetryToken(t => t + 1); }, 3000);
+        }
       });
-  // sortedUsers and currentUserId are intentionally excluded from deps so a
-  // change in online presence does not re-fire the anchor call after success.
+    return () => { cancelled = true; };
+  // sortedUsers and currentUserId intentionally excluded: online-presence
+  // changes should not re-fire after a successful anchor.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, currentUserId, serverReviewCohort]);
+  }, [sessionId, currentUserId, serverReviewCohort, cohortRetryToken]);
 
-  // Reset anchored cohort state when the session changes.
+  // Reset anchored cohort and retry state when the session changes.
   useEffect(() => {
     setAnchoredCohort(null);
+    setCohortRetryToken(0);
   }, [sessionId]);
 
   // Parse the prop value (used for sessions that were already reviewed).
