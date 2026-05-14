@@ -1265,8 +1265,8 @@ export default function LabelScannerTab({
       }
       if (anyTruncated) {
         toast({
-          title: "Some pins were skipped — batch too large",
-          description: "Try scanning fewer pins at once to get results for all of them.",
+          title: "Some pins were skipped because the batch was too large",
+          description: "Try scanning fewer pins at once.",
           variant: "destructive",
         });
       }
