@@ -19,6 +19,7 @@ export function useSessionWebSocket(
   const reconnectDelayRef = useRef(WS_RECONNECT_BASE_MS);
   const pendingBufferRef = useRef<string[]>([]);
   const hasEverConnectedRef = useRef(false);
+  const shouldReconnectRef = useRef(true);
   const [wsStatus, setWsStatus] = useState<WsStatus>("connecting");
   const [reconnectDelayMs, setReconnectDelayMs] = useState<number | null>(null);
 
@@ -45,14 +46,13 @@ export function useSessionWebSocket(
       hasEverConnectedRef.current = true;
       setWsStatus("connected");
       setReconnectDelayMs(null);
-      // Drain the pre-open buffer first, then send the join frame.
-      // safeSend is used for all sends so the guard path is consistent even
-      // though readyState is guaranteed OPEN inside onopen.
+      // Send join first so the server registers room membership before any
+      // buffered messages arrive — buffered messages may require room context.
+      safeSend(JSON.stringify({ type: "join", sessionId, userId: userInfo?.userId, username: userInfo?.username }));
       const buffered = pendingBufferRef.current.splice(0);
       for (const msg of buffered) {
         safeSend(msg);
       }
-      safeSend(JSON.stringify({ type: "join", sessionId, userId: userInfo?.userId, username: userInfo?.username }));
     };
 
     ws.onmessage = (event) => {
@@ -80,6 +80,9 @@ export function useSessionWebSocket(
     };
 
     ws.onclose = () => {
+      // Guard against scheduling a reconnect after intentional cleanup
+      // (e.g. effect teardown or session disable).
+      if (!shouldReconnectRef.current) return;
       const jitter = (Math.random() * 2 - 1) * WS_RECONNECT_JITTER_MS;
       const delay = Math.min(reconnectDelayRef.current + jitter, WS_RECONNECT_CAP_MS);
       reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, WS_RECONNECT_CAP_MS);
@@ -97,8 +100,11 @@ export function useSessionWebSocket(
   }, [sessionId, onMessage, userInfo?.userId, userInfo?.username]);
 
   useEffect(() => {
+    shouldReconnectRef.current = true;
     connect();
     return () => {
+      // Signal onclose that this teardown is intentional so it skips reconnect.
+      shouldReconnectRef.current = false;
       clearTimeout(reconnectTimerRef.current);
       wsRef.current?.close();
       wsRef.current = null;
