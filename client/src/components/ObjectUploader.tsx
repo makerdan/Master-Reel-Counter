@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
 import type { UppyFile, UploadResult } from "@uppy/core";
@@ -41,6 +41,8 @@ interface ObjectUploaderProps {
  *   - File preview
  *   - Upload progress tracking
  *   - Upload status display
+ * - Guards against accidental closure mid-upload: closing the modal or navigating
+ *   away while an upload is in progress shows a confirmation prompt.
  *
  * The component uses Uppy v5 under the hood to handle all file upload functionality.
  * All file management features are automatically handled by the Uppy dashboard modal.
@@ -68,6 +70,8 @@ export function ObjectUploader({
   children,
 }: ObjectUploaderProps) {
   const [showModal, setShowModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
   const [uppy] = useState(() =>
     new Uppy({
       restrictions: {
@@ -85,25 +89,70 @@ export function ObjectUploader({
       })
   );
 
+  // Track upload state via Uppy events.
+  useEffect(() => {
+    const onUploadStart = () => setIsUploading(true);
+    const onDone = () => setIsUploading(false);
+
+    uppy.on("upload", onUploadStart);
+    uppy.on("complete", onDone);
+    uppy.on("upload-error", onDone);
+    uppy.on("cancel-all", onDone);
+
+    return () => {
+      uppy.off("upload", onUploadStart);
+      uppy.off("complete", onDone);
+      uppy.off("upload-error", onDone);
+      uppy.off("cancel-all", onDone);
+    };
+  }, [uppy]);
+
+  // Warn before browser navigation / page refresh while an upload is in progress.
+  useEffect(() => {
+    if (!isUploading) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isUploading]);
+
+  // Guard the destroy call: if the component is unmounted while uploading,
+  // cancel so the Uppy instance is left in a clean state.
   useEffect(() => {
     return () => {
       uppy.destroy();
     };
   }, [uppy]);
 
+  // Close handler: requires confirmation when an upload is active.
+  const handleRequestClose = useCallback(() => {
+    if (isUploading) {
+      const confirmed = window.confirm(
+        "An upload is currently in progress. Closing will cancel it. Are you sure?"
+      );
+      if (!confirmed) return;
+      uppy.cancelAll();
+    }
+    setShowModal(false);
+  }, [isUploading, uppy]);
+
   return (
     <div>
-      <Button onClick={() => setShowModal(true)} className={buttonClassName}>
+      <Button
+        onClick={() => setShowModal(true)}
+        className={buttonClassName}
+        data-testid="button-open-uploader"
+      >
         {children}
       </Button>
 
       <DashboardModal
         uppy={uppy}
         open={showModal}
-        onRequestClose={() => setShowModal(false)}
+        onRequestClose={handleRequestClose}
         proudlyDisplayPoweredByUppy={false}
       />
     </div>
   );
 }
-
