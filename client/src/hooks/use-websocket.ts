@@ -38,11 +38,14 @@ export function useSessionWebSocket(
 
     ws.onopen = () => {
       reconnectDelayRef.current = WS_RECONNECT_BASE_MS;
+      // Drain the pre-open buffer first, then send the join frame.
+      // safeSend is used for all sends so the guard path is consistent even
+      // though readyState is guaranteed OPEN inside onopen.
       const buffered = pendingBufferRef.current.splice(0);
       for (const msg of buffered) {
-        if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+        safeSend(msg);
       }
-      ws.send(JSON.stringify({ type: "join", sessionId, userId: userInfo?.userId, username: userInfo?.username }));
+      safeSend(JSON.stringify({ type: "join", sessionId, userId: userInfo?.userId, username: userInfo?.username }));
     };
 
     ws.onmessage = (event) => {

@@ -533,21 +533,50 @@ export class DatabaseStorage implements IStorage {
     footage?: number | null; flagged?: boolean; flagReason?: string | null;
   }>): Promise<Pin[]> {
     return db.transaction(async (tx) => {
-      await tx.delete(pins).where(and(eq(pins.photoId, photoId), isNull(pins.entryId)));
-      if (newPins.length === 0) return [];
-      const inserted = await tx.insert(pins).values(newPins.map(p => ({
-        photoId,
-        xPercent: p.xPercent,
-        yPercent: p.yPercent,
-        label: p.label || null,
-        reelCount: p.reelCount || 1,
-        wireDetails: p.wireDetails || null,
-        vendorCode: p.vendorCode || null,
-        footage: p.footage || null,
-        flagged: p.flagged || false,
-        flagReason: p.flagReason || null,
-      }))).returning();
-      return inserted;
+      // Fetch current draft (non-committed) pins inside the transaction for snapshot consistency.
+      const existingDrafts = await tx.select().from(pins)
+        .where(and(eq(pins.photoId, photoId), isNull(pins.entryId)));
+
+      // Separate incoming set by labeled vs unlabeled.
+      const incomingLabeled = newPins.filter(p => p.label);
+      const incomingUnlabeled = newPins.filter(p => !p.label);
+      const incomingLabelSet = new Set(incomingLabeled.map(p => p.label!));
+
+      // Ids to delete:
+      //   • All unlabeled drafts (replaced wholesale; no stable key to match on).
+      //   • Labeled drafts whose label IS in the incoming set (will be re-inserted
+      //     with updated data from this client).
+      // Labeled drafts whose label is NOT in the incoming set are preserved as-is
+      // — they were added by a concurrent collaborator and should survive this write.
+      const idsToDelete = existingDrafts
+        .filter(p => !p.label || incomingLabelSet.has(p.label))
+        .map(p => p.id);
+
+      if (idsToDelete.length > 0) {
+        await tx.delete(pins).where(inArray(pins.id, idsToDelete));
+      }
+
+      const toInsert = [...incomingUnlabeled, ...incomingLabeled];
+      const inserted: Pin[] = [];
+      if (toInsert.length > 0) {
+        const rows = await tx.insert(pins).values(toInsert.map(p => ({
+          photoId,
+          xPercent: p.xPercent,
+          yPercent: p.yPercent,
+          label: p.label || null,
+          reelCount: p.reelCount || 1,
+          wireDetails: p.wireDetails || null,
+          vendorCode: p.vendorCode || null,
+          footage: p.footage || null,
+          flagged: p.flagged || false,
+          flagReason: p.flagReason || null,
+        }))).returning();
+        inserted.push(...rows);
+      }
+
+      // Return union: collaborator-preserved labeled pins + everything we just inserted.
+      const preserved = existingDrafts.filter(p => p.label && !incomingLabelSet.has(p.label));
+      return [...preserved, ...inserted];
     });
   }
 
