@@ -58,6 +58,7 @@ type SessionWithStats = Session & {
   lastPhotoAt: string | null;
   thumbnailKey: string | null;
   collaboratorUsernames: string[];
+  wireTypes?: string[];
 };
 
 type SharedSessionWithStats = SessionWithStats & {
@@ -88,22 +89,30 @@ export default function Dashboard() {
   const [newFolderName, setNewFolderName] = useState("");
   const [renamingFolder, setRenamingFolder] = useState<FolderType | null>(null);
   const [renameFolderName, setRenameFolderName] = useState("");
-  const [openFolders, setOpenFolders] = useState<Set<number>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchInside, setSearchInside] = useState(false);
+  const [openFolders, setOpenFolders] = useState<Set<number>>(() => {
+    try {
+      const stored = sessionStorage.getItem("dash:openFolders");
+      return stored ? new Set<number>(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem("dash:searchQuery") || "");
+  const [searchInside, setSearchInside] = useState(() => sessionStorage.getItem("dash:searchInside") === "true");
   const [showRecentSearches, setShowRecentSearches] = useState(false);
-  const [showFilterBar, setShowFilterBar] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<"" | "active" | "completed">("");
-  const [filterCollaborator, setFilterCollaborator] = useState("");
-  const [filterWireType, setFilterWireType] = useState("");
-  const [filterMinFootage, setFilterMinFootage] = useState("");
-  const [filterDateMonth, setFilterDateMonth] = useState("");
-  const [filterDateYear, setFilterDateYear] = useState("");
+  const [showFilterBar, setShowFilterBar] = useState(() => sessionStorage.getItem("dash:showFilterBar") === "true");
+  const [filterStatus, setFilterStatus] = useState<"" | "active" | "completed">(() => (sessionStorage.getItem("dash:filterStatus") as "" | "active" | "completed") || "");
+  const [filterCollaborator, setFilterCollaborator] = useState(() => sessionStorage.getItem("dash:filterCollaborator") || "");
+  const [filterWireType, setFilterWireType] = useState(() => sessionStorage.getItem("dash:filterWireType") || "");
+  const [filterMinFootage, setFilterMinFootage] = useState(() => sessionStorage.getItem("dash:filterMinFootage") || "");
+  const [filterDateMonth, setFilterDateMonth] = useState(() => sessionStorage.getItem("dash:filterDateMonth") || "");
+  const [filterDateYear, setFilterDateYear] = useState(() => sessionStorage.getItem("dash:filterDateYear") || "");
 
   type SortField = "date" | "name" | "entries" | "footage";
   type SortDirection = "asc" | "desc";
-  const [sortField, setSortField] = useState<SortField>("date");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sortField, setSortField] = useState<SortField>(() => (sessionStorage.getItem("dash:sortField") as SortField) || "date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => (sessionStorage.getItem("dash:sortDirection") as SortDirection) || "desc");
+
+  const [inlineRenameId, setInlineRenameId] = useState<number | null>(null);
+  const [inlineRenameValue, setInlineRenameValue] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const recentDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -157,6 +166,20 @@ export default function Dashboard() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => { try { sessionStorage.setItem("dash:searchQuery", searchQuery); } catch {} }, [searchQuery]);
+  useEffect(() => { try { sessionStorage.setItem("dash:searchInside", String(searchInside)); } catch {} }, [searchInside]);
+  useEffect(() => { try { sessionStorage.setItem("dash:showFilterBar", String(showFilterBar)); } catch {} }, [showFilterBar]);
+  useEffect(() => { try { sessionStorage.setItem("dash:filterStatus", filterStatus); } catch {} }, [filterStatus]);
+  useEffect(() => { try { sessionStorage.setItem("dash:filterCollaborator", filterCollaborator); } catch {} }, [filterCollaborator]);
+  useEffect(() => { try { sessionStorage.setItem("dash:filterWireType", filterWireType); } catch {} }, [filterWireType]);
+  useEffect(() => { try { sessionStorage.setItem("dash:filterMinFootage", filterMinFootage); } catch {} }, [filterMinFootage]);
+  useEffect(() => { try { sessionStorage.setItem("dash:filterDateMonth", filterDateMonth); } catch {} }, [filterDateMonth]);
+  useEffect(() => { try { sessionStorage.setItem("dash:filterDateYear", filterDateYear); } catch {} }, [filterDateYear]);
+  useEffect(() => { try { sessionStorage.setItem("dash:sortField", sortField); } catch {} }, [sortField]);
+  useEffect(() => { try { sessionStorage.setItem("dash:sortDirection", sortDirection); } catch {} }, [sortDirection]);
+  useEffect(() => { try { sessionStorage.setItem("dash:openFolders", JSON.stringify([...openFolders])); } catch {} }, [openFolders]);
+
   const [_moveSessionTarget, setMoveSessionTarget] = useState<SessionWithStats | null>(null);
   const [createFolderForSession, setCreateFolderForSession] = useState<SessionWithStats | null>(null);
   const [inlineFolderName, setInlineFolderName] = useState("");
@@ -1011,9 +1034,42 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-sm truncate" data-testid={`text-${prefix}session-name-${session.id}`}>
-                  {session.name}
-                </h3>
+                {!isShared && inlineRenameId === session.id ? (
+                  <input
+                    autoFocus
+                    value={inlineRenameValue}
+                    onClick={e => e.stopPropagation()}
+                    onChange={e => setInlineRenameValue(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        const trimmed = inlineRenameValue.trim();
+                        if (trimmed && trimmed !== session.name) {
+                          updateSession.mutate({ id: session.id, name: trimmed, location: session.location || "", expectedLastUpdatedAt: session.lastUpdatedAt });
+                        }
+                        setInlineRenameId(null);
+                      }
+                      if (e.key === "Escape") { e.stopPropagation(); setInlineRenameId(null); }
+                    }}
+                    onBlur={() => {
+                      const trimmed = inlineRenameValue.trim();
+                      if (trimmed && trimmed !== session.name) {
+                        updateSession.mutate({ id: session.id, name: trimmed, location: session.location || "", expectedLastUpdatedAt: session.lastUpdatedAt });
+                      }
+                      setInlineRenameId(null);
+                    }}
+                    className="font-semibold text-sm bg-transparent border-b border-primary outline-none min-w-0 flex-1 font-[inherit]"
+                    data-testid={`input-inline-rename-${session.id}`}
+                  />
+                ) : (
+                  <h3
+                    className={`font-semibold text-sm truncate${!isShared ? " cursor-text hover:text-primary transition-colors" : ""}`}
+                    data-testid={`text-${prefix}session-name-${session.id}`}
+                    onClick={!isShared ? (e) => { e.stopPropagation(); setInlineRenameId(session.id); setInlineRenameValue(session.name); } : undefined}
+                    title={!isShared ? "Click to rename" : undefined}
+                  >
+                    {session.name}
+                  </h3>
+                )}
                 <Badge
                   variant={session.status === "active" ? "default" : "secondary"}
                   className="no-default-hover-elevate no-default-active-elevate"
@@ -1054,6 +1110,16 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
+              {(() => {
+                const wt = session.wireTypes;
+                if (!wt || wt.length === 0 || session.entryCount === 0) return null;
+                const shown = wt.slice(0, 2).join(" · ");
+                return (
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate mono" data-testid={`text-wire-summary-${session.id}`}>
+                    {shown} — {wt.length} wire type{wt.length !== 1 ? "s" : ""}, {session.entryCount} reel{session.entryCount !== 1 ? "s" : ""}
+                  </p>
+                );
+              })()}
               <div className="flex items-start gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
                 {isShared && (session as SharedSessionWithStats).ownerUsername && (
                   <span className="flex items-center gap-1" data-testid={`text-shared-session-owner-${session.id}`}>
@@ -1487,7 +1553,12 @@ export default function Dashboard() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => logout()}
+                  onClick={() => {
+                    try {
+                      ["dash:searchQuery","dash:searchInside","dash:showFilterBar","dash:filterStatus","dash:filterCollaborator","dash:filterWireType","dash:filterMinFootage","dash:filterDateMonth","dash:filterDateYear","dash:sortField","dash:sortDirection","dash:openFolders"].forEach(k => sessionStorage.removeItem(k));
+                    } catch {}
+                    logout();
+                  }}
                   data-testid="button-logout"
                 >
                   <LogOut className="h-4 w-4" />

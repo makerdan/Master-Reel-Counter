@@ -503,18 +503,20 @@ export async function registerRoutes(
       const offset = req.query.offset ? parseInt(req.query.offset) : undefined;
       const { sessions, total } = await storage.getUserSessions(userId, { trash, limit, offset });
       const sessionIds = sessions.map(s => s.id);
-      const [stats, photoStats, thumbnails, collabUsernames] = await Promise.all([
+      const [stats, photoStats, thumbnails, collabUsernames, wireTypesMap] = await Promise.all([
         storage.getSessionStats(sessionIds),
         storage.getSessionPhotoStats(sessionIds),
         storage.getSessionThumbnails(sessionIds),
         storage.getSessionCollaboratorUsernames(sessionIds),
+        storage.getSessionWireTypes(sessionIds),
       ]);
       const sessionsWithStats = sessions.map(s => {
         const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0, sectionCount: 0 };
         const ps = photoStats.get(s.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
         const thumbnailKey = thumbnails.get(s.id) || null;
         const collaboratorUsernames = collabUsernames.get(s.id) || [];
-        return { ...s, ...st, ...ps, thumbnailKey, collaboratorUsernames };
+        const wireTypes = wireTypesMap.get(s.id) || [];
+        return { ...s, ...st, ...ps, thumbnailKey, collaboratorUsernames, wireTypes };
       });
       res.json({ sessions: sessionsWithStats, total, limit, offset: offset || 0 });
     } catch (error) {
@@ -544,18 +546,20 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const sharedSessions = await storage.getSharedSessions(userId);
       const sessionIds = sharedSessions.map(s => s.id);
-      const [stats, photoStats, thumbnails, collabUsernames] = await Promise.all([
+      const [stats, photoStats, thumbnails, collabUsernames, wireTypesMap] = await Promise.all([
         storage.getSessionStats(sessionIds),
         storage.getSessionPhotoStats(sessionIds),
         storage.getSessionThumbnails(sessionIds),
         storage.getSessionCollaboratorUsernames(sessionIds),
+        storage.getSessionWireTypes(sessionIds),
       ]);
       const result = sharedSessions.map(s => {
         const st = stats.get(s.id) || { entryCount: 0, totalFootage: 0, sectionCount: 0 };
         const ps = photoStats.get(s.id) || { photoCount: 0, firstPhotoAt: null, lastPhotoAt: null };
         const thumbnailKey = thumbnails.get(s.id) || null;
         const collaboratorUsernames = collabUsernames.get(s.id) || [];
-        return { ...s, ...st, ...ps, thumbnailKey, collaboratorUsernames };
+        const wireTypes = wireTypesMap.get(s.id) || [];
+        return { ...s, ...st, ...ps, thumbnailKey, collaboratorUsernames, wireTypes };
       });
       res.json(result);
     } catch (error) {

@@ -150,6 +150,7 @@ export interface IStorage {
   getSessionPhotoStats(sessionIds: number[]): Promise<Map<number, { photoCount: number; firstPhotoAt: Date | null; lastPhotoAt: Date | null }>>;
   getSessionThumbnails(sessionIds: number[]): Promise<Map<number, string>>;
   getSessionCollaboratorUsernames(sessionIds: number[]): Promise<Map<number, string[]>>;
+  getSessionWireTypes(sessionIds: number[]): Promise<Map<number, string[]>>;
 
   addCollaborator(data: InsertCollaborator): Promise<Collaborator>;
   getSessionCollaborators(sessionId: number): Promise<Collaborator[]>;
@@ -984,6 +985,27 @@ export class DatabaseStorage implements IStorage {
       const existing = result.get(row.sessionId) || [];
       existing.push(row.username || "?");
       result.set(row.sessionId, existing);
+    }
+    return result;
+  }
+
+  async getSessionWireTypes(sessionIds: number[]): Promise<Map<number, string[]>> {
+    const result = new Map<number, string[]>();
+    if (sessionIds.length === 0) return result;
+    const rows = await db
+      .select({
+        sessionId: entries.sessionId,
+        wireType: entries.wireType,
+      })
+      .from(entries)
+      .where(and(inArray(entries.sessionId, sessionIds), isNotNull(entries.wireType)))
+      .groupBy(entries.sessionId, entries.wireType)
+      .orderBy(sql`count(${entries.id}) desc`);
+    for (const row of rows) {
+      if (!row.wireType) continue;
+      const arr = result.get(row.sessionId) || [];
+      arr.push(row.wireType);
+      result.set(row.sessionId, arr);
     }
     return result;
   }
