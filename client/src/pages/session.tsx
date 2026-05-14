@@ -318,7 +318,7 @@ function SessionWorkspace({
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
 
-  useSessionWebSocket(sessionId, (msg) => {
+  const { wsStatus } = useSessionWebSocket(sessionId, (msg) => {
     if (msg.type === "presence") {
       setOnlineUsers(msg.users || []);
     }
@@ -692,6 +692,12 @@ function SessionWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {wsStatus === "reconnecting" && (
+              <span className="flex items-center gap-1 text-xs text-amber-500 animate-pulse" data-testid="text-ws-reconnecting">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Reconnecting…
+              </span>
+            )}
             {saveStatus === "saving" && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse" data-testid="text-save-status">
                 <Loader2 className="h-3 w-3 animate-spin" />

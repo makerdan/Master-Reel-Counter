@@ -14,6 +14,9 @@ export interface LocalPin {
   flagged?: boolean;
   flagReason?: string;
   aliasUsed?: string;
+  /** Stable client-generated UUID persisted on the server so concurrent draft-pin
+   *  writes can be merged per-row instead of last-write-wins for the whole set. */
+  draftClientId?: string;
 }
 
 export interface SessionWithRole extends Session {

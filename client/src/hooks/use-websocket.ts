@@ -1,7 +1,8 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { queryClient } from "@/lib/queryClient";
 
 type MessageHandler = (msg: any) => void;
+export type WsStatus = "connecting" | "connected" | "reconnecting";
 
 const WS_RECONNECT_BASE_MS = 1_000;
 const WS_RECONNECT_CAP_MS = 30_000;
@@ -17,6 +18,8 @@ export function useSessionWebSocket(
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const reconnectDelayRef = useRef(WS_RECONNECT_BASE_MS);
   const pendingBufferRef = useRef<string[]>([]);
+  const hasEverConnectedRef = useRef(false);
+  const [wsStatus, setWsStatus] = useState<WsStatus>("connecting");
 
   const safeSend = useCallback((data: string) => {
     const ws = wsRef.current;
@@ -38,6 +41,8 @@ export function useSessionWebSocket(
 
     ws.onopen = () => {
       reconnectDelayRef.current = WS_RECONNECT_BASE_MS;
+      hasEverConnectedRef.current = true;
+      setWsStatus("connected");
       // Drain the pre-open buffer first, then send the join frame.
       // safeSend is used for all sends so the guard path is consistent even
       // though readyState is guaranteed OPEN inside onopen.
@@ -73,6 +78,9 @@ export function useSessionWebSocket(
     };
 
     ws.onclose = () => {
+      if (hasEverConnectedRef.current) {
+        setWsStatus("reconnecting");
+      }
       const jitter = (Math.random() * 2 - 1) * WS_RECONNECT_JITTER_MS;
       const delay = Math.min(reconnectDelayRef.current + jitter, WS_RECONNECT_CAP_MS);
       reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, WS_RECONNECT_CAP_MS);
@@ -97,5 +105,5 @@ export function useSessionWebSocket(
     safeSend(JSON.stringify(data));
   }, [safeSend]);
 
-  return { wsRef, sendMessage };
+  return { wsRef, sendMessage, wsStatus };
 }

@@ -488,6 +488,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           footage: p.footage || null,
           flagged: p.flagged || false,
           flagReason: p.flagReason || null,
+          draftClientId: p.draftClientId || p.id,
         })),
       });
     } catch {
@@ -558,6 +559,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             footage: p.footage || null,
             flagged: p.flagged || false,
             flagReason: p.flagReason || null,
+            draftClientId: p.draftClientId || p.id,
           })),
         });
       } catch (err) {
@@ -597,7 +599,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     })).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })));
     if (draftPins.length > 0) {
       setLocalPins(draftPins.map(p => ({
-        id: `pin-${p.id}`,
+        id: p.draftClientId || `pin-${p.id}`,
+        draftClientId: p.draftClientId || undefined,
         x: p.xPercent,
         y: p.yPercent,
         label: p.label || "001",
@@ -733,6 +736,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             footage: p.footage || null,
             flagged: p.flagged || false,
             flagReason: p.flagReason || null,
+            draftClientId: p.draftClientId || p.id,
           })),
         });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
@@ -1504,6 +1508,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               footage: p.footage || null,
               flagged: p.flagged || false,
               flagReason: p.flagReason || null,
+              draftClientId: p.draftClientId || p.id,
             })),
           });
         } catch (err) {

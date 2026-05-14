@@ -1394,6 +1394,7 @@ export default function LabelScannerTab({
               vendorCode: p.vendorCode || "",
               footage: p.footage,
               flagged: p.flagged || false,
+              draftClientId: p.draftClientId || undefined,
             })),
           });
         } catch {}

@@ -165,6 +165,7 @@ export const pins = pgTable("pins", {
   footage: integer("footage"),
   flagged: boolean("flagged").default(false),
   flagReason: text("flag_reason"),
+  draftClientId: text("draft_client_id"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("pins_photo_id_idx").on(table.photoId),
