@@ -75,6 +75,15 @@ function orderWithDetailShots(photos: Photo[]): Photo[] {
   return result;
 }
 
+const PRESET_LINK_REASONS = ["Close-up", "Re-shoot for flag", "Better tag visibility"];
+const sessionCustomLinkReasons: string[] = [];
+function addCustomLinkReason(reason: string) {
+  const trimmed = reason.trim();
+  if (trimmed && !PRESET_LINK_REASONS.includes(trimmed) && !sessionCustomLinkReasons.includes(trimmed)) {
+    sessionCustomLinkReasons.push(trimmed);
+  }
+}
+
 const BLUE_SHADES = [
   { bg: "bg-blue-500", border: "border-blue-300", shadow: "shadow-[0_0_0_3px_rgba(59,130,246,0.5)]", css: "rgba(59,130,246,1)" },
   { bg: "bg-sky-400", border: "border-sky-200", shadow: "shadow-[0_0_0_3px_rgba(56,189,248,0.5)]", css: "rgba(56,189,248,1)" },
@@ -273,6 +282,7 @@ function PhotoCard({
       });
     },
     onSuccess: (_data, params) => {
+      if (customReasonOpen && params.reason) addCustomLinkReason(params.reason);
       setParentId(params.parentId);
       setLinkReason(params.reason);
       setLinkedPinLabel(params.pinLabel);
@@ -850,9 +860,12 @@ function PhotoCard({
                     data-testid={`select-strip-reason-${photo.id}`}
                   >
                     <option value="">No reason</option>
-                    <option value="Close-up">Close-up</option>
-                    <option value="Re-shoot for flag">Re-shoot for flag</option>
-                    <option value="Better tag visibility">Better tag visibility</option>
+                    {PRESET_LINK_REASONS.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                    {sessionCustomLinkReasons.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
                     <option value="__custom__">Custom…</option>
                   </select>
                 </div>
