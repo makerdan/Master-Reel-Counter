@@ -257,8 +257,15 @@ function EntryTable({
   const bannerDismissKey = `incomplete-banner-dismissed-${sessionId}`;
   const [dismissedAt, setDismissedAt] = useState<number>(() => {
     const stored = sessionStorage.getItem(bannerDismissKey);
-    return stored ? parseInt(stored, 10) : 0;
+    const parsed = stored ? parseInt(stored, 10) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
   });
+  // Rehydrate from storage when sessionId changes without unmounting.
+  useEffect(() => {
+    const stored = sessionStorage.getItem(bannerDismissKey);
+    const parsed = stored ? parseInt(stored, 10) : 0;
+    setDismissedAt(Number.isFinite(parsed) ? parsed : 0);
+  }, [bannerDismissKey]);
   // Re-show banner when incomplete count grows beyond whatever the user dismissed.
   const showIncompleteBanner = incompleteCount > 0 && incompleteCount > dismissedAt;
 
