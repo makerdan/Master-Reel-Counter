@@ -2065,7 +2065,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 draggable={false}
                 className={`w-full select-none transition-opacity duration-300 ${photoLoaded ? "opacity-100" : "absolute inset-0 w-full h-full opacity-0"}`}
                 style={{ display: imageError ? "none" : "block" }}
-                onLoad={() => setPhotoLoadedKey(displayedPhoto?.url || currentPhoto?.url || "")}
+                onLoad={() => { setPhotoLoadedKey(displayedPhoto?.url || currentPhoto?.url || ""); setPhotoErrorKey(""); }}
                 onError={() => setPhotoErrorKey(displayedPhoto?.url || currentPhoto?.url || "")}
               />
               {viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx ? (

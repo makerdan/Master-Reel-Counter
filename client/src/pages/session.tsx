@@ -320,6 +320,8 @@ function SessionWorkspace({
   const [exclusiveExpandKey, setExclusiveExpandKey] = useState<string | undefined>(undefined);
   const undoWithSignal = useCallback(async () => { await undo(); setUndoRedoSignal(s => s + 1); }, [undo]);
   const redoWithSignal = useCallback(async () => { await redo(); setUndoRedoSignal(s => s + 1); }, [redo]);
+  const undoWithSignalRef = useRef(undoWithSignal);
+  useEffect(() => { undoWithSignalRef.current = undoWithSignal; }, [undoWithSignal]);
 
   const { data: sessionPins = [] } = useQuery<Pin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "pins"],
@@ -427,7 +429,7 @@ function SessionWorkspace({
       });
       toast({
         title: "Entry deleted",
-        action: <ToastAction altText="Undo" onClick={() => undoWithSignal()}>Undo</ToastAction>,
+        action: <ToastAction altText="Undo" onClick={() => undoWithSignalRef.current()}>Undo</ToastAction>,
       });
       setEditingEntry(null);
     },
