@@ -58,7 +58,7 @@ function getScanPanelStorageKey(sessionId: number) {
 
 type OnlineUser = { userId: string; username: string };
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto, flushRef, onScanApplied }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void; flushRef?: React.MutableRefObject<(() => Promise<void>) | null>; onScanApplied?: (sectionKey: string) => void }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto, flushRef, onScanApplied, onPanStateChange }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void; flushRef?: React.MutableRefObject<(() => Promise<void>) | null>; onScanApplied?: (sectionKey: string) => void; onPanStateChange?: (active: boolean) => void }) {
   const tz = useTimezone();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
@@ -1118,6 +1118,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const panModeRef = useRef(panMode);
   panModeRef.current = panMode;
 
+  const onPanStateChangeRef = useRef(onPanStateChange);
+  useEffect(() => { onPanStateChangeRef.current = onPanStateChange; }, [onPanStateChange]);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -1134,6 +1137,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           midY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
           scale: scaleRef.current,
         };
+        onPanStateChangeRef.current?.(true);
       } else if (e.touches.length === 1 && (panModeRef.current || scaleRef.current > 1)) {
         if ((e.target as HTMLElement).closest(".pin-marker")) return;
         e.preventDefault();
@@ -1144,6 +1148,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           panY: panYRef.current,
           moved: false,
         };
+        onPanStateChangeRef.current?.(true);
       }
     };
 
@@ -1177,6 +1182,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       }
       pinchRef.current = null;
       touchPanRef.current = null;
+      onPanStateChangeRef.current?.(false);
     };
 
     el.addEventListener("touchstart", onTouchStart, { passive: false });
