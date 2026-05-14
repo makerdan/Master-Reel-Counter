@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment, useEffect } from "react";
+import { useState, useMemo, Fragment, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, Loader2, Search, X, ShieldAlert, Camera } from "lucide-react";
 
@@ -9,6 +9,7 @@ function hasUnreadableField(entry: Entry): boolean {
   return ENCRYPTED_ENTRY_FIELDS.some(f => (entry[f] as unknown) === UNREADABLE_SENTINEL);
 }
 import { Button } from "@/components/ui/button";
+import { ToastAction } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -126,7 +127,7 @@ function FilterChipButton({ label, active, count, onClick, testId, warning }: {
 }
 
 function EntryTable({
-  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, exclusiveExpandKey, onJumpToPin, unitLabel: uLabel = "ft", currentUnit = "feet" as UnitType, onGoToPhotoMode,
+  entries, photos, onEdit, sessionId, totalFootage, onUndoableDelete, canEdit = true, forceExpandKey, exclusiveExpandKey, onJumpToPin, unitLabel: uLabel = "ft", currentUnit = "feet" as UnitType, onGoToPhotoMode, onTriggerUndo,
 }: {
   entries: Entry[];
   photos: Photo[];
@@ -141,8 +142,11 @@ function EntryTable({
   unitLabel?: string;
   currentUnit?: UnitType;
   onGoToPhotoMode?: () => void;
+  onTriggerUndo?: () => void;
 }) {
   const { toast } = useToast();
+  const onTriggerUndoRef = useRef(onTriggerUndo);
+  useEffect(() => { onTriggerUndoRef.current = onTriggerUndo; }, [onTriggerUndo]);
   const photoMap = new Map(photos.map(p => [p.id, p]));
 
   const { data: sessionPins = [], isFetching: pinsFetching } = useQuery<Pin[]>({
@@ -317,7 +321,12 @@ function EntryTable({
           serverUpdatedAt: entry.updatedAt instanceof Date ? entry.updatedAt.toISOString() : new Date(entry.updatedAt as unknown as string).toISOString(),
         });
       }
-      toast({ title: "Entry deleted" });
+      toast({
+        title: "Entry deleted",
+        action: onTriggerUndoRef.current
+          ? <ToastAction altText="Undo" onClick={() => onTriggerUndoRef.current?.()}>Undo</ToastAction>
+          : undefined,
+      });
     },
   });
 

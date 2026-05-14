@@ -7,6 +7,7 @@ import {
   ScanLine, X as PanelCloseX, Pipette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -176,6 +177,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [highlightedCommittedPinDbId, setHighlightedCommittedPinDbId] = useState<number | null>(null);
   const [pinsVisible, setPinsVisible] = useState(true);
   const [photoLoadedKey, setPhotoLoadedKey] = useState("");
+  const [photoErrorKey, setPhotoErrorKey] = useState("");
   const [previewHeight, setPreviewHeight] = useState(0);
   const [focusedFootagePinId, setFocusedFootagePinId] = useState<string | null>(null);
   const [committedPins, setCommittedPins] = useState<Array<{ id: string; dbId?: number; x: number; y: number; label: string; reelCount: number; entryId?: number; flagged?: boolean; updatedAt?: string }>>([]);
@@ -368,6 +370,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
 
   const isDisplayedPhotoDetail = displayedPhoto?.isDetailShot || false;
   const photoLoaded = photoLoadedKey === photoSrc;
+  const imageError = photoErrorKey === photoSrc && !!photoSrc;
 
   useEffect(() => {
     if (photos.length === 0) return;
@@ -2044,14 +2047,26 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   ["--pin-scale" as string]: pinScale,
                 }}
               >
+              {!photoLoaded && !imageError && (
+                <Skeleton className="w-full aspect-[4/3]" />
+              )}
+              {imageError && (
+                <div className="w-full aspect-[4/3] flex items-center justify-center bg-muted/20">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <AlertTriangle className="h-8 w-8 text-muted-foreground/60" />
+                    <span className="text-sm">Photo unavailable</span>
+                  </div>
+                </div>
+              )}
               <img
                 ref={photoImgRef}
                 src={displayedPhoto?.url || currentPhoto.url}
                 alt="Section photo"
                 draggable={false}
-                className="w-full select-none"
-                style={{ display: "block" }}
+                className={`w-full select-none transition-opacity duration-300 ${photoLoaded ? "opacity-100" : "absolute inset-0 w-full h-full opacity-0"}`}
+                style={{ display: imageError ? "none" : "block" }}
                 onLoad={() => setPhotoLoadedKey(displayedPhoto?.url || currentPhoto?.url || "")}
+                onError={() => setPhotoErrorKey(displayedPhoto?.url || currentPhoto?.url || "")}
               />
               {viewingNearbyIdx === null || viewingNearbyIdx === currentPhotoIdx ? (
                 <>

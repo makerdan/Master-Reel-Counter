@@ -425,7 +425,10 @@ function SessionWorkspace({
         previousData: rest,
         serverUpdatedAt: entry.updatedAt instanceof Date ? entry.updatedAt.toISOString() : new Date(entry.updatedAt as unknown as string).toISOString(),
       });
-      toast({ title: "Entry deleted" });
+      toast({
+        title: "Entry deleted",
+        action: <ToastAction altText="Undo" onClick={() => undoWithSignal()}>Undo</ToastAction>,
+      });
       setEditingEntry(null);
     },
   });
@@ -1080,6 +1083,7 @@ function SessionWorkspace({
                 unitLabel={uLabel}
                 currentUnit={currentUnit}
                 onUndoableDelete={pushUndo}
+                onTriggerUndo={undoWithSignal}
                 canEdit={canEditSession}
                 exclusiveExpandKey={exclusiveExpandKey}
                 onJumpToPin={(photoId, pinId) => {
