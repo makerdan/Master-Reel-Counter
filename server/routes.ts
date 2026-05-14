@@ -3796,6 +3796,11 @@ export async function registerRoutes(
           }
         };
 
+        // Tracks IDs of parent photos that were successfully loaded and rendered.
+        // Populated incrementally so that a failed parent load still allows its
+        // detail shots to surface in the orphan pass below.
+        const renderedParentIds = new Set<number>();
+
         // Compact photos (receiving section, with entries): load → render → release.
         if (compactMeta.length > 0) {
           const compactMinH = 80;
@@ -3812,6 +3817,7 @@ export async function registerRoutes(
             const availH = Math.min(maxY - currentY, 180);
             const result = renderCompactPhotoWithEntries(pl, item.entries, tableLeft, currentY, pageWidth, availH);
             currentY += result.renderedH + gap;
+            renderedParentIds.add(item.photoMeta.id);
             renderDetailShotsWithLayouts(item.photoMeta.id, layouts);
           }
         }
@@ -3849,6 +3855,7 @@ export async function registerRoutes(
             }
             currentY += maxRowH + gap;
             for (const photoMeta of rowPhotos) {
+              if (layouts.get(photoMeta.id)) renderedParentIds.add(photoMeta.id);
               renderDetailShotsWithLayouts(photoMeta.id, layouts);
             }
             idx += perRow;
@@ -3887,6 +3894,7 @@ export async function registerRoutes(
           const tblW = pageWidth - photoW - gap;
           const r = renderStandardPhotoAt({ pl, entries: item.entries }, tableLeft, photoW, tblW, currentY, maxY - currentY);
           currentY = r.bottomY + gap;
+          renderedParentIds.add(item.photoMeta.id);
           renderDetailShotsWithLayouts(item.photoMeta.id, layouts);
           // `layouts` goes out of scope → GC can collect the image buffers
         }
@@ -3913,6 +3921,7 @@ export async function registerRoutes(
                 const centeredX = tableLeft + (pageWidth - maxW) / 2;
                 const result = renderPhoto(pl, centeredX, currentY, maxW, availH);
                 currentY += result.renderedH + gap;
+                renderedParentIds.add(photoMeta.id);
                 renderDetailShotsWithLayouts(photoMeta.id, layouts);
               }
               idx++;
@@ -3940,6 +3949,7 @@ export async function registerRoutes(
               }
               currentY += maxRowH + gap;
               for (const photoMeta of rowPhotos) {
+                if (layouts.get(photoMeta.id)) renderedParentIds.add(photoMeta.id);
                 renderDetailShotsWithLayouts(photoMeta.id, layouts);
               }
               idx += photosInRow;
@@ -3947,13 +3957,10 @@ export async function registerRoutes(
           }
         }
 
-        // Orphan detail shots: detail shots whose parent photo is not in allPhotos.
-        const renderedParentIds = new Set<number>([
-          ...standardMeta.map(i => i.photoMeta.id),
-          ...compactMeta.map(i => i.photoMeta.id),
-          ...(standardWithoutMeta as any[]).map((p: any) => p.id),
-          ...(compactWithoutMeta as any[]).map((p: any) => p.id),
-        ]);
+        // Orphan detail shots: detail shots whose parent photo was not successfully
+        // loaded and rendered above (renderedParentIds is built incrementally).
+        // A parent whose image failed to load is NOT in renderedParentIds, so its
+        // detail shots still surface here (preserving graceful failure behaviour).
         for (const [parentId, items] of detailMetaByParent) {
           if (renderedParentIds.has(parentId)) continue;
           for (const { photoMeta, entries: photoEntries } of items) {
@@ -4015,24 +4022,8 @@ export async function registerRoutes(
         }
       }
 
-      // --- Load photos needed for the Flagged Reels section in batches ---
-      // Each flagged item references a photo that may not have been loaded by
-      // the section loop above (it could belong to a section with no other
-      // entries).  We build a separate bounded-batch map here so the flagged
-      // section also avoids an unbounded parallel load.
-      const flaggedPhotos = flaggedPdfItems
-        .map((item: any) => item.photo)
-        .filter((p: any): p is NonNullable<typeof p> => !!p);
-      const uniqueFlaggedPhotos = Array.from(new Map(flaggedPhotos.map((p: any) => [p.id, p])).values());
-      const flaggedPhotoLayoutMap = new Map<number, PhotoLayout>();
-      for (let batchStart = 0; batchStart < uniqueFlaggedPhotos.length; batchStart += PDF_PHOTO_BATCH_SIZE) {
-        const batch = uniqueFlaggedPhotos.slice(batchStart, batchStart + PDF_PHOTO_BATCH_SIZE);
-        const batchResults = await Promise.all(batch.map((p: any) => loadPhoto(p)));
-        batch.forEach((p: any, j: number) => {
-          const pl = batchResults[j];
-          if (pl) flaggedPhotoLayoutMap.set(p.id, pl);
-        });
-      }
+      // Flagged photos are loaded one at a time inside the render loop below
+      // (load → render → release) so buffers don't accumulate.
 
       // --- Flagged Reels Section ---
       if (flaggedPdfItems.length > 0) {
@@ -4089,7 +4080,7 @@ export async function registerRoutes(
           doc.rect(tableLeft, currentY, pageWidth, 18).stroke(borderColor);
           currentY += 22;
 
-          const pl = flaggedPhotoLayoutMap.get(item.pin.photoId);
+          const pl = item.photo ? await loadPhoto(item.photo) : undefined;
           const photoW = Math.min(pageWidth * 0.4, 280);
           const infoX = tableLeft + photoW + 14;
           const infoW = pageWidth - photoW - 14;
