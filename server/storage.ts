@@ -596,6 +596,8 @@ export class DatabaseStorage implements IStorage {
 
       // Labeled legacy pins (no clientId): upsert keyed by (photoId, label).
       // Uses the existing pins_photo_label_unique index.
+      // setWhere restricts updates to draft rows — a stale draft write that conflicts
+      // with an already-committed pin label is silently ignored (DO NOTHING behavior).
       if (labeledLegacy.length > 0) {
         const rows = await tx.insert(pins).values(labeledLegacy.map(p => ({
           photoId,
@@ -611,6 +613,8 @@ export class DatabaseStorage implements IStorage {
         }))).onConflictDoUpdate({
           target: [pins.photoId, pins.label],
           set: updateSet,
+          // Only update rows that are still draft — never overwrite a committed pin.
+          setWhere: isNull(pins.entryId),
         }).returning();
         results.push(...rows);
       }
