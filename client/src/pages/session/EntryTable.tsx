@@ -321,10 +321,11 @@ function EntryTable({
           serverUpdatedAt: entry.updatedAt instanceof Date ? entry.updatedAt.toISOString() : new Date(entry.updatedAt as unknown as string).toISOString(),
         });
       }
+      let consumed = false;
       toast({
         title: "Entry deleted",
         action: onTriggerUndoRef.current
-          ? <ToastAction altText="Undo" onClick={() => onTriggerUndoRef.current?.()}>Undo</ToastAction>
+          ? <ToastAction altText="Undo" onClick={() => { if (consumed) return; consumed = true; onTriggerUndoRef.current?.(); }}>Undo</ToastAction>
           : undefined,
       });
     },

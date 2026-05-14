@@ -427,9 +427,10 @@ function SessionWorkspace({
         previousData: rest,
         serverUpdatedAt: entry.updatedAt instanceof Date ? entry.updatedAt.toISOString() : new Date(entry.updatedAt as unknown as string).toISOString(),
       });
+      let consumed = false;
       toast({
         title: "Entry deleted",
-        action: <ToastAction altText="Undo" onClick={() => undoWithSignalRef.current()}>Undo</ToastAction>,
+        action: <ToastAction altText="Undo" onClick={() => { if (consumed) return; consumed = true; undoWithSignalRef.current(); }}>Undo</ToastAction>,
       });
       setEditingEntry(null);
     },
@@ -993,7 +994,7 @@ function SessionWorkspace({
                     <button className="underline text-muted-foreground" onClick={() => window.location.reload()} data-testid="button-photo-mode-reload">Reload page</button>
                   </div>
                 }>
-                  <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setExclusiveExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} onJumpToStripPhoto={(photoId) => { setStripScrollToPhotoId(photoId); setMode("strip"); }} flushRef={photoModeFlushRef} onScanApplied={(sectionKey) => { setExclusiveExpandKey(sectionKey); }} onPanStateChange={(active) => { panActiveRef.current = active; }} />
+                  <PhotoMode sessionId={sessionId} photos={photos} navigateToPhotoId={navigateToPhotoId} navigateAisle={navigateAisle} navigateSection={navigateSection} navigateToPinId={navigateToPinId} onNavigated={() => { setNavigateToPhotoId(null); setNavigateAisle(""); setNavigateSection(""); setNavigateToPinId(null); }} canEdit={canEditSession} initialPhotoIndex={session.lastPhotoIndex ?? 0} onPushUndo={pushUndo} onClearUndoHistory={clearHistory} undoRedoSignal={undoRedoSignal} onDraftPinsHint={(aisle, section) => setExclusiveExpandKey(`${aisle}-${section}`)} pinRefreshSignal={pinRefreshSignal} onCurrentPhotoChange={(photoId) => { lastPhotoModePhotoIdRef.current = photoId; }} isAdmin={isOwner} onPinDataChanged={triggerPinRefresh} onlineUsers={onlineUsers} initialScanPanelOpen={initialScanPanelOpen} onJumpToStripPhoto={(photoId) => { setStripScrollToPhotoId(photoId); setMode("strip"); }} flushRef={photoModeFlushRef} onScanApplied={(sectionKey) => { setExclusiveExpandKey(sectionKey); }} onPanStateChange={(active) => { panActiveRef.current = active; }} onTriggerUndo={() => undoWithSignalRef.current()} />
                 </ErrorBoundary>
               </TabsContent>
 

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ToastAction } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -59,9 +60,11 @@ function getScanPanelStorageKey(sessionId: number) {
 
 type OnlineUser = { userId: string; username: string };
 
-export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto, flushRef, onScanApplied, onPanStateChange }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void; flushRef?: React.MutableRefObject<(() => Promise<void>) | null>; onScanApplied?: (sectionKey: string) => void; onPanStateChange?: (active: boolean) => void }) {
+export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto, flushRef, onScanApplied, onPanStateChange, onTriggerUndo }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void; flushRef?: React.MutableRefObject<(() => Promise<void>) | null>; onScanApplied?: (sectionKey: string) => void; onPanStateChange?: (active: boolean) => void; onTriggerUndo?: () => void }) {
   const tz = useTimezone();
   const { toast } = useToast();
+  const onTriggerUndoRef = useRef(onTriggerUndo);
+  useEffect(() => { onTriggerUndoRef.current = onTriggerUndo; }, [onTriggerUndo]);
   const { uploadFile, isUploading } = useUpload();
   const { allCodes: vendorCodes, addCustomCode } = useVendorCodes();
   const { catalogs: userCatalogs } = useWireCatalogs();
@@ -1411,6 +1414,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         toast({ title: "Failed to delete pin", variant: "destructive" });
         return;
       }
+      let consumed = false;
+      toast({
+        title: "Pin deleted",
+        action: onTriggerUndoRef.current
+          ? <ToastAction altText="Undo" onClick={() => { if (consumed) return; consumed = true; onTriggerUndoRef.current?.(); }}>Undo</ToastAction>
+          : undefined,
+      });
     }
     setCommittedPins(prev => prev.filter(p => p.id !== pin.id));
     queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "entries"] });
