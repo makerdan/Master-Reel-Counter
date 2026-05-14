@@ -189,7 +189,20 @@ export function useUndoRedo(sessionId: number) {
         return { type: "update-pin", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data, serverUpdatedAt: updated?.updatedAt ?? undefined };
       }
       case "restore-draft-pins": {
-        await apiRequest("PUT", `/api/photos/${action.previousData.photoId}/draft-pins`, { pins: action.previousData.pins });
+        // Compute which pins in the current snapshot (data.pins) are absent from the
+        // state we're restoring to (previousData.pins). Those need to be explicitly
+        // deleted since replaceDraftPins no longer deletes by absence.
+        type WirePin = { draftClientId?: string; label?: string; [k: string]: unknown };
+        const targetPins: WirePin[] = action.previousData.pins || [];
+        const currentPins: WirePin[] = action.data?.pins || [];
+        const targetClientIds = new Set(targetPins.map(p => p.draftClientId).filter(Boolean));
+        const deletedClientIds = currentPins
+          .filter(p => p.draftClientId && !targetClientIds.has(p.draftClientId))
+          .map(p => p.draftClientId as string);
+        await apiRequest("PUT", `/api/photos/${action.previousData.photoId}/draft-pins`, {
+          pins: targetPins,
+          deletedClientIds,
+        });
         return { type: "restore-draft-pins", sessionId: action.sessionId, entityId: action.entityId, data: action.previousData, previousData: action.data };
       }
       case "dismiss-duplicate": {

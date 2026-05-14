@@ -2078,6 +2078,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                 reelCount: p.reelCount, wireDetails: p.wireDetails || null,
                                 vendorCode: p.vendorCode || null, footage: p.footage || null,
                                 flagged: p.flagged || false, flagReason: p.flagReason || null,
+                                draftClientId: p.draftClientId || p.id,
                               }));
                               onPushUndo({
                                 type: "restore-draft-pins",
