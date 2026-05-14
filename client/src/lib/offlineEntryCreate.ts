@@ -19,9 +19,31 @@ function isNetworkFailure(err: unknown): boolean {
   return false;
 }
 
-let _placeholderCounter = 0;
+// ─── Persistent placeholder ID counter ───────────────────────────────────────
+// The counter is seeded from localStorage so IDs stay unique across page
+// reloads.  Without persistence the counter restarts at 0 after every reload,
+// producing duplicate negative IDs that collide with optimistic entries from
+// a previous session (React key collisions, mismatched UI rows).
+
+const PLACEHOLDER_SEED_KEY = "offlinePlaceholderSeed";
+
+function readSeedFromStorage(): number {
+  try {
+    const raw = localStorage.getItem(PLACEHOLDER_SEED_KEY);
+    if (raw !== null) {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+  } catch {}
+  return 0;
+}
+
+let _placeholderCounter = readSeedFromStorage();
+
 function nextPlaceholderId(): number {
-  return -(++_placeholderCounter);
+  const id = -(++_placeholderCounter);
+  try { localStorage.setItem(PLACEHOLDER_SEED_KEY, String(_placeholderCounter)); } catch {}
+  return id;
 }
 
 export async function createEntryWithOfflineFallback(

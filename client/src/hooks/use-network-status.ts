@@ -7,6 +7,11 @@ import {
   getPendingCount,
   onQueueChange,
   dispatchEntrySynced,
+  markPhotoInFlight,
+  clearPhotoInFlight,
+  markEntryInFlight,
+  clearEntryInFlight,
+  clearAllInFlight,
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
 
@@ -55,6 +60,8 @@ export function useNetworkStatus() {
     try {
       const entries = await getQueuedEntries();
       for (const entry of entries) {
+        // Skip items that are already being processed (concurrent drain guard).
+        if (entry.inFlight) continue;
         if (permanentlyFailedRef.current.has(entry.id)) continue;
         if (!navigator.onLine) break;
 
@@ -62,6 +69,9 @@ export function useNetworkStatus() {
         if (currentRetries > 0) {
           setEntryRetryAttempt(currentRetries + 1);
         }
+
+        // Claim the item before submitting so a concurrent drainer skips it.
+        await markEntryInFlight(entry.id);
 
         let fetchFailed = false;
         try {
@@ -80,6 +90,7 @@ export function useNetworkStatus() {
               clearTimeout(existingTimer);
               entryRetryTimersRef.current.delete(entry.id);
             }
+            // Item is removed from IDB — no need to clear inFlight separately.
             await removeEntryFromQueue(entry.id);
             if (entry.placeholderId != null && created?.id != null) {
               dispatchEntrySynced(entry.placeholderId, created.id, entry.sessionId);
@@ -88,12 +99,13 @@ export function useNetworkStatus() {
               queryKey: ["/api/sessions", entry.sessionId.toString(), "entries"],
             });
           } else if (res.status === 401) {
-            // Session has expired — retrying won't help.  Force the auth check
-            // to refetch so the app redirects to the login page, preserving the
-            // queued entry in IndexedDB for the next session.
+            // Session expired — retrying won't help.  Force re-auth and keep
+            // the item in the queue for the next session.
+            await clearEntryInFlight(entry.id);
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             fetchFailed = true;
           } else {
+            await clearEntryInFlight(entry.id);
             const nextRetries = currentRetries + 1;
             entryRetryCountsRef.current.set(entry.id, nextRetries);
             if (nextRetries >= MAX_ENTRY_RETRIES) {
@@ -104,6 +116,7 @@ export function useNetworkStatus() {
             }
           }
         } catch {
+          await clearEntryInFlight(entry.id);
           fetchFailed = true;
           const nextRetries = currentRetries + 1;
           entryRetryCountsRef.current.set(entry.id, nextRetries);
@@ -120,7 +133,13 @@ export function useNetworkStatus() {
 
       const photos = await getQueuedPhotos();
       for (const photo of photos) {
+        // Skip items already claimed by a concurrent drainer.
+        if (photo.inFlight) continue;
         if (!navigator.onLine) break;
+
+        // Claim the item before submitting.
+        await markPhotoInFlight(photo.id);
+
         try {
           const formData = new FormData();
           formData.append("file", photo.blob, `photo-${photo.id}.jpg`);
@@ -132,13 +151,14 @@ export function useNetworkStatus() {
           });
 
           if (uploadRes.status === 401) {
-            // Session expired — stop syncing and force re-auth.
+            await clearPhotoInFlight(photo.id);
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             break;
           }
           if (!uploadRes.ok) {
-            // Server-side error for this photo (e.g. bad file) — skip it and
-            // try the next one rather than blocking the whole queue.
+            // Server-side error for this photo — release the claim and try the
+            // next one rather than blocking the whole queue.
+            await clearPhotoInFlight(photo.id);
             continue;
           }
           const uploadData = await uploadRes.json();
@@ -158,17 +178,23 @@ export function useNetworkStatus() {
           });
 
           if (photoRes.status === 401) {
+            await clearPhotoInFlight(photo.id);
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             break;
           }
           if (photoRes.ok) {
+            // Item removed from IDB — inFlight flag goes with it.
             await removeFromQueue(photo.id);
             queryClient.invalidateQueries({
               queryKey: ["/api/sessions", photo.sessionId.toString(), "photos"],
             });
+          } else {
+            // Photo record creation failed — release claim for retry.
+            await clearPhotoInFlight(photo.id);
           }
         } catch {
-          // True network failure — stop and wait for the next online event.
+          // True network failure — release claim and wait for next online event.
+          await clearPhotoInFlight(photo.id);
           break;
         }
       }
@@ -192,6 +218,10 @@ export function useNetworkStatus() {
   }, [syncQueue]);
 
   useEffect(() => {
+    // Clear any inFlight flags left by an interrupted previous session so
+    // those items are retried rather than silently skipped on this page load.
+    clearAllInFlight().catch(() => {});
+
     const handleOnline = () => {
       setIsOnline(true);
       for (const [id, timer] of entryRetryTimersRef.current.entries()) {

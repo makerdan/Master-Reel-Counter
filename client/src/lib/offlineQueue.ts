@@ -24,6 +24,7 @@ export interface QueuedPhoto {
   isReceiving: boolean;
   isOnFloor: boolean;
   createdAt: number;
+  inFlight?: boolean;
 }
 
 export interface QueuedEntry {
@@ -32,6 +33,7 @@ export interface QueuedEntry {
   data: Record<string, unknown>;
   createdAt: number;
   placeholderId?: number;
+  inFlight?: boolean;
 }
 
 export function dispatchEntrySynced(placeholderId: number, realId: number, sessionId: number): void {
@@ -74,7 +76,7 @@ export async function removeFromQueue(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PHOTO_STORE, "readwrite");
     tx.objectStore(PHOTO_STORE).delete(id);
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -105,7 +107,7 @@ export async function clearQueue(sessionId?: number): Promise<void> {
       for (const item of items) {
         store.delete(item.id);
       }
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { resolve(); notifyQueueChange(); };
       tx.onerror = () => reject(tx.error);
     });
   }
@@ -113,7 +115,7 @@ export async function clearQueue(sessionId?: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PHOTO_STORE, "readwrite");
     tx.objectStore(PHOTO_STORE).clear();
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -133,7 +135,7 @@ export async function removeEntryFromQueue(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ENTRY_STORE, "readwrite");
     tx.objectStore(ENTRY_STORE).delete(id);
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -168,4 +170,82 @@ export async function clearAllQueuedPhotos(): Promise<void> {
     tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
+}
+
+// ─── In-flight claim helpers ──────────────────────────────────────────────────
+// Each queue item is marked inFlight=true before the drain loop submits it.
+// The drain loop skips any item already marked inFlight, preventing
+// double-submission when two drainers run concurrently (e.g. rapid reconnect
+// events or multiple tabs open simultaneously).
+// clearAllInFlight() resets stale inFlight flags left by interrupted page
+// sessions and must be called once on startup.
+
+async function patchPhotoRecord(id: string, patch: Partial<QueuedPhoto>): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PHOTO_STORE, "readwrite");
+    const store = tx.objectStore(PHOTO_STORE);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      if (req.result) store.put({ ...req.result, ...patch });
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function patchEntryRecord(id: string, patch: Partial<QueuedEntry>): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(ENTRY_STORE, "readwrite");
+    const store = tx.objectStore(ENTRY_STORE);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      if (req.result) store.put({ ...req.result, ...patch });
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function markPhotoInFlight(id: string): Promise<void> {
+  return patchPhotoRecord(id, { inFlight: true });
+}
+
+export async function clearPhotoInFlight(id: string): Promise<void> {
+  return patchPhotoRecord(id, { inFlight: false });
+}
+
+export async function markEntryInFlight(id: string): Promise<void> {
+  return patchEntryRecord(id, { inFlight: true });
+}
+
+export async function clearEntryInFlight(id: string): Promise<void> {
+  return patchEntryRecord(id, { inFlight: false });
+}
+
+// Resets all inFlight flags across both stores.  Call once on app startup so
+// that items stranded in-flight by a prior page crash or reload are retried
+// on the next sync rather than silently skipped forever.
+export async function clearAllInFlight(): Promise<void> {
+  const db = await openDB();
+
+  const resetStore = (storeName: string) =>
+    new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        for (const item of req.result as Array<Record<string, unknown>>) {
+          if (item.inFlight) {
+            store.put({ ...item, inFlight: false });
+          }
+        }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+
+  await resetStore(PHOTO_STORE);
+  await resetStore(ENTRY_STORE);
 }
