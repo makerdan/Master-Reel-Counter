@@ -20,6 +20,16 @@ export function useSessionWebSocket(
   const pendingBufferRef = useRef<string[]>([]);
   const hasEverConnectedRef = useRef(false);
   const shouldReconnectRef = useRef(true);
+
+  // Stable refs for callbacks and user info — updated every render so the
+  // connect callback always reads the latest values without those values
+  // appearing in the effect dependency array (which would trigger reconnects
+  // every time the parent re-renders with a new function or object literal).
+  const onMessageRef = useRef(onMessage);
+  const userInfoRef = useRef(userInfo);
+  onMessageRef.current = onMessage;
+  userInfoRef.current = userInfo;
+
   const [wsStatus, setWsStatus] = useState<WsStatus>("connecting");
   const [reconnectDelayMs, setReconnectDelayMs] = useState<number | null>(null);
 
@@ -34,6 +44,8 @@ export function useSessionWebSocket(
     }
   }, []);
 
+  // connect is keyed only on sessionId (and the stable safeSend). Callbacks
+  // (onMessage, userInfo) are read from refs so they never cause reconnects.
   const connect = useCallback(() => {
     if (!sessionId) return;
 
@@ -48,7 +60,9 @@ export function useSessionWebSocket(
       setReconnectDelayMs(null);
       // Send join first so the server registers room membership before any
       // buffered messages arrive — buffered messages may require room context.
-      safeSend(JSON.stringify({ type: "join", sessionId, userId: userInfo?.userId, username: userInfo?.username }));
+      // Read userInfo from the ref to avoid stale closures.
+      const ui = userInfoRef.current;
+      safeSend(JSON.stringify({ type: "join", sessionId, userId: ui?.userId, username: ui?.username }));
       const buffered = pendingBufferRef.current.splice(0);
       for (const msg of buffered) {
         safeSend(msg);
@@ -75,7 +89,8 @@ export function useSessionWebSocket(
         } else if (msg.type === "activity") {
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "activity"] });
         }
-        onMessage?.(msg);
+        // Read handler from ref so parent can swap it without causing reconnects.
+        onMessageRef.current?.(msg);
       } catch {}
     };
 
@@ -97,7 +112,7 @@ export function useSessionWebSocket(
     ws.onerror = () => {
       ws.close();
     };
-  }, [sessionId, onMessage, userInfo?.userId, userInfo?.username]);
+  }, [sessionId, safeSend]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;

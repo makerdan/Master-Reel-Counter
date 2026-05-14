@@ -5657,6 +5657,32 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   }, WS_HEARTBEAT_INTERVAL_MS);
   wss.on("close", () => { clearInterval(wsHeartbeat); });
 
+  // Defensive ghost-entry pruner: walks sessionRooms and wsUserMap every
+  // 5 minutes and removes any socket whose readyState is CLOSED or CLOSING.
+  // The heartbeat already terminates dead connections, but this acts as a
+  // safety net in case a socket slips through (e.g. terminated before pong
+  // could be registered) and leaves an orphaned entry in either map.
+  const WS_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
+  const wsGhostPruner = setInterval(() => {
+    // Prune sessionRooms — remove dead sockets from each room set.
+    for (const [roomSessionId, room] of sessionRooms) {
+      for (const ws of room) {
+        if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+          room.delete(ws);
+          wsUserMap.delete(ws);
+        }
+      }
+      if (room.size === 0) sessionRooms.delete(roomSessionId);
+    }
+    // Prune wsUserMap — remove any dead socket not already caught above.
+    for (const [ws] of wsUserMap) {
+      if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        wsUserMap.delete(ws);
+      }
+    }
+  }, WS_PRUNE_INTERVAL_MS);
+  wss.on("close", () => { clearInterval(wsGhostPruner); });
+
   const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000;
   const TRASH_MAX_AGE_DAYS = 30;
 
