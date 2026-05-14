@@ -167,6 +167,17 @@ const resourceRateLimiter = rateLimit({
   message: { message: "Too many requests, please try again later." },
 });
 
+const MAX_PINS_PER_CROP_REQUEST = 50;
+
+const cropAiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: any) => req.user?.claims?.sub ?? req.ip,
+  message: { message: "Too many scan requests. Please wait a moment before trying again." },
+});
+
 const patchSessionSchema = z.object({
   name: z.string().min(1).max(500).optional(),
   description: z.string().max(5000).nullable().optional(),
@@ -1772,7 +1783,7 @@ export async function registerRoutes(
     return fs.readFile(path.join(UPLOADS_DIR, photoFilename));
   }
 
-  app.post("/api/photos/:photoId/analyze-labels", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
+  app.post("/api/photos/:photoId/analyze-labels", isAuthenticated, cropAiRateLimiter, async (req: any, res) => {
     taskTracker.increment();
     let _sid: number | null = null;
     try {
@@ -1788,6 +1799,9 @@ export async function registerRoutes(
       const { pins: pinData } = req.body;
       if (!Array.isArray(pinData) || pinData.length === 0) {
         return res.status(400).json({ message: "pins array is required" });
+      }
+      if (pinData.length > MAX_PINS_PER_CROP_REQUEST) {
+        return res.status(400).json({ message: `Too many pins: maximum ${MAX_PINS_PER_CROP_REQUEST} per request.` });
       }
 
       const photoBuffer = await loadPhotoBuffer(photo.objectStorageKey);
@@ -1806,12 +1820,15 @@ export async function registerRoutes(
       for (let i = 0; i < pinData.length; i += MAX_BATCH) {
         const batch = pinData.slice(i, i + MAX_BATCH);
         try {
-          const crops = await cropPhoto(orientedBuffer, batch.map((p: any) => ({
+          const { results: crops, truncated: batchTruncated } = await cropPhoto(orientedBuffer, batch.map((p: any) => ({
             pinId: p.pinId,
             x: p.x,
             y: p.y,
             zoomLevel: p.zoomLevel ?? 1,
           })));
+          if (batchTruncated) {
+            console.warn(`[analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}`);
+          }
 
           const imageMessages = crops.map((crop) => ({
             type: "image_url" as const,
@@ -1899,7 +1916,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sessions/:sessionId/analyze-labels", isAuthenticated, async (req: any, res) => {
+  app.post("/api/sessions/:sessionId/analyze-labels", isAuthenticated, cropAiRateLimiter, async (req: any, res) => {
     const _sid = parseInt(req.params.sessionId);
     taskTracker.increment();
     try {
@@ -1912,6 +1929,9 @@ export async function registerRoutes(
       const { pins: pinData } = req.body;
       if (!Array.isArray(pinData) || pinData.length === 0) {
         return res.status(400).json({ message: "pins array is required" });
+      }
+      if (pinData.length > MAX_PINS_PER_CROP_REQUEST) {
+        return res.status(400).json({ message: `Too many pins: maximum ${MAX_PINS_PER_CROP_REQUEST} per request.` });
       }
 
       const uniquePhotoIds = [...new Set(pinData.map((p: any) => p.photoId as number))];
@@ -1955,12 +1975,15 @@ export async function registerRoutes(
           const crops: Array<{ pinId: number; base64: string }> = [];
           for (const [photoId, items] of cropsByPhoto) {
             const buf = photoBufferMap.get(photoId)!;
-            const photoCrops = await cropPhoto(buf, items.map((it) => ({
+            const { results: photoCrops, truncated: photoTruncated } = await cropPhoto(buf, items.map((it) => ({
               pinId: it.pinId,
               x: it.x,
               y: it.y,
               zoomLevel: it.zoomLevel,
             })));
+            if (photoTruncated) {
+              console.warn(`[session-analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}`);
+            }
             crops.push(...photoCrops);
           }
 

@@ -12,21 +12,35 @@ interface CropResult {
   base64: string;
 }
 
+export interface CropPhotoResult {
+  results: CropResult[];
+  truncated: boolean;
+}
+
 const MIN_ZOOM = 0.005;
 const MAX_ZOOM = 1.0;
 const MAX_CROP_PX = 600;
 
+const MAX_OUTPUT_BYTES = 50 * 1024 * 1024;
+
 export async function cropPhoto(
   photoBuffer: Buffer,
   pins: CropRequest[]
-): Promise<CropResult[]> {
+): Promise<CropPhotoResult> {
   const metadata = await sharp(photoBuffer).metadata();
   const imgWidth = metadata.width!;
   const imgHeight = metadata.height!;
 
   const results: CropResult[] = [];
+  let accumulatedBytes = 0;
+  let truncated = false;
 
   for (const pin of pins) {
+    if (accumulatedBytes >= MAX_OUTPUT_BYTES) {
+      truncated = true;
+      break;
+    }
+
     const fraction = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pin.zoomLevel));
 
     let cropW = Math.round(imgWidth * fraction);
@@ -57,11 +71,13 @@ export async function cropPhoto(
       .jpeg({ quality: 85 })
       .toBuffer();
 
+    accumulatedBytes += croppedBuffer.length;
+
     results.push({
       pinId: pin.pinId,
       base64: croppedBuffer.toString("base64"),
     });
   }
 
-  return results;
+  return { results, truncated };
 }
