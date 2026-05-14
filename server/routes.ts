@@ -844,8 +844,8 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
-      await storage.restoreFolder(folder.id);
-      res.json({ success: true });
+      const { relinkedCount } = await storage.restoreFolder(folder.id);
+      res.json({ success: true, relinkedCount });
     } catch (error) {
       res.status(500).json({ message: "Failed to restore folder" });
     }
@@ -5846,6 +5846,26 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       if (expiredSessions.length > 0) {
         console.log(`Trash purge complete: ${expiredSessions.length} session(s) permanently deleted`);
       }
+
+      // Auto-purge folders that have been in trash longer than TRASH_MAX_AGE_DAYS.
+      // Sessions were already unlinked during soft-delete; no file cleanup needed.
+      try {
+        const expiredFolders = await storage.getExpiredTrashFolders(TRASH_MAX_AGE_DAYS);
+        for (const folder of expiredFolders) {
+          try {
+            await storage.permanentDeleteFolder(folder.id);
+            console.log(`Purged expired trashed folder ${folder.id} (${folder.name})`);
+          } catch (err) {
+            console.error(`Failed to purge trashed folder ${folder.id}:`, err);
+          }
+        }
+        if (expiredFolders.length > 0) {
+          console.log(`Folder purge complete: ${expiredFolders.length} folder(s) permanently deleted`);
+        }
+      } catch (err) {
+        console.error("Folder trash purge error:", err);
+      }
+
       // Also sweep orphaned uploads on every trash-purge cycle.
       await purgeOrphanedUploads();
     } catch (err) {

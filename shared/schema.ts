@@ -78,6 +78,11 @@ export const countingSessions = pgTable("counting_sessions", {
   completedAt: timestamp("completed_at"),
   lastPhotoIndex: integer("last_photo_index").default(0),
   deletedAt: timestamp("deleted_at"),
+  // trashedFromFolderId: snapshot of the folderId at the moment a folder was
+  // soft-deleted. Set on sessions when their parent folder is trashed (before
+  // folderId is nulled out). Cleared and folderId restored when the folder is
+  // un-trashed. No FK — the folder row may itself be permanently deleted later.
+  trashedFromFolderId: integer("trashed_from_folder_id"),
   // reviewCohort: JSON-encoded sorted array of { userId, username } objects.
   // Set once (server-side) when the first review response is submitted for this
   // session. All clients read this value so every reviewer computes identical

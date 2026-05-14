@@ -1,0 +1,12 @@
+-- Adds trashedFromFolderId to counting_sessions so that folder-restore can
+-- relink the sessions that were in the folder at the time of soft-delete.
+-- When a folder is soft-deleted:
+--   1. sessions.trashed_from_folder_id is set to folders.id (snapshot)
+--   2. sessions.folder_id is cleared to NULL
+-- When a folder is restored:
+--   1. sessions whose trashed_from_folder_id matches the folder and that are
+--      not themselves trashed (deletedAt IS NULL) have folder_id restored and
+--      trashed_from_folder_id cleared.
+-- The post-merge setup script runs `npm run db:push` (drizzle-kit push) which
+-- applies the schema automatically; this file documents the change.
+ALTER TABLE "counting_sessions" ADD COLUMN IF NOT EXISTS "trashed_from_folder_id" integer;

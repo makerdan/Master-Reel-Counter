@@ -164,9 +164,17 @@ export interface IStorage {
   getFolder(id: number): Promise<Folder | undefined>;
   updateFolder(id: number, data: Partial<Folder>): Promise<Folder | undefined>;
   softDeleteFolder(id: number): Promise<void>;
-  restoreFolder(id: number): Promise<void>;
+  /**
+   * Restores a soft-deleted folder by clearing its deletedAt timestamp.
+   * Also relinks any sessions that have trashedFromFolderId matching this
+   * folder and are still active (deletedAt IS NULL) — their folderId is
+   * restored to this folder and trashedFromFolderId is cleared.
+   * Returns the count of sessions that were relinked.
+   */
+  restoreFolder(id: number): Promise<{ relinkedCount: number }>;
   permanentDeleteFolder(id: number): Promise<void>;
   deleteFolder(id: number): Promise<void>;
+  getExpiredTrashFolders(olderThanDays: number): Promise<Folder[]>;
   /**
    * Deep-copies a session into a new row owned by `userId`.
    * Copies all photos, entries, and pins, updating foreign-key references to
@@ -1063,19 +1071,49 @@ export class DatabaseStorage implements IStorage {
     await db.update(folders)
       .set({ deletedAt: new Date() })
       .where(eq(folders.id, id));
+    // Snapshot folderId → trashedFromFolderId before unlinking, so a later
+    // restore can put sessions back into this folder.
+    await db.update(countingSessions)
+      .set({ folderId: null, trashedFromFolderId: id })
+      .where(and(eq(countingSessions.folderId, id), isNull(countingSessions.deletedAt)));
+    // Sessions that are themselves already trashed just get unlinked; we don't
+    // snapshot for them because restoring the folder won't relink trashed sessions.
     await db.update(countingSessions)
       .set({ folderId: null })
-      .where(eq(countingSessions.folderId, id));
+      .where(and(eq(countingSessions.folderId, id), isNotNull(countingSessions.deletedAt)));
   }
 
-  async restoreFolder(id: number): Promise<void> {
+  async restoreFolder(id: number): Promise<{ relinkedCount: number }> {
     await db.update(folders)
       .set({ deletedAt: null })
       .where(eq(folders.id, id));
+    // Relink active (non-trashed) sessions that were snapshotted from this folder.
+    const relinked = await db.update(countingSessions)
+      .set({ folderId: id, trashedFromFolderId: null })
+      .where(and(
+        eq(countingSessions.trashedFromFolderId, id),
+        isNull(countingSessions.deletedAt),
+      ))
+      .returning({ id: countingSessions.id });
+    return { relinkedCount: relinked.length };
   }
 
   async permanentDeleteFolder(id: number): Promise<void> {
+    // Clear any lingering snapshots so sessions aren't left with an orphaned
+    // trashedFromFolderId pointing at a now-deleted folder.
+    await db.update(countingSessions)
+      .set({ trashedFromFolderId: null })
+      .where(eq(countingSessions.trashedFromFolderId, id));
     await db.delete(folders).where(eq(folders.id, id));
+  }
+
+  async getExpiredTrashFolders(olderThanDays: number): Promise<Folder[]> {
+    const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+    return db.select().from(folders)
+      .where(and(
+        isNotNull(folders.deletedAt),
+        lt(folders.deletedAt, cutoff),
+      ));
   }
 
   async deleteFolder(id: number): Promise<void> {

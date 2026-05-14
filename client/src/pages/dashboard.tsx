@@ -617,12 +617,19 @@ export default function Dashboard() {
 
   const restoreFolder = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("POST", `/api/folders/${id}/restore`);
+      const res = await apiRequest("POST", `/api/folders/${id}/restore`);
+      return res.json() as Promise<{ success: boolean; relinkedCount: number }>;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       invalidateAll();
       queryClient.invalidateQueries({ queryKey: ["/api/folders/trash"] });
-      toast({ title: "Folder restored" });
+      const count = data?.relinkedCount ?? 0;
+      const desc = count === 0
+        ? "No sessions could be relinked (they may have been moved or deleted)."
+        : count === 1
+          ? "1 session was restored into the folder."
+          : `${count} sessions were restored into the folder.`;
+      toast({ title: "Folder restored", description: desc });
     },
     onError: () => {
       toast({ title: "Failed to restore folder", variant: "destructive" });
