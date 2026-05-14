@@ -143,9 +143,15 @@ function DupPinTile({
 
   const keepMutation = useMutation({
     mutationFn: async () => {
-      for (const id of siblingPinIds) {
-        await apiRequest("DELETE", `/api/pins/${id}`);
-      }
+      // Send one atomic request: the server keeps pinIdToKeep and deletes all
+      // others in a single DB transaction, so concurrent "Keep" clicks from
+      // different users can never leave a group with zero pins remaining.
+      const allGroupIds = [pin.pinId, ...siblingPinIds];
+      await apiRequest(
+        "DELETE",
+        `/api/sessions/${sessionId}/pins/keep/${pin.pinId}`,
+        { pinGroupIds: allGroupIds },
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });

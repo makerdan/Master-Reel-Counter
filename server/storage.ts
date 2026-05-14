@@ -127,6 +127,14 @@ export interface IStorage {
   getSessionPinsPaginated(sessionId: number, limit: number, offset: number): Promise<{ pins: Pin[]; total: number }>;
   updatePin(id: number, data: Partial<Pin>): Promise<Pin | undefined>;
   deletePin(id: number): Promise<void>;
+  /**
+   * Atomically keeps one pin and deletes all other pins in a duplicate group.
+   * Runs inside a single DB transaction. Pin IDs that no longer exist (because
+   * a concurrent keep already deleted them) are silently skipped so two users
+   * clicking "Keep" simultaneously never cause data loss.
+   * Also deletes any entries linked to the deleted pins.
+   */
+  batchKeepPins(pinIdToKeep: number, pinIdsToDelete: number[]): Promise<{ deletedCount: number }>;
 
   getSessionIncompletePins(sessionId: number): Promise<{ photoId: number; incompleteCount: number }[]>;
   resolveParentPinForDetailShot(detailPhotoId: number, entryId: number): Promise<void>;
@@ -815,6 +823,29 @@ export class DatabaseStorage implements IStorage {
 
   async deletePin(id: number): Promise<void> {
     await db.delete(pins).where(eq(pins.id, id));
+  }
+
+  async batchKeepPins(pinIdToKeep: number, pinIdsToDelete: number[]): Promise<{ deletedCount: number }> {
+    // Extra safety guard: never delete the keeper, even if the caller
+    // accidentally included it in the delete list.
+    const safeToDelete = pinIdsToDelete.filter(id => id !== pinIdToKeep);
+    if (!safeToDelete.length) return { deletedCount: 0 };
+    return db.transaction(async (tx) => {
+      // Only operate on pins that still exist — concurrent keeps may have
+      // already removed some of them, and that is not an error.
+      const existing = await tx
+        .select({ id: pins.id, entryId: pins.entryId })
+        .from(pins)
+        .where(inArray(pins.id, safeToDelete));
+      if (!existing.length) return { deletedCount: 0 };
+
+      const entryIds = existing.map(p => p.entryId).filter((id): id is number => id !== null);
+      if (entryIds.length) {
+        await tx.delete(entries).where(inArray(entries.id, entryIds));
+      }
+      await tx.delete(pins).where(inArray(pins.id, existing.map(p => p.id)));
+      return { deletedCount: existing.length };
+    });
   }
 
   async getUserSettings(userId: string): Promise<UserSettings | undefined> {

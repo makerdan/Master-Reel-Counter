@@ -1761,6 +1761,39 @@ export async function registerRoutes(
     }
   });
 
+  // Atomic batch-keep: keeps one pin from a duplicate group and deletes all others
+  // in a single DB transaction. Concurrent keeps are safe — already-deleted pins
+  // are silently skipped rather than causing a 404.
+  app.delete("/api/sessions/:sessionId/pins/keep/:pinIdToKeep", isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.sessionId);
+      const pinIdToKeep = parseInt(req.params.pinIdToKeep);
+      const { pinGroupIds } = req.body ?? {};
+
+      if (!Array.isArray(pinGroupIds) || !pinGroupIds.every((id: unknown) => Number.isInteger(id))) {
+        return res.status(400).json({ message: "pinGroupIds must be an array of integers" });
+      }
+
+      const access = await verifySessionAccess(sessionId, resolveUserId(req), getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
+      const lockMsg = checkLocked(access.session, access.role);
+      if (lockMsg) return res.status(403).json({ message: lockMsg });
+
+      const pinIdsToDelete = (pinGroupIds as number[]).filter((id) => id !== pinIdToKeep);
+      const { deletedCount } = await storage.batchKeepPins(pinIdToKeep, pinIdsToDelete);
+
+      broadcastToSession(sessionId, { type: "sync", entity: "pins", sessionId });
+      broadcastToSession(sessionId, { type: "sync", entity: "entries", sessionId });
+      logActivity(sessionId, resolveUserId(req), req.user?.claims?.username, "pins_batch_kept", "pin", pinIdToKeep);
+
+      res.json({ success: true, deletedCount });
+    } catch (error) {
+      console.error("Error in batch-keep pins:", error);
+      res.status(500).json({ message: "Failed to process keep operation" });
+    }
+  });
+
   app.put("/api/photos/:photoId/draft-pins", isAuthenticated, async (req: any, res) => {
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
