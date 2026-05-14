@@ -366,6 +366,13 @@ export async function registerRoutes(
       await putToObjectStorage(BUCKET_NAME, objectName, req.file.buffer, req.file.mimetype, localFallback);
       console.log(`Upload success: file="${objectId}", size=${req.file.size}, type=${req.file.mimetype}`);
 
+      // Track the pending upload so orphan cleanup can delete the file if the
+      // client never completes the photo-registration step.
+      const uploadUserId = resolveUserId(req);
+      storage.createUploadIntent(objectPath, uploadUserId).catch((err) => {
+        console.warn("createUploadIntent failed (non-fatal):", err?.message);
+      });
+
       res.json({
         objectPath,
         metadata: {
@@ -5769,6 +5776,32 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000;
   const TRASH_MAX_AGE_DAYS = 30;
+  const ORPHAN_INTENT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  async function purgeOrphanedUploads() {
+    try {
+      const expired = await storage.getExpiredUploadIntents(ORPHAN_INTENT_MAX_AGE_MS);
+      if (expired.length === 0) return;
+      const purged: number[] = [];
+      for (const intent of expired) {
+        try {
+          const key = intent.objectPath;
+          const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+          await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
+          await fs.unlink(path.join(UPLOADS_DIR, filename)).catch(() => {});
+          purged.push(intent.id);
+        } catch (err) {
+          console.warn(`Could not delete orphaned upload ${intent.objectPath}:`, err);
+        }
+      }
+      if (purged.length > 0) {
+        await storage.deleteUploadIntents(purged);
+        console.log(`Orphan upload purge: removed ${purged.length} stranded file(s)`);
+      }
+    } catch (err) {
+      console.error("Orphan upload purge error:", err);
+    }
+  }
 
   async function purgeExpiredTrash() {
     try {
@@ -5799,10 +5832,27 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       if (expiredSessions.length > 0) {
         console.log(`Trash purge complete: ${expiredSessions.length} session(s) permanently deleted`);
       }
+      // Also sweep orphaned uploads on every trash-purge cycle.
+      await purgeOrphanedUploads();
     } catch (err) {
       console.error("Trash purge error:", err);
     }
   }
+
+  // Admin endpoint: manually trigger orphan upload cleanup.
+  app.post("/api/admin/purge-orphaned-uploads", isAuthenticated, async (req: any, res) => {
+    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
+    const userId = resolveUserId(req);
+    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    try {
+      await purgeOrphanedUploads();
+      res.json({ message: "Orphan upload purge triggered" });
+    } catch (err) {
+      res.status(500).json({ message: "Purge failed" });
+    }
+  });
 
   setInterval(purgeExpiredTrash, TRASH_PURGE_INTERVAL_MS);
   setTimeout(purgeExpiredTrash, 30000);

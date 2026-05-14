@@ -454,6 +454,23 @@ export const insertReviewResponseSchema = createInsertSchema(reviewResponses).om
 export type ReviewResponse = typeof reviewResponses.$inferSelect;
 export type InsertReviewResponse = z.infer<typeof insertReviewResponseSchema>;
 
+// upload_intents: records each file written to object storage by
+// POST /api/uploads/direct. The row is deleted when the corresponding
+// POST /api/sessions/:id/photos creates the photo DB record (via
+// atomicCreatePhoto). Any row older than 24 h with no matching photos row
+// is treated as orphaned and cleaned up by the hourly purge job.
+export const uploadIntents = pgTable("upload_intents", {
+  id: serial("id").primaryKey(),
+  objectPath: text("object_path").notNull().unique(),
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("upload_intents_created_at_idx").on(table.createdAt),
+  index("upload_intents_user_id_idx").on(table.userId),
+]);
+
+export type UploadIntent = typeof uploadIntents.$inferSelect;
+
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),

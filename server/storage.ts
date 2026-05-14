@@ -44,6 +44,8 @@ import {
   reviewResponses,
   type ReviewResponse,
   type InsertReviewResponse,
+  uploadIntents,
+  type UploadIntent,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -230,6 +232,31 @@ export interface IStorage {
   upsertReviewResponse(data: InsertReviewResponse): Promise<ReviewResponse>;
   deleteReviewResponse(sessionId: number, entryId: number, userId: string): Promise<void>;
   resolveReviewResponsesByEntry(sessionId: number, entryId: number): Promise<void>;
+
+  /**
+   * Records that a file was written to object storage but not yet registered
+   * as a photo DB row. Called immediately after POST /api/uploads/direct
+   * succeeds. Idempotent — uses INSERT OR IGNORE semantics on the unique
+   * objectPath column.
+   */
+  createUploadIntent(objectPath: string, userId: string): Promise<void>;
+  /**
+   * Removes the upload intent for the given objectPath. Called inside
+   * atomicCreatePhoto once the photos row is successfully committed so the
+   * file is no longer considered a candidate for orphan cleanup.
+   */
+  resolveUploadIntent(objectPath: string): Promise<void>;
+  /**
+   * Returns all upload_intents rows whose createdAt is older than
+   * `olderThanMs` milliseconds ago, indicating the client never completed
+   * the second step (registering the photo) within the grace period.
+   */
+  getExpiredUploadIntents(olderThanMs: number): Promise<UploadIntent[]>;
+  /**
+   * Bulk-deletes upload_intents rows by primary-key IDs. Used by the purge
+   * job after it has deleted the corresponding object storage files.
+   */
+  deleteUploadIntents(ids: number[]): Promise<void>;
 
   getRoleComparisonStats(userId: string): Promise<{
     Owner: { entries: number; footage: number; reels: number; photos: number };
@@ -424,6 +451,10 @@ export class DatabaseStorage implements IStorage {
         .set({ originalFilename: uniqueFilename })
         .where(eq(photos.id, inserted.id))
         .returning();
+      // Resolve the upload intent so the orphan-cleanup job won't delete this file.
+      if (photo.objectStorageKey) {
+        await tx.delete(uploadIntents).where(eq(uploadIntents.objectPath, photo.objectStorageKey));
+      }
       return updated;
     });
   }
@@ -2428,6 +2459,26 @@ export class DatabaseStorage implements IStorage {
         eq(reviewResponses.entryId, entryId),
         eq(reviewResponses.verdict, "flagged"),
       ));
+  }
+
+  async createUploadIntent(objectPath: string, userId: string): Promise<void> {
+    await db.insert(uploadIntents)
+      .values({ objectPath, userId })
+      .onConflictDoNothing();
+  }
+
+  async resolveUploadIntent(objectPath: string): Promise<void> {
+    await db.delete(uploadIntents).where(eq(uploadIntents.objectPath, objectPath));
+  }
+
+  async getExpiredUploadIntents(olderThanMs: number): Promise<UploadIntent[]> {
+    const cutoff = new Date(Date.now() - olderThanMs);
+    return db.select().from(uploadIntents).where(lt(uploadIntents.createdAt, cutoff));
+  }
+
+  async deleteUploadIntents(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.delete(uploadIntents).where(inArray(uploadIntents.id, ids));
   }
 }
 
