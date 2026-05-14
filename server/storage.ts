@@ -1627,7 +1627,7 @@ export class DatabaseStorage implements IStorage {
         if (dateMonth || dateYear) addReason(s.id, "date");
         if (footageMin !== null) addReason(s.id, "footage");
         if (collaboratorFilter) addReason(s.id, "collaborator");
-        if (wireTypeFilter) addReason(s.id, "wire_type");
+        if (wireTypeFilter && !encryptionActive) addReason(s.id, "wire_type");
       }
     }
 
@@ -1698,7 +1698,7 @@ export class DatabaseStorage implements IStorage {
           if (dateMonth || dateYear) addReason(s.id, "date");
           if (footageMin !== null) addReason(s.id, "footage");
           if (collaboratorFilter) addReason(s.id, "collaborator");
-          if (wireTypeFilter) addReason(s.id, "wire_type");
+          if (wireTypeFilter && !encryptionActive) addReason(s.id, "wire_type");
         }
       }
 

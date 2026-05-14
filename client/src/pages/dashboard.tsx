@@ -1980,6 +1980,7 @@ export default function Dashboard() {
                     onChange={e => setFilterWireType(e.target.value)}
                     placeholder={searchResults?.wireTypeFilterDisabled ? "Unavailable with encryption" : "e.g. THHN"}
                     className={`h-7 text-xs${searchResults?.wireTypeFilterDisabled ? " opacity-50" : ""}`}
+                    disabled={!!searchResults?.wireTypeFilterDisabled}
                     data-testid="input-filter-wiretype"
                   />
                 </div>
