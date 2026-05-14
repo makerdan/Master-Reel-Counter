@@ -374,8 +374,8 @@ export async function registerRoutes(
       const uploadUserId = resolveUserId(req);
       try {
         await storage.createUploadIntent(objectPath, uploadUserId);
-      } catch (intentErr: any) {
-        console.error("createUploadIntent failed; rolling back object storage write:", intentErr?.message);
+      } catch (intentErr: unknown) {
+        console.error("createUploadIntent failed; rolling back object storage write:", (intentErr as Error)?.message);
         objectStorageClient.bucket(BUCKET_NAME).file(objectName).delete({ ignoreNotFound: true }).catch(() => {});
         fs.unlink(localFallback).catch(() => {});
         return res.status(500).json({ error: "Failed to record upload intent; upload rolled back" });
@@ -5794,15 +5794,19 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       if (expired.length === 0) return;
       const purged: number[] = [];
       for (const intent of expired) {
+        const key = intent.objectPath;
+        const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+        let gcsOk = false;
         try {
-          const key = intent.objectPath;
-          const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
-          await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
-          await fs.unlink(path.join(UPLOADS_DIR, filename)).catch(() => {});
-          purged.push(intent.id);
+          await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true });
+          gcsOk = true;
         } catch (err) {
-          console.warn(`Could not delete orphaned upload ${intent.objectPath}:`, err);
+          console.warn(`Orphan purge: GCS delete failed for ${key} — will retry next cycle:`, (err as Error).message);
         }
+        if (!gcsOk) continue; // leave intent row so next run retries
+        // Local-disk fallback cleanup is best-effort: missing files are fine.
+        await fs.unlink(path.join(UPLOADS_DIR, filename)).catch(() => {});
+        purged.push(intent.id);
       }
       if (purged.length > 0) {
         await storage.deleteUploadIntents(purged);
