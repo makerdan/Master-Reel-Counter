@@ -392,7 +392,7 @@ export function useUndoRedo(sessionId: number) {
         }
         invalidateSession(action.type);
         toast({
-          title: "Undo skipped",
+          title: direction === "undo" ? "Undo skipped" : "Redo skipped",
           description: "This change was already modified by another user.",
         });
         return;
