@@ -34,6 +34,7 @@ export interface DuplicateGroup {
   section: string | null;
   pins: DuplicatePinInfo[];
   isDefiniteDoubleCount: boolean;
+  severity: "definite" | "probable" | "possible";
   groupType: "label-match" | "same-reel";
 }
 
@@ -52,7 +53,9 @@ export function detectDuplicatePins(
     const photo = photoMap.get(pin.photoId);
     const aisle = photo?.aisle ?? null;
     const section = photo?.section ?? null;
-    const key = `${pin.label.trim().toUpperCase()}||${aisle ?? ""}||${section ?? ""}`;
+    const normAisle = (aisle ?? "").trim().toUpperCase();
+    const normSection = (section ?? "").trim().toUpperCase();
+    const key = `${pin.label.trim().toUpperCase()}||${normAisle}||${normSection}`;
 
     const scanner = scannerMap.get(pin.id);
     const info: DuplicatePinInfo = {
@@ -105,19 +108,24 @@ export function detectDuplicatePins(
     const aislePart = parts[1] || null;
     const sectionPart = parts[2] || null;
 
+    const isDefinite = uniqueNonNullEntries.size > 1;
+    const isProbable = !isDefinite && nonNullEntryIds.length > 0 && nonNullEntryIds.length < groupPins.length;
+    const severity: DuplicateGroup["severity"] = isDefinite ? "definite" : isProbable ? "probable" : "possible";
+
     result.push({
       label: labelPart,
       aisle: aislePart,
       section: sectionPart,
       pins: groupPins,
-      isDefiniteDoubleCount: uniqueNonNullEntries.size > 1,
+      isDefiniteDoubleCount: isDefinite,
+      severity,
       groupType: "label-match",
     });
   }
 
+  const severityOrder: Record<DuplicateGroup["severity"], number> = { definite: 0, probable: 1, possible: 2 };
   result.sort((a, b) => {
-    if (a.isDefiniteDoubleCount !== b.isDefiniteDoubleCount)
-      return a.isDefiniteDoubleCount ? -1 : 1;
+    if (a.severity !== b.severity) return severityOrder[a.severity] - severityOrder[b.severity];
     return a.label.localeCompare(b.label);
   });
 
@@ -239,6 +247,7 @@ export function detectSameReelDuplicates(
         section,
         pins: groupPins,
         isDefiniteDoubleCount: false,
+        severity: "possible",
         groupType: "same-reel",
       });
     }

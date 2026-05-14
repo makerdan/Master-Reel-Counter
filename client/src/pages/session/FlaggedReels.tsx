@@ -865,7 +865,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                 return (
                 <div
                   key={groupKey}
-                  className={`border border-blue-600/50 rounded-lg p-2 sm:p-3 overflow-hidden ${isSameReel ? "bg-violet-50/40 dark:bg-violet-950/15" : group.isDefiniteDoubleCount ? "bg-orange-50/50 dark:bg-orange-950/20" : "bg-amber-50/30 dark:bg-amber-950/10"}`}
+                  className={`border border-blue-600/50 rounded-lg p-2 sm:p-3 overflow-hidden ${isSameReel ? "bg-violet-50/40 dark:bg-violet-950/15" : group.severity === "definite" ? "bg-orange-50/50 dark:bg-orange-950/20" : group.severity === "probable" ? "bg-amber-50/30 dark:bg-amber-950/10" : "bg-slate-50/50 dark:bg-slate-900/20"}`}
                   data-testid={`dup-group-${groupKey}`}
                 >
                   <div className="flex items-center gap-1.5 sm:gap-2 mb-2 flex-wrap">
@@ -878,10 +878,10 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
                       </span>
                     )}
                     <Badge
-                      className={`text-[9px] sm:text-[10px] px-1 ${isSameReel ? "bg-violet-900/50 text-violet-300 border-violet-700/40" : group.isDefiniteDoubleCount ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : "bg-amber-900/50 text-amber-300 border-amber-700/40"}`}
+                      className={`text-[9px] sm:text-[10px] px-1 ${isSameReel ? "bg-violet-900/50 text-violet-300 border-violet-700/40" : group.severity === "definite" ? "bg-orange-900/50 text-orange-300 border-orange-700/40" : group.severity === "probable" ? "bg-amber-900/50 text-amber-300 border-amber-700/40" : "bg-slate-700/50 text-slate-300 border-slate-600/40"}`}
                       data-testid={`badge-dup-type-${groupKey}`}
                     >
-                      {isSameReel ? "Same Reel?" : group.isDefiniteDoubleCount ? "Double Count" : "Check Needed"}
+                      {isSameReel ? "Same Reel?" : group.severity === "definite" ? "Double Count" : group.severity === "probable" ? "Probable Duplicate" : "Check Needed"}
                     </Badge>
                     <Button
                       size="sm"
