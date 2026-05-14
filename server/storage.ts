@@ -1071,16 +1071,16 @@ export class DatabaseStorage implements IStorage {
     await db.update(folders)
       .set({ deletedAt: new Date() })
       .where(eq(folders.id, id));
-    // Snapshot folderId → trashedFromFolderId before unlinking, so a later
-    // restore can put sessions back into this folder.
+    // Snapshot folderId → trashedFromFolderId for ALL sessions in the folder
+    // before unlinking, regardless of whether the sessions are themselves
+    // trashed. This means a session that was individually trashed before its
+    // folder was trashed can still be relinked once the user restores both the
+    // session and the folder — the restore query requires both folderId IS NULL
+    // and deletedAt IS NULL, so trashed sessions are naturally skipped at
+    // restore time but retain the snapshot until then.
     await db.update(countingSessions)
       .set({ folderId: null, trashedFromFolderId: id })
-      .where(and(eq(countingSessions.folderId, id), isNull(countingSessions.deletedAt)));
-    // Sessions that are themselves already trashed just get unlinked; we don't
-    // snapshot for them because restoring the folder won't relink trashed sessions.
-    await db.update(countingSessions)
-      .set({ folderId: null })
-      .where(and(eq(countingSessions.folderId, id), isNotNull(countingSessions.deletedAt)));
+      .where(eq(countingSessions.folderId, id));
   }
 
   async restoreFolder(id: number): Promise<{ relinkedCount: number }> {
