@@ -5380,6 +5380,12 @@ export async function registerRoutes(
       const { enabled } = req.body;
       const currentSettings = await storage.getUserSettings(userId);
 
+      // Derive a stable pair of int32 lock keys from userId for pg_advisory_xact_lock.
+      // Using two int4 values avoids BigInt serialization issues with the Drizzle sql tag.
+      const lockHash = createHash("sha256").update(userId).digest();
+      const lockKey1 = lockHash.readInt32BE(0);
+      const lockKey2 = lockHash.readInt32BE(4);
+
       // Helper: SQL condition — any encodable field carries an 'enc:' prefix
       const encPrefixCondition = sql`(
         ${entries.reelTag}      LIKE 'enc:%' OR
@@ -5410,30 +5416,53 @@ export async function registerRoutes(
       let entriesProcessed = 0;
 
       if (enabled) {
-        const salt = generateSalt();
-        const dataKey = generateDataKey();
-        const kek = deriveKEK(salt);
-        const wrappedKey = wrapKey(dataKey, kek);
+        // Determine which key to use:
+        // - If settings already show enabled+key, re-use that key (idempotent retry).
+        // - If settings show disabled but entries have enc: fields, a partial prior run
+        //   used an unknown key → reject with MIXED_KEY_STATE.
+        // - Otherwise (clean first-time enable) generate a fresh key.
+        let salt: string;
+        let dataKey: Buffer;
+        let wrappedKey: string;
+
+        const alreadyFullyEnabled =
+          !!currentSettings?.encodingEnabled &&
+          !!currentSettings.encryptionKey &&
+          !!currentSettings.encryptionSalt;
+
+        if (alreadyFullyEnabled) {
+          // Re-use existing key — this is an idempotent retry or a "catch stragglers" call.
+          salt = currentSettings!.encryptionSalt!;
+          const kek = deriveKEK(salt);
+          dataKey = unwrapKey(currentSettings!.encryptionKey!, kek);
+          wrappedKey = currentSettings!.encryptionKey!;
+        } else {
+          // Check for mixed-key-state before generating a new key.
+          const preCheck = await db
+            .select({ id: entries.id })
+            .from(entries)
+            .where(sql`${entries.userId} = ${userId} AND ${encPrefixCondition}`);
+          if (preCheck.length > 0) {
+            const err = new Error("MIXED_KEY_STATE") as Error & { count: number };
+            err.count = preCheck.length;
+            throw err;
+          }
+          salt = generateSalt();
+          dataKey = generateDataKey();
+          const kek = deriveKEK(salt);
+          wrappedKey = wrapKey(dataKey, kek);
+        }
 
         await db.transaction(async (tx) => {
-          // Consistent snapshot: all reads and writes share this transaction.
+          // Cross-process advisory lock — blocks concurrent toggles across all app instances.
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockKey1}, ${lockKey2})`);
+
+          // Consistent snapshot inside the locked transaction.
           const allEntries = await tx.select().from(entries).where(eq(entries.userId, userId));
           entriesProcessed = allEntries.length;
 
-          // Mixed-key-state guard: if any entries are already encrypted but settings
-          // show encoding is off, a prior partial run used a different key. Proceeding
-          // would encrypt remaining entries with a NEW key, making prior rows undecryptable.
-          const alreadyEncrypted = allEntries.filter(e =>
-            [e.reelTag, e.wireType, e.gauge, e.color, e.manufacturer, e.notes, e.palletId, e.position, e.conductors]
-              .some(v => typeof v === "string" && v.startsWith("enc:"))
-          );
-          if (alreadyEncrypted.length > 0) {
-            const err = new Error("MIXED_KEY_STATE") as Error & { count: number };
-            err.count = alreadyEncrypted.length;
-            throw err;
-          }
-
           // Encrypt all entries via the same tx — fully atomic with the verification below.
+          // encryptEntry is idempotent: already-encrypted fields are skipped.
           for (const entry of allEntries) {
             const encrypted = encryptEntry({
               reelTag: entry.reelTag,
@@ -5472,10 +5501,28 @@ export async function registerRoutes(
         res.json({ success: true, encodingEnabled: true, entriesEncoded: entriesProcessed });
       } else {
         await db.transaction(async (tx) => {
+          // Cross-process advisory lock.
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockKey1}, ${lockKey2})`);
+
           const allEntries = await tx.select().from(entries).where(eq(entries.userId, userId));
           entriesProcessed = allEntries.length;
 
-          if (currentSettings?.encodingEnabled && currentSettings.encryptionKey && currentSettings.encryptionSalt) {
+          // Always check for enc: fields — even if settings already say disabled.
+          // This catches the mixed-state scenario where a prior run encrypted entries
+          // but failed to update settings.
+          const encryptedRows = await tx
+            .select({ id: entries.id })
+            .from(entries)
+            .where(sql`${entries.userId} = ${userId} AND ${encPrefixCondition}`);
+
+          if (encryptedRows.length > 0) {
+            if (!currentSettings?.encodingEnabled || !currentSettings.encryptionKey || !currentSettings.encryptionSalt) {
+              // Entries are encrypted but we have no key to decrypt them.
+              const err = new Error("MIXED_KEY_STATE") as Error & { count: number };
+              err.count = encryptedRows.length;
+              throw err;
+            }
+
             const kek = deriveKEK(currentSettings.encryptionSalt);
             const dataKey = unwrapKey(currentSettings.encryptionKey, kek);
 
