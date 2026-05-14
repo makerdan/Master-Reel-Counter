@@ -426,9 +426,14 @@ export default function ReviewTab({
   // The single canonical cohort used everywhere.  Both propCohort and
   // anchoredCohort originate from the same server-side value (the
   // review_cohort DB column), so they will always agree once set.
+  // stableCohort is null only while the server round-trip is in flight.
   const stableCohort = propCohort ?? anchoredCohort;
   // Flag: true while we're waiting for the server to return the anchored cohort.
   const cohortPending = stableCohort === null;
+  // Null-safe alias used in all memos that run before the cohortPending gate.
+  // An empty array causes those memos to short-circuit harmlessly (length === 0
+  // guards are already present throughout).
+  const effectiveCohort = stableCohort ?? [];
 
   const isLateJoiner = useMemo(() => {
     const cacheKey = `${sessionId}:${currentUserId}`;
@@ -442,10 +447,10 @@ export default function ReviewTab({
     if (sortedEntries.length === 0) return [];
 
     if (!isLateJoiner) {
-      if (stableCohort.length === 0) return [];
-      const userIndex = stableCohort.findIndex(u => u.userId === currentUserId);
+      if (effectiveCohort.length === 0) return [];
+      const userIndex = effectiveCohort.findIndex(u => u.userId === currentUserId);
       if (userIndex === -1) return [];
-      return sortedEntries.filter((_, i) => i % stableCohort.length === userIndex);
+      return sortedEntries.filter((_, i) => i % effectiveCohort.length === userIndex);
     }
 
     const cacheKey = `${sessionId}:${currentUserId}`;
@@ -460,8 +465,8 @@ export default function ReviewTab({
       if (result.length === cached.length) return result;
     }
 
-    if (stableCohort.length === 0) return [];
-    const avgCount = Math.max(1, Math.floor(sortedEntries.length / stableCohort.length));
+    if (effectiveCohort.length === 0) return [];
+    const avgCount = Math.max(1, Math.floor(sortedEntries.length / effectiveCohort.length));
 
     let hash = 0;
     for (let i = 0; i < currentUserId.length; i++) {
@@ -494,7 +499,7 @@ export default function ReviewTab({
 
     lateJoinerQueueCache.set(cacheKey, queue.map(e => e.id));
     return queue;
-  }, [sortedEntries, stableCohort, currentUserId, isLateJoiner, reviewResponses, sessionId]);
+  }, [sortedEntries, effectiveCohort, currentUserId, isLateJoiner, reviewResponses, sessionId]);
 
   const myResponses = useMemo(() => {
     const map = new Map<number, ReviewResponse>();
@@ -537,9 +542,9 @@ export default function ReviewTab({
   const reviewedCount = useMemo(() => assignedEntries.filter(e => myResponses.has(e.id)).length, [assignedEntries, myResponses]);
 
   const allReviewerStatus = useMemo(() => {
-    if (stableCohort.length === 0 || sortedEntries.length === 0) return [];
-    const statuses = stableCohort.map((u, idx) => {
-      const assigned = sortedEntries.filter((_, i) => i % stableCohort.length === idx);
+    if (effectiveCohort.length === 0 || sortedEntries.length === 0) return [];
+    const statuses = effectiveCohort.map((u, idx) => {
+      const assigned = sortedEntries.filter((_, i) => i % effectiveCohort.length === idx);
       const respondedIds = new Set(
         reviewResponses.filter(r => r.userId === u.userId).map(r => r.entryId)
       );
@@ -563,7 +568,7 @@ export default function ReviewTab({
     }
 
     return statuses;
-  }, [stableCohort, sortedEntries, reviewResponses, isLateJoiner, currentUserId, assignedEntries, sortedUsers, user]);
+  }, [effectiveCohort, sortedEntries, reviewResponses, isLateJoiner, currentUserId, assignedEntries, sortedUsers, user]);
 
   // ── Reveal timer state ─────────────────────────────────────────────────────
   const [currentIndex, setCurrentIndex] = useState(0);
