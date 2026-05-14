@@ -9,7 +9,7 @@ import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/route
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, pins, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, pins, entries, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -41,6 +41,7 @@ function formatPinLabel(label: string): string {
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
 const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null }>();
+const encodingToggleInProgress = new Set<string>();
 
 function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSocket) {
   const room = sessionRooms.get(sessionId);
@@ -1370,6 +1371,9 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      if (encodingToggleInProgress.has(access.session.userId)) {
+        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      }
 
       let entryData = { ...req.body, sessionId: access.session.id, userId };
       const encKey = await getEncryptionKey(access.session.userId);
@@ -1405,6 +1409,9 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
+      if (encodingToggleInProgress.has(access.session.userId)) {
+        return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      }
 
       const serverUpdatedAt = req.body?.serverUpdatedAt;
       if (serverUpdatedAt) {
@@ -5355,48 +5362,109 @@ export async function registerRoutes(
   });
 
   app.post("/api/settings/encoding", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = resolveUserId(req);
-      const { enabled } = req.body;
-      const { db: txDb } = await import("./db");
+    const userId = resolveUserId(req);
 
+    if (encodingToggleInProgress.has(userId)) {
+      return res.status(409).json({
+        success: false,
+        error: "toggle_in_progress",
+        message: "An encryption toggle is already in progress for your account. Please wait for it to complete.",
+      });
+    }
+
+    encodingToggleInProgress.add(userId);
+    try {
+      const { enabled } = req.body;
       const currentSettings = await storage.getUserSettings(userId);
-      const allEntries = await storage.getAllUserEntries(userId);
+
+      // SQL condition matching all encodable fields that carry an 'enc:' prefix
+      const encPrefixCondition = sql`(
+        ${entries.reelTag}    LIKE 'enc:%' OR
+        ${entries.wireType}   LIKE 'enc:%' OR
+        ${entries.gauge}      LIKE 'enc:%' OR
+        ${entries.color}      LIKE 'enc:%' OR
+        ${entries.manufacturer} LIKE 'enc:%' OR
+        ${entries.notes}      LIKE 'enc:%' OR
+        ${entries.palletId}   LIKE 'enc:%' OR
+        ${entries.position}   LIKE 'enc:%' OR
+        ${entries.conductors} LIKE 'enc:%'
+      )`;
+
+      // SQL condition matching any non-null encodable field that is NOT encrypted
+      const plainPresentCondition = sql`(
+        (${entries.reelTag}    IS NOT NULL AND ${entries.reelTag}    NOT LIKE 'enc:%') OR
+        (${entries.wireType}   IS NOT NULL AND ${entries.wireType}   NOT LIKE 'enc:%') OR
+        (${entries.gauge}      IS NOT NULL AND ${entries.gauge}      NOT LIKE 'enc:%') OR
+        (${entries.color}      IS NOT NULL AND ${entries.color}      NOT LIKE 'enc:%') OR
+        (${entries.manufacturer} IS NOT NULL AND ${entries.manufacturer} NOT LIKE 'enc:%') OR
+        (${entries.notes}      IS NOT NULL AND ${entries.notes}      NOT LIKE 'enc:%') OR
+        (${entries.palletId}   IS NOT NULL AND ${entries.palletId}   NOT LIKE 'enc:%') OR
+        (${entries.position}   IS NOT NULL AND ${entries.position}   NOT LIKE 'enc:%') OR
+        (${entries.conductors} IS NOT NULL AND ${entries.conductors} NOT LIKE 'enc:%')
+      )`;
+
+      let entriesProcessed = 0;
 
       if (enabled) {
         const salt = generateSalt();
         const dataKey = generateDataKey();
         const kek = deriveKEK(salt);
         const wrappedKey = wrapKey(dataKey, kek);
-        const entriesToUpdate = allEntries.map(entry => ({
-          id: entry.id,
-          data: encryptEntry({
-            reelTag: entry.reelTag,
-            wireType: entry.wireType,
-            gauge: entry.gauge,
-            color: entry.color,
-            manufacturer: entry.manufacturer,
-            notes: entry.notes,
-            palletId: entry.palletId,
-            position: entry.position,
-          }, dataKey),
-        }));
-        await txDb.transaction(async () => {
+
+        await db.transaction(async (tx) => {
+          // Fetch all entries inside the transaction for a consistent snapshot
+          const allEntries = await tx.select().from(entries).where(eq(entries.userId, userId));
+
+          // encryptEntry is idempotent: already-encrypted fields are left as-is
+          const entriesToUpdate = allEntries.map(entry => ({
+            id: entry.id,
+            data: encryptEntry({
+              reelTag: entry.reelTag,
+              wireType: entry.wireType,
+              gauge: entry.gauge,
+              color: entry.color,
+              manufacturer: entry.manufacturer,
+              notes: entry.notes,
+              palletId: entry.palletId,
+              position: entry.position,
+              conductors: entry.conductors,
+            }, dataKey),
+          }));
+          entriesProcessed = entriesToUpdate.length;
+
           if (entriesToUpdate.length > 0) {
             await storage.bulkUpdateEntries(entriesToUpdate);
           }
+
+          // Verification: no non-null encodable field may remain in plaintext
+          const unprotected = await tx
+            .select({ id: entries.id })
+            .from(entries)
+            .where(sql`${entries.userId} = ${userId} AND ${plainPresentCondition}`);
+          if (unprotected.length > 0) {
+            const err = new Error("VERIFICATION_FAILED") as Error & { remaining: number };
+            err.remaining = unprotected.length;
+            throw err;
+          }
+
           await storage.upsertUserSettings(userId, {
             encodingEnabled: true,
             encryptionKey: wrappedKey,
             encryptionSalt: salt,
           });
         });
-        res.json({ success: true, encodingEnabled: true, entriesEncoded: entriesToUpdate.length });
+
+        res.json({ success: true, encodingEnabled: true, entriesEncoded: entriesProcessed });
       } else {
-        await txDb.transaction(async () => {
+        await db.transaction(async (tx) => {
+          const allEntries = await tx.select().from(entries).where(eq(entries.userId, userId));
+          entriesProcessed = allEntries.length;
+
           if (currentSettings?.encodingEnabled && currentSettings.encryptionKey && currentSettings.encryptionSalt) {
             const kek = deriveKEK(currentSettings.encryptionSalt);
             const dataKey = unwrapKey(currentSettings.encryptionKey, kek);
+
+            // decryptEntry is idempotent: plaintext fields are left as-is
             const entriesToUpdate = allEntries.map(entry => ({
               id: entry.id,
               data: decryptEntry({
@@ -5408,23 +5476,50 @@ export async function registerRoutes(
                 notes: entry.notes,
                 palletId: entry.palletId,
                 position: entry.position,
+                conductors: entry.conductors,
               }, dataKey),
             }));
+
             if (entriesToUpdate.length > 0) {
               await storage.bulkUpdateEntries(entriesToUpdate);
             }
+
+            // Verification: no enc:-prefixed values may remain
+            const stillEncrypted = await tx
+              .select({ id: entries.id })
+              .from(entries)
+              .where(sql`${entries.userId} = ${userId} AND ${encPrefixCondition}`);
+            if (stillEncrypted.length > 0) {
+              const err = new Error("VERIFICATION_FAILED") as Error & { remaining: number };
+              err.remaining = stillEncrypted.length;
+              throw err;
+            }
           }
+
           await storage.upsertUserSettings(userId, {
             encodingEnabled: false,
             encryptionKey: null,
             encryptionSalt: null,
           });
         });
-        res.json({ success: true, encodingEnabled: false, entriesDecoded: allEntries.length });
+
+        res.json({ success: true, encodingEnabled: false, entriesDecoded: entriesProcessed });
       }
     } catch (error) {
+      if (error instanceof Error && error.message === "VERIFICATION_FAILED") {
+        const remaining = (error as Error & { remaining?: number }).remaining ?? 0;
+        console.error(`[encoding toggle] verification failed: ${remaining} entries not fully converted`);
+        return res.status(500).json({
+          success: false,
+          error: "verification_failed",
+          message: `Encryption toggle failed: ${remaining} ${remaining === 1 ? "entry" : "entries"} could not be fully converted. No data was changed — please try again.`,
+          remainingCount: remaining,
+        });
+      }
       console.error("Error toggling encoding:", error);
       res.status(500).json({ message: "Failed to toggle encoding" });
+    } finally {
+      encodingToggleInProgress.delete(userId);
     }
   });
 
