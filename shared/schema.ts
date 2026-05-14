@@ -170,6 +170,10 @@ export const pins = pgTable("pins", {
   index("pins_photo_id_idx").on(table.photoId),
   index("pins_entry_id_idx").on(table.entryId),
   index("pins_label_idx").on(table.label),
+  // Prevents duplicate labels on the same photo. NULL labels (draft pins) are
+  // considered distinct in PostgreSQL unique indexes so multiple draft pins per
+  // photo are still allowed.
+  uniqueIndex("pins_photo_label_unique").on(table.photoId, table.label),
 ]);
 
 

@@ -1658,20 +1658,9 @@ export async function registerRoutes(
 
       const data = insertPinSchema.parse({ ...req.body, photoId: photo.id });
 
-      // Idempotency guard: if a pin with the same label already exists on this
-      // photo (e.g. because a network retry re-submitted a request that
-      // previously succeeded), return the existing pin instead of inserting a
-      // duplicate.  Label uniqueness per photo is an invariant of the data model.
-      if (data.label) {
-        const existingPins = await storage.getPhotoPins(photo.id);
-        const existing = existingPins.find((p) => p.label === data.label);
-        if (existing) {
-          broadcastToSession(photo.sessionId, { type: "sync", entity: "pins", sessionId: photo.sessionId });
-          return res.json(existing);
-        }
-      }
-
-      const pin = await storage.createPin(data);
+      // atomicCreatePin enforces (photoId, label) uniqueness at the DB level,
+      // preventing duplicates from double-clicks or concurrent collaborator inserts.
+      const pin = await storage.atomicCreatePin(data);
       broadcastToSession(photo.sessionId, { type: "sync", entity: "pins", sessionId: photo.sessionId });
       res.json(pin);
     } catch (error) {
@@ -1755,29 +1744,9 @@ export async function registerRoutes(
 
       const { pins: pinData } = req.body;
       if (!Array.isArray(pinData)) return res.status(400).json({ message: "pins must be an array" });
-      const existing = await storage.getPhotoPins(photo.id);
-      const draftIds = existing.filter(p => !p.entryId).map(p => p.id);
-      if (draftIds.length > 0) {
-        for (const id of draftIds) {
-          await storage.deletePin(id);
-        }
-      }
-      const saved = [];
-      for (const p of pinData) {
-        const pin = await storage.createPin({
-          photoId: photo.id,
-          xPercent: p.xPercent,
-          yPercent: p.yPercent,
-          label: p.label || null,
-          reelCount: p.reelCount || 1,
-          wireDetails: p.wireDetails || null,
-          vendorCode: p.vendorCode || null,
-          footage: p.footage || null,
-          flagged: p.flagged || false,
-          flagReason: p.flagReason || null,
-        });
-        saved.push(pin);
-      }
+      // replaceDraftPins wraps the delete-then-insert in a single transaction so
+      // concurrent writes cannot observe a partially-deleted intermediate state.
+      const saved = await storage.replaceDraftPins(photo.id, pinData);
       res.json(saved);
     } catch (error) {
       console.error("Error saving draft pins:", error);

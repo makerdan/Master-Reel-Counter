@@ -3,9 +3,31 @@ import { queryClient } from "@/lib/queryClient";
 
 type MessageHandler = (msg: any) => void;
 
-export function useSessionWebSocket(sessionId: number | null, onMessage?: MessageHandler, userInfo?: { userId: string; username: string }) {
+const WS_RECONNECT_BASE_MS = 1_000;
+const WS_RECONNECT_CAP_MS = 30_000;
+const WS_RECONNECT_JITTER_MS = 500;
+const WS_BUFFER_MAX = 20;
+
+export function useSessionWebSocket(
+  sessionId: number | null,
+  onMessage?: MessageHandler,
+  userInfo?: { userId: string; username: string },
+) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectDelayRef = useRef(WS_RECONNECT_BASE_MS);
+  const pendingBufferRef = useRef<string[]>([]);
+
+  const safeSend = useCallback((data: string) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
+    } else {
+      if (pendingBufferRef.current.length < WS_BUFFER_MAX) {
+        pendingBufferRef.current.push(data);
+      }
+    }
+  }, []);
 
   const connect = useCallback(() => {
     if (!sessionId) return;
@@ -15,6 +37,11 @@ export function useSessionWebSocket(sessionId: number | null, onMessage?: Messag
     wsRef.current = ws;
 
     ws.onopen = () => {
+      reconnectDelayRef.current = WS_RECONNECT_BASE_MS;
+      const buffered = pendingBufferRef.current.splice(0);
+      for (const msg of buffered) {
+        if (ws.readyState === WebSocket.OPEN) ws.send(msg);
+      }
       ws.send(JSON.stringify({ type: "join", sessionId, userId: userInfo?.userId, username: userInfo?.username }));
     };
 
@@ -43,7 +70,10 @@ export function useSessionWebSocket(sessionId: number | null, onMessage?: Messag
     };
 
     ws.onclose = () => {
-      reconnectTimerRef.current = setTimeout(connect, 3000);
+      const jitter = (Math.random() * 2 - 1) * WS_RECONNECT_JITTER_MS;
+      const delay = Math.min(reconnectDelayRef.current + jitter, WS_RECONNECT_CAP_MS);
+      reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, WS_RECONNECT_CAP_MS);
+      reconnectTimerRef.current = setTimeout(connect, Math.max(delay, WS_RECONNECT_BASE_MS));
     };
 
     ws.onerror = () => {
@@ -60,5 +90,9 @@ export function useSessionWebSocket(sessionId: number | null, onMessage?: Messag
     };
   }, [connect]);
 
-  return wsRef;
+  const sendMessage = useCallback((data: object) => {
+    safeSend(JSON.stringify(data));
+  }, [safeSend]);
+
+  return { wsRef, sendMessage };
 }

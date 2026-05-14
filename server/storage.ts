@@ -94,6 +94,23 @@ export interface IStorage {
   deleteEntry(id: number): Promise<void>;
 
   createPin(pin: InsertPin): Promise<Pin>;
+  /**
+   * Atomically creates a pin, deduplicating by (photoId, label).
+   * If a pin with the same non-null label already exists on this photo
+   * (e.g. from a concurrent request or network retry), the existing pin is
+   * returned instead of inserting a duplicate.
+   */
+  atomicCreatePin(pin: InsertPin): Promise<Pin>;
+  /**
+   * Replaces all draft (non-committed) pins for a photo inside a single
+   * database transaction. The delete-then-insert is atomic, so concurrent
+   * requests cannot observe a partially-deleted intermediate state.
+   */
+  replaceDraftPins(photoId: number, newPins: Array<{
+    xPercent: number; yPercent: number; label?: string | null;
+    reelCount?: number; wireDetails?: string | null; vendorCode?: string | null;
+    footage?: number | null; flagged?: boolean; flagReason?: string | null;
+  }>): Promise<Pin[]>;
   getPin(id: number): Promise<Pin | undefined>;
   getPhotoPins(photoId: number): Promise<Pin[]>;
   getSessionPins(sessionId: number): Promise<Pin[]>;
@@ -492,6 +509,46 @@ export class DatabaseStorage implements IStorage {
   async createPin(pin: InsertPin): Promise<Pin> {
     const [result] = await db.insert(pins).values(pin).returning();
     return result;
+  }
+
+  async atomicCreatePin(pin: InsertPin): Promise<Pin> {
+    if (!pin.label) {
+      const [result] = await db.insert(pins).values(pin).returning();
+      return result;
+    }
+    const [inserted] = await db.insert(pins)
+      .values(pin)
+      .onConflictDoNothing()
+      .returning();
+    if (inserted) return inserted;
+    const [existing] = await db.select().from(pins)
+      .where(and(eq(pins.photoId, pin.photoId), eq(pins.label, pin.label)));
+    if (existing) return existing;
+    throw new Error("Pin creation conflict but no existing row found");
+  }
+
+  async replaceDraftPins(photoId: number, newPins: Array<{
+    xPercent: number; yPercent: number; label?: string | null;
+    reelCount?: number; wireDetails?: string | null; vendorCode?: string | null;
+    footage?: number | null; flagged?: boolean; flagReason?: string | null;
+  }>): Promise<Pin[]> {
+    return db.transaction(async (tx) => {
+      await tx.delete(pins).where(and(eq(pins.photoId, photoId), isNull(pins.entryId)));
+      if (newPins.length === 0) return [];
+      const inserted = await tx.insert(pins).values(newPins.map(p => ({
+        photoId,
+        xPercent: p.xPercent,
+        yPercent: p.yPercent,
+        label: p.label || null,
+        reelCount: p.reelCount || 1,
+        wireDetails: p.wireDetails || null,
+        vendorCode: p.vendorCode || null,
+        footage: p.footage || null,
+        flagged: p.flagged || false,
+        flagReason: p.flagReason || null,
+      }))).returning();
+      return inserted;
+    });
   }
 
   async getPin(id: number): Promise<Pin | undefined> {
