@@ -2510,8 +2510,17 @@ export class DatabaseStorage implements IStorage {
             await db.update(dismissedDuplicates).set({ key: normalized }).where(eq(dismissedDuplicates.id, row.id));
             normalizedKeys.add(normalized);
           } catch {
-            // Unique constraint or other DB error — just drop the stale row.
-            rowsToDelete.push(row.id);
+            // Update failed unexpectedly. Only drop this row if the normalized key is
+            // already occupied in the DB (key-collision), so we never silently lose a
+            // dismissal due to an unrelated DB error.
+            const collision = await db.select({ id: dismissedDuplicates.id })
+              .from(dismissedDuplicates)
+              .where(and(eq(dismissedDuplicates.sessionId, sessionId), eq(dismissedDuplicates.key, normalized)))
+              .limit(1)
+              .catch(() => [] as { id: number }[]);
+            if (collision.length > 0) {
+              rowsToDelete.push(row.id);
+            }
           }
         }
       } else {
