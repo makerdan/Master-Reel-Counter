@@ -80,13 +80,19 @@ export default function SessionPage() {
 
   const retriedMissingPhotoIdsRef = useRef<string>("");
   useEffect(() => {
+    retriedMissingPhotoIdsRef.current = "";
+  }, [sessionId]);
+  useEffect(() => {
     if (!entries.length || !sessionId || photosFetching) return;
     const photoIds = new Set(photos.map((p) => p.id));
     const missingIds = entries
       .filter((e) => e.photoId && !photoIds.has(e.photoId))
       .map((e) => e.photoId!)
       .sort((a, b) => a - b);
-    if (missingIds.length === 0) return;
+    if (missingIds.length === 0) {
+      retriedMissingPhotoIdsRef.current = "";
+      return;
+    }
     const signature = missingIds.join(",");
     if (signature === retriedMissingPhotoIdsRef.current) return;
     retriedMissingPhotoIdsRef.current = signature;

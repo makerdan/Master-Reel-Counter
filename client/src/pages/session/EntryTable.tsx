@@ -321,6 +321,10 @@ function EntryTable({
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    setExpandedSections({});
+  }, [activeFilters, debouncedQuery]);
+
+  useEffect(() => {
     if (forceExpandKey) {
       setExpandedSections(prev => ({ ...prev, [forceExpandKey]: true }));
     }

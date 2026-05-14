@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import Uppy from "@uppy/core";
 import type { UppyFile, UploadResult } from "@uppy/core";
@@ -84,6 +84,12 @@ export function ObjectUploader({
         onComplete?.(result);
       })
   );
+
+  useEffect(() => {
+    return () => {
+      uppy.close({ reason: "unmount" });
+    };
+  }, [uppy]);
 
   return (
     <div>
