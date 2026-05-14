@@ -578,9 +578,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       );
       localPinsRef.current = merged;
       _setLocalPins(merged);
+      // Snapshot and clear before the async call so new deletions that arrive
+      // during the await are not incorrectly discarded on retry.
+      const deletedIds = [...deletedDraftClientIdsRef.current];
+      deletedDraftClientIdsRef.current.clear();
       try {
-        const deletedIds = [...deletedDraftClientIdsRef.current];
-        deletedDraftClientIdsRef.current.clear();
         await apiRequest("PUT", `/api/photos/${photoId}/draft-pins`, {
           pins: merged.map(p => ({
             xPercent: p.x,
@@ -759,9 +761,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     if (!currentPhoto?.dbId || !pinsLoaded || skipAutoSave.current) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
+      // Snapshot and clear before the async call so new deletions that happen
+      // during the await are not incorrectly discarded.
+      const deletedIds = [...deletedDraftClientIdsRef.current];
+      deletedDraftClientIdsRef.current.clear();
       try {
-        const deletedIds = [...deletedDraftClientIdsRef.current];
-        deletedDraftClientIdsRef.current.clear();
         await apiRequest("PUT", `/api/photos/${currentPhoto.dbId}/draft-pins`, {
           pins: localPins.map(p => ({
             xPercent: p.x,
