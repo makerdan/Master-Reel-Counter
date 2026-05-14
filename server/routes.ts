@@ -5378,10 +5378,11 @@ export async function registerRoutes(
     encodingToggleInProgress.add(userId);
     try {
       const { enabled } = req.body;
-      const currentSettings = await storage.getUserSettings(userId);
 
-      // Derive a stable pair of int32 lock keys from userId for pg_advisory_xact_lock.
-      // Using two int4 values avoids BigInt serialization issues with the Drizzle sql tag.
+      // Derive a stable pair of int32 advisory lock keys from userId.
+      // Two int4 values avoid BigInt serialization issues with the Drizzle sql tag.
+      // The lock is acquired FIRST inside every transaction so that all state reads
+      // and key decisions happen under the lock, preventing cross-instance races.
       const lockHash = createHash("sha256").update(userId).digest();
       const lockKey1 = lockHash.readInt32BE(0);
       const lockKey2 = lockHash.readInt32BE(4);
@@ -5416,64 +5417,64 @@ export async function registerRoutes(
       let entriesProcessed = 0;
 
       if (enabled) {
-        // Determine which key to use:
-        // - If settings already show enabled+key, re-use that key (idempotent retry).
-        // - If settings show disabled but entries have enc: fields, a partial prior run
-        //   used an unknown key → reject with MIXED_KEY_STATE.
-        // - Otherwise (clean first-time enable) generate a fresh key.
-        let salt: string;
-        let dataKey: Buffer;
-        let wrappedKey: string;
-
-        const alreadyFullyEnabled =
-          !!currentSettings?.encodingEnabled &&
-          !!currentSettings.encryptionKey &&
-          !!currentSettings.encryptionSalt;
-
-        if (alreadyFullyEnabled) {
-          // Re-use existing key — this is an idempotent retry or a "catch stragglers" call.
-          salt = currentSettings!.encryptionSalt!;
-          const kek = deriveKEK(salt);
-          dataKey = unwrapKey(currentSettings!.encryptionKey!, kek);
-          wrappedKey = currentSettings!.encryptionKey!;
-        } else {
-          // Check for mixed-key-state before generating a new key.
-          const preCheck = await db
-            .select({ id: entries.id })
-            .from(entries)
-            .where(sql`${entries.userId} = ${userId} AND ${encPrefixCondition}`);
-          if (preCheck.length > 0) {
-            const err = new Error("MIXED_KEY_STATE") as Error & { count: number };
-            err.count = preCheck.length;
-            throw err;
-          }
-          salt = generateSalt();
-          dataKey = generateDataKey();
-          const kek = deriveKEK(salt);
-          wrappedKey = wrapKey(dataKey, kek);
-        }
-
         await db.transaction(async (tx) => {
-          // Cross-process advisory lock — blocks concurrent toggles across all app instances.
+          // Acquire cross-process advisory lock FIRST — all state reads and key decisions
+          // happen after this point, preventing races across multiple app instances.
           await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockKey1}, ${lockKey2})`);
 
-          // Consistent snapshot inside the locked transaction.
+          // Read settings and entry snapshot inside the lock.
+          const lockedSettings = await tx
+            .select()
+            .from(userSettings)
+            .where(eq(userSettings.userId, userId))
+            .limit(1)
+            .then(r => r[0] ?? null);
           const allEntries = await tx.select().from(entries).where(eq(entries.userId, userId));
           entriesProcessed = allEntries.length;
 
-          // Encrypt all entries via the same tx — fully atomic with the verification below.
-          // encryptEntry is idempotent: already-encrypted fields are skipped.
+          // Decide which key to use — entirely inside the lock:
+          // - If settings already show enabled+key: re-use that key (idempotent retry /
+          //   "catch stragglers" call). encryptEntry skips already-encrypted fields.
+          // - If settings show disabled but entries have enc: fields: a partial prior run
+          //   left entries encrypted with an unknown key. Reject with MIXED_KEY_STATE.
+          // - Otherwise (clean first-time enable): generate a fresh key.
+          let salt: string;
+          let dataKey: Buffer;
+          let wrappedKey: string;
+
+          const alreadyFullyEnabled =
+            !!lockedSettings?.encodingEnabled &&
+            !!lockedSettings.encryptionKey &&
+            !!lockedSettings.encryptionSalt;
+
+          if (alreadyFullyEnabled) {
+            salt = lockedSettings!.encryptionSalt!;
+            const kek = deriveKEK(salt);
+            dataKey = unwrapKey(lockedSettings!.encryptionKey!, kek);
+            wrappedKey = lockedSettings!.encryptionKey!;
+          } else {
+            // Check for enc: fields left by a partial prior run.
+            const alreadyEncrypted = allEntries.filter(e =>
+              [e.reelTag, e.wireType, e.gauge, e.color, e.manufacturer, e.notes, e.palletId, e.position, e.conductors]
+                .some(v => typeof v === "string" && v.startsWith("enc:"))
+            );
+            if (alreadyEncrypted.length > 0) {
+              const err = new Error("MIXED_KEY_STATE") as Error & { count: number };
+              err.count = alreadyEncrypted.length;
+              throw err;
+            }
+            salt = generateSalt();
+            dataKey = generateDataKey();
+            const kek = deriveKEK(salt);
+            wrappedKey = wrapKey(dataKey, kek);
+          }
+
+          // Encrypt all entries in the same tx — fully atomic with verification below.
           for (const entry of allEntries) {
             const encrypted = encryptEntry({
-              reelTag: entry.reelTag,
-              wireType: entry.wireType,
-              gauge: entry.gauge,
-              color: entry.color,
-              manufacturer: entry.manufacturer,
-              notes: entry.notes,
-              palletId: entry.palletId,
-              position: entry.position,
-              conductors: entry.conductors,
+              reelTag: entry.reelTag, wireType: entry.wireType, gauge: entry.gauge,
+              color: entry.color, manufacturer: entry.manufacturer, notes: entry.notes,
+              palletId: entry.palletId, position: entry.position, conductors: entry.conductors,
             }, dataKey);
             await tx.update(entries).set(encrypted).where(eq(entries.id, entry.id));
           }
@@ -5489,7 +5490,7 @@ export async function registerRoutes(
             throw err;
           }
 
-          // Settings update in the same transaction — atomically paired with the bulk encrypt.
+          // Settings update atomically paired with the bulk encrypt.
           await tx.insert(userSettings)
             .values({ userId, encodingEnabled: true, encryptionKey: wrappedKey, encryptionSalt: salt })
             .onConflictDoUpdate({
@@ -5501,14 +5502,21 @@ export async function registerRoutes(
         res.json({ success: true, encodingEnabled: true, entriesEncoded: entriesProcessed });
       } else {
         await db.transaction(async (tx) => {
-          // Cross-process advisory lock.
+          // Acquire cross-process advisory lock FIRST.
           await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockKey1}, ${lockKey2})`);
 
+          // Read settings and entry snapshot inside the lock.
+          const lockedSettings = await tx
+            .select()
+            .from(userSettings)
+            .where(eq(userSettings.userId, userId))
+            .limit(1)
+            .then(r => r[0] ?? null);
           const allEntries = await tx.select().from(entries).where(eq(entries.userId, userId));
           entriesProcessed = allEntries.length;
 
-          // Always check for enc: fields — even if settings already say disabled.
-          // This catches the mixed-state scenario where a prior run encrypted entries
+          // Always check for enc: fields inside the lock — even if settings already say
+          // disabled. This catches the mixed-state where a prior run encrypted entries
           // but failed to update settings.
           const encryptedRows = await tx
             .select({ id: entries.id })
@@ -5516,29 +5524,23 @@ export async function registerRoutes(
             .where(sql`${entries.userId} = ${userId} AND ${encPrefixCondition}`);
 
           if (encryptedRows.length > 0) {
-            if (!currentSettings?.encodingEnabled || !currentSettings.encryptionKey || !currentSettings.encryptionSalt) {
+            if (!lockedSettings?.encodingEnabled || !lockedSettings.encryptionKey || !lockedSettings.encryptionSalt) {
               // Entries are encrypted but we have no key to decrypt them.
               const err = new Error("MIXED_KEY_STATE") as Error & { count: number };
               err.count = encryptedRows.length;
               throw err;
             }
 
-            const kek = deriveKEK(currentSettings.encryptionSalt);
-            const dataKey = unwrapKey(currentSettings.encryptionKey, kek);
+            const kek = deriveKEK(lockedSettings.encryptionSalt);
+            const dataKey = unwrapKey(lockedSettings.encryptionKey, kek);
 
-            // Decrypt all entries via the same tx — fully atomic with the verification below.
+            // Decrypt all entries in the same tx — fully atomic with verification below.
             // decryptEntry is idempotent: plaintext fields (no 'enc:' prefix) are left as-is.
             for (const entry of allEntries) {
               const decrypted = decryptEntry({
-                reelTag: entry.reelTag,
-                wireType: entry.wireType,
-                gauge: entry.gauge,
-                color: entry.color,
-                manufacturer: entry.manufacturer,
-                notes: entry.notes,
-                palletId: entry.palletId,
-                position: entry.position,
-                conductors: entry.conductors,
+                reelTag: entry.reelTag, wireType: entry.wireType, gauge: entry.gauge,
+                color: entry.color, manufacturer: entry.manufacturer, notes: entry.notes,
+                palletId: entry.palletId, position: entry.position, conductors: entry.conductors,
               }, dataKey);
               await tx.update(entries).set(decrypted).where(eq(entries.id, entry.id));
             }
