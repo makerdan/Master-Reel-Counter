@@ -102,9 +102,9 @@ function actionLabel(action: UndoAction): string {
       const src = d ?? p ?? {};
       const aisle: string = src.aisle ?? "";
       const section: string = src.section ?? "";
-      const wire: string = src.wireDetails ?? "";
+      const tag: string = src.reelTag ?? src.wireType ?? "";
       const loc = [aisle, section].filter(Boolean).join("-");
-      if (loc) return `Entry ${loc}${wire ? ` (${wire})` : ""}`;
+      if (loc) return `Entry ${loc}${tag ? ` (${tag})` : ""}`;
       return `Entry #${action.entityId}`;
     }
     case "create-pin":
