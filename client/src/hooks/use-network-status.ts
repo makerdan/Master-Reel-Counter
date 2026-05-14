@@ -17,6 +17,13 @@ import { queryClient } from "@/lib/queryClient";
 
 const MAX_ENTRY_RETRIES = 3;
 
+export interface FailedEntryInfo {
+  id: string;
+  sessionId: number;
+  data: Record<string, unknown>;
+  reason: string;
+}
+
 function scheduleEntryRetry(
   entryId: string,
   nextRetries: number,
@@ -39,10 +46,12 @@ export function useNetworkStatus() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [entryRetryAttempt, setEntryRetryAttempt] = useState<number | null>(null);
   const [permanentlyFailedCount, setPermanentlyFailedCount] = useState(0);
+  const [failedEntries, setFailedEntries] = useState<FailedEntryInfo[]>([]);
 
   const syncingRef = useRef(false);
   const entryRetryCountsRef = useRef<Map<string, number>>(new Map());
   const permanentlyFailedRef = useRef<Set<string>>(new Set());
+  const failedEntriesRef = useRef<Map<string, FailedEntryInfo>>(new Map());
   const entryRetryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const refreshPendingCount = useCallback(async () => {
@@ -115,6 +124,14 @@ export function useNetworkStatus() {
             if (nextRetries >= MAX_ENTRY_RETRIES) {
               permanentlyFailedRef.current.add(entry.id);
               setPermanentlyFailedCount(permanentlyFailedRef.current.size);
+              const info: FailedEntryInfo = {
+                id: entry.id,
+                sessionId: entry.sessionId,
+                data: entry.data,
+                reason: `Server error (${res.status})`,
+              };
+              failedEntriesRef.current.set(entry.id, info);
+              setFailedEntries(Array.from(failedEntriesRef.current.values()));
             } else {
               scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
             }
@@ -127,6 +144,14 @@ export function useNetworkStatus() {
           if (nextRetries >= MAX_ENTRY_RETRIES) {
             permanentlyFailedRef.current.add(entry.id);
             setPermanentlyFailedCount(permanentlyFailedRef.current.size);
+            const info: FailedEntryInfo = {
+              id: entry.id,
+              sessionId: entry.sessionId,
+              data: entry.data,
+              reason: "Network error",
+            };
+            failedEntriesRef.current.set(entry.id, info);
+            setFailedEntries(Array.from(failedEntriesRef.current.values()));
           } else {
             scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
           }
@@ -217,7 +242,9 @@ export function useNetworkStatus() {
     entryRetryTimersRef.current.clear();
     permanentlyFailedRef.current.clear();
     entryRetryCountsRef.current.clear();
+    failedEntriesRef.current.clear();
     setPermanentlyFailedCount(0);
+    setFailedEntries([]);
     syncQueue();
   }, [syncQueue]);
 
@@ -272,5 +299,6 @@ export function useNetworkStatus() {
     entryRetryAttempt,
     permanentlyFailedCount,
     retryAllFailedEntries,
+    failedEntries,
   };
 }
