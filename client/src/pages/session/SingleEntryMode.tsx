@@ -104,17 +104,19 @@ export default function SingleEntryMode({
 
   const flagMutation = useMutation({
     mutationFn: async ({ pinId, flagged, prevFlagged, prevFlagReason }: { pinId: number; flagged: boolean; prevFlagged: boolean; prevFlagReason: string | null }) => {
-      await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged, flagReason: flagged ? undefined : null });
-      return { pinId, flagged, prevFlagged, prevFlagReason };
+      const res = await apiRequest("PATCH", `/api/pins/${pinId}/flag`, { flagged, flagReason: flagged ? undefined : null });
+      const updated = await res.json().catch(() => null);
+      const serverUpdatedAt: string | undefined = updated?.updatedAt ? new Date(updated.updatedAt as unknown as string).toISOString() : undefined;
+      return { pinId, flagged, prevFlagged, prevFlagReason, serverUpdatedAt };
     },
-    onSuccess: ({ pinId, flagged, prevFlagged, prevFlagReason }) => {
+    onSuccess: ({ pinId, flagged, prevFlagged, prevFlagReason, serverUpdatedAt }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/entries", editingEntry?.id?.toString(), "pin"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       if (onUndoableSave) {
         if (flagged) {
-          onUndoableSave({ type: "flag-pin", sessionId, entityId: pinId, data: { flagged: true, flagReason: null }, previousData: { flagged: prevFlagged, flagReason: prevFlagReason } });
+          onUndoableSave({ type: "flag-pin", sessionId, entityId: pinId, data: { flagged: true, flagReason: null }, previousData: { flagged: prevFlagged, flagReason: prevFlagReason }, serverUpdatedAt });
         } else {
-          onUndoableSave({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason: prevFlagReason } });
+          onUndoableSave({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason: prevFlagReason }, serverUpdatedAt });
         }
       }
     },
