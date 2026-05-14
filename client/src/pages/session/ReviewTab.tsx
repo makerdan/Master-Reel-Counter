@@ -394,11 +394,11 @@ export default function ReviewTab({
         }
       })
       .catch(() => {
-        // The server call failed. Unlock so a subsequent render can retry, and
-        // provide an immediate best-effort fallback using the current online users
-        // so reviewers are never permanently stuck on the loading screen.
-        cohortAnchorRef.current = { sid: sessionId, called: false };
-        setAnchoredCohort(sortedUsers.length > 0 ? sortedUsers : [{ userId: currentUserId, username: currentUserId }]);
+        // Server call failed (transient network error). Provide a best-effort
+        // local fallback so reviewers are never permanently stuck on the loading
+        // screen. Once the session prop is eventually refreshed (e.g. on the
+        // next query cycle), propCohort will take priority over this fallback.
+        setAnchoredCohort(sortedUsers.length > 0 ? [...sortedUsers] : [{ userId: currentUserId, username: currentUserId }]);
       });
   // sortedUsers and currentUserId are intentionally excluded from deps so a
   // change in online presence does not re-fire the anchor call after success.
