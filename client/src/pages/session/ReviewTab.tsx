@@ -376,6 +376,22 @@ export default function ReviewTab({
     return cohortIds.map(id => ({ userId: id, username: usernameMap.get(id) || id }));
   }, [reviewResponses, sortedUsers, sessionId]);
 
+  // Freeze the assignment cohort on first non-empty computation so that users
+  // joining or leaving mid-review do not reshuffle entry-to-reviewer mappings.
+  // The ref stores { sid, cohort } to auto-reset when the session changes.
+  const frozenCohortRef = useRef<{ sid: number; cohort: Array<{ userId: string; username: string }> } | null>(null);
+  if (frozenCohortRef.current?.sid !== sessionId) {
+    // Session changed — discard the old snapshot so the next non-empty cohort
+    // for this session is captured fresh.
+    frozenCohortRef.current = null;
+  }
+  if (frozenCohortRef.current === null && reviewCohort.length > 0 && sortedEntries.length > 0) {
+    frozenCohortRef.current = { sid: sessionId, cohort: reviewCohort };
+  }
+  // Use the frozen snapshot when available; fall back to live cohort until it
+  // can be frozen (i.e. before any entries or users are known).
+  const stableCohort = frozenCohortRef.current?.cohort ?? reviewCohort;
+
   const isLateJoiner = useMemo(() => {
     const cacheKey = `${sessionId}:${currentUserId}`;
     if (lateJoinerQueueCache.has(cacheKey)) return true;
@@ -388,10 +404,10 @@ export default function ReviewTab({
     if (sortedEntries.length === 0) return [];
 
     if (!isLateJoiner) {
-      if (reviewCohort.length === 0) return [];
-      const userIndex = reviewCohort.findIndex(u => u.userId === currentUserId);
+      if (stableCohort.length === 0) return [];
+      const userIndex = stableCohort.findIndex(u => u.userId === currentUserId);
       if (userIndex === -1) return [];
-      return sortedEntries.filter((_, i) => i % reviewCohort.length === userIndex);
+      return sortedEntries.filter((_, i) => i % stableCohort.length === userIndex);
     }
 
     const cacheKey = `${sessionId}:${currentUserId}`;
@@ -406,7 +422,7 @@ export default function ReviewTab({
       if (result.length === cached.length) return result;
     }
 
-    const avgCount = Math.max(1, Math.floor(sortedEntries.length / reviewCohort.length));
+    const avgCount = Math.max(1, Math.floor(sortedEntries.length / stableCohort.length));
 
     let hash = 0;
     for (let i = 0; i < currentUserId.length; i++) {
@@ -482,9 +498,9 @@ export default function ReviewTab({
   const reviewedCount = useMemo(() => assignedEntries.filter(e => myResponses.has(e.id)).length, [assignedEntries, myResponses]);
 
   const allReviewerStatus = useMemo(() => {
-    if (reviewCohort.length === 0 || sortedEntries.length === 0) return [];
-    const statuses = reviewCohort.map((u, idx) => {
-      const assigned = sortedEntries.filter((_, i) => i % reviewCohort.length === idx);
+    if (stableCohort.length === 0 || sortedEntries.length === 0) return [];
+    const statuses = stableCohort.map((u, idx) => {
+      const assigned = sortedEntries.filter((_, i) => i % stableCohort.length === idx);
       const respondedIds = new Set(
         reviewResponses.filter(r => r.userId === u.userId).map(r => r.entryId)
       );
@@ -525,49 +541,69 @@ export default function ReviewTab({
     hasAutoAdvanced.current = true;
   }, [orderedEntries, myResponses, responsesLoading]);
 
+  // Wall-clock timestamps when each entry's reveal timer was started.
+  // Stored in a ref so re-renders never reset the countdown — the remaining
+  // time is always derived from (Date.now() - startTimestamp).
+  const revealStartTimestamps = useRef<Map<number, number>>(new Map());
+  // Ref-backed revealed set: source of truth, avoids stale-closure issues
+  // when the interval fires between React renders.
+  const revealedRef = useRef<Set<number>>(new Set());
+  // State copy for rendering — updated whenever an entry transitions to revealed.
   const [revealedEntries, setRevealedEntries] = useState<Set<number>>(new Set());
-  const [timers, setTimers] = useState<Map<number, number>>(new Map());
-  const timerRefs = useRef<Map<number, ReturnType<typeof setInterval>>>(new Map());
+  // Tick counter: forces a re-render every second so countdown labels stay current.
+  const [, setTimerTick] = useState(0);
   const [flagReason, setFlagReason] = useState("");
   const [showFlagInput, setShowFlagInput] = useState(false);
   const [justActed, setJustActed] = useState(false);
 
+  // Register each newly-assigned entry with the timer system.
+  // Already-revealed or already-tracked entries are skipped so re-renders
+  // caused by WebSocket updates or query refetches don't restart the clock.
   useEffect(() => {
-    const immediateReveal = new Set<number>();
-    const pending: { id: number; remainingMs: number }[] = [];
+    let anyImmediateReveal = false;
     for (const entry of assignedEntries) {
-      if (myResponses.has(entry.id)) { immediateReveal.add(entry.id); continue; }
-      if (revealedEntries.has(entry.id) || timerRefs.current.has(entry.id)) continue;
+      const id = entry.id;
+      if (revealedRef.current.has(id) || revealStartTimestamps.current.has(id)) continue;
+      if (myResponses.has(id)) {
+        revealedRef.current.add(id);
+        anyImmediateReveal = true;
+        continue;
+      }
       const createdAt = entry.createdAt ? new Date(entry.createdAt).getTime() : Date.now();
-      const remaining = REVEAL_DELAY_MS - (Date.now() - createdAt);
-      if (remaining <= 0) { immediateReveal.add(entry.id); }
-      else { pending.push({ id: entry.id, remainingMs: remaining }); }
+      const elapsed = Date.now() - createdAt;
+      if (elapsed >= REVEAL_DELAY_MS) {
+        revealedRef.current.add(id);
+        anyImmediateReveal = true;
+      } else {
+        // Record the entry's creation time as its timer origin. Using
+        // createdAt (not Date.now()) means the clock survives remounts and
+        // refetches — the server timestamp is the single source of truth.
+        revealStartTimestamps.current.set(id, createdAt);
+      }
     }
-    if (immediateReveal.size > 0) {
-      setRevealedEntries(prev => { const next = new Set(prev); for (const id of immediateReveal) next.add(id); return next; });
+    if (anyImmediateReveal) {
+      setRevealedEntries(new Set(revealedRef.current));
     }
-    for (const { id, remainingMs } of pending) {
-      const initialSeconds = Math.ceil(remainingMs / 1000);
-      setTimers(prev => new Map(prev).set(id, initialSeconds));
-      const interval = setInterval(() => {
-        setTimers(prev => {
-          const next = new Map(prev);
-          const current = (next.get(id) ?? 1) - 1;
-          if (current <= 0) {
-            next.delete(id); clearInterval(timerRefs.current.get(id)); timerRefs.current.delete(id);
-            setRevealedEntries(r => new Set(r).add(id));
-            return next;
-          }
-          next.set(id, current); return next;
-        });
-      }, 1000);
-      timerRefs.current.set(id, interval);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignedEntries, myResponses]);
 
+  // Single 1-second interval shared across all pending entries.
+  // Runs for the component lifetime; no per-entry intervals needed.
   useEffect(() => {
-    return () => { for (const iv of timerRefs.current.values()) clearInterval(iv); timerRefs.current.clear(); };
+    const iv = setInterval(() => {
+      const now = Date.now();
+      let anyNewlyRevealed = false;
+      for (const [id, startTs] of revealStartTimestamps.current) {
+        if (now - startTs >= REVEAL_DELAY_MS) {
+          revealStartTimestamps.current.delete(id);
+          revealedRef.current.add(id);
+          anyNewlyRevealed = true;
+        }
+      }
+      if (anyNewlyRevealed) setRevealedEntries(new Set(revealedRef.current));
+      // Always tick so countdown labels re-compute from the latest Date.now().
+      setTimerTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(iv);
   }, []);
 
   // ── Per-entry view state (zoom/pan/rotate), reset on navigation ────────────
@@ -648,7 +684,15 @@ export default function ReviewTab({
   // Synchronous ready check — avoids the one-frame flash that a useEffect reset would cause
   const photoReadyKey = `${currentIndex}-${isRevealed}`;
   const photoReady = photoReadyForKey === photoReadyKey;
-  const timerSeconds = currentEntry ? (timers.get(currentEntry.id) ?? null) : null;
+  // Derive remaining seconds from the wall-clock timestamp — never from state —
+  // so the displayed count always reflects elapsed real time regardless of how
+  // many re-renders have occurred since the timer was registered.
+  const timerSeconds = (() => {
+    if (!currentEntry) return null;
+    const startTs = revealStartTimestamps.current.get(currentEntry.id);
+    if (startTs === undefined) return null;
+    return Math.max(0, Math.ceil((REVEAL_DELAY_MS - (Date.now() - startTs)) / 1000));
+  })();
   const existingResponse = currentEntry ? myResponses.get(currentEntry.id) : undefined;
   const isPinEntry = !!(currentPin && currentPin.xPercent !== undefined && currentPin.yPercent !== undefined);
 
