@@ -779,6 +779,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       } catch {
+        // Restore pending deletes so they're retried on the next auto-save.
+        for (const id of deletedIds) deletedDraftClientIdsRef.current.add(id);
       }
     }, 1000);
     return () => {

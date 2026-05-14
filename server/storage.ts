@@ -588,6 +588,8 @@ export class DatabaseStorage implements IStorage {
         }))).onConflictDoUpdate({
           target: [pins.photoId, pins.draftClientId],
           set: updateSet,
+          // Only update rows that are still draft — never overwrite a committed pin.
+          setWhere: isNull(pins.entryId),
         }).returning();
         results.push(...rows);
       }

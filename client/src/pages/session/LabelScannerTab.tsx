@@ -1384,6 +1384,13 @@ export default function LabelScannerTab({
             const pinKey = `${p.xPercent.toFixed(5)}_${p.yPercent.toFixed(5)}_${p.label}`;
             return !succeededKeys.has(pinKey);
           });
+          // Explicitly delete draft pins that are no longer in the remaining set.
+          // With upsert-only semantics, absence from the pins array no longer removes
+          // rows — we must send a deletedClientIds list instead.
+          const remainingDraftIds = new Set(remainingDrafts.map((p: Pin) => p.id));
+          const deletedClientIds = (allPhotoPins as Pin[])
+            .filter(p => !p.entryId && !remainingDraftIds.has(p.id) && p.draftClientId)
+            .map(p => p.draftClientId!);
           await retryRequest("PUT", `/api/photos/${photoId}/draft-pins`, {
             pins: remainingDrafts.map((p: Pin) => ({
               xPercent: p.xPercent,
@@ -1396,6 +1403,7 @@ export default function LabelScannerTab({
               flagged: p.flagged || false,
               draftClientId: p.draftClientId || undefined,
             })),
+            deletedClientIds,
           });
         } catch {}
       }
