@@ -175,6 +175,9 @@ export const pins = pgTable("pins", {
   // considered distinct in PostgreSQL unique indexes so multiple draft pins per
   // photo are still allowed.
   uniqueIndex("pins_photo_label_unique").on(table.photoId, table.label),
+  // Stable per-row upsert key for draft pins. PostgreSQL unique indexes treat
+  // NULLs as distinct, so rows with draftClientId=NULL are never constrained.
+  uniqueIndex("pins_photo_draft_client_id_unique").on(table.photoId, table.draftClientId),
 ]);
 
 

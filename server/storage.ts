@@ -111,7 +111,7 @@ export interface IStorage {
     reelCount?: number; wireDetails?: string | null; vendorCode?: string | null;
     footage?: number | null; flagged?: boolean; flagReason?: string | null;
     draftClientId?: string | null;
-  }>): Promise<Pin[]>;
+  }>, deletedClientIds?: string[]): Promise<Pin[]>;
   getPin(id: number): Promise<Pin | undefined>;
   getPhotoPins(photoId: number): Promise<Pin[]>;
   getSessionPins(sessionId: number): Promise<Pin[]>;
@@ -533,44 +533,49 @@ export class DatabaseStorage implements IStorage {
     reelCount?: number; wireDetails?: string | null; vendorCode?: string | null;
     footage?: number | null; flagged?: boolean; flagReason?: string | null;
     draftClientId?: string | null;
-  }>): Promise<Pin[]> {
+  }>, deletedClientIds?: string[]): Promise<Pin[]> {
     return db.transaction(async (tx) => {
-      // Snapshot of current draft (non-committed) pins for this photo.
-      const existingDrafts = await tx.select().from(pins)
-        .where(and(eq(pins.photoId, photoId), isNull(pins.entryId)));
-
-      const existingByClientId = new Map(
-        existingDrafts.filter(p => p.draftClientId).map(p => [p.draftClientId!, p])
-      );
-
-      // Separate incoming pins into those with a stable client ID and legacy ones.
-      const incomingWithClientId = newPins.filter(p => p.draftClientId);
-      const incomingWithoutClientId = newPins.filter(p => !p.draftClientId);
-      const incomingClientIds = new Set(incomingWithClientId.map(p => p.draftClientId!));
-      const incomingLabelSet = new Set(
-        incomingWithoutClientId.filter(p => p.label).map(p => p.label!)
-      );
-
-      // Which existing rows to remove:
-      //   • Rows with a clientId NOT in the incoming set: explicitly removed by this client.
-      //   • Rows without a clientId and without a label: unlabeled legacy, replace wholesale.
-      //   • Rows without a clientId whose label IS in incoming: will be re-inserted with updates.
-      // Rows without a clientId whose label is NOT in incoming are preserved (collaborator-added).
-      const idsToDelete = existingDrafts.filter(p => {
-        if (p.draftClientId) return !incomingClientIds.has(p.draftClientId);
-        if (!p.label) return true;
-        return incomingLabelSet.has(p.label);
-      }).map(p => p.id);
-
-      if (idsToDelete.length > 0) {
-        await tx.delete(pins).where(inArray(pins.id, idsToDelete));
+      // Step 1: Explicitly delete only pins the client intentionally removed.
+      // We NEVER delete based on absence from the incoming set — the client may
+      // have a stale snapshot that is missing pins added by concurrent collaborators.
+      if (deletedClientIds && deletedClientIds.length > 0) {
+        await tx.delete(pins).where(
+          and(
+            eq(pins.photoId, photoId),
+            isNull(pins.entryId),
+            inArray(pins.draftClientId, deletedClientIds),
+          )
+        );
       }
 
-      // Per-row upsert for pins that carry a stable clientId.
-      const upserted: Pin[] = [];
-      for (const p of incomingWithClientId) {
-        const existing = existingByClientId.get(p.draftClientId!);
-        const rowData = {
+      if (newPins.length === 0) return [];
+
+      // Step 2: Upsert incoming pins.
+      // Pins are batched by key type so each group can target the right unique index.
+      const withClientId = newPins.filter(p => p.draftClientId);
+      const labeledLegacy = newPins.filter(p => !p.draftClientId && p.label);
+      const unlabeledLegacy = newPins.filter(p => !p.draftClientId && !p.label);
+
+      const updateSet = {
+        xPercent: sql`excluded.x_percent`,
+        yPercent: sql`excluded.y_percent`,
+        label: sql`excluded.label`,
+        reelCount: sql`excluded.reel_count`,
+        wireDetails: sql`excluded.wire_details`,
+        vendorCode: sql`excluded.vendor_code`,
+        footage: sql`excluded.footage`,
+        flagged: sql`excluded.flagged`,
+        flagReason: sql`excluded.flag_reason`,
+      };
+
+      const results: Pin[] = [];
+
+      // Client-ID pins: atomic per-row upsert keyed by (photoId, draftClientId).
+      // The unique index pins_photo_draft_client_id_unique enforces the constraint.
+      if (withClientId.length > 0) {
+        const rows = await tx.insert(pins).values(withClientId.map(p => ({
+          photoId,
+          draftClientId: p.draftClientId,
           xPercent: p.xPercent,
           yPercent: p.yPercent,
           label: p.label || null,
@@ -580,30 +585,41 @@ export class DatabaseStorage implements IStorage {
           footage: p.footage || null,
           flagged: p.flagged || false,
           flagReason: p.flagReason || null,
-        };
-        if (existing) {
-          const [updated] = await tx.update(pins).set(rowData)
-            .where(eq(pins.id, existing.id)).returning();
-          if (updated) upserted.push(updated);
-        } else {
-          const [inserted] = await tx.insert(pins).values({
-            photoId,
-            draftClientId: p.draftClientId,
-            ...rowData,
-          }).returning();
-          if (inserted) upserted.push(inserted);
-        }
+        }))).onConflictDoUpdate({
+          target: [pins.photoId, pins.draftClientId],
+          set: updateSet,
+        }).returning();
+        results.push(...rows);
       }
 
-      // Insert legacy pins (no clientId) that were not already deleted above.
-      const legacyToInsert = incomingWithoutClientId;
-      const legacyInserted: Pin[] = [];
-      if (legacyToInsert.length > 0) {
-        const rows = await tx.insert(pins).values(legacyToInsert.map(p => ({
+      // Labeled legacy pins (no clientId): upsert keyed by (photoId, label).
+      // Uses the existing pins_photo_label_unique index.
+      if (labeledLegacy.length > 0) {
+        const rows = await tx.insert(pins).values(labeledLegacy.map(p => ({
           photoId,
           xPercent: p.xPercent,
           yPercent: p.yPercent,
-          label: p.label || null,
+          label: p.label,
+          reelCount: p.reelCount || 1,
+          wireDetails: p.wireDetails || null,
+          vendorCode: p.vendorCode || null,
+          footage: p.footage || null,
+          flagged: p.flagged || false,
+          flagReason: p.flagReason || null,
+        }))).onConflictDoUpdate({
+          target: [pins.photoId, pins.label],
+          set: updateSet,
+        }).returning();
+        results.push(...rows);
+      }
+
+      // Unlabeled legacy pins: no stable merge key; just insert.
+      if (unlabeledLegacy.length > 0) {
+        const rows = await tx.insert(pins).values(unlabeledLegacy.map(p => ({
+          photoId,
+          xPercent: p.xPercent,
+          yPercent: p.yPercent,
+          label: null,
           reelCount: p.reelCount || 1,
           wireDetails: p.wireDetails || null,
           vendorCode: p.vendorCode || null,
@@ -611,15 +627,10 @@ export class DatabaseStorage implements IStorage {
           flagged: p.flagged || false,
           flagReason: p.flagReason || null,
         }))).returning();
-        legacyInserted.push(...rows);
+        results.push(...rows);
       }
 
-      // Preserved: existing labeled pins without clientId that were not in the incoming set.
-      const preserved = existingDrafts.filter(
-        p => !p.draftClientId && p.label && !incomingLabelSet.has(p.label)
-      );
-
-      return [...preserved, ...upserted, ...legacyInserted];
+      return results;
     });
   }
 

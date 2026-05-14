@@ -143,12 +143,34 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, [viewingNearbyIdx, currentPhotoIdx, uploadedPhotos]);
   const [localPins, _setLocalPins] = useState<LocalPin[]>([]);
   const localPinsRef = useRef<LocalPin[]>([]);
+  // Tracks draftClientIds that the user has explicitly removed since the last
+  // successful save. Sent as `deletedClientIds` in PUT draft-pins requests so the
+  // server can delete those specific rows without touching any collaborator pins.
+  const deletedDraftClientIdsRef = useRef<Set<string>>(new Set());
   const setLocalPins = useCallback((updater: LocalPin[] | ((prev: LocalPin[]) => LocalPin[])) => {
     _setLocalPins((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
+      // Track pins explicitly removed from the local list so we can send
+      // deletedClientIds to the server on the next save.
+      if (next.length < prev.length) {
+        const nextIds = new Set(next.map(p => p.draftClientId || p.id));
+        for (const removed of prev) {
+          const clientId = removed.draftClientId || removed.id;
+          if (!nextIds.has(clientId)) {
+            deletedDraftClientIdsRef.current.add(clientId);
+          }
+        }
+      }
       localPinsRef.current = next;
       return next;
     });
+  }, []);
+  /** Reset pins from a DB load — clears the pending-delete set so we don't
+   *  accidentally delete pins that were just fetched from the server. */
+  const resetLocalPins = useCallback((newPins: LocalPin[]) => {
+    deletedDraftClientIdsRef.current.clear();
+    _setLocalPins(newPins);
+    localPinsRef.current = newPins;
   }, []);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [highlightedCommittedPinDbId, setHighlightedCommittedPinDbId] = useState<number | null>(null);
@@ -477,20 +499,29 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     const pins = localPinsRef.current;
     if (!photoDbId) return;
     try {
-      await apiRequest("PUT", `/api/photos/${photoDbId}/draft-pins`, {
-        pins: pins.map(p => ({
-          xPercent: p.x,
-          yPercent: p.y,
-          label: p.label,
-          reelCount: p.reelCount,
-          wireDetails: p.wireDetails || null,
-          vendorCode: p.vendorCode || null,
-          footage: p.footage || null,
-          flagged: p.flagged || false,
-          flagReason: p.flagReason || null,
-          draftClientId: p.draftClientId || p.id,
-        })),
-      });
+      const deletedIds = [...deletedDraftClientIdsRef.current];
+      deletedDraftClientIdsRef.current.clear();
+      try {
+        await apiRequest("PUT", `/api/photos/${photoDbId}/draft-pins`, {
+          pins: pins.map(p => ({
+            xPercent: p.x,
+            yPercent: p.y,
+            label: p.label,
+            reelCount: p.reelCount,
+            wireDetails: p.wireDetails || null,
+            vendorCode: p.vendorCode || null,
+            footage: p.footage || null,
+            flagged: p.flagged || false,
+            flagReason: p.flagReason || null,
+            draftClientId: p.draftClientId || p.id,
+          })),
+          deletedClientIds: deletedIds,
+        });
+      } catch (err) {
+        // Restore pending deletes so they're retried on the next save attempt.
+        for (const id of deletedIds) deletedDraftClientIdsRef.current.add(id);
+        throw err;
+      }
     } catch {
     }
   }, [uploadedPhotos, currentPhotoIdx]);
@@ -548,6 +579,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       localPinsRef.current = merged;
       _setLocalPins(merged);
       try {
+        const deletedIds = [...deletedDraftClientIdsRef.current];
+        deletedDraftClientIdsRef.current.clear();
         await apiRequest("PUT", `/api/photos/${photoId}/draft-pins`, {
           pins: merged.map(p => ({
             xPercent: p.x,
@@ -561,8 +594,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             flagReason: p.flagReason || null,
             draftClientId: p.draftClientId || p.id,
           })),
+          deletedClientIds: deletedIds,
         });
       } catch (err) {
+        for (const id of deletedIds) deletedDraftClientIdsRef.current.add(id);
         console.error("Failed to save auto-detected draft pins:", err);
       }
       toast({
@@ -598,7 +633,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
       updatedAt: p.updatedAt ? (p.updatedAt instanceof Date ? p.updatedAt.toISOString() : new Date(p.updatedAt as unknown as string).toISOString()) : undefined,
     })).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })));
     if (draftPins.length > 0) {
-      setLocalPins(draftPins.map(p => ({
+      resetLocalPins(draftPins.map(p => ({
         id: p.draftClientId || `pin-${p.id}`,
         draftClientId: p.draftClientId || undefined,
         x: p.xPercent,
@@ -612,7 +647,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         flagReason: p.flagReason || undefined,
       })).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true })));
     } else {
-      setLocalPins([]);
+      resetLocalPins([]);
     }
   }, []);
 
@@ -725,6 +760,8 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
       try {
+        const deletedIds = [...deletedDraftClientIdsRef.current];
+        deletedDraftClientIdsRef.current.clear();
         await apiRequest("PUT", `/api/photos/${currentPhoto.dbId}/draft-pins`, {
           pins: localPins.map(p => ({
             xPercent: p.x,
@@ -738,6 +775,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             flagReason: p.flagReason || null,
             draftClientId: p.draftClientId || p.id,
           })),
+          deletedClientIds: deletedIds,
         });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "incomplete-pins"] });
       } catch {
@@ -1510,7 +1548,9 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               flagReason: p.flagReason || null,
               draftClientId: p.draftClientId || p.id,
             })),
+            deletedClientIds: [...deletedDraftClientIdsRef.current],
           });
+          deletedDraftClientIdsRef.current.clear();
         } catch (err) {
           console.error("Failed to save remaining draft pins after commit:", err);
         }

@@ -20,6 +20,7 @@ export function useSessionWebSocket(
   const pendingBufferRef = useRef<string[]>([]);
   const hasEverConnectedRef = useRef(false);
   const [wsStatus, setWsStatus] = useState<WsStatus>("connecting");
+  const [reconnectDelayMs, setReconnectDelayMs] = useState<number | null>(null);
 
   const safeSend = useCallback((data: string) => {
     const ws = wsRef.current;
@@ -43,6 +44,7 @@ export function useSessionWebSocket(
       reconnectDelayRef.current = WS_RECONNECT_BASE_MS;
       hasEverConnectedRef.current = true;
       setWsStatus("connected");
+      setReconnectDelayMs(null);
       // Drain the pre-open buffer first, then send the join frame.
       // safeSend is used for all sends so the guard path is consistent even
       // though readyState is guaranteed OPEN inside onopen.
@@ -78,13 +80,15 @@ export function useSessionWebSocket(
     };
 
     ws.onclose = () => {
-      if (hasEverConnectedRef.current) {
-        setWsStatus("reconnecting");
-      }
       const jitter = (Math.random() * 2 - 1) * WS_RECONNECT_JITTER_MS;
       const delay = Math.min(reconnectDelayRef.current + jitter, WS_RECONNECT_CAP_MS);
       reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, WS_RECONNECT_CAP_MS);
-      reconnectTimerRef.current = setTimeout(connect, Math.max(delay, WS_RECONNECT_BASE_MS));
+      const actualDelay = Math.max(delay, WS_RECONNECT_BASE_MS);
+      if (hasEverConnectedRef.current) {
+        setWsStatus("reconnecting");
+        setReconnectDelayMs(actualDelay);
+      }
+      reconnectTimerRef.current = setTimeout(connect, actualDelay);
     };
 
     ws.onerror = () => {
@@ -105,5 +109,5 @@ export function useSessionWebSocket(
     safeSend(JSON.stringify(data));
   }, [safeSend]);
 
-  return { wsRef, sendMessage, wsStatus };
+  return { wsRef, sendMessage, wsStatus, reconnectDelayMs };
 }

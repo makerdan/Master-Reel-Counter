@@ -1742,11 +1742,11 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
 
-      const { pins: pinData } = req.body;
+      const { pins: pinData, deletedClientIds } = req.body;
       if (!Array.isArray(pinData)) return res.status(400).json({ message: "pins must be an array" });
-      // replaceDraftPins wraps the delete-then-insert in a single transaction so
-      // concurrent writes cannot observe a partially-deleted intermediate state.
-      const saved = await storage.replaceDraftPins(photo.id, pinData);
+      // replaceDraftPins uses per-row upsert by draftClientId and only deletes
+      // pins explicitly listed in deletedClientIds — never by absence from the set.
+      const saved = await storage.replaceDraftPins(photo.id, pinData, Array.isArray(deletedClientIds) ? deletedClientIds : undefined);
       res.json(saved);
     } catch (error) {
       console.error("Error saving draft pins:", error);
