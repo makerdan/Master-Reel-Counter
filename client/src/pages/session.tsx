@@ -573,6 +573,15 @@ function SessionWorkspace({
     return `/api/sessions/${sessionId}/export/pdf/start?${params}`;
   };
 
+  const triggerPdfGeneration = (quality: "full" | "standard", jobId: string) => {
+    const params = new URLSearchParams();
+    if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
+    if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
+    params.set("quality", quality);
+    params.set("jobId", jobId);
+    fetch(`/api/sessions/${sessionId}/export/pdf?${params}`, { credentials: "include" }).catch(() => null);
+  };
+
   const pollPdfJob = async (
     jobId: string,
     signal: AbortSignal,
@@ -608,8 +617,11 @@ function SessionWorkspace({
       .then(r => r.ok ? r.json() : null)
       .then((data) => {
         if (!data?.jobId) return;
-        if (quality === "full") fullJobRef.current = data.jobId;
-        else stdJobRef.current = data.jobId;
+        const jobId = data.jobId;
+        if (quality === "full") fullJobRef.current = jobId;
+        else stdJobRef.current = jobId;
+        // Fire-and-forget: trigger actual PDF generation with this job ID
+        triggerPdfGeneration(quality, jobId);
       })
       .catch(() => null);
   };
@@ -699,6 +711,8 @@ function SessionWorkspace({
       });
       if (!startRes.ok) throw new Error("Failed to start PDF export");
       const { jobId } = await startRes.json();
+      // Fire-and-forget: trigger actual PDF generation with this job ID
+      triggerPdfGeneration(quality, jobId);
       const blob = await pollPdfJob(jobId, ctrl.signal, setPdfProgress);
       if (ctrl.signal.aborted) return;
       if (!blob || blob.size < 500) throw new Error("The PDF was generated but appears to be empty.");
