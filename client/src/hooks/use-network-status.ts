@@ -12,6 +12,9 @@ import {
   claimEntryInFlight,
   clearEntryInFlight,
   clearStaleInFlight,
+  markEntryPermanentlyFailed,
+  clearEntryPermanentlyFailed,
+  getFailedQueuedEntries,
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
 
@@ -74,7 +77,10 @@ export function useNetworkStatus(currentUserId?: string) {
       for (const entry of entries) {
         // Fast path: skip items the snapshot already shows as in-flight.
         if (entry.inFlight) continue;
-        if (permanentlyFailedRef.current.has(entry.id)) continue;
+        // Check both the in-memory ref and the IDB-persisted flag so that
+        // entries which permanently failed before the last reload are also
+        // skipped until the user explicitly retries.
+        if (permanentlyFailedRef.current.has(entry.id) || entry.permanentlyFailed) continue;
         if (!navigator.onLine) break;
 
         const currentRetries = entryRetryCountsRef.current.get(entry.id) ?? 0;
@@ -125,16 +131,19 @@ export function useNetworkStatus(currentUserId?: string) {
             const nextRetries = currentRetries + 1;
             entryRetryCountsRef.current.set(entry.id, nextRetries);
             if (nextRetries >= MAX_ENTRY_RETRIES) {
+              const reason = `Server error (${res.status})`;
               permanentlyFailedRef.current.add(entry.id);
               setPermanentlyFailedCount(permanentlyFailedRef.current.size);
               const info: FailedEntryInfo = {
                 id: entry.id,
                 sessionId: entry.sessionId,
                 data: entry.data,
-                reason: `Server error (${res.status})`,
+                reason,
               };
               failedEntriesRef.current.set(entry.id, info);
               setFailedEntries(Array.from(failedEntriesRef.current.values()));
+              // Persist the failure to IDB so the warning survives a page reload.
+              markEntryPermanentlyFailed(entry.id, reason).catch(() => {});
             } else {
               scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
             }
@@ -145,16 +154,19 @@ export function useNetworkStatus(currentUserId?: string) {
           const nextRetries = currentRetries + 1;
           entryRetryCountsRef.current.set(entry.id, nextRetries);
           if (nextRetries >= MAX_ENTRY_RETRIES) {
+            const reason = "Network error";
             permanentlyFailedRef.current.add(entry.id);
             setPermanentlyFailedCount(permanentlyFailedRef.current.size);
             const info: FailedEntryInfo = {
               id: entry.id,
               sessionId: entry.sessionId,
               data: entry.data,
-              reason: "Network error",
+              reason,
             };
             failedEntriesRef.current.set(entry.id, info);
             setFailedEntries(Array.from(failedEntriesRef.current.values()));
+            // Persist the failure to IDB so the warning survives a page reload.
+            markEntryPermanentlyFailed(entry.id, reason).catch(() => {});
           } else {
             scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
           }
@@ -243,6 +255,11 @@ export function useNetworkStatus(currentUserId?: string) {
       clearTimeout(timer);
     }
     entryRetryTimersRef.current.clear();
+    // Clear the IDB-persisted failure flags so the entries are retried on the
+    // next drain and don't reappear as failed after a future reload.
+    for (const id of permanentlyFailedRef.current) {
+      clearEntryPermanentlyFailed(id).catch(() => {});
+    }
     permanentlyFailedRef.current.clear();
     entryRetryCountsRef.current.clear();
     failedEntriesRef.current.clear();
@@ -276,9 +293,31 @@ export function useNetworkStatus(currentUserId?: string) {
     // staleness threshold rather than clearing all flags so that active claims
     // in another tab are never disturbed.  syncQueue fires only after the clear
     // completes to prevent a race where the drain skips not-yet-reset items.
+    //
+    // After clearing stale flags, restore any entries that were permanently
+    // failed in a previous session.  They stay in IDB with permanentlyFailed=true
+    // and must be surfaced to the user immediately — before the first drain —
+    // so the warning panel appears right away instead of after the next retry
+    // cycle exhausts its attempts again.
     clearStaleInFlight()
       .catch(() => {})
-      .then(() => {
+      .then(async () => {
+        try {
+          const failed = await getFailedQueuedEntries(currentUserId);
+          for (const entry of failed) {
+            permanentlyFailedRef.current.add(entry.id);
+            failedEntriesRef.current.set(entry.id, {
+              id: entry.id,
+              sessionId: entry.sessionId,
+              data: entry.data,
+              reason: entry.failureReason || "Unknown error",
+            });
+          }
+          if (failed.length > 0) {
+            setPermanentlyFailedCount(permanentlyFailedRef.current.size);
+            setFailedEntries(Array.from(failedEntriesRef.current.values()));
+          }
+        } catch {}
         if (navigator.onLine) syncQueue();
       });
 

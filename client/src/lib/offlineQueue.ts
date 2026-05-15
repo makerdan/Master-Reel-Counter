@@ -38,6 +38,8 @@ export interface QueuedEntry {
   placeholderId?: number;
   inFlight?: boolean;
   claimedAt?: number;
+  permanentlyFailed?: boolean;
+  failureReason?: string;
 }
 
 export function dispatchEntrySynced(placeholderId: number, realId: number, sessionId: number): void {
@@ -312,4 +314,22 @@ export async function clearStaleInFlight(): Promise<void> {
 
   await resetStore(PHOTO_STORE);
   await resetStore(ENTRY_STORE);
+}
+
+// ─── Permanently-failed entry helpers ────────────────────────────────────────
+// These persist the failure state to IDB so that the warning panel is
+// restored immediately after a page reload, without having to exhaust retries
+// again.
+
+export async function markEntryPermanentlyFailed(id: string, reason: string): Promise<void> {
+  return patchEntryRecord(id, { permanentlyFailed: true, failureReason: reason });
+}
+
+export async function clearEntryPermanentlyFailed(id: string): Promise<void> {
+  return patchEntryRecord(id, { permanentlyFailed: false, failureReason: undefined });
+}
+
+export async function getFailedQueuedEntries(userId?: string): Promise<QueuedEntry[]> {
+  const all = await getQueuedEntries(undefined, userId);
+  return all.filter(e => e.permanentlyFailed === true);
 }
