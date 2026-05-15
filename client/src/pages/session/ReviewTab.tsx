@@ -716,6 +716,7 @@ export default function ReviewTab({
     revealStartTimestamps.current.clear();
     revealedRef.current.clear();
     setRevealedEntries(new Set());
+    setSkippedIds(new Set());
   }, [sessionId]);
 
   // Register each newly-assigned entry with the timer system.
