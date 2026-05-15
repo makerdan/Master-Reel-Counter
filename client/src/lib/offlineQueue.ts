@@ -333,3 +333,31 @@ export async function getFailedQueuedEntries(userId?: string): Promise<QueuedEnt
   const all = await getQueuedEntries(undefined, userId);
   return all.filter(e => e.permanentlyFailed === true);
 }
+
+// ─── Legacy migration ─────────────────────────────────────────────────────────
+// Queue items saved before user-scoping was introduced have no userId field.
+// This one-time helper stamps them with the provided userId so they are
+// unambiguously owned and can never be drained by a different user.
+// It is idempotent: items that already have a userId are left untouched.
+export async function migrateQueueUserIds(userId: string): Promise<void> {
+  const db = await openDB();
+
+  const migrateStore = (storeName: string) =>
+    new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        for (const item of req.result as Array<Record<string, unknown>>) {
+          if (!item.userId) {
+            store.put({ ...item, userId });
+          }
+        }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+
+  await migrateStore(PHOTO_STORE);
+  await migrateStore(ENTRY_STORE);
+}

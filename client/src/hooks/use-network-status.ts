@@ -15,8 +15,14 @@ import {
   markEntryPermanentlyFailed,
   clearEntryPermanentlyFailed,
   getFailedQueuedEntries,
+  migrateQueueUserIds,
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
+
+// Tracks which userIds have already had their legacy queue items migrated in
+// this page session. Module-level so the migration runs once even when
+// useNetworkStatus is called from multiple components simultaneously.
+const migratedUserIds = new Set<string>();
 
 const MAX_ENTRY_RETRIES = 3;
 
@@ -296,6 +302,16 @@ export function useNetworkStatus(currentUserId?: string) {
     refreshPendingCount();
     const interval = setInterval(refreshPendingCount, 5000);
     const unsubQueue = onQueueChange(refreshPendingCount);
+
+    // Stamp any legacy queue items (created before user-scoping) with the
+    // current userId. Fire-and-forget: items without a userId are still drained
+    // correctly via the !r.userId fallback, so the migration is best-effort
+    // cleanup rather than a required gate. Guarded by migratedUserIds so it
+    // only touches IDB once per user per page session.
+    if (currentUserId && !migratedUserIds.has(currentUserId)) {
+      migratedUserIds.add(currentUserId);
+      migrateQueueUserIds(currentUserId).catch(() => {});
+    }
 
     // Clear STALE inFlight flags (older than 2 min) from a previous page crash
     // BEFORE the initial drain, so stranded items are retried.  We use a
