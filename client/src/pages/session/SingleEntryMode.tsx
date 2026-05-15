@@ -29,6 +29,8 @@ const FIELD_LABELS: Record<string, string> = {
   manufacturer: "Vendor Code", notes: "Notes", palletId: "Pallet ID",
   position: "Position", conductors: "Conductors",
 };
+// Fields that have a rendered input in SingleEntryMode and can be re-typed by the user
+const VISIBLE_ENCRYPTED_FIELDS = new Set(["reelTag", "manufacturer", "notes"]);
 
 function clearSentinel(val: string | null | undefined): string {
   return val === UNREADABLE_SENTINEL ? "" : (val || "");
@@ -463,20 +465,32 @@ export default function SingleEntryMode({
   };
 
   const hasCorruption = editingEntry && corruptedFields.size > 0;
+  const visibleCorrupted = hasCorruption ? Array.from(corruptedFields).filter(f => VISIBLE_ENCRYPTED_FIELDS.has(f)) : [];
+  const hiddenCorrupted = hasCorruption ? Array.from(corruptedFields).filter(f => !VISIBLE_ENCRYPTED_FIELDS.has(f)) : [];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       {hasCorruption && (
         <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2.5 text-sm" data-testid="banner-corrupted-fields">
           <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-          <div>
+          <div className="space-y-0.5">
             <p className="font-medium text-destructive leading-tight">Some fields could not be decrypted</p>
-            <p className="text-muted-foreground text-xs mt-0.5">
-              Re-enter the highlighted fields:{" "}
-              <span className="font-medium text-foreground">
-                {Array.from(corruptedFields).map(f => FIELD_LABELS[f] ?? f).join(", ")}
-              </span>
-            </p>
+            {visibleCorrupted.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                Re-enter the highlighted fields:{" "}
+                <span className="font-medium text-foreground">
+                  {visibleCorrupted.map(f => FIELD_LABELS[f] ?? f).join(", ")}
+                </span>
+              </p>
+            )}
+            {hiddenCorrupted.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                Will be cleared on save:{" "}
+                <span className="font-medium text-foreground">
+                  {hiddenCorrupted.map(f => FIELD_LABELS[f] ?? f).join(", ")}
+                </span>
+              </p>
+            )}
           </div>
         </div>
       )}
