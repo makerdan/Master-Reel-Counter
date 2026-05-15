@@ -23,8 +23,9 @@ const buttonVariants = cva(
         ghost: "border border-transparent",
         // Muted destructive outline — used for delete actions that should be visible but not alarming at rest.
         // Renders with a faint destructive border/text and only brightens to full destructive on hover.
+        // Includes shadow-xs/active:shadow-none to match the elevation behaviour of the outline variant.
         "destructive-outline":
-          "border border-destructive/40 text-destructive/70 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/60",
+          "border border-destructive/40 text-destructive/70 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/60 shadow-xs active:shadow-none",
       },
       // Heights are set as "min" heights, because sometimes Ai will place large amount of content
       // inside buttons. With a min-height they will look appropriate with small amounts of content,
