@@ -2150,7 +2150,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {!user?.isTester && adminUsers && Array.isArray(adminUsers) && crashData && (
+        {!user?.isTester && adminUsers && Array.isArray(adminUsers) && (
           <Card data-testid="card-crash-history">
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
@@ -2168,9 +2168,11 @@ export default function SettingsPage() {
                   >
                     <RefreshCw className="h-4 w-4" />
                   </Button>
-                  <Badge variant="secondary" data-testid="badge-crash-count">
-                    {crashData.count} record{crashData.count !== 1 ? "s" : ""}
-                  </Badge>
+                  {crashData && (
+                    <Badge variant="secondary" data-testid="badge-crash-count">
+                      {crashData.count} record{crashData.count !== 1 ? "s" : ""}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -2179,6 +2181,8 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading crash history...
                 </div>
+              ) : !crashData ? (
+                <p className="text-sm text-muted-foreground">Unable to load crash history.</p>
               ) : crashData.crashes.length === 0 ? (
                 <p className="text-sm text-muted-foreground" data-testid="text-no-crashes">No crashes recorded.</p>
               ) : (
