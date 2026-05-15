@@ -34,6 +34,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/lib/theme-provider";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { LogoutGuardDialog } from "@/components/LogoutGuardDialog";
 import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
@@ -67,6 +69,8 @@ interface UserSettingsResponse {
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
+  const { pendingCount } = useNetworkStatus(user?.id);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { setThemeMode } = useTheme();
@@ -591,7 +595,7 @@ export default function SettingsPage() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => logout()}
+              onClick={() => pendingCount > 0 ? setLogoutDialogOpen(true) : logout()}
               data-testid="button-logout"
             >
               Sign Out
@@ -2079,7 +2083,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-end">
               <Button
                 variant="outline"
-                onClick={() => logout()}
+                onClick={() => pendingCount > 0 ? setLogoutDialogOpen(true) : logout()}
                 data-testid="button-settings-logout"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -2403,6 +2407,13 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <LogoutGuardDialog
+        pendingCount={pendingCount}
+        open={logoutDialogOpen}
+        onOpenChange={setLogoutDialogOpen}
+        onConfirm={logout}
+      />
     </div>
   );
 }

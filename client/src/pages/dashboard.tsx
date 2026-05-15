@@ -47,7 +47,9 @@ import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { findFolderConflict, getNextAutoNumberedName } from "@/lib/folder-conflicts";
 import { FolderConflictDialog, type ConflictResolution } from "@/components/folder-conflict-dialog";
+import { LogoutGuardDialog } from "@/components/LogoutGuardDialog";
 import { buildExportFilename } from "./session/utils";
+import { useNetworkStatus } from "@/hooks/use-network-status";
 
 type SessionWithStats = Session & {
   entryCount: number;
@@ -68,6 +70,8 @@ type SharedSessionWithStats = SessionWithStats & {
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const { pendingCount } = useNetworkStatus(user?.id);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const tz = useTimezone();
@@ -1628,10 +1632,14 @@ export default function Dashboard() {
                   size="icon"
                   variant="ghost"
                   onClick={() => {
-                    try {
-                      ["dash:searchQuery","dash:searchInside","dash:showFilterBar","dash:filterStatus","dash:filterCollaborator","dash:filterWireType","dash:filterMinFootage","dash:filterDateMonth","dash:filterDateYear","dash:sortField","dash:sortDirection","dash:openFolders"].forEach(k => sessionStorage.removeItem(k));
-                    } catch {}
-                    logout();
+                    if (pendingCount > 0) {
+                      setLogoutDialogOpen(true);
+                    } else {
+                      try {
+                        ["dash:searchQuery","dash:searchInside","dash:showFilterBar","dash:filterStatus","dash:filterCollaborator","dash:filterWireType","dash:filterMinFootage","dash:filterDateMonth","dash:filterDateYear","dash:sortField","dash:sortDirection","dash:openFolders"].forEach(k => sessionStorage.removeItem(k));
+                      } catch {}
+                      logout();
+                    }
                   }}
                   data-testid="button-logout"
                 >
@@ -2626,6 +2634,18 @@ export default function Dashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <LogoutGuardDialog
+        pendingCount={pendingCount}
+        open={logoutDialogOpen}
+        onOpenChange={setLogoutDialogOpen}
+        onConfirm={() => {
+          try {
+            ["dash:searchQuery","dash:searchInside","dash:showFilterBar","dash:filterStatus","dash:filterCollaborator","dash:filterWireType","dash:filterMinFootage","dash:filterDateMonth","dash:filterDateYear","dash:sortField","dash:sortDirection","dash:openFolders"].forEach(k => sessionStorage.removeItem(k));
+          } catch {}
+          logout();
+        }}
+      />
 
       <FolderConflictDialog
         open={!!folderConflict}
