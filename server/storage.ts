@@ -269,6 +269,7 @@ export interface IStorage {
    * `olderThanMs` milliseconds ago, indicating the client never completed
    * the second step (registering the photo) within the grace period.
    */
+  getAllKnownStorageKeys(): Promise<Set<string>>;
   getExpiredUploadIntents(olderThanMs: number): Promise<UploadIntent[]>;
   /**
    * Bulk-deletes upload_intents rows by primary-key IDs. Used by the purge
@@ -2671,6 +2672,21 @@ export class DatabaseStorage implements IStorage {
 
   async resolveUploadIntent(objectPath: string): Promise<void> {
     await db.delete(uploadIntents).where(eq(uploadIntents.objectPath, objectPath));
+  }
+
+  async getAllKnownStorageKeys(): Promise<Set<string>> {
+    const keys = new Set<string>();
+    const photoRows = await db
+      .select({ key: photos.objectStorageKey })
+      .from(photos)
+      .where(isNotNull(photos.objectStorageKey));
+    for (const row of photoRows) if (row.key) keys.add(row.key);
+    const logoRows = await db
+      .select({ key: userSettings.companyLogoKey })
+      .from(userSettings)
+      .where(isNotNull(userSettings.companyLogoKey));
+    for (const row of logoRows) if (row.key) keys.add(row.key);
+    return keys;
   }
 
   async getExpiredUploadIntents(olderThanMs: number): Promise<UploadIntent[]> {

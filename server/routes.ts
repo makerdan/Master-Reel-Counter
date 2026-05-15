@@ -6258,6 +6258,80 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     }
   });
 
+  // Admin endpoint: one-time sweep for legacy orphaned files that predate the
+  // upload_intents table and will never be caught by the normal purge job.
+  // Cross-references every /uploads/* GCS key against all DB-referenced keys
+  // (photos, company logos, user avatars). Files older than `minAgeDays` (default 7)
+  // with no DB reference are deleted. Capped at 500 files per call to avoid timeouts.
+  app.post("/api/admin/sweep-legacy-orphans", isAuthenticated, async (req: any, res) => {
+    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
+    const userId = resolveUserId(req);
+    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+
+    const SWEEP_MAX_FILES = 500;
+    const minAgeDays = Math.max(1, parseInt((req.query as any).minAgeDays as string) || 7);
+    const cutoff = new Date(Date.now() - minAgeDays * 24 * 60 * 60 * 1000);
+
+    try {
+      // Build set of all DB-referenced storage keys (photos + logos)
+      const knownKeys = await storage.getAllKnownStorageKeys();
+      // Augment with user avatar keys from the auth users table
+      const allUsers = await authStorage.getAllUsers();
+      for (const u of allUsers) {
+        if (u.customAvatarKey) knownKeys.add(u.customAvatarKey);
+      }
+
+      // Compute the GCS prefix for the uploads directory
+      const dirPart = privateDir.replace(/^\/[^/]+\/?/, "");
+      const uploadsPrefix = dirPart ? `${dirPart}/uploads/` : "uploads/";
+
+      // List GCS objects under the uploads prefix; cap the fetch to avoid OOM
+      const [files] = await objectStorageClient.bucket(BUCKET_NAME).getFiles({
+        prefix: uploadsPrefix,
+        maxResults: SWEEP_MAX_FILES * 4,
+      });
+
+      let scanned = 0;
+      let deleted = 0;
+      let skipped = 0;
+      let errors = 0;
+
+      for (const file of files) {
+        if (scanned >= SWEEP_MAX_FILES) break;
+        scanned++;
+
+        // Skip files newer than the age threshold
+        const created = new Date((file.metadata as any).timeCreated as string);
+        if (created > cutoff) { skipped++; continue; }
+
+        // Convert GCS name → DB key  e.g. "mydir/uploads/foo.jpg" → "/uploads/foo.jpg"
+        const dbKey = "/" + file.name.slice(dirPart ? dirPart.length + 1 : 0);
+
+        if (knownKeys.has(dbKey)) { skipped++; continue; }
+
+        // Orphaned — delete from GCS and attempt local disk cleanup
+        try {
+          await file.delete({ ignoreNotFound: true });
+          const filename = file.name.slice(uploadsPrefix.length);
+          await fs.unlink(path.join(UPLOADS_DIR, filename)).catch(() => {});
+          deleted++;
+          console.log(`Legacy orphan sweep: deleted ${dbKey}`);
+        } catch (err) {
+          errors++;
+          console.warn(`Legacy orphan sweep: failed to delete ${dbKey}:`, (err as Error).message);
+        }
+      }
+
+      const remaining = Math.max(0, files.length - scanned);
+      res.json({ scanned, deleted, skipped, errors, remaining, minAgeDays });
+    } catch (err) {
+      console.error("Legacy orphan sweep error:", err);
+      res.status(500).json({ message: "Sweep failed" });
+    }
+  });
+
   setInterval(purgeExpiredTrash, TRASH_PURGE_INTERVAL_MS);
   setTimeout(purgeExpiredTrash, 30000);
 
