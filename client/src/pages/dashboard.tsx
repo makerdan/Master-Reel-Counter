@@ -471,7 +471,8 @@ export default function Dashboard() {
     mutationFn: async (id: number) => {
       await apiRequest("POST", `/api/sessions/${id}/reset-to-photos`);
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      try { localStorage.removeItem(`scanner-results-${id}`); } catch {}
       invalidateAll();
       toast({ title: "Session reset to photos only" });
     },

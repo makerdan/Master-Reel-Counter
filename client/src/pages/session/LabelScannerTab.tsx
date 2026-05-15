@@ -697,6 +697,9 @@ export default function LabelScannerTab({
     if (!effectivePins.length) {
       setCards([]);
       setPhase("preview");
+      // All pins have been removed — stale failure reasons are no longer
+      // meaningful, so wipe the persisted results blob immediately.
+      try { localStorage.removeItem(getResultsStorageKey(sessionId)); } catch {}
       return;
     }
 
