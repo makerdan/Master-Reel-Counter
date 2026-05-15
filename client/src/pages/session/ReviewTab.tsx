@@ -3,7 +3,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Check, Flag, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
-  ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, CheckCircle2, Clock, X, Info,
+  ZoomIn, ZoomOut, RotateCw, RotateCcw, Move, CheckCircle2, Clock, X, Info, SkipForward,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -689,6 +689,27 @@ export default function ReviewTab({
   const [showFlagInput, setShowFlagInput] = useState(false);
   const [justActed, setJustActed] = useState(false);
 
+  // In-session skip set: entry IDs moved to end of queue without a verdict.
+  // Lives in component memory only — resets on page reload per task spec.
+  const [skippedIds, setSkippedIds] = useState<Set<number>>(new Set());
+
+  const handleSkip = useCallback(() => {
+    const entry = displayEntries[currentIndex];
+    if (!entry) return;
+    const entryId = entry.id;
+    setSkippedIds(prev => new Set([...prev, entryId]));
+    setOrderedEntries(prev => {
+      const idx = prev.findIndex(e => e.id === entryId);
+      if (idx === -1) return prev;
+      const updated = [...prev];
+      updated.splice(idx, 1);
+      updated.push(prev[idx]); // move to end
+      return updated;
+    });
+    // If already at the last position, loop back so skipped entries are reachable.
+    setCurrentIndex(prev => (prev >= displayEntries.length - 1 ? 0 : prev));
+  }, [currentIndex, displayEntries]);
+
   // Reset reveal state when the session changes so stale entry IDs from a
   // previous session never bleed into a newly-opened one.
   useEffect(() => {
@@ -973,12 +994,20 @@ export default function ReviewTab({
         <div className="absolute inset-x-0 h-3 rounded-full overflow-hidden top-1/2 -translate-y-1/2 flex">
           {displayEntries.map((entry, idx) => {
             const response = myResponses.get(entry.id);
-            const bandColor = !response ? "bg-muted" : response.verdict === "flagged" ? "bg-yellow-600" : "bg-green-500";
+            const isSkipped = !response && skippedIds.has(entry.id);
+            const bandColor = !response && !isSkipped ? "bg-muted"
+              : response?.verdict === "flagged" ? "bg-yellow-600"
+              : response ? "bg-green-500"
+              : ""; // skipped — rendered via backgroundImage below
             return (
               <div
                 key={entry.id}
                 className={`flex-1 ${bandColor} ${idx === 0 ? "rounded-l-full" : ""} ${idx === displayEntries.length - 1 ? "rounded-r-full" : ""}`}
-                style={{ minWidth: 0 }}
+                style={isSkipped ? {
+                  minWidth: 0,
+                  // Dashed/striped pattern to signal "needs a second look"
+                  backgroundImage: "repeating-linear-gradient(90deg, hsl(var(--muted-foreground) / 0.35) 0px, hsl(var(--muted-foreground) / 0.35) 3px, transparent 3px, transparent 9px)",
+                } : { minWidth: 0 }}
               />
             );
           })}
@@ -1295,50 +1324,64 @@ export default function ReviewTab({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex gap-2" data-testid="review-actions">
-                    {existingResponse?.verdict === "approved" ? (
+                  <>
+                    <div className="flex gap-2" data-testid="review-actions">
+                      {existingResponse?.verdict === "approved" ? (
+                        <Button
+                          variant="outline" className="flex-1 border-muted-foreground/30 text-muted-foreground hover:bg-muted"
+                          onClick={() => removeApproval.mutate(currentEntry.id)}
+                          disabled={removeApproval.isPending}
+                          data-testid="button-remove-approval"
+                        >
+                          {removeApproval.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <X className="h-4 w-4 mr-1" />}
+                          Remove Approval
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="default" className="flex-1"
+                          onClick={() => submitReview.mutate({ entryId: currentEntry.id, verdict: "approved" })}
+                          disabled={submitReview.isPending}
+                          data-testid="button-approve"
+                        >
+                          {submitReview.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
+                          Approve
+                        </Button>
+                      )}
+                      {existingResponse?.verdict === "flagged" ? (
+                        <Button
+                          variant="outline" className="flex-1 border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                          onClick={() => removeApproval.mutate(currentEntry.id)}
+                          disabled={removeApproval.isPending}
+                          data-testid="button-unflag"
+                        >
+                          {removeApproval.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Flag className="h-4 w-4 mr-1" />}
+                          Un-Flag
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline" className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+                          onClick={() => setShowFlagInput(true)}
+                          disabled={submitReview.isPending}
+                          data-testid="button-flag"
+                        >
+                          <Flag className="h-4 w-4 mr-1" />
+                          Flag
+                        </Button>
+                      )}
+                    </div>
+                    {!existingResponse && (
                       <Button
-                        variant="outline" className="flex-1 border-muted-foreground/30 text-muted-foreground hover:bg-muted"
-                        onClick={() => removeApproval.mutate(currentEntry.id)}
-                        disabled={removeApproval.isPending}
-                        data-testid="button-remove-approval"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-muted-foreground hover:text-foreground"
+                        onClick={handleSkip}
+                        data-testid="button-skip-entry"
                       >
-                        {removeApproval.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <X className="h-4 w-4 mr-1" />}
-                        Remove Approval
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="default" className="flex-1"
-                        onClick={() => submitReview.mutate({ entryId: currentEntry.id, verdict: "approved" })}
-                        disabled={submitReview.isPending}
-                        data-testid="button-approve"
-                      >
-                        {submitReview.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
-                        Approve
+                        <SkipForward className="h-4 w-4 mr-1" />
+                        Skip for now
                       </Button>
                     )}
-                    {existingResponse?.verdict === "flagged" ? (
-                      <Button
-                        variant="outline" className="flex-1 border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
-                        onClick={() => removeApproval.mutate(currentEntry.id)}
-                        disabled={removeApproval.isPending}
-                        data-testid="button-unflag"
-                      >
-                        {removeApproval.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Flag className="h-4 w-4 mr-1" />}
-                        Un-Flag
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline" className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10"
-                        onClick={() => setShowFlagInput(true)}
-                        disabled={submitReview.isPending}
-                        data-testid="button-flag"
-                      >
-                        <Flag className="h-4 w-4 mr-1" />
-                        Flag
-                      </Button>
-                    )}
-                  </div>
+                  </>
                 )}
               </div>
             )}
