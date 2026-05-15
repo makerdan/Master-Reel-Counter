@@ -14,14 +14,43 @@ function entryLabel(data: Record<string, unknown>): string {
   return [loc, detail].filter(Boolean).join(" — ") || "Unknown entry";
 }
 
+// ---------------------------------------------------------------------------
+// Module-level WS reconnect state store.
+// session.tsx calls setWsReconnectState() to push live countdown updates.
+// NetworkStatusIndicator subscribes via useWsReconnectState().
+// ---------------------------------------------------------------------------
+interface WsReconnectState {
+  wsStatus: string;
+  countdown: number | null;
+}
+let _wsReconnect: WsReconnectState = { wsStatus: "connected", countdown: null };
+const _wsListeners = new Set<() => void>();
+
+export function setWsReconnectState(wsStatus: string, countdown: number | null) {
+  _wsReconnect = { wsStatus, countdown };
+  _wsListeners.forEach((fn) => fn());
+}
+
+function useWsReconnectState(): WsReconnectState {
+  const [state, setState] = useState<WsReconnectState>(_wsReconnect);
+  useEffect(() => {
+    const handler = () => setState({ ..._wsReconnect });
+    _wsListeners.add(handler);
+    return () => { _wsListeners.delete(handler); };
+  }, []);
+  return state;
+}
+
 export function NetworkStatusIndicator() {
   const { user } = useAuth();
   const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, failedEntries } = useNetworkStatus(user?.id);
+  const { wsStatus, countdown: reconnectCountdown } = useWsReconnectState();
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   const hasRetryingEntries = isSyncing && entryRetryAttempt !== null;
   const hasPermanentFailures = !isSyncing && permanentlyFailedCount > 0;
+  const isWsReconnecting = wsStatus === "reconnecting";
 
   // Auto-show details panel when new failures arrive.
   useEffect(() => {
@@ -39,7 +68,7 @@ export function NetworkStatusIndicator() {
     }
   }, [failedEntries.length]);
 
-  if (isOnline && pendingCount === 0 && !isSyncing && !hasPermanentFailures) {
+  if (isOnline && pendingCount === 0 && !isSyncing && !hasPermanentFailures && !isWsReconnecting) {
     return null;
   }
 
@@ -112,7 +141,17 @@ export function NetworkStatusIndicator() {
             <span data-testid="text-offline-status">Offline</span>
           </>
         )}
-        {isOnline && hasRetryingEntries && (
+        {isOnline && isWsReconnecting && (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span data-testid="text-ws-reconnecting-mobile">
+              {reconnectCountdown !== null
+                ? `Reconnecting in ${reconnectCountdown}s…`
+                : "Reconnecting…"}
+            </span>
+          </>
+        )}
+        {isOnline && !isWsReconnecting && hasRetryingEntries && (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span data-testid="text-retrying-entry-status">
@@ -120,7 +159,7 @@ export function NetworkStatusIndicator() {
             </span>
           </>
         )}
-        {isOnline && isSyncing && !hasRetryingEntries && (
+        {isOnline && !isWsReconnecting && isSyncing && !hasRetryingEntries && (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span data-testid="text-syncing-status">Syncing...</span>
@@ -138,7 +177,7 @@ export function NetworkStatusIndicator() {
             }
           </>
         )}
-        {isOnline && !isSyncing && !hasPermanentFailures && pendingCount > 0 && (
+        {isOnline && !isWsReconnecting && !isSyncing && !hasPermanentFailures && pendingCount > 0 && (
           <>
             <CloudUpload className="h-3.5 w-3.5" />
             <span data-testid="text-pending-status">

@@ -47,6 +47,7 @@ import SessionProgress from "./session/SessionProgress";
 import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename } from "./session/utils";
 import { useTimezone } from "@/hooks/use-timezone";
+import { setWsReconnectState } from "@/components/NetworkStatusIndicator";
 import { formatSessionTimeWithTz, formatSessionTimeMobile, formatTimestamp } from "@/lib/timezone";
 import { useUndoRedo } from "@/hooks/use-undo";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
@@ -364,6 +365,13 @@ function SessionWorkspace({
     }, 1000);
     return () => clearInterval(interval);
   }, [wsStatus, reconnectDelayMs]);
+
+  // Publish WS reconnect state to the global NetworkStatusIndicator so the
+  // mobile bottom pill can show the live countdown without prop drilling.
+  useEffect(() => {
+    setWsReconnectState(wsStatus, reconnectCountdown);
+    return () => { setWsReconnectState("connected", null); };
+  }, [wsStatus, reconnectCountdown]);
 
   const isMutating = useIsMutating();
   useEffect(() => {
