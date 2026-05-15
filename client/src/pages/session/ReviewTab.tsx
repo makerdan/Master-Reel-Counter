@@ -663,8 +663,14 @@ export default function ReviewTab({
 
   // ── Reveal timer state ─────────────────────────────────────────────────────
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Guards writes to sessionStorage until after the restore attempt has run.
+  // Prevents the initial render (currentIndex = 0) from overwriting a stored
+  // position before the restore effect has had a chance to read it.
+  const hasRestoredPosition = useRef(false);
   // Persist position to sessionStorage so it survives a hard reload.
+  // Skipped until hasRestoredPosition is true (set by the restore effect below).
   useEffect(() => {
+    if (!hasRestoredPosition.current) return;
     try { sessionStorage.setItem(posSKey(sessionId, currentUserId), String(currentIndex)); } catch {}
   }, [currentIndex, sessionId, currentUserId]);
   const hasAutoAdvanced = useRef(false);
@@ -673,6 +679,8 @@ export default function ReviewTab({
 
   // On first load, restore from sessionStorage if available and within bounds;
   // otherwise jump to the first unreviewed entry in the reordered list.
+  // Always marks hasRestoredPosition = true before returning so that
+  // subsequent currentIndex changes are persisted normally.
   useEffect(() => {
     if (hasAutoAdvanced.current) return;
     if (orderedEntries.length === 0 || responsesLoading) return;
@@ -683,6 +691,7 @@ export default function ReviewTab({
         if (!isNaN(n) && n >= 0 && n < displayEntries.length) {
           setCurrentIndex(n);
           hasAutoAdvanced.current = true;
+          hasRestoredPosition.current = true;
           return;
         }
       }
@@ -690,6 +699,7 @@ export default function ReviewTab({
     const firstUnreviewed = orderedEntries.findIndex(e => !myResponses.has(e.id));
     if (firstUnreviewed > 0) setCurrentIndex(firstUnreviewed);
     hasAutoAdvanced.current = true;
+    hasRestoredPosition.current = true;
   }, [orderedEntries, myResponses, responsesLoading, sessionId, currentUserId, displayEntries.length]);
 
   // Wall-clock timestamps when each entry's reveal timer was started.
