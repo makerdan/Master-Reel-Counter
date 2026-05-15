@@ -38,6 +38,7 @@ const pdfJobs = new Map<string, {
   filename?: string;
   createdAt: number;
   userId: string;
+  sessionId: number;
 }>();
 setInterval(() => {
   const cutoff = Date.now() - 15 * 60 * 1000;
@@ -2815,7 +2816,8 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const jobId = randomUUID();
-      pdfJobs.set(jobId, { done: 0, total: 0, complete: false, createdAt: Date.now(), userId });
+      const sessionId = parseInt(req.params.id);
+      pdfJobs.set(jobId, { done: 0, total: 0, complete: false, createdAt: Date.now(), userId, sessionId });
       res.json({ jobId });
     } catch {
       res.status(500).json({ message: "Failed to create PDF job" });
@@ -2825,16 +2827,18 @@ export async function registerRoutes(
   // GET /api/sessions/:id/export/pdf/progress/:jobId — poll generation progress
   app.get("/api/sessions/:id/export/pdf/progress/:jobId", isAuthenticated, (req: any, res) => {
     const userId = resolveUserId(req);
+    const routeSessionId = parseInt(req.params.id);
     const job = pdfJobs.get(req.params.jobId);
-    if (!job || job.userId !== userId) return res.status(404).json({ error: "Job not found" });
+    if (!job || job.userId !== userId || job.sessionId !== routeSessionId) return res.status(404).json({ error: "Job not found" });
     res.json({ done: job.done, total: job.total, complete: job.complete, error: job.error });
   });
 
   // GET /api/sessions/:id/export/pdf/download/:jobId — retrieve completed PDF buffer
   app.get("/api/sessions/:id/export/pdf/download/:jobId", isAuthenticated, (req: any, res) => {
     const userId = resolveUserId(req);
+    const routeSessionId = parseInt(req.params.id);
     const job = pdfJobs.get(req.params.jobId);
-    if (!job || job.userId !== userId) return res.status(404).json({ error: "Job not found" });
+    if (!job || job.userId !== userId || job.sessionId !== routeSessionId) return res.status(404).json({ error: "Job not found" });
     if (!job.complete) return res.status(202).json({ message: "Not ready" });
     if (job.error) return res.status(500).json({ error: job.error });
     if (!job.buffer) return res.status(500).json({ error: "No buffer" });
