@@ -7,7 +7,7 @@ import {
   Download, Camera, Keyboard, Sun, Moon, Monitor, Target,
   ChevronDown, FileText, Globe, Upload, Trash2,
   HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
-  Users, UserCheck, UserX,
+  Users, UserCheck, UserX, Activity,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -233,6 +233,27 @@ export default function SettingsPage() {
       if (!res.ok) return null;
       return res.json();
     },
+    retry: false,
+  });
+
+  const { data: crashData, isLoading: crashDataLoading } = useQuery<{
+    count: number;
+    crashes: Array<{
+      timestamp: string;
+      type: "uncaughtException" | "unhandledRejection";
+      fatal: boolean;
+      message: string;
+      stack?: string;
+    }>;
+  }>({
+    queryKey: ["/api/admin/crashes"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/crashes", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    staleTime: 30_000,
     retry: false,
   });
 
@@ -2128,6 +2149,86 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {!user?.isTester && adminUsers && Array.isArray(adminUsers) && crashData && (
+          <Card data-testid="card-crash-history">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-base">Crash History</CardTitle>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/crashes"] })}
+                    data-testid="button-refresh-crashes"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Badge variant="secondary" data-testid="badge-crash-count">
+                    {crashData.count} record{crashData.count !== 1 ? "s" : ""}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {crashDataLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading crash history...
+                </div>
+              ) : crashData.crashes.length === 0 ? (
+                <p className="text-sm text-muted-foreground" data-testid="text-no-crashes">No crashes recorded.</p>
+              ) : (
+                <div className="space-y-2" data-testid="list-crashes">
+                  {[...crashData.crashes].reverse().map((crash, i) => (
+                    <Collapsible key={i} data-testid={`crash-record-${i}`}>
+                      <div className={`rounded-md border ${crash.fatal ? "border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-950/20" : "border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/20"}`}>
+                        <div className="flex items-start gap-2 p-2.5">
+                          <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${crash.fatal ? "text-red-500" : "text-amber-500"}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-medium mono" data-testid={`crash-timestamp-${i}`}>
+                                {new Date(crash.timestamp).toLocaleString()}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] h-4 px-1 ${crash.fatal ? "border-red-300 text-red-600 dark:border-red-700 dark:text-red-400" : "border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400"}`}
+                                data-testid={`crash-fatal-${i}`}
+                              >
+                                {crash.fatal ? "fatal" : "non-fatal"}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] h-4 px-1 text-muted-foreground" data-testid={`crash-type-${i}`}>
+                                {crash.type}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-foreground mt-0.5 break-words" data-testid={`crash-message-${i}`}>{crash.message}</p>
+                          </div>
+                          {crash.stack && (
+                            <CollapsibleTrigger asChild>
+                              <button className="shrink-0 mt-0.5" data-testid={`crash-expand-${i}`} aria-label="Toggle stack trace">
+                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
+                              </button>
+                            </CollapsibleTrigger>
+                          )}
+                        </div>
+                        {crash.stack && (
+                          <CollapsibleContent>
+                            <div className="px-2.5 pb-2.5">
+                              <pre className="text-[10px] leading-relaxed text-muted-foreground overflow-x-auto whitespace-pre-wrap break-words bg-muted/50 rounded p-2 max-h-48" data-testid={`crash-stack-${i}`}>{crash.stack}</pre>
+                            </div>
+                          </CollapsibleContent>
+                        )}
+                      </div>
+                    </Collapsible>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {!user?.isTester && adminUsers && Array.isArray(adminUsers) && (
           <Card data-testid="card-manage-users">
