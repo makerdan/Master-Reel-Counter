@@ -3543,12 +3543,12 @@ export async function registerRoutes(
         const bottomLimit = y + maxH;
 
         for (const e of entries) {
-          const entryLines: { text: string; fontSize: number; color: string; font: string; indent: boolean; corrupted?: boolean }[] = [];
+          const entryLines: { text: string; fontSize: number; color: string; font: string; indent: boolean }[] = [];
           const pinLabel = photoPins.find((p: any) => p.entryId === e.id)?.label;
           const rawTag = e.reelTag || e.wireType;
           const tagDisplay = rawTag && !isSentinel(rawTag) ? rawTag : (isSentinel(rawTag) ? CORRUPT_DISPLAY : "Entry");
           const header = pinLabel ? `${formatPinLabel(String(pinLabel))} — ${tagDisplay}` : tagDisplay;
-          entryLines.push({ text: header, fontSize: 6.5, color: isSentinel(rawTag) ? "#999999" : accentHex, font: isSentinel(rawTag) ? 'Helvetica-Oblique' : 'Helvetica-Bold', indent: false, corrupted: isSentinel(rawTag) });
+          entryLines.push({ text: header, fontSize: 6.5, color: isSentinel(rawTag) ? "#999999" : accentHex, font: isSentinel(rawTag) ? 'Helvetica-Oblique' : 'Helvetica-Bold', indent: false });
 
           const details: string[] = [];
           const detailCorrupted: boolean[] = [];
@@ -3565,9 +3565,9 @@ export async function registerRoutes(
           const slice2Corrupted = detailCorrupted.slice(3).some(Boolean);
           const line1 = slice1.join("  •  ");
           const line2 = slice2.join("  •  ");
-          if (line1) entryLines.push({ text: line1, fontSize: 5.5, color: slice1Corrupted ? "#999999" : "#333333", font: slice1Corrupted ? 'Helvetica-Oblique' : 'Helvetica', indent: true, corrupted: slice1Corrupted });
-          if (line2) entryLines.push({ text: line2, fontSize: 5.5, color: slice2Corrupted ? "#999999" : "#333333", font: slice2Corrupted ? 'Helvetica-Oblique' : 'Helvetica', indent: true, corrupted: slice2Corrupted });
-          if (e.notes) entryLines.push({ text: `Notes: ${fmtSentinel(e.notes)}`, fontSize: 5, color: isSentinel(e.notes) ? "#999999" : "#666666", font: isSentinel(e.notes) ? 'Helvetica-Oblique' : 'Helvetica', indent: true, corrupted: isSentinel(e.notes) });
+          if (line1) entryLines.push({ text: line1, fontSize: 5.5, color: slice1Corrupted ? "#999999" : "#333333", font: slice1Corrupted ? 'Helvetica-Oblique' : 'Helvetica', indent: true });
+          if (line2) entryLines.push({ text: line2, fontSize: 5.5, color: slice2Corrupted ? "#999999" : "#333333", font: slice2Corrupted ? 'Helvetica-Oblique' : 'Helvetica', indent: true });
+          if (e.notes) entryLines.push({ text: `Notes: ${fmtSentinel(e.notes)}`, fontSize: 5, color: isSentinel(e.notes) ? "#999999" : "#666666", font: isSentinel(e.notes) ? 'Helvetica-Oblique' : 'Helvetica', indent: true });
 
           const neededH = entryLines.length * (lineH - 1) + 4;
           if (listY + neededH > bottomLimit) {
