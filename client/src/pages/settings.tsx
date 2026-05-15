@@ -210,6 +210,12 @@ export default function SettingsPage() {
     totalPhotoCount: number;
     distinctUserCount: number;
     stalledIntentCount: number;
+    stalledIntentsByUser: Array<{
+      userId: string;
+      displayName: string;
+      count: number;
+      oldestAgeMinutes: number;
+    }>;
   }>({
     queryKey: ["/api/storage/global-usage"],
     queryFn: async () => {
@@ -707,12 +713,45 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 {globalUsage.stalledIntentCount > 0 && (
-                  <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-md p-2.5" data-testid="banner-stalled-intents">
-                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                    <p className="text-xs text-amber-700 dark:text-amber-400">
-                      <span className="font-medium">{globalUsage.stalledIntentCount} upload intent{globalUsage.stalledIntentCount !== 1 ? "s" : ""} older than 1 hour</span> — likely stalled and will be purged by the hourly cleanup job.
-                    </p>
-                  </div>
+                  <Collapsible data-testid="banner-stalled-intents">
+                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-md">
+                      <CollapsibleTrigger asChild>
+                        <button className="flex items-center gap-2 w-full p-2.5 text-left" data-testid="btn-stalled-intents-expand">
+                          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                          <p className="text-xs text-amber-700 dark:text-amber-400 flex-1">
+                            <span className="font-medium">{globalUsage.stalledIntentCount} upload intent{globalUsage.stalledIntentCount !== 1 ? "s" : ""} older than 1 hour</span> — likely stalled and will be purged by the hourly cleanup job.
+                          </p>
+                          <ChevronDown className="h-3.5 w-3.5 text-amber-500 shrink-0 transition-transform [[data-state=open]_&]:rotate-180" />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-2.5 pb-2.5">
+                          <table className="w-full text-xs" data-testid="table-stalled-intents-by-user">
+                            <thead>
+                              <tr className="text-amber-600 dark:text-amber-500 border-t border-amber-200 dark:border-amber-800/50">
+                                <th className="text-left py-1.5 font-medium">User</th>
+                                <th className="text-right py-1.5 font-medium">Count</th>
+                                <th className="text-right py-1.5 font-medium">Oldest</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(globalUsage.stalledIntentsByUser ?? []).map((row) => (
+                                <tr key={row.userId} className="border-t border-amber-100 dark:border-amber-900/40" data-testid={`row-stalled-user-${row.userId}`}>
+                                  <td className="py-1 text-amber-700 dark:text-amber-400 font-medium truncate max-w-[140px]" title={row.displayName}>{row.displayName}</td>
+                                  <td className="py-1 text-right text-amber-700 dark:text-amber-400 mono">{row.count}</td>
+                                  <td className="py-1 text-right text-amber-600 dark:text-amber-500">
+                                    {row.oldestAgeMinutes >= 60
+                                      ? `${Math.floor(row.oldestAgeMinutes / 60)}h ${row.oldestAgeMinutes % 60}m`
+                                      : `${row.oldestAgeMinutes}m`}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
                 )}
               </CardContent>
             </Card>

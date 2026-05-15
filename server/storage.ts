@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { eq, and, desc, asc, inArray, sql, count, sum, min, max, ilike, or, isNull, isNotNull, lt } from "drizzle-orm";
+import { users } from "@shared/models/auth";
 import {
   countingSessions,
   photos,
@@ -299,6 +300,12 @@ export interface IStorage {
     totalPhotoCount: number;
     distinctUserCount: number;
     stalledIntentCount: number;
+    stalledIntentsByUser: Array<{
+      userId: string;
+      displayName: string;
+      count: number;
+      oldestAgeMinutes: number;
+    }>;
   }>;
 
   getUserStats(userId: string): Promise<{
@@ -2509,6 +2516,12 @@ export class DatabaseStorage implements IStorage {
     totalPhotoCount: number;
     distinctUserCount: number;
     stalledIntentCount: number;
+    stalledIntentsByUser: Array<{
+      userId: string;
+      displayName: string;
+      count: number;
+      oldestAgeMinutes: number;
+    }>;
   }> {
     const result = await db.select({
       totalSize: sql<string>`coalesce(sum(${photos.fileSize}), 0)`,
@@ -2525,11 +2538,39 @@ export class DatabaseStorage implements IStorage {
       .from(uploadIntents)
       .where(lt(uploadIntents.createdAt, oneHourAgo));
 
+    const perUserRows = await db.select({
+      userId: uploadIntents.userId,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      intentCount: sql<string>`count(*)`,
+      oldestCreatedAt: sql<string>`min(${uploadIntents.createdAt})`,
+    })
+      .from(uploadIntents)
+      .leftJoin(users, eq(users.id, uploadIntents.userId))
+      .where(lt(uploadIntents.createdAt, oneHourAgo))
+      .groupBy(uploadIntents.userId, users.firstName, users.lastName, users.email)
+      .orderBy(sql`count(*) desc`);
+
+    const now = Date.now();
+    const stalledIntentsByUser = perUserRows.map((row) => {
+      const parts = [row.firstName, row.lastName].filter(Boolean);
+      const displayName = parts.length > 0 ? parts.join(" ") : (row.email ?? row.userId);
+      const oldestMs = row.oldestCreatedAt ? new Date(row.oldestCreatedAt).getTime() : now;
+      return {
+        userId: row.userId,
+        displayName,
+        count: parseInt(row.intentCount, 10),
+        oldestAgeMinutes: Math.floor((now - oldestMs) / 60_000),
+      };
+    });
+
     return {
       totalBytes: parseInt(result[0]?.totalSize || "0", 10),
       totalPhotoCount: parseInt(result[0]?.photoCount || "0", 10),
       distinctUserCount: parseInt(result[0]?.userCount || "0", 10),
       stalledIntentCount: parseInt(stalledResult[0]?.stalledCount || "0", 10),
+      stalledIntentsByUser,
     };
   }
 
