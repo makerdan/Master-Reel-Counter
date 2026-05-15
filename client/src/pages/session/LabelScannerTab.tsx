@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo, Fragment } from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -2161,7 +2161,7 @@ export default function LabelScannerTab({
             ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
             : "grid-cols-1 sm:grid-cols-2"
         }`}>
-        {displayCards.map((card) => {
+        {displayCards.map((card, cardIdx) => {
           const hasFilled = !!(card.pin.wireDetails && card.pin.footage);
           const isFromOtherPhoto = card.pin.photoId !== currentPhotoId;
           const pinPhotoObj = photos.find((p) => p.id === card.pin.photoId) ?? null;
@@ -2169,9 +2169,47 @@ export default function LabelScannerTab({
           const batchPhotoObj = batchMode ? pinPhotoObj || photo : null;
           const cardPhotoUrl = (batchMode || isFromOtherPhoto) ? getPhotoUrl(batchPhotoObj || cardPhotoObj || pinPhotoObj) : photoUrl;
           const isBatch = batchMode && phase === "preview";
+          const isFirstInPhotoGroup = batchMode && phase === "results" && (
+            cardIdx === 0 || displayCards[cardIdx - 1].pin.photoId !== card.pin.photoId
+          );
+          const photoGroupIsRetrying = batchMode && phase === "results" && retryingPhotoIds.has(card.pin.photoId);
+          const photoGroupHasFailures = isFirstInPhotoGroup && displayCards.some(
+            c => c.pin.photoId === card.pin.photoId && c.notAnalyzedReason === "failed"
+          );
           return (
+            <Fragment key={card.pin.id}>
+              {isFirstInPhotoGroup && (
+                <div
+                  className="col-span-full flex items-center gap-2 px-3 py-2 border rounded-lg bg-[hsl(25_15%_13%)] border-[hsl(215_30%_50%/0.25)]"
+                  data-testid={`batch-photo-header-${card.pin.photoId}`}
+                >
+                  <span className="text-xs font-semibold text-white/70">
+                    {pinPhotoObj?.aisle ? `Aisle ${pinPhotoObj.aisle}` : `Photo ${photos.findIndex(p => p.id === card.pin.photoId) + 1}`}
+                    {pinPhotoObj?.section ? ` / Section ${pinPhotoObj.section}` : ""}
+                  </span>
+                  <Badge className="text-[9px] bg-white/10 text-white/50 border-0 py-0 px-1.5">
+                    {displayCards.filter(c => c.pin.photoId === card.pin.photoId).length} pin{displayCards.filter(c => c.pin.photoId === card.pin.photoId).length !== 1 ? "s" : ""}
+                  </Badge>
+                  {(photoGroupHasFailures || photoGroupIsRetrying) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRetryPhoto(card.pin.photoId)}
+                      disabled={analyzing || photoGroupIsRetrying}
+                      className="ml-auto h-6 gap-1 px-2 text-[11px] border-red-700/50 text-red-300 hover:text-red-200 hover:bg-red-900/20 disabled:opacity-50"
+                      data-testid={`btn-retry-photo-header-${card.pin.photoId}`}
+                    >
+                      {photoGroupIsRetrying ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCw className="h-3 w-3" />
+                      )}
+                      {photoGroupIsRetrying ? "Retrying…" : "Retry Photo"}
+                    </Button>
+                  )}
+                </div>
+              )}
             <div
-              key={card.pin.id}
               className={`rounded-lg border ${isBatch ? "p-2 space-y-1" : "p-3 space-y-2"} transition-colors ${
                 card.included
                   ? "bg-[hsl(25_12%_16%)] border-[hsl(215_30%_50%/0.3)]"
@@ -2428,6 +2466,7 @@ export default function LabelScannerTab({
                 </div>
               )}
             </div>
+            </Fragment>
           );
         })}
       </div>
