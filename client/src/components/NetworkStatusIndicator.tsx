@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { WifiOff, Loader2, CloudUpload, AlertTriangle, RefreshCw, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useAuth } from "@/hooks/use-auth";
+import { useWsReconnect } from "@/hooks/use-ws-reconnect";
 
 function entryLabel(data: Record<string, unknown>): string {
   const parts: string[] = [];
@@ -14,37 +15,22 @@ function entryLabel(data: Record<string, unknown>): string {
   return [loc, detail].filter(Boolean).join(" — ") || "Unknown entry";
 }
 
-// ---------------------------------------------------------------------------
-// Module-level WS reconnect state store.
-// session.tsx calls setWsReconnectState() to push live countdown updates.
-// NetworkStatusIndicator subscribes via useWsReconnectState().
-// ---------------------------------------------------------------------------
-interface WsReconnectState {
-  wsStatus: string;
-  countdown: number | null;
-}
-let _wsReconnect: WsReconnectState = { wsStatus: "connected", countdown: null };
-const _wsListeners = new Set<() => void>();
-
-export function setWsReconnectState(wsStatus: string, countdown: number | null) {
-  _wsReconnect = { wsStatus, countdown };
-  _wsListeners.forEach((fn) => fn());
+interface NetworkStatusIndicatorProps {
+  wsStatus?: string;
+  reconnectCountdown?: number | null;
 }
 
-function useWsReconnectState(): WsReconnectState {
-  const [state, setState] = useState<WsReconnectState>(_wsReconnect);
-  useEffect(() => {
-    const handler = () => setState({ ..._wsReconnect });
-    _wsListeners.add(handler);
-    return () => { _wsListeners.delete(handler); };
-  }, []);
-  return state;
-}
-
-export function NetworkStatusIndicator() {
+export function NetworkStatusIndicator({
+  wsStatus: wsProp,
+  reconnectCountdown: countdownProp,
+}: NetworkStatusIndicatorProps = {}) {
   const { user } = useAuth();
   const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, failedEntries } = useNetworkStatus(user?.id);
-  const { wsStatus, countdown: reconnectCountdown } = useWsReconnectState();
+  const ctx = useWsReconnect();
+  // Props take priority over context (allows direct rendering with explicit values).
+  const wsStatus = wsProp !== undefined ? wsProp : ctx.wsStatus;
+  const reconnectCountdown = countdownProp !== undefined ? countdownProp : ctx.reconnectCountdown;
+
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 

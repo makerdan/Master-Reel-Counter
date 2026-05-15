@@ -47,7 +47,7 @@ import SessionProgress from "./session/SessionProgress";
 import HelpMenu from "@/components/HelpMenu";
 import { buildExportFilename } from "./session/utils";
 import { useTimezone } from "@/hooks/use-timezone";
-import { setWsReconnectState } from "@/components/NetworkStatusIndicator";
+import { useWsReconnect } from "@/hooks/use-ws-reconnect";
 import { formatSessionTimeWithTz, formatSessionTimeMobile, formatTimestamp } from "@/lib/timezone";
 import { useUndoRedo } from "@/hooks/use-undo";
 import { useSessionWebSocket } from "@/hooks/use-websocket";
@@ -341,6 +341,7 @@ function SessionWorkspace({
   const canEditSession = !isLocked || isOwner;
 
   const { user } = useAuth();
+  const { setWsReconnect } = useWsReconnect();
   const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
 
   const { wsStatus, reconnectDelayMs } = useSessionWebSocket(sessionId, (msg) => {
@@ -366,12 +367,16 @@ function SessionWorkspace({
     return () => clearInterval(interval);
   }, [wsStatus, reconnectDelayMs]);
 
-  // Publish WS reconnect state to the global NetworkStatusIndicator so the
-  // mobile bottom pill can show the live countdown without prop drilling.
+  // Push WS reconnect state into context so the global NetworkStatusIndicator
+  // pill can show the live countdown on mobile.
   useEffect(() => {
-    setWsReconnectState(wsStatus, reconnectCountdown);
-    return () => { setWsReconnectState("connected", null); };
-  }, [wsStatus, reconnectCountdown]);
+    setWsReconnect(wsStatus, reconnectCountdown);
+  }, [wsStatus, reconnectCountdown, setWsReconnect]);
+
+  // Reset context only on unmount so the pill disappears when leaving the page.
+  useEffect(() => {
+    return () => { setWsReconnect("connected", null); };
+  }, []);
 
   const isMutating = useIsMutating();
   useEffect(() => {

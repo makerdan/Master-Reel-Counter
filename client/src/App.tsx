@@ -19,6 +19,7 @@ import TesterLoginPage from "@/pages/tester-login";
 import PendingApproval from "@/pages/pending-approval";
 import NotFound from "@/pages/not-found";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
+import { WsReconnectProvider } from "@/hooks/use-ws-reconnect";
 
 const TEXT_SIZE_MAP: Record<string, string> = {
   small: "14px",
@@ -102,13 +103,15 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <TooltipProvider>
-            <Toaster />
-            <ThemeSyncer />
-            <TextSizeSyncer />
-            <NetworkStatusIndicator />
-            <AuthRouter />
-          </TooltipProvider>
+          <WsReconnectProvider>
+            <TooltipProvider>
+              <Toaster />
+              <ThemeSyncer />
+              <TextSizeSyncer />
+              <NetworkStatusIndicator />
+              <AuthRouter />
+            </TooltipProvider>
+          </WsReconnectProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>
