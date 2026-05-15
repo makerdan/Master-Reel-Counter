@@ -1958,11 +1958,12 @@ export async function registerRoutes(
       const MAX_BATCH = 20;
       const allResults: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> = [];
       let anyTruncated = false;
+      let totalSkipped = 0;
 
       for (let i = 0; i < pinData.length; i += MAX_BATCH) {
         const batch = pinData.slice(i, i + MAX_BATCH);
         try {
-          const { results: crops, truncated: batchTruncated } = await cropPhoto(orientedBuffer, batch.map((p: any) => ({
+          const { results: crops, truncated: batchTruncated, skippedCount } = await cropPhoto(orientedBuffer, batch.map((p: any) => ({
             pinId: p.pinId,
             x: p.x,
             y: p.y,
@@ -1970,7 +1971,8 @@ export async function registerRoutes(
           })));
           if (batchTruncated) {
             anyTruncated = true;
-            console.warn(`[analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}`);
+            totalSkipped += skippedCount;
+            console.warn(`[analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}, skipped=${skippedCount}`);
           }
 
           const imageMessages = crops.map((crop) => ({
@@ -2049,7 +2051,7 @@ export async function registerRoutes(
         console.error("[analyze-labels] Failed to persist scan results:", e);
       }
 
-      res.json({ ...cacheEntry, truncated: anyTruncated });
+      res.json({ ...cacheEntry, truncated: anyTruncated, truncatedCount: totalSkipped });
     } catch (error) {
       console.error("Error analyzing labels:", error);
       res.status(500).json({ message: "Failed to analyze labels" });
@@ -2106,6 +2108,7 @@ export async function registerRoutes(
       const allResults: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> = [];
       const totalBatches = Math.ceil(allCropRequests.length / MAX_BATCH);
       let anyTruncated = false;
+      let totalSkipped = 0;
 
       for (let i = 0; i < allCropRequests.length; i += MAX_BATCH) {
         const batch = allCropRequests.slice(i, i + MAX_BATCH);
@@ -2119,7 +2122,7 @@ export async function registerRoutes(
           const crops: Array<{ pinId: number; base64: string }> = [];
           for (const [photoId, items] of cropsByPhoto) {
             const buf = photoBufferMap.get(photoId)!;
-            const { results: photoCrops, truncated: photoTruncated } = await cropPhoto(buf, items.map((it) => ({
+            const { results: photoCrops, truncated: photoTruncated, skippedCount } = await cropPhoto(buf, items.map((it) => ({
               pinId: it.pinId,
               x: it.x,
               y: it.y,
@@ -2127,7 +2130,8 @@ export async function registerRoutes(
             })));
             if (photoTruncated) {
               anyTruncated = true;
-              console.warn(`[session-analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}`);
+              totalSkipped += skippedCount;
+              console.warn(`[session-analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}, skipped=${skippedCount}`);
             }
             crops.push(...photoCrops);
           }
@@ -2214,7 +2218,7 @@ export async function registerRoutes(
         console.error("[session-analyze-labels] Failed to persist scan results:", e);
       }
 
-      res.json({ results: allResults, totalBatches, truncated: anyTruncated });
+      res.json({ results: allResults, totalBatches, truncated: anyTruncated, truncatedCount: totalSkipped });
     } catch (error) {
       console.error("Error analyzing session labels:", error);
       res.status(500).json({ message: "Failed to analyze labels" });

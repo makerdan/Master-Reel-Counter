@@ -15,6 +15,7 @@ interface CropResult {
 export interface CropPhotoResult {
   results: CropResult[];
   truncated: boolean;
+  skippedCount: number;
 }
 
 const MIN_ZOOM = 0.005;
@@ -78,5 +79,5 @@ export async function cropPhoto(
     }
   }
 
-  return { results, truncated };
+  return { results, truncated, skippedCount: pins.length - results.length };
 }
