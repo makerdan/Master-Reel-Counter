@@ -426,8 +426,12 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
 
   const unflagGroupMutation = useMutation({
     mutationFn: async (pins: { id: number; entryId: number | null; flagReason: string | null; entryNotes: string | null }[]) => {
+      const results: { pinId: number; flagReason: string | null; unflagToken: string | undefined }[] = [];
       for (const pin of pins) {
-        await apiRequest("PATCH", `/api/pins/${pin.id}/flag`, { flagged: false, flagReason: null });
+        const unflagRes = await apiRequest("PATCH", `/api/pins/${pin.id}/flag`, { flagged: false, flagReason: null });
+        const unflagUpdated = await unflagRes.json().catch(() => null);
+        const unflagToken: string | undefined = unflagUpdated?.updatedAt ? new Date(unflagUpdated.updatedAt as unknown as string).toISOString() : undefined;
+        results.push({ pinId: pin.id, flagReason: pin.flagReason, unflagToken });
       }
       const entryUpdates = new Map<number, { baseNotes: string | null; markers: string[] }>();
       for (const pin of pins) {
@@ -444,8 +448,12 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
         const updatedNotes = baseNotes ? `${baseNotes}\n${combined}` : combined;
         await apiRequest("PATCH", `/api/entries/${entryId}`, { notes: updatedNotes });
       }
+      return results;
     },
-    onSuccess: () => {
+    onSuccess: (results) => {
+      for (const { pinId, flagReason, unflagToken } of results) {
+        pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason }, serverUpdatedAt: unflagToken });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
