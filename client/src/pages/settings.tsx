@@ -298,11 +298,11 @@ export default function SettingsPage() {
         res.json() as Promise<{ scanned: number; deleted: number; skipped: number; errors: number; nextPageToken: string | null; minAgeDays: number }>
       ),
     onSuccess: (data) => {
-      const errorNote = data.errors > 0 ? ` ${data.errors} deletion error(s).` : "";
-      const pageNote = data.nextPageToken ? " More pages remain — run again to continue." : "";
+      const remaining = data.errors;
+      const runAgain = remaining > 0 || data.nextPageToken !== null;
       toast({
         title: "Orphan sweep complete",
-        description: `Scanned ${data.scanned}, deleted ${data.deleted}, skipped ${data.skipped}.${errorNote}${pageNote}`,
+        description: `Scanned ${data.scanned}, deleted ${data.deleted}, skipped ${data.skipped}. Remaining: ${remaining}.${runAgain ? " Run again to continue." : ""}`,
       });
     },
     onError: () => {
@@ -702,7 +702,7 @@ export default function SettingsPage() {
                     <CardTitle className="text-base">App-Wide Storage</CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!user?.isTester && (
+                    {!user?.isTester && adminUsers && Array.isArray(adminUsers) && (
                       <Button
                         variant="outline"
                         size="sm"
