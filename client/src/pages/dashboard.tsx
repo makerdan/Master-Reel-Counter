@@ -1122,14 +1122,25 @@ export default function Dashboard() {
                     data-testid={`input-inline-rename-${session.id}`}
                   />
                 ) : (
-                  <h3
-                    className={`font-semibold text-sm truncate${!isShared ? " cursor-text hover:text-primary transition-colors" : ""}`}
-                    data-testid={`text-${prefix}session-name-${session.id}`}
+                  <div
+                    className={`inline-flex items-center gap-1 min-w-0 max-w-full${!isShared ? " group/rename cursor-text" : ""}`}
                     onClick={!isShared ? (e) => { e.stopPropagation(); setInlineRenameId(session.id); setInlineRenameValue(session.name); } : undefined}
                     title={!isShared ? "Click to rename" : undefined}
+                    data-testid={`btn-rename-hint-${session.id}`}
                   >
-                    {session.name}
-                  </h3>
+                    <h3
+                      className={`font-semibold text-sm truncate${!isShared ? " group-hover/rename:text-primary transition-colors" : ""}`}
+                      data-testid={`text-${prefix}session-name-${session.id}`}
+                    >
+                      {session.name}
+                    </h3>
+                    {!isShared && (
+                      <Pencil
+                        className="h-3 w-3 shrink-0 text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover/rename:opacity-100 transition-opacity"
+                        data-testid={`icon-rename-hint-${session.id}`}
+                      />
+                    )}
+                  </div>
                 )}
                 <Badge
                   variant={session.status === "active" ? "default" : "secondary"}
