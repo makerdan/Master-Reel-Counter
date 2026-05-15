@@ -289,12 +289,15 @@ export interface IStorage {
     userPhotoCount: number;
     userSessionCount: number;
     unknownSizeCount: number;
+    pendingIntentCount: number;
+    oldestIntentAgeMinutes: number | null;
   }>;
 
   getGlobalStorageUsage(): Promise<{
     totalBytes: number;
     totalPhotoCount: number;
     distinctUserCount: number;
+    stalledIntentCount: number;
   }>;
 
   getUserStats(userId: string): Promise<{
@@ -2421,6 +2424,8 @@ export class DatabaseStorage implements IStorage {
     userPhotoCount: number;
     userSessionCount: number;
     unknownSizeCount: number;
+    pendingIntentCount: number;
+    oldestIntentAgeMinutes: number | null;
   }> {
     const userSessionRows = await db.select({ id: countingSessions.id })
       .from(countingSessions)
@@ -2443,11 +2448,26 @@ export class DatabaseStorage implements IStorage {
       unknownSizeCount = parseInt(userResult[0]?.unknownCount || "0", 10);
     }
 
+    const intentResult = await db.select({
+      intentCount: sql<string>`count(*)`,
+      oldestCreatedAt: sql<string | null>`min(${uploadIntents.createdAt})`,
+    })
+      .from(uploadIntents)
+      .where(eq(uploadIntents.userId, userId));
+
+    const pendingIntentCount = parseInt(intentResult[0]?.intentCount || "0", 10);
+    const oldestRaw = intentResult[0]?.oldestCreatedAt ?? null;
+    const oldestIntentAgeMinutes = oldestRaw
+      ? Math.floor((Date.now() - new Date(oldestRaw).getTime()) / 60_000)
+      : null;
+
     return {
       userBytes,
       userPhotoCount,
       userSessionCount: userSessionIds.length,
       unknownSizeCount,
+      pendingIntentCount,
+      oldestIntentAgeMinutes,
     };
   }
 
@@ -2455,6 +2475,7 @@ export class DatabaseStorage implements IStorage {
     totalBytes: number;
     totalPhotoCount: number;
     distinctUserCount: number;
+    stalledIntentCount: number;
   }> {
     const result = await db.select({
       totalSize: sql<string>`coalesce(sum(${photos.fileSize}), 0)`,
@@ -2464,10 +2485,18 @@ export class DatabaseStorage implements IStorage {
       .from(photos)
       .innerJoin(countingSessions, eq(photos.sessionId, countingSessions.id));
 
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const stalledResult = await db.select({
+      stalledCount: sql<string>`count(*)`,
+    })
+      .from(uploadIntents)
+      .where(lt(uploadIntents.createdAt, oneHourAgo));
+
     return {
       totalBytes: parseInt(result[0]?.totalSize || "0", 10),
       totalPhotoCount: parseInt(result[0]?.photoCount || "0", 10),
       distinctUserCount: parseInt(result[0]?.userCount || "0", 10),
+      stalledIntentCount: parseInt(stalledResult[0]?.stalledCount || "0", 10),
     };
   }
 

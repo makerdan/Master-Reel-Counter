@@ -193,6 +193,8 @@ export default function SettingsPage() {
     userPhotoCount: number;
     userSessionCount: number;
     unknownSizeCount: number;
+    pendingIntentCount: number;
+    oldestIntentAgeMinutes: number | null;
   }>({
     queryKey: ["/api/storage/usage"],
   });
@@ -201,6 +203,7 @@ export default function SettingsPage() {
     totalBytes: number;
     totalPhotoCount: number;
     distinctUserCount: number;
+    stalledIntentCount: number;
   }>({
     queryKey: ["/api/storage/global-usage"],
     queryFn: async () => {
@@ -608,6 +611,21 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                   )}
+                  {storageUsage.pendingIntentCount > 0 && (
+                    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-md p-2.5" data-testid="banner-pending-uploads">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        <span className="font-medium">{storageUsage.pendingIntentCount} pending upload{storageUsage.pendingIntentCount !== 1 ? "s" : ""}</span>
+                        {storageUsage.oldestIntentAgeMinutes !== null && (
+                          <> — oldest started {storageUsage.oldestIntentAgeMinutes < 60
+                            ? `${storageUsage.oldestIntentAgeMinutes}m`
+                            : `${Math.floor(storageUsage.oldestIntentAgeMinutes / 60)}h ${storageUsage.oldestIntentAgeMinutes % 60}m`} ago
+                          </>
+                        )}
+                        {storageUsage.oldestIntentAgeMinutes !== null && storageUsage.oldestIntentAgeMinutes >= 60 && " (may be stalled)"}
+                      </p>
+                    </div>
+                  )}
                 </>
               );
             })() : (
@@ -663,6 +681,14 @@ export default function SettingsPage() {
                     {globalUsage.totalPhotoCount} photo{globalUsage.totalPhotoCount !== 1 ? "s" : ""} across {globalUsage.distinctUserCount} user{globalUsage.distinctUserCount !== 1 ? "s" : ""}
                   </p>
                 </div>
+                {globalUsage.stalledIntentCount > 0 && (
+                  <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-md p-2.5" data-testid="banner-stalled-intents">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      <span className="font-medium">{globalUsage.stalledIntentCount} upload intent{globalUsage.stalledIntentCount !== 1 ? "s" : ""} older than 1 hour</span> — likely stalled and will be purged by the hourly cleanup job.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
