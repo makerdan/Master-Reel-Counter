@@ -197,13 +197,11 @@ export default function Dashboard() {
     () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
   );
   const [pdfDialogWaiting, setPdfDialogWaiting] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState<{done: number, total: number} | null>(null);
   const [exportSessionTarget, setExportSessionTarget] = useState<SessionWithStats | null>(null);
-  const fullAbortRef = useRef<AbortController | null>(null);
-  const stdAbortRef = useRef<AbortController | null>(null);
-  const fullBlobRef = useRef<Blob | null>(null);
-  const stdBlobRef = useRef<Blob | null>(null);
-  const fullFetchRef = useRef<Promise<Blob | null> | null>(null);
-  const stdFetchRef = useRef<Promise<Blob | null> | null>(null);
+  const fullJobRef = useRef<string | null>(null);
+  const stdJobRef  = useRef<string | null>(null);
+  const pdfPollAbortRef = useRef<AbortController | null>(null);
 
   const [folderConflict, setFolderConflict] = useState<{
     mode: "create" | "create-and-move";
@@ -879,71 +877,102 @@ export default function Dashboard() {
     }
   };
 
-  const buildPdfUrl = (sessionId: number, quality: "full" | "standard") => {
+  const buildPdfStartUrl = (sessionId: number, quality: "full" | "standard") => {
     const params = new URLSearchParams();
     if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
     if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
     params.set("quality", quality);
-    return `/api/sessions/${sessionId}/export/pdf?${params}`;
+    return `/api/sessions/${sessionId}/export/pdf/start?${params}`;
   };
 
-  const startPdfFetch = (sessionId: number, quality: "full" | "standard") => {
-    const ctrl = new AbortController();
-    if (quality === "full") fullAbortRef.current = ctrl;
-    else stdAbortRef.current = ctrl;
-    const p = fetch(buildPdfUrl(sessionId, quality), { credentials: "include", signal: ctrl.signal })
-      .then(async (res) => {
+  const pollPdfJob = async (
+    sessionId: number,
+    jobId: string,
+    signal: AbortSignal,
+    onProgress: (p: {done: number, total: number}) => void
+  ): Promise<Blob | null> => {
+    while (!signal.aborted) {
+      await new Promise<void>(r => setTimeout(r, 800));
+      if (signal.aborted) return null;
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/export/pdf/progress/${jobId}`, {
+          credentials: "include", signal,
+        });
         if (!res.ok) return null;
-        const blob = await res.blob();
-        return blob.size >= 500 ? blob : null;
+        const prog = await res.json();
+        if (prog.error) return null;
+        if (prog.total > 0) onProgress({ done: prog.done, total: prog.total });
+        if (prog.complete) {
+          const dlRes = await fetch(`/api/sessions/${sessionId}/export/pdf/download/${jobId}`, {
+            credentials: "include", signal,
+          });
+          if (!dlRes.ok) return null;
+          return await dlRes.blob();
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const startPdfJob = (sessionId: number, quality: "full" | "standard") => {
+    fetch(buildPdfStartUrl(sessionId, quality), { method: "POST", credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.jobId) return;
+        if (quality === "full") fullJobRef.current = data.jobId;
+        else stdJobRef.current = data.jobId;
       })
       .catch(() => null);
-    if (quality === "full") fullFetchRef.current = p;
-    else stdFetchRef.current = p;
-    p.then((blob) => {
-      if (quality === "full") fullBlobRef.current = blob;
-      else stdBlobRef.current = blob;
-    });
   };
 
   const abortPdfFetches = () => {
-    fullAbortRef.current?.abort(); fullAbortRef.current = null;
-    stdAbortRef.current?.abort(); stdAbortRef.current = null;
-    fullBlobRef.current = null; stdBlobRef.current = null;
-    fullFetchRef.current = null; stdFetchRef.current = null;
+    fullJobRef.current = null;
+    stdJobRef.current  = null;
+    pdfPollAbortRef.current?.abort();
+    pdfPollAbortRef.current = null;
+    setPdfProgress(null);
   };
 
   const handleExportPdf = (session: SessionWithStats) => {
     setExportSessionTarget(session);
     abortPdfFetches();
     setPdfQualityOpen(true);
-    startPdfFetch(session.id, "full");
-    startPdfFetch(session.id, "standard");
+    startPdfJob(session.id, "full");
+    startPdfJob(session.id, "standard");
   };
 
   const confirmPdfQualityExport = async () => {
     if (!exportSessionTarget) return;
     localStorage.setItem("pdfExportQuality", pdfQualityChoice);
-    if (pdfQualityChoice === "full") { stdAbortRef.current?.abort(); stdAbortRef.current = null; }
-    else { fullAbortRef.current?.abort(); fullAbortRef.current = null; }
-    const blobRef = pdfQualityChoice === "full" ? fullBlobRef : stdBlobRef;
-    const fetchRef = pdfQualityChoice === "full" ? fullFetchRef : stdFetchRef;
-    let blob = blobRef.current;
-    if (!blob) {
+    const sessionId = exportSessionTarget.id;
+    const jobId = pdfQualityChoice === "full" ? fullJobRef.current : stdJobRef.current;
+    if (!jobId) {
+      // Job ID not yet returned — wait briefly then try once more
       setPdfDialogWaiting(true);
-      blob = (await fetchRef.current) ?? null;
-      setPdfDialogWaiting(false);
+      await new Promise(r => setTimeout(r, 1500));
+      const retryJobId = pdfQualityChoice === "full" ? fullJobRef.current : stdJobRef.current;
+      if (!retryJobId) {
+        setPdfDialogWaiting(false);
+        toast({ title: "PDF Export Failed", description: "Export failed — Try again in a moment.", variant: "destructive" });
+        return;
+      }
     }
+    const finalJobId = pdfQualityChoice === "full" ? fullJobRef.current : stdJobRef.current;
+    if (!finalJobId) return;
+    setPdfDialogWaiting(true);
+    setPdfProgress(null);
+    const ctrl = new AbortController();
+    pdfPollAbortRef.current = ctrl;
+    const blob = await pollPdfJob(sessionId, finalJobId, ctrl.signal, setPdfProgress);
+    setPdfDialogWaiting(false);
     setPdfQualityOpen(false);
     const session = exportSessionTarget;
     setExportSessionTarget(null);
     abortPdfFetches();
-    if (!blob) {
-      toast({
-        title: "PDF Export Failed",
-        description: "Export failed — Try again in a moment.",
-        variant: "destructive",
-      });
+    if (!blob || blob.size < 500) {
+      toast({ title: "PDF Export Failed", description: "Export failed — Try again in a moment.", variant: "destructive" });
       return;
     }
     const url = URL.createObjectURL(blob);
@@ -2847,7 +2876,9 @@ export default function Dashboard() {
               {pdfDialogWaiting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating…
+                  {pdfProgress && pdfProgress.total > 0
+                    ? `Generating… ${pdfProgress.done} of ${pdfProgress.total}`
+                    : "Generating…"}
                 </>
               ) : (
                 "Export"

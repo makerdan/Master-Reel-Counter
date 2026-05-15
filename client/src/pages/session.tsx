@@ -516,12 +516,10 @@ function SessionWorkspace({
     () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
   );
   const [pdfDialogWaiting, setPdfDialogWaiting] = useState(false);
-  const fullAbortRef = useRef<AbortController | null>(null);
-  const stdAbortRef  = useRef<AbortController | null>(null);
-  const fullBlobRef  = useRef<Blob | null>(null);
-  const stdBlobRef   = useRef<Blob | null>(null);
-  const fullFetchRef = useRef<Promise<Blob | null> | null>(null);
-  const stdFetchRef  = useRef<Promise<Blob | null> | null>(null);
+  const [pdfProgress, setPdfProgress] = useState<{done: number, total: number} | null>(null);
+  const fullJobRef = useRef<string | null>(null);
+  const stdJobRef  = useRef<string | null>(null);
+  const pdfPollAbortRef = useRef<AbortController | null>(null);
   const unpinnedEntries = entries.filter(e => !pinByEntryId.has(e.id));
 
   const flushBeforeExport = async (): Promise<boolean> => {
@@ -567,38 +565,61 @@ function SessionWorkspace({
     await doExportExcel();
   };
 
-  const buildPdfUrl = (quality: "full" | "standard") => {
+  const buildPdfStartUrl = (quality: "full" | "standard") => {
     const params = new URLSearchParams();
     if (userSettings?.companyName) params.set("companyName", userSettings.companyName);
     if (userSettings?.exportFooterText) params.set("footerText", userSettings.exportFooterText);
     params.set("quality", quality);
-    return `/api/sessions/${sessionId}/export/pdf?${params}`;
+    return `/api/sessions/${sessionId}/export/pdf/start?${params}`;
   };
 
-  const startPdfFetch = (quality: "full" | "standard") => {
-    const ctrl = new AbortController();
-    if (quality === "full") fullAbortRef.current = ctrl;
-    else stdAbortRef.current = ctrl;
-    const p = fetch(buildPdfUrl(quality), { credentials: "include", signal: ctrl.signal })
-      .then(async (res) => {
+  const pollPdfJob = async (
+    jobId: string,
+    signal: AbortSignal,
+    onProgress: (p: {done: number, total: number}) => void
+  ): Promise<Blob | null> => {
+    while (!signal.aborted) {
+      await new Promise<void>(r => setTimeout(r, 800));
+      if (signal.aborted) return null;
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/export/pdf/progress/${jobId}`, {
+          credentials: "include", signal,
+        });
         if (!res.ok) return null;
-        const blob = await res.blob();
-        return blob.size >= 500 ? blob : null;
+        const prog = await res.json();
+        if (prog.error) return null;
+        if (prog.total > 0) onProgress({ done: prog.done, total: prog.total });
+        if (prog.complete) {
+          const dlRes = await fetch(`/api/sessions/${sessionId}/export/pdf/download/${jobId}`, {
+            credentials: "include", signal,
+          });
+          if (!dlRes.ok) return null;
+          return await dlRes.blob();
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const startPdfJob = (quality: "full" | "standard") => {
+    fetch(buildPdfStartUrl(quality), { method: "POST", credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.jobId) return;
+        if (quality === "full") fullJobRef.current = data.jobId;
+        else stdJobRef.current = data.jobId;
       })
       .catch(() => null);
-    if (quality === "full") fullFetchRef.current = p;
-    else stdFetchRef.current = p;
-    p.then((blob) => {
-      if (quality === "full") fullBlobRef.current = blob;
-      else stdBlobRef.current = blob;
-    });
   };
 
   const abortPdfFetches = () => {
-    fullAbortRef.current?.abort(); fullAbortRef.current = null;
-    stdAbortRef.current?.abort();  stdAbortRef.current = null;
-    fullBlobRef.current = null; stdBlobRef.current = null;
-    fullFetchRef.current = null; stdFetchRef.current = null;
+    fullJobRef.current = null;
+    stdJobRef.current  = null;
+    pdfPollAbortRef.current?.abort();
+    pdfPollAbortRef.current = null;
+    setPdfProgress(null);
   };
 
   const openQualityDialogDirect = async () => {
@@ -606,25 +627,40 @@ function SessionWorkspace({
     if (!canProceed) return;
     abortPdfFetches();
     setPdfQualityOpen(true);
-    startPdfFetch("full");
-    startPdfFetch("standard");
+    startPdfJob("full");
+    startPdfJob("standard");
   };
 
   const confirmQualityExport = async () => {
     localStorage.setItem("pdfExportQuality", pdfQualityChoice);
-    if (pdfQualityChoice === "full") { stdAbortRef.current?.abort(); stdAbortRef.current = null; }
-    else { fullAbortRef.current?.abort(); fullAbortRef.current = null; }
-    const blobRef  = pdfQualityChoice === "full" ? fullBlobRef  : stdBlobRef;
-    const fetchRef = pdfQualityChoice === "full" ? fullFetchRef : stdFetchRef;
-    let blob = blobRef.current;
-    if (!blob) {
+    const jobId = pdfQualityChoice === "full" ? fullJobRef.current : stdJobRef.current;
+    if (!jobId) {
+      // Job ID not yet returned — wait briefly then try once more
       setPdfDialogWaiting(true);
-      blob = (await fetchRef.current) ?? null;
-      setPdfDialogWaiting(false);
+      await new Promise(r => setTimeout(r, 1500));
+      const retryJobId = pdfQualityChoice === "full" ? fullJobRef.current : stdJobRef.current;
+      if (!retryJobId) {
+        setPdfDialogWaiting(false);
+        toast({
+          title: "PDF Export Failed",
+          description: "Export failed — Try again in a moment.",
+          variant: "destructive",
+          action: <ToastAction altText="Try again" onClick={exportPdf}>Try Again</ToastAction>,
+        });
+        return;
+      }
     }
+    const finalJobId = pdfQualityChoice === "full" ? fullJobRef.current : stdJobRef.current;
+    if (!finalJobId) return;
+    setPdfDialogWaiting(true);
+    setPdfProgress(null);
+    const ctrl = new AbortController();
+    pdfPollAbortRef.current = ctrl;
+    const blob = await pollPdfJob(finalJobId, ctrl.signal, setPdfProgress);
+    setPdfDialogWaiting(false);
     setPdfQualityOpen(false);
     abortPdfFetches();
-    if (!blob) {
+    if (!blob || blob.size < 500) {
       toast({
         title: "PDF Export Failed",
         description: "Export failed — Try again in a moment.",
@@ -654,15 +690,18 @@ function SessionWorkspace({
     const canProceed = await flushBeforeExport();
     if (!canProceed) return;
     setIsPdfExporting(true);
+    setPdfProgress(null);
+    const ctrl = new AbortController();
+    pdfPollAbortRef.current = ctrl;
     try {
-      const res = await fetch(buildPdfUrl(quality), { credentials: "include" });
-      if (!res.ok) {
-        let serverMsg = "PDF export failed";
-        try { const body = await res.json(); serverMsg = body.message || body.error || serverMsg; } catch {}
-        throw new Error(serverMsg);
-      }
-      const blob = await res.blob();
-      if (blob.size < 500) throw new Error("The PDF was generated but appears to be empty.");
+      const startRes = await fetch(buildPdfStartUrl(quality), {
+        method: "POST", credentials: "include", signal: ctrl.signal,
+      });
+      if (!startRes.ok) throw new Error("Failed to start PDF export");
+      const { jobId } = await startRes.json();
+      const blob = await pollPdfJob(jobId, ctrl.signal, setPdfProgress);
+      if (ctrl.signal.aborted) return;
+      if (!blob || blob.size < 500) throw new Error("The PDF was generated but appears to be empty.");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -670,6 +709,7 @@ function SessionWorkspace({
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
+      if (ctrl.signal.aborted) return;
       const msg = err instanceof Error ? err.message : "PDF export failed";
       const isNetworkError = /offline|fetch|network|failed to fetch/i.test(msg);
       let recommendation: string;
@@ -696,6 +736,8 @@ function SessionWorkspace({
       });
     } finally {
       setIsPdfExporting(false);
+      setPdfProgress(null);
+      pdfPollAbortRef.current = null;
     }
   };
 
@@ -849,14 +891,18 @@ function SessionWorkspace({
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isAnyExportRunning}>
                       {(isPdfExporting || serverActiveTasks?.pdf) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                      {(isPdfExporting || serverActiveTasks?.pdf) ? "Generating PDF…" : "PDF"}
+                      {(isPdfExporting || serverActiveTasks?.pdf)
+                        ? (pdfProgress && pdfProgress.total > 0 ? `Generating… ${pdfProgress.done} of ${pdfProgress.total}` : "Generating PDF…")
+                        : "PDF"}
                     </DropdownMenuItem>
                   </>
                 ) : (
                   <>
                     <DropdownMenuItem onClick={exportPdf} data-testid="button-export-pdf" disabled={isAnyExportRunning}>
                       {(isPdfExporting || serverActiveTasks?.pdf) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                      {(isPdfExporting || serverActiveTasks?.pdf) ? "Generating PDF…" : "PDF"}
+                      {(isPdfExporting || serverActiveTasks?.pdf)
+                        ? (pdfProgress && pdfProgress.total > 0 ? `Generating… ${pdfProgress.done} of ${pdfProgress.total}` : "Generating PDF…")
+                        : "PDF"}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={exportExcel} data-testid="button-export-excel" disabled={isAnyExportRunning}>
                       {(isExcelExporting || serverActiveTasks?.excel) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
@@ -1362,7 +1408,9 @@ function SessionWorkspace({
               {pdfDialogWaiting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating…
+                  {pdfProgress && pdfProgress.total > 0
+                    ? `Generating… ${pdfProgress.done} of ${pdfProgress.total}`
+                    : "Generating…"}
                 </>
               ) : (
                 "Export"

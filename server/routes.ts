@@ -28,6 +28,22 @@ import ExcelJS from "exceljs";
 import { openai } from "./replit_integrations/image/client";
 import { taskTracker } from "./lib/taskTracker";
 
+// In-memory PDF generation job tracker
+const pdfJobs = new Map<string, {
+  done: number;
+  total: number;
+  complete: boolean;
+  error?: string;
+  buffer?: Buffer;
+  filename?: string;
+  createdAt: number;
+  userId: string;
+}>();
+setInterval(() => {
+  const cutoff = Date.now() - 15 * 60 * 1000;
+  for (const [k, v] of pdfJobs) if (v.createdAt < cutoff) pdfJobs.delete(k);
+}, 5 * 60 * 1000);
+
 function formatPinLabel(label: string): string {
   if (/^\d+$/.test(label)) {
     return `P${label.padStart(3, "0")}`;
@@ -2792,6 +2808,44 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/sessions/:id/export/pdf/start — create a background PDF job, returns {jobId}
+  app.post("/api/sessions/:id/export/pdf/start", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
+    try {
+      const userId = resolveUserId(req);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      if (!access) return res.status(404).json({ message: "Session not found" });
+      const jobId = randomUUID();
+      pdfJobs.set(jobId, { done: 0, total: 0, complete: false, createdAt: Date.now(), userId });
+      res.json({ jobId });
+    } catch {
+      res.status(500).json({ message: "Failed to create PDF job" });
+    }
+  });
+
+  // GET /api/sessions/:id/export/pdf/progress/:jobId — poll generation progress
+  app.get("/api/sessions/:id/export/pdf/progress/:jobId", isAuthenticated, (req: any, res) => {
+    const userId = resolveUserId(req);
+    const job = pdfJobs.get(req.params.jobId);
+    if (!job || job.userId !== userId) return res.status(404).json({ error: "Job not found" });
+    res.json({ done: job.done, total: job.total, complete: job.complete, error: job.error });
+  });
+
+  // GET /api/sessions/:id/export/pdf/download/:jobId — retrieve completed PDF buffer
+  app.get("/api/sessions/:id/export/pdf/download/:jobId", isAuthenticated, (req: any, res) => {
+    const userId = resolveUserId(req);
+    const job = pdfJobs.get(req.params.jobId);
+    if (!job || job.userId !== userId) return res.status(404).json({ error: "Job not found" });
+    if (!job.complete) return res.status(202).json({ message: "Not ready" });
+    if (job.error) return res.status(500).json({ error: job.error });
+    if (!job.buffer) return res.status(500).json({ error: "No buffer" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${job.filename || "export.pdf"}"`);
+    res.setHeader("Content-Length", job.buffer.length);
+    const buf = job.buffer;
+    pdfJobs.delete(req.params.jobId);
+    res.send(buf);
+  });
+
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
     const _sid = parseInt(req.params.id);
     taskTracker.increment();
@@ -2800,6 +2854,11 @@ export async function registerRoutes(
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       taskTracker.startSession(_sid, "pdf");
+      const jobId = typeof req.query.jobId === "string" ? req.query.jobId : null;
+      const job = jobId ? pdfJobs.get(jobId) : null;
+      if (jobId && !job) return res.status(404).json({ error: "Job not found" });
+      // Respond immediately so the client can start polling progress
+      if (job) res.json({ started: true });
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
@@ -3641,6 +3700,10 @@ export async function registerRoutes(
         return undefined;
       };
 
+      let pdfSecsDone = 0;
+      const pdfSecsTotal = sortedSections.length;
+      if (job) job.total = pdfSecsTotal;
+
       let tocSecIdx = 0;
       for (const sec of sortedSections) {
         const allPhotos = sec.photos || [];
@@ -3680,7 +3743,10 @@ export async function registerRoutes(
         }
 
         const hasPhotoContent = allPhotos.length > 0;
-        if (!hasPhotoContent && unmatchedEntries.length === sec.entries.length) continue;
+        if (!hasPhotoContent && unmatchedEntries.length === sec.entries.length) {
+          if (job) job.done = ++pdfSecsDone;
+          continue;
+        }
 
         const isReceivingSection = (sec.aisle || "").toLowerCase() === "receiving";
 
@@ -4079,6 +4145,7 @@ export async function registerRoutes(
             currentY += result.renderedH + gap;
           }
         }
+        if (job) job.done = ++pdfSecsDone;
       }
 
       // --- Entries Without Photos (deferred, before Summary) ---
@@ -4546,14 +4613,25 @@ export async function registerRoutes(
       });
 
       const pdfBuffer = Buffer.concat(pdfChunks);
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.setHeader("Content-Length", pdfBuffer.length);
       logActivity(session.id, userId, req.user?.claims?.username, "exported_pdf", "session", session.id);
-      res.send(pdfBuffer);
+      if (job) {
+        job.buffer = pdfBuffer;
+        job.filename = filename;
+        job.complete = true;
+      } else {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("Content-Length", pdfBuffer.length);
+        res.send(pdfBuffer);
+      }
     } catch (error) {
       console.error("Error generating PDF:", error);
-      if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
+      if (job) {
+        job.error = error instanceof Error ? error.message : "Failed to generate PDF";
+        job.complete = true;
+      } else if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to generate report" });
+      }
     } finally {
       taskTracker.decrement();
       taskTracker.endSession(_sid, "pdf");
