@@ -407,7 +407,7 @@ export const dismissedDuplicates = pgTable("dismissed_duplicates", {
 }, (table) => [
   index("dismissed_duplicates_session_id_idx").on(table.sessionId),
   index("dismissed_duplicates_key_idx").on(table.key),
-  index("dismissed_duplicates_session_key_idx").on(table.sessionId, table.key),
+  uniqueIndex("dismissed_duplicates_session_key_uniq").on(table.sessionId, table.key),
 ]);
 
 export type DismissedDuplicate = typeof dismissedDuplicates.$inferSelect;

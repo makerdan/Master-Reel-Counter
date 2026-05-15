@@ -2598,22 +2598,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addDismissedDuplicate(sessionId: number, key: string): Promise<DismissedDuplicate> {
-    const existing = await db.select().from(dismissedDuplicates)
+    const [result] = await db.insert(dismissedDuplicates)
+      .values({ sessionId, key })
+      .onConflictDoNothing()
+      .returning();
+    if (result) return result;
+    // Row already existed — fetch and return the existing record.
+    const [existing] = await db.select().from(dismissedDuplicates)
       .where(and(eq(dismissedDuplicates.sessionId, sessionId), eq(dismissedDuplicates.key, key)));
-    if (existing.length > 0) return existing[0];
-    const [result] = await db.insert(dismissedDuplicates).values({ sessionId, key }).returning();
-    return result;
+    return existing;
   }
 
   async addDismissedDuplicatesBulk(sessionId: number, keys: string[]): Promise<void> {
     if (keys.length === 0) return;
-    const existing = await db.select({ key: dismissedDuplicates.key })
-      .from(dismissedDuplicates)
-      .where(and(eq(dismissedDuplicates.sessionId, sessionId), inArray(dismissedDuplicates.key, keys)));
-    const existingSet = new Set(existing.map(r => r.key));
-    const newKeys = keys.filter(k => !existingSet.has(k));
-    if (newKeys.length === 0) return;
-    await db.insert(dismissedDuplicates).values(newKeys.map(key => ({ sessionId, key })));
+    await db.insert(dismissedDuplicates)
+      .values(keys.map(key => ({ sessionId, key })))
+      .onConflictDoNothing();
   }
 
   async removeDismissedDuplicate(sessionId: number, key: string): Promise<void> {
