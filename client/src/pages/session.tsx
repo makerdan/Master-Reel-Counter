@@ -348,7 +348,8 @@ function SessionWorkspace({
     }
   }, user ? { userId: (user as any).id, username: (user as any).firstName || (user as any).id } : undefined);
 
-  // Live countdown: ticks once per second from the initial reconnect delay to 0.
+  // Live countdown: ticks once per second from the initial reconnect delay down to 0,
+  // then holds at 0 until the socket reconnects (wsStatus returns to "connected").
   // Resets whenever a new delay is received (each disconnect cycle may use a different
   // exponential-backoff value) and clears when the connection recovers.
   const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
@@ -359,7 +360,7 @@ function SessionWorkspace({
     }
     setReconnectCountdown(Math.ceil(reconnectDelayMs / 1000));
     const interval = setInterval(() => {
-      setReconnectCountdown(prev => (prev !== null && prev > 1 ? prev - 1 : prev));
+      setReconnectCountdown(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
     }, 1000);
     return () => clearInterval(interval);
   }, [wsStatus, reconnectDelayMs]);
