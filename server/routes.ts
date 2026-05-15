@@ -6346,6 +6346,23 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     }
   });
 
+  // Admin endpoint: returns the full crash history (up to 10 records) including
+  // stack traces and error messages. The public /api/health endpoint only surfaces
+  // a redacted summary of the most recent crash; this endpoint gives operators
+  // the complete picture for post-incident analysis.
+  app.get("/api/admin/crashes", isAuthenticated, (req: any, res) => {
+    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
+    const userId = resolveUserId(req);
+    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const history = taskTracker.crashHistory();
+    res.json({
+      count: history.length,
+      crashes: history,
+    });
+  });
+
   setInterval(purgeExpiredTrash, TRASH_PURGE_INTERVAL_MS);
   setTimeout(purgeExpiredTrash, 30000);
 
