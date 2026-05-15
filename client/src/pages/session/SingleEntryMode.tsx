@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Camera, Save, X, Loader2, ImagePlus, Flag } from "lucide-react";
+import { Camera, Save, X, Loader2, ImagePlus, Flag, AlertTriangle } from "lucide-react";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 
@@ -19,6 +19,28 @@ import { lookupCatalog, PARSED_CATALOG, userWireCatalogToParsedEntry, type Parse
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 import type { Entry, Pin } from "@shared/schema";
+
+const UNREADABLE_SENTINEL = "[unreadable]";
+const ENCRYPTED_ENTRY_FIELDS = [
+  "reelTag", "wireType", "gauge", "color", "manufacturer", "notes", "palletId", "position", "conductors",
+] as const;
+const FIELD_LABELS: Record<string, string> = {
+  reelTag: "Catalog", wireType: "Wire Type", gauge: "Gauge", color: "Color",
+  manufacturer: "Vendor Code", notes: "Notes", palletId: "Pallet ID",
+  position: "Position", conductors: "Conductors",
+};
+
+function clearSentinel(val: string | null | undefined): string {
+  return val === UNREADABLE_SENTINEL ? "" : (val || "");
+}
+
+function getCorruptedFields(entry: Entry): Set<string> {
+  const out = new Set<string>();
+  for (const f of ENCRYPTED_ENTRY_FIELDS) {
+    if ((entry[f as keyof Entry] as unknown) === UNREADABLE_SENTINEL) out.add(f);
+  }
+  return out;
+}
 
 export default function SingleEntryMode({
   sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true, defaultAisle, defaultSection, getNextReceivingSection, onIsDirtyChange,
@@ -91,6 +113,9 @@ export default function SingleEntryMode({
   const [showCatalogSuggestions, setShowCatalogSuggestions] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [corruptedFields, setCorruptedFields] = useState<Set<string>>(() =>
+    editingEntry ? getCorruptedFields(editingEntry) : new Set()
+  );
   const formDirtyRef = useRef(false);
 
   const { data: linkedPin } = useQuery<Pin>({
@@ -126,26 +151,30 @@ export default function SingleEntryMode({
 
   useEffect(() => {
     if (editingEntry) {
+      const corrupted = getCorruptedFields(editingEntry);
+      setCorruptedFields(corrupted);
+      const notes = clearSentinel(editingEntry.notes);
       setForm({
         aisle: editingEntry.aisle || "",
         section: editingEntry.section || "",
-        position: editingEntry.position || "",
-        reelTag: editingEntry.reelTag || "",
-        wireType: editingEntry.wireType || "",
-        gauge: editingEntry.gauge || "",
+        position: clearSentinel(editingEntry.position),
+        reelTag: clearSentinel(editingEntry.reelTag),
+        wireType: clearSentinel(editingEntry.wireType),
+        gauge: clearSentinel(editingEntry.gauge),
         footage: editingEntry.footage && editingEntry.reelCount && editingEntry.reelCount > 1 ? Math.round(toDisplayUnit(editingEntry.footage, currentUnit) / editingEntry.reelCount).toString() : editingEntry.footage ? toDisplayUnit(editingEntry.footage, currentUnit).toString() : "",
-        color: editingEntry.color || "",
-        manufacturer: editingEntry.manufacturer || "",
-        notes: editingEntry.notes || "",
+        color: clearSentinel(editingEntry.color),
+        manufacturer: clearSentinel(editingEntry.manufacturer),
+        notes,
         reelCount: editingEntry.reelCount?.toString() || "1",
-        conductors: editingEntry.conductors || "",
+        conductors: clearSentinel(editingEntry.conductors),
       });
       setOnFloorInFront(
-        (editingEntry.notes?.includes("On the floor, in front of.") || editingEntry.notes?.includes("On Floor") || editingEntry.notes?.includes("In Front Of")) || false
+        (notes.includes("On the floor, in front of.") || notes.includes("On Floor") || notes.includes("In Front Of")) || false
       );
       setReceivingChecked(editingEntry.aisle?.toLowerCase() === "receiving" || false);
       setFootageOverride(true);
-      lastMatchedCatalog.current = editingEntry.reelTag?.toUpperCase().replace(/[^A-Z0-9]/g, "") || null;
+      const reelTagClear = clearSentinel(editingEntry.reelTag);
+      lastMatchedCatalog.current = reelTagClear ? reelTagClear.toUpperCase().replace(/[^A-Z0-9]/g, "") : null;
       setCapturedPhoto(null);
       setErrors({});
       setTouched({});
@@ -304,6 +333,9 @@ export default function SingleEntryMode({
     if (errors[field]) {
       setErrors((e) => { const n = { ...e }; delete n[field]; return n; });
     }
+    if (corruptedFields.has(field)) {
+      setCorruptedFields(prev => { const n = new Set(prev); n.delete(field); return n; });
+    }
   };
 
   const markTouched = (field: string) => {
@@ -430,8 +462,24 @@ export default function SingleEntryMode({
     saveEntry.mutate();
   };
 
+  const hasCorruption = editingEntry && corruptedFields.size > 0;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      {hasCorruption && (
+        <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2.5 text-sm" data-testid="banner-corrupted-fields">
+          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-destructive leading-tight">Some fields could not be decrypted</p>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              Re-enter the highlighted fields:{" "}
+              <span className="font-medium text-foreground">
+                {Array.from(corruptedFields).map(f => FIELD_LABELS[f] ?? f).join(", ")}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
       {!editingEntry && (
         <div className="space-y-2">
           <Label className="text-xs underline">Photo (optional):</Label>
@@ -559,7 +607,10 @@ export default function SingleEntryMode({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1 relative">
-          <Label className="text-xs underline">Catalog:</Label>
+          <Label className="text-xs underline">
+            Catalog:
+            {corruptedFields.has("reelTag") && <AlertTriangle className="inline h-3.5 w-3.5 text-destructive ml-1" />}
+          </Label>
           <Input
             value={form.reelTag}
             onChange={(e) => {
@@ -595,6 +646,7 @@ export default function SingleEntryMode({
             }}
             enterKeyHint="next"
             autoComplete="off"
+            className={corruptedFields.has("reelTag") ? "border-destructive focus-visible:ring-destructive" : ""}
             data-testid="input-reel-tag"
           />
           {showCatalogSuggestions && catalogSuggestions.length > 0 && (
@@ -630,8 +682,11 @@ export default function SingleEntryMode({
           )}
         </div>
         <div className="space-y-1">
-          <Label className="text-xs underline">Vendor Code:</Label>
-          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value.toUpperCase())} enterKeyHint="next" list="vendor-code-suggestions-single" data-testid="input-manufacturer" />
+          <Label className="text-xs underline">
+            Vendor Code:
+            {corruptedFields.has("manufacturer") && <AlertTriangle className="inline h-3.5 w-3.5 text-destructive ml-1" />}
+          </Label>
+          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value.toUpperCase())} enterKeyHint="next" list="vendor-code-suggestions-single" className={corruptedFields.has("manufacturer") ? "border-destructive focus-visible:ring-destructive" : ""} data-testid="input-manufacturer" />
           <datalist id="vendor-code-suggestions-single">
             {vendorCodes.map(code => (
               <option key={code} value={code} />
@@ -680,8 +735,11 @@ export default function SingleEntryMode({
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs underline">Notes:</Label>
-        <Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Notes..." rows={2} enterKeyHint="done" data-testid="input-notes" />
+        <Label className="text-xs underline">
+          Notes:
+          {corruptedFields.has("notes") && <AlertTriangle className="inline h-3.5 w-3.5 text-destructive ml-1" />}
+        </Label>
+        <Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} placeholder="Notes..." rows={2} enterKeyHint="done" className={corruptedFields.has("notes") ? "border-destructive focus-visible:ring-destructive" : ""} data-testid="input-notes" />
       </div>
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
