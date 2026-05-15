@@ -299,6 +299,13 @@ function getPhotoUrl(photo: Photo): string {
 
 const lateJoinerQueueCache = new Map<string, number[]>();
 
+// sessionStorage helpers — keys are namespaced by sessionId so data from
+// different sessions never bleeds. Data survives hard reloads (unlike the
+// module-level cache above) but is cleared when the user leaves the session
+// (component unmount cleanup) and on tab close.
+const cohortSKey = (sid: number) => `rr_cohort_${sid}`;
+const queueSKey = (sid: number, uid: string) => `rr_queue_${sid}_${uid}`;
+
 // ─── ReviewTab ────────────────────────────────────────────────────────────────
 
 export default function ReviewTab({
@@ -371,7 +378,18 @@ export default function ReviewTab({
   //      this is the first write for brand-new sessions.
   // While neither is available we show a brief loading gate so no assignments
   // are ever derived from the non-deterministic online-presence array.
-  const [anchoredCohort, setAnchoredCohort] = useState<Array<{ userId: string; username: string }> | null>(null);
+  // Seed from sessionStorage so the loading gate is skipped on hard reload when
+  // the cohort is already known (server round-trip is still made to stay fresh).
+  const [anchoredCohort, setAnchoredCohort] = useState<Array<{ userId: string; username: string }> | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(cohortSKey(sessionId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return null;
+  });
   // retryToken increments after transient failures so the anchor effect re-fires.
   const [cohortRetryToken, setCohortRetryToken] = useState(0);
   const cohortAnchorRef = useRef<{ sid: number; succeeded: boolean; attempts: number }>({ sid: -1, succeeded: false, attempts: 0 });
@@ -387,6 +405,7 @@ export default function ReviewTab({
         const parsed = JSON.parse(serverReviewCohort);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setAnchoredCohort(parsed);
+          try { sessionStorage.setItem(cohortSKey(sessionId), JSON.stringify(parsed)); } catch {}
           cohortAnchorRef.current = { sid: sessionId, succeeded: true, attempts: 0 };
           return;
         }
@@ -405,6 +424,7 @@ export default function ReviewTab({
         if (Array.isArray(data.cohort) && data.cohort.length > 0) {
           cohortAnchorRef.current.succeeded = true;
           setAnchoredCohort(data.cohort);
+          try { sessionStorage.setItem(cohortSKey(sessionId), JSON.stringify(data.cohort)); } catch {}
           // Refresh the session record so the parent's serverReviewCohort prop
           // is populated on subsequent renders (avoids redundant round-trips).
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
@@ -432,6 +452,18 @@ export default function ReviewTab({
     setCohortRetryToken(0);
   }, [sessionId]);
 
+  // Clear this session's persisted review data from sessionStorage when the
+  // user navigates away (component unmount / sessionId change). This prevents
+  // stale data from accumulating across many visited sessions.
+  // NOTE: React does NOT run effect cleanups on hard page reloads, so the data
+  // is preserved across reloads — which is exactly the behaviour we want.
+  useEffect(() => {
+    return () => {
+      sessionStorage.removeItem(cohortSKey(sessionId));
+      sessionStorage.removeItem(queueSKey(sessionId, currentUserId));
+    };
+  }, [sessionId, currentUserId]);
+
   // Parse the prop value (used for sessions that were already reviewed).
   const propCohort = useMemo<Array<{ userId: string; username: string }> | null>(() => {
     if (!serverReviewCohort) return null;
@@ -457,6 +489,18 @@ export default function ReviewTab({
   const isLateJoiner = useMemo(() => {
     const cacheKey = `${sessionId}:${currentUserId}`;
     if (lateJoinerQueueCache.has(cacheKey)) return true;
+    // On hard reload the module cache is empty — check sessionStorage to avoid
+    // re-classifying a known late joiner as a regular reviewer.
+    try {
+      const raw = sessionStorage.getItem(queueSKey(sessionId, currentUserId));
+      if (raw) {
+        const ids = JSON.parse(raw) as number[];
+        if (Array.isArray(ids) && ids.length > 0) {
+          lateJoinerQueueCache.set(cacheKey, ids); // seed module cache for this render cycle
+          return true;
+        }
+      }
+    } catch {}
     if (reviewResponses.length === 0) return false;
     const responderIds = new Set(reviewResponses.map(r => r.userId));
     return !responderIds.has(currentUserId);
@@ -516,7 +560,9 @@ export default function ReviewTab({
       }
     }
 
-    lateJoinerQueueCache.set(cacheKey, queue.map(e => e.id));
+    const queueIds = queue.map(e => e.id);
+    lateJoinerQueueCache.set(cacheKey, queueIds);
+    try { sessionStorage.setItem(queueSKey(sessionId, currentUserId), JSON.stringify(queueIds)); } catch {}
     return queue;
   }, [sortedEntries, effectiveCohort, currentUserId, isLateJoiner, reviewResponses, sessionId]);
 
