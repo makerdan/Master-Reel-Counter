@@ -305,6 +305,7 @@ const lateJoinerQueueCache = new Map<string, number[]>();
 // (component unmount cleanup) and on tab close.
 const cohortSKey = (sid: number) => `rr_cohort_${sid}`;
 const queueSKey = (sid: number, uid: string) => `rr_queue_${sid}_${uid}`;
+const posSKey = (sid: number, uid: string) => `rr_pos_${sid}_${uid}`;
 
 // ─── ReviewTab ────────────────────────────────────────────────────────────────
 
@@ -485,6 +486,7 @@ export default function ReviewTab({
     return () => {
       sessionStorage.removeItem(cohortSKey(sessionId));
       sessionStorage.removeItem(queueSKey(sessionId, currentUserId));
+      sessionStorage.removeItem(posSKey(sessionId, currentUserId));
     };
   }, [sessionId, currentUserId]);
 
@@ -661,18 +663,34 @@ export default function ReviewTab({
 
   // ── Reveal timer state ─────────────────────────────────────────────────────
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Persist position to sessionStorage so it survives a hard reload.
+  useEffect(() => {
+    try { sessionStorage.setItem(posSKey(sessionId, currentUserId), String(currentIndex)); } catch {}
+  }, [currentIndex, sessionId, currentUserId]);
   const hasAutoAdvanced = useRef(false);
   const scrubBarRef = useRef<HTMLDivElement>(null);
   const isScrubbing = useRef(false);
 
-  // On first load, jump straight to the first unreviewed entry in the reordered list
+  // On first load, restore from sessionStorage if available and within bounds;
+  // otherwise jump to the first unreviewed entry in the reordered list.
   useEffect(() => {
     if (hasAutoAdvanced.current) return;
     if (orderedEntries.length === 0 || responsesLoading) return;
+    try {
+      const raw = sessionStorage.getItem(posSKey(sessionId, currentUserId));
+      if (raw !== null) {
+        const n = parseInt(raw, 10);
+        if (!isNaN(n) && n >= 0 && n < displayEntries.length) {
+          setCurrentIndex(n);
+          hasAutoAdvanced.current = true;
+          return;
+        }
+      }
+    } catch {}
     const firstUnreviewed = orderedEntries.findIndex(e => !myResponses.has(e.id));
     if (firstUnreviewed > 0) setCurrentIndex(firstUnreviewed);
     hasAutoAdvanced.current = true;
-  }, [orderedEntries, myResponses, responsesLoading]);
+  }, [orderedEntries, myResponses, responsesLoading, sessionId, currentUserId, displayEntries.length]);
 
   // Wall-clock timestamps when each entry's reveal timer was started.
   // Stored in a ref so re-renders never reset the countdown — the remaining
