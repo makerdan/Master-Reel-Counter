@@ -446,8 +446,14 @@ export default function ReviewTab({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, currentUserId, serverReviewCohort, cohortRetryToken]);
 
-  // Reset anchored cohort and retry state when the session changes.
+  // Reset anchored cohort and retry state when the session *changes*.
+  // Using a ref to track the previous sessionId ensures we do NOT reset on
+  // initial mount, which would immediately wipe the cohort seeded from
+  // sessionStorage in the useState initializer.
+  const prevSessionIdForReset = useRef<number>(sessionId);
   useEffect(() => {
+    if (prevSessionIdForReset.current === sessionId) return;
+    prevSessionIdForReset.current = sessionId;
     setAnchoredCohort(null);
     setCohortRetryToken(0);
   }, [sessionId]);
