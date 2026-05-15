@@ -453,9 +453,11 @@ export function useUndoRedo(sessionId: number) {
       }
       // Server-side or other failure: leave the stacks unchanged so the
       // action remains available to retry, and inform the user.
+      const failLabel = actionLabel(action);
+      const failMsg = errorMessage(err, "The server rejected this change.");
       toast({
         title: `${verb} failed`,
-        description: errorMessage(err, "The server rejected this change."),
+        description: failLabel ? `${failLabel} — ${failMsg}` : failMsg,
         variant: "destructive",
       });
     }
