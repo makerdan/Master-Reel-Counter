@@ -421,8 +421,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSession(id: number, data: Partial<Session>): Promise<Session | undefined> {
+    // If folderId is being explicitly set (even to null), clear trashedFromFolderId so
+    // a future folder-restore does not pull the session back into its original folder.
+    const setData = "folderId" in data ? { ...data, trashedFromFolderId: null } : data;
     const [result] = await db.update(countingSessions)
-      .set({ ...data, lastUpdatedAt: new Date() })
+      .set({ ...setData, lastUpdatedAt: new Date() })
       .where(eq(countingSessions.id, id))
       .returning();
     return result;
@@ -437,8 +440,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSessionIfUnchanged(id: number, expectedLastUpdatedAt: Date, data: Partial<Session>): Promise<Session | undefined> {
+    // Mirror the folderId → trashedFromFolderId clearing from updateSession.
+    const setData = "folderId" in data ? { ...data, trashedFromFolderId: null } : data;
     const [result] = await db.update(countingSessions)
-      .set({ ...data, lastUpdatedAt: new Date() })
+      .set({ ...setData, lastUpdatedAt: new Date() })
       .where(and(
         eq(countingSessions.id, id),
         eq(countingSessions.lastUpdatedAt, expectedLastUpdatedAt),
