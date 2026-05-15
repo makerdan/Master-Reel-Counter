@@ -13,7 +13,7 @@ import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, pins, 
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
-import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry } from "./encryption";
+import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry, UNREADABLE_SENTINEL } from "./encryption";
 import multer from "multer";
 import PDFDocument from "pdfkit";
 import { toDisplayUnit, unitLabel, type UnitType } from "./unit-conversion";
@@ -2868,6 +2868,12 @@ export async function registerRoutes(
       const rawEntries = await storage.getSessionEntries(session.id);
       const key = await getEncryptionKey(userId);
       const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key, { strict: false }) as any) : rawEntries);
+      const CORRUPT_DISPLAY = "(corrupted)";
+      const isSentinel = (v: any): boolean => v === UNREADABLE_SENTINEL;
+      const fmtSentinel = (v: any): string => isSentinel(v) ? CORRUPT_DISPLAY : (v || "");
+      const hasCorruptedEntries = (sessionEntries as any[]).some((e: any) =>
+        [e.reelTag, e.wireType, e.gauge, e.color, e.manufacturer, e.notes, e.conductors].some(isSentinel)
+      );
       const totalFootage = sessionEntries.reduce((s: number, e: any) => s + (e.footage || 0), 0);
       const userSettings = await storage.getUserSettings(userId);
       const pdfUnit: UnitType = (userSettings?.defaultUnit as UnitType) || "feet";
@@ -3537,24 +3543,31 @@ export async function registerRoutes(
         const bottomLimit = y + maxH;
 
         for (const e of entries) {
-          const entryLines: { text: string; fontSize: number; color: string; font: string; indent: boolean }[] = [];
+          const entryLines: { text: string; fontSize: number; color: string; font: string; indent: boolean; corrupted?: boolean }[] = [];
           const pinLabel = photoPins.find((p: any) => p.entryId === e.id)?.label;
-          const header = pinLabel ? `${formatPinLabel(String(pinLabel))} — ${e.reelTag || e.wireType || "Entry"}` : (e.reelTag || e.wireType || "Entry");
-          entryLines.push({ text: header, fontSize: 6.5, color: accentHex, font: 'Helvetica-Bold', indent: false });
+          const rawTag = e.reelTag || e.wireType;
+          const tagDisplay = rawTag && !isSentinel(rawTag) ? rawTag : (isSentinel(rawTag) ? CORRUPT_DISPLAY : "Entry");
+          const header = pinLabel ? `${formatPinLabel(String(pinLabel))} — ${tagDisplay}` : tagDisplay;
+          entryLines.push({ text: header, fontSize: 6.5, color: isSentinel(rawTag) ? "#999999" : accentHex, font: isSentinel(rawTag) ? 'Helvetica-Oblique' : 'Helvetica-Bold', indent: false, corrupted: isSentinel(rawTag) });
 
           const details: string[] = [];
-          if (e.manufacturer) details.push(`Vendor: ${e.manufacturer}`);
-          if (e.reelCount && e.reelCount > 1) details.push(`Reels: ${e.reelCount}`);
-          if (e.footage) details.push(`Footage: ${fmtFootage(e.footage)} ${pdfULabel}`);
-          if (e.gauge) details.push(`Gauge: ${e.gauge}`);
-          if (e.color) details.push(`Color: ${e.color}`);
-          if (e.conductors) details.push(`Conductors: ${e.conductors}`);
+          const detailCorrupted: boolean[] = [];
+          if (e.manufacturer) { details.push(`Vendor: ${fmtSentinel(e.manufacturer)}`); detailCorrupted.push(isSentinel(e.manufacturer)); }
+          if (e.reelCount && e.reelCount > 1) { details.push(`Reels: ${e.reelCount}`); detailCorrupted.push(false); }
+          if (e.footage) { details.push(`Footage: ${fmtFootage(e.footage)} ${pdfULabel}`); detailCorrupted.push(false); }
+          if (e.gauge) { details.push(`Gauge: ${fmtSentinel(e.gauge)}`); detailCorrupted.push(isSentinel(e.gauge)); }
+          if (e.color) { details.push(`Color: ${fmtSentinel(e.color)}`); detailCorrupted.push(isSentinel(e.color)); }
+          if (e.conductors) { details.push(`Conductors: ${fmtSentinel(e.conductors)}`); detailCorrupted.push(isSentinel(e.conductors)); }
 
-          const line1 = details.slice(0, 3).join("  •  ");
-          const line2 = details.slice(3).join("  •  ");
-          if (line1) entryLines.push({ text: line1, fontSize: 5.5, color: "#333333", font: 'Helvetica', indent: true });
-          if (line2) entryLines.push({ text: line2, fontSize: 5.5, color: "#333333", font: 'Helvetica', indent: true });
-          if (e.notes) entryLines.push({ text: `Notes: ${e.notes}`, fontSize: 5, color: "#666666", font: 'Helvetica', indent: true });
+          const slice1 = details.slice(0, 3);
+          const slice1Corrupted = detailCorrupted.slice(0, 3).some(Boolean);
+          const slice2 = details.slice(3);
+          const slice2Corrupted = detailCorrupted.slice(3).some(Boolean);
+          const line1 = slice1.join("  •  ");
+          const line2 = slice2.join("  •  ");
+          if (line1) entryLines.push({ text: line1, fontSize: 5.5, color: slice1Corrupted ? "#999999" : "#333333", font: slice1Corrupted ? 'Helvetica-Oblique' : 'Helvetica', indent: true, corrupted: slice1Corrupted });
+          if (line2) entryLines.push({ text: line2, fontSize: 5.5, color: slice2Corrupted ? "#999999" : "#333333", font: slice2Corrupted ? 'Helvetica-Oblique' : 'Helvetica', indent: true, corrupted: slice2Corrupted });
+          if (e.notes) entryLines.push({ text: `Notes: ${fmtSentinel(e.notes)}`, fontSize: 5, color: isSentinel(e.notes) ? "#999999" : "#666666", font: isSentinel(e.notes) ? 'Helvetica-Oblique' : 'Helvetica', indent: true, corrupted: isSentinel(e.notes) });
 
           const neededH = entryLines.length * (lineH - 1) + 4;
           if (listY + neededH > bottomLimit) {
@@ -3610,7 +3623,7 @@ export async function registerRoutes(
         const notesColWidth = allCols[notesColIdx].width;
         for (let i = 0; i < entries.length; i++) {
           const e: any = entries[i];
-          const notesText = e.notes || "";
+          const notesText = fmtSentinel(e.notes);
           doc.font('Helvetica-Bold').fontSize(fontSize);
           const measuredNotesH = notesText ? doc.heightOfString(notesText, { width: notesColWidth - 4 }) : 0;
           const actualRowH = Math.max(rH, measuredNotesH + 6);
@@ -3619,20 +3632,34 @@ export async function registerRoutes(
           doc.font('Helvetica-Bold').fontSize(fontSize).fillColor("#333333");
           let x = tblX;
           const baseVals = [
-            e.reelTag || "",
-            e.manufacturer || "",
+            fmtSentinel(e.reelTag),
+            fmtSentinel(e.manufacturer),
             String(e.reelCount || 1),
             e.footage ? `${fmtFootage(e.footage)} ${pdfULabel}` : "",
             notesText,
           ];
+          const baseCorrupted = [
+            isSentinel(e.reelTag),
+            isSentinel(e.manufacturer),
+            false,
+            false,
+            isSentinel(e.notes),
+          ];
           const vals = pinMap
             ? [pinMap.get(e.id) || "", ...baseVals]
             : baseVals;
+          const corruptedFlags = pinMap
+            ? [false, ...baseCorrupted]
+            : baseCorrupted;
           const cellTextY = tblY + Math.max(1, (actualRowH - fontSize) / 2);
           for (let j = 0; j < allCols.length; j++) {
             const isNotesCol = j === notesColIdx;
             const isPinCol = pinMap !== undefined && j === 0;
             const col = allCols[j] as { header: string; width: number; centered?: boolean };
+            const cellCorrupted = corruptedFlags[j] ?? false;
+            if (cellCorrupted) {
+              doc.font('Helvetica-Oblique').fillColor("#999999");
+            }
             if (isPinCol) {
               doc.fillColor(accentHex);
               doc.text(vals[j], x + 2, cellTextY, { width: col.width - 4, lineBreak: false });
@@ -3643,6 +3670,9 @@ export async function registerRoutes(
               doc.text(vals[j], x, cellTextY, { width: col.width, align: 'center', lineBreak: false });
             } else {
               doc.text(vals[j], x + 2, cellTextY, { width: col.width - 4, lineBreak: false });
+            }
+            if (cellCorrupted) {
+              doc.font('Helvetica-Bold').fillColor("#333333");
             }
             x += col.width;
           }
@@ -4298,18 +4328,18 @@ export async function registerRoutes(
             infoY += doc.heightOfString(`Reason: ${item.pin.flagReason}`, { width: infoW }) + 4;
           }
 
-          const infoLines: [string, string][] = [
-            ["Catalog:", e.reelTag || "Unknown"],
-            ["Vendor:", e.manufacturer || "Unknown"],
-            ["Reels:", String(e.reelCount || 1)],
-            ["Footage:", e.footage ? `${fmtFootage(e.footage)} ${pdfULabel}` : `0 ${pdfULabel}`],
+          const infoLines: [string, string, boolean][] = [
+            ["Catalog:", isSentinel(e.reelTag) ? CORRUPT_DISPLAY : (e.reelTag || "Unknown"), isSentinel(e.reelTag)],
+            ["Vendor:", isSentinel(e.manufacturer) ? CORRUPT_DISPLAY : (e.manufacturer || "Unknown"), isSentinel(e.manufacturer)],
+            ["Reels:", String(e.reelCount || 1), false],
+            ["Footage:", e.footage ? `${fmtFootage(e.footage)} ${pdfULabel}` : `0 ${pdfULabel}`, false],
           ];
-          if (e.notes) infoLines.push(["Notes:", e.notes]);
+          if (e.notes) infoLines.push(["Notes:", fmtSentinel(e.notes), isSentinel(e.notes)]);
 
-          for (const [label, value] of infoLines) {
+          for (const [label, value, isCorrupted] of infoLines) {
             doc.font('Helvetica-Bold').fontSize(7).fillColor("#555555")
               .text(label, infoX, infoY, { width: 55, lineBreak: false });
-            doc.font('Helvetica').fontSize(7).fillColor("#333333")
+            doc.font(isCorrupted ? 'Helvetica-Oblique' : 'Helvetica').fontSize(7).fillColor(isCorrupted ? "#999999" : "#333333")
               .text(value, infoX + 55, infoY, { width: infoW - 55, lineBreak: false });
             infoY += lineH;
           }
@@ -4352,8 +4382,9 @@ export async function registerRoutes(
 
       const catalogMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: { text: string; color?: string }[] }>();
       for (const e of activeEntries) {
-        const cat = e.reelTag || e.wireType || "Uncataloged";
-        const vendor = e.manufacturer || "";
+        const rawCat = e.reelTag || e.wireType;
+        const cat = rawCat && !isSentinel(rawCat) ? rawCat : (isSentinel(rawCat) ? CORRUPT_DISPLAY : "Uncataloged");
+        const vendor = isSentinel(e.manufacturer) ? CORRUPT_DISPLAY : (e.manufacturer || "");
         const groupKey = `${cat}|||${vendor}`;
         const existing = catalogMap.get(groupKey);
         const pinLabel = entryPinLabelMap.get(e.id);
@@ -4587,6 +4618,12 @@ export async function registerRoutes(
       if (session.completedAt) { auditLabel("Completed:", formatCT(new Date(session.completedAt))); }
       auditLabel("Total Number of Reels:", String(sortedCatalogs.reduce((s, c) => s + c.reelCount, 0)));
       auditLabel("Data Encoding:", key ? "Active (entries decrypted for export)" : "Off");
+      if (hasCorruptedEntries) {
+        doc.font('Helvetica-Oblique').fontSize(7).fillColor("#cc4400");
+        doc.text("Data Integrity Warning: One or more entry fields could not be decrypted and are shown as (corrupted) in this report. Re-enter the correct encryption key in Settings to recover the original values.", 36, currentY, { width: pageWidth, lineBreak: true });
+        currentY += doc.heightOfString("Data Integrity Warning: One or more entry fields could not be decrypted and are shown as (corrupted) in this report. Re-enter the correct encryption key in Settings to recover the original values.", { width: pageWidth }) + 4;
+        doc.font('Helvetica');
+      }
       currentY += 5;
 
       doc.rect(36, currentY, 260, 20).strokeColor(accentHex).lineWidth(1.5).stroke();
@@ -4728,6 +4765,12 @@ export async function registerRoutes(
         if (s.length > 0 && "=+-@\t\r".includes(s[0])) return "'" + s;
         return s;
       };
+      const xlIsSentinel = (v: any): boolean => v === UNREADABLE_SENTINEL;
+      const xlFmtSentinel = (v: any): string => xlIsSentinel(v) ? "(corrupted)" : safeStr(v);
+      const xlHasCorrupted = (sessionEntries as any[]).some((e: any) =>
+        [e.reelTag, e.wireType, e.gauge, e.color, e.manufacturer, e.notes].some(xlIsSentinel)
+      );
+      const corruptedCellBg = "FFF3E0";
 
       const accentHex = "EA580C";
       const headerBg = "F5F0EB";
@@ -4889,12 +4932,17 @@ export async function registerRoutes(
             detailOfText = parts.length > 0 ? parts.join(" ") : "Detail shot";
           }
         }
+        const corruptedCols = new Set<number>();
+        if (xlIsSentinel(e.reelTag)) corruptedCols.add(3);
+        if (xlIsSentinel(e.manufacturer)) corruptedCols.add(4);
+        if (xlIsSentinel(e.color)) corruptedCols.add(7);
+        if (xlIsSentinel(e.notes)) corruptedCols.add(8);
         const vals = [
           pinLabel, safeStr(e.aisle), safeStr(e.section),
-          safeStr(e.reelTag), safeStr(e.manufacturer),
+          xlFmtSentinel(e.reelTag), xlFmtSentinel(e.manufacturer),
           e.reelCount || 1, xlFmt(e.footage || 0),
-          safeStr(e.color),
-          safeStr(e.notes),
+          xlFmtSentinel(e.color),
+          xlFmtSentinel(e.notes),
           isFlagged ? "Yes" : "",
           safeStr(flagPin?.flagReason),
           safeStr(detailOfText),
@@ -4905,12 +4953,19 @@ export async function registerRoutes(
         vals.forEach((v, i) => {
           const cell = r.getCell(i + 1);
           cell.value = v;
-          cell.font = { size: 8.5, color: { argb: isFlagged ? "CC4400" : "333333" } };
+          const isCorruptedCell = corruptedCols.has(i);
+          if (isCorruptedCell) {
+            cell.font = { size: 8.5, italic: true, color: { argb: "999999" } };
+          } else {
+            cell.font = { size: 8.5, color: { argb: isFlagged ? "CC4400" : "333333" } };
+          }
           cell.border = thinBorder;
           cell.alignment = { vertical: "middle", wrapText: i === 8, horizontal: centeredCols.has(i) ? "center" : undefined, indent: i === 0 ? 2 : undefined };
           if (i === 0 && pinLabel) cell.font = { size: 8.5, bold: true, color: { argb: accentHex } };
           if (i === 6 && typeof v === "number" && v > 0) cell.numFmt = `#,##0" ${xlULabel}"`;
-          if (isFlagged) {
+          if (isCorruptedCell) {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: corruptedCellBg } };
+          } else if (isFlagged) {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: flaggedRowBg } };
           } else if (altShade) {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: altRowBg } };
@@ -5013,8 +5068,9 @@ export async function registerRoutes(
 
       const catalogMap = new Map<string, { vendorCode: string; totalFootage: number; reelCount: number; locations: string[] }>();
       for (const e of activeEntries) {
-        const cat = e.reelTag || e.wireType || "Uncataloged";
-        const vendor = e.manufacturer || "";
+        const rawXlCat = e.reelTag || e.wireType;
+        const cat = rawXlCat && !xlIsSentinel(rawXlCat) ? rawXlCat : (xlIsSentinel(rawXlCat) ? "(corrupted)" : "Uncataloged");
+        const vendor = xlIsSentinel(e.manufacturer) ? "(corrupted)" : (e.manufacturer || "");
         const groupKey = `${cat}|||${vendor}`;
         const existing = catalogMap.get(groupKey);
         const pin = entryPinMap.get(e.id);
@@ -5138,6 +5194,9 @@ export async function registerRoutes(
       if (session.completedAt) auditData.push(["Completed:", fmtDt(new Date(session.completedAt)) + " " + tzAbbr]);
       auditData.push(["Total Reels:", String(totalReels)]);
       auditData.push(["Data Encoding:", key ? "Active (entries decrypted for export)" : "Off"]);
+      if (xlHasCorrupted) {
+        auditData.push(["Data Integrity:", "Warning: fields shown as (corrupted) could not be decrypted — re-enter encryption key in Settings to recover"]);
+      }
 
       for (const [label, value] of auditData) {
         const r = ws.getRow(row);
