@@ -1146,7 +1146,7 @@ function SessionWorkspace({
                 <div className="mt-4 pt-4 border-t border-destructive/20">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="w-full border-destructive/40 text-destructive/70 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/60" data-testid="button-delete-entry-modal">
+                      <Button variant="destructive-outline" size="sm" className="w-full" data-testid="button-delete-entry-modal">
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete Entry
                       </Button>

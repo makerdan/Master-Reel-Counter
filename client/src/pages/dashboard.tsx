@@ -2103,10 +2103,9 @@ export default function Dashboard() {
                             <TooltipTrigger asChild>
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="destructive-outline"
                                 onClick={() => setPermanentDeleteTarget({ id: session.id, name: session.name })}
                                 disabled={permanentDeleteSession.isPending}
-                                className="border-destructive/40 text-destructive/70 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/60"
                                 data-testid={`button-permanent-delete-session-${session.id}`}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -2172,10 +2171,9 @@ export default function Dashboard() {
                             <TooltipTrigger asChild>
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="destructive-outline"
                                 onClick={() => setPermanentDeleteFolderTarget({ id: folder.id, name: folder.name })}
                                 disabled={permanentDeleteFolder.isPending}
-                                className="border-destructive/40 text-destructive/70 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/60"
                                 data-testid={`button-permanent-delete-folder-${folder.id}`}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -2774,7 +2772,7 @@ export default function Dashboard() {
           )}
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="outline" className="border-destructive/40 text-destructive/70 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/60" data-testid="button-bulk-delete" title="Delete selected sessions">
+              <Button size="sm" variant="destructive-outline" data-testid="button-bulk-delete" title="Delete selected sessions">
                 <Trash2 className="h-3 w-3 mr-1" /> Delete
               </Button>
             </AlertDialogTrigger>
