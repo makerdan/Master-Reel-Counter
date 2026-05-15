@@ -6262,7 +6262,12 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // upload_intents table and will never be caught by the normal purge job.
   // Cross-references every /uploads/* GCS key against all DB-referenced keys
   // (photos, company logos, user avatars). Files older than `minAgeDays` (default 7)
-  // with no DB reference are deleted. Capped at 500 files per call to avoid timeouts.
+  // with no DB reference are deleted.
+  //
+  // Pagination: each call processes up to 500 GCS objects. If there are more,
+  // the response includes `nextPageToken`. Pass it in the request body as
+  // `{ pageToken: "..." }` to continue from where the previous call left off.
+  // Keep calling until `nextPageToken` is null.
   app.post("/api/admin/sweep-legacy-orphans", isAuthenticated, async (req: any, res) => {
     const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
     const userId = resolveUserId(req);
@@ -6273,25 +6278,34 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     const SWEEP_MAX_FILES = 500;
     const minAgeDays = Math.max(1, parseInt((req.query as any).minAgeDays as string) || 7);
     const cutoff = new Date(Date.now() - minAgeDays * 24 * 60 * 60 * 1000);
+    const pageToken: string | undefined = req.body?.pageToken || undefined;
+
+    // Normalize any key to canonical "/uploads/<filename>" form so that legacy
+    // "/objects/uploads/<filename>" DB values match the GCS-derived key.
+    const normalizeKey = (key: string) =>
+      key.startsWith("/objects/uploads/") ? key.slice("/objects".length) : key;
 
     try {
-      // Build set of all DB-referenced storage keys (photos + logos)
+      // Build set of all DB-referenced storage keys (photos + logos, already normalized)
       const knownKeys = await storage.getAllKnownStorageKeys();
-      // Augment with user avatar keys from the auth users table
+      // Augment with user avatar keys (stored in the auth users table)
       const allUsers = await authStorage.getAllUsers();
       for (const u of allUsers) {
-        if (u.customAvatarKey) knownKeys.add(u.customAvatarKey);
+        if (u.customAvatarKey) knownKeys.add(normalizeKey(u.customAvatarKey));
       }
 
       // Compute the GCS prefix for the uploads directory
       const dirPart = privateDir.replace(/^\/[^/]+\/?/, "");
       const uploadsPrefix = dirPart ? `${dirPart}/uploads/` : "uploads/";
 
-      // List GCS objects under the uploads prefix; cap the fetch to avoid OOM
-      const [files] = await objectStorageClient.bucket(BUCKET_NAME).getFiles({
+      // Paginated GCS listing — exactly SWEEP_MAX_FILES objects per call.
+      // nextQuery contains the pageToken for the following page (if any).
+      const [files, nextQuery] = await objectStorageClient.bucket(BUCKET_NAME).getFiles({
         prefix: uploadsPrefix,
-        maxResults: SWEEP_MAX_FILES * 4,
+        maxResults: SWEEP_MAX_FILES,
+        pageToken,
       });
+      const nextPageToken: string | null = (nextQuery as any)?.pageToken ?? null;
 
       let scanned = 0;
       let deleted = 0;
@@ -6299,15 +6313,16 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       let errors = 0;
 
       for (const file of files) {
-        if (scanned >= SWEEP_MAX_FILES) break;
         scanned++;
 
         // Skip files newer than the age threshold
         const created = new Date((file.metadata as any).timeCreated as string);
         if (created > cutoff) { skipped++; continue; }
 
-        // Convert GCS name → DB key  e.g. "mydir/uploads/foo.jpg" → "/uploads/foo.jpg"
-        const dbKey = "/" + file.name.slice(dirPart ? dirPart.length + 1 : 0);
+        // Convert GCS name → canonical DB key
+        // e.g. "mydir/uploads/foo.jpg" → "/uploads/foo.jpg"
+        const rawKey = "/" + file.name.slice(dirPart ? dirPart.length + 1 : 0);
+        const dbKey = normalizeKey(rawKey);
 
         if (knownKeys.has(dbKey)) { skipped++; continue; }
 
@@ -6324,8 +6339,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         }
       }
 
-      const remaining = Math.max(0, files.length - scanned);
-      res.json({ scanned, deleted, skipped, errors, remaining, minAgeDays });
+      res.json({ scanned, deleted, skipped, errors, nextPageToken, minAgeDays });
     } catch (err) {
       console.error("Legacy orphan sweep error:", err);
       res.status(500).json({ message: "Sweep failed" });

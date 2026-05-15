@@ -2675,17 +2675,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllKnownStorageKeys(): Promise<Set<string>> {
+    // Normalize to canonical "/uploads/<filename>" form so legacy
+    // "/objects/uploads/<filename>" keys compare equal.
+    const normalize = (key: string) =>
+      key.startsWith("/objects/uploads/") ? key.slice("/objects".length) : key;
     const keys = new Set<string>();
     const photoRows = await db
       .select({ key: photos.objectStorageKey })
       .from(photos)
       .where(isNotNull(photos.objectStorageKey));
-    for (const row of photoRows) if (row.key) keys.add(row.key);
+    for (const row of photoRows) if (row.key) keys.add(normalize(row.key));
     const logoRows = await db
       .select({ key: userSettings.companyLogoKey })
       .from(userSettings)
       .where(isNotNull(userSettings.companyLogoKey));
-    for (const row of logoRows) if (row.key) keys.add(row.key);
+    for (const row of logoRows) if (row.key) keys.add(normalize(row.key));
     return keys;
   }
 
