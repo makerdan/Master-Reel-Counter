@@ -216,6 +216,7 @@ export default function Dashboard() {
     defaultExportFormat: string;
     companyName: string | null;
     exportFooterText: string | null;
+    encodingEnabled: boolean;
   }>({
     queryKey: ["/api/settings"],
     enabled: !!user,
@@ -1965,7 +1966,7 @@ export default function Dashboard() {
                     <X className="h-3 w-3" />
                   </Badge>
                 )}
-                {searchResults?.wireTypeFilterDisabled && filterWireType && (
+                {(userSettings?.encodingEnabled || searchResults?.wireTypeFilterDisabled) && (
                   <span
                     role="status"
                     aria-live="polite"
@@ -2042,7 +2043,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">
                     Wire Type
-                    {searchResults?.wireTypeFilterDisabled && (
+                    {(userSettings?.encodingEnabled || searchResults?.wireTypeFilterDisabled) && (
                       <span className="ml-1 text-amber-600 dark:text-amber-400" title="Encryption is on — wire type values are stored as ciphertext and cannot be searched">
                         (unavailable)
                       </span>
@@ -2051,9 +2052,10 @@ export default function Dashboard() {
                   <Input
                     value={filterWireType}
                     onChange={e => setFilterWireType(e.target.value)}
-                    placeholder={searchResults?.wireTypeFilterDisabled ? "Unavailable with encryption" : "e.g. THHN"}
-                    className={`h-7 text-xs${searchResults?.wireTypeFilterDisabled ? " opacity-50" : ""}`}
-                    disabled={!!searchResults?.wireTypeFilterDisabled}
+                    placeholder={(userSettings?.encodingEnabled || searchResults?.wireTypeFilterDisabled) ? "Unavailable with encryption" : "e.g. THHN"}
+                    className={`h-7 text-xs${(userSettings?.encodingEnabled || searchResults?.wireTypeFilterDisabled) ? " opacity-50" : ""}`}
+                    disabled={!!(userSettings?.encodingEnabled || searchResults?.wireTypeFilterDisabled)}
+                    title={(userSettings?.encodingEnabled || searchResults?.wireTypeFilterDisabled) ? "Encryption is on — wire type values are stored as ciphertext and cannot be searched" : undefined}
                     data-testid="input-filter-wiretype"
                   />
                 </div>
