@@ -348,6 +348,22 @@ function SessionWorkspace({
     }
   }, user ? { userId: (user as any).id, username: (user as any).firstName || (user as any).id } : undefined);
 
+  // Live countdown: ticks once per second from the initial reconnect delay to 0.
+  // Resets whenever a new delay is received (each disconnect cycle may use a different
+  // exponential-backoff value) and clears when the connection recovers.
+  const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
+  useEffect(() => {
+    if (wsStatus !== "reconnecting" || reconnectDelayMs === null) {
+      setReconnectCountdown(null);
+      return;
+    }
+    setReconnectCountdown(Math.ceil(reconnectDelayMs / 1000));
+    const interval = setInterval(() => {
+      setReconnectCountdown(prev => (prev !== null && prev > 1 ? prev - 1 : prev));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [wsStatus, reconnectDelayMs]);
+
   const isMutating = useIsMutating();
   useEffect(() => {
     if (isMutating > 0) {
@@ -723,8 +739,8 @@ function SessionWorkspace({
             {wsStatus === "reconnecting" && (
               <span className="flex items-center gap-1 text-xs text-amber-500 animate-pulse" data-testid="text-ws-reconnecting">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                {reconnectDelayMs
-                  ? `Reconnecting in ~${Math.ceil(reconnectDelayMs / 1000)}s`
+                {reconnectCountdown !== null
+                  ? `Reconnecting in ${reconnectCountdown}s…`
                   : "Reconnecting…"}
               </span>
             )}
