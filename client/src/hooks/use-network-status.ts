@@ -258,9 +258,15 @@ export function useNetworkStatus(currentUserId?: string) {
     // Clear the IDB-persisted failure flags BEFORE draining so the drain loop
     // does not see permanentlyFailed=true and skip these entries.  We must
     // await all clears; a fire-and-forget here would race with syncQueue.
+    // If a clear fails, we proceed anyway so the current session's retry works
+    // correctly (in-memory refs are cleared below regardless).  The worst-case
+    // degradation is that a successfully-retried entry re-appears as "failed"
+    // after the next reload; IDB remove (on success) makes this self-healing.
     await Promise.all(
       Array.from(permanentlyFailedRef.current).map(id =>
-        clearEntryPermanentlyFailed(id).catch(() => {}),
+        clearEntryPermanentlyFailed(id).catch(err => {
+          console.warn("[offline] Failed to clear permanentlyFailed flag for entry", id, err);
+        }),
       ),
     );
     permanentlyFailedRef.current.clear();
