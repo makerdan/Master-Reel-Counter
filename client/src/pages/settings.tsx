@@ -1643,7 +1643,9 @@ export default function SettingsPage() {
                   <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                      {encodingRetryPayload.error === "verification_failed" ? "Conversion failed" : "Mixed encryption state"}
+                      {encodingRetryPayload.error === "verification_failed"
+                        ? `Conversion failed${encodingRetryPayload.remainingCount != null ? ` — ${encodingRetryPayload.remainingCount} ${encodingRetryPayload.remainingCount === 1 ? "entry" : "entries"} not converted` : ""}`
+                        : "Mixed encryption state"}
                     </p>
                     <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{encodingRetryPayload.message}</p>
                   </div>
