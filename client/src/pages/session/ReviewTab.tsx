@@ -458,6 +458,24 @@ export default function ReviewTab({
     setCohortRetryToken(0);
   }, [sessionId]);
 
+  // Rehydrate cohort from sessionStorage when sessionId changes without a full
+  // component remount (e.g. in-SPA navigation to a different session while the
+  // ReviewTab stays mounted). The useState initializer only runs once per
+  // mount, so this effect covers the "same component, new sessionId" case.
+  useEffect(() => {
+    setAnchoredCohort(prev => {
+      if (prev !== null) return prev; // already have a cohort — leave it
+      try {
+        const raw = sessionStorage.getItem(cohortSKey(sessionId));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+      return null;
+    });
+  }, [sessionId]);
+
   // Clear this session's persisted review data from sessionStorage when the
   // user navigates away (component unmount / sessionId change). This prevents
   // stale data from accumulating across many visited sessions.
