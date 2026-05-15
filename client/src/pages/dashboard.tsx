@@ -571,9 +571,10 @@ export default function Dashboard() {
   const createFolder = useMutation({
     mutationFn: async (nameOverride?: string) => {
       const res = await apiRequest("POST", "/api/folders", { name: nameOverride || newFolderName });
-      return res.json();
+      return res.json() as Promise<FolderType>;
     },
-    onSuccess: () => {
+    onSuccess: (newFolder) => {
+      setOpenFolders(prev => new Set([...prev, newFolder.id]));
       invalidateAll();
       setNewFolderDialogOpen(false);
       setNewFolderName("");
@@ -707,11 +708,12 @@ export default function Dashboard() {
   const createFolderAndMove = useMutation({
     mutationFn: async ({ sessionId, folderName }: { sessionId: number; folderName: string }) => {
       const folderRes = await apiRequest("POST", "/api/folders", { name: folderName });
-      const folder = await folderRes.json();
+      const folder = await folderRes.json() as FolderType;
       await apiRequest("POST", `/api/sessions/${sessionId}/move`, { folderId: folder.id });
       return folder;
     },
-    onSuccess: () => {
+    onSuccess: (newFolder) => {
+      setOpenFolders(prev => new Set([...prev, newFolder.id]));
       invalidateAll();
       setCreateFolderForSession(null);
       setInlineFolderName("");
