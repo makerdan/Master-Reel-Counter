@@ -298,11 +298,11 @@ export default function SettingsPage() {
         res.json() as Promise<{ scanned: number; deleted: number; skipped: number; errors: number; nextPageToken: string | null; minAgeDays: number }>
       ),
     onSuccess: (data) => {
-      const remaining = data.errors;
-      const runAgain = remaining > 0 || data.nextPageToken !== null;
+      const errorNote = data.errors > 0 ? ` ${data.errors} deletion error(s).` : "";
+      const pageNote = data.nextPageToken ? " More pages remain — run again to continue." : "";
       toast({
         title: "Orphan sweep complete",
-        description: `Scanned ${data.scanned}, deleted ${data.deleted}, skipped ${data.skipped}. Remaining: ${remaining}.${runAgain ? " Run again to continue." : ""}`,
+        description: `Scanned ${data.scanned}, deleted ${data.deleted}, skipped ${data.skipped}.${errorNote}${pageNote}`,
       });
     },
     onError: () => {
@@ -716,7 +716,7 @@ export default function SettingsPage() {
                         ) : (
                           <Trash2 className="h-3 w-3 mr-1" />
                         )}
-                        Sweep Orphans
+                        Sweep Legacy Orphans
                       </Button>
                     )}
                     <Button
