@@ -603,47 +603,68 @@ export class DatabaseStorage implements IStorage {
       return result;
     }
 
+    // Helper: short exponential sleep used between conflict-path retries.
+    // Delays: 5 ms → 10 ms → 20 ms (attempts 1-3).
+    const retryDelay = (attempt: number) =>
+      new Promise<void>(r => setTimeout(r, 5 * 2 ** (attempt - 1)));
+
     // Commit flow (entryId present): promote the existing draft row so the entry
     // gets linked correctly. setWhere ensures we never overwrite an already-committed
     // row when two commits race on the same label.
     if (pin.entryId) {
-      const [promoted] = await db.insert(pins).values(pin)
-        .onConflictDoUpdate({
-          target: [pins.photoId, pins.label],
-          set: {
-            entryId: sql`excluded.entry_id`,
-            xPercent: sql`excluded.x_percent`,
-            yPercent: sql`excluded.y_percent`,
-            reelCount: sql`excluded.reel_count`,
-            wireDetails: sql`excluded.wire_details`,
-            vendorCode: sql`excluded.vendor_code`,
-            footage: sql`excluded.footage`,
-          },
-          // Only promote draft rows — if the conflict row is already committed,
-          // setWhere blocks the update (DO NOTHING behavior for that row).
-          setWhere: isNull(pins.entryId),
-        })
-        .returning();
-      if (promoted) return promoted;
-      // setWhere blocked the update (conflict row was already committed);
-      // return the existing committed row.
-      const [existing] = await db.select().from(pins)
-        .where(and(eq(pins.photoId, pin.photoId), eq(pins.label, pin.label)));
-      if (existing) return existing;
-      throw new Error("Pin creation conflict but no existing row found");
+      for (let attempt = 0; attempt <= 3; attempt++) {
+        if (attempt > 0) await retryDelay(attempt);
+        const [promoted] = await db.insert(pins).values(pin)
+          .onConflictDoUpdate({
+            target: [pins.photoId, pins.label],
+            set: {
+              entryId: sql`excluded.entry_id`,
+              xPercent: sql`excluded.x_percent`,
+              yPercent: sql`excluded.y_percent`,
+              reelCount: sql`excluded.reel_count`,
+              wireDetails: sql`excluded.wire_details`,
+              vendorCode: sql`excluded.vendor_code`,
+              footage: sql`excluded.footage`,
+            },
+            // Only promote draft rows — if the conflict row is already committed,
+            // setWhere blocks the update (DO NOTHING behavior for that row).
+            setWhere: isNull(pins.entryId),
+          })
+          .returning();
+        if (promoted) return promoted;
+        // setWhere blocked the update (conflict row was already committed);
+        // return the existing committed row.
+        const [existing] = await db.select().from(pins)
+          .where(and(eq(pins.photoId, pin.photoId), eq(pins.label, pin.label)));
+        if (existing) return existing;
+        // Neither path succeeded — the conflicting row was deleted between our
+        // insert and select. Loop to retry the whole sequence.
+      }
+      throw new Error(
+        "atomicCreatePin: commit-path conflict unresolvable after 3 retries — " +
+        "pin was likely deleted concurrently [photoId=" + pin.photoId + " label=" + pin.label + "]"
+      );
     }
 
     // Draft creation (no entryId): DO NOTHING on conflict so double-clicks and
     // concurrent requests are silently deduplicated without creating duplicates.
-    const [inserted] = await db.insert(pins)
-      .values(pin)
-      .onConflictDoNothing()
-      .returning();
-    if (inserted) return inserted;
-    const [existing] = await db.select().from(pins)
-      .where(and(eq(pins.photoId, pin.photoId), eq(pins.label, pin.label)));
-    if (existing) return existing;
-    throw new Error("Pin creation conflict but no existing row found");
+    for (let attempt = 0; attempt <= 3; attempt++) {
+      if (attempt > 0) await retryDelay(attempt);
+      const [inserted] = await db.insert(pins)
+        .values(pin)
+        .onConflictDoNothing()
+        .returning();
+      if (inserted) return inserted;
+      const [existing] = await db.select().from(pins)
+        .where(and(eq(pins.photoId, pin.photoId), eq(pins.label, pin.label)));
+      if (existing) return existing;
+      // Neither path succeeded — the conflicting row was deleted between our
+      // insert and select. Loop to retry the whole sequence.
+    }
+    throw new Error(
+      "atomicCreatePin: draft-path conflict unresolvable after 3 retries — " +
+      "pin was likely deleted concurrently [photoId=" + pin.photoId + " label=" + pin.label + "]"
+    );
   }
 
   async replaceDraftPins(photoId: number, newPins: Array<{
