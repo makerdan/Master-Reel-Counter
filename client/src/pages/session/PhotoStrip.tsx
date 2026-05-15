@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight, MoreVertical, Camera, ImagePlus } from "lucide-react";
+import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight, MoreVertical, Camera, ImagePlus, ImageOff } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -119,6 +119,8 @@ function PhotoCard({
 }) {
   const { toast } = useToast();
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const [aisle, setAisle] = useState(photo.aisle || "");
   const [section, setSection] = useState(photo.section || "");
   const [notes, setNotes] = useState(photo.notes || "");
@@ -480,31 +482,42 @@ function PhotoCard({
   return (
     <div className={`rounded-md border bg-card group relative flex flex-col ${isDetail ? "!border-blue-500 sm:ml-3" : "border-border"}`} data-testid={`strip-card-${photo.id}`}>
       <div ref={thumbContainerRef} className="relative aspect-square lg:aspect-video bg-muted overflow-hidden">
-        <img
-          src={photoUrl(photo.objectStorageKey)}
-          alt={`Photo ${photo.id}`}
-          className="w-full h-full object-contain cursor-zoom-in"
-          loading="lazy"
-          role="button"
-          tabIndex={0}
-          aria-label={`View photo ${[photo.aisle, photo.section].filter(Boolean).join(" / ") || `#${photo.id}`} full size`}
-          onClick={() => {
-            const label = [photo.aisle, photo.section].filter(Boolean).join(" / ") || `Photo #${photo.id}`;
-            onLightbox(photoUrl(photo.objectStorageKey), label);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
+        {!imgLoaded && !imgError && (
+          <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
+        )}
+        {imgError ? (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground" data-testid={`img-strip-error-${photo.id}`}>
+            <ImageOff className="h-6 w-6" />
+          </div>
+        ) : (
+          <img
+            src={photoUrl(photo.objectStorageKey)}
+            alt={`Photo ${photo.id}`}
+            className={`w-full h-full object-contain cursor-zoom-in transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+            loading="lazy"
+            role="button"
+            tabIndex={0}
+            aria-label={`View photo ${[photo.aisle, photo.section].filter(Boolean).join(" / ") || `#${photo.id}`} full size`}
+            onClick={() => {
               const label = [photo.aisle, photo.section].filter(Boolean).join(" / ") || `Photo #${photo.id}`;
               onLightbox(photoUrl(photo.objectStorageKey), label);
-            }
-          }}
-          onLoad={(e) => {
-            const img = e.currentTarget;
-            setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-          }}
-          data-testid={`img-strip-thumb-${photo.id}`}
-        />
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                const label = [photo.aisle, photo.section].filter(Boolean).join(" / ") || `Photo #${photo.id}`;
+                onLightbox(photoUrl(photo.objectStorageKey), label);
+              }
+            }}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+              setImgLoaded(true);
+            }}
+            onError={() => setImgError(true)}
+            data-testid={`img-strip-thumb-${photo.id}`}
+          />
+        )}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none flex items-center justify-center">
           <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-80 transition-opacity drop-shadow pointer-events-none" />
         </div>
