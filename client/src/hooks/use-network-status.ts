@@ -62,6 +62,9 @@ export function useNetworkStatus(currentUserId?: string) {
   }, [currentUserId]);
 
   const syncQueue = useCallback(async () => {
+    // Never drain without a confirmed user identity — would risk submitting
+    // another user's queued items under the current auth cookie.
+    if (!currentUserId) return;
     if (syncingRef.current || !navigator.onLine) return;
     syncingRef.current = true;
     setIsSyncing(true);

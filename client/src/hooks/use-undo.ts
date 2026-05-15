@@ -333,7 +333,7 @@ export function useUndoRedo(sessionId: number) {
       return placeholderId;
     }
     return false;
-  }, [optimisticallyApplyOffline]);
+  }, [optimisticallyApplyOffline, user?.id]);
 
   const performStep = useCallback(async (
     action: UndoAction,

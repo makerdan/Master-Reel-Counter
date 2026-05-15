@@ -168,7 +168,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
   useEffect(() => {
     let cancelled = false;
-    getQueuedPhotos(sessionId).then(items => {
+    getQueuedPhotos(sessionId, user?.id).then(items => {
       if (cancelled || items.length === 0) return;
       const restored: UploadQueueItem[] = items.map(item => ({
         queueId: item.id,
@@ -192,7 +192,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       toast({ title: "Could not restore queued photos", variant: "destructive" });
     });
     return () => { cancelled = true; };
-  }, [sessionId]);
+  }, [sessionId, user?.id]);
 
   useEffect(() => {
     if (photos.length > 0) {
@@ -395,7 +395,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       return [];
     });
     clearAllQueuedPhotos(user?.id).catch(() => {});
-  }, []);
+  }, [user?.id]);
 
   const getNextReceivingSection = useCallback(() => {
     const allReceivingPhotos = [
