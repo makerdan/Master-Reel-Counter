@@ -2849,13 +2849,14 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
     const _sid = parseInt(req.params.id);
     taskTracker.increment();
+    // Hoist jobId/job outside try so the catch block can safely mark the job failed
+    const jobId = typeof req.query.jobId === "string" ? req.query.jobId : null;
+    const job = jobId ? pdfJobs.get(jobId) : null;
     try {
       const userId = resolveUserId(req);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
       if (!access) return res.status(404).json({ message: "Session not found" });
       taskTracker.startSession(_sid, "pdf");
-      const jobId = typeof req.query.jobId === "string" ? req.query.jobId : null;
-      const job = jobId ? pdfJobs.get(jobId) : null;
       if (jobId && !job) return res.status(404).json({ error: "Job not found" });
       // Respond immediately so the client can start polling progress
       if (job) res.json({ started: true });
