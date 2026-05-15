@@ -660,6 +660,7 @@ export default function Dashboard() {
             <button
               className="underline font-medium"
               onClick={() => {
+                setOpenFolders((prev) => new Set([...prev, folderId]));
                 const el = document.getElementById(`folder-section-${folderId}`);
                 el?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}
