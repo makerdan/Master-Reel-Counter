@@ -309,8 +309,9 @@ export function useNetworkStatus(currentUserId?: string) {
     // cleanup rather than a required gate. Guarded by migratedUserIds so it
     // only touches IDB once per user per page session.
     if (currentUserId && !migratedUserIds.has(currentUserId)) {
-      migratedUserIds.add(currentUserId);
-      migrateQueueUserIds(currentUserId).catch(() => {});
+      migrateQueueUserIds(currentUserId)
+        .then(() => { migratedUserIds.add(currentUserId!); })
+        .catch(() => {}); // transient IDB error — userId not added, so retry on next startup
     }
 
     // Clear STALE inFlight flags (older than 2 min) from a previous page crash
