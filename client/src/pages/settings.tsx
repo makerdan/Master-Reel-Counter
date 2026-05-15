@@ -292,6 +292,24 @@ export default function SettingsPage() {
     },
   });
 
+  const sweepOrphans = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/sweep-legacy-orphans");
+      if (!res.ok) throw new Error("Sweep failed");
+      return res.json() as Promise<{ scanned: number; deleted: number; skipped: number; errors: number; nextPageToken: string | null; minAgeDays: number }>;
+    },
+    onSuccess: (data) => {
+      const remaining = data.nextPageToken ? "Run again to continue." : null;
+      toast({
+        title: "Orphan sweep complete",
+        description: `Scanned ${data.scanned}, deleted ${data.deleted}, skipped ${data.skipped}${data.errors ? `, ${data.errors} error(s)` : ""}.${remaining ? ` ${remaining}` : ""}`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Orphan sweep failed", variant: "destructive" });
+    },
+  });
+
   const hasTesterPassword = settings?.testerPassword === "********";
 
   useEffect(() => {
@@ -684,6 +702,21 @@ export default function SettingsPage() {
                     <CardTitle className="text-base">App-Wide Storage</CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => sweepOrphans.mutate()}
+                      disabled={sweepOrphans.isPending}
+                      data-testid="button-sweep-orphans"
+                    >
+                      {sweepOrphans.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        <Trash2 className="h-3 w-3 mr-1" />
+                      )}
+                      Sweep Orphans
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
