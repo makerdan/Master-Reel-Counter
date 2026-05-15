@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { WifiOff, Loader2, CloudUpload, AlertTriangle, RefreshCw, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useNetworkStatus } from "@/hooks/use-network-status";
+import { useAuth } from "@/hooks/use-auth";
 
 function entryLabel(data: Record<string, unknown>): string {
   const parts: string[] = [];
@@ -14,7 +15,8 @@ function entryLabel(data: Record<string, unknown>): string {
 }
 
 export function NetworkStatusIndicator() {
-  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, failedEntries } = useNetworkStatus();
+  const { user } = useAuth();
+  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, failedEntries } = useNetworkStatus(user?.id);
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos } from "@/lib/offlineQueue";
 import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
@@ -42,6 +43,7 @@ type UploadQueueItem = {
 };
 
 function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured, onBackToFlagged, onClearUndoHistory }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void; onBackToFlagged?: () => void; onClearUndoHistory?: () => void }) {
+  const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -392,7 +394,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       }
       return [];
     });
-    clearAllQueuedPhotos().catch(() => {});
+    clearAllQueuedPhotos(user?.id).catch(() => {});
   }, []);
 
   const getNextReceivingSection = useCallback(() => {
@@ -444,6 +446,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       saveToQueue({
         id: item.queueId,
         sessionId,
+        userId: user?.id,
         blob: item.file,
         aisle: item.aisle,
         section: item.section,

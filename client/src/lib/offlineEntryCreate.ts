@@ -49,11 +49,12 @@ function nextPlaceholderId(): number {
 export async function createEntryWithOfflineFallback(
   sessionId: number,
   data: Record<string, unknown>,
+  userId?: string,
 ): Promise<OfflineEntryResult> {
   if (!navigator.onLine) {
     const id = `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const placeholderId = nextPlaceholderId();
-    await saveEntryToQueue({ id, sessionId, data, createdAt: Date.now(), placeholderId });
+    await saveEntryToQueue({ id, sessionId, userId, data, createdAt: Date.now(), placeholderId });
     return { entry: { ...data, id: placeholderId, sessionId }, queued: true, placeholderId };
   }
 
@@ -65,7 +66,7 @@ export async function createEntryWithOfflineFallback(
     if (isNetworkFailure(err)) {
       const id = `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const placeholderId = nextPlaceholderId();
-      await saveEntryToQueue({ id, sessionId, data, createdAt: Date.now(), placeholderId });
+      await saveEntryToQueue({ id, sessionId, userId, data, createdAt: Date.now(), placeholderId });
       return { entry: { ...data, id: placeholderId, sessionId }, queued: true, placeholderId };
     }
     throw err;

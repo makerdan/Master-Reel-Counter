@@ -40,7 +40,7 @@ function scheduleEntryRetry(
   timersRef.current.set(entryId, timer);
 }
 
-export function useNetworkStatus() {
+export function useNetworkStatus(currentUserId?: string) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -56,10 +56,10 @@ export function useNetworkStatus() {
 
   const refreshPendingCount = useCallback(async () => {
     try {
-      const count = await getPendingCount();
+      const count = await getPendingCount(currentUserId);
       setPendingCount(count);
     } catch {}
-  }, []);
+  }, [currentUserId]);
 
   const syncQueue = useCallback(async () => {
     if (syncingRef.current || !navigator.onLine) return;
@@ -67,7 +67,7 @@ export function useNetworkStatus() {
     setIsSyncing(true);
 
     try {
-      const entries = await getQueuedEntries();
+      const entries = await getQueuedEntries(undefined, currentUserId);
       for (const entry of entries) {
         // Fast path: skip items the snapshot already shows as in-flight.
         if (entry.inFlight) continue;
@@ -160,7 +160,7 @@ export function useNetworkStatus() {
         if (fetchFailed) break;
       }
 
-      const photos = await getQueuedPhotos();
+      const photos = await getQueuedPhotos(undefined, currentUserId);
       for (const photo of photos) {
         // Fast path: snapshot already shows this item as in-flight.
         if (photo.inFlight) continue;
@@ -233,7 +233,7 @@ export function useNetworkStatus() {
       setEntryRetryAttempt(null);
       await refreshPendingCount();
     }
-  }, [refreshPendingCount]);
+  }, [refreshPendingCount, currentUserId]);
 
   const retryAllFailedEntries = useCallback(() => {
     for (const timer of entryRetryTimersRef.current.values()) {

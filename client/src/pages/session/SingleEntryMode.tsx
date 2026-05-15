@@ -14,6 +14,7 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { lookupCatalog, PARSED_CATALOG, userWireCatalogToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
@@ -33,6 +34,7 @@ export default function SingleEntryMode({
   getNextReceivingSection?: () => string;
   onIsDirtyChange?: (isDirty: boolean) => void;
 }) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const { allCodes: vendorCodes } = useVendorCodes();
@@ -252,6 +254,7 @@ export default function SingleEntryMode({
           await saveToQueue({
             id: queueId,
             sessionId,
+            userId: user?.id,
             blob,
             aisle: form.aisle,
             section: form.section,
@@ -372,7 +375,7 @@ export default function SingleEntryMode({
         const updated = await patchRes.json().catch(() => null);
         result = { type: "update" as const, body, previousData: editingEntry, queued: false, serverUpdatedAt: updated?.updatedAt ?? undefined };
       } else {
-        const { entry: created, queued } = await createEntryWithOfflineFallback(sessionId, body);
+        const { entry: created, queued } = await createEntryWithOfflineFallback(sessionId, body, user?.id);
         result = { type: "create" as const, body, id: created.id, queued, serverUpdatedAt: queued ? undefined : (created?.updatedAt ?? undefined) };
       }
       return result;

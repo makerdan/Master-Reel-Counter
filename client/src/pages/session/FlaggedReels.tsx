@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import type { Entry, Pin, Photo, ReviewResponse } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
 import { lookupCatalog, type ParsedCatalogEntry, PARSED_CATALOG, userWireCatalogToParsedEntry } from "@/lib/wireReference";
@@ -303,6 +304,7 @@ function DupPinTile({
 }
 
 export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, onViewInPhoto, pushUndo }: FlaggedReelsProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
   const { catalogs: userCatalogs } = useWireCatalogs();
@@ -489,7 +491,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
             reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
             photoId,
             notes: notesWithMarker,
-          });
+          }, user?.id);
           resolvedEntryId = newEntry.id;
           if (!entryQueued) {
             await apiRequest("PATCH", `/api/pins/${pinId}`, { entryId: resolvedEntryId });

@@ -31,6 +31,7 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { lookupCatalog, userWireCatalogToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
@@ -62,6 +63,7 @@ type OnlineUser = { userId: string; username: string };
 
 export default function PhotoMode({ sessionId, photos, navigateToPhotoId, navigateAisle, navigateSection, navigateToPinId, onNavigated, canEdit = true, initialPhotoIndex = 0, onPushUndo, onClearUndoHistory, undoRedoSignal, onDraftPinsHint, pinRefreshSignal, onCurrentPhotoChange, isAdmin = false, onPinDataChanged, onlineUsers = [], initialScanPanelOpen = false, onJumpToStripPhoto, flushRef, onScanApplied, onPanStateChange, onTriggerUndo }: { sessionId: number; photos: Photo[]; navigateToPhotoId?: number | null; navigateAisle?: string; navigateSection?: string; navigateToPinId?: number | null; onNavigated?: () => void; canEdit?: boolean; initialPhotoIndex?: number; onPushUndo?: (action: any) => void; onClearUndoHistory?: () => void; undoRedoSignal?: number; onDraftPinsHint?: (aisle: string, section: string) => void; pinRefreshSignal?: number; onCurrentPhotoChange?: (photoId: number | null) => void; isAdmin?: boolean; onPinDataChanged?: () => void; onlineUsers?: OnlineUser[]; initialScanPanelOpen?: boolean; onJumpToStripPhoto?: (photoId: number) => void; flushRef?: React.MutableRefObject<(() => Promise<void>) | null>; onScanApplied?: (sectionKey: string) => void; onPanStateChange?: (active: boolean) => void; onTriggerUndo?: () => void }) {
   const tz = useTimezone();
+  const { user } = useAuth();
   const { toast } = useToast();
   const onTriggerUndoRef = useRef(onTriggerUndo);
   useEffect(() => { onTriggerUndoRef.current = onTriggerUndo; }, [onTriggerUndo]);
@@ -885,7 +887,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             let sectionVal = "";
             if (isRec) { sectionVal = String(nextRecNum).padStart(3, "0"); nextRecNum++; }
-            await saveToQueue({ id: queueId, sessionId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, isOnFloor: false, createdAt: Date.now() });
+            await saveToQueue({ id: queueId, sessionId, userId: user?.id, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, isOnFloor: false, createdAt: Date.now() });
             toast({ title: "Photo queued", description: `${file.name} will upload when back online` });
           } else {
             toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
@@ -1521,7 +1523,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               reelCount: pin.reelCount,
               photoId: entryPhotoId || undefined,
               notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
-            });
+            }, user?.id);
           });
           if (pinPhotoId && !entryQueued) {
             try {

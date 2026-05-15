@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
+import { useAuth } from "@/hooks/use-auth";
 
 export type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
 
@@ -132,6 +133,7 @@ export function useUndoRedo(sessionId: number) {
   const [undoStack, setUndoStack] = useState<UndoAction[]>(() => loadStack(undoKey(sessionId)));
   const [redoStack, setRedoStack] = useState<UndoAction[]>(() => loadStack(redoKey(sessionId)));
   const busyRef = useRef(false);
+  const { user } = useAuth();
   const { toast } = useToast();
 
   // Rehydrate stacks when sessionId changes (guards against a component instance
@@ -325,7 +327,7 @@ export function useUndoRedo(sessionId: number) {
   const tryQueueOffline = useCallback(async (action: UndoAction): Promise<number | false> => {
     if (!isQueueSafeOffline(action)) return false;
     if (action.type === "delete-entry") {
-      const result = await createEntryWithOfflineFallback(action.sessionId, action.previousData);
+      const result = await createEntryWithOfflineFallback(action.sessionId, action.previousData, user?.id);
       const placeholderId = result.placeholderId ?? result.entry.id;
       optimisticallyApplyOffline(action, placeholderId);
       return placeholderId;

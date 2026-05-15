@@ -17,6 +17,7 @@ export function onQueueChange(callback: () => void): () => void {
 export interface QueuedPhoto {
   id: string;
   sessionId: number;
+  userId?: string;
   blob: Blob;
   aisle: string;
   section: string;
@@ -31,6 +32,7 @@ export interface QueuedPhoto {
 export interface QueuedEntry {
   id: string;
   sessionId: number;
+  userId?: string;
   data: Record<string, unknown>;
   createdAt: number;
   placeholderId?: number;
@@ -83,7 +85,7 @@ export async function removeFromQueue(id: string): Promise<void> {
   });
 }
 
-export async function getQueuedPhotos(sessionId?: number): Promise<QueuedPhoto[]> {
+export async function getQueuedPhotos(sessionId?: number, userId?: string): Promise<QueuedPhoto[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PHOTO_STORE, "readonly");
@@ -93,15 +95,18 @@ export async function getQueuedPhotos(sessionId?: number): Promise<QueuedPhoto[]
       if (sessionId !== undefined) {
         results = results.filter(r => r.sessionId === sessionId);
       }
+      if (userId !== undefined) {
+        results = results.filter(r => !r.userId || r.userId === userId);
+      }
       resolve(results.sort((a, b) => a.createdAt - b.createdAt));
     };
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function clearQueue(sessionId?: number): Promise<void> {
-  if (sessionId !== undefined) {
-    const items = await getQueuedPhotos(sessionId);
+export async function clearQueue(sessionId?: number, userId?: string): Promise<void> {
+  const items = await getQueuedPhotos(sessionId, userId);
+  if (sessionId !== undefined || userId !== undefined) {
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(PHOTO_STORE, "readwrite");
@@ -142,7 +147,7 @@ export async function removeEntryFromQueue(id: string): Promise<void> {
   });
 }
 
-export async function getQueuedEntries(sessionId?: number): Promise<QueuedEntry[]> {
+export async function getQueuedEntries(sessionId?: number, userId?: string): Promise<QueuedEntry[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ENTRY_STORE, "readonly");
@@ -152,19 +157,25 @@ export async function getQueuedEntries(sessionId?: number): Promise<QueuedEntry[
       if (sessionId !== undefined) {
         results = results.filter(r => r.sessionId === sessionId);
       }
+      if (userId !== undefined) {
+        results = results.filter(r => !r.userId || r.userId === userId);
+      }
       resolve(results.sort((a, b) => a.createdAt - b.createdAt));
     };
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function getPendingCount(): Promise<number> {
-  const photos = await getQueuedPhotos();
-  const entries = await getQueuedEntries();
+export async function getPendingCount(userId?: string): Promise<number> {
+  const photos = await getQueuedPhotos(undefined, userId);
+  const entries = await getQueuedEntries(undefined, userId);
   return photos.length + entries.length;
 }
 
-export async function clearAllQueuedPhotos(): Promise<void> {
+export async function clearAllQueuedPhotos(userId?: string): Promise<void> {
+  if (userId !== undefined) {
+    return clearQueue(undefined, userId);
+  }
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PHOTO_STORE, "readwrite");
