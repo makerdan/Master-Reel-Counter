@@ -613,7 +613,10 @@ export class DatabaseStorage implements IStorage {
     // row when two commits race on the same label.
     if (pin.entryId) {
       for (let attempt = 0; attempt <= 3; attempt++) {
-        if (attempt > 0) await retryDelay(attempt);
+        if (attempt > 0) {
+          console.warn(`atomicCreatePin: commit-path retry ${attempt}/3 after conflict+delete race [photoId=${pin.photoId} label=${pin.label}]`);
+          await retryDelay(attempt);
+        }
         const [promoted] = await db.insert(pins).values(pin)
           .onConflictDoUpdate({
             target: [pins.photoId, pins.label],
@@ -649,7 +652,10 @@ export class DatabaseStorage implements IStorage {
     // Draft creation (no entryId): DO NOTHING on conflict so double-clicks and
     // concurrent requests are silently deduplicated without creating duplicates.
     for (let attempt = 0; attempt <= 3; attempt++) {
-      if (attempt > 0) await retryDelay(attempt);
+      if (attempt > 0) {
+        console.warn(`atomicCreatePin: draft-path retry ${attempt}/3 after conflict+delete race [photoId=${pin.photoId} label=${pin.label}]`);
+        await retryDelay(attempt);
+      }
       const [inserted] = await db.insert(pins)
         .values(pin)
         .onConflictDoNothing()
