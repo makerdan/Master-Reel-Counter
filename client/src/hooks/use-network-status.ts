@@ -250,16 +250,19 @@ export function useNetworkStatus(currentUserId?: string) {
     }
   }, [refreshPendingCount, currentUserId]);
 
-  const retryAllFailedEntries = useCallback(() => {
+  const retryAllFailedEntries = useCallback(async () => {
     for (const timer of entryRetryTimersRef.current.values()) {
       clearTimeout(timer);
     }
     entryRetryTimersRef.current.clear();
-    // Clear the IDB-persisted failure flags so the entries are retried on the
-    // next drain and don't reappear as failed after a future reload.
-    for (const id of permanentlyFailedRef.current) {
-      clearEntryPermanentlyFailed(id).catch(() => {});
-    }
+    // Clear the IDB-persisted failure flags BEFORE draining so the drain loop
+    // does not see permanentlyFailed=true and skip these entries.  We must
+    // await all clears; a fire-and-forget here would race with syncQueue.
+    await Promise.all(
+      Array.from(permanentlyFailedRef.current).map(id =>
+        clearEntryPermanentlyFailed(id).catch(() => {}),
+      ),
+    );
     permanentlyFailedRef.current.clear();
     entryRetryCountsRef.current.clear();
     failedEntriesRef.current.clear();
