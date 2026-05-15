@@ -181,7 +181,7 @@ export interface IStorage {
    * restored to this folder and trashedFromFolderId is cleared.
    * Returns the count of sessions that were relinked.
    */
-  restoreFolder(id: number): Promise<{ relinkedCount: number }>;
+  restoreFolder(id: number): Promise<{ relinkedCount: number; relinkedSessionNames: string[] }>;
   permanentDeleteFolder(id: number): Promise<void>;
   deleteFolder(id: number): Promise<void>;
   getExpiredTrashFolders(olderThanDays: number): Promise<Folder[]>;
@@ -1169,7 +1169,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(countingSessions.folderId, id));
   }
 
-  async restoreFolder(id: number): Promise<{ relinkedCount: number }> {
+  async restoreFolder(id: number): Promise<{ relinkedCount: number; relinkedSessionNames: string[] }> {
     await db.update(folders)
       .set({ deletedAt: null })
       .where(eq(folders.id, id));
@@ -1184,13 +1184,13 @@ export class DatabaseStorage implements IStorage {
         isNull(countingSessions.deletedAt),
         isNull(countingSessions.folderId),
       ))
-      .returning({ id: countingSessions.id });
+      .returning({ id: countingSessions.id, name: countingSessions.name });
     // Clear snapshots for sessions that were moved elsewhere so we don't leave
     // stale trashedFromFolderId values on rows we decided not to relink.
     await db.update(countingSessions)
       .set({ trashedFromFolderId: null })
       .where(eq(countingSessions.trashedFromFolderId, id));
-    return { relinkedCount: relinked.length };
+    return { relinkedCount: relinked.length, relinkedSessionNames: relinked.map(r => r.name) };
   }
 
   async permanentDeleteFolder(id: number): Promise<void> {

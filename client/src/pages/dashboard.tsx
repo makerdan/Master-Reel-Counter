@@ -641,17 +641,34 @@ export default function Dashboard() {
   const restoreFolder = useMutation({
     mutationFn: async (id: number) => {
       const res = await apiRequest("POST", `/api/folders/${id}/restore`);
-      return res.json() as Promise<{ success: boolean; relinkedCount: number }>;
+      return res.json() as Promise<{ success: boolean; relinkedCount: number; relinkedSessionNames: string[] }>;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, folderId) => {
       invalidateAll();
       queryClient.invalidateQueries({ queryKey: ["/api/folders/trash"] });
       const count = data?.relinkedCount ?? 0;
-      const desc = count === 0
-        ? "No sessions could be relinked (they may have been moved or deleted)."
-        : count === 1
-          ? "1 session was restored into the folder."
-          : `${count} sessions were restored into the folder.`;
+      const names = data?.relinkedSessionNames ?? [];
+      let desc: React.ReactNode;
+      if (count === 0) {
+        desc = "No sessions could be relinked (they may have been moved or deleted).";
+      } else if (count <= 3) {
+        desc = `${names.join(", ")} ${count === 1 ? "was" : "were"} moved back into the folder.`;
+      } else {
+        desc = (
+          <span>
+            {count} sessions were moved back into the folder.{" "}
+            <button
+              className="underline font-medium"
+              onClick={() => {
+                const el = document.getElementById(`folder-section-${folderId}`);
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              View folder
+            </button>
+          </span>
+        );
+      }
       toast({ title: "Folder restored", description: desc });
     },
     onError: () => {
@@ -1398,7 +1415,7 @@ export default function Dashboard() {
         key={folder.id}
         open={!isCollapsed}
       >
-        <div className="rounded-md p-3" style={{ backgroundColor: 'hsl(var(--folder-bg))', border: '1px solid hsl(var(--folder-border))' }}>
+        <div id={`folder-section-${folder.id}`} className="rounded-md p-3" style={{ backgroundColor: 'hsl(var(--folder-bg))', border: '1px solid hsl(var(--folder-border))' }}>
         <div className="flex items-start justify-between gap-2 group" data-testid={`folder-header-${folder.id}`}>
           <Button variant="ghost" size="sm" className="gap-2 px-2 items-start h-auto touch-manipulation min-w-0" data-testid={`button-toggle-folder-${folder.id}`} title="Toggle folder" onPointerDown={(e) => { e.preventDefault(); toggleFolderCollapse(folder.id); }}>
               {isCollapsed ? <Folder className="h-4 w-4 text-primary shrink-0 mt-0.5" /> : <FolderOpen className="h-4 w-4 text-primary shrink-0 mt-0.5" />}

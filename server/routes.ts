@@ -877,8 +877,8 @@ export async function registerRoutes(
       const userId = resolveUserId(req);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
-      const { relinkedCount } = await storage.restoreFolder(folder.id);
-      res.json({ success: true, relinkedCount });
+      const { relinkedCount, relinkedSessionNames } = await storage.restoreFolder(folder.id);
+      res.json({ success: true, relinkedCount, relinkedSessionNames });
     } catch (error) {
       res.status(500).json({ message: "Failed to restore folder" });
     }
