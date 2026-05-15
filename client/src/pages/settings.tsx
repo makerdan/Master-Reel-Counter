@@ -34,7 +34,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/lib/theme-provider";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
 import { CATALOG, parseCatalogEntry } from "@/lib/wireReference";
@@ -89,6 +89,12 @@ export default function SettingsPage() {
   const [showTesterPassword, setShowTesterPassword] = useState(false);
   const [showTesterPasswordConfirm, setShowTesterPasswordConfirm] = useState(false);
   const [testerPasswordLoaded, setTesterPasswordLoaded] = useState(false);
+  const [encodingRetryPayload, setEncodingRetryPayload] = useState<{
+    error: "verification_failed" | "mixed_key_state";
+    message: string;
+    remainingCount?: number;
+    lastEnabled: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -311,6 +317,7 @@ export default function SettingsPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
+      setEncodingRetryPayload(null);
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
       if (data.encodingEnabled) {
@@ -319,7 +326,25 @@ export default function SettingsPage() {
         toast({ title: "Data encoding disabled", description: `${data.entriesDecoded || 0} entries have been decoded.` });
       }
     },
-    onError: () => {
+    onError: (error: Error, variables: { enabled: boolean }) => {
+      const payload = parseApiErrorPayload(error);
+      if (payload?.error === "verification_failed") {
+        setEncodingRetryPayload({
+          error: "verification_failed",
+          message: String(payload.message || "Conversion failed — no data was changed. Please try again."),
+          remainingCount: typeof payload.remainingCount === "number" ? payload.remainingCount : undefined,
+          lastEnabled: variables.enabled,
+        });
+        return;
+      }
+      if (payload?.error === "mixed_key_state") {
+        setEncodingRetryPayload({
+          error: "mixed_key_state",
+          message: String(payload.message || "Mixed encryption state detected. Disable encoding first, then re-enable."),
+          lastEnabled: variables.enabled,
+        });
+        return;
+      }
       toast({ title: "Failed to change encoding setting", variant: "destructive" });
     },
   });
@@ -1611,6 +1636,47 @@ export default function SettingsPage() {
               will be encrypted in the database using AES-256 encryption. A unique encryption key is generated automatically 
               and secured by the server. The data is automatically decrypted when you view it in the app.
             </p>
+
+            {encodingRetryPayload && (
+              <div className="flex flex-col gap-3 p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700" data-testid="alert-encoding-retry">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      {encodingRetryPayload.error === "verification_failed" ? "Conversion failed" : "Mixed encryption state"}
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{encodingRetryPayload.message}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pl-8">
+                  {encodingRetryPayload.error === "verification_failed" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => toggleEncoding.mutate({ enabled: encodingRetryPayload.lastEnabled })}
+                      disabled={toggleEncoding.isPending}
+                      data-testid="button-retry-encoding"
+                    >
+                      {toggleEncoding.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3 mr-1.5" />
+                      )}
+                      Try Again
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100"
+                    onClick={() => setEncodingRetryPayload(null)}
+                    data-testid="button-dismiss-encoding-error"
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {settingsError ? (
               <div className="flex items-center gap-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">

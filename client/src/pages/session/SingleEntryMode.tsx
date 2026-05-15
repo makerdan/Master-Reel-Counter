@@ -450,7 +450,11 @@ export default function SingleEntryMode({
         setTouched({});
       }
     },
-    onError: () => {
+    onError: (error: Error) => {
+      if (error.message.startsWith("503:")) {
+        toast({ title: "Encryption is being reconfigured", description: "Please wait a moment, then try saving again.", variant: "destructive" });
+        return;
+      }
       toast({ title: "Failed to save entry", variant: "destructive" });
     },
   });
