@@ -376,7 +376,7 @@ function SessionWorkspace({
   // Reset context only on unmount so the pill disappears when leaving the page.
   useEffect(() => {
     return () => { setWsReconnect("connected", null); };
-  }, []);
+  }, [setWsReconnect]);
 
   const isMutating = useIsMutating();
   useEffect(() => {
