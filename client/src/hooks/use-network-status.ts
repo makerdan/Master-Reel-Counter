@@ -376,6 +376,20 @@ export function useNetworkStatus(currentUserId?: string) {
     };
   }, [syncQueue, refreshPendingCount]);
 
+  // Show the browser's native "Leave site?" dialog whenever there are items
+  // waiting to be synced. Registered/removed as pendingCount crosses zero so
+  // the listener is never attached unnecessarily.
+  useEffect(() => {
+    if (pendingCount === 0) return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "You have unsynced items that have not been uploaded yet. If you leave now they will be lost.";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [pendingCount]);
+
   return {
     isOnline,
     pendingCount,
