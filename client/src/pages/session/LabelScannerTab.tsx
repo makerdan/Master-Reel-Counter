@@ -705,6 +705,21 @@ export default function LabelScannerTab({
 
     const serverResultsMap = new Map(serverScanResults.map((r) => [r.pinId, r]));
 
+    // Prune stale localStorage results for pins that have been deleted.
+    // When only a subset of pins is removed the blob would otherwise retain
+    // tombstone entries that inflate stored data and could resurface if a new
+    // pin is later assigned a recycled ID.  This runs outside setCards so the
+    // localStorage write is a clean side-effect and not inside a reconciler.
+    const effectivePinIds = new Set(effectivePins.map((p) => p.id));
+    const localResults = loadSavedResults(sessionId);
+    const prunedLocalResults = localResults.filter((r) => effectivePinIds.has(r.pinId));
+    if (prunedLocalResults.length !== localResults.length) {
+      try {
+        localStorage.setItem(getResultsStorageKey(sessionId), JSON.stringify(prunedLocalResults));
+      } catch {}
+    }
+    const localResultsMap = new Map(prunedLocalResults.map((r) => [r.pinId, r]));
+
     let builtHasResults = false;
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
@@ -713,8 +728,6 @@ export default function LabelScannerTab({
       const existingByStableKey = new Map(prev.map((c) => [stableKey(c.pin), c]));
       const savedZooms = loadSavedZooms(sessionId);
       const savedSelections = loadSavedSelections(sessionId);
-      const localResults = loadSavedResults(sessionId);
-      const localResultsMap = new Map(localResults.map((r) => [r.pinId, r]));
       const pinCountByPhoto = new Map<number, number>();
       for (const p of effectivePins) {
         pinCountByPhoto.set(p.photoId, (pinCountByPhoto.get(p.photoId) || 0) + 1);
