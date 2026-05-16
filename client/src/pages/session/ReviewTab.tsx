@@ -704,7 +704,7 @@ export default function ReviewTab({
       }
     } catch {}
     const firstUnreviewed = orderedEntries.findIndex(e => !myResponses.has(e.id));
-    if (firstUnreviewed > 0) setCurrentIndex(firstUnreviewed);
+    setCurrentIndex(Math.max(0, firstUnreviewed));
     hasAutoAdvanced.current = true;
     hasRestoredPosition.current = true;
   }, [orderedEntries, myResponses, responsesLoading, sessionId, currentUserId, displayEntries.length]);
