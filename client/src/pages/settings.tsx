@@ -7,7 +7,7 @@ import {
   Download, Camera, Keyboard, Sun, Moon, Monitor, Target,
   ChevronDown, FileText, Globe, Upload, Trash2,
   HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
-  Users, UserCheck, UserX, Activity, ShieldCheck, Wrench,
+  Users, UserCheck, UserX, Activity, Wrench,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -117,16 +117,6 @@ export default function SettingsPage() {
     window.addEventListener("hashchange", handleHash);
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
-
-  // Guard: if a non-admin user somehow lands on #admin, redirect them to settings
-  useEffect(() => {
-    if (!isAdmin && activeTab === "admin") {
-      setActiveTab("settings");
-      if (typeof window !== "undefined") {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      }
-    }
-  }, [isAdmin, activeTab]);
 
   useEffect(() => {
     if (user) {
@@ -267,6 +257,19 @@ export default function SettingsPage() {
     },
     retry: false,
   });
+
+  // isAdmin must be declared after adminUsers (the query result it depends on)
+  const isAdmin = !user?.isTester && !!adminUsers && Array.isArray(adminUsers);
+
+  // Guard: if a non-admin user somehow lands on #admin, redirect them to settings
+  useEffect(() => {
+    if (!isAdmin && activeTab === "admin") {
+      setActiveTab("settings");
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    }
+  }, [isAdmin, activeTab]);
 
   const { data: rejectedCountData } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/rejected-users/count"],
@@ -487,7 +490,6 @@ export default function SettingsPage() {
   });
 
   const hasTesterPassword = settings?.testerPassword === "********";
-  const isAdmin = !user?.isTester && !!adminUsers && Array.isArray(adminUsers);
 
   useEffect(() => {
     if (settings && !testerPasswordLoaded) {
