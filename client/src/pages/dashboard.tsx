@@ -800,6 +800,9 @@ export default function Dashboard() {
     onSuccess: () => {
       invalidateAll();
       setDuplicatingSession(null);
+      // The duplicate receives a new server-assigned ID, so no `session-tab-{id}`
+      // key exists for it in localStorage — the user will always land on the
+      // default tab. Tab state is intentionally NOT copied from the source.
       toast({ title: "Session duplicated" });
     },
     onError: () => {
