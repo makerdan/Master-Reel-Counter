@@ -122,6 +122,15 @@ function PhotoCard({
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [imgSrc, setImgSrc] = useState(() => photoUrl(photo.objectStorageKey));
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current !== null) clearTimeout(retryTimerRef.current);
+    };
+  }, []);
   const [aisle, setAisle] = useState(photo.aisle || "");
   const [section, setSection] = useState(photo.section || "");
   const [notes, setNotes] = useState(photo.notes || "");
@@ -492,7 +501,7 @@ function PhotoCard({
           </div>
         ) : (
           <img
-            src={photoUrl(photo.objectStorageKey)}
+            src={imgSrc}
             alt={`Photo ${photo.id}`}
             className={`w-full h-full object-contain cursor-zoom-in transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
             loading="lazy"
@@ -515,7 +524,18 @@ function PhotoCard({
               setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
               setImgLoaded(true);
             }}
-            onError={() => setImgError(true)}
+            onError={() => {
+              if (retryCount === 0) {
+                retryTimerRef.current = setTimeout(() => {
+                  retryTimerRef.current = null;
+                  setImgLoaded(false);
+                  setRetryCount(1);
+                  setImgSrc(`${photoUrl(photo.objectStorageKey)}?_retry=1`);
+                }, 3000);
+              } else {
+                setImgError(true);
+              }
+            }}
             data-testid={`img-strip-thumb-${photo.id}`}
           />
         )}
