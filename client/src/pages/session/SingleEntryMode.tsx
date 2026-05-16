@@ -248,7 +248,7 @@ export default function SingleEntryMode({
   useEffect(() => {
     const match = getCatalogMatch(form.reelTag);
     if (match) {
-      if (match.conductors && !form.conductors) {
+      if (match.conductors && !form.conductors && !userClearedFields.current.has("conductors")) {
         setForm(f => ({ ...f, conductors: match.conductors || "" }));
       }
       const uniqueVendor = getUniqueVendor(match.catalog);
@@ -286,6 +286,20 @@ export default function SingleEntryMode({
       }
     }
   }, [form.reelCount, footageOverride]);
+
+  // Track when the user explicitly clears the conductors field so the
+  // auto-fill effect does not immediately overwrite the empty value.
+  const prevConductorsRef = useRef(form.conductors);
+  useEffect(() => {
+    const prev = prevConductorsRef.current;
+    const cur = form.conductors;
+    if (prev && !cur) {
+      userClearedFields.current.add("conductors");
+    } else if (cur) {
+      userClearedFields.current.delete("conductors");
+    }
+    prevConductorsRef.current = cur;
+  }, [form.conductors]);
 
   const markDirty = (isDirty: boolean) => {
     formDirtyRef.current = isDirty;
@@ -531,6 +545,7 @@ export default function SingleEntryMode({
         setReceivingChecked(false);
         setFootageOverride(false);
         lastMatchedCatalog.current = null;
+        userClearedFields.current.clear();
         setCapturedPhoto(null);
         setErrors({});
         setTouched({});
