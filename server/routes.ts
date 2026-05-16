@@ -6523,6 +6523,28 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     });
   });
 
+  // Admin endpoint: force-clear stalled upload intents (older than 1 hour) for a
+  // specific user. Allows admins to clean up per-user stalls directly from the
+  // Settings storage dashboard without waiting for the hourly purge job.
+  app.delete("/api/admin/stalled-intents/:userId", isAuthenticated, async (req: any, res) => {
+    const replOwner = process.env.REPL_OWNER;
+    const username = req.user?.claims?.username;
+    if (!replOwner || username !== replOwner) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const { userId } = req.params;
+    if (!userId || typeof userId !== "string") {
+      return res.status(400).json({ message: "userId required" });
+    }
+    try {
+      const cleared = await storage.clearStalledIntentsForUser(userId);
+      res.json({ cleared });
+    } catch (err) {
+      console.error("Error clearing stalled intents for user:", err);
+      res.status(500).json({ message: "Failed to clear stalled intents" });
+    }
+  });
+
   // Admin endpoint: clears the in-memory crash history ring buffer and the
   // persisted crash log file so operators can acknowledge investigated incidents.
   app.delete("/api/admin/crashes", isAuthenticated, async (req: any, res) => {

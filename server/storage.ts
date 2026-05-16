@@ -308,6 +308,8 @@ export interface IStorage {
     }>;
   }>;
 
+  clearStalledIntentsForUser(userId: string): Promise<number>;
+
   getUserStats(userId: string): Promise<{
     totalSessions: number;
     activeSessions: number;
@@ -2572,6 +2574,14 @@ export class DatabaseStorage implements IStorage {
       stalledIntentCount: parseInt(stalledResult[0]?.stalledCount || "0", 10),
       stalledIntentsByUser,
     };
+  }
+
+  async clearStalledIntentsForUser(userId: string): Promise<number> {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const result = await db
+      .delete(uploadIntents)
+      .where(and(eq(uploadIntents.userId, userId), lt(uploadIntents.createdAt, oneHourAgo)));
+    return result.rowCount ?? 0;
   }
 
   async createUserWireCatalog(data: InsertUserWireCatalog): Promise<UserWireCatalog> {

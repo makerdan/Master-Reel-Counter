@@ -351,6 +351,23 @@ export default function SettingsPage() {
     },
   });
 
+  const clearStalledIntents = useMutation({
+    mutationFn: (userId: string) =>
+      apiRequest("DELETE", `/api/admin/stalled-intents/${encodeURIComponent(userId)}`).then(
+        (res) => res.json() as Promise<{ cleared: number }>
+      ),
+    onSuccess: (data, userId) => {
+      toast({
+        title: "Stalled intents cleared",
+        description: `Removed ${data.cleared} stalled upload intent${data.cleared !== 1 ? "s" : ""}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/storage/global-usage"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to clear stalled intents", variant: "destructive" });
+    },
+  });
+
   const hasTesterPassword = settings?.testerPassword === "********";
 
   useEffect(() => {
@@ -808,6 +825,7 @@ export default function SettingsPage() {
                                 <th className="text-left py-1.5 font-medium">User</th>
                                 <th className="text-right py-1.5 font-medium">Count</th>
                                 <th className="text-right py-1.5 font-medium">Oldest</th>
+                                <th className="py-1.5" />
                               </tr>
                             </thead>
                             <tbody>
@@ -819,6 +837,22 @@ export default function SettingsPage() {
                                     {row.oldestAgeMinutes >= 60
                                       ? `${Math.floor(row.oldestAgeMinutes / 60)}h ${row.oldestAgeMinutes % 60}m`
                                       : `${row.oldestAgeMinutes}m`}
+                                  </td>
+                                  <td className="py-1 pl-2 text-right">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 px-1.5 text-xs text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 hover:text-amber-900 dark:hover:text-amber-200"
+                                      onClick={() => clearStalledIntents.mutate(row.userId)}
+                                      disabled={clearStalledIntents.isPending && clearStalledIntents.variables === row.userId}
+                                      data-testid={`button-clear-stalled-${row.userId}`}
+                                    >
+                                      {clearStalledIntents.isPending && clearStalledIntents.variables === row.userId ? (
+                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                      ) : (
+                                        "Clear"
+                                      )}
+                                    </Button>
                                   </td>
                                 </tr>
                               ))}
