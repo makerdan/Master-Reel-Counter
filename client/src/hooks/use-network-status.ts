@@ -370,15 +370,15 @@ export function useNetworkStatus(currentUserId?: string) {
           const TTL_MS = 30 * 24 * 60 * 60 * 1000;
           const now = Date.now();
           const photos = await getQueuedPhotos(undefined, currentUserId);
-          let purgedPhotoCount = 0;
-          for (const photo of photos) {
-            if (now - photo.createdAt > TTL_MS) {
-              removeFromQueue(photo.id).catch(() => {});
-              purgedPhotoCount++;
-            }
-          }
-          if (purgedPhotoCount > 0) {
-            console.debug(`[offline-queue] auto-purged ${purgedPhotoCount} stale queued photo${purgedPhotoCount === 1 ? "" : "s"} (>30 days old)`);
+          const staleIds = photos
+            .filter(p => {
+              const age = typeof p.createdAt === "number" ? now - p.createdAt : 0;
+              return age > TTL_MS;
+            })
+            .map(p => p.id);
+          if (staleIds.length > 0) {
+            await Promise.allSettled(staleIds.map(id => removeFromQueue(id)));
+            console.debug(`[offline-queue] auto-purged ${staleIds.length} stale queued photo${staleIds.length === 1 ? "" : "s"} (>30 days old)`);
           }
         } catch {}
 
