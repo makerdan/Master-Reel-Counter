@@ -118,6 +118,16 @@ export default function SettingsPage() {
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
 
+  // Guard: if a non-admin user somehow lands on #admin, redirect them to settings
+  useEffect(() => {
+    if (!isAdmin && activeTab === "admin") {
+      setActiveTab("settings");
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    }
+  }, [isAdmin, activeTab]);
+
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName || "");
@@ -2447,50 +2457,49 @@ export default function SettingsPage() {
                 );
               })()}
 
-              {/* Crash History */}
-              <Card data-testid="card-crash-history">
+              {/* System Health — Crash History + Database Integrity */}
+              <Card data-testid="card-system-health">
                 <CardHeader>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Activity className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-base">Crash History</CardTitle>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/crashes"] })}
-                        data-testid="button-refresh-crashes"
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
-                      {crashData && crashData.crashes.length > 0 && (
-                        <>
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base">System Health</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Crash History section */}
+                  <div data-testid="section-crash-history">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Crash History</p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/crashes"] })}
+                          data-testid="button-refresh-crashes"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                        {crashData && crashData.crashes.length > 0 && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-xs text-muted-foreground hover:text-destructive"
+                            className="h-7 text-xs text-muted-foreground hover:text-destructive"
                             onClick={() => setConfirmClearCrashesOpen(true)}
                             disabled={clearCrashes.isPending}
                             data-testid="button-clear-crashes"
                           >
-                            {clearCrashes.isPending ? (
-                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                            ) : null}
+                            {clearCrashes.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                             Clear
                           </Button>
-                        </>
-                      )}
-                      {crashData && (
-                        <Badge variant="secondary" data-testid="badge-crash-count">
-                          {crashData.count} record{crashData.count !== 1 ? "s" : ""}
-                        </Badge>
-                      )}
+                        )}
+                        {crashData && (
+                          <Badge variant="secondary" data-testid="badge-crash-count">
+                            {crashData.count} record{crashData.count !== 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
                   {crashDataLoading ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" /> Loading crash history...
@@ -2599,87 +2608,83 @@ export default function SettingsPage() {
                       )}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-
-              {/* Database Integrity Checks */}
-              <Card data-testid="card-integrity-checks">
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-base">Database Integrity Checks</CardTitle>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => refetchIntegrity()}
-                      data-testid="button-refresh-integrity"
-                      aria-label="Refresh integrity checks"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {integrityLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Running checks...
+
+                  <Separator />
+
+                  {/* Database Integrity section */}
+                  <div data-testid="section-integrity-checks">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Database Integrity</p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => refetchIntegrity()}
+                        data-testid="button-refresh-integrity"
+                        aria-label="Refresh integrity checks"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                  ) : !integrityData ? (
-                    <p className="text-sm text-muted-foreground">Unable to load integrity checks.</p>
-                  ) : (
-                    <div className="space-y-2" data-testid="list-integrity-checks">
-                      {integrityData.checks.map((check) => {
-                        const healthy = check.count === 0;
-                        return (
-                          <div
-                            key={check.id}
-                            className={`flex items-start gap-3 rounded-md border px-3 py-2.5 ${healthy ? "border-border bg-card" : "border-destructive/40 bg-destructive/5"}`}
-                            data-testid={`integrity-check-${check.id}`}
-                          >
-                            <div className="mt-0.5 shrink-0">
-                              {healthy
-                                ? <Check className="h-4 w-4 text-green-500" />
-                                : <AlertTriangle className="h-4 w-4 text-destructive" />
-                              }
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-xs font-medium leading-snug">{check.label}</p>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {!healthy && check.fixable && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-6 text-[10px] px-2 text-destructive border-destructive/40 hover:bg-destructive/10"
-                                      onClick={() => fixIntegrity.mutate(check.id)}
-                                      disabled={fixIntegrity.isPending}
-                                      data-testid={`button-fix-${check.id}`}
-                                    >
-                                      {fixIntegrity.isPending && fixIntegrity.variables === check.id
-                                        ? <Loader2 className="h-3 w-3 animate-spin" />
-                                        : <Wrench className="h-3 w-3 mr-1" />
-                                      }
-                                      Fix
-                                    </Button>
-                                  )}
-                                  <span
-                                    className={`font-mono text-xs font-semibold ${healthy ? "text-muted-foreground" : "text-destructive"}`}
-                                    data-testid={`integrity-count-${check.id}`}
-                                  >
-                                    {check.count}
-                                  </span>
-                                </div>
+                    {integrityLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Running checks...
+                      </div>
+                    ) : !integrityData ? (
+                      <p className="text-sm text-muted-foreground">Unable to load integrity checks.</p>
+                    ) : (
+                      <div className="space-y-2" data-testid="list-integrity-checks">
+                        {integrityData.checks.map((check) => {
+                          const healthy = check.count === 0;
+                          return (
+                            <div
+                              key={check.id}
+                              className={`flex items-start gap-3 rounded-md border px-3 py-2.5 ${healthy ? "border-border bg-card" : "border-destructive/40 bg-destructive/5"}`}
+                              data-testid={`integrity-check-${check.id}`}
+                            >
+                              <div className="mt-0.5 shrink-0">
+                                {healthy
+                                  ? <Check className="h-4 w-4 text-green-500" />
+                                  : <AlertTriangle className="h-4 w-4 text-destructive" />
+                                }
                               </div>
-                              <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{check.description}</p>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-xs font-medium leading-snug">{check.label}</p>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {!healthy && check.fixable && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-6 text-[10px] px-2 text-destructive border-destructive/40 hover:bg-destructive/10"
+                                        onClick={() => fixIntegrity.mutate(check.id)}
+                                        disabled={fixIntegrity.isPending}
+                                        data-testid={`button-fix-${check.id}`}
+                                      >
+                                        {fixIntegrity.isPending && fixIntegrity.variables === check.id
+                                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                                          : <Wrench className="h-3 w-3 mr-1" />
+                                        }
+                                        Fix
+                                      </Button>
+                                    )}
+                                    <span
+                                      className={`font-mono text-xs font-semibold ${healthy ? "text-muted-foreground" : "text-destructive"}`}
+                                      data-testid={`integrity-count-${check.id}`}
+                                    >
+                                      {check.count}
+                                    </span>
+                                  </div>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{check.description}</p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
