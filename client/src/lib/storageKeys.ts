@@ -34,11 +34,11 @@
  * reelcounter:undo-stack:{sid}      LS     session  delete / permanentDelete / restore / reset
  * reelcounter:redo-stack:{sid}      LS     session  delete / permanentDelete / restore / reset
  * scanner-batch-{sid}               SS     session  delete / permanentDelete / restore
- * rr_cohort_{sid}                   SS     session  cleared by ReviewTab on unmount
- * rr_queue_{sid}_{uid}              SS     session  cleared by ReviewTab on unmount
- * rr_pos_{sid}_{uid}                SS     session  cleared by ReviewTab on unmount
+ * rr_cohort_{sid}                   SS     session  clearSessionKeys / clearSessionResetKeys / ReviewTab unmount
+ * rr_queue_{sid}_{uid}              SS     session  clearSessionKeys / ReviewTab unmount
+ * rr_pos_{sid}_{uid}                SS     session  clearSessionKeys / ReviewTab unmount
  * dash:*                            SS     global   resets on every page load (no risk)
- * disregarded-dups-{sid}            LS     session  legacy migration; removed after migrating to DB
+ * disregarded-dups-{sid}            LS     session  clearSessionKeys; legacy key — cleared once migrated to DB
  * ────────────────────────────────────────────────────────────────────────────
  *
  * INDEXEDDB (reel-counter-offline, version 2)
@@ -120,9 +120,20 @@ export const scanPanelOpenKey = (sid: number) => `scan-panel-open-${sid}`;
 
 /** Undo action stack for a session. */
 export const undoStackKey = (sid: number) => `reelcounter:undo-stack:${sid}`;
+/** Key prefix used by pruneStaleSessionKeys to sweep all undo stacks. */
+export const UNDO_STACK_KEY_PREFIX = "reelcounter:undo-stack:";
 
 /** Redo action stack for a session. */
 export const redoStackKey = (sid: number) => `reelcounter:redo-stack:${sid}`;
+/** Key prefix used by pruneStaleSessionKeys to sweep all redo stacks. */
+export const REDO_STACK_KEY_PREFIX = "reelcounter:redo-stack:";
+
+/**
+ * Legacy localStorage key used to store dismissed-duplicate pin keys before
+ * they were migrated to the database. The key is removed by FlaggedReels.tsx
+ * once migration has run for a session.
+ */
+export const disregardedDupsKey = (sid: number) => `disregarded-dups-${sid}`;
 
 // ─── Session-scoped sessionStorage key factories ──────────────────────────────
 
@@ -158,6 +169,7 @@ export function clearSessionKeys(sid: number): void {
   clearKey(redoStackKey(sid));
   clearSessionKey(scannerBatchKey(sid));
   clearSessionKey(reviewCohortKey(sid));
+  clearKey(disregardedDupsKey(sid));
   // rr_queue_{sid}_{uid} and rr_pos_{sid}_{uid} carry per-user suffixes;
   // sweep sessionStorage for all keys matching either prefix.
   try {
@@ -186,4 +198,5 @@ export function clearSessionResetKeys(sid: number): void {
   clearKey(scannerSelectKey(sid));
   clearKey(undoStackKey(sid));
   clearKey(redoStackKey(sid));
+  clearSessionKey(reviewCohortKey(sid));
 }

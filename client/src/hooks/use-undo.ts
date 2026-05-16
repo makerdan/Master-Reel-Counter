@@ -3,7 +3,7 @@ import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient
 import { useToast } from "@/hooks/use-toast";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { useAuth } from "@/hooks/use-auth";
-import { undoStackKey, redoStackKey } from "@/lib/storageKeys";
+import { undoStackKey, redoStackKey, UNDO_STACK_KEY_PREFIX, REDO_STACK_KEY_PREFIX } from "@/lib/storageKeys";
 
 export type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
 
@@ -56,8 +56,8 @@ function pruneStaleSessionKeys(currentSessionId: number) {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key) continue;
-      if (!key.startsWith("reelcounter:undo-stack:") && !key.startsWith("reelcounter:redo-stack:")) continue;
-      const idStr = key.replace("reelcounter:undo-stack:", "").replace("reelcounter:redo-stack:", "");
+      if (!key.startsWith(UNDO_STACK_KEY_PREFIX) && !key.startsWith(REDO_STACK_KEY_PREFIX)) continue;
+      const idStr = key.replace(UNDO_STACK_KEY_PREFIX, "").replace(REDO_STACK_KEY_PREFIX, "");
       const id = parseInt(idStr, 10);
       if (id === currentSessionId) continue;
       try {

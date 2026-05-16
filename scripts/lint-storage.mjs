@@ -42,6 +42,19 @@ const RAW_LITERAL_RE =
   /(localStorage|sessionStorage)\.(getItem|setItem|removeItem)\s*\(\s*(['"`])/;
 
 /**
+ * Secondary check: catches raw key-like template literals assigned to a
+ * variable outside storageKeys.ts, e.g.:
+ *   const lsKey = `disregarded-dups-${sessionId}`;
+ *
+ * Requires ≥ 2 hyphen-separated word segments before the interpolation so
+ * generic template literals (`` `error-${id}` ``) are NOT flagged.
+ * Arrow-function returns are excluded because key factory definitions live
+ * in storageKeys.ts (which is already in EXCLUDE_FILES).
+ */
+const RAW_KEY_FACTORY_RE = /\b\w*[kK]ey\w*\s*=\s*`[a-z][a-z]+-[a-z][a-z]+-\${/;
+const ARROW_RETURN_RE = /=>\s*`/;
+
+/**
  * Patterns that are intentionally exempt from the registry.
  * These are raw string literals whose keys are out of scope per the registry
  * table in storageKeys.ts — tested against each matching line.
@@ -75,9 +88,11 @@ for (const filePath of walk(SRC)) {
 
   const lines = readFileSync(filePath, "utf8").split("\n");
   for (let i = 0; i < lines.length; i++) {
-    if (!RAW_LITERAL_RE.test(lines[i])) continue;
-    if (EXEMPT_PATTERNS.some(p => p.test(lines[i]))) continue;
-    console.log(`${rel}:${i + 1}  ${lines[i].trim()}`);
+    const line = lines[i];
+    const isRawStorageCall = RAW_LITERAL_RE.test(line) && !EXEMPT_PATTERNS.some(p => p.test(line));
+    const isRawKeyFactory = RAW_KEY_FACTORY_RE.test(line) && !ARROW_RETURN_RE.test(line);
+    if (!isRawStorageCall && !isRawKeyFactory) continue;
+    console.log(`${rel}:${i + 1}  ${line.trim()}`);
     violations++;
   }
 }

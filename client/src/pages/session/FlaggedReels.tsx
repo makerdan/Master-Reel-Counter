@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import type { Entry, Pin, Photo, ReviewResponse } from "@shared/schema";
 import { detectDuplicatePins, detectSameReelDuplicates, loadScannerResults, type DuplicateGroup, type DuplicatePinInfo } from "@/lib/duplicateDetector";
+import { disregardedDupsKey } from "@/lib/storageKeys";
 import { lookupCatalog, type ParsedCatalogEntry, PARSED_CATALOG, userWireCatalogToParsedEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
@@ -715,7 +716,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
 
   useEffect(() => {
     if (migrated) return;
-    const lsKey = `disregarded-dups-${sessionId}`;
+    const lsKey = disregardedDupsKey(sessionId);
     try {
       const raw = localStorage.getItem(lsKey);
       if (!raw) { setMigrated(true); return; }
