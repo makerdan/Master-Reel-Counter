@@ -6,6 +6,7 @@ import {
   Lock, Check, Loader2, AlertTriangle, Flag, Users, TabletSmartphone, Monitor, Trash2, LayoutGrid, X, ClipboardCheck, BarChart2,
 } from "lucide-react";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
+import { LAST_SESSION_KEY, sessionTabKey, PDF_EXPORT_QUALITY_KEY } from "@/lib/storageKeys";
 import type { UnitType } from "@/lib/unit-conversion";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -60,7 +61,7 @@ export default function SessionPage() {
 
   useEffect(() => {
     if (sessionId > 0) {
-      try { localStorage.setItem("reel-counter-last-session", String(sessionId)); } catch {}
+      try { localStorage.setItem(LAST_SESSION_KEY, String(sessionId)); } catch {}
     }
   }, [sessionId]);
 
@@ -190,7 +191,7 @@ function SessionWorkspace({
       if (tab === "single") return "photo";
       if (tab === "scanner") return "photo";
       if (tab && ["photo", "flagged", "strip", "review", "results"].includes(tab)) return tab;
-      const stored = localStorage.getItem(`session-tab-${sessionId}`);
+      const stored = localStorage.getItem(sessionTabKey(sessionId));
       if (stored && ["photo", "flagged", "strip", "review", "results"].includes(stored)) return stored;
     } catch {}
     return "strip";
@@ -302,7 +303,7 @@ function SessionWorkspace({
       url.searchParams.set("tab", mode);
     }
     window.history.replaceState({}, "", url.toString());
-    try { localStorage.setItem(`session-tab-${sessionId}`, mode); } catch {}
+    try { localStorage.setItem(sessionTabKey(sessionId), mode); } catch {}
   }, [mode, sessionId]);
 
   const [captureMode, setCaptureMode] = useState(window.innerWidth < 768);
@@ -526,7 +527,7 @@ function SessionWorkspace({
   const isAnyExportRunning = isPdfExporting || isExcelExporting || !!(serverActiveTasks?.pdf) || !!(serverActiveTasks?.excel);
   const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
   const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
-    () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
+    () => (localStorage.getItem(PDF_EXPORT_QUALITY_KEY) as "full" | "standard") ?? "full"
   );
   const [pdfDialogWaiting, setPdfDialogWaiting] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{done: number, total: number} | null>(null);
@@ -657,7 +658,7 @@ function SessionWorkspace({
   };
 
   const confirmQualityExport = async () => {
-    localStorage.setItem("pdfExportQuality", pdfQualityChoice);
+    localStorage.setItem(PDF_EXPORT_QUALITY_KEY, pdfQualityChoice);
     const jobId = pdfQualityChoice === "full" ? fullJobRef.current : stdJobRef.current;
     if (!jobId) {
       // Job ID not yet returned — wait briefly then try once more
@@ -711,7 +712,7 @@ function SessionWorkspace({
   };
 
   const doExportPdf = async () => {
-    const quality = (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full";
+    const quality = (localStorage.getItem(PDF_EXPORT_QUALITY_KEY) as "full" | "standard") ?? "full";
     const canProceed = await flushBeforeExport();
     if (!canProceed) return;
     setIsPdfExporting(true);

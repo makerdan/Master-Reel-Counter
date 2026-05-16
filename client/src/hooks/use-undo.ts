@@ -3,6 +3,7 @@ import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient
 import { useToast } from "@/hooks/use-toast";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { useAuth } from "@/hooks/use-auth";
+import { undoStackKey, redoStackKey } from "@/lib/storageKeys";
 
 export type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
 
@@ -18,8 +19,6 @@ export interface UndoAction {
 const MAX_STACK = 20;
 const TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-function undoKey(sessionId: number) { return `reelcounter:undo-stack:${sessionId}`; }
-function redoKey(sessionId: number) { return `reelcounter:redo-stack:${sessionId}`; }
 
 interface PersistedStack {
   storedAt: number;
@@ -130,8 +129,8 @@ function actionLabel(action: UndoAction): string {
 }
 
 export function useUndoRedo(sessionId: number) {
-  const [undoStack, setUndoStack] = useState<UndoAction[]>(() => loadStack(undoKey(sessionId)));
-  const [redoStack, setRedoStack] = useState<UndoAction[]>(() => loadStack(redoKey(sessionId)));
+  const [undoStack, setUndoStack] = useState<UndoAction[]>(() => loadStack(undoStackKey(sessionId)));
+  const [redoStack, setRedoStack] = useState<UndoAction[]>(() => loadStack(redoStackKey(sessionId)));
   const busyRef = useRef(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -140,8 +139,8 @@ export function useUndoRedo(sessionId: number) {
   // being reused with a different sessionId without unmounting first).
   // Also prune stale keys from other sessions on sessionId change.
   useEffect(() => {
-    setUndoStack(loadStack(undoKey(sessionId)));
-    setRedoStack(loadStack(redoKey(sessionId)));
+    setUndoStack(loadStack(undoStackKey(sessionId)));
+    setRedoStack(loadStack(redoStackKey(sessionId)));
     pruneStaleSessionKeys(sessionId);
   }, [sessionId]);
 
@@ -155,8 +154,8 @@ export function useUndoRedo(sessionId: number) {
       undoStack.some(a => a.sessionId !== sessionId) ||
       redoStack.some(a => a.sessionId !== sessionId);
     if (!mismatch) {
-      saveStack(undoKey(sessionId), undoStack);
-      saveStack(redoKey(sessionId), redoStack);
+      saveStack(undoStackKey(sessionId), undoStack);
+      saveStack(redoStackKey(sessionId), redoStack);
     }
   }, [sessionId, undoStack, redoStack]);
 
@@ -191,8 +190,8 @@ export function useUndoRedo(sessionId: number) {
   const clearHistory = useCallback(() => {
     setUndoStack([]);
     setRedoStack([]);
-    try { localStorage.removeItem(undoKey(sessionId)); } catch {}
-    try { localStorage.removeItem(redoKey(sessionId)); } catch {}
+    try { localStorage.removeItem(undoStackKey(sessionId)); } catch {}
+    try { localStorage.removeItem(redoStackKey(sessionId)); } catch {}
     pruneStaleSessionKeys(sessionId);
   }, [sessionId]);
 

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { RECENT_SEARCHES_KEY, PDF_EXPORT_QUALITY_KEY, LAST_SESSION_KEY, clearSessionKeys, clearSessionResetKeys } from "@/lib/storageKeys";
 import reelIconPath from "@assets/Master_Reel_Counter_-_i001_1776633528982.png";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -120,7 +121,6 @@ export default function Dashboard() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const recentDropdownRef = useRef<HTMLDivElement>(null);
 
-  const RECENT_SEARCHES_KEY = "reel-counter-recent-searches";
   const MAX_RECENT = 8;
 
   const getRecentSearches = useCallback((): string[] => {
@@ -198,7 +198,7 @@ export default function Dashboard() {
 
   const [pdfQualityOpen, setPdfQualityOpen] = useState(false);
   const [pdfQualityChoice, setPdfQualityChoice] = useState<"full" | "standard">(
-    () => (localStorage.getItem("pdfExportQuality") as "full" | "standard") ?? "full"
+    () => (localStorage.getItem(PDF_EXPORT_QUALITY_KEY) as "full" | "standard") ?? "full"
   );
   const [pdfDialogWaiting, setPdfDialogWaiting] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{done: number, total: number} | null>(null);
@@ -436,7 +436,7 @@ export default function Dashboard() {
       await apiRequest("DELETE", `/api/sessions/${id}`);
     },
     onSuccess: (_data, id) => {
-      try { localStorage.removeItem(`session-tab-${id}`); } catch {}
+      clearSessionKeys(id);
       invalidateAll();
       toast({ title: "Session moved to trash" });
     },
@@ -449,7 +449,8 @@ export default function Dashboard() {
     mutationFn: async (id: number) => {
       await apiRequest("POST", `/api/sessions/${id}/restore`);
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      clearSessionKeys(id);
       invalidateAll();
       toast({ title: "Session restored" });
     },
@@ -463,7 +464,7 @@ export default function Dashboard() {
       await apiRequest("DELETE", `/api/sessions/${id}/permanent`);
     },
     onSuccess: (_data, id) => {
-      try { localStorage.removeItem(`session-tab-${id}`); } catch {}
+      clearSessionKeys(id);
       invalidateAll();
       toast({ title: "Session permanently deleted" });
     },
@@ -477,9 +478,7 @@ export default function Dashboard() {
       await apiRequest("POST", `/api/sessions/${id}/reset-to-photos`);
     },
     onSuccess: (_data, id) => {
-      try { localStorage.removeItem(`scanner-results-${id}`); } catch {}
-      try { localStorage.removeItem(`scanner-zoom-${id}`); } catch {}
-      try { localStorage.removeItem(`scanner-select-${id}`); } catch {}
+      clearSessionResetKeys(id);
       invalidateAll();
       toast({ title: "Session reset to photos only" });
     },
@@ -969,7 +968,7 @@ export default function Dashboard() {
 
   const confirmPdfQualityExport = async () => {
     if (!exportSessionTarget) return;
-    localStorage.setItem("pdfExportQuality", pdfQualityChoice);
+    localStorage.setItem(PDF_EXPORT_QUALITY_KEY, pdfQualityChoice);
     const sessionId = exportSessionTarget.id;
     const jobId = pdfQualityChoice === "full" ? fullJobRef.current : stdJobRef.current;
     if (!jobId) {
@@ -2263,7 +2262,7 @@ export default function Dashboard() {
         <>
         {(() => {
           try {
-            const lastId = localStorage.getItem("reel-counter-last-session");
+            const lastId = localStorage.getItem(LAST_SESSION_KEY);
             if (!lastId || !sessions?.length) return null;
             const lastSession = sessions.find(s => s.id === parseInt(lastId));
             if (!lastSession || lastSession.status === "completed") return null;

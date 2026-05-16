@@ -1,4 +1,5 @@
 import type { Pin, Photo } from "@shared/schema";
+import { scannerResultsKey } from "@/lib/storageKeys";
 
 export interface ScannerResultSlim {
   pinId: number;
@@ -259,7 +260,7 @@ export function detectSameReelDuplicates(
 
 export function loadScannerResults(sessionId: number): ScannerResultSlim[] {
   try {
-    const raw = localStorage.getItem(`scanner-results-${sessionId}`);
+    const raw = localStorage.getItem(scannerResultsKey(sessionId));
     if (!raw) return [];
     const data: ScannerResultSlim[] = JSON.parse(raw);
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;

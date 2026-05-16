@@ -45,6 +45,7 @@ import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
 import SingleEntryMode from "./SingleEntryMode";
 import LabelScannerTab from "./LabelScannerTab";
+import { scanPanelOpenKey, scannerBatchKey } from "@/lib/storageKeys";
 
 const BLUE_SHADES_CSS = [
   "rgba(59,130,246,1)",
@@ -55,9 +56,6 @@ const BLUE_SHADES_CSS = [
   "rgba(139,92,246,1)",
 ];
 
-function getScanPanelStorageKey(sessionId: number) {
-  return `scan-panel-open-${sessionId}`;
-}
 
 type OnlineUser = { userId: string; username: string };
 
@@ -257,11 +255,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [scanPanelOpen, setScanPanelOpen] = useState(() => {
     if (initialScanPanelOpen) return true;
     try {
-      return localStorage.getItem(getScanPanelStorageKey(sessionId)) === "true";
+      return localStorage.getItem(scanPanelOpenKey(sessionId)) === "true";
     } catch { return false; }
   });
   const [scanBatchMode, setScanBatchMode] = useState(() => {
-    try { return sessionStorage.getItem(`scanner-batch-${sessionId}`) === "true"; } catch { return false; }
+    try { return sessionStorage.getItem(scannerBatchKey(sessionId)) === "true"; } catch { return false; }
   });
   const [scanPanelCurrentPhotoId, setScanPanelCurrentPhotoId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
@@ -277,7 +275,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const toggleScanPanel = useCallback(() => {
     setScanPanelOpen((prev) => {
       const next = !prev;
-      try { localStorage.setItem(getScanPanelStorageKey(sessionId), String(next)); } catch {}
+      try { localStorage.setItem(scanPanelOpenKey(sessionId), String(next)); } catch {}
       return next;
     });
   }, [sessionId]);
@@ -3248,7 +3246,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         <Sheet open={scanPanelOpen} onOpenChange={(open) => {
           if (!open) {
             setScanPanelOpen(false);
-            try { localStorage.setItem(getScanPanelStorageKey(sessionId), "false"); } catch {}
+            try { localStorage.setItem(scanPanelOpenKey(sessionId), "false"); } catch {}
           }
         }}>
           <SheetContent

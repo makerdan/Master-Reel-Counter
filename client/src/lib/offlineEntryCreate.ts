@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/queryClient";
 import { saveEntryToQueue } from "@/lib/offlineQueue";
+import { OFFLINE_PLACEHOLDER_SEED_KEY } from "@/lib/storageKeys";
 
 export interface OfflineEntryResult {
   entry: { id: number; sessionId: number; [key: string]: unknown };
@@ -25,11 +26,9 @@ function isNetworkFailure(err: unknown): boolean {
 // producing duplicate negative IDs that collide with optimistic entries from
 // a previous session (React key collisions, mismatched UI rows).
 
-const PLACEHOLDER_SEED_KEY = "offlinePlaceholderSeed";
-
 function readSeedFromStorage(): number {
   try {
-    const raw = localStorage.getItem(PLACEHOLDER_SEED_KEY);
+    const raw = localStorage.getItem(OFFLINE_PLACEHOLDER_SEED_KEY);
     if (raw !== null) {
       const n = parseInt(raw, 10);
       if (Number.isFinite(n) && n > 0) return n;
@@ -42,7 +41,7 @@ let _placeholderCounter = readSeedFromStorage();
 
 function nextPlaceholderId(): number {
   const id = -(++_placeholderCounter);
-  try { localStorage.setItem(PLACEHOLDER_SEED_KEY, String(_placeholderCounter)); } catch {}
+  try { localStorage.setItem(OFFLINE_PLACEHOLDER_SEED_KEY, String(_placeholderCounter)); } catch {}
   return id;
 }
 

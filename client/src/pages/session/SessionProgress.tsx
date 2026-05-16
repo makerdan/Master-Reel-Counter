@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, MapPin, CheckCircle2, Flag, CircleDot } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Entry, Pin, ReviewResponse } from "@shared/schema";
+import { SESSION_PROGRESS_COLLAPSED_KEY } from "@/lib/storageKeys";
 
 function MetricBar({ label, icon: Icon, current, total, colorClass }: {
   label: string;
@@ -42,7 +43,7 @@ export default function SessionProgress({
 }) {
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      return localStorage.getItem("session-progress-collapsed") === "1";
+      return localStorage.getItem(SESSION_PROGRESS_COLLAPSED_KEY) === "1";
     } catch {
       return false;
     }
@@ -81,7 +82,7 @@ export default function SessionProgress({
   const toggle = () => {
     const next = !collapsed;
     setCollapsed(next);
-    try { localStorage.setItem("session-progress-collapsed", next ? "1" : "0"); } catch {}
+    try { localStorage.setItem(SESSION_PROGRESS_COLLAPSED_KEY, next ? "1" : "0"); } catch {}
   };
 
   return (

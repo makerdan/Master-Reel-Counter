@@ -26,19 +26,17 @@ import { toDisplayUnit, toBaseFeet } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { formatPinLabel } from "./utils";
 import type { Photo, Pin } from "@shared/schema";
+import { scannerZoomKey, scannerSelectKey, scannerResultsKey, scannerBatchKey } from "@/lib/storageKeys";
 
 const ZOOM_MIN = 0.005;
 const ZOOM_MAX = 1.0;
 const ZOOM_STEP = 0.005;
 const ZOOM_CLICK_STEP = 0.015;
 
-function getZoomStorageKey(sessionId: number) {
-  return `scanner-zoom-${sessionId}`;
-}
 
 function loadSavedZooms(sessionId: number): Record<string, number> {
   try {
-    const raw = localStorage.getItem(getZoomStorageKey(sessionId));
+    const raw = localStorage.getItem(scannerZoomKey(sessionId));
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }
@@ -47,17 +45,14 @@ function saveZoomLevel(sessionId: number, pinId: number, zoom: number) {
   try {
     const saved = loadSavedZooms(sessionId);
     saved[String(pinId)] = zoom;
-    localStorage.setItem(getZoomStorageKey(sessionId), JSON.stringify(saved));
+    localStorage.setItem(scannerZoomKey(sessionId), JSON.stringify(saved));
   } catch {}
 }
 
-function getSelectStorageKey(sessionId: number) {
-  return `scanner-select-${sessionId}`;
-}
 
 function loadSavedSelections(sessionId: number): Record<string, boolean> {
   try {
-    const raw = localStorage.getItem(getSelectStorageKey(sessionId));
+    const raw = localStorage.getItem(scannerSelectKey(sessionId));
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }
@@ -66,7 +61,7 @@ function saveSelectionState(sessionId: number, pinId: number, included: boolean)
   try {
     const saved = loadSavedSelections(sessionId);
     saved[String(pinId)] = included;
-    localStorage.setItem(getSelectStorageKey(sessionId), JSON.stringify(saved));
+    localStorage.setItem(scannerSelectKey(sessionId), JSON.stringify(saved));
   } catch {}
 }
 
@@ -160,9 +155,6 @@ function FitTextInput({
   );
 }
 
-function getResultsStorageKey(sessionId: number) {
-  return `scanner-results-${sessionId}`;
-}
 
 interface SavedCardResult {
   pinId: number;
@@ -195,19 +187,19 @@ function saveAnalysisResults(sessionId: number, cards: PinCard[]) {
         // Only persist the reason when there is no successful result.
         notAnalyzedReason: c.result ? undefined : c.notAnalyzedReason,
       }));
-    localStorage.setItem(getResultsStorageKey(sessionId), JSON.stringify(data));
+    localStorage.setItem(scannerResultsKey(sessionId), JSON.stringify(data));
   } catch {}
 }
 
 function loadSavedResults(sessionId: number): SavedCardResult[] {
   try {
-    const raw = localStorage.getItem(getResultsStorageKey(sessionId));
+    const raw = localStorage.getItem(scannerResultsKey(sessionId));
     if (!raw) return [];
     const data: SavedCardResult[] = JSON.parse(raw);
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
     const valid = data.filter((d) => d.timestamp > cutoff);
     if (valid.length !== data.length) {
-      localStorage.setItem(getResultsStorageKey(sessionId), JSON.stringify(valid));
+      localStorage.setItem(scannerResultsKey(sessionId), JSON.stringify(valid));
     }
     return valid;
   } catch { return []; }
@@ -474,16 +466,16 @@ export default function LabelScannerTab({
   const serverScanRunning = !analyzing && !!(serverActiveTasks?.scan);
   const [batchMode, setBatchModeRaw] = useState(() => {
     try {
-      const saved = sessionStorage.getItem(`scanner-batch-${sessionId}`);
+      const saved = sessionStorage.getItem(scannerBatchKey(sessionId));
       return saved === "true";
     } catch { return false; }
   });
   const setBatchMode = useCallback((v: boolean) => {
     setBatchModeRaw(v);
-    try { sessionStorage.setItem(`scanner-batch-${sessionId}`, String(v)); } catch {}
+    try { sessionStorage.setItem(scannerBatchKey(sessionId), String(v)); } catch {}
     onBatchModeChange?.(v);
   }, [sessionId, onBatchModeChange]);
-  const batchModeInitRef = useRef(batchMode || sessionStorage.getItem(`scanner-batch-${sessionId}`) !== null);
+  const batchModeInitRef = useRef(batchMode || sessionStorage.getItem(scannerBatchKey(sessionId)) !== null);
   useEffect(() => {
     if (initialPhotoId && initialPhotoId !== lastInitialPhotoIdRef.current) {
       lastInitialPhotoIdRef.current = initialPhotoId;
@@ -699,9 +691,9 @@ export default function LabelScannerTab({
       setPhase("preview");
       // All pins have been removed — wipe all three persisted scanner blobs so
       // a fresh session starts with no stale results, zoom levels, or selections.
-      try { localStorage.removeItem(getResultsStorageKey(sessionId)); } catch {}
-      try { localStorage.removeItem(getZoomStorageKey(sessionId)); } catch {}
-      try { localStorage.removeItem(getSelectStorageKey(sessionId)); } catch {}
+      try { localStorage.removeItem(scannerResultsKey(sessionId)); } catch {}
+      try { localStorage.removeItem(scannerZoomKey(sessionId)); } catch {}
+      try { localStorage.removeItem(scannerSelectKey(sessionId)); } catch {}
       return;
     }
 
@@ -717,7 +709,7 @@ export default function LabelScannerTab({
     const prunedLocalResults = localResults.filter((r) => effectivePinIds.has(r.pinId));
     if (prunedLocalResults.length !== localResults.length) {
       try {
-        localStorage.setItem(getResultsStorageKey(sessionId), JSON.stringify(prunedLocalResults));
+        localStorage.setItem(scannerResultsKey(sessionId), JSON.stringify(prunedLocalResults));
       } catch {}
     }
     const localResultsMap = new Map(prunedLocalResults.map((r) => [r.pinId, r]));
