@@ -383,7 +383,7 @@ export function useNetworkStatus(currentUserId?: string) {
     if (pendingCount === 0) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = "You have unsynced items that have not been uploaded yet. If you leave now they will be lost.";
+      e.returnValue = "You have unsynced items that have not been uploaded yet. Are you sure you want to leave?";
       return e.returnValue;
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
