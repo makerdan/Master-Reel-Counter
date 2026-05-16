@@ -247,6 +247,7 @@ export default function SettingsPage() {
       if (!res.ok) return { count: 0 };
       return res.json();
     },
+    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
     retry: false,
   });
 
