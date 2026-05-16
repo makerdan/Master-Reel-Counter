@@ -660,7 +660,16 @@ export default function ReviewTab({
   }, [effectiveCohort, sortedEntries, reviewResponses, isLateJoiner, currentUserId, assignedEntries, sortedUsers, user]);
 
   // ── Reveal timer state ─────────────────────────────────────────────────────
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(reviewPosKey(sessionId, currentUserId));
+      if (raw !== null) {
+        const n = parseInt(raw, 10);
+        if (!isNaN(n) && n >= 0) return n;
+      }
+    } catch {}
+    return 0;
+  });
   // Guards writes to sessionStorage until after the restore attempt has run.
   // Prevents the initial render (currentIndex = 0) from overwriting a stored
   // position before the restore effect has had a chance to read it.
