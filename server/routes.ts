@@ -50,7 +50,7 @@ setInterval(() => {
       pdfJobs.delete(k);
     }
   }
-}, 5 * 60 * 1000);
+}, 60 * 1000); // run every minute so completed-job TTL (2 min) is honoured promptly
 
 function formatPinLabel(label: string): string {
   if (/^\d+$/.test(label)) {
