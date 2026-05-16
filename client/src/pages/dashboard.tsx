@@ -478,6 +478,8 @@ export default function Dashboard() {
     },
     onSuccess: (_data, id) => {
       try { localStorage.removeItem(`scanner-results-${id}`); } catch {}
+      try { localStorage.removeItem(`scanner-zoom-${id}`); } catch {}
+      try { localStorage.removeItem(`scanner-select-${id}`); } catch {}
       invalidateAll();
       toast({ title: "Session reset to photos only" });
     },

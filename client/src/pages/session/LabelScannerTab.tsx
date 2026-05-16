@@ -697,9 +697,11 @@ export default function LabelScannerTab({
     if (!effectivePins.length) {
       setCards([]);
       setPhase("preview");
-      // All pins have been removed — stale failure reasons are no longer
-      // meaningful, so wipe the persisted results blob immediately.
+      // All pins have been removed — wipe all three persisted scanner blobs so
+      // a fresh session starts with no stale results, zoom levels, or selections.
       try { localStorage.removeItem(getResultsStorageKey(sessionId)); } catch {}
+      try { localStorage.removeItem(getZoomStorageKey(sessionId)); } catch {}
+      try { localStorage.removeItem(getSelectStorageKey(sessionId)); } catch {}
       return;
     }
 
