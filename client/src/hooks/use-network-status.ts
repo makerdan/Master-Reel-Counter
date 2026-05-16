@@ -336,7 +336,7 @@ export function useNetworkStatus(currentUserId?: string) {
               id: entry.id,
               sessionId: entry.sessionId,
               data: entry.data,
-              reason: entry.failureReason || "Unknown error",
+              reason: entry.failureReason || "Failed to sync",
             });
           }
           if (failed.length > 0) {
