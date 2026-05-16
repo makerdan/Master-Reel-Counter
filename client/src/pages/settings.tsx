@@ -388,6 +388,7 @@ export default function SettingsPage() {
 
   const [sweepPage, setSweepPage] = useState(0);
   const [sweepDeleted, setSweepDeleted] = useState(0);
+  const [sweepMinAgeDays, setSweepMinAgeDays] = useState(7);
 
   const sweepOrphans = useMutation({
     mutationFn: async () => {
@@ -399,7 +400,7 @@ export default function SettingsPage() {
         page++;
         setSweepPage(page);
         setSweepDeleted(totals.deleted);
-        const res = await apiRequest("POST", "/api/admin/sweep-legacy-orphans", pageToken ? { pageToken } : undefined);
+        const res = await apiRequest("POST", "/api/admin/sweep-legacy-orphans", { minAgeDays: sweepMinAgeDays, ...(pageToken ? { pageToken } : {}) });
         const data: SweepResult = await res.json();
         totals.scanned += data.scanned;
         totals.deleted += data.deleted;
@@ -836,28 +837,44 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {!user?.isTester && adminUsers && Array.isArray(adminUsers) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => sweepOrphans.mutate()}
-                        disabled={sweepOrphans.isPending}
-                        data-testid="button-sweep-orphans"
-                      >
-                        {sweepOrphans.isPending ? (
-                          <>
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                            {sweepPage > 1
-                              ? `Page ${sweepPage}, ${sweepDeleted.toLocaleString()} deleted…`
-                              : "Sweeping…"}
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Sweep Legacy Orphans
-                          </>
-                        )}
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <span>Min age</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={365}
+                            value={sweepMinAgeDays}
+                            onChange={e => setSweepMinAgeDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
+                            disabled={sweepOrphans.isPending}
+                            className="w-14 h-7 rounded border border-input bg-background px-2 text-xs font-mono text-center disabled:opacity-50"
+                            data-testid="input-sweep-min-age"
+                          />
+                          <span>days</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => sweepOrphans.mutate()}
+                          disabled={sweepOrphans.isPending}
+                          data-testid="button-sweep-orphans"
+                        >
+                          {sweepOrphans.isPending ? (
+                            <>
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              {sweepPage > 1
+                                ? `Page ${sweepPage}, ${sweepDeleted.toLocaleString()} deleted…`
+                                : "Sweeping…"}
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Sweep Legacy Orphans
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     )}
                     <Button
                       variant="ghost"
