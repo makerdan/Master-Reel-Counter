@@ -131,6 +131,19 @@ function PhotoCard({
       if (retryTimerRef.current !== null) clearTimeout(retryTimerRef.current);
     };
   }, []);
+
+  // Resync imgSrc when the photo's object key changes (e.g. after a re-upload)
+  // and reset all load/error/retry state so the new image loads fresh.
+  useEffect(() => {
+    if (retryTimerRef.current !== null) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    setImgSrc(photoUrl(photo.objectStorageKey));
+    setImgLoaded(false);
+    setImgError(false);
+    setRetryCount(0);
+  }, [photo.objectStorageKey]);
   const [aisle, setAisle] = useState(photo.aisle || "");
   const [section, setSection] = useState(photo.section || "");
   const [notes, setNotes] = useState(photo.notes || "");
@@ -520,6 +533,10 @@ function PhotoCard({
               }
             }}
             onLoad={(e) => {
+              if (retryTimerRef.current !== null) {
+                clearTimeout(retryTimerRef.current);
+                retryTimerRef.current = null;
+              }
               const img = e.currentTarget;
               setImgNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
               setImgLoaded(true);
