@@ -1,12 +1,13 @@
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 import { db } from "../../db";
-import { eq, ne } from "drizzle-orm";
+import { eq, ne, count } from "drizzle-orm";
 
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserAvatar(id: string, customAvatarKey: string | null): Promise<User>;
   getAllUsers(): Promise<User[]>;
+  getRejectedCount(): Promise<number>;
   setUserApproved(id: string, approved: boolean): Promise<User>;
   rejectUser(id: string): Promise<User>;
   clearAllRejected(): Promise<void>;
@@ -44,6 +45,11 @@ class AuthStorage implements IAuthStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).where(ne(users.rejected, true)).orderBy(users.createdAt);
+  }
+
+  async getRejectedCount(): Promise<number> {
+    const [row] = await db.select({ value: count() }).from(users).where(eq(users.rejected, true));
+    return row?.value ?? 0;
   }
 
   async setUserApproved(id: string, approved: boolean): Promise<User> {

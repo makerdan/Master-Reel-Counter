@@ -73,6 +73,19 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
+  app.get("/api/admin/rejected-users/count", isAuthenticated, isApproved, async (req: any, res) => {
+    try {
+      if (!isAppOwner(req.user)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      const rejectedCount = await authStorage.getRejectedCount();
+      res.json({ count: rejectedCount });
+    } catch (error) {
+      console.error("Error fetching rejected user count:", error);
+      res.status(500).json({ message: "Failed to fetch rejected user count" });
+    }
+  });
+
   app.post("/api/admin/users/clear-rejected", isAuthenticated, isApproved, async (req: any, res) => {
     try {
       if (!isAppOwner(req.user)) {

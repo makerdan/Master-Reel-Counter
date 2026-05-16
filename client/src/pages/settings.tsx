@@ -240,6 +240,16 @@ export default function SettingsPage() {
     retry: false,
   });
 
+  const { data: rejectedCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/admin/rejected-users/count"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/rejected-users/count", { credentials: "include" });
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    retry: false,
+  });
+
   const { data: integrityData, isLoading: integrityLoading, refetch: refetchIntegrity } = useQuery<{
     checks: Array<{ id: string; label: string; description: string; count: number }>;
   }>({
@@ -353,6 +363,7 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rejected-users/count"] });
       toast({ title: "Block list cleared", description: "Previously rejected users can now sign in again." });
     },
     onError: () => {
@@ -2710,7 +2721,9 @@ export default function SettingsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Clear block list?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will remove all rejected users from the block list, allowing them to sign in again. This action cannot be undone.
+                {(rejectedCountData?.count ?? 0) > 0
+                  ? `This will unblock ${rejectedCountData!.count} rejected user${rejectedCountData!.count === 1 ? "" : "s"}, allowing them to sign in again. This action cannot be undone.`
+                  : "This will remove all rejected users from the block list, allowing them to sign in again. This action cannot be undone."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -2718,9 +2731,12 @@ export default function SettingsPage() {
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => clearRejected.mutate()}
+                disabled={clearRejected.isPending}
                 data-testid="button-confirm-clear-rejected"
               >
-                Clear Block List
+                {(rejectedCountData?.count ?? 0) > 0
+                  ? `Clear ${rejectedCountData!.count} blocked user${rejectedCountData!.count === 1 ? "" : "s"}`
+                  : "Clear Block List"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
