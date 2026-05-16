@@ -435,7 +435,8 @@ export default function Dashboard() {
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/sessions/${id}`);
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      try { localStorage.removeItem(`session-tab-${id}`); } catch {}
       invalidateAll();
       toast({ title: "Session moved to trash" });
     },
@@ -461,7 +462,8 @@ export default function Dashboard() {
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/sessions/${id}/permanent`);
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      try { localStorage.removeItem(`session-tab-${id}`); } catch {}
       invalidateAll();
       toast({ title: "Session permanently deleted" });
     },
