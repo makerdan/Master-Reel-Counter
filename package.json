@@ -9,7 +9,8 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "lint:storage": "node scripts/lint-storage.mjs"
+    "lint:storage": "node scripts/lint-storage.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
@@ -122,7 +123,8 @@
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
     "typescript": "5.6.3",
-    "vite": "^7.3.0"
+    "vite": "^7.3.0",
+    "@playwright/test": "^1.60.0"
   },
   "overrides": {
     "drizzle-kit": {

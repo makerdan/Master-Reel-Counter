@@ -6523,6 +6523,35 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     });
   });
 
+  // ── Dev-only test seeding endpoint ──────────────────────────────────────────
+  // Sets (or overwrites) the tester password for the first non-tester owner so
+  // that the Playwright global-setup can authenticate without a real OAuth flow.
+  // Strictly unavailable in production.
+  if (process.env.NODE_ENV !== "production") {
+    app.post("/api/__test__/seed-tester-password", async (req: any, res) => {
+      try {
+        const { password } = req.body ?? {};
+        if (!password || typeof password !== "string") {
+          return res.status(400).json({ message: "password required" });
+        }
+        const allUsers = await authStorage.getAllUsers();
+        const owners = allUsers.filter((u: any) => !u.isTester);
+        if (owners.length === 0) {
+          return res.status(404).json({
+            message: "No owner users found. Log in with Replit Auth once first.",
+          });
+        }
+        const owner = owners[0];
+        const hashed = await bcrypt.hash(password, 10);
+        await storage.upsertUserSettings(owner.id, { testerPassword: hashed });
+        return res.json({ ok: true, ownerUserId: owner.id });
+      } catch (err) {
+        console.error("[test-seed] error:", err);
+        return res.status(500).json({ message: "seed failed" });
+      }
+    });
+  }
+
   setInterval(purgeExpiredTrash, TRASH_PURGE_INTERVAL_MS);
   setTimeout(purgeExpiredTrash, 30000);
 
