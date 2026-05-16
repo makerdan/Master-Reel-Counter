@@ -9,6 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
@@ -118,6 +122,7 @@ export default function SingleEntryMode({
   const [corruptedFields, setCorruptedFields] = useState<Set<string>>(() =>
     editingEntry ? getCorruptedFields(editingEntry) : new Set()
   );
+  const [showUnreadableConfirm, setShowUnreadableConfirm] = useState(false);
   const formDirtyRef = useRef(false);
 
   const { data: linkedPin } = useQuery<Pin>({
@@ -465,6 +470,12 @@ export default function SingleEntryMode({
       toast({ title: "Missing required fields", description: "Aisle and Section are required", variant: "destructive" });
       return;
     }
+    // Warn if any originally-corrupted fields are still empty (user never re-entered them).
+    // corruptedFields retains only fields the user has not touched since opening the editor.
+    if (editingEntry && corruptedFields.size > 0) {
+      setShowUnreadableConfirm(true);
+      return;
+    }
     saveEntry.mutate();
   };
 
@@ -473,6 +484,7 @@ export default function SingleEntryMode({
   const hiddenCorrupted = hasCorruption ? Array.from(corruptedFields).filter(f => !VISIBLE_ENCRYPTED_FIELDS.has(f)) : [];
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-3">
       {hasCorruption && (
         <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2.5 text-sm" data-testid="banner-corrupted-fields">
@@ -849,5 +861,32 @@ export default function SingleEntryMode({
         </div>
       </div>
     </form>
+
+    <AlertDialog open={showUnreadableConfirm} onOpenChange={setShowUnreadableConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Save with missing data?</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              <p>The following fields were previously encrypted but could not be decrypted, and have not been re-entered:</p>
+              <p className="font-medium text-foreground">
+                {Array.from(corruptedFields).map(f => FIELD_LABELS[f] ?? f).join(", ")}
+              </p>
+              <p>Saving now will store these fields as empty. You can cancel and fill them in first, or save anyway.</p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="button-cancel-save-unreadable">Go back</AlertDialogCancel>
+          <AlertDialogAction
+            data-testid="button-confirm-save-unreadable"
+            onClick={() => { setShowUnreadableConfirm(false); saveEntry.mutate(); }}
+          >
+            Save anyway
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
