@@ -129,6 +129,8 @@ export default function SingleEntryMode({
   );
   const [showUnreadableConfirm, setShowUnreadableConfirm] = useState(false);
   const [stillEmptyAtSubmit, setStillEmptyAtSubmit] = useState<string[]>([]);
+  const [encodingReconfiguring, setEncodingReconfiguring] = useState(false);
+  const encodingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const formDirtyRef = useRef(false);
 
   const { data: linkedPin } = useQuery<Pin>({
@@ -284,6 +286,46 @@ export default function SingleEntryMode({
     window.addEventListener("beforeunload", beforeUnloadHandler);
     return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
   }, []);
+
+  // Check encoding status once at mount so button reflects reconfiguration
+  // that was already running before this form was opened.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/settings/encoding-status")
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { inProgress: boolean } | null) => {
+        if (active && data?.inProgress) setEncodingReconfiguring(true);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  // While encoding is reconfiguring, poll every 2 s and clear once done.
+  useEffect(() => {
+    if (!encodingReconfiguring) {
+      if (encodingPollRef.current) {
+        clearInterval(encodingPollRef.current);
+        encodingPollRef.current = null;
+      }
+      return;
+    }
+    if (encodingPollRef.current) return;
+    encodingPollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch("/api/settings/encoding-status");
+        if (r.ok) {
+          const data: { inProgress: boolean } = await r.json();
+          if (!data.inProgress) setEncodingReconfiguring(false);
+        }
+      } catch {}
+    }, 2000);
+    return () => {
+      if (encodingPollRef.current) {
+        clearInterval(encodingPollRef.current);
+        encodingPollRef.current = null;
+      }
+    };
+  }, [encodingReconfiguring]);
 
   const handleSinglePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -464,7 +506,8 @@ export default function SingleEntryMode({
     },
     onError: (error: Error) => {
       if (error.message.startsWith("503:")) {
-        toast({ title: "Encryption is being reconfigured", description: "Please wait a moment, then try saving again.", variant: "destructive" });
+        // Show reconfiguring state on the button; polling will clear it automatically.
+        setEncodingReconfiguring(true);
         return;
       }
       toast({ title: "Failed to save entry", variant: "destructive" });
@@ -866,11 +909,11 @@ export default function SingleEntryMode({
             type="submit"
             size={editingEntry ? "lg" : "default"}
             className={editingEntry ? "w-full" : undefined}
-            disabled={saveEntry.isPending || !canEdit}
+            disabled={saveEntry.isPending || !canEdit || encodingReconfiguring}
             data-testid="button-save-entry"
           >
-            {saveEntry.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {editingEntry ? "Update" : "Save Entry"}
+            {(saveEntry.isPending || encodingReconfiguring) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {encodingReconfiguring ? "Reconfiguring\u2026" : editingEntry ? "Update" : "Save Entry"}
           </Button>
         </div>
       </div>

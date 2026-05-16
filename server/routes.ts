@@ -5574,6 +5574,11 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/settings/encoding-status", isAuthenticated, (req: any, res) => {
+    const userId = resolveUserId(req);
+    res.json({ inProgress: encodingToggleInProgress.has(userId) });
+  });
+
   app.post("/api/settings/encoding", isAuthenticated, async (req: any, res) => {
     const userId = resolveUserId(req);
 
