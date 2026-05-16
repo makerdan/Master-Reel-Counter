@@ -510,7 +510,7 @@ export async function registerRoutes(
       try {
         await fs.access(filePath);
       } catch {
-        return res.status(404).json({ error: "File not found" });
+        return res.status(404).json({ error: "File not found", message: "The file may still be uploading or was moved. Try again in a moment." });
       }
       res.set(headers);
       const { createReadStream } = await import("fs");

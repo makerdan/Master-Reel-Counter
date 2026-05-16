@@ -1575,10 +1575,14 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                 return await pinRes.json();
               });
               (pin as any)._dbPinId = savedPin.id;
-            } catch (pinErr) {
+            } catch (pinErr: any) {
+              const pinErrMsg: string = pinErr?.message || "";
               console.error(`Failed to create pin for entry ${entry.id}, rolling back entry:`, pinErr);
               try { await apiRequest("DELETE", `/api/entries/${entry.id}`); } catch (deleteErr) {
                 console.error(`Failed to roll back entry ${entry.id} after pin creation failure:`, deleteErr);
+              }
+              if (/already exists/i.test(pinErrMsg)) {
+                throw new Error("pin-label-taken");
               }
               throw new Error("pin-creation-failed");
             }
@@ -1586,8 +1590,13 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           (pin as any)._entryId = entry.id;
           completed++;
           setBatchProgress({ current: completed, total: totalEntries, errors });
-        } catch {
-          errors.push(`Pin ${pin.label}`);
+        } catch (commitErr: any) {
+          const commitErrMsg: string = commitErr?.message || "";
+          if (commitErrMsg === "pin-label-taken") {
+            errors.push(`${pin.label} (label already taken)`);
+          } else {
+            errors.push(`Pin ${pin.label}`);
+          }
           setBatchProgress({ current: completed, total: totalEntries, errors });
         }
       }

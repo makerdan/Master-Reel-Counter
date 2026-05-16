@@ -248,7 +248,7 @@ export default function SingleEntryMode({
   useEffect(() => {
     const match = getCatalogMatch(form.reelTag);
     if (match) {
-      if (match.conductors && !form.conductors && !userClearedFields.current.has("conductors")) {
+      if (match.conductors && !form.conductors) {
         setForm(f => ({ ...f, conductors: match.conductors || "" }));
       }
       const uniqueVendor = getUniqueVendor(match.catalog);
