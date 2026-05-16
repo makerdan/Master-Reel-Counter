@@ -3,7 +3,7 @@ import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
-import { storage, pinRetryStats } from "./storage";
+import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/routes";
 import { authStorage } from "./replit_integrations/auth/storage";
@@ -6517,6 +6517,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       return res.status(403).json({ message: "Admin only" });
     }
     const history = taskTracker.crashHistory();
+    const buckets = getPinRetryBuckets();
     res.json({
       count: history.length,
       crashes: history,
@@ -6525,6 +6526,14 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         draftRetries: pinRetryStats.draftRetries,
         total: pinRetryStats.commitRetries + pinRetryStats.draftRetries,
         since: pinRetryStats.since,
+        // Per-minute buckets (up to 60 = 1 hour), newest last.
+        // Allows the UI to render a contention trend table/chart.
+        buckets: buckets.map(b => ({
+          minute: b.minute,
+          commitRetries: b.commitRetries,
+          draftRetries: b.draftRetries,
+          total: b.commitRetries + b.draftRetries,
+        })),
       },
     });
   });

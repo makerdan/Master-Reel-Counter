@@ -624,7 +624,7 @@ export class DatabaseStorage implements IStorage {
       for (let attempt = 0; attempt <= 3; attempt++) {
         if (attempt > 0) {
           console.warn(`atomicCreatePin: commit-path retry ${attempt}/3 after conflict+delete race [photoId=${pin.photoId} label=${pin.label}]`);
-          pinRetryStats.commitRetries++;
+          recordPinRetry("commit");
           await retryDelay(attempt);
         }
         const [promoted] = await db.insert(pins).values(pin)
@@ -664,7 +664,7 @@ export class DatabaseStorage implements IStorage {
     for (let attempt = 0; attempt <= 3; attempt++) {
       if (attempt > 0) {
         console.warn(`atomicCreatePin: draft-path retry ${attempt}/3 after conflict+delete race [photoId=${pin.photoId} label=${pin.label}]`);
-        pinRetryStats.draftRetries++;
+        recordPinRetry("draft");
         await retryDelay(attempt);
       }
       const [inserted] = await db.insert(pins)
@@ -2805,17 +2805,62 @@ export class DatabaseStorage implements IStorage {
 
 export const storage = new DatabaseStorage();
 
-// In-process counter for atomicCreatePin retry events.
-// Incremented whenever a conflict+delete race forces a retry in either the
-// commit-path or the draft-path of atomicCreatePin. Persists for the lifetime
-// of the server process; reset only on restart or via resetPinRetryStats().
+// In-process observability for atomicCreatePin retry events.
+// Per-minute rolling buckets (up to 60 kept) let operators spot contention
+// trends without parsing raw server logs. Lifetime totals let them see the
+// overall picture since the last restart or manual reset.
+
+interface PinRetryBucket {
+  minute: number; // Unix ms, floored to the minute boundary
+  commitRetries: number;
+  draftRetries: number;
+}
+
+const PIN_RETRY_BUCKETS: PinRetryBucket[] = [];
+const MAX_PIN_RETRY_BUCKETS = 60; // 1 hour of per-minute history
+
 export const pinRetryStats = {
   commitRetries: 0,
   draftRetries: 0,
   since: new Date().toISOString(),
 };
 
+function recordPinRetry(path: "commit" | "draft"): void {
+  const now = Date.now();
+  const minute = Math.floor(now / 60_000) * 60_000;
+
+  // Prune buckets outside the rolling 1-hour window.
+  const cutoff = now - 60 * 60_000;
+  while (PIN_RETRY_BUCKETS.length > 0 && PIN_RETRY_BUCKETS[0].minute < cutoff) {
+    PIN_RETRY_BUCKETS.shift();
+  }
+
+  // Find or create the current-minute bucket.
+  let bucket = PIN_RETRY_BUCKETS[PIN_RETRY_BUCKETS.length - 1];
+  if (!bucket || bucket.minute !== minute) {
+    bucket = { minute, commitRetries: 0, draftRetries: 0 };
+    PIN_RETRY_BUCKETS.push(bucket);
+    if (PIN_RETRY_BUCKETS.length > MAX_PIN_RETRY_BUCKETS) {
+      PIN_RETRY_BUCKETS.shift();
+    }
+  }
+
+  if (path === "commit") {
+    bucket.commitRetries++;
+    pinRetryStats.commitRetries++;
+  } else {
+    bucket.draftRetries++;
+    pinRetryStats.draftRetries++;
+  }
+}
+
+export function getPinRetryBuckets(): PinRetryBucket[] {
+  const cutoff = Date.now() - 60 * 60_000;
+  return PIN_RETRY_BUCKETS.filter(b => b.minute >= cutoff);
+}
+
 export function resetPinRetryStats(): void {
+  PIN_RETRY_BUCKETS.length = 0;
   pinRetryStats.commitRetries = 0;
   pinRetryStats.draftRetries = 0;
   pinRetryStats.since = new Date().toISOString();
