@@ -80,4 +80,9 @@ export const taskTracker = {
 
   crashHistory(): CrashRecord[] { return _crashHistory; },
   lastCrash(): CrashRecord | null { return _lastCrash; },
+
+  clearCrashHistory(): void {
+    _crashHistory = [];
+    _lastCrash = null;
+  },
 };

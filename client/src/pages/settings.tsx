@@ -261,6 +261,20 @@ export default function SettingsPage() {
     retry: false,
   });
 
+  const clearCrashes = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/admin/crashes");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/crashes"] });
+      toast({ title: "Crash history cleared" });
+    },
+    onError: () => {
+      toast({ title: "Failed to clear crash history", variant: "destructive" });
+    },
+  });
+
   const toggleApproval = useMutation({
     mutationFn: async ({ userId, approved }: { userId: string; approved: boolean }) => {
       const res = await apiRequest("PATCH", `/api/admin/users/${userId}/approval`, { approved });
@@ -2172,6 +2186,21 @@ export default function SettingsPage() {
                   >
                     <RefreshCw className="h-4 w-4" />
                   </Button>
+                  {crashData && crashData.crashes.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => clearCrashes.mutate()}
+                      disabled={clearCrashes.isPending}
+                      data-testid="button-clear-crashes"
+                    >
+                      {clearCrashes.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : null}
+                      Clear
+                    </Button>
+                  )}
                   {crashData && (
                     <Badge variant="secondary" data-testid="badge-crash-count">
                       {crashData.count} record{crashData.count !== 1 ? "s" : ""}

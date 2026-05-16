@@ -6523,6 +6523,24 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     });
   });
 
+  // Admin endpoint: clears the in-memory crash history ring buffer and the
+  // persisted crash log file so operators can acknowledge investigated incidents.
+  app.delete("/api/admin/crashes", isAuthenticated, async (req: any, res) => {
+    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
+    const userId = resolveUserId(req);
+    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    taskTracker.clearCrashHistory();
+    const crashLogPath = path.join(process.cwd(), ".crash_log.json");
+    try {
+      await fs.writeFile(crashLogPath, "[]", "utf8");
+    } catch {
+      // Best-effort — don't fail the request if the file write fails.
+    }
+    res.json({ cleared: true });
+  });
+
   // ── Dev-only test seeding endpoint ──────────────────────────────────────────
   // Sets (or overwrites) the tester password for the first non-tester owner so
   // that the Playwright global-setup can authenticate without a real OAuth flow.
