@@ -87,6 +87,14 @@ export async function removeFromQueue(id: string): Promise<void> {
   });
 }
 
+/**
+ * Returns queued photos, optionally filtered by session and/or user.
+ *
+ * **Always pass `userId` in UI contexts.** Omitting it returns items for ALL
+ * users on this device, which inflates any count or list shown to the current
+ * user. The only legitimate callers without a userId are internal migration and
+ * admin helpers that intentionally operate on the full store.
+ */
 export async function getQueuedPhotos(sessionId?: number, userId?: string): Promise<QueuedPhoto[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -149,6 +157,14 @@ export async function removeEntryFromQueue(id: string): Promise<void> {
   });
 }
 
+/**
+ * Returns queued entries, optionally filtered by session and/or user.
+ *
+ * **Always pass `userId` in UI contexts.** Omitting it returns items for ALL
+ * users on this device, which inflates any count or list shown to the current
+ * user. The only legitimate callers without a userId are internal migration and
+ * admin helpers that intentionally operate on the full store.
+ */
 export async function getQueuedEntries(sessionId?: number, userId?: string): Promise<QueuedEntry[]> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -168,6 +184,14 @@ export async function getQueuedEntries(sessionId?: number, userId?: string): Pro
   });
 }
 
+/**
+ * Returns the total number of queued items (photos + entries) pending sync.
+ *
+ * **Always pass `userId` in UI contexts.** Omitting it counts items for ALL
+ * users on this device and will show an inflated badge number to the current
+ * user. The only legitimate callers without a userId are internal diagnostics
+ * or admin helpers that need the full device-wide total.
+ */
 export async function getPendingCount(userId?: string): Promise<number> {
   const photos = await getQueuedPhotos(undefined, userId);
   const entries = await getQueuedEntries(undefined, userId);
