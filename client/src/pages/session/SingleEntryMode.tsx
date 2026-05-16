@@ -300,6 +300,21 @@ export default function SingleEntryMode({
     return () => { active = false; };
   }, []);
 
+  // Low-frequency background probe (10 s) to catch toggles that start after
+  // mount — sets encodingReconfiguring=true, which activates the 2 s fast poll.
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const r = await fetch("/api/settings/encoding-status");
+        if (r.ok) {
+          const data: { inProgress: boolean } = await r.json();
+          if (data.inProgress) setEncodingReconfiguring(true);
+        }
+      } catch {}
+    }, 10000);
+    return () => clearInterval(id);
+  }, []);
+
   // While encoding is reconfiguring, poll every 2 s and clear once done.
   useEffect(() => {
     if (!encodingReconfiguring) {
