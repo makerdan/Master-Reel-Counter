@@ -261,15 +261,16 @@ export default function SettingsPage() {
   // isAdmin must be declared after adminUsers (the query result it depends on)
   const isAdmin = !user?.isTester && !!adminUsers && Array.isArray(adminUsers);
 
-  // Guard: if a non-admin user somehow lands on #admin, redirect them to settings
+  // Guard: redirect non-admins off #admin — only after the admin-users query has settled
+  // (adminUsers is undefined while loading; we wait for it to resolve before judging)
   useEffect(() => {
-    if (!isAdmin && activeTab === "admin") {
+    if (adminUsers !== undefined && !isAdmin && activeTab === "admin") {
       setActiveTab("settings");
       if (typeof window !== "undefined") {
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
     }
-  }, [isAdmin, activeTab]);
+  }, [adminUsers, isAdmin, activeTab]);
 
   const { data: rejectedCountData } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/rejected-users/count"],
@@ -2469,7 +2470,7 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Crash History section */}
-                  <div data-testid="section-crash-history">
+                  <div data-testid="card-crash-history">
                     <div className="flex items-center justify-between gap-2 mb-3">
                       <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Crash History</p>
                       <div className="flex items-center gap-2">
