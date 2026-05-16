@@ -8,6 +8,18 @@ const ENCRYPTED_ENTRY_FIELDS: ReadonlyArray<keyof Entry> = ["reelTag", "wireType
 function hasUnreadableField(entry: Entry): boolean {
   return ENCRYPTED_ENTRY_FIELDS.some(f => (entry[f] as unknown) === UNREADABLE_SENTINEL);
 }
+
+const FIELD_LABELS: Partial<Record<keyof Entry, string>> = {
+  reelTag: "Reel Tag", wireType: "Wire Type", gauge: "Gauge", color: "Color",
+  manufacturer: "Manufacturer", notes: "Notes", palletId: "Pallet ID",
+  position: "Position", conductors: "Conductors",
+};
+
+function getUnreadableFieldNames(entry: Entry): string[] {
+  return ENCRYPTED_ENTRY_FIELDS
+    .filter(f => (entry[f] as unknown) === UNREADABLE_SENTINEL)
+    .map(f => FIELD_LABELS[f] ?? String(f));
+}
 import { Button } from "@/components/ui/button";
 import { ToastAction } from "@/components/ui/toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -660,6 +672,7 @@ function EntryTable({
                         const info = getReelInfo(entry);
                         const isUnpinned = !pinByEntryId.has(entry.id);
                         const entryHasUnreadable = hasUnreadableField(entry);
+                        const unreadableFields = entryHasUnreadable ? getUnreadableFieldNames(entry) : [];
                         const isUnreadableTag = entry.reelTag === UNREADABLE_SENTINEL;
                         const isUnreadableMfg = entry.manufacturer === UNREADABLE_SENTINEL;
                         return (<tr key={entry.id} className={entryHasUnreadable ? "bg-red-50 dark:bg-red-950/20" : ""} data-testid={`row-entry-${entry.id}`}>
@@ -681,7 +694,7 @@ function EntryTable({
                               </Badge>
                             )}
                             {entry.manufacturer && !isUnreadableMfg && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
-                            {entryHasUnreadable && <span className="ml-1 inline-flex items-center" title="One or more encrypted fields could not be decrypted" data-testid={`icon-unreadable-${entry.id}`}><ShieldAlert className="h-3 w-3 text-red-500" /></span>}
+                            {entryHasUnreadable && <span className="ml-1 inline-flex items-center" title={`Unreadable field${unreadableFields.length === 1 ? "" : "s"}: ${unreadableFields.join(", ")}`} data-testid={`icon-unreadable-${entry.id}`}><ShieldAlert className="h-3 w-3 text-red-500" /></span>}
                           </td>
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>
                             {isUnreadableMfg ? (
