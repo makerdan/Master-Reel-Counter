@@ -302,6 +302,7 @@ export default function SettingsPage() {
 
   const [confirmClearCrashesOpen, setConfirmClearCrashesOpen] = useState(false);
   const [confirmClearIntent, setConfirmClearIntent] = useState<{ userId: string; displayName: string; count: number } | null>(null);
+  const [confirmClearRejectedOpen, setConfirmClearRejectedOpen] = useState(false);
 
   const clearCrashes = useMutation({
     mutationFn: async () => {
@@ -2591,7 +2592,7 @@ export default function SettingsPage() {
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs shrink-0"
-                  onClick={() => clearRejected.mutate()}
+                  onClick={() => setConfirmClearRejectedOpen(true)}
                   disabled={clearRejected.isPending}
                   data-testid="button-clear-rejected"
                 >
@@ -2704,6 +2705,26 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         )}
+        <AlertDialog open={confirmClearRejectedOpen} onOpenChange={setConfirmClearRejectedOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear block list?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will remove all rejected users from the block list, allowing them to sign in again. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-clear-rejected">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => clearRejected.mutate()}
+                data-testid="button-confirm-clear-rejected"
+              >
+                Clear Block List
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
 
       <AlertDialog open={confirmEnableOpen} onOpenChange={setConfirmEnableOpen}>
