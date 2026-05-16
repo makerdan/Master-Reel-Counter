@@ -166,6 +166,7 @@ export default function SingleEntryMode({
     if (editingEntry) {
       const corrupted = getCorruptedFields(editingEntry);
       setCorruptedFields(corrupted);
+      originalCorruptedRef.current = corrupted;
       const notes = clearSentinel(editingEntry.notes);
       setForm({
         aisle: editingEntry.aisle || "",
@@ -881,11 +882,35 @@ export default function SingleEntryMode({
           <AlertDialogTitle>Save with missing data?</AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-2">
-              <p>The following fields were previously encrypted but could not be decrypted, and have not been re-entered:</p>
-              <p className="font-medium text-foreground">
-                {stillEmptyAtSubmit.map(f => FIELD_LABELS[f] ?? f).join(", ")}
-              </p>
-              <p>Saving now will store these fields as empty. You can cancel and fill them in first, or save anyway.</p>
+              {(() => {
+                const editable = stillEmptyAtSubmit.filter(f => VISIBLE_ENCRYPTED_FIELDS.has(f));
+                const uneditable = stillEmptyAtSubmit.filter(f => !VISIBLE_ENCRYPTED_FIELDS.has(f));
+                return (
+                  <>
+                    {editable.length > 0 && (
+                      <p>
+                        The following fields could not be decrypted and are still empty — go back to fill them in:{" "}
+                        <span className="font-medium text-foreground">
+                          {editable.map(f => FIELD_LABELS[f] ?? f).join(", ")}
+                        </span>
+                      </p>
+                    )}
+                    {uneditable.length > 0 && (
+                      <p>
+                        The following fields could not be decrypted and cannot be re-entered here — they will be saved as empty:{" "}
+                        <span className="font-medium text-foreground">
+                          {uneditable.map(f => FIELD_LABELS[f] ?? f).join(", ")}
+                        </span>
+                      </p>
+                    )}
+                    <p>
+                      {editable.length > 0
+                        ? "You can cancel and fill in the editable fields, or save anyway to clear all missing data."
+                        : "Saving now will store these fields as empty."}
+                    </p>
+                  </>
+                );
+              })()}
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
