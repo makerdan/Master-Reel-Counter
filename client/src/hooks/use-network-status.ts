@@ -362,6 +362,26 @@ export function useNetworkStatus(currentUserId?: string) {
             setFailedEntries(Array.from(failedEntriesRef.current.values()));
           }
         } catch {}
+
+        // Purge orphaned queued photos older than 30 days.  These accumulate
+        // when a tab is closed mid-upload before the item exhausts its retry
+        // budget (it never reaches permanentlyFailed so it stays in IDB forever).
+        try {
+          const TTL_MS = 30 * 24 * 60 * 60 * 1000;
+          const now = Date.now();
+          const photos = await getQueuedPhotos(undefined, currentUserId);
+          let purgedPhotoCount = 0;
+          for (const photo of photos) {
+            if (now - photo.createdAt > TTL_MS) {
+              removeFromQueue(photo.id).catch(() => {});
+              purgedPhotoCount++;
+            }
+          }
+          if (purgedPhotoCount > 0) {
+            console.debug(`[offline-queue] auto-purged ${purgedPhotoCount} stale queued photo${purgedPhotoCount === 1 ? "" : "s"} (>30 days old)`);
+          }
+        } catch {}
+
         if (navigator.onLine) syncQueue();
       });
 
