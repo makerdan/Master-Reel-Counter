@@ -266,7 +266,7 @@ export default function SettingsPage() {
   });
 
   const { data: integrityData, isLoading: integrityLoading, refetch: refetchIntegrity } = useQuery<{
-    checks: Array<{ id: string; label: string; description: string; count: number }>;
+    checks: Array<{ id: string; label: string; description: string; count: number; fixable?: boolean }>;
   }>({
     queryKey: ["/api/admin/integrity-checks"],
     queryFn: async () => {
@@ -2606,13 +2606,13 @@ export default function SettingsPage() {
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-xs font-medium leading-snug">{check.label}</p>
                             <div className="flex items-center gap-2 shrink-0">
-                              {!healthy && (
+                              {!healthy && check.fixable && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="h-6 text-[10px] px-2 text-destructive border-destructive/40 hover:bg-destructive/10"
                                   onClick={() => fixIntegrity.mutate(check.id)}
-                                  disabled={fixIntegrity.isPending && fixIntegrity.variables === check.id}
+                                  disabled={fixIntegrity.isPending}
                                   data-testid={`button-fix-${check.id}`}
                                 >
                                   {fixIntegrity.isPending && fixIntegrity.variables === check.id

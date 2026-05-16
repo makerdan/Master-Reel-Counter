@@ -6615,18 +6615,21 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
             label: "trashedFromFolderId / folderId mismatch",
             description: "Sessions where both folder_id and trashed_from_folder_id are set but differ",
             count: Number(mismatch.count),
+            fixable: true,
           },
           {
             id: "stale_trashed_from_folder",
             label: "Stale trashedFromFolderId on active sessions",
             description: "Sessions with trashed_from_folder_id set but not currently trashed (deleted_at IS NULL)",
             count: Number(stale.count),
+            fixable: true,
           },
           {
             id: "session_in_deleted_folder",
             label: "Active sessions inside a trashed folder",
             description: "Non-trashed sessions whose folder_id points to a soft-deleted folder",
             count: Number(orphanedFolder.count),
+            fixable: true,
           },
         ],
       });
