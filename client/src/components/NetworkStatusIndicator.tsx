@@ -25,7 +25,7 @@ export function NetworkStatusIndicator({
   reconnectCountdown: countdownProp,
 }: NetworkStatusIndicatorProps = {}) {
   const { user } = useAuth();
-  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, failedEntries } = useNetworkStatus(user?.id);
+  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, discardFailedEntry, failedEntries } = useNetworkStatus(user?.id);
   const ctx = useWsReconnect();
   // Props take priority over context (allows direct rendering with explicit values).
   const wsStatus = wsProp !== undefined ? wsProp : ctx.wsStatus;
@@ -87,11 +87,21 @@ export function NetworkStatusIndicator({
 
           <ul className="max-h-48 overflow-y-auto divide-y divide-border/50" data-testid="list-failed-entries">
             {failedEntries.map((entry) => (
-              <li key={entry.id} className="px-3 py-2" data-testid={`item-failed-entry-${entry.id}`}>
-                <p className="text-xs font-medium text-foreground leading-snug">
-                  Session {entry.sessionId} · {entryLabel(entry.data)}
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{entry.reason}</p>
+              <li key={entry.id} className="flex items-start gap-1.5 px-3 py-2" data-testid={`item-failed-entry-${entry.id}`}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground leading-snug">
+                    Session {entry.sessionId} · {entryLabel(entry.data)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{entry.reason}</p>
+                </div>
+                <button
+                  onClick={() => discardFailedEntry(entry.id)}
+                  className="shrink-0 mt-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                  aria-label="Discard entry"
+                  data-testid={`button-discard-entry-${entry.id}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </li>
             ))}
           </ul>

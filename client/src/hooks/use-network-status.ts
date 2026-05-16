@@ -256,6 +256,16 @@ export function useNetworkStatus(currentUserId?: string) {
     }
   }, [refreshPendingCount, currentUserId]);
 
+  const discardFailedEntry = useCallback(async (id: string) => {
+    try {
+      await removeEntryFromQueue(id);
+    } catch {}
+    permanentlyFailedRef.current.delete(id);
+    failedEntriesRef.current.delete(id);
+    setPermanentlyFailedCount(permanentlyFailedRef.current.size);
+    setFailedEntries(Array.from(failedEntriesRef.current.values()));
+  }, []);
+
   const retryAllFailedEntries = useCallback(async () => {
     for (const timer of entryRetryTimersRef.current.values()) {
       clearTimeout(timer);
@@ -330,7 +340,15 @@ export function useNetworkStatus(currentUserId?: string) {
       .then(async () => {
         try {
           const failed = await getFailedQueuedEntries(currentUserId);
+          const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+          const now = Date.now();
           for (const entry of failed) {
+            const age = typeof entry.createdAt === "number" ? now - entry.createdAt : 0;
+            if (age > TTL_MS) {
+              // Silently remove expired entries — no need to surface them.
+              removeEntryFromQueue(entry.id).catch(() => {});
+              continue;
+            }
             permanentlyFailedRef.current.add(entry.id);
             failedEntriesRef.current.set(entry.id, {
               id: entry.id,
@@ -339,7 +357,7 @@ export function useNetworkStatus(currentUserId?: string) {
               reason: entry.failureReason || "Failed to sync",
             });
           }
-          if (failed.length > 0) {
+          if (permanentlyFailedRef.current.size > 0) {
             setPermanentlyFailedCount(permanentlyFailedRef.current.size);
             setFailedEntries(Array.from(failedEntriesRef.current.values()));
           }
@@ -367,6 +385,7 @@ export function useNetworkStatus(currentUserId?: string) {
     entryRetryAttempt,
     permanentlyFailedCount,
     retryAllFailedEntries,
+    discardFailedEntry,
     failedEntries,
   };
 }
