@@ -600,7 +600,7 @@ function SessionWorkspace({
     jobId: string,
     signal: AbortSignal,
     onProgress: (p: {done: number, total: number}) => void
-  ): Promise<Blob | null> => {
+  ): Promise<Blob | null | "job_missing"> => {
     while (!signal.aborted) {
       await new Promise<void>(r => setTimeout(r, 800));
       if (signal.aborted) return null;
@@ -608,6 +608,7 @@ function SessionWorkspace({
         const res = await fetch(`/api/sessions/${sessionId}/export/pdf/progress/${jobId}`, {
           credentials: "include", signal,
         });
+        if (res.status === 404) return "job_missing";
         if (!res.ok) return null;
         const prog = await res.json();
         if (prog.error) return null;
@@ -686,6 +687,15 @@ function SessionWorkspace({
     setPdfDialogWaiting(false);
     setPdfQualityOpen(false);
     abortPdfFetches();
+    if (blob === "job_missing") {
+      toast({
+        title: "PDF Export Interrupted",
+        description: "PDF generation was interrupted — the server may have restarted. Please try again.",
+        variant: "destructive",
+        action: <ToastAction altText="Try again" onClick={exportPdf}>Try Again</ToastAction>,
+      });
+      return;
+    }
     if (!blob || blob.size < 500) {
       toast({
         title: "PDF Export Failed",
@@ -729,6 +739,15 @@ function SessionWorkspace({
       triggerPdfGeneration(quality, jobId);
       const blob = await pollPdfJob(jobId, ctrl.signal, setPdfProgress);
       if (ctrl.signal.aborted) return;
+      if (blob === "job_missing") {
+        toast({
+          title: "PDF Export Interrupted",
+          description: "PDF generation was interrupted — the server may have restarted. Please try again.",
+          variant: "destructive",
+          action: <ToastAction altText="Try again" onClick={() => doExportPdf()}>Try Again</ToastAction>,
+        });
+        return;
+      }
       if (!blob || blob.size < 500) throw new Error("The PDF was generated but appears to be empty.");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

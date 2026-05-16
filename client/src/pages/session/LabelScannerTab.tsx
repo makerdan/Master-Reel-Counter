@@ -1498,7 +1498,12 @@ export default function LabelScannerTab({
             }
           }
         } catch (err: any) {
-          failures.push(card.pin.label || `Pin ${card.pin.id}`);
+          const msg: string = err?.message || "";
+          if (/already exists/i.test(msg)) {
+            failures.push(`${card.pin.label || `Pin ${card.pin.id}`} (label already taken)`);
+          } else {
+            failures.push(card.pin.label || `Pin ${card.pin.id}`);
+          }
         }
       }
 
@@ -1705,13 +1710,13 @@ export default function LabelScannerTab({
   };
 
   return (
-    <ErrorBoundary fallback={
+    <ErrorBoundary fallback={(onReset) => (
       <div className="flex flex-col items-center justify-center p-8 gap-3 text-center text-sm">
         <AlertTriangle className="h-8 w-8 text-destructive" />
-        <p className="font-medium">The scanner encountered an unexpected error.</p>
-        <button className="underline text-muted-foreground" onClick={() => window.location.reload()}>Reload page</button>
+        <p className="font-medium">Scanner encountered an error — tap to reload the tab.</p>
+        <button className="underline text-muted-foreground" onClick={onReset}>Reload tab</button>
       </div>
-    }>
+    )}>
     <div className="space-y-4" data-testid="label-scanner-tab">
       <div className="bg-[hsl(25_12%_16%)] dark:bg-[hsl(25_8%_13%)] rounded-lg p-3 border border-[hsl(215_30%_50%/0.25)] space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">

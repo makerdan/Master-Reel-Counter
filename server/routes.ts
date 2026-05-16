@@ -275,16 +275,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Display name and password are required" });
       }
       const candidates = await storage.getAllSettingsWithTesterPassword();
-      let ownerSettings = null;
+      const matchedOwners: typeof candidates = [];
       for (const candidate of candidates) {
         if (candidate.testerPassword && await bcrypt.compare(password.trim(), candidate.testerPassword)) {
-          ownerSettings = candidate;
-          break;
+          matchedOwners.push(candidate);
         }
       }
-      if (!ownerSettings) {
+      if (matchedOwners.length === 0) {
         return res.status(401).json({ message: "Invalid tester password" });
       }
+      if (matchedOwners.length > 1) {
+        return res.status(409).json({ message: "This password is shared by multiple accounts — contact the app owner to set a unique tester password" });
+      }
+      const ownerSettings = matchedOwners[0];
       const testerId = `tester-${createHash("sha256").update(`${ownerSettings.userId}:${displayName.trim().toLowerCase()}`).digest("hex").slice(0, 16)}`;
       await authStorage.upsertUser({
         id: testerId,
@@ -492,7 +495,7 @@ export async function registerRoutes(
         const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(`/uploads/${filename}`));
         const [existsInGcs] = await Promise.race([
           gcsFile.exists(),
-          new Promise<[boolean]>(resolve => setTimeout(() => resolve([false]), 2000)),
+          new Promise<[boolean]>(resolve => setTimeout(() => { console.warn("[GCS] exists() timed out for /uploads/%s — treating as not found", filename); resolve([false]); }, 5000)),
         ]);
         if (existsInGcs) {
           res.set(headers);
@@ -1776,7 +1779,10 @@ export async function registerRoutes(
       const pin = await storage.atomicCreatePin(data);
       broadcastToSession(photo.sessionId, { type: "sync", entity: "pins", sessionId: photo.sessionId });
       res.json(pin);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "A pin with that label already exists on this photo" });
+      }
       console.error("Error creating pin:", error);
       res.status(500).json({ message: "Failed to create pin" });
     }
@@ -1921,7 +1927,7 @@ export async function registerRoutes(
       const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
       const [existsInGcs] = await Promise.race([
         gcsFile.exists(),
-        new Promise<[boolean]>(resolve => setTimeout(() => resolve([false]), 2000)),
+        new Promise<[boolean]>(resolve => setTimeout(() => { console.warn("[GCS] exists() timed out for photo key %s — treating as not found", photoKey); resolve([false]); }, 5000)),
       ]);
       if (existsInGcs) {
         const [downloaded] = await gcsFile.download();
@@ -5545,7 +5551,14 @@ export async function registerRoutes(
       }
       if (updates.testerPassword !== undefined) {
         if (updates.testerPassword && typeof updates.testerPassword === "string" && updates.testerPassword.trim()) {
-          updates.testerPassword = await bcrypt.hash(updates.testerPassword.trim(), 10);
+          const plain = updates.testerPassword.trim();
+          const allWithPw = await storage.getAllSettingsWithTesterPassword();
+          for (const other of allWithPw) {
+            if (other.userId !== userId && other.testerPassword && await bcrypt.compare(plain, other.testerPassword)) {
+              return res.status(409).json({ message: "This password is already in use by another account. Please choose a different tester password." });
+            }
+          }
+          updates.testerPassword = await bcrypt.hash(plain, 10);
         } else {
           updates.testerPassword = null;
         }
@@ -6224,6 +6237,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
     let authDone = false;
     const pendingMessages: (Buffer | string)[] = [];
+    let revalidateTimer: ReturnType<typeof setInterval> | null = null;
 
     sessionParser(req, {} as any, () => {
       passport.initialize()(req, {} as any, () => {
@@ -6246,6 +6260,31 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
             processWsMessage(ws, buffered);
           }
           pendingMessages.length = 0;
+
+          // Periodic session re-validation: terminates ghost editor presence
+          // when the underlying auth session expires without the WS closing.
+          const WS_REVALIDATE_MS = 10 * 60 * 1000;
+          revalidateTimer = setInterval(() => {
+            if (ws.readyState !== WebSocket.OPEN) {
+              if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
+              return;
+            }
+            sessionParser(req, {} as any, () => {
+              passport.initialize()(req, {} as any, () => {
+                passport.session()(req, {} as any, () => {
+                  const freshUser = req.user as any;
+                  const freshNow = Math.floor(Date.now() / 1000);
+                  const stillValid = freshUser && freshUser.expires_at && freshNow <= freshUser.expires_at;
+                  if (!stillValid) {
+                    console.log("[WS] auth session expired for user %s — terminating socket", connUserId);
+                    try { ws.send(JSON.stringify({ type: "auth_expired" })); } catch {}
+                    ws.close(1008, "Session expired");
+                    if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
+                  }
+                });
+              });
+            });
+          }, WS_REVALIDATE_MS);
         });
       });
     });
@@ -6265,6 +6304,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     });
 
     ws.on("close", () => {
+      if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
       cleanupWs(ws);
     });
   });

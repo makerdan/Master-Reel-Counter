@@ -100,6 +100,11 @@ export function useSessionWebSocket(
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
+        if (msg.type === "auth_expired") {
+          shouldReconnectRef.current = false;
+          window.location.href = "/api/login";
+          return;
+        }
         if (msg.type === "sync") {
           const sid = msg.sessionId?.toString() || sessionId.toString();
           if (msg.entity === "entries") {

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
+  fallback?: ReactNode | ((onReset: () => void) => ReactNode);
 }
 
 interface State {
@@ -30,7 +30,11 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
-        return this.props.fallback;
+        const fb = this.props.fallback;
+        if (typeof fb === "function") {
+          return fb(this.handleReset);
+        }
+        return fb;
       }
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">

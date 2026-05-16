@@ -41,6 +41,7 @@ import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatTimestamp } from "@/lib/timezone";
 import type { Session, Folder as FolderType } from "@shared/schema";
@@ -913,7 +914,7 @@ export default function Dashboard() {
     jobId: string,
     signal: AbortSignal,
     onProgress: (p: {done: number, total: number}) => void
-  ): Promise<Blob | null> => {
+  ): Promise<Blob | null | "job_missing"> => {
     while (!signal.aborted) {
       await new Promise<void>(r => setTimeout(r, 800));
       if (signal.aborted) return null;
@@ -921,6 +922,7 @@ export default function Dashboard() {
         const res = await fetch(`/api/sessions/${sessionId}/export/pdf/progress/${jobId}`, {
           credentials: "include", signal,
         });
+        if (res.status === 404) return "job_missing";
         if (!res.ok) return null;
         const prog = await res.json();
         if (prog.error) return null;
@@ -997,6 +999,15 @@ export default function Dashboard() {
     const session = exportSessionTarget;
     setExportSessionTarget(null);
     abortPdfFetches();
+    if (blob === "job_missing") {
+      toast({
+        title: "PDF Export Interrupted",
+        description: "PDF generation was interrupted — the server may have restarted. Please try again.",
+        variant: "destructive",
+        action: session ? <ToastAction altText="Try again" onClick={() => handleExportPdf(session)}>Try Again</ToastAction> : undefined,
+      });
+      return;
+    }
     if (!blob || blob.size < 500) {
       toast({ title: "PDF Export Failed", description: "Export failed — Try again in a moment.", variant: "destructive" });
       return;

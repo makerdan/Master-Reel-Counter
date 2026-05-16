@@ -119,6 +119,7 @@ export default function SingleEntryMode({
   const [footageOverride, setFootageOverride] = useState(!!editingEntry);
   const preReceivingSnapshot = useRef<{ aisle: string; section: string } | null>(null);
   const lastMatchedCatalog = useRef<string | null>(null);
+  const userClearedFields = useRef<Set<string>>(new Set());
   const [catalogSuggestions, setCatalogSuggestions] = useState<ParsedCatalogEntry[]>([]);
   const [showCatalogSuggestions, setShowCatalogSuggestions] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -247,17 +248,21 @@ export default function SingleEntryMode({
   useEffect(() => {
     const match = getCatalogMatch(form.reelTag);
     if (match) {
-      if (match.conductors && !form.conductors) {
+      if (match.conductors && !form.conductors && !userClearedFields.current.has("conductors")) {
         setForm(f => ({ ...f, conductors: match.conductors || "" }));
       }
       const uniqueVendor = getUniqueVendor(match.catalog);
-      if (uniqueVendor && !form.manufacturer) {
+      if (uniqueVendor && !form.manufacturer && !userClearedFields.current.has("manufacturer")) {
         setForm(f => ({ ...f, manufacturer: uniqueVendor }));
       }
       if (match.footage) {
         const matchCatalog = match.catalog;
         if (matchCatalog !== lastMatchedCatalog.current) {
           lastMatchedCatalog.current = matchCatalog;
+          // New catalog selected — allow auto-fill to restore manufacturer/conductors
+          // if the user hasn't typed a replacement value yet.
+          userClearedFields.current.delete("conductors");
+          userClearedFields.current.delete("manufacturer");
           setFootageOverride(false);
           const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
           setForm(f => ({ ...f, footage: (toDisplayUnit(match.footage!, currentUnit) * reelCount).toString() }));
@@ -428,6 +433,7 @@ export default function SingleEntryMode({
     markDirty(true);
     const reelCount = Math.max(1, parseInt(form.reelCount) || 1);
     lastMatchedCatalog.current = match.catalog;
+    userClearedFields.current.clear();
     setFootageOverride(false);
     const uniqueVendor = getUniqueVendor(match.catalog);
     setForm(f => {
@@ -799,7 +805,15 @@ export default function SingleEntryMode({
             Vendor Code:
             {corruptedFields.has("manufacturer") && <AlertTriangle className="inline h-3.5 w-3.5 text-destructive ml-1" />}
           </Label>
-          <Input value={form.manufacturer} onChange={(e) => update("manufacturer", e.target.value.toUpperCase())} enterKeyHint="next" list="vendor-code-suggestions-single" className={corruptedFields.has("manufacturer") ? "border-destructive focus-visible:ring-destructive" : ""} data-testid="input-manufacturer" />
+          <Input value={form.manufacturer} onChange={(e) => {
+            const val = e.target.value.toUpperCase();
+            if (!val && form.manufacturer) {
+              userClearedFields.current.add("manufacturer");
+            } else if (val) {
+              userClearedFields.current.delete("manufacturer");
+            }
+            update("manufacturer", val);
+          }} enterKeyHint="next" list="vendor-code-suggestions-single" className={corruptedFields.has("manufacturer") ? "border-destructive focus-visible:ring-destructive" : ""} data-testid="input-manufacturer" />
           <datalist id="vendor-code-suggestions-single">
             {vendorCodes.map(code => (
               <option key={code} value={code} />
@@ -922,6 +936,7 @@ export default function SingleEntryMode({
                 setReceivingChecked(false);
                 setFootageOverride(false);
                 lastMatchedCatalog.current = null;
+                userClearedFields.current.clear();
                 setCapturedPhoto(null);
                 setErrors({});
                 setTouched({});
