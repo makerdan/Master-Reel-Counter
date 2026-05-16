@@ -282,6 +282,24 @@ export default function SettingsPage() {
     retry: false,
   });
 
+  const { data: pdfJobsData } = useQuery<{
+    activeCount: number;
+    completedCount: number;
+    totalBufferBytes: number;
+    oldestJobAgeMs: number | null;
+  }>({
+    queryKey: ["/api/admin/pdf-jobs"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/pdf-jobs", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    retry: false,
+  });
+
   const [confirmClearCrashesOpen, setConfirmClearCrashesOpen] = useState(false);
 
   const clearCrashes = useMutation({
@@ -912,6 +930,52 @@ export default function SettingsPage() {
                       </CollapsibleContent>
                     </div>
                   </Collapsible>
+                )}
+                {pdfJobsData !== undefined && (
+                  <>
+                    <Separator />
+                    <div className="space-y-1.5" data-testid="section-pdf-jobs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-xs font-medium">PDF Export Jobs</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/pdf-jobs"] })}
+                          data-testid="button-refresh-pdf-jobs"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>Active</span>
+                        <span className="text-right font-mono" data-testid="text-pdf-active-count">{pdfJobsData.activeCount}</span>
+                        <span>Awaiting download</span>
+                        <span className="text-right font-mono" data-testid="text-pdf-completed-count">{pdfJobsData.completedCount}</span>
+                        <span>Buffer memory</span>
+                        <span className="text-right font-mono" data-testid="text-pdf-buffer-bytes">
+                          {pdfJobsData.totalBufferBytes === 0
+                            ? "—"
+                            : pdfJobsData.totalBufferBytes < 1024 * 1024
+                              ? `${(pdfJobsData.totalBufferBytes / 1024).toFixed(1)} KB`
+                              : `${(pdfJobsData.totalBufferBytes / (1024 * 1024)).toFixed(2)} MB`}
+                        </span>
+                        {pdfJobsData.oldestJobAgeMs !== null && (
+                          <>
+                            <span>Oldest job</span>
+                            <span className="text-right font-mono" data-testid="text-pdf-oldest-age">
+                              {pdfJobsData.oldestJobAgeMs < 60_000
+                                ? `${Math.round(pdfJobsData.oldestJobAgeMs / 1000)}s`
+                                : `${Math.round(pdfJobsData.oldestJobAgeMs / 60_000)}m`}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>

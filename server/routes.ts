@@ -6636,6 +6636,37 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     }
   });
 
+  // Admin endpoint: current PDF export job stats (owner-only).
+  // Returns active/completed job counts, total buffer memory, and oldest job age
+  // so operators can spot memory build-up without needing server logs.
+  app.get("/api/admin/pdf-jobs", isAuthenticated, (req: any, res) => {
+    const replOwner = process.env.REPL_OWNER;
+    const username = req.user?.claims?.username;
+    if (!replOwner || username !== replOwner) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const now = Date.now();
+    let activeCount = 0;
+    let completedCount = 0;
+    let totalBufferBytes = 0;
+    let oldestJobAgeMs: number | null = null;
+    for (const job of pdfJobs.values()) {
+      if (job.complete) {
+        completedCount++;
+      } else {
+        activeCount++;
+      }
+      if (job.buffer) {
+        totalBufferBytes += job.buffer.length;
+      }
+      const ageMs = now - job.createdAt;
+      if (oldestJobAgeMs === null || ageMs > oldestJobAgeMs) {
+        oldestJobAgeMs = ageMs;
+      }
+    }
+    res.json({ activeCount, completedCount, totalBufferBytes, oldestJobAgeMs });
+  });
+
   // ── Dev-only test seeding endpoint ──────────────────────────────────────────
   // Sets (or overwrites) the tester password for the first non-tester owner so
   // that the Playwright global-setup can authenticate without a real OAuth flow.
