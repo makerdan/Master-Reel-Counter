@@ -301,6 +301,7 @@ export default function SettingsPage() {
   });
 
   const [confirmClearCrashesOpen, setConfirmClearCrashesOpen] = useState(false);
+  const [confirmClearIntent, setConfirmClearIntent] = useState<{ userId: string; displayName: string; count: number } | null>(null);
 
   const clearCrashes = useMutation({
     mutationFn: async () => {
@@ -911,7 +912,7 @@ export default function SettingsPage() {
                                       variant="ghost"
                                       size="sm"
                                       className="h-5 px-1.5 text-xs text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 hover:text-amber-900 dark:hover:text-amber-200"
-                                      onClick={() => clearStalledIntents.mutate(row.userId)}
+                                      onClick={() => setConfirmClearIntent({ userId: row.userId, displayName: row.displayName, count: row.count })}
                                       disabled={clearStalledIntents.isPending && clearStalledIntents.variables === row.userId}
                                       data-testid={`button-clear-stalled-${row.userId}`}
                                     >
@@ -931,6 +932,26 @@ export default function SettingsPage() {
                     </div>
                   </Collapsible>
                 )}
+                <AlertDialog open={!!confirmClearIntent} onOpenChange={(open) => { if (!open) setConfirmClearIntent(null); }}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Clear stalled intents?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently remove {confirmClearIntent?.count ?? 0} stalled upload intent{(confirmClearIntent?.count ?? 0) !== 1 ? "s" : ""} for <strong>{confirmClearIntent?.displayName}</strong>. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-cancel-clear-stalled">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => { if (confirmClearIntent) { clearStalledIntents.mutate(confirmClearIntent.userId); setConfirmClearIntent(null); } }}
+                        data-testid="button-confirm-clear-stalled"
+                      >
+                        Clear {confirmClearIntent?.count ?? 0} intent{(confirmClearIntent?.count ?? 0) !== 1 ? "s" : ""}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
                 {pdfJobsData !== undefined && (
                   <>
                     <Separator />
