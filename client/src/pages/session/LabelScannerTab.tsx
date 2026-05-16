@@ -714,6 +714,38 @@ export default function LabelScannerTab({
     }
     const localResultsMap = new Map(prunedLocalResults.map((r) => [r.pinId, r]));
 
+    const savedZoomsOuter = loadSavedZooms(sessionId);
+    const prunedZooms: Record<string, number> = {};
+    let zoomsChanged = false;
+    for (const [k, v] of Object.entries(savedZoomsOuter)) {
+      if (effectivePinIds.has(Number(k))) {
+        prunedZooms[k] = v;
+      } else {
+        zoomsChanged = true;
+      }
+    }
+    if (zoomsChanged) {
+      try {
+        localStorage.setItem(scannerZoomKey(sessionId), JSON.stringify(prunedZooms));
+      } catch {}
+    }
+
+    const savedSelectionsOuter = loadSavedSelections(sessionId);
+    const prunedSelections: Record<string, boolean> = {};
+    let selectionsChanged = false;
+    for (const [k, v] of Object.entries(savedSelectionsOuter)) {
+      if (effectivePinIds.has(Number(k))) {
+        prunedSelections[k] = v;
+      } else {
+        selectionsChanged = true;
+      }
+    }
+    if (selectionsChanged) {
+      try {
+        localStorage.setItem(scannerSelectKey(sessionId), JSON.stringify(prunedSelections));
+      } catch {}
+    }
+
     let builtHasResults = false;
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
