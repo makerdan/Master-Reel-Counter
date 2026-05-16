@@ -1385,6 +1385,41 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     );
   }, []);
 
+  const doFlagPin = useCallback((pinId: string, flagged: boolean, flagReason?: string) => {
+    const beforePins = localPinsRef.current;
+    const afterPins = beforePins.map(p =>
+      p.id === pinId
+        ? { ...p, flagged, flagReason: flagged ? (flagReason ?? p.flagReason) : undefined }
+        : p
+    );
+    if (onPushUndo && currentPhoto?.dbId) {
+      const toWire = (arr: typeof beforePins) => arr.map(p => ({
+        xPercent: p.x, yPercent: p.y, label: p.label,
+        reelCount: p.reelCount, wireDetails: p.wireDetails || null,
+        vendorCode: p.vendorCode || null, footage: p.footage || null,
+        flagged: p.flagged || false, flagReason: p.flagReason || null,
+        draftClientId: p.draftClientId || p.id,
+      }));
+      onPushUndo({
+        type: "restore-draft-pins",
+        sessionId,
+        entityId: currentPhoto.dbId,
+        data: { photoId: currentPhoto.dbId, pins: toWire(afterPins) },
+        previousData: { photoId: currentPhoto.dbId, pins: toWire(beforePins) },
+      });
+    }
+    updatePinField(pinId, "flagged", flagged);
+    if (flagged && flagReason) updatePinField(pinId, "flagReason", flagReason);
+    if (!flagged) updatePinField(pinId, "flagReason", undefined);
+    let consumed = false;
+    toast({
+      title: flagged ? "Pin flagged" : "Flag removed",
+      action: onTriggerUndoRef.current
+        ? <ToastAction altText="Undo" onClick={(e) => { if (consumed) return; consumed = true; (e.currentTarget as HTMLButtonElement).disabled = true; onTriggerUndoRef.current?.(); }}>Undo</ToastAction>
+        : undefined,
+    });
+  }, [onPushUndo, currentPhoto?.dbId, sessionId, updatePinField, toast]);
+
 
   const deleteCommittedPin = useCallback(async (pin: { id: string; dbId?: number; x?: number; y?: number; label?: string; reelCount?: number; entryId?: number; flagged?: boolean; updatedAt?: string | Date }) => {
     if (pin.dbId) {
@@ -2976,8 +3011,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                               className="flag-btn flagged"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                updatePinField(pin.id, "flagged", false);
-                                updatePinField(pin.id, "flagReason", undefined);
+                                doFlagPin(pin.id, false);
                               }}
                               title="Remove re-shoot flag"
                               data-testid={`button-flag-${index}`}
@@ -3019,8 +3053,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                   onChange={(e) => setFlagReasonDraft(e.target.value)}
                                   onKeyDown={(e) => {
                                     if (e.key === "Enter") {
-                                      updatePinField(pin.id, "flagged", true);
-                                      if (flagReasonDraft.trim()) updatePinField(pin.id, "flagReason", flagReasonDraft.trim());
+                                      doFlagPin(pin.id, true, flagReasonDraft.trim() || undefined);
                                       setFlagPopoverPinId(null);
                                     }
                                   }}
@@ -3039,8 +3072,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                                   <Button
                                     size="sm"
                                     onClick={() => {
-                                      updatePinField(pin.id, "flagged", true);
-                                      if (flagReasonDraft.trim()) updatePinField(pin.id, "flagReason", flagReasonDraft.trim());
+                                      doFlagPin(pin.id, true, flagReasonDraft.trim() || undefined);
                                       setFlagPopoverPinId(null);
                                     }}
                                     data-testid={`button-flag-confirm-${index}`}

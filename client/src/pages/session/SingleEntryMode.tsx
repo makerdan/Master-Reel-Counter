@@ -4,6 +4,7 @@ import { Camera, Save, X, Loader2, ImagePlus, Flag, AlertTriangle } from "lucide
 import { toDisplayUnit, toBaseFeet, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 
+import { ToastAction } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,7 +50,7 @@ function getCorruptedFields(entry: Entry): Set<string> {
 }
 
 export default function SingleEntryMode({
-  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true, defaultAisle, defaultSection, getNextReceivingSection, onIsDirtyChange,
+  sessionId, editingEntry, onDoneEditing, onSwitchToPhoto, onUndoableSave, canEdit = true, defaultAisle, defaultSection, getNextReceivingSection, onIsDirtyChange, onTriggerUndo,
 }: {
   sessionId: number;
   editingEntry: Entry | null;
@@ -61,9 +62,12 @@ export default function SingleEntryMode({
   defaultSection?: string;
   getNextReceivingSection?: () => string;
   onIsDirtyChange?: (isDirty: boolean) => void;
+  onTriggerUndo?: () => void;
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const onTriggerUndoRef = useRef(onTriggerUndo);
+  useEffect(() => { onTriggerUndoRef.current = onTriggerUndo; }, [onTriggerUndo]);
   const { uploadFile, isUploading } = useUpload();
   const { allCodes: vendorCodes } = useVendorCodes();
   const singleFileRef = useRef<HTMLInputElement>(null);
@@ -161,6 +165,13 @@ export default function SingleEntryMode({
           onUndoableSave({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason: prevFlagReason }, serverUpdatedAt });
         }
       }
+      let consumed = false;
+      toast({
+        title: flagged ? "Pin flagged" : "Flag removed",
+        action: onTriggerUndoRef.current
+          ? <ToastAction altText="Undo" onClick={(e) => { if (consumed) return; consumed = true; (e.currentTarget as HTMLButtonElement).disabled = true; onTriggerUndoRef.current?.(); }}>Undo</ToastAction>
+          : undefined,
+      });
     },
   });
 

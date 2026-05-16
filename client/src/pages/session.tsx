@@ -1232,7 +1232,7 @@ function SessionWorkspace({
               );
             })()}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
-              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => { editingEntryDirtyRef.current = false; setEditingEntry(null); }} onUndoableSave={pushUndo} canEdit={canEditSession} onIsDirtyChange={(dirty) => { editingEntryDirtyRef.current = dirty; }} />
+              <SingleEntryMode sessionId={sessionId} editingEntry={editingEntry} onDoneEditing={() => { editingEntryDirtyRef.current = false; setEditingEntry(null); }} onUndoableSave={pushUndo} canEdit={canEditSession} onIsDirtyChange={(dirty) => { editingEntryDirtyRef.current = dirty; }} onTriggerUndo={() => undoWithSignalRef.current()} />
               {canEditSession && (
                 <div className="mt-4 pt-4 border-t border-destructive/20">
                   <AlertDialog>
