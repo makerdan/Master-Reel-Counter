@@ -333,20 +333,42 @@ export default function SettingsPage() {
     },
   });
 
+  const [sweepPage, setSweepPage] = useState(0);
+  const [sweepDeleted, setSweepDeleted] = useState(0);
+
   const sweepOrphans = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", "/api/admin/sweep-legacy-orphans").then((res) =>
-        res.json() as Promise<{ scanned: number; deleted: number; skipped: number; errors: number; nextPageToken: string | null; minAgeDays: number }>
-      ),
+    mutationFn: async () => {
+      type SweepResult = { scanned: number; deleted: number; skipped: number; errors: number; nextPageToken: string | null; minAgeDays: number };
+      let pageToken: string | null = null;
+      let page = 0;
+      const totals = { scanned: 0, deleted: 0, skipped: 0, errors: 0, minAgeDays: 0 };
+      do {
+        page++;
+        setSweepPage(page);
+        setSweepDeleted(totals.deleted);
+        const res = await apiRequest("POST", "/api/admin/sweep-legacy-orphans", pageToken ? { pageToken } : undefined);
+        const data: SweepResult = await res.json();
+        totals.scanned += data.scanned;
+        totals.deleted += data.deleted;
+        totals.skipped += data.skipped;
+        totals.errors += data.errors;
+        totals.minAgeDays = data.minAgeDays;
+        pageToken = data.nextPageToken;
+      } while (pageToken !== null);
+      return totals;
+    },
     onSuccess: (data) => {
+      setSweepPage(0);
+      setSweepDeleted(0);
       const remaining = data.errors;
-      const runAgain = remaining > 0 || data.nextPageToken !== null;
       toast({
         title: "Orphan sweep complete",
-        description: `Scanned ${data.scanned}, deleted ${data.deleted}, skipped ${data.skipped}. Remaining: ${remaining}.${runAgain ? " Run again to continue." : ""}`,
+        description: `Scanned ${data.scanned}, deleted ${data.deleted}, skipped ${data.skipped}. Remaining: ${remaining}.`,
       });
     },
     onError: () => {
+      setSweepPage(0);
+      setSweepDeleted(0);
       toast({ title: "Orphan sweep failed", variant: "destructive" });
     },
   });
@@ -356,7 +378,7 @@ export default function SettingsPage() {
       apiRequest("DELETE", `/api/admin/stalled-intents/${encodeURIComponent(userId)}`).then(
         (res) => res.json() as Promise<{ cleared: number }>
       ),
-    onSuccess: (data, userId) => {
+    onSuccess: (data) => {
       toast({
         title: "Stalled intents cleared",
         description: `Removed ${data.cleared} stalled upload intent${data.cleared !== 1 ? "s" : ""}.`,
@@ -770,11 +792,18 @@ export default function SettingsPage() {
                         data-testid="button-sweep-orphans"
                       >
                         {sweepOrphans.isPending ? (
-                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          <>
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            {sweepPage > 1
+                              ? `Page ${sweepPage}, ${sweepDeleted.toLocaleString()} deleted…`
+                              : "Sweeping…"}
+                          </>
                         ) : (
-                          <Trash2 className="h-3 w-3 mr-1" />
+                          <>
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Sweep Legacy Orphans
+                          </>
                         )}
-                        Sweep Legacy Orphans
                       </Button>
                     )}
                     <Button
