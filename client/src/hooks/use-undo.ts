@@ -391,9 +391,10 @@ export function useUndoRedo(sessionId: number) {
             description: "You're offline. The change will sync when you're back online.",
           });
         } else {
+          const offlineLabel = actionLabel(action);
           toast({
             title: `Can't ${verb.toLowerCase()} while offline`,
-            description: "This action can't be queued. Reconnect and try again.",
+            description: offlineLabel ? `${offlineLabel} — This action can't be queued. Reconnect and try again.` : "This action can't be queued. Reconnect and try again.",
             variant: "destructive",
           });
         }
@@ -450,9 +451,10 @@ export function useUndoRedo(sessionId: number) {
           });
           return;
         }
+        const networkOfflineLabel = actionLabel(action);
         toast({
           title: `Can't ${verb.toLowerCase()} while offline`,
-          description: "This action can't be queued. Reconnect and try again.",
+          description: networkOfflineLabel ? `${networkOfflineLabel} — This action can't be queued. Reconnect and try again.` : "This action can't be queued. Reconnect and try again.",
           variant: "destructive",
         });
         return;
