@@ -2272,7 +2272,133 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* App-Wide Storage */}
+              {/* Manage Users */}
+              <Card data-testid="card-manage-users">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-base">Manage Users</CardTitle>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs shrink-0"
+                      onClick={() => setConfirmClearRejectedOpen(true)}
+                      disabled={clearRejected.isPending}
+                      data-testid="button-clear-rejected"
+                    >
+                      {clearRejected.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                      Clear Block List
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Approve or reject users who have signed in. Only approved users can access the app.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {adminUsersLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading users...
+                    </div>
+                  ) : adminUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No users registered yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {adminUsers.map((u: any) => {
+                        const isOwner = u.id === user?.id;
+                        return (
+                          <div
+                            key={u.id}
+                            className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card"
+                            data-testid={`row-user-${u.id}`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <Avatar className="h-8 w-8">
+                                {u.profileImageUrl ? (
+                                  <AvatarImage src={u.profileImageUrl} alt={u.firstName || u.id} />
+                                ) : null}
+                                <AvatarFallback className="text-xs">
+                                  {(u.firstName || u.id).charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium truncate" data-testid={`text-username-${u.id}`}>
+                                    {u.firstName || u.id}{u.lastName ? ` ${u.lastName}` : ""}
+                                  </span>
+                                  {isOwner && (
+                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Owner</Badge>
+                                  )}
+                                </div>
+                                {u.email && (
+                                  <span className="text-xs text-muted-foreground truncate block">{u.email}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {u.isTester ? (
+                                <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-700" data-testid={`badge-tester-${u.id}`}>
+                                  Tester
+                                </Badge>
+                              ) : isOwner ? (
+                                <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
+                              ) : u.approved ? (
+                                <>
+                                  <Badge className="bg-green-600 text-white text-xs" data-testid={`badge-approved-${u.id}`}>
+                                    Approved
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                                    onClick={() => rejectUser.mutate(u.id)}
+                                    disabled={rejectUser.isPending}
+                                    data-testid={`button-reject-${u.id}`}
+                                  >
+                                    <UserX className="h-3 w-3 mr-1" />
+                                    Reject
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700" data-testid={`badge-pending-${u.id}`}>
+                                    Pending
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
+                                    onClick={() => toggleApproval.mutate({ userId: u.id, approved: true })}
+                                    disabled={toggleApproval.isPending}
+                                    data-testid={`button-approve-${u.id}`}
+                                  >
+                                    <UserCheck className="h-3 w-3 mr-1" />
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                                    onClick={() => rejectUser.mutate(u.id)}
+                                    disabled={rejectUser.isPending}
+                                    data-testid={`button-reject-pending-${u.id}`}
+                                  >
+                                    <UserX className="h-3 w-3 mr-1" />
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Storage Operations */}
               {globalUsage && (() => {
                 const STORAGE_LIMIT = 10 * 1024 * 1024 * 1024;
                 const pct = Math.min((globalUsage.totalBytes / STORAGE_LIMIT) * 100, 100);
@@ -2282,7 +2408,7 @@ export default function SettingsPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Globe className="h-5 w-5 text-primary" />
-                          <CardTitle className="text-base">App-Wide Storage</CardTitle>
+                          <CardTitle className="text-base">Storage Operations</CardTitle>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1.5">
@@ -2691,131 +2817,6 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              {/* Manage Users */}
-              <Card data-testid="card-manage-users">
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-base">Manage Users</CardTitle>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs shrink-0"
-                      onClick={() => setConfirmClearRejectedOpen(true)}
-                      disabled={clearRejected.isPending}
-                      data-testid="button-clear-rejected"
-                    >
-                      {clearRejected.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                      Clear Block List
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Approve or reject users who have signed in. Only approved users can access the app.
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {adminUsersLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading users...
-                    </div>
-                  ) : adminUsers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No users registered yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {adminUsers.map((u: any) => {
-                        const isOwner = u.id === user?.id;
-                        return (
-                          <div
-                            key={u.id}
-                            className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card"
-                            data-testid={`row-user-${u.id}`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <Avatar className="h-8 w-8">
-                                {u.profileImageUrl ? (
-                                  <AvatarImage src={u.profileImageUrl} alt={u.firstName || u.id} />
-                                ) : null}
-                                <AvatarFallback className="text-xs">
-                                  {(u.firstName || u.id).charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium truncate" data-testid={`text-username-${u.id}`}>
-                                    {u.firstName || u.id}{u.lastName ? ` ${u.lastName}` : ""}
-                                  </span>
-                                  {isOwner && (
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Owner</Badge>
-                                  )}
-                                </div>
-                                {u.email && (
-                                  <span className="text-xs text-muted-foreground truncate block">{u.email}</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {u.isTester ? (
-                                <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-700" data-testid={`badge-tester-${u.id}`}>
-                                  Tester
-                                </Badge>
-                              ) : isOwner ? (
-                                <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
-                              ) : u.approved ? (
-                                <>
-                                  <Badge className="bg-green-600 text-white text-xs" data-testid={`badge-approved-${u.id}`}>
-                                    Approved
-                                  </Badge>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                                    onClick={() => rejectUser.mutate(u.id)}
-                                    disabled={rejectUser.isPending}
-                                    data-testid={`button-reject-${u.id}`}
-                                  >
-                                    <UserX className="h-3 w-3 mr-1" />
-                                    Reject
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700" data-testid={`badge-pending-${u.id}`}>
-                                    Pending
-                                  </Badge>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
-                                    onClick={() => toggleApproval.mutate({ userId: u.id, approved: true })}
-                                    disabled={toggleApproval.isPending}
-                                    data-testid={`button-approve-${u.id}`}
-                                  >
-                                    <UserCheck className="h-3 w-3 mr-1" />
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                                    onClick={() => rejectUser.mutate(u.id)}
-                                    disabled={rejectUser.isPending}
-                                    data-testid={`button-reject-pending-${u.id}`}
-                                  >
-                                    <UserX className="h-3 w-3 mr-1" />
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </TabsContent>
           )}
         </Tabs>
