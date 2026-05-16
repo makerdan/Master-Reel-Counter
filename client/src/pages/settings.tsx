@@ -263,6 +263,12 @@ export default function SettingsPage() {
       message: string;
       stack?: string;
     }>;
+    pinRetryStats: {
+      commitRetries: number;
+      draftRetries: number;
+      total: number;
+      since: string;
+    };
   }>({
     queryKey: ["/api/admin/crashes"],
     queryFn: async () => {
@@ -2317,9 +2323,33 @@ export default function SettingsPage() {
                 </div>
               ) : !crashData ? (
                 <p className="text-sm text-muted-foreground">Unable to load crash history.</p>
-              ) : crashData.crashes.length === 0 ? (
-                <p className="text-sm text-muted-foreground" data-testid="text-no-crashes">No crashes recorded.</p>
               ) : (
+                <div className="space-y-4">
+                  {crashData.pinRetryStats && (
+                    <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5" data-testid="card-pin-retry-stats">
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Pin Creation Retries (since restart)</p>
+                      <div className="flex flex-wrap gap-4">
+                        <div className="flex flex-col">
+                          <span className="font-mono text-lg font-bold leading-tight" data-testid="stat-pin-retries-total">{crashData.pinRetryStats.total}</span>
+                          <span className="text-[10px] text-muted-foreground">total</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-mono text-lg font-bold leading-tight" data-testid="stat-pin-retries-commit">{crashData.pinRetryStats.commitRetries}</span>
+                          <span className="text-[10px] text-muted-foreground">commit-path</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-mono text-lg font-bold leading-tight" data-testid="stat-pin-retries-draft">{crashData.pinRetryStats.draftRetries}</span>
+                          <span className="text-[10px] text-muted-foreground">draft-path</span>
+                        </div>
+                        <div className="flex flex-col justify-end ml-auto">
+                          <span className="text-[10px] text-muted-foreground text-right">since {new Date(crashData.pinRetryStats.since).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {crashData.crashes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-crashes">No crashes recorded.</p>
+                  ) : (
                 <div className="space-y-2" data-testid="list-crashes">
                   {[...crashData.crashes].reverse().map((crash, i) => (
                     <Collapsible key={i} data-testid={`crash-record-${i}`}>
@@ -2362,6 +2392,8 @@ export default function SettingsPage() {
                       </div>
                     </Collapsible>
                   ))}
+                </div>
+                  )}
                 </div>
               )}
             </CardContent>

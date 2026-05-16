@@ -3,7 +3,7 @@ import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
-import { storage } from "./storage";
+import { storage, pinRetryStats } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/routes";
 import { authStorage } from "./replit_integrations/auth/storage";
@@ -6520,6 +6520,12 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     res.json({
       count: history.length,
       crashes: history,
+      pinRetryStats: {
+        commitRetries: pinRetryStats.commitRetries,
+        draftRetries: pinRetryStats.draftRetries,
+        total: pinRetryStats.commitRetries + pinRetryStats.draftRetries,
+        since: pinRetryStats.since,
+      },
     });
   });
 

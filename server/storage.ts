@@ -624,6 +624,7 @@ export class DatabaseStorage implements IStorage {
       for (let attempt = 0; attempt <= 3; attempt++) {
         if (attempt > 0) {
           console.warn(`atomicCreatePin: commit-path retry ${attempt}/3 after conflict+delete race [photoId=${pin.photoId} label=${pin.label}]`);
+          pinRetryStats.commitRetries++;
           await retryDelay(attempt);
         }
         const [promoted] = await db.insert(pins).values(pin)
@@ -663,6 +664,7 @@ export class DatabaseStorage implements IStorage {
     for (let attempt = 0; attempt <= 3; attempt++) {
       if (attempt > 0) {
         console.warn(`atomicCreatePin: draft-path retry ${attempt}/3 after conflict+delete race [photoId=${pin.photoId} label=${pin.label}]`);
+        pinRetryStats.draftRetries++;
         await retryDelay(attempt);
       }
       const [inserted] = await db.insert(pins)
@@ -2802,3 +2804,19 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+// In-process counter for atomicCreatePin retry events.
+// Incremented whenever a conflict+delete race forces a retry in either the
+// commit-path or the draft-path of atomicCreatePin. Persists for the lifetime
+// of the server process; reset only on restart or via resetPinRetryStats().
+export const pinRetryStats = {
+  commitRetries: 0,
+  draftRetries: 0,
+  since: new Date().toISOString(),
+};
+
+export function resetPinRetryStats(): void {
+  pinRetryStats.commitRetries = 0;
+  pinRetryStats.draftRetries = 0;
+  pinRetryStats.since = new Date().toISOString();
+}
