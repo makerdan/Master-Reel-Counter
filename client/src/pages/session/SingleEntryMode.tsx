@@ -122,7 +122,13 @@ export default function SingleEntryMode({
   const [corruptedFields, setCorruptedFields] = useState<Set<string>>(() =>
     editingEntry ? getCorruptedFields(editingEntry) : new Set()
   );
+  // Frozen snapshot of originally-corrupted fields — never mutated after init.
+  // Used at submit time to detect which fields were corrupted AND are still empty.
+  const originalCorruptedRef = useRef<Set<string>>(
+    editingEntry ? getCorruptedFields(editingEntry) : new Set()
+  );
   const [showUnreadableConfirm, setShowUnreadableConfirm] = useState(false);
+  const [stillEmptyAtSubmit, setStillEmptyAtSubmit] = useState<string[]>([]);
   const formDirtyRef = useRef(false);
 
   const { data: linkedPin } = useQuery<Pin>({
@@ -470,11 +476,18 @@ export default function SingleEntryMode({
       toast({ title: "Missing required fields", description: "Aisle and Section are required", variant: "destructive" });
       return;
     }
-    // Warn if any originally-corrupted fields are still empty (user never re-entered them).
-    // corruptedFields retains only fields the user has not touched since opening the editor.
-    if (editingEntry && corruptedFields.size > 0) {
-      setShowUnreadableConfirm(true);
-      return;
+    // Warn if any originally-corrupted fields are still empty.
+    // Check actual form values so a field that was typed then cleared is also caught.
+    if (editingEntry && originalCorruptedRef.current.size > 0) {
+      const formValues = form as Record<string, unknown>;
+      const stillEmpty = Array.from(originalCorruptedRef.current).filter(
+        f => !String(formValues[f] ?? "").trim()
+      );
+      if (stillEmpty.length > 0) {
+        setStillEmptyAtSubmit(stillEmpty);
+        setShowUnreadableConfirm(true);
+        return;
+      }
     }
     saveEntry.mutate();
   };
@@ -870,7 +883,7 @@ export default function SingleEntryMode({
             <div className="space-y-2">
               <p>The following fields were previously encrypted but could not be decrypted, and have not been re-entered:</p>
               <p className="font-medium text-foreground">
-                {Array.from(corruptedFields).map(f => FIELD_LABELS[f] ?? f).join(", ")}
+                {stillEmptyAtSubmit.map(f => FIELD_LABELS[f] ?? f).join(", ")}
               </p>
               <p>Saving now will store these fields as empty. You can cancel and fill them in first, or save anyway.</p>
             </div>
