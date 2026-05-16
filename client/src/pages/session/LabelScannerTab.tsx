@@ -689,11 +689,13 @@ export default function LabelScannerTab({
     if (!effectivePins.length) {
       setCards([]);
       setPhase("preview");
-      // All pins have been removed — wipe all three persisted scanner blobs so
-      // a fresh session starts with no stale results, zoom levels, or selections.
+      // All pins have been removed — wipe all four persisted scanner blobs so
+      // a fresh session starts with no stale results, zoom levels, selections,
+      // or batch-mode flag.
       try { localStorage.removeItem(scannerResultsKey(sessionId)); } catch {}
       try { localStorage.removeItem(scannerZoomKey(sessionId)); } catch {}
       try { localStorage.removeItem(scannerSelectKey(sessionId)); } catch {}
+      try { sessionStorage.removeItem(scannerBatchKey(sessionId)); } catch {}
       return;
     }
 
@@ -744,10 +746,6 @@ export default function LabelScannerTab({
       try {
         localStorage.setItem(scannerSelectKey(sessionId), JSON.stringify(prunedSelections));
       } catch {}
-    }
-
-    if (effectivePinIds.size === 0 && sessionStorage.getItem(scannerBatchKey(sessionId)) !== null) {
-      try { sessionStorage.removeItem(scannerBatchKey(sessionId)); } catch {}
     }
 
     let builtHasResults = false;
