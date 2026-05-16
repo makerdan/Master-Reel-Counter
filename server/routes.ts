@@ -37,12 +37,19 @@ const pdfJobs = new Map<string, {
   buffer?: Buffer;
   filename?: string;
   createdAt: number;
+  completedAt?: number;
   userId: string;
   sessionId: number;
 }>();
 setInterval(() => {
-  const cutoff = Date.now() - 15 * 60 * 1000;
-  for (const [k, v] of pdfJobs) if (v.createdAt < cutoff) pdfJobs.delete(k);
+  const now = Date.now();
+  const staleCutoff = now - 15 * 60 * 1000;      // 15 min for in-progress jobs
+  const completedCutoff = now - 2 * 60 * 1000;   // 2 min for completed-but-undownloaded
+  for (const [k, v] of pdfJobs) {
+    if (v.completedAt !== undefined ? v.completedAt < completedCutoff : v.createdAt < staleCutoff) {
+      pdfJobs.delete(k);
+    }
+  }
 }, 5 * 60 * 1000);
 
 function formatPinLabel(label: string): string {
@@ -4664,6 +4671,7 @@ export async function registerRoutes(
         job.buffer = pdfBuffer;
         job.filename = filename;
         job.complete = true;
+        job.completedAt = Date.now();
       } else {
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -4675,6 +4683,7 @@ export async function registerRoutes(
       if (job) {
         job.error = error instanceof Error ? error.message : "Failed to generate PDF";
         job.complete = true;
+        job.completedAt = Date.now();
       } else if (!res.headersSent) {
         res.status(500).json({ message: "Failed to generate report" });
       }
