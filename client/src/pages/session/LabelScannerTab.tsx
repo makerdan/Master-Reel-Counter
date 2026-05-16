@@ -748,6 +748,32 @@ export default function LabelScannerTab({
       } catch {}
     }
 
+    // Prune stale batch-state entries (same guard pattern as zoom/selection).
+    // The value is currently a boolean flag but may evolve to a per-pin object;
+    // only proceed — and only write back — if the stored value is already an
+    // object, so the existing boolean readers are never overwritten with a
+    // different format.
+    try {
+      const batchRaw = sessionStorage.getItem(scannerBatchKey(sessionId));
+      if (batchRaw !== null) {
+        const batchParsed = JSON.parse(batchRaw);
+        if (batchParsed && typeof batchParsed === "object" && !Array.isArray(batchParsed)) {
+          const prunedBatch: Record<string, unknown> = {};
+          let batchChanged = false;
+          for (const [k, v] of Object.entries(batchParsed as Record<string, unknown>)) {
+            if (effectivePinIds.has(Number(k))) {
+              prunedBatch[k] = v;
+            } else {
+              batchChanged = true;
+            }
+          }
+          if (batchChanged) {
+            sessionStorage.setItem(scannerBatchKey(sessionId), JSON.stringify(prunedBatch));
+          }
+        }
+      }
+    } catch {}
+
     let builtHasResults = false;
     setCards((prev) => {
       const existing = new Map(prev.map((c) => [c.pin.id, c]));
