@@ -6636,6 +6636,51 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     }
   });
 
+  // Admin endpoint: one-click repair for flagged integrity issues.
+  // Runs a targeted UPDATE for the given checkId and returns { fixed } row count.
+  app.post("/api/admin/integrity-fix/:checkId", isAuthenticated, async (req: any, res) => {
+    const replOwner = process.env.REPL_OWNER;
+    const username = req.user?.claims?.username;
+    if (!replOwner || username !== replOwner) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const { checkId } = req.params;
+    try {
+      let result;
+      if (checkId === "trashed_from_folder_mismatch") {
+        result = await db.execute(
+          sql`UPDATE counting_sessions
+              SET trashed_from_folder_id = NULL
+              WHERE trashed_from_folder_id IS NOT NULL
+                AND folder_id IS NOT NULL
+                AND folder_id != trashed_from_folder_id`
+        );
+      } else if (checkId === "stale_trashed_from_folder") {
+        result = await db.execute(
+          sql`UPDATE counting_sessions
+              SET trashed_from_folder_id = NULL
+              WHERE trashed_from_folder_id IS NOT NULL
+                AND deleted_at IS NULL`
+        );
+      } else if (checkId === "session_in_deleted_folder") {
+        result = await db.execute(
+          sql`UPDATE counting_sessions
+              SET folder_id = NULL
+              WHERE folder_id IN (SELECT id FROM folders WHERE deleted_at IS NOT NULL)
+                AND deleted_at IS NULL`
+        );
+      } else {
+        return res.status(400).json({ message: "Unknown checkId" });
+      }
+      const fixed = result.rowCount ?? 0;
+      console.log(`[integrity-fix] ${checkId}: fixed ${fixed} row(s)`);
+      res.json({ fixed });
+    } catch (err) {
+      console.error("[integrity-fix]", err);
+      res.status(500).json({ message: "Fix failed" });
+    }
+  });
+
   // Admin endpoint: current PDF export job stats (owner-only).
   // Returns active/completed job counts, total buffer memory, and oldest job age
   // so operators can spot memory build-up without needing server logs.

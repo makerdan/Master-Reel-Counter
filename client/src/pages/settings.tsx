@@ -7,7 +7,7 @@ import {
   Download, Camera, Keyboard, Sun, Moon, Monitor, Target,
   ChevronDown, FileText, Globe, Upload, Trash2,
   HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
-  Users, UserCheck, UserX, Activity, ShieldCheck,
+  Users, UserCheck, UserX, Activity, ShieldCheck, Wrench,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -249,6 +249,20 @@ export default function SettingsPage() {
     },
     enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
     retry: false,
+  });
+
+  const fixIntegrity = useMutation({
+    mutationFn: async (checkId: string) => {
+      const res = await apiRequest("POST", `/api/admin/integrity-fix/${checkId}`);
+      return res.json() as Promise<{ fixed: number }>;
+    },
+    onSuccess: (data, checkId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/integrity-checks"] });
+      toast({ title: "Fix applied", description: `Repaired ${data.fixed} row${data.fixed !== 1 ? "s" : ""} for ${checkId}.` });
+    },
+    onError: () => {
+      toast({ title: "Fix failed", variant: "destructive" });
+    },
   });
 
   const { data: integrityData, isLoading: integrityLoading, refetch: refetchIntegrity } = useQuery<{
@@ -2591,12 +2605,30 @@ export default function SettingsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-xs font-medium leading-snug">{check.label}</p>
-                            <span
-                              className={`shrink-0 font-mono text-xs font-semibold ${healthy ? "text-muted-foreground" : "text-destructive"}`}
-                              data-testid={`integrity-count-${check.id}`}
-                            >
-                              {check.count}
-                            </span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {!healthy && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 text-[10px] px-2 text-destructive border-destructive/40 hover:bg-destructive/10"
+                                  onClick={() => fixIntegrity.mutate(check.id)}
+                                  disabled={fixIntegrity.isPending && fixIntegrity.variables === check.id}
+                                  data-testid={`button-fix-${check.id}`}
+                                >
+                                  {fixIntegrity.isPending && fixIntegrity.variables === check.id
+                                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                                    : <Wrench className="h-3 w-3 mr-1" />
+                                  }
+                                  Fix
+                                </Button>
+                              )}
+                              <span
+                                className={`font-mono text-xs font-semibold ${healthy ? "text-muted-foreground" : "text-destructive"}`}
+                                data-testid={`integrity-count-${check.id}`}
+                              >
+                                {check.count}
+                              </span>
+                            </div>
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{check.description}</p>
                         </div>
