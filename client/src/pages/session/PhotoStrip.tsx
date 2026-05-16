@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { photoNotesDismissedKey } from "@/lib/storageKeys";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Pencil, ExternalLink, Loader2, Link2, X, Copy, Trash2, LayoutGrid, ZoomIn, ChevronLeft, ChevronRight, MoreVertical, Camera, ImagePlus, ImageOff } from "lucide-react";
 import {
@@ -126,7 +127,7 @@ function PhotoCard({
   const [notes, setNotes] = useState(photo.notes || "");
   const [notesOpen, setNotesOpen] = useState(() => {
     if (!photo.notes?.trim()) return false;
-    return sessionStorage.getItem(`notes-closed-${photo.id}`) !== "1";
+    return sessionStorage.getItem(photoNotesDismissedKey(photo.id)) !== "1";
   });
   const [parentId, setParentId] = useState<number | null>(photo.parentPhotoId ?? null);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
@@ -709,8 +710,8 @@ function PhotoCard({
               className="ml-auto"
               onClick={() => setNotesOpen((o) => {
                 const next = !o;
-                if (!next) sessionStorage.setItem(`notes-closed-${photo.id}`, "1");
-                else sessionStorage.removeItem(`notes-closed-${photo.id}`);
+                if (!next) sessionStorage.setItem(photoNotesDismissedKey(photo.id), "1");
+                else sessionStorage.removeItem(photoNotesDismissedKey(photo.id));
                 return next;
               })}
               title={hasNotes ? "View/edit notes" : "Add notes"}
@@ -741,8 +742,8 @@ function PhotoCard({
                 <DropdownMenuItem
                   onClick={() => setNotesOpen((o) => {
                     const next = !o;
-                    if (!next) sessionStorage.setItem(`notes-closed-${photo.id}`, "1");
-                    else sessionStorage.removeItem(`notes-closed-${photo.id}`);
+                    if (!next) sessionStorage.setItem(photoNotesDismissedKey(photo.id), "1");
+                    else sessionStorage.removeItem(photoNotesDismissedKey(photo.id));
                     return next;
                   })}
                   data-testid={`menu-strip-notes-${photo.id}`}

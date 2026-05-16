@@ -27,9 +27,6 @@ const SRC = join(ROOT, "client", "src");
 
 const EXCLUDE_FILES = new Set([
   "client/src/lib/storageKeys.ts",
-  "client/src/lib/theme-provider.tsx",
-  "client/src/App.tsx",
-  "client/src/pages/session/PhotoStrip.tsx",
 ]);
 
 /**
@@ -51,7 +48,7 @@ const RAW_LITERAL_RE =
  * Arrow-function returns are excluded because key factory definitions live
  * in storageKeys.ts (which is already in EXCLUDE_FILES).
  */
-const RAW_KEY_FACTORY_RE = /\b\w*[kK]ey\w*\s*=\s*`[a-z][a-z]+-[a-z][a-z]+-\${/;
+const RAW_KEY_FACTORY_RE = /\b\w*[kK]ey\w*\s*=\s*`(?:[a-z][a-z]*-){2,}\${/;
 const ARROW_RETURN_RE = /=>\s*`/;
 
 /**

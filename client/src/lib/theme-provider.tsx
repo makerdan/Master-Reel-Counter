@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext, useCallback } from "react";
+import { THEME_MODE_KEY, THEME_LEGACY_KEY } from "@/lib/storageKeys";
 
 type Theme = "light" | "dark";
 type ThemeMode = "light" | "dark" | "system";
@@ -25,11 +26,11 @@ const ThemeContext = createContext<{
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("themeMode") as ThemeMode;
+      const stored = localStorage.getItem(THEME_MODE_KEY) as ThemeMode;
       if (stored) return stored;
-      const legacy = localStorage.getItem("theme") as Theme;
+      const legacy = localStorage.getItem(THEME_LEGACY_KEY) as Theme;
       if (legacy) {
-        localStorage.setItem("themeMode", legacy);
+        localStorage.setItem(THEME_MODE_KEY, legacy);
         return legacy;
       }
       return "light";
@@ -58,12 +59,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       root.classList.remove("dark");
     }
-    localStorage.setItem("theme", theme);
+    localStorage.setItem(THEME_LEGACY_KEY, theme);
   }, [theme]);
 
   const setThemeMode = useCallback((mode: ThemeMode) => {
     setThemeModeState(mode);
-    localStorage.setItem("themeMode", mode);
+    localStorage.setItem(THEME_MODE_KEY, mode);
   }, []);
 
   const toggleTheme = useCallback(() => {

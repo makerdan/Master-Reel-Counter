@@ -1,4 +1,5 @@
 import { useState, useMemo, Fragment, useEffect, useRef } from "react";
+import { incompleteBannerDismissedKey } from "@/lib/storageKeys";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, Loader2, Search, X, ShieldAlert, Camera } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -281,7 +282,7 @@ function EntryTable({
 
   const incompleteCount = useMemo(() => entries.filter(e => !e.reelTag || !e.footage).length, [entries]);
 
-  const bannerDismissKey = `incomplete-banner-dismissed-${sessionId}`;
+  const bannerDismissKey = incompleteBannerDismissedKey(sessionId);
   const [dismissedAt, setDismissedAt] = useState<number>(() => {
     const stored = sessionStorage.getItem(bannerDismissKey);
     const parsed = stored ? parseInt(stored, 10) : 0;

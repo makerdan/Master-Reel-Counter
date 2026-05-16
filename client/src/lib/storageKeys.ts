@@ -37,7 +37,11 @@
  * rr_cohort_{sid}                   SS     session  clearSessionKeys / clearSessionResetKeys / ReviewTab unmount
  * rr_queue_{sid}_{uid}              SS     session  clearSessionKeys / ReviewTab unmount
  * rr_pos_{sid}_{uid}                SS     session  clearSessionKeys / ReviewTab unmount
+ * incomplete-banner-dismissed-{sid} SS     session  clearSessionKeys / user dismiss action
+ * notes-closed-{photoId}            SS     photo    user action (toggle notes open)
  * dash:*                            SS     global   resets on every page load (no risk)
+ * themeMode                         LS     global   user preference (never auto-cleared)
+ * theme                             LS     global   legacy theme key; one-time migration to themeMode
  * disregarded-dups-{sid}            LS     session  clearSessionKeys; legacy key — cleared once migrated to DB
  * ────────────────────────────────────────────────────────────────────────────
  *
@@ -101,6 +105,13 @@ export const OFFLINE_PLACEHOLDER_SEED_KEY = "offlinePlaceholderSeed";
 /** Whether the Session Progress card on the session page is collapsed. */
 export const SESSION_PROGRESS_COLLAPSED_KEY = "session-progress-collapsed";
 
+/**
+ * Active theme — persisted so the CSS class is restored on page load.
+ * THEME_LEGACY_KEY was used before themeMode; kept for one-time migration.
+ */
+export const THEME_LEGACY_KEY = "theme";
+export const THEME_MODE_KEY = "themeMode";
+
 // ─── Session-scoped localStorage key factories ────────────────────────────────
 
 /** Currently active tab within the session page. */
@@ -141,6 +152,17 @@ export const disregardedDupsKey = (sid: number) => `disregarded-dups-${sid}`;
 export const scannerBatchKey = (sid: number) => `scanner-batch-${sid}`;
 
 /**
+ * Timestamp of the most recent incomplete-entry banner dismissal.
+ * Managed by EntryTable.tsx; cleared as part of session lifecycle.
+ */
+export const incompleteBannerDismissedKey = (sid: number) => `incomplete-banner-dismissed-${sid}`;
+
+// ─── Photo-scoped sessionStorage key factories ────────────────────────────────
+
+/** Whether the photo notes panel was closed by the user (value "1" = closed). */
+export const photoNotesDismissedKey = (photoId: number) => `notes-closed-${photoId}`;
+
+/**
  * The following keys are managed entirely within ReviewTab.tsx and are cleared
  * by that component on unmount. Exported here for documentation and for use
  * in clearSessionKeys if ever needed.
@@ -170,6 +192,7 @@ export function clearSessionKeys(sid: number): void {
   clearSessionKey(scannerBatchKey(sid));
   clearSessionKey(reviewCohortKey(sid));
   clearKey(disregardedDupsKey(sid));
+  clearSessionKey(incompleteBannerDismissedKey(sid));
   // rr_queue_{sid}_{uid} and rr_pos_{sid}_{uid} carry per-user suffixes;
   // sweep sessionStorage for all keys matching either prefix.
   try {

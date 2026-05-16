@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { THEME_MODE_KEY } from "@/lib/storageKeys";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -50,7 +51,7 @@ function ThemeSyncer() {
     enabled: !!user,
   });
   useEffect(() => {
-    if (settings?.defaultTheme && !localStorage.getItem("themeMode")) {
+    if (settings?.defaultTheme && !localStorage.getItem(THEME_MODE_KEY)) {
       setThemeMode(settings.defaultTheme as "light" | "dark" | "system");
     }
   }, [settings?.defaultTheme, setThemeMode]);
