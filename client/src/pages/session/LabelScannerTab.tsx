@@ -746,27 +746,8 @@ export default function LabelScannerTab({
       } catch {}
     }
 
-    const savedBatchOuter: Record<string, unknown> = (() => {
-      try {
-        const raw = sessionStorage.getItem(scannerBatchKey(sessionId));
-        if (!raw) return {};
-        const parsed = JSON.parse(raw);
-        return (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed as Record<string, unknown> : {};
-      } catch { return {}; }
-    })();
-    const prunedBatch: Record<string, unknown> = {};
-    let batchChanged = false;
-    for (const [k, v] of Object.entries(savedBatchOuter)) {
-      if (effectivePinIds.has(Number(k))) {
-        prunedBatch[k] = v;
-      } else {
-        batchChanged = true;
-      }
-    }
-    if (batchChanged) {
-      try {
-        sessionStorage.setItem(scannerBatchKey(sessionId), JSON.stringify(prunedBatch));
-      } catch {}
+    if (effectivePinIds.size === 0 && sessionStorage.getItem(scannerBatchKey(sessionId)) !== null) {
+      try { sessionStorage.removeItem(scannerBatchKey(sessionId)); } catch {}
     }
 
     let builtHasResults = false;
