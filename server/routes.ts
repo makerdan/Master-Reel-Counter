@@ -6563,6 +6563,64 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     res.json({ cleared: true });
   });
 
+  // Admin endpoint: data-consistency integrity checks. Returns one row per check
+  // with a count of anomalous rows (0 = healthy). Useful for catching regressions
+  // from folder/trash workflow bugs (e.g. tasks #297 and #336).
+  app.get("/api/admin/integrity-checks", isAuthenticated, async (req: any, res) => {
+    const replOwner = process.env.REPL_OWNER;
+    const username = req.user?.claims?.username;
+    if (!replOwner || username !== replOwner) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const [mismatch] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM counting_sessions
+            WHERE trashed_from_folder_id IS NOT NULL
+              AND folder_id IS NOT NULL
+              AND folder_id != trashed_from_folder_id`
+      )).rows as [{ count: number }];
+
+      const [stale] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM counting_sessions
+            WHERE trashed_from_folder_id IS NOT NULL
+              AND deleted_at IS NULL`
+      )).rows as [{ count: number }];
+
+      const [orphanedFolder] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM counting_sessions cs
+            JOIN folders f ON cs.folder_id = f.id
+            WHERE f.deleted_at IS NOT NULL
+              AND cs.deleted_at IS NULL`
+      )).rows as [{ count: number }];
+
+      res.json({
+        checks: [
+          {
+            id: "trashed_from_folder_mismatch",
+            label: "trashedFromFolderId / folderId mismatch",
+            description: "Sessions where both folder_id and trashed_from_folder_id are set but differ",
+            count: Number(mismatch.count),
+          },
+          {
+            id: "stale_trashed_from_folder",
+            label: "Stale trashedFromFolderId on active sessions",
+            description: "Sessions with trashed_from_folder_id set but not currently trashed (deleted_at IS NULL)",
+            count: Number(stale.count),
+          },
+          {
+            id: "session_in_deleted_folder",
+            label: "Active sessions inside a trashed folder",
+            description: "Non-trashed sessions whose folder_id points to a soft-deleted folder",
+            count: Number(orphanedFolder.count),
+          },
+        ],
+      });
+    } catch (err) {
+      console.error("[integrity-checks]", err);
+      res.status(500).json({ message: "Internal error" });
+    }
+  });
+
   // ── Dev-only test seeding endpoint ──────────────────────────────────────────
   // Sets (or overwrites) the tester password for the first non-tester owner so
   // that the Playwright global-setup can authenticate without a real OAuth flow.

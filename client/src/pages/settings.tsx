@@ -7,7 +7,7 @@ import {
   Download, Camera, Keyboard, Sun, Moon, Monitor, Target,
   ChevronDown, FileText, Globe, Upload, Trash2,
   HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
-  Users, UserCheck, UserX, Activity,
+  Users, UserCheck, UserX, Activity, ShieldCheck,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -237,6 +237,20 @@ export default function SettingsPage() {
       if (!res.ok) return null;
       return res.json();
     },
+    retry: false,
+  });
+
+  const { data: integrityData, isLoading: integrityLoading, refetch: refetchIntegrity } = useQuery<{
+    checks: Array<{ id: string; label: string; description: string; count: number }>;
+  }>({
+    queryKey: ["/api/admin/integrity-checks"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/integrity-checks", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    staleTime: 60_000,
     retry: false,
   });
 
@@ -2348,6 +2362,70 @@ export default function SettingsPage() {
                       </div>
                     </Collapsible>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {!user?.isTester && adminUsers && Array.isArray(adminUsers) && (
+          <Card data-testid="card-integrity-checks">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-base">Database Integrity Checks</CardTitle>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => refetchIntegrity()}
+                  data-testid="button-refresh-integrity"
+                  aria-label="Refresh integrity checks"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {integrityLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Running checks...
+                </div>
+              ) : !integrityData ? (
+                <p className="text-sm text-muted-foreground">Unable to load integrity checks.</p>
+              ) : (
+                <div className="space-y-2" data-testid="list-integrity-checks">
+                  {integrityData.checks.map((check) => {
+                    const healthy = check.count === 0;
+                    return (
+                      <div
+                        key={check.id}
+                        className={`flex items-start gap-3 rounded-md border px-3 py-2.5 ${healthy ? "border-border bg-card" : "border-destructive/40 bg-destructive/5"}`}
+                        data-testid={`integrity-check-${check.id}`}
+                      >
+                        <div className="mt-0.5 shrink-0">
+                          {healthy
+                            ? <Check className="h-4 w-4 text-green-500" />
+                            : <AlertTriangle className="h-4 w-4 text-destructive" />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-medium leading-snug">{check.label}</p>
+                            <span
+                              className={`shrink-0 font-mono text-xs font-semibold ${healthy ? "text-muted-foreground" : "text-destructive"}`}
+                              data-testid={`integrity-count-${check.id}`}
+                            >
+                              {check.count}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{check.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
