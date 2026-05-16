@@ -5,7 +5,7 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { useAuth } from "@/hooks/use-auth";
 import { undoStackKey, redoStackKey, UNDO_STACK_KEY_PREFIX, REDO_STACK_KEY_PREFIX } from "@/lib/storageKeys";
 
-export type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
+export type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "flag-pin-group" | "unflag-pin-group" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
 
 export interface UndoAction {
   type: ActionType;
@@ -118,6 +118,11 @@ function actionLabel(action: UndoAction): string {
     case "flag-pin":
     case "unflag-pin":
       return `Pin #${action.entityId}`;
+    case "flag-pin-group":
+    case "unflag-pin-group": {
+      const count: number = Array.isArray(action.data?.pins) ? action.data.pins.length : 0;
+      return count > 0 ? `${count} flagged pin${count === 1 ? "" : "s"}` : "Flagged pins";
+    }
     case "update-session":
     case "lock-session": {
       const name: string = d?.name ?? p?.name ?? "";
@@ -259,6 +264,26 @@ export function useUndoRedo(sessionId: number) {
         const res = await apiRequest("PATCH", `/api/pins/${action.entityId}/flag`, { flagged: true, flagReason: action.previousData?.flagReason ?? null, serverUpdatedAt: action.serverUpdatedAt });
         const updated = await res.json().catch(() => null);
         return { type: "flag-pin", sessionId: action.sessionId, entityId: action.entityId, data: { flagged: true, flagReason: action.previousData?.flagReason ?? null }, previousData: { flagged: false, flagReason: null }, serverUpdatedAt: updated?.updatedAt ?? undefined };
+      }
+      case "unflag-pin-group": {
+        const pins: { pinId: number; flagReason: string | null; serverUpdatedAt: string | undefined }[] = action.data?.pins ?? [];
+        const reflagged: { pinId: number; flagReason: string | null; serverUpdatedAt: string | undefined }[] = [];
+        for (const pin of pins) {
+          const res = await apiRequest("PATCH", `/api/pins/${pin.pinId}/flag`, { flagged: true, flagReason: pin.flagReason, serverUpdatedAt: pin.serverUpdatedAt });
+          const updated = await res.json().catch(() => null);
+          reflagged.push({ pinId: pin.pinId, flagReason: pin.flagReason, serverUpdatedAt: updated?.updatedAt ? new Date(updated.updatedAt as string).toISOString() : undefined });
+        }
+        return { type: "flag-pin-group", sessionId: action.sessionId, entityId: 0, data: { pins: reflagged }, previousData: action.data };
+      }
+      case "flag-pin-group": {
+        const pins: { pinId: number; flagReason: string | null; serverUpdatedAt: string | undefined }[] = action.data?.pins ?? [];
+        const unflagged: { pinId: number; flagReason: string | null; serverUpdatedAt: string | undefined }[] = [];
+        for (const pin of pins) {
+          const res = await apiRequest("PATCH", `/api/pins/${pin.pinId}/flag`, { flagged: false, flagReason: null, serverUpdatedAt: pin.serverUpdatedAt });
+          const updated = await res.json().catch(() => null);
+          unflagged.push({ pinId: pin.pinId, flagReason: pin.flagReason, serverUpdatedAt: updated?.updatedAt ? new Date(updated.updatedAt as string).toISOString() : undefined });
+        }
+        return { type: "unflag-pin-group", sessionId: action.sessionId, entityId: 0, data: { pins: unflagged }, previousData: action.data };
       }
       case "delete-photo": {
         const res = await apiRequest("POST", `/api/sessions/${action.sessionId}/photos/restore`, { ...action.previousData, oldPhotoId: action.entityId });

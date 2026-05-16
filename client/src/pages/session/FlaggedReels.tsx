@@ -452,8 +452,13 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
       return results;
     },
     onSuccess: (results) => {
-      for (const { pinId, flagReason, unflagToken } of results) {
-        pushUndo?.({ type: "unflag-pin", sessionId, entityId: pinId, data: { flagged: false, flagReason: null }, previousData: { flagged: true, flagReason }, serverUpdatedAt: unflagToken });
+      if (results.length > 0) {
+        pushUndo?.({
+          type: "unflag-pin-group",
+          sessionId,
+          entityId: 0,
+          data: { pins: results.map(r => ({ pinId: r.pinId, flagReason: r.flagReason, serverUpdatedAt: r.unflagToken })) },
+        });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "flagged-pins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "pins"] });
