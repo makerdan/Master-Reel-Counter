@@ -157,6 +157,19 @@ export function clearSessionKeys(sid: number): void {
   clearKey(undoStackKey(sid));
   clearKey(redoStackKey(sid));
   clearSessionKey(scannerBatchKey(sid));
+  clearSessionKey(reviewCohortKey(sid));
+  // rr_queue_{sid}_{uid} and rr_pos_{sid}_{uid} carry per-user suffixes;
+  // sweep sessionStorage for all keys matching either prefix.
+  try {
+    const qPrefix = `rr_queue_${sid}_`;
+    const pPrefix = `rr_pos_${sid}_`;
+    const toRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && (k.startsWith(qPrefix) || k.startsWith(pPrefix))) toRemove.push(k);
+    }
+    toRemove.forEach(k => sessionStorage.removeItem(k));
+  } catch {}
 }
 
 /**

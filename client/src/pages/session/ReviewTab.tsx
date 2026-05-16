@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { reviewCohortKey, reviewQueueKey, reviewPosKey } from "@/lib/storageKeys";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import type { Entry, Photo, Pin, ReviewResponse } from "@shared/schema";
@@ -303,9 +304,6 @@ const lateJoinerQueueCache = new Map<string, number[]>();
 // different sessions never bleeds. Data survives hard reloads (unlike the
 // module-level cache above) but is cleared when the user leaves the session
 // (component unmount cleanup) and on tab close.
-const cohortSKey = (sid: number) => `rr_cohort_${sid}`;
-const queueSKey = (sid: number, uid: string) => `rr_queue_${sid}_${uid}`;
-const posSKey = (sid: number, uid: string) => `rr_pos_${sid}_${uid}`;
 
 // ─── ReviewTab ────────────────────────────────────────────────────────────────
 
@@ -383,7 +381,7 @@ export default function ReviewTab({
   // the cohort is already known (server round-trip is still made to stay fresh).
   const [anchoredCohort, setAnchoredCohort] = useState<Array<{ userId: string; username: string }> | null>(() => {
     try {
-      const raw = sessionStorage.getItem(cohortSKey(sessionId));
+      const raw = sessionStorage.getItem(reviewCohortKey(sessionId));
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -406,7 +404,7 @@ export default function ReviewTab({
         const parsed = JSON.parse(serverReviewCohort);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setAnchoredCohort(parsed);
-          try { sessionStorage.setItem(cohortSKey(sessionId), JSON.stringify(parsed)); } catch {}
+          try { sessionStorage.setItem(reviewCohortKey(sessionId), JSON.stringify(parsed)); } catch {}
           cohortAnchorRef.current = { sid: sessionId, succeeded: true, attempts: 0 };
           return;
         }
@@ -425,7 +423,7 @@ export default function ReviewTab({
         if (Array.isArray(data.cohort) && data.cohort.length > 0) {
           cohortAnchorRef.current.succeeded = true;
           setAnchoredCohort(data.cohort);
-          try { sessionStorage.setItem(cohortSKey(sessionId), JSON.stringify(data.cohort)); } catch {}
+          try { sessionStorage.setItem(reviewCohortKey(sessionId), JSON.stringify(data.cohort)); } catch {}
           // Refresh the session record so the parent's serverReviewCohort prop
           // is populated on subsequent renders (avoids redundant round-trips).
           queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
@@ -467,7 +465,7 @@ export default function ReviewTab({
     setAnchoredCohort(prev => {
       if (prev !== null) return prev; // already have a cohort — leave it
       try {
-        const raw = sessionStorage.getItem(cohortSKey(sessionId));
+        const raw = sessionStorage.getItem(reviewCohortKey(sessionId));
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -484,9 +482,9 @@ export default function ReviewTab({
   // is preserved across reloads — which is exactly the behaviour we want.
   useEffect(() => {
     return () => {
-      sessionStorage.removeItem(cohortSKey(sessionId));
-      sessionStorage.removeItem(queueSKey(sessionId, currentUserId));
-      sessionStorage.removeItem(posSKey(sessionId, currentUserId));
+      sessionStorage.removeItem(reviewCohortKey(sessionId));
+      sessionStorage.removeItem(reviewQueueKey(sessionId, currentUserId));
+      sessionStorage.removeItem(reviewPosKey(sessionId, currentUserId));
     };
   }, [sessionId, currentUserId]);
 
@@ -518,7 +516,7 @@ export default function ReviewTab({
     // On hard reload the module cache is empty — check sessionStorage to avoid
     // re-classifying a known late joiner as a regular reviewer.
     try {
-      const raw = sessionStorage.getItem(queueSKey(sessionId, currentUserId));
+      const raw = sessionStorage.getItem(reviewQueueKey(sessionId, currentUserId));
       if (raw) {
         const ids = JSON.parse(raw) as number[];
         if (Array.isArray(ids) && ids.length > 0) {
@@ -588,7 +586,7 @@ export default function ReviewTab({
 
     const queueIds = queue.map(e => e.id);
     lateJoinerQueueCache.set(cacheKey, queueIds);
-    try { sessionStorage.setItem(queueSKey(sessionId, currentUserId), JSON.stringify(queueIds)); } catch {}
+    try { sessionStorage.setItem(reviewQueueKey(sessionId, currentUserId), JSON.stringify(queueIds)); } catch {}
     return queue;
   }, [sortedEntries, effectiveCohort, currentUserId, isLateJoiner, reviewResponses, sessionId]);
 
@@ -671,7 +669,7 @@ export default function ReviewTab({
   // Skipped until hasRestoredPosition is true (set by the restore effect below).
   useEffect(() => {
     if (!hasRestoredPosition.current) return;
-    try { sessionStorage.setItem(posSKey(sessionId, currentUserId), String(currentIndex)); } catch {}
+    try { sessionStorage.setItem(reviewPosKey(sessionId, currentUserId), String(currentIndex)); } catch {}
   }, [currentIndex, sessionId, currentUserId]);
   const hasAutoAdvanced = useRef(false);
   const scrubBarRef = useRef<HTMLDivElement>(null);
@@ -685,7 +683,7 @@ export default function ReviewTab({
     if (hasAutoAdvanced.current) return;
     if (orderedEntries.length === 0 || responsesLoading) return;
     try {
-      const raw = sessionStorage.getItem(posSKey(sessionId, currentUserId));
+      const raw = sessionStorage.getItem(reviewPosKey(sessionId, currentUserId));
       if (raw !== null) {
         const n = parseInt(raw, 10);
         if (!isNaN(n) && n >= 0 && n < displayEntries.length) {
