@@ -1,6 +1,7 @@
 import { useState, useMemo, Fragment, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Eye, Pencil, Trash2, ChevronDown, AlertTriangle, Loader2, Search, X, ShieldAlert, Camera } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const UNREADABLE_SENTINEL = "[unreadable]";
 const ENCRYPTED_ENTRY_FIELDS: ReadonlyArray<keyof Entry> = ["reelTag", "wireType", "gauge", "color", "manufacturer", "notes", "palletId", "position", "conductors"];
@@ -694,7 +695,19 @@ function EntryTable({
                               </Badge>
                             )}
                             {entry.manufacturer && !isUnreadableMfg && <span className="sm:hidden">-<HighlightText text={entry.manufacturer} query={debouncedQuery} /></span>}
-                            {entryHasUnreadable && <span className="ml-1 inline-flex items-center" title={`Unreadable field${unreadableFields.length === 1 ? "" : "s"}: ${unreadableFields.join(", ")}`} data-testid={`icon-unreadable-${entry.id}`}><ShieldAlert className="h-3 w-3 text-red-500" /></span>}
+                            {entryHasUnreadable && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="ml-1 inline-flex items-center cursor-help" aria-label={`Unreadable field${unreadableFields.length === 1 ? "" : "s"}: ${unreadableFields.join(", ")}`} data-testid={`icon-unreadable-${entry.id}`}>
+                                    <ShieldAlert className="h-3 w-3 text-red-500" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  <p className="font-medium">Unreadable field{unreadableFields.length === 1 ? "" : "s"}</p>
+                                  <p className="text-muted-foreground text-xs">{unreadableFields.join(", ")}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </td>
                           <td className="hidden sm:table-cell" style={{ textAlign: "center" }}>
                             {isUnreadableMfg ? (
