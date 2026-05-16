@@ -261,6 +261,8 @@ export default function SettingsPage() {
     retry: false,
   });
 
+  const [confirmClearCrashesOpen, setConfirmClearCrashesOpen] = useState(false);
+
   const clearCrashes = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("DELETE", "/api/admin/crashes");
@@ -2187,19 +2189,41 @@ export default function SettingsPage() {
                     <RefreshCw className="h-4 w-4" />
                   </Button>
                   {crashData && crashData.crashes.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs text-muted-foreground hover:text-destructive"
-                      onClick={() => clearCrashes.mutate()}
-                      disabled={clearCrashes.isPending}
-                      data-testid="button-clear-crashes"
-                    >
-                      {clearCrashes.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                      ) : null}
-                      Clear
-                    </Button>
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => setConfirmClearCrashesOpen(true)}
+                        disabled={clearCrashes.isPending}
+                        data-testid="button-clear-crashes"
+                      >
+                        {clearCrashes.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : null}
+                        Clear
+                      </Button>
+                      <AlertDialog open={confirmClearCrashesOpen} onOpenChange={setConfirmClearCrashesOpen}>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Clear crash history?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove {crashData.count} crash record{crashData.count !== 1 ? "s" : ""} from the in-memory buffer and the persisted log file. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel data-testid="button-cancel-clear-crashes">Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => clearCrashes.mutate()}
+                              data-testid="button-confirm-clear-crashes"
+                            >
+                              Clear {crashData.count} record{crashData.count !== 1 ? "s" : ""}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
                   )}
                   {crashData && (
                     <Badge variant="secondary" data-testid="badge-crash-count">
