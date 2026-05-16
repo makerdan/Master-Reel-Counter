@@ -6436,7 +6436,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     }
 
     const SWEEP_MAX_FILES = 500;
-    const minAgeDays = Math.max(1, parseInt(req.body?.minAgeDays ?? (req.query as any).minAgeDays) || 7);
+    const minAgeDays = Math.min(365, Math.max(1, parseInt(req.body?.minAgeDays ?? (req.query as any).minAgeDays) || 7));
     const cutoff = new Date(Date.now() - minAgeDays * 24 * 60 * 60 * 1000);
     const pageToken: string | undefined = req.body?.pageToken || undefined;
 
