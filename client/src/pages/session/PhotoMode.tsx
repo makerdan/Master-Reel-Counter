@@ -938,6 +938,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const handleContainerClick = (e: React.MouseEvent) => {
     if (isPanning || panMode) return;
     if (lastTouchPanRef.current) { lastTouchPanRef.current = false; return; }
+    if (viewingNearbyIdx !== null && viewingNearbyIdx !== currentPhotoIdx) return;
     if (!effectiveCanEdit && !colorPickMode) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -2086,7 +2087,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             <div
               ref={containerRef}
               className="photo-viewer-container w-full min-w-0"
-              style={{ cursor: panMode ? "grab" : colorPickMode ? "cell" : effectiveCanEdit ? "crosshair" : "not-allowed" }}
+              style={{ cursor: panMode ? "grab" : (viewingNearbyIdx !== null && viewingNearbyIdx !== currentPhotoIdx) ? "default" : colorPickMode ? "cell" : effectiveCanEdit ? "crosshair" : "not-allowed" }}
               onMouseDown={handleMouseDown}
               onClick={handleContainerClick}
               data-testid="photo-viewer"
