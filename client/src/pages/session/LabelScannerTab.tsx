@@ -1425,6 +1425,7 @@ export default function LabelScannerTab({
             const entryData: Record<string, any> = {
               aisle,
               section,
+              position: card.pin.label != null ? String(card.pin.label) : "",
               reelTag: card.editCatalog ? card.editCatalog.toUpperCase() : "",
               manufacturer: card.editVendor ? card.editVendor.toUpperCase() : "",
               footage: computedFootage,

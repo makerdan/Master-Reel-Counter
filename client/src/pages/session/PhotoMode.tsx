@@ -1550,7 +1550,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             return await createEntryWithOfflineFallback(sessionId, {
               aisle: entryAisle,
               section: entrySection,
-              position: "",
+              position: pin.label != null ? String(pin.label) : "",
               reelTag: reelLabel,
               manufacturer: pin.vendorCode || undefined,
               footage: totalFootage,
