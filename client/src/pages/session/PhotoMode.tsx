@@ -4,7 +4,7 @@ import {
   Camera, Plus, Trash2, RotateCw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, RotateCcw, AlertTriangle, Move, StickyNote, Focus, Eye, EyeOff,
   AlertCircle, Flag, ImagePlus, Pencil, ListPlus, ChevronDown, ChevronUp,
-  ScanLine, X as PanelCloseX, Pipette,
+  ScanLine, X as PanelCloseX, Pipette, Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -372,6 +372,25 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   }, [photos, displayedPhoto?.isDetailShot, displayedPhoto?.parentPhotoId, displayedPhoto?.dbId]);
 
   const isDisplayedPhotoDetail = displayedPhoto?.isDetailShot || false;
+
+  const [showLinkedBanner, setShowLinkedBanner] = useState(false);
+  const linkedBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (linkedBannerTimerRef.current !== null) clearTimeout(linkedBannerTimerRef.current);
+    if (isDisplayedPhotoDetail) {
+      setShowLinkedBanner(true);
+      linkedBannerTimerRef.current = setTimeout(() => {
+        setShowLinkedBanner(false);
+        linkedBannerTimerRef.current = null;
+      }, 3000);
+    } else {
+      setShowLinkedBanner(false);
+    }
+    return () => {
+      if (linkedBannerTimerRef.current !== null) clearTimeout(linkedBannerTimerRef.current);
+    };
+  }, [currentPhotoIdx, isDisplayedPhotoDetail]);
+
   const photoLoaded = photoLoadedKey === photoSrc;
   const imageError = photoErrorKey === photoSrc && !!photoSrc;
 
@@ -2084,6 +2103,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <ChevronLeft className="h-5 w-5" />
                 </button>
               )}
+            {showLinkedBanner && (
+              <div
+                className="fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-blue-600/90 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300"
+                data-testid="banner-linked-photo"
+                role="status"
+                aria-live="polite"
+              >
+                <Link2 className="h-4 w-4 flex-shrink-0" />
+                <span>This is a linked photo</span>
+              </div>
+            )}
             <div
               ref={containerRef}
               className="photo-viewer-container w-full min-w-0"
