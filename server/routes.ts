@@ -262,6 +262,7 @@ export async function registerRoutes(
     const skipPaths = [
       "/api/login", "/api/callback", "/api/logout",
       "/api/auth/user", "/api/auth/tester-login", "/api/auth/tester-logout",
+      "/api/__test__/seed-tester-password",
     ];
     const matchesSkip = skipPaths.some(p => req.originalUrl === p || req.originalUrl.startsWith(p + "/") || req.originalUrl.startsWith(p + "?"));
     if (matchesSkip) return next();

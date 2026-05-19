@@ -1,5 +1,17 @@
 import { chromium } from "@playwright/test";
 import { mkdir } from "fs/promises";
+import { execSync } from "child_process";
+
+function findChromium(): string | undefined {
+  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+    return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  }
+  try {
+    return execSync("which chromium", { encoding: "utf-8" }).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5000";
 export const TESTER_PASSWORD =
@@ -33,7 +45,10 @@ async function globalSetup() {
     );
   }
 
-  const browser = await chromium.launch();
+  const chromiumExecutable = findChromium();
+  const browser = await chromium.launch(
+    chromiumExecutable ? { executablePath: chromiumExecutable } : undefined,
+  );
   const context = await browser.newContext();
   const page = await context.newPage();
 
