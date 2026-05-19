@@ -2113,7 +2113,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             >
               {showLinkedBanner && (
                 <div
-                  className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-blue-600/90 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300"
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex items-center gap-2 bg-blue-600/90 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg pointer-events-none animate-in fade-in zoom-in-95 duration-300"
                   data-testid="banner-linked-photo"
                   role="status"
                   aria-live="polite"
