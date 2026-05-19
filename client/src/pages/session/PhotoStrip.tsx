@@ -1074,6 +1074,25 @@ function Lightbox({
     return () => document.removeEventListener("keydown", handleKey);
   }, [handleKey]);
 
+  const [showLinkedBanner, setShowLinkedBanner] = useState(false);
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (bannerTimerRef.current !== null) clearTimeout(bannerTimerRef.current);
+    if (current.isDetailShot) {
+      setShowLinkedBanner(true);
+      bannerTimerRef.current = setTimeout(() => {
+        setShowLinkedBanner(false);
+        bannerTimerRef.current = null;
+      }, 3000);
+    } else {
+      setShowLinkedBanner(false);
+    }
+    return () => {
+      if (bannerTimerRef.current !== null) clearTimeout(bannerTimerRef.current);
+    };
+  }, [index, current.isDetailShot]);
+
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -1113,6 +1132,18 @@ function Lightbox({
           <X className="h-5 w-5" />
         </button>
       </div>
+
+      {showLinkedBanner && (
+        <div
+          className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-blue-600/90 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300"
+          data-testid="banner-linked-photo"
+          role="status"
+          aria-live="polite"
+        >
+          <Link2 className="h-4 w-4 flex-shrink-0" />
+          <span>This is a linked photo</span>
+        </div>
+      )}
 
       {hasPrev && (
         <button
