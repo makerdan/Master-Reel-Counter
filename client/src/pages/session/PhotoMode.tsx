@@ -2103,17 +2103,6 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
                   <ChevronLeft className="h-5 w-5" />
                 </button>
               )}
-            {showLinkedBanner && (
-              <div
-                className="fixed top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-blue-600/90 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300"
-                data-testid="banner-linked-photo"
-                role="status"
-                aria-live="polite"
-              >
-                <Link2 className="h-4 w-4 flex-shrink-0" />
-                <span>This is a linked photo</span>
-              </div>
-            )}
             <div
               ref={containerRef}
               className="photo-viewer-container w-full min-w-0"
@@ -2122,6 +2111,17 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               onClick={handleContainerClick}
               data-testid="photo-viewer"
             >
+              {showLinkedBanner && (
+                <div
+                  className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-blue-600/90 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg pointer-events-none animate-in fade-in slide-in-from-top-3 duration-300"
+                  data-testid="banner-linked-photo"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Link2 className="h-4 w-4 flex-shrink-0" />
+                  <span>This is a linked photo</span>
+                </div>
+              )}
               <div className="photo-scroll-strip left" onWheel={(e) => e.stopPropagation()} />
               <div className="photo-scroll-strip right" onWheel={(e) => e.stopPropagation()} />
               <div
