@@ -21,60 +21,68 @@ test.describe("folder auto-expand @folder-expand", () => {
     );
     cleanupIds.push(sess.id);
 
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-
-    // Open session context menu
-    const menuBtn = page.locator(
-      `[data-testid="button-session-menu-${sess.id}"]`,
-    );
-    await expect(menuBtn).toBeVisible({ timeout: 10_000 });
-    await menuBtn.click();
-
-    // Click "Create folder and move"
-    const createFolderItem = page.locator(
-      `[data-testid="menu-create-folder-${sess.id}"]`,
-    );
-    await expect(createFolderItem).toBeVisible({ timeout: 5_000 });
-    await createFolderItem.click();
-
-    // Fill in folder name and submit
-    const folderNameInput = page.locator(
-      '[data-testid="input-inline-folder-name"]',
-    );
-    await expect(folderNameInput).toBeVisible({ timeout: 5_000 });
+    // Capture the folder name before any UI interaction so the finally block
+    // can always find and delete it via the API, even if an assertion fails.
     const folderName = `AutoExpand ${Date.now()}`;
-    await folderNameInput.fill(folderName);
 
-    const createMoveBtn = page.locator(
-      '[data-testid="button-create-folder-and-move"]',
-    );
-    await createMoveBtn.click();
+    try {
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
 
-    // Wait for the mutation to complete and the UI to update
-    await page.waitForLoadState("networkidle");
+      // Open session context menu
+      const menuBtn = page.locator(
+        `[data-testid="button-session-menu-${sess.id}"]`,
+      );
+      await expect(menuBtn).toBeVisible({ timeout: 10_000 });
+      await menuBtn.click();
 
-    // Find the newly created folder's ID from the DOM
-    const folderHeader = page
-      .locator('[data-testid^="folder-header-"]')
-      .filter({ hasText: folderName });
-    await expect(folderHeader).toBeVisible({ timeout: 10_000 });
+      // Click "Create folder and move"
+      const createFolderItem = page.locator(
+        `[data-testid="menu-create-folder-${sess.id}"]`,
+      );
+      await expect(createFolderItem).toBeVisible({ timeout: 5_000 });
+      await createFolderItem.click();
 
-    // The session card must be visible (i.e., the folder is expanded)
-    const sessionCard = page.locator(
-      `[data-testid="card-session-${sess.id}"]`,
-    );
-    await expect(
-      sessionCard,
-      "Session card must be visible after create-and-move (folder should be auto-expanded)",
-    ).toBeVisible({ timeout: 10_000 });
+      // Fill in folder name and submit
+      const folderNameInput = page.locator(
+        '[data-testid="input-inline-folder-name"]',
+      );
+      await expect(folderNameInput).toBeVisible({ timeout: 5_000 });
+      await folderNameInput.fill(folderName);
 
-    // --- Clean up: delete the folder ---
-    // Extract folder ID from the folder header data-testid
-    const headerTestId = await folderHeader.getAttribute("data-testid");
-    if (headerTestId) {
-      const folderId = headerTestId.replace("folder-header-", "");
-      await request.delete(`/api/folders/${folderId}`).catch(() => {});
+      const createMoveBtn = page.locator(
+        '[data-testid="button-create-folder-and-move"]',
+      );
+      await createMoveBtn.click();
+
+      // Wait for the mutation to complete and the UI to update
+      await page.waitForLoadState("networkidle");
+
+      // Find the newly created folder's header in the DOM
+      const folderHeader = page
+        .locator('[data-testid^="folder-header-"]')
+        .filter({ hasText: folderName });
+      await expect(folderHeader).toBeVisible({ timeout: 10_000 });
+
+      // The session card must be visible (i.e., the folder is expanded)
+      const sessionCard = page.locator(
+        `[data-testid="card-session-${sess.id}"]`,
+      );
+      await expect(
+        sessionCard,
+        "Session card must be visible after create-and-move (folder should be auto-expanded)",
+      ).toBeVisible({ timeout: 10_000 });
+    } finally {
+      // Always clean up: look up the folder by name via the API and delete it.
+      // This runs even when an assertion fails before the folderHeader resolves.
+      const foldersRes = await request.get("/api/folders").catch(() => null);
+      if (foldersRes?.ok()) {
+        const folders = (await foldersRes.json()) as { id: number; name: string }[];
+        const matches = folders.filter((f) => f.name === folderName);
+        for (const match of matches) {
+          await request.delete(`/api/folders/${match.id}`).catch(() => {});
+        }
+      }
     }
   });
 
