@@ -32,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { SWEEP_MIN_AGE_DAYS_KEY, readKey, writeKey } from "@/lib/storageKeys";
 import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/lib/theme-provider";
@@ -434,7 +435,11 @@ export default function SettingsPage() {
 
   const [sweepPage, setSweepPage] = useState(0);
   const [sweepDeleted, setSweepDeleted] = useState(0);
-  const [sweepMinAgeDays, setSweepMinAgeDays] = useState(7);
+  const [sweepMinAgeDays, setSweepMinAgeDays] = useState(() => {
+    const stored = readKey(SWEEP_MIN_AGE_DAYS_KEY);
+    const parsed = parseInt(stored ?? "", 10);
+    return !isNaN(parsed) && parsed >= 1 && parsed <= 365 ? parsed : 7;
+  });
 
   const sweepOrphans = useMutation({
     mutationFn: async () => {
@@ -2419,7 +2424,11 @@ export default function SettingsPage() {
                                 min={1}
                                 max={365}
                                 value={sweepMinAgeDays}
-                                onChange={e => setSweepMinAgeDays(Math.min(365, Math.max(1, parseInt(e.target.value) || 1)))}
+                                onChange={e => {
+                                  const val = Math.min(365, Math.max(1, parseInt(e.target.value) || 1));
+                                  setSweepMinAgeDays(val);
+                                  writeKey(SWEEP_MIN_AGE_DAYS_KEY, String(val));
+                                }}
                                 disabled={sweepOrphans.isPending}
                                 className="w-14 h-7 rounded border border-input bg-background px-2 text-xs font-mono text-center disabled:opacity-50"
                                 data-testid="input-sweep-min-age"

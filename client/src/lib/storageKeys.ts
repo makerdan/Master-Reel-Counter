@@ -42,6 +42,7 @@
  * dash:*                            SS     global   resets on every page load (no risk)
  * themeMode                         LS     global   user preference (never auto-cleared)
  * theme                             LS     global   legacy theme key; one-time migration to themeMode
+ * sweepMinAgeDays                   LS     global   admin preference (never auto-cleared)
  * disregarded-dups-{sid}            LS     session  clearSessionKeys; legacy key — cleared once migrated to DB
  * ────────────────────────────────────────────────────────────────────────────
  *
@@ -111,6 +112,9 @@ export const SESSION_PROGRESS_COLLAPSED_KEY = "session-progress-collapsed";
  */
 export const THEME_LEGACY_KEY = "theme";
 export const THEME_MODE_KEY = "themeMode";
+
+/** Admin preference for the minimum orphan age (days) used in the legacy-orphan sweep. */
+export const SWEEP_MIN_AGE_DAYS_KEY = "sweepMinAgeDays";
 
 // ─── Session-scoped localStorage key factories ────────────────────────────────
 
