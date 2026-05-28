@@ -86,6 +86,14 @@ test.describe("mobile layout parity @mobile", () => {
     // Track WS instances so we can close the live socket without going offline
     // (offline shows a different indicator; reconnecting shows while online but WS dropped).
     await page.addInitScript(() => {
+      // Playwright's routeWebSocket mock (_WebSocketMock) calls URL.parse() internally.
+      // URL.parse is only available in Chrome 120+; polyfill it for older Chromium builds.
+      if (typeof (URL as unknown as Record<string, unknown>).parse !== "function") {
+        (URL as unknown as Record<string, unknown>).parse = (url: string, base?: string) => {
+          try { return new URL(url, base); } catch { return null; }
+        };
+      }
+
       const tracked: WebSocket[] = [];
       (window as unknown as Record<string, unknown>).__testWsSockets = tracked;
       const OrigWS = window.WebSocket;
@@ -112,10 +120,19 @@ test.describe("mobile layout parity @mobile", () => {
     await page.goto(`/session/${sess.id}`);
     await page.waitForLoadState("networkidle");
 
-    // Close the live socket while online → triggers wsStatus=reconnecting
+    // Wait until the app has created at least one WebSocket (tracked by PatchedWS)
+    await page.waitForFunction(() => {
+      const sockets = (window as unknown as Record<string, WebSocket[]>).__testWsSockets;
+      return Array.isArray(sockets) && sockets.length > 0;
+    }, undefined, { timeout: 10_000 });
+
+    // Close all tracked sockets while online → triggers wsStatus=reconnecting.
+    // Don't filter by readyState because _WebSocketMock may not proxy it correctly.
     await page.evaluate(() => {
       const sockets = (window as unknown as Record<string, WebSocket[]>).__testWsSockets ?? [];
-      sockets.forEach((s) => { if (s.readyState === WebSocket.OPEN) s.close(1001, "test-force-reconnect"); });
+      for (const s of sockets) {
+        try { s.close(1000, "test-force-reconnect"); } catch { /* ignore if already closed */ }
+      }
     });
 
     await expect(

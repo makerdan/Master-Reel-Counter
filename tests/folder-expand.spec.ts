@@ -36,7 +36,14 @@ test.describe("folder auto-expand @folder-expand", () => {
       await expect(menuBtn).toBeVisible({ timeout: 10_000 });
       await menuBtn.click();
 
-      // Click "Create folder and move"
+      // Open the "Move to Folder" submenu to expose nested items
+      const moveSubmenu = page.locator(
+        `[data-testid="menu-move-session-${sess.id}"]`,
+      );
+      await expect(moveSubmenu).toBeVisible({ timeout: 5_000 });
+      await moveSubmenu.click();
+
+      // Click "Create folder and move" (nested inside the submenu)
       const createFolderItem = page.locator(
         `[data-testid="menu-create-folder-${sess.id}"]`,
       );

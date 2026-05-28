@@ -65,13 +65,9 @@ test.describe("offline queue warning @offline-queue", () => {
     const indicator = page.locator('[data-testid="network-status-indicator"]');
     await expect(indicator).toBeVisible({ timeout: 8_000 });
 
-    // Attempt logout; fall back to avatar dropdown if the button isn't directly visible
-    const logoutBtn = page.getByRole("button", { name: /sign out|log out|logout/i }).first();
-    if (!await logoutBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const avatarBtn = page.locator('button[aria-label*="user" i], button[aria-label*="account" i]').first();
-      if (await avatarBtn.isVisible({ timeout: 2_000 }).catch(() => false)) await avatarBtn.click();
-    }
-    await page.getByRole("button", { name: /sign out|log out|logout/i }).first().click();
+    // Click the logout button (icon-only button in the header; no visible text)
+    const logoutBtn = page.locator('[data-testid="button-logout"]');
+    await logoutBtn.click({ timeout: 8_000 });
 
     // Guard dialog must appear
     const guardDialog = page.locator('[data-testid="dialog-logout-guard"]');

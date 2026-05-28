@@ -282,6 +282,7 @@ export async function registerRoutes(
       "/api/login", "/api/callback", "/api/logout",
       "/api/auth/user", "/api/auth/tester-login", "/api/auth/tester-logout",
       "/api/__test__/seed-tester-password",
+      "/api/__test__/owner-login",
       "/api/track/pageview",
     ];
     const matchesSkip = skipPaths.some(p => req.originalUrl === p || req.originalUrl.startsWith(p + "/") || req.originalUrl.startsWith(p + "?"));
@@ -7045,6 +7046,33 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // that the Playwright global-setup can authenticate without a real OAuth flow.
   // Strictly unavailable in production.
   if (process.env.NODE_ENV !== "production") {
+    app.post("/api/__test__/owner-login", async (req: any, res) => {
+      try {
+        const allUsers = await authStorage.getAllUsers();
+        const owners = allUsers.filter((u: any) => !u.isTester);
+        if (owners.length === 0) {
+          return res.status(404).json({ message: "No owner found. Log in once with Replit Auth first." });
+        }
+        const owner = owners[0];
+        const ownerUser = {
+          claims: {
+            sub: owner.id,
+            firstName: owner.firstName || "TestOwner",
+            username: owner.firstName || "TestOwner",
+          },
+          expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+          isTester: false,
+        };
+        req.login(ownerUser, (err: any) => {
+          if (err) return res.status(500).json({ message: "Login failed" });
+          res.json({ ok: true, userId: owner.id });
+        });
+      } catch (err) {
+        console.error("[test-owner-login] error:", err);
+        res.status(500).json({ message: "Failed to create owner session" });
+      }
+    });
+
     app.post("/api/__test__/seed-tester-password", async (req: any, res) => {
       try {
         const { password } = req.body ?? {};

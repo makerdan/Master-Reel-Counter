@@ -52,10 +52,14 @@ async function globalSetup() {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  await page.goto(`${BASE_URL}/tester-login`);
-  await page.fill('[data-testid="input-display-name"]', TESTER_NAME);
-  await page.fill('[data-testid="input-tester-password"]', TESTER_PASSWORD);
-  await page.click('[data-testid="button-tester-login"]');
+  // Log in as the real owner via a test-only endpoint so all e2e tests run
+  // with full owner permissions (create, delete, trash sessions, etc.).
+  const loginRes = await context.request.post(`${BASE_URL}/api/__test__/owner-login`);
+  if (!loginRes.ok()) {
+    const text = await loginRes.text();
+    throw new Error(`Failed to owner-login (${loginRes.status()}): ${text}`);
+  }
+  await page.goto(`${BASE_URL}/`);
   await page.waitForURL(`${BASE_URL}/`, { timeout: 20_000 });
 
   await mkdir("tests/.auth", { recursive: true });

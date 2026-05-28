@@ -32,6 +32,7 @@ test.describe("review tab persistence @review", () => {
     }
 
     await page.goto(`/session/${sess.id}`);
+    await page.waitForLoadState("networkidle");
     await page.click('[data-testid="tab-review-mode"]');
 
     const container = page.locator('[data-testid="review-tab-container"]');
@@ -47,6 +48,7 @@ test.describe("review tab persistence @review", () => {
     const nextBtn = page.locator('[data-testid="button-review-next"]');
     for (let i = 0; i < 3; i++) {
       await expect(nextBtn).toBeVisible({ timeout: 5_000 });
+      await expect(nextBtn).toBeEnabled({ timeout: 10_000 });
       await nextBtn.click();
       await page.waitForTimeout(300);
     }

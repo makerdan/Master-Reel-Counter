@@ -705,7 +705,10 @@ export default function Dashboard() {
       const res = await apiRequest("POST", `/api/sessions/${id}/move`, { folderId });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      if (variables.folderId != null) {
+        setOpenFolders(prev => new Set([...prev, variables.folderId!]));
+      }
       invalidateAll();
       setMoveSessionTarget(null);
       toast({ title: "Session moved" });

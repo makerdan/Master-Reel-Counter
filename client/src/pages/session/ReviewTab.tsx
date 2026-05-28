@@ -684,6 +684,38 @@ export default function ReviewTab({
   const scrubBarRef = useRef<HTMLDivElement>(null);
   const isScrubbing = useRef(false);
 
+  // ── Scrub-bar interaction — must be declared before the early returns ───────
+  // React's Rules of Hooks require that ALL hooks are called unconditionally on
+  // every render. These three useCallbacks were originally placed after the
+  // cohortPending / empty-state guard returns which caused "Rendered more hooks
+  // than during the previous render" on the second render (after cohort loads).
+  const scrubTo = useCallback((clientX: number) => {
+    const bar = scrubBarRef.current;
+    if (!bar || displayEntries.length === 0) return;
+    const rect = bar.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    setCurrentIndex(Math.round(ratio * (displayEntries.length - 1)));
+  }, [displayEntries.length]);
+
+  const handleScrubMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isScrubbing.current = true;
+    scrubTo(e.clientX);
+    const onMove = (me: MouseEvent) => { if (isScrubbing.current) scrubTo(me.clientX); };
+    const onUp = () => { isScrubbing.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [scrubTo]);
+
+  const handleScrubTouchStart = useCallback((e: React.TouchEvent) => {
+    isScrubbing.current = true;
+    scrubTo(e.touches[0].clientX);
+    const onMove = (te: TouchEvent) => { if (isScrubbing.current) scrubTo(te.touches[0].clientX); };
+    const onEnd = () => { isScrubbing.current = false; window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onEnd); };
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd);
+  }, [scrubTo]);
+
   // On first load, restore from sessionStorage if available and within bounds;
   // otherwise jump to the first unreviewed entry in the reordered list.
   // Always marks hasRestoredPosition = true before returning so that
@@ -933,33 +965,6 @@ export default function ReviewTab({
   }
 
   const thumbPercent = displayEntries.length > 1 ? (currentIndex / (displayEntries.length - 1)) * 100 : 0;
-
-  const scrubTo = useCallback((clientX: number) => {
-    const bar = scrubBarRef.current;
-    if (!bar || displayEntries.length === 0) return;
-    const rect = bar.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    setCurrentIndex(Math.round(ratio * (displayEntries.length - 1)));
-  }, [displayEntries.length]);
-
-  const handleScrubMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isScrubbing.current = true;
-    scrubTo(e.clientX);
-    const onMove = (me: MouseEvent) => { if (isScrubbing.current) scrubTo(me.clientX); };
-    const onUp = () => { isScrubbing.current = false; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  }, [scrubTo]);
-
-  const handleScrubTouchStart = useCallback((e: React.TouchEvent) => {
-    isScrubbing.current = true;
-    scrubTo(e.touches[0].clientX);
-    const onMove = (te: TouchEvent) => { if (isScrubbing.current) scrubTo(te.touches[0].clientX); };
-    const onEnd = () => { isScrubbing.current = false; window.removeEventListener("touchmove", onMove); window.removeEventListener("touchend", onEnd); };
-    window.addEventListener("touchmove", onMove, { passive: true });
-    window.addEventListener("touchend", onEnd);
-  }, [scrubTo]);
 
   return (
     <ErrorBoundary fallback={

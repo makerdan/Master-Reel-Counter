@@ -61,16 +61,15 @@ test.describe("session state cleanup @session-cleanup", () => {
     await expect(menuBtn).toBeVisible({ timeout: 10_000 });
     await menuBtn.click();
 
-    const trashItem = page.getByRole("menuitem", { name: /trash/i }).first();
+    const trashItem = page.locator(`[data-testid="menu-delete-session-${sid}"]`);
     await expect(trashItem).toBeVisible({ timeout: 5_000 });
     await trashItem.click();
 
-    const confirmBtn = page.getByRole("button", { name: /confirm|yes|trash|delete/i }).first();
-    if (await confirmBtn.isVisible({ timeout: 1_500 }).catch(() => false)) {
-      await confirmBtn.click();
-    }
+    const confirmBtn = page.locator('[data-testid="button-confirm-delete-session"]');
+    await expect(confirmBtn).toBeVisible({ timeout: 3_000 });
+    await confirmBtn.click();
 
-    await page.waitForTimeout(1_500);
+    await page.waitForTimeout(2_000);
 
     const after = await getKeyPresence(page, allKeys);
     for (const k of allKeys) {

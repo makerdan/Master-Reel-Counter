@@ -17,20 +17,35 @@ test.describe("undo/redo parity @undo", () => {
     const entry = await createEntryViaApi(request, sess.id);
 
     await page.goto(`/session/${sess.id}`);
+    await page.waitForLoadState("networkidle");
     await page.click('[data-testid="tab-photo-mode"]');
+
+    // Entry sections are collapsed by default — expand the section first
+    const sectionToggle = page.locator('[data-testid="section-toggle-A-1"]');
+    if (await sectionToggle.isVisible({ timeout: 8_000 }).catch(() => false)) {
+      await sectionToggle.click();
+    }
 
     const entryRow = page.locator(`[data-testid="row-entry-${entry.id}"]`);
     await expect(entryRow).toBeVisible({ timeout: 10_000 });
 
     await page.click(`[data-testid="button-delete-entry-${entry.id}"]`);
 
+    // The delete button opens a confirmation dialog — confirm the deletion
+    const deleteConfirmBtn = page.getByRole("button", { name: /^Delete$/i }).last();
+    if (await deleteConfirmBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await deleteConfirmBtn.click();
+    }
+
     // Undo toast action button must appear
     const undoBtn = page.getByRole("button", { name: /^Undo$/i });
     await expect(undoBtn).toBeVisible({ timeout: 8_000 });
 
-    // Clicking undo must restore the row
+    // Clicking undo must restore the row.
+    // The undo for delete-entry re-creates the entry via POST (new server-assigned ID),
+    // so we check that ANY entry row is visible rather than the original ID.
     await undoBtn.click();
-    await expect(entryRow).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('[data-testid^="row-entry-"]').first()).toBeVisible({ timeout: 8_000 });
   });
 
   test("deleting a pin shows undo toast @undo", async ({
