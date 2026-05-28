@@ -8,9 +8,11 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "typecheck": "tsc --noEmit && tsc --project tsconfig.playwright.json --noEmit",
     "db:push": "drizzle-kit push",
     "lint:storage": "node scripts/lint-storage.mjs --strict",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "ci": "bash scripts/ci.sh"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",

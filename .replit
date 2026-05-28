@@ -53,6 +53,10 @@ args = "lint-storage"
 task = "workflow.run"
 args = "typecheck"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ci"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -69,31 +73,42 @@ outputType = "webview"
 name = "e2e"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx playwright test --reporter=line"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test:e2e"
 
 [[workflows.workflow]]
 name = "lint-storage"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node scripts/lint-storage.mjs --strict"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run lint:storage"
 
 [[workflows.workflow]]
 name = "typecheck"
 author = "agent"
 
+[workflows.workflow.metadata]
+isValidation = true
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx tsc --noEmit && npx tsc --project tsconfig.playwright.json --noEmit"
+args = "npm run typecheck"
+
+[[workflows.workflow]]
+name = "ci"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run ci"
 
 [workflows.workflow.metadata]
 isValidation = true
