@@ -7,3 +7,4 @@ vite.config.ts.*
 playwright-report/
 test-results/
 tests/.auth/
+.crash_log.json
