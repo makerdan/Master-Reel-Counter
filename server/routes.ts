@@ -6726,8 +6726,8 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   });
 
   // Admin endpoint: current PDF export job stats (owner-only).
-  // Returns active/completed job counts, total buffer memory, and oldest job age
-  // so operators can spot memory build-up without needing server logs.
+  // Returns active/completed job counts, total buffer memory, oldest job age,
+  // and the individual job list so operators can cancel stuck jobs.
   app.get("/api/admin/pdf-jobs", isAuthenticated, (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
     const username = req.user?.claims?.username;
@@ -6739,7 +6739,8 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     let completedCount = 0;
     let totalBufferBytes = 0;
     let oldestJobAgeMs: number | null = null;
-    for (const job of pdfJobs.values()) {
+    const jobs: Array<{ id: string; createdAt: number; complete: boolean; completedAt?: number }> = [];
+    for (const [id, job] of pdfJobs.entries()) {
       if (job.complete) {
         completedCount++;
       } else {
@@ -6752,8 +6753,26 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       if (oldestJobAgeMs === null || ageMs > oldestJobAgeMs) {
         oldestJobAgeMs = ageMs;
       }
+      jobs.push({ id, createdAt: job.createdAt, complete: job.complete, completedAt: job.completedAt });
     }
-    res.json({ activeCount, completedCount, totalBufferBytes, oldestJobAgeMs });
+    res.json({ activeCount, completedCount, totalBufferBytes, oldestJobAgeMs, jobs });
+  });
+
+  // Admin endpoint: force-remove a single PDF export job (owner-only).
+  // Removes the job from the in-memory map regardless of its current state,
+  // freeing any buffer memory immediately without requiring a server restart.
+  app.delete("/api/admin/pdf-jobs/:jobId", isAuthenticated, (req: any, res) => {
+    const replOwner = process.env.REPL_OWNER;
+    const username = req.user?.claims?.username;
+    if (!replOwner || username !== replOwner) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const { jobId } = req.params;
+    if (!pdfJobs.has(jobId)) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+    pdfJobs.delete(jobId);
+    res.json({ ok: true, jobId });
   });
 
   // ── Dev-only test seeding endpoint ──────────────────────────────────────────

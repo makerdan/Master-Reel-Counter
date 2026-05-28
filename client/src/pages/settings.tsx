@@ -345,6 +345,7 @@ export default function SettingsPage() {
     completedCount: number;
     totalBufferBytes: number;
     oldestJobAgeMs: number | null;
+    jobs: Array<{ id: string; createdAt: number; complete: boolean; completedAt?: number }>;
   }>({
     queryKey: ["/api/admin/pdf-jobs"],
     queryFn: async () => {
@@ -361,6 +362,38 @@ export default function SettingsPage() {
   const [confirmClearCrashesOpen, setConfirmClearCrashesOpen] = useState(false);
   const [confirmClearIntent, setConfirmClearIntent] = useState<{ userId: string; displayName: string; count: number } | null>(null);
   const [confirmClearRejectedOpen, setConfirmClearRejectedOpen] = useState(false);
+  const [confirmRemoveStaleJobsOpen, setConfirmRemoveStaleJobsOpen] = useState(false);
+
+  const PDF_STALE_MS = 15 * 60 * 1000;
+
+  const removeStaleJobs = useMutation({
+    mutationFn: async () => {
+      const now = Date.now();
+      const staleJobs = (pdfJobsData?.jobs ?? []).filter(
+        (j) => !j.complete && now - j.createdAt >= PDF_STALE_MS,
+      );
+      const results = await Promise.allSettled(
+        staleJobs.map((j) => apiRequest("DELETE", `/api/admin/pdf-jobs/${j.id}`)),
+      );
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.filter((r) => r.status === "rejected").length;
+      return { succeeded, failed };
+    },
+    onSuccess: ({ succeeded, failed }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pdf-jobs"] });
+      if (failed > 0) {
+        toast({
+          title: `Removed ${succeeded} job${succeeded !== 1 ? "s" : ""}, ${failed} already gone`,
+        });
+      } else {
+        toast({ title: `Removed ${succeeded} stale PDF job${succeeded !== 1 ? "s" : ""}` });
+      }
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pdf-jobs"] });
+      toast({ title: "Failed to remove stale jobs", variant: "destructive" });
+    },
+  });
 
   const clearCrashes = useMutation({
     mutationFn: async () => {
@@ -2553,15 +2586,40 @@ export default function SettingsPage() {
                                 <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                                 <span className="text-xs font-medium">PDF Export Jobs</span>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/pdf-jobs"] })}
-                                data-testid="button-refresh-pdf-jobs"
-                              >
-                                <RefreshCw className="h-3 w-3" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                {(() => {
+                                  const now = Date.now();
+                                  const staleCount = (pdfJobsData.jobs ?? []).filter(
+                                    (j) => !j.complete && now - j.createdAt >= PDF_STALE_MS,
+                                  ).length;
+                                  return staleCount > 0 ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                                      onClick={() => setConfirmRemoveStaleJobsOpen(true)}
+                                      disabled={removeStaleJobs.isPending}
+                                      data-testid="button-remove-stale-pdf-jobs"
+                                    >
+                                      {removeStaleJobs.isPending ? (
+                                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-3 w-3 mr-1" />
+                                      )}
+                                      Force remove stale ({staleCount})
+                                    </Button>
+                                  ) : null;
+                                })()}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/pdf-jobs"] })}
+                                  data-testid="button-refresh-pdf-jobs"
+                                >
+                                  <RefreshCw className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                               <span>Active</span>
@@ -2895,6 +2953,33 @@ export default function SettingsPage() {
               {(rejectedCountData?.count ?? 0) > 0
                 ? `Clear ${rejectedCountData!.count} blocked user${rejectedCountData!.count === 1 ? "" : "s"}`
                 : "Clear Block List"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmRemoveStaleJobsOpen} onOpenChange={setConfirmRemoveStaleJobsOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force remove stale PDF jobs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const now = Date.now();
+                const staleCount = (pdfJobsData?.jobs ?? []).filter(
+                  (j) => !j.complete && now - j.createdAt >= PDF_STALE_MS,
+                ).length;
+                return `This will immediately remove ${staleCount} stuck PDF job${staleCount !== 1 ? "s" : ""} that ${staleCount !== 1 ? "have" : "has"} been running for over 15 minutes, freeing their buffer memory. Jobs that are actually still generating will be cancelled and users will need to re-export.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-remove-stale-jobs">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { setConfirmRemoveStaleJobsOpen(false); removeStaleJobs.mutate(); }}
+              data-testid="button-confirm-remove-stale-jobs"
+            >
+              Force Remove
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
