@@ -61,12 +61,17 @@ function ThemeSyncer() {
 function PageViewTracker() {
   const [location] = useLocation();
   useEffect(() => {
-    fetch("/api/track/pageview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: location }),
-      credentials: "include",
-    }).catch(() => {});
+    // Defer tracking by 2 s so the POST fires after the page has reached
+    // network-idle. This prevents the request from delaying load-state checks.
+    const t = setTimeout(() => {
+      fetch("/api/track/pageview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: location }),
+        credentials: "include",
+      }).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(t);
   }, [location]);
   return null;
 }
