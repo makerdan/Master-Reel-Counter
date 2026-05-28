@@ -342,10 +342,10 @@ function SessionWorkspace({
   const canEditSession = !isLocked || isOwner;
 
   const { user } = useAuth();
-  const { setWsReconnect } = useWsReconnect();
+  const { setWsReconnect, setForceReconnect } = useWsReconnect();
   const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
 
-  const { wsStatus, reconnectDelayMs } = useSessionWebSocket(sessionId, (msg) => {
+  const { wsStatus, reconnectDelayMs, forceReconnect } = useSessionWebSocket(sessionId, (msg) => {
     if (msg.type === "presence") {
       setOnlineUsers(msg.users || []);
     }
@@ -373,6 +373,12 @@ function SessionWorkspace({
   useEffect(() => {
     setWsReconnect(wsStatus, reconnectCountdown);
   }, [wsStatus, reconnectCountdown, setWsReconnect]);
+
+  // Push forceReconnect into context so the global pill can call it.
+  useEffect(() => {
+    setForceReconnect(forceReconnect);
+    return () => { setForceReconnect(null); };
+  }, [forceReconnect, setForceReconnect]);
 
   // Reset context only on unmount so the pill disappears when leaving the page.
   useEffect(() => {
@@ -827,11 +833,23 @@ function SessionWorkspace({
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {wsStatus === "reconnecting" && (
-              <span className="flex items-center gap-1 text-xs text-amber-500 animate-pulse" data-testid="text-ws-reconnecting">
+              <span className="flex items-center gap-1 text-xs text-amber-500" data-testid="text-ws-reconnecting">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                {reconnectCountdown !== null
-                  ? `Reconnecting in ${reconnectCountdown}s…`
-                  : "Reconnecting…"}
+                <span className="animate-pulse">
+                  {reconnectCountdown !== null
+                    ? `Reconnecting in ${reconnectCountdown}s…`
+                    : "Reconnecting…"}
+                </span>
+                {forceReconnect && (
+                  <button
+                    onClick={forceReconnect}
+                    className="ml-0.5 underline underline-offset-2 hover:text-amber-400 transition-colors"
+                    data-testid="button-ws-retry-now"
+                    aria-label="Retry connection now"
+                  >
+                    Retry now
+                  </button>
+                )}
               </span>
             )}
             {saveStatus === "saving" && (

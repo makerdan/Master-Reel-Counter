@@ -175,5 +175,10 @@ export function useSessionWebSocket(
     safeSend(JSON.stringify(data));
   }, [safeSend]);
 
-  return { wsRef, sendMessage, wsStatus, reconnectDelayMs };
+  const forceReconnect = useCallback(() => {
+    clearTimeout(reconnectTimerRef.current);
+    connect();
+  }, [connect]);
+
+  return { wsRef, sendMessage, wsStatus, reconnectDelayMs, forceReconnect };
 }

@@ -30,6 +30,7 @@ export function NetworkStatusIndicator({
   // Props take priority over context (allows direct rendering with explicit values).
   const wsStatus = wsProp !== undefined ? wsProp : ctx.wsStatus;
   const reconnectCountdown = countdownProp !== undefined ? countdownProp : ctx.reconnectCountdown;
+  const forceReconnect = ctx.forceReconnect;
 
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -140,11 +141,21 @@ export function NetworkStatusIndicator({
         {isOnline && isWsReconnecting && (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span data-testid="text-ws-reconnecting-mobile">
+            <span className="animate-pulse" data-testid="text-ws-reconnecting-mobile">
               {reconnectCountdown !== null
                 ? `Reconnecting in ${reconnectCountdown}s…`
                 : "Reconnecting…"}
             </span>
+            {forceReconnect && (
+              <button
+                onClick={(e) => { e.stopPropagation(); forceReconnect(); }}
+                className="ml-0.5 underline underline-offset-2 hover:opacity-80 transition-opacity"
+                data-testid="button-ws-retry-now-mobile"
+                aria-label="Retry connection now"
+              >
+                Retry now
+              </button>
+            )}
           </>
         )}
         {isOnline && !isWsReconnecting && hasRetryingEntries && (
