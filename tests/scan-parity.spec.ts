@@ -48,7 +48,8 @@ test.describe("scan result parity @scan", () => {
 
     await expect(
       page.locator('[role="status"]').getByText(/1\s+skip/i).first(),
-    ).toBeVisible({ timeout: 12_000, message: "Per-photo scan toast must report skipped-pin count" });
+      "Per-photo scan toast must report skipped-pin count",
+    ).toBeVisible({ timeout: 12_000 });
   });
 
   test("session-wide scan toast shows skipped-pin count", async ({
@@ -93,6 +94,7 @@ test.describe("scan result parity @scan", () => {
     // Parity check: session-wide toast must also show skipped count
     await expect(
       page.locator('[role="status"]').getByText(/1\s+skip/i).first(),
-    ).toBeVisible({ timeout: 12_000, message: "Session-wide scan toast must report skipped-pin count — parity with per-photo scan" });
+      "Session-wide scan toast must report skipped-pin count — parity with per-photo scan",
+    ).toBeVisible({ timeout: 12_000 });
   });
 });

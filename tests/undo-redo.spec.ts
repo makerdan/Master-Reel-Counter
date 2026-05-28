@@ -77,11 +77,10 @@ test.describe("undo/redo parity @undo", () => {
     await page.click(`[data-testid="button-delete-pin-${pin.id}"]`);
 
     const undoBtn = page.getByRole("button", { name: /^Undo$/i });
-    await expect(undoBtn).toBeVisible({
-      timeout: 8_000,
-      message:
-        "Pin deletion must show an Undo toast — parity with entry deletion",
-    });
+    await expect(
+      undoBtn,
+      "Pin deletion must show an Undo toast — parity with entry deletion",
+    ).toBeVisible({ timeout: 8_000 });
 
     // Clicking undo must restore the pin
     await undoBtn.click();

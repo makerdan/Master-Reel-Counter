@@ -44,16 +44,16 @@ test.describe("mobile layout parity @mobile", () => {
     await page.context().setOffline(true);
     await page.evaluate(() => window.dispatchEvent(new Event("offline-queue-change")));
 
-    await expect(page.locator('[data-testid="network-status-indicator"]')).toBeVisible({
-      timeout: 8_000,
-      message: "NetworkStatusIndicator must be visible at 390px",
-    });
+    await expect(
+      page.locator('[data-testid="network-status-indicator"]'),
+      "NetworkStatusIndicator must be visible at 390px",
+    ).toBeVisible({ timeout: 8_000 });
 
     const pendingCount = page.locator('[data-testid="text-pending-count"]');
-    await expect(pendingCount).toBeVisible({
-      timeout: 5_000,
-      message: "text-pending-count badge must render on mobile when there are queued entries",
-    });
+    await expect(
+      pendingCount,
+      "text-pending-count badge must render on mobile when there are queued entries",
+    ).toBeVisible({ timeout: 5_000 });
     expect(
       parseInt((await pendingCount.textContent()) ?? "0", 10),
       "Pending-count badge should display at least 1 queued item",
@@ -118,9 +118,9 @@ test.describe("mobile layout parity @mobile", () => {
       sockets.forEach((s) => { if (s.readyState === WebSocket.OPEN) s.close(1001, "test-force-reconnect"); });
     });
 
-    await expect(page.locator('[data-testid="text-ws-reconnecting-mobile"]')).toBeVisible({
-      timeout: 15_000,
-      message: "WS reconnect countdown banner must be visible at 390px when wsStatus=reconnecting",
-    });
+    await expect(
+      page.locator('[data-testid="text-ws-reconnecting-mobile"]'),
+      "WS reconnect countdown banner must be visible at 390px when wsStatus=reconnecting",
+    ).toBeVisible({ timeout: 15_000 });
   });
 });

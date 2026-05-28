@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "lint:storage": "node scripts/lint-storage.mjs",
+    "lint:storage": "node scripts/lint-storage.mjs --strict",
     "test:e2e": "playwright test"
   },
   "dependencies": {

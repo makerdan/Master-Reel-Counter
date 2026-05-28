@@ -64,11 +64,10 @@ test.describe("folder auto-expand @folder-expand", () => {
     const sessionCard = page.locator(
       `[data-testid="card-session-${sess.id}"]`,
     );
-    await expect(sessionCard).toBeVisible({
-      timeout: 10_000,
-      message:
-        "Session card must be visible after create-and-move (folder should be auto-expanded)",
-    });
+    await expect(
+      sessionCard,
+      "Session card must be visible after create-and-move (folder should be auto-expanded)",
+    ).toBeVisible({ timeout: 10_000 });
 
     // --- Clean up: delete the folder ---
     // Extract folder ID from the folder header data-testid
@@ -90,67 +89,68 @@ test.describe("folder auto-expand @folder-expand", () => {
     );
     cleanupIds.push(sess.id);
 
-    // Create a folder via API
+    // Create a folder via API — capture its ID immediately for guaranteed cleanup
     const folderRes = await request.post("/api/folders", {
       data: { name: `MoveTarget ${Date.now()}` },
     });
-    const folder = await folderRes.json();
+    const folder = await folderRes.json() as { id: number };
 
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    try {
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
 
-    // Collapse the folder first (it should be collapsed if empty)
-    const toggleBtn = page.locator(
-      `[data-testid="button-toggle-folder-${folder.id}"]`,
-    );
-    if (await toggleBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      // Check if folder is currently expanded by seeing if sessions inside are visible
-      const folderSection = page.locator(`#folder-section-${folder.id}`);
-      const isOpen = await folderSection
-        .locator('[data-testid^="card-session-"]')
-        .first()
-        .isVisible({ timeout: 1_000 })
-        .catch(() => false);
-      if (isOpen) {
-        await toggleBtn.click();
-        await page.waitForTimeout(300);
+      // Collapse the folder first (it should be collapsed if empty)
+      const toggleBtn = page.locator(
+        `[data-testid="button-toggle-folder-${folder.id}"]`,
+      );
+      if (await toggleBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        // Check if folder is currently expanded by seeing if sessions inside are visible
+        const folderSection = page.locator(`#folder-section-${folder.id}`);
+        const isOpen = await folderSection
+          .locator('[data-testid^="card-session-"]')
+          .first()
+          .isVisible({ timeout: 1_000 })
+          .catch(() => false);
+        if (isOpen) {
+          await toggleBtn.click();
+          await page.waitForTimeout(300);
+        }
       }
-    }
 
-    // Open session context menu and move to the existing folder
-    const menuBtn = page.locator(
-      `[data-testid="button-session-menu-${sess.id}"]`,
-    );
-    await expect(menuBtn).toBeVisible({ timeout: 10_000 });
-    await menuBtn.click();
+      // Open session context menu and move to the existing folder
+      const menuBtn = page.locator(
+        `[data-testid="button-session-menu-${sess.id}"]`,
+      );
+      await expect(menuBtn).toBeVisible({ timeout: 10_000 });
+      await menuBtn.click();
 
-    // Open the "Move to Folder" submenu
-    const moveSubmenu = page.locator(
-      `[data-testid="menu-move-session-${sess.id}"]`,
-    );
-    await expect(moveSubmenu).toBeVisible({ timeout: 5_000 });
-    await moveSubmenu.click();
+      // Open the "Move to Folder" submenu
+      const moveSubmenu = page.locator(
+        `[data-testid="menu-move-session-${sess.id}"]`,
+      );
+      await expect(moveSubmenu).toBeVisible({ timeout: 5_000 });
+      await moveSubmenu.click();
 
-    // Click the specific target folder
-    const moveFolderItem = page.locator(
-      `[data-testid="menu-move-to-folder-${folder.id}-${sess.id}"]`,
-    );
-    await expect(moveFolderItem).toBeVisible({ timeout: 5_000 });
-    await moveFolderItem.click();
+      // Click the specific target folder
+      const moveFolderItem = page.locator(
+        `[data-testid="menu-move-to-folder-${folder.id}-${sess.id}"]`,
+      );
+      await expect(moveFolderItem).toBeVisible({ timeout: 5_000 });
+      await moveFolderItem.click();
 
-    await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("networkidle");
 
-    // The session must be visible inside the target folder (i.e., folder is expanded)
-    const sessionCard = page.locator(
-      `[data-testid="card-session-${sess.id}"]`,
-    );
-    await expect(sessionCard).toBeVisible({
-      timeout: 10_000,
-      message:
+      // The session must be visible inside the target folder (i.e., folder is expanded)
+      const sessionCard = page.locator(
+        `[data-testid="card-session-${sess.id}"]`,
+      );
+      await expect(
+        sessionCard,
         "Session card must be visible after Move-to-Folder (target folder should auto-expand)",
-    });
-
-    // Clean up folder
-    await request.delete(`/api/folders/${folder.id}`).catch(() => {});
+      ).toBeVisible({ timeout: 10_000 });
+    } finally {
+      // Always clean up the folder — runs even when an assertion fails mid-test
+      await request.delete(`/api/folders/${folder.id}`).catch(() => {});
+    }
   });
 });

@@ -32,12 +32,13 @@ test.describe("offline queue warning @offline-queue", () => {
     const sess = await createSessionViaApi(request, `Offline Guard ${Date.now()}`);
     cleanupIds.push(sess.id);
 
-    await page.goto(`/session/${sess.id}`);
+    // Navigate to "/" while ONLINE so the page is loaded before going offline.
+    // In dev mode there is no service worker, so page.goto() while offline would
+    // fail with a network error. Loading the page first avoids that.
+    await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    await page.context().setOffline(true);
-
-    // Plant a queued entry in IndexedDB
+    // Plant a queued entry in IndexedDB (works on any page; IndexedDB is browser-wide)
     await page.evaluate((sid) => {
       return new Promise<void>((resolve, reject) => {
         const req = indexedDB.open("reel-counter-offline", 2);
@@ -57,10 +58,9 @@ test.describe("offline queue warning @offline-queue", () => {
       });
     }, sess.id);
 
+    // Go offline and notify the app about the queue change
+    await page.context().setOffline(true);
     await page.evaluate(() => window.dispatchEvent(new Event("offline-queue-change")));
-
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
 
     const indicator = page.locator('[data-testid="network-status-indicator"]');
     await expect(indicator).toBeVisible({ timeout: 8_000 });
@@ -75,17 +75,17 @@ test.describe("offline queue warning @offline-queue", () => {
 
     // Guard dialog must appear
     const guardDialog = page.locator('[data-testid="dialog-logout-guard"]');
-    await expect(guardDialog).toBeVisible({
-      timeout: 8_000,
-      message: "Logout guard dialog must appear when there are pending offline items",
-    });
+    await expect(
+      guardDialog,
+      "Logout guard dialog must appear when there are pending offline items",
+    ).toBeVisible({ timeout: 8_000 });
 
     // Cancel — dialog must hide
     await page.click('[data-testid="button-logout-guard-cancel"]');
-    await expect(guardDialog).toBeHidden({
-      timeout: 5_000,
-      message: "Guard dialog must hide after clicking cancel",
-    });
+    await expect(
+      guardDialog,
+      "Guard dialog must hide after clicking cancel",
+    ).toBeHidden({ timeout: 5_000 });
 
     // Restore network, clear queue, dispatch change event
     await page.context().setOffline(false);
