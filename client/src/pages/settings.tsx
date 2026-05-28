@@ -7,8 +7,11 @@ import {
   Download, Camera, Keyboard, Sun, Moon, Monitor, Target,
   ChevronDown, FileText, Globe, Upload, Trash2,
   HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
-  Users, UserCheck, UserX, Activity, Wrench,
+  Users, UserCheck, UserX, Activity, Wrench, Brain, TrendingUp, Database,
 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell,
+} from "recharts";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -337,6 +340,61 @@ export default function SettingsPage() {
     },
     enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
     staleTime: 30_000,
+    retry: false,
+  });
+
+  const { data: adminSummary } = useQuery<{
+    totalUsers: number;
+    newUsersWeek: number;
+    newUsersMonth: number;
+    totalSessions: number;
+    totalEntries: number;
+    totalPhotos: number;
+  }>({
+    queryKey: ["/api/admin/summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/summary", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const { data: aiUsageData } = useQuery<{
+    totalRequests: number;
+    totalPromptTokens: number;
+    totalCompletionTokens: number;
+    byFeature: Array<{ feature: string; requests: number; promptTokens: number; completionTokens: number }>;
+    byUser: Array<{ userId: string | null; displayName: string; requests: number; tokens: number }>;
+    dailyTrend: Array<{ date: string; requests: number }>;
+  }>({
+    queryKey: ["/api/admin/ai-usage"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/ai-usage", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const { data: pageViewData } = useQuery<{
+    totalViews: number;
+    uniqueVisitorsToday: number;
+    byPath: Array<{ path: string; views: number }>;
+    dailyTrend: Array<{ date: string; views: number }>;
+  }>({
+    queryKey: ["/api/admin/page-views"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/page-views", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    staleTime: 60_000,
     retry: false,
   });
 
@@ -2881,6 +2939,180 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Summary Cards */}
+              <Card className="border-border/60">
+                <CardHeader className="pb-3 pt-4 px-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Database className="h-4 w-4 text-primary" />
+                    App Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {[
+                      { label: "Total Users", value: adminSummary?.totalUsers, sub: `+${adminSummary?.newUsersWeek ?? 0} this week` },
+                      { label: "New (30d)", value: adminSummary?.newUsersMonth, sub: "registered users" },
+                      { label: "Active Sessions", value: adminSummary?.totalSessions, sub: "non-trashed" },
+                      { label: "Total Entries", value: adminSummary?.totalEntries, sub: "across all sessions" },
+                      { label: "Total Photos", value: adminSummary?.totalPhotos, sub: "uploaded" },
+                    ].map((card) => (
+                      <div key={card.label} className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{card.label}</p>
+                        <p className="font-mono text-lg font-bold text-foreground leading-tight" data-testid={`admin-stat-${card.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                          {adminSummary ? card.value?.toLocaleString() ?? "0" : "—"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{card.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* AI Usage */}
+              <Card className="border-border/60">
+                <CardHeader className="pb-3 pt-4 px-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-primary" />
+                    AI Usage
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Total Calls", value: aiUsageData?.totalRequests },
+                      { label: "Prompt Tokens", value: aiUsageData?.totalPromptTokens },
+                      { label: "Output Tokens", value: aiUsageData?.totalCompletionTokens },
+                    ].map((card) => (
+                      <div key={card.label} className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{card.label}</p>
+                        <p className="font-mono text-base font-bold text-foreground leading-tight" data-testid={`ai-stat-${card.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                          {aiUsageData ? (card.value ?? 0).toLocaleString() : "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {aiUsageData && aiUsageData.byFeature.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Calls by Feature</p>
+                      <ResponsiveContainer width="100%" height={90}>
+                        <BarChart data={aiUsageData.byFeature} layout="vertical" margin={{ left: 8, right: 8 }}>
+                          <XAxis type="number" tick={{ fontSize: 10 }} />
+                          <YAxis type="category" dataKey="feature" tick={{ fontSize: 10 }} width={80} />
+                          <RechartsTooltip
+                            contentStyle={{ fontSize: 11, background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
+                            formatter={(v: number) => [v.toLocaleString(), "calls"]}
+                          />
+                          <Bar dataKey="requests" radius={[0, 3, 3, 0]}>
+                            {aiUsageData.byFeature.map((_, i) => (
+                              <Cell key={i} fill={i === 0 ? "hsl(var(--primary))" : i === 1 ? "hsl(var(--primary) / 0.7)" : "hsl(var(--primary) / 0.45)"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {aiUsageData && aiUsageData.dailyTrend.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Daily Calls (30d)</p>
+                      <ResponsiveContainer width="100%" height={70}>
+                        <BarChart data={aiUsageData.dailyTrend} margin={{ left: -8, right: 0 }}>
+                          <XAxis dataKey="date" tick={false} />
+                          <YAxis tick={{ fontSize: 9 }} width={28} />
+                          <RechartsTooltip
+                            contentStyle={{ fontSize: 11, background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
+                            formatter={(v: number) => [v, "calls"]}
+                          />
+                          <Bar dataKey="requests" fill="hsl(var(--primary) / 0.7)" radius={[2, 2, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {aiUsageData && aiUsageData.byUser.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Top Users</p>
+                      <div className="space-y-1">
+                        {aiUsageData.byUser.slice(0, 8).map((u, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs py-0.5 border-b border-border/30 last:border-0">
+                            <span className="text-foreground/80 truncate max-w-[60%]">{u.displayName}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-muted-foreground">{u.tokens.toLocaleString()} tok</span>
+                              <span className="font-mono font-semibold text-foreground">{u.requests} calls</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {aiUsageData && aiUsageData.totalRequests === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-2">No AI calls recorded yet. Usage will appear here after label scans or chat sessions.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Page Views */}
+              <Card className="border-border/60">
+                <CardHeader className="pb-3 pt-4 px-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Page Views (30d)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Views (30d)", value: pageViewData?.totalViews },
+                      { label: "Unique Visitors Today", value: pageViewData?.uniqueVisitorsToday },
+                    ].map((card) => (
+                      <div key={card.label} className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{card.label}</p>
+                        <p className="font-mono text-lg font-bold text-foreground leading-tight" data-testid={`pv-stat-${card.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                          {pageViewData ? (card.value ?? 0).toLocaleString() : "—"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {pageViewData && pageViewData.dailyTrend.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Daily Views</p>
+                      <ResponsiveContainer width="100%" height={80}>
+                        <BarChart data={pageViewData.dailyTrend} margin={{ left: -8, right: 0 }}>
+                          <XAxis dataKey="date" tick={false} />
+                          <YAxis tick={{ fontSize: 9 }} width={28} />
+                          <RechartsTooltip
+                            contentStyle={{ fontSize: 11, background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
+                            formatter={(v: number) => [v, "views"]}
+                          />
+                          <Bar dataKey="views" fill="hsl(var(--primary) / 0.7)" radius={[2, 2, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {pageViewData && pageViewData.byPath.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Top Pages</p>
+                      <div className="space-y-1">
+                        {pageViewData.byPath.map((p, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs py-0.5 border-b border-border/30 last:border-0">
+                            <span className="font-mono text-foreground/80 truncate max-w-[75%]">{p.path}</span>
+                            <span className="font-mono font-semibold text-foreground shrink-0">{p.views.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {pageViewData && pageViewData.totalViews === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-2">No page views recorded yet. Views will appear here as users navigate the app.</p>
+                  )}
                 </CardContent>
               </Card>
 

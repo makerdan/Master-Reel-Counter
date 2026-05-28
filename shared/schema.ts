@@ -494,3 +494,29 @@ export const messages = pgTable("messages", {
 
 export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+
+// ─── AI Usage Tracking ────────────────────────────────────────────────────────
+export const aiUsageLogs = pgTable("ai_usage_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id"),
+  feature: text("feature").notNull(),
+  model: text("model").notNull(),
+  promptTokens: integer("prompt_tokens").notNull().default(0),
+  completionTokens: integer("completion_tokens").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("ai_usage_logs_user_id_idx").on(table.userId),
+  index("ai_usage_logs_created_at_idx").on(table.createdAt),
+  index("ai_usage_logs_feature_idx").on(table.feature),
+]);
+
+// ─── Page Views ───────────────────────────────────────────────────────────────
+export const pageViews = pgTable("page_views", {
+  id: serial("id").primaryKey(),
+  path: text("path").notNull(),
+  visitorHash: text("visitor_hash").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("page_views_created_at_idx").on(table.createdAt),
+  index("page_views_path_idx").on(table.path),
+]);

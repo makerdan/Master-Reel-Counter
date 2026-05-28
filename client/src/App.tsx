@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { THEME_MODE_KEY } from "@/lib/storageKeys";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -58,6 +58,19 @@ function ThemeSyncer() {
   return null;
 }
 
+function PageViewTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    fetch("/api/track/pageview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: location }),
+      credentials: "include",
+    }).catch(() => {});
+  }, [location]);
+  return null;
+}
+
 function AuthRouter() {
   const { user, isLoading } = useAuth();
 
@@ -109,6 +122,7 @@ function App() {
               <Toaster />
               <ThemeSyncer />
               <TextSizeSyncer />
+              <PageViewTracker />
               <NetworkStatusIndicator />
               <AuthRouter />
             </TooltipProvider>

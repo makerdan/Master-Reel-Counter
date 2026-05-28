@@ -28,6 +28,25 @@ import ExcelJS from "exceljs";
 import { openai } from "./replit_integrations/image/client";
 import { taskTracker } from "./lib/taskTracker";
 
+// Fire-and-forget helper: records one AI API call to ai_usage_logs.
+// Errors are suppressed so logging never disrupts the caller's flow.
+async function logAiUsage(
+  userId: string | null,
+  feature: string,
+  model: string,
+  promptTokens: number,
+  completionTokens: number,
+): Promise<void> {
+  try {
+    await db.execute(sql`
+      INSERT INTO ai_usage_logs (user_id, feature, model, prompt_tokens, completion_tokens, created_at)
+      VALUES (${userId}, ${feature}, ${model}, ${promptTokens}, ${completionTokens}, NOW())
+    `);
+  } catch {
+    // intentionally silent
+  }
+}
+
 // In-memory PDF generation job tracker
 const pdfJobs = new Map<string, {
   done: number;
@@ -263,6 +282,7 @@ export async function registerRoutes(
       "/api/login", "/api/callback", "/api/logout",
       "/api/auth/user", "/api/auth/tester-login", "/api/auth/tester-logout",
       "/api/__test__/seed-tester-password",
+      "/api/track/pageview",
     ];
     const matchesSkip = skipPaths.some(p => req.originalUrl === p || req.originalUrl.startsWith(p + "/") || req.originalUrl.startsWith(p + "?"));
     if (matchesSkip) return next();
@@ -2013,6 +2033,7 @@ export async function registerRoutes(
             max_tokens: 2000,
           });
 
+          logAiUsage(req.user?.claims?.sub ?? null, "label-scan", "gpt-4o", response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0).catch(() => {});
           const content = response.choices?.[0]?.message?.content ?? "{}";
           let parsed: { labels?: (string | null)[] } = {};
           let parseFailed = false;
@@ -2177,6 +2198,7 @@ export async function registerRoutes(
             max_tokens: 2000,
           });
 
+          logAiUsage(req.user?.claims?.sub ?? null, "session-scan", "gpt-4o", response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0).catch(() => {});
           const content = response.choices?.[0]?.message?.content ?? "{}";
           let parsed: { labels?: (string | null)[] } = {};
           let parseFailed = false;
@@ -6156,13 +6178,20 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         model: "gpt-4o-mini",
         messages: chatMessages,
         stream: true,
+        stream_options: { include_usage: true },
         max_completion_tokens: 1024,
       });
 
+      let promptTokens = 0;
+      let completionTokens = 0;
       for await (const chunk of stream) {
         if (aborted) {
           stream.controller.abort();
           break;
+        }
+        if (chunk.usage) {
+          promptTokens = chunk.usage.prompt_tokens ?? 0;
+          completionTokens = chunk.usage.completion_tokens ?? 0;
         }
         const content = chunk.choices[0]?.delta?.content || "";
         if (content) {
@@ -6173,6 +6202,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       if (!aborted) {
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         res.end();
+        logAiUsage(req.user?.claims?.sub ?? null, "help-chat", "gpt-4o-mini", promptTokens, completionTokens).catch(() => {});
       }
     } catch (error) {
       console.error("Error in help chat:", error);
@@ -6649,6 +6679,25 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
               AND cs.deleted_at IS NULL`
       )).rows as [{ count: number }];
 
+      const [zeroFootage] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM entries
+            WHERE footage IS NULL OR footage <= 0`
+      )).rows as [{ count: number }];
+
+      const [stalePins] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM pins p
+            JOIN photos ph ON p.photo_id = ph.id
+            JOIN counting_sessions cs ON ph.session_id = cs.id
+            WHERE p.entry_id IS NULL
+              AND cs.created_at < NOW() - INTERVAL '7 days'
+              AND cs.deleted_at IS NULL`
+      )).rows as [{ count: number }];
+
+      const [staleIntents] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM upload_intents
+            WHERE created_at < NOW() - INTERVAL '48 hours'`
+      )).rows as [{ count: number }];
+
       res.json({
         checks: [
           {
@@ -6670,6 +6719,27 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
             label: "Active sessions inside a trashed folder",
             description: "Non-trashed sessions whose folder_id points to a soft-deleted folder",
             count: Number(orphanedFolder.count),
+            fixable: true,
+          },
+          {
+            id: "entries_zero_footage",
+            label: "Entries with zero or missing footage",
+            description: "Committed entries where footage is NULL or 0 — likely a data entry error",
+            count: Number(zeroFootage.count),
+            fixable: false,
+          },
+          {
+            id: "uncommitted_pins_stale",
+            label: "Stale uncommitted pins (>7 days old)",
+            description: "Draft pins with no linked entry on sessions active for over 7 days",
+            count: Number(stalePins.count),
+            fixable: true,
+          },
+          {
+            id: "stale_upload_intents",
+            label: "Stale upload intents (>48 hours old)",
+            description: "Upload intent records that were never completed and are older than 48 hours",
+            count: Number(staleIntents.count),
             fixable: true,
           },
         ],
@@ -6712,6 +6782,22 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
               SET folder_id = NULL
               WHERE folder_id IN (SELECT id FROM folders WHERE deleted_at IS NOT NULL)
                 AND deleted_at IS NULL`
+        );
+      } else if (checkId === "uncommitted_pins_stale") {
+        result = await db.execute(
+          sql`DELETE FROM pins
+              WHERE entry_id IS NULL
+                AND photo_id IN (
+                  SELECT ph.id FROM photos ph
+                  JOIN counting_sessions cs ON ph.session_id = cs.id
+                  WHERE cs.created_at < NOW() - INTERVAL '7 days'
+                    AND cs.deleted_at IS NULL
+                )`
+        );
+      } else if (checkId === "stale_upload_intents") {
+        result = await db.execute(
+          sql`DELETE FROM upload_intents
+              WHERE created_at < NOW() - INTERVAL '48 hours'`
         );
       } else {
         return res.status(400).json({ message: "Unknown checkId" });
@@ -6773,6 +6859,185 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     }
     pdfJobs.delete(jobId);
     res.json({ ok: true, jobId });
+  });
+
+  // Public endpoint: fire-and-forget page view tracking.
+  // Hashes the client IP for privacy-safe visitor counting; never blocks the response.
+  app.post("/api/track/pageview", async (req: any, res) => {
+    try {
+      const { path } = req.body ?? {};
+      if (!path || typeof path !== "string" || path.length > 500) {
+        return res.status(400).json({ ok: false });
+      }
+      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";
+      const salt = process.env.SESSION_SECRET || "pv-salt";
+      const hash = createHash("sha256").update(ip + salt).digest("hex").slice(0, 16);
+      db.execute(sql`
+        INSERT INTO page_views (path, visitor_hash, created_at)
+        VALUES (${path.slice(0, 200)}, ${hash}, NOW())
+      `).catch(() => {});
+      res.json({ ok: true });
+    } catch {
+      res.json({ ok: false });
+    }
+  });
+
+  // Admin endpoint: high-level aggregate app stats (owner-only).
+  app.get("/api/admin/summary", isAuthenticated, async (req: any, res) => {
+    const replOwner = process.env.REPL_OWNER;
+    const username = req.user?.claims?.username;
+    if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const [totalUsers] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM users WHERE NOT is_tester`
+      )).rows as [{ count: number }];
+      const [newUsersWeek] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM users WHERE NOT is_tester AND created_at > NOW() - INTERVAL '7 days'`
+      )).rows as [{ count: number }];
+      const [newUsersMonth] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM users WHERE NOT is_tester AND created_at > NOW() - INTERVAL '30 days'`
+      )).rows as [{ count: number }];
+      const [totalSessions] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM counting_sessions WHERE deleted_at IS NULL`
+      )).rows as [{ count: number }];
+      const [totalEntries] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM entries`
+      )).rows as [{ count: number }];
+      const [totalPhotos] = (await db.execute(
+        sql`SELECT COUNT(*)::int AS count FROM photos`
+      )).rows as [{ count: number }];
+      res.json({
+        totalUsers: Number(totalUsers.count),
+        newUsersWeek: Number(newUsersWeek.count),
+        newUsersMonth: Number(newUsersMonth.count),
+        totalSessions: Number(totalSessions.count),
+        totalEntries: Number(totalEntries.count),
+        totalPhotos: Number(totalPhotos.count),
+      });
+    } catch (err) {
+      console.error("[admin-summary]", err);
+      res.status(500).json({ message: "Internal error" });
+    }
+  });
+
+  // Admin endpoint: AI API usage statistics (owner-only).
+  app.get("/api/admin/ai-usage", isAuthenticated, async (req: any, res) => {
+    const replOwner = process.env.REPL_OWNER;
+    const username = req.user?.claims?.username;
+    if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const [totals] = (await db.execute(sql`
+        SELECT
+          COUNT(*)::int AS total_requests,
+          COALESCE(SUM(prompt_tokens), 0)::int AS total_prompt_tokens,
+          COALESCE(SUM(completion_tokens), 0)::int AS total_completion_tokens
+        FROM ai_usage_logs
+      `)).rows as [{ total_requests: number; total_prompt_tokens: number; total_completion_tokens: number }];
+
+      const byFeatureRows = (await db.execute(sql`
+        SELECT feature,
+          COUNT(*)::int AS requests,
+          COALESCE(SUM(prompt_tokens), 0)::int AS prompt_tokens,
+          COALESCE(SUM(completion_tokens), 0)::int AS completion_tokens
+        FROM ai_usage_logs
+        GROUP BY feature
+        ORDER BY requests DESC
+      `)).rows as Array<{ feature: string; requests: number; prompt_tokens: number; completion_tokens: number }>;
+
+      const byUserRows = (await db.execute(sql`
+        SELECT al.user_id,
+          COALESCE(
+            NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
+            u.username,
+            al.user_id,
+            'Unknown'
+          ) AS display_name,
+          COUNT(*)::int AS requests,
+          COALESCE(SUM(al.prompt_tokens + al.completion_tokens), 0)::int AS tokens
+        FROM ai_usage_logs al
+        LEFT JOIN users u ON u.id = al.user_id
+        GROUP BY al.user_id, display_name
+        ORDER BY requests DESC
+        LIMIT 20
+      `)).rows as Array<{ user_id: string | null; display_name: string; requests: number; tokens: number }>;
+
+      const dailyRows = (await db.execute(sql`
+        SELECT DATE(created_at)::text AS date, COUNT(*)::int AS requests
+        FROM ai_usage_logs
+        WHERE created_at > NOW() - INTERVAL '30 days'
+        GROUP BY DATE(created_at)
+        ORDER BY date
+      `)).rows as Array<{ date: string; requests: number }>;
+
+      res.json({
+        totalRequests: Number(totals.total_requests),
+        totalPromptTokens: Number(totals.total_prompt_tokens),
+        totalCompletionTokens: Number(totals.total_completion_tokens),
+        byFeature: byFeatureRows.map(r => ({
+          feature: r.feature,
+          requests: Number(r.requests),
+          promptTokens: Number(r.prompt_tokens),
+          completionTokens: Number(r.completion_tokens),
+        })),
+        byUser: byUserRows.map(r => ({
+          userId: r.user_id,
+          displayName: r.display_name,
+          requests: Number(r.requests),
+          tokens: Number(r.tokens),
+        })),
+        dailyTrend: dailyRows.map(r => ({ date: r.date, requests: Number(r.requests) })),
+      });
+    } catch (err) {
+      console.error("[admin-ai-usage]", err);
+      res.status(500).json({ message: "Internal error" });
+    }
+  });
+
+  // Admin endpoint: page view statistics (owner-only).
+  app.get("/api/admin/page-views", isAuthenticated, async (req: any, res) => {
+    const replOwner = process.env.REPL_OWNER;
+    const username = req.user?.claims?.username;
+    if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const [totals] = (await db.execute(sql`
+        SELECT COUNT(*)::int AS total_views
+        FROM page_views
+        WHERE created_at > NOW() - INTERVAL '30 days'
+      `)).rows as [{ total_views: number }];
+
+      const [uniqueToday] = (await db.execute(sql`
+        SELECT COUNT(DISTINCT visitor_hash)::int AS unique_visitors
+        FROM page_views
+        WHERE created_at >= CURRENT_DATE
+      `)).rows as [{ unique_visitors: number }];
+
+      const byPathRows = (await db.execute(sql`
+        SELECT path, COUNT(*)::int AS views
+        FROM page_views
+        WHERE created_at > NOW() - INTERVAL '30 days'
+        GROUP BY path
+        ORDER BY views DESC
+        LIMIT 15
+      `)).rows as Array<{ path: string; views: number }>;
+
+      const dailyRows = (await db.execute(sql`
+        SELECT DATE(created_at)::text AS date, COUNT(*)::int AS views
+        FROM page_views
+        WHERE created_at > NOW() - INTERVAL '30 days'
+        GROUP BY DATE(created_at)
+        ORDER BY date
+      `)).rows as Array<{ date: string; views: number }>;
+
+      res.json({
+        totalViews: Number(totals.total_views),
+        uniqueVisitorsToday: Number(uniqueToday.unique_visitors),
+        byPath: byPathRows.map(r => ({ path: r.path, views: Number(r.views) })),
+        dailyTrend: dailyRows.map(r => ({ date: r.date, views: Number(r.views) })),
+      });
+    } catch (err) {
+      console.error("[admin-page-views]", err);
+      res.status(500).json({ message: "Internal error" });
+    }
   });
 
   // ── Dev-only test seeding endpoint ──────────────────────────────────────────

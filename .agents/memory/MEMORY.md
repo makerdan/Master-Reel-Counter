@@ -1,0 +1,1 @@
+- [Global isApproved middleware](global-isapproved-middleware.md) — all /api/* routes pass through isApproved; exempt public endpoints in the skipPaths array in routes.ts.
