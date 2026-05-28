@@ -155,6 +155,7 @@ export const CATALOG: CatalogEntry[] = [
   { vendor: "ALU", catalog: "URD40500", description: "URD (UNDERGROUND DISTRIBUTION CABLE) SWEETBRIAR 4/0 AWG 500'" },
   { vendor: "ALU", catalog: "URD4040401000", description: "URD (UNDERGROUND DISTRIBUTION CABLE) MONMOUTH 4/0 AWG 3C 1000'" },
   { vendor: "ALU", catalog: "URD404040201500", description: "URD (UNDERGROUND DISTRIBUTION CABLE) 4/0 AWG, 4/0 AWG, 4/0 AWG & 2/0 AWG GROUND 1500'" },
+  { vendor: "ALU", catalog: "URD40404020500", description: "URD (UNDERGROUND DISTRIBUTION CABLE) 4/0 AWG, 4/0 AWG, 4/0 AWG & 2/0 AWG GROUND 500'" },
   { vendor: "ALU", catalog: "URD404040500", description: "URD (UNDERGROUND DISTRIBUTION CABLE) MONMOUTH 4/0 AWG 3C 500'" },
   { vendor: "ALU", catalog: "URD41000", description: "URD (UNDERGROUND DISTRIBUTION CABLE) VASSAR 4 AWG 1000'" },
   { vendor: "ALU", catalog: "URD4500", description: "URD (UNDERGROUND DISTRIBUTION CABLE) VASSAR 4 AWG 500'" },
