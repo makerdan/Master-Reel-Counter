@@ -114,7 +114,7 @@ args = "npm run ci"
 isValidation = true
 
 [agent]
-integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0"]
+integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0", "github:1.0.0"]
 
 [postMerge]
 path = "scripts/post-merge.sh"
