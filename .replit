@@ -106,12 +106,12 @@ args = "npm run typecheck"
 name = "ci"
 author = "agent"
 
+[workflows.workflow.metadata]
+isValidation = true
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run ci"
-
-[workflows.workflow.metadata]
-isValidation = true
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0", "github:1.0.0"]

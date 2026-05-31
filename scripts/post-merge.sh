@@ -2,3 +2,4 @@
 set -e
 npm install
 npm run db:push
+npm run ci
