@@ -8,3 +8,4 @@ playwright-report/
 test-results/
 tests/.auth/
 .crash_log.json
+.crash_log.json
