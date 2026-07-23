@@ -17,6 +17,13 @@ const WS_RECONNECT_CAP_MS = 30_000;
 const WS_RECONNECT_JITTER_MS = 500;
 const WS_BUFFER_MAX = 20;
 
+// Client sends an application-level ping every 25 s on idle connections.
+// The server echoes { type: "pong" } which resets the silence timer.
+const WS_PING_INTERVAL_MS = 25_000;
+// If no message of any kind arrives within this window the connection is
+// considered dead and the socket is closed to trigger a reconnect.
+const WS_SILENCE_TIMEOUT_MS = 45_000;
+
 export function useSessionWebSocket(
   sessionId: number | null,
   onMessage?: MessageHandler,
@@ -81,6 +88,29 @@ export function useSessionWebSocket(
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     wsRef.current = ws;
 
+    // Silence-detection: close the socket if no message arrives for
+    // WS_SILENCE_TIMEOUT_MS. The browser WebSocket API cannot observe native
+    // ping/pong frames, so the client sends application-level pings every
+    // WS_PING_INTERVAL_MS; the server echoes a "pong" which resets this timer.
+    // Any other inbound message also resets the timer.
+    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+    let pingInterval: ReturnType<typeof setInterval> | null = null;
+
+    const clearHeartbeat = () => {
+      if (silenceTimer !== null) { clearTimeout(silenceTimer); silenceTimer = null; }
+      if (pingInterval !== null) { clearInterval(pingInterval); pingInterval = null; }
+    };
+
+    const resetSilenceTimer = () => {
+      if (silenceTimer !== null) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        // No message received within the silence window — the connection is
+        // likely dead. Close the socket so the existing onclose → reconnect
+        // path fires and the "Retry now" UI is shown.
+        ws.close();
+      }, WS_SILENCE_TIMEOUT_MS);
+    };
+
     ws.onopen = () => {
       reconnectDelayRef.current = WS_RECONNECT_BASE_MS;
       hasEverConnectedRef.current = true;
@@ -95,9 +125,25 @@ export function useSessionWebSocket(
       for (const msg of buffered) {
         safeSend(msg);
       }
+
+      // Start silence detection. Reset the timer on open so we don't fire
+      // immediately for sessions where the server sends no early messages.
+      resetSilenceTimer();
+
+      // Send application-level pings so the server can echo pongs even on
+      // completely idle sessions, keeping the silence timer from firing
+      // spuriously.
+      pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, WS_PING_INTERVAL_MS);
     };
 
     ws.onmessage = (event) => {
+      // Any inbound message proves the connection is alive — reset the timer.
+      resetSilenceTimer();
+
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === "auth_expired") {
@@ -105,6 +151,8 @@ export function useSessionWebSocket(
           window.location.href = "/api/login";
           return;
         }
+        // pong is only a heartbeat acknowledgement; no further processing needed.
+        if (msg.type === "pong") return;
         if (msg.type === "sync") {
           const sid = msg.sessionId?.toString() || sessionId.toString();
           if (msg.entity === "entries") {
@@ -128,6 +176,7 @@ export function useSessionWebSocket(
     };
 
     ws.onclose = () => {
+      clearHeartbeat();
       // Primary guard: if the cleanup has already run (or a newer connection is
       // active), this onclose belongs to a superseded socket — do nothing.
       // The cleanup always increments connectionIdRef, so any onclose that fires

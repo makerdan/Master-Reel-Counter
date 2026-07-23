@@ -6236,6 +6236,10 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   const processWsMessage = async (ws: WebSocket, raw: Buffer | string) => {
     try {
       const msg = JSON.parse(raw.toString());
+      if (msg.type === "ping") {
+        ws.send(JSON.stringify({ type: "pong" }));
+        return;
+      }
       if (msg.type === "join" && typeof msg.sessionId === "number") {
         const info = wsUserMap.get(ws)!;
         if (!info.userId) {
