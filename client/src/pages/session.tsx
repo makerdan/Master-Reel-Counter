@@ -345,7 +345,7 @@ function SessionWorkspace({
   const { setWsReconnect, setForceReconnect } = useWsReconnect();
   const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
 
-  const { wsStatus, reconnectDelayMs, forceReconnect } = useSessionWebSocket(sessionId, (msg) => {
+  const { wsStatus, reconnectDelayMs, forceReconnect, isRefreshing } = useSessionWebSocket(sessionId, (msg) => {
     if (msg.type === "presence") {
       setOnlineUsers(msg.users || []);
     }
@@ -850,6 +850,12 @@ function SessionWorkspace({
                     Retry now
                   </button>
                 )}
+              </span>
+            )}
+            {isRefreshing && wsStatus === "connected" && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse" data-testid="text-ws-refreshing">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Refreshing…
               </span>
             )}
             {saveStatus === "saving" && (

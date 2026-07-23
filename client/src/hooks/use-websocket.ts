@@ -63,6 +63,8 @@ export function useSessionWebSocket(
 
   const [wsStatus, setWsStatus] = useState<WsStatus>("connecting");
   const [reconnectDelayMs, setReconnectDelayMs] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshingTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const safeSend = useCallback((data: string) => {
     const ws = wsRef.current;
@@ -113,9 +115,23 @@ export function useSessionWebSocket(
 
     ws.onopen = () => {
       reconnectDelayRef.current = WS_RECONNECT_BASE_MS;
+      const isReconnect = hasEverConnectedRef.current;
       hasEverConnectedRef.current = true;
       setWsStatus("connected");
       setReconnectDelayMs(null);
+
+      // On reconnect, proactively invalidate session caches so collaborators
+      // never see stale entries, photos, or pins after a silent reconnect.
+      if (isReconnect && sessionId) {
+        const sid = sessionId.toString();
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "entries"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "photos"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "pins"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "incomplete-pins"] });
+        clearTimeout(refreshingTimerRef.current);
+        setIsRefreshing(true);
+        refreshingTimerRef.current = setTimeout(() => setIsRefreshing(false), 2_000);
+      }
       // Send join first so the server registers room membership before any
       // buffered messages arrive — buffered messages may require room context.
       // Read userInfo from the ref to avoid stale closures.
@@ -215,6 +231,7 @@ export function useSessionWebSocket(
       connectionIdRef.current++;
       shouldReconnectRef.current = false;
       clearTimeout(reconnectTimerRef.current);
+      clearTimeout(refreshingTimerRef.current);
       wsRef.current?.close();
       wsRef.current = null;
     };
@@ -229,5 +246,5 @@ export function useSessionWebSocket(
     connect();
   }, [connect]);
 
-  return { wsRef, sendMessage, wsStatus, reconnectDelayMs, forceReconnect };
+  return { wsRef, sendMessage, wsStatus, reconnectDelayMs, forceReconnect, isRefreshing };
 }
