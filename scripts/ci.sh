@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci.sh — Sequential CI gate: typecheck → lint:storage → e2e
+# ci.sh — Sequential CI gate: audit → typecheck → lint:storage → e2e
 # Prints a summary table at the end showing pass/fail per step.
 # Exits non-zero if any step fails.
 #
@@ -10,8 +10,8 @@
 
 set -euo pipefail
 
-STEPS=("typecheck" "lint:storage" "e2e")
-CMDS=("npm run typecheck" "npm run lint:storage" "node scripts/free-ports.mjs && npm run test:e2e")
+STEPS=("audit" "typecheck" "lint:storage" "e2e")
+CMDS=("npm audit --audit-level=high" "npm run typecheck" "npm run lint:storage" "node scripts/free-ports.mjs && npm run test:e2e")
 
 declare -A RESULTS
 declare -A SKIP_REASONS
