@@ -9,7 +9,7 @@ import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/route
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -1223,13 +1223,16 @@ export async function registerRoutes(
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
+      const parsed = insertPhotoBodySchema.safeParse(r.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid photo data", errors: parsed.error.flatten().fieldErrors });
+      }
       const displayName = r.user.claims.first_name
         ? `${r.user.claims.first_name} ${r.user.claims.last_name || ""}`.trim()
         : r.user.claims.email || userId;
-      const ext = (r.body.originalFilename || "photo.jpg").match(/\.[^.]+$/)?.[0] || ".jpg";
+      const ext = (parsed.data.originalFilename || "photo.jpg").match(/\.[^.]+$/)?.[0] || ".jpg";
       const photo = await storage.atomicCreatePhoto({
-        ...r.body,
-        objectStorageKey: r.body.objectStorageKey!, // client always provides this; runtime validates
+        ...parsed.data,
         sessionId: access.session.id,
         userId,
         uploadedBy: displayName,

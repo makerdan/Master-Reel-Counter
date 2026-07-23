@@ -298,6 +298,26 @@ export const insertPhotoSchema = createInsertSchema(photos).omit({
   createdAt: true,
 });
 
+export const insertPhotoBodySchema = insertPhotoSchema.pick({
+  objectStorageKey: true,
+  originalFilename: true,
+  mimeType: true,
+  fileSize: true,
+  aisle: true,
+  section: true,
+  notes: true,
+  isDetailShot: true,
+  parentPhotoId: true,
+  linkedPinLabel: true,
+  linkReason: true,
+  rotation: true,
+  pinScale: true,
+  width: true,
+  height: true,
+  exifTimestamp: true,
+  exifGps: true,
+});
+
 export const insertEntrySchema = createInsertSchema(entries).omit({
   id: true,
   createdAt: true,
