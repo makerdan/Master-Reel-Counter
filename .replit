@@ -43,10 +43,6 @@ args = "Start application"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "e2e"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "lint-storage"
 
 [[workflows.workflow.tasks]]
@@ -56,6 +52,10 @@ args = "typecheck"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "ci"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "e2e"
 
 [[workflows.workflow]]
 name = "Start application"
@@ -68,17 +68,6 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
-
-[[workflows.workflow]]
-name = "e2e"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run test:e2e"
 
 [[workflows.workflow]]
 name = "lint-storage"
@@ -112,6 +101,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run ci"
+
+[[workflows.workflow]]
+name = "e2e"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node scripts/free-ports.mjs && npm run test:e2e"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0", "github:1.0.0"]

@@ -11,7 +11,7 @@
 set -euo pipefail
 
 STEPS=("typecheck" "lint:storage" "e2e")
-CMDS=("npm run typecheck" "npm run lint:storage" "npm run test:e2e")
+CMDS=("npm run typecheck" "npm run lint:storage" "node scripts/free-ports.mjs && npm run test:e2e")
 
 declare -A RESULTS
 declare -A SKIP_REASONS
