@@ -1,8 +1,8 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import passport from "passport";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
 import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
 import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/routes";
@@ -194,18 +194,18 @@ function checkLocked(session: any, role: string): string | null {
   return null;
 }
 
-function resolveUserId(req: any): string {
-  const user = req.user as any;
-  if (user?.isTester && user?.claims?.testerOwnerUserId) {
-    return user.claims.testerOwnerUserId;
+function resolveUserId(req: AuthenticatedRequest | any): string {
+  const ar = req as AuthenticatedRequest;
+  if (ar.user?.isTester && ar.user?.claims?.testerOwnerUserId) {
+    return ar.user.claims.testerOwnerUserId;
   }
-  return user?.claims?.sub;
+  return ar.user?.claims?.sub;
 }
 
-function getTesterOwner(req: any): string | undefined {
-  const user = req.user as any;
-  if (user?.isTester && user?.claims?.testerOwnerUserId) {
-    return user.claims.testerOwnerUserId;
+function getTesterOwner(req: AuthenticatedRequest | any): string | undefined {
+  const ar = req as AuthenticatedRequest;
+  if (ar.user?.isTester && ar.user?.claims?.testerOwnerUserId) {
+    return ar.user.claims.testerOwnerUserId;
   }
   return undefined;
 }
@@ -246,9 +246,93 @@ const cropAiRateLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.user?.claims?.sub ?? req.ip,
+  keyGenerator: (req: any) => req.user?.claims?.sub ?? ipKeyGenerator(req.ip ?? ""),
   message: { message: "Too many scan requests. Please wait a moment before trying again." },
 });
+
+// Public endpoint rate limiter: prevents DB flooding on unauthenticated routes.
+// Uses ipKeyGenerator (proxy-aware, IPv6-safe) from express-rate-limit so it
+// behaves correctly behind Replit's reverse proxy without IPv6 validation errors.
+const pageviewRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? ""),
+  message: { ok: false, message: "Too many pageview requests, please try again later." },
+});
+
+/**
+ * Typed wrapper for Express requests that have been authenticated.
+ * Replaces `req: any` on high-risk route handlers so TypeScript can catch
+ * missing-field bugs at compile time. Apply incrementally — handlers still
+ * using `req: any` are marked with // TODO(req-typing).
+ */
+interface AuthenticatedUser {
+  isTester?: boolean;
+  claims: {
+    sub: string;
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    testerOwnerUserId?: string;
+  };
+}
+
+/** Generic authenticated request — TBody types req.body for compile-time safety. */
+interface AuthenticatedRequest<TBody = Record<string, unknown>> extends Request {
+  user: AuthenticatedUser;
+  body: TBody;
+}
+
+/** Body shape for POST /api/uploads/direct (multipart; body fields are minimal). */
+interface UploadBody {
+  sessionId?: string;
+}
+
+/** Body shape for POST /api/sessions/:sessionId/photos */
+interface PhotoCreateBody {
+  objectStorageKey?: string;
+  originalFilename?: string;
+  objectPath?: string;
+  mimeType?: string;
+  aisle?: string;
+  section?: string;
+  notes?: string;
+  isReceiving?: boolean | string;
+  isOnFloor?: boolean | string;
+  fileSize?: number;
+  rotation?: number;
+  capturedAt?: string;
+  width?: number;
+  height?: number;
+}
+
+/** Body shape for POST /api/sessions/:sessionId/entries */
+interface EntryCreateBody {
+  aisle?: string;
+  section?: string;
+  category?: string;
+  footage?: number;
+  manufacturer?: string;
+  reelCount?: number;
+  notes?: string;
+  reelTag?: string;
+  photoId?: number;
+  unitType?: string;
+}
+
+/** Body shape for POST /api/photos/:photoId/pins */
+interface PinCreateBody {
+  x?: number;
+  y?: number;
+  label?: string;
+  notes?: string;
+  photoUrl?: string;
+  isDraft?: boolean;
+  scale?: number;
+}
 
 const patchSessionSchema = z.object({
   name: z.string().min(1).max(500).optional(),
@@ -429,28 +513,29 @@ export async function registerRoutes(
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 }, fileFilter: imageFileFilter });
 
   app.post("/api/uploads/direct", isAuthenticated, resourceRateLimiter, upload.single("file"), async (req: any, res) => {
+    const authedReq = req as AuthenticatedRequest<UploadBody> & { file?: Express.Multer.File; _rejectedMimetype?: string };
     try {
-      if (!req.file) {
-        if (req._rejectedMimetype) {
-          return res.status(400).json({ error: `Invalid file type: ${req._rejectedMimetype}. Allowed: image/jpeg, image/png, image/webp.` });
+      if (!authedReq.file) {
+        if (authedReq._rejectedMimetype) {
+          return res.status(400).json({ error: `Invalid file type: ${authedReq._rejectedMimetype}. Allowed: image/jpeg, image/png, image/webp.` });
         }
         return res.status(400).json({ error: "No file provided" });
       }
 
-      const ext = path.extname(req.file.originalname) || "";
+      const ext = path.extname(authedReq.file.originalname) || "";
       const objectId = `${randomUUID()}${ext}`;
       const objectPath = `/uploads/${objectId}`;
       const objectName = toStorageObjectName(objectPath);
       const localFallback = path.join(UPLOADS_DIR, objectId);
-      await putToObjectStorage(BUCKET_NAME, objectName, req.file.buffer, req.file.mimetype, localFallback);
-      console.log(`Upload success: file="${objectId}", size=${req.file.size}, type=${req.file.mimetype}`);
+      await putToObjectStorage(BUCKET_NAME, objectName, authedReq.file.buffer, authedReq.file.mimetype, localFallback);
+      console.log(`Upload success: file="${objectId}", size=${authedReq.file.size}, type=${authedReq.file.mimetype}`);
 
       // Track the pending upload so orphan cleanup can delete the file if the
       // client never completes the photo-registration step.
       // We await this so that a DB failure causes step-1 to surface an error
       // rather than silently leaving an untracked orphan. On failure, we make
       // a best-effort attempt to delete the already-uploaded file.
-      const uploadUserId = resolveUserId(req);
+      const uploadUserId = resolveUserId(authedReq);
       try {
         await storage.createUploadIntent(objectPath, uploadUserId);
       } catch (intentErr: unknown) {
@@ -463,9 +548,9 @@ export async function registerRoutes(
       res.json({
         objectPath,
         metadata: {
-          name: req.file.originalname,
-          size: req.file.size,
-          contentType: req.file.mimetype,
+          name: authedReq.file.originalname,
+          size: authedReq.file.size,
+          contentType: authedReq.file.mimetype,
         },
       });
     } catch (error: any) {
@@ -1129,20 +1214,22 @@ export async function registerRoutes(
   });
 
   app.post("/api/sessions/:sessionId/photos", isAuthenticated, async (req: any, res) => {
+    const r = req as AuthenticatedRequest<PhotoCreateBody>; // typed access — TODO(req-typing): migrate all handlers
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
+      const userId = resolveUserId(r);
+      const access = await verifySessionAccess(parseInt(r.params.sessionId as string), userId, getTesterOwner(r));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add photos" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
-      const displayName = req.user.claims.first_name
-        ? `${req.user.claims.first_name} ${req.user.claims.last_name || ""}`.trim()
-        : req.user.claims.email || userId;
-      const ext = (req.body.originalFilename || "photo.jpg").match(/\.[^.]+$/)?.[0] || ".jpg";
+      const displayName = r.user.claims.first_name
+        ? `${r.user.claims.first_name} ${r.user.claims.last_name || ""}`.trim()
+        : r.user.claims.email || userId;
+      const ext = (r.body.originalFilename || "photo.jpg").match(/\.[^.]+$/)?.[0] || ".jpg";
       const photo = await storage.atomicCreatePhoto({
-        ...req.body,
+        ...r.body,
+        objectStorageKey: r.body.objectStorageKey!, // client always provides this; runtime validates
         sessionId: access.session.id,
         userId,
         uploadedBy: displayName,
@@ -1455,9 +1542,10 @@ export async function registerRoutes(
   });
 
   app.post("/api/sessions/:sessionId/entries", isAuthenticated, async (req: any, res) => {
+    const r = req as AuthenticatedRequest<EntryCreateBody>; // typed access — TODO(req-typing): migrate all handlers
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
+      const userId = resolveUserId(r);
+      const access = await verifySessionAccess(parseInt(r.params.sessionId as string), userId, getTesterOwner(r));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add entries" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -1467,7 +1555,7 @@ export async function registerRoutes(
       const { entry, encKey } = await db.transaction(async (tx) => {
         await acquireSharedEncodingLock(tx, lk1, lk2);
         const key = await getEncryptionKey(access.session.userId);
-        let rawData: any = { ...req.body, sessionId: access.session.id, userId };
+        let rawData: any = { ...r.body, sessionId: access.session.id, userId };
         if (key) rawData = encryptEntry(rawData, key) as any;
         const parsed = insertEntrySchema.parse(rawData);
         const [inserted] = await tx.insert(entries).values(parsed).returning();
@@ -1482,7 +1570,7 @@ export async function registerRoutes(
       }
       await storage.updateSession(access.session.id, {});
       const result = encKey ? decryptEntry(entry, encKey) : entry;
-      const username = req.user.claims.first_name || req.user.claims.email || userId;
+      const username = r.user.claims.first_name || r.user.claims.email || userId;
       logActivity(access.session.id, userId, username, "entry_created", "entry", entry.id, result.reelTag || undefined);
       broadcastToSession(access.session.id, { type: "sync", entity: "entries", sessionId: access.session.id });
       res.json(result);
@@ -1786,16 +1874,17 @@ export async function registerRoutes(
   });
 
   app.post("/api/photos/:photoId/pins", isAuthenticated, async (req: any, res) => {
+    const r = req as AuthenticatedRequest<PinCreateBody>; // typed access — TODO(req-typing): migrate all handlers
     try {
-      const photo = await storage.getPhoto(parseInt(req.params.photoId));
+      const photo = await storage.getPhoto(parseInt(r.params.photoId as string));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, r.user.claims.sub, getTesterOwner(r));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to add pins" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
-      const data = insertPinSchema.parse({ ...req.body, photoId: photo.id });
+      const data = insertPinSchema.parse({ ...r.body, photoId: photo.id });
 
       // atomicCreatePin enforces (photoId, label) uniqueness at the DB level,
       // preventing duplicates from double-clicks or concurrent collaborator inserts.
@@ -6869,7 +6958,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   // Public endpoint: fire-and-forget page view tracking.
   // Hashes the client IP for privacy-safe visitor counting; never blocks the response.
-  app.post("/api/track/pageview", async (req: any, res) => {
+  app.post("/api/track/pageview", pageviewRateLimiter, async (req, res) => {
     try {
       const { path } = req.body ?? {};
       if (!path || typeof path !== "string" || path.length > 500) {

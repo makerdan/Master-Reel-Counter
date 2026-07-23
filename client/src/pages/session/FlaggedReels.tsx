@@ -770,14 +770,17 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
       if (existing) existing.push(pin);
       else groupMap.set(pin.photoId, [pin]);
     }
-    const groups = Array.from(groupMap.entries()).map(([photoId, pins]) => ({
-      photoId,
-      photoUrl: pins[0].photoUrl || null,
-      photoFilename: pins[0].photoFilename || null,
-      photoAisle: pins[0].photoAisle || null,
-      photoSection: pins[0].photoSection || null,
-      pins,
-    }));
+    const groups = Array.from(groupMap.entries()).map(([photoId, pins]) => {
+      const first = pins.length > 0 ? pins[0] : null;
+      return {
+        photoId,
+        photoUrl: first?.photoUrl ?? null,
+        photoFilename: first?.photoFilename ?? null,
+        photoAisle: first?.photoAisle ?? null,
+        photoSection: first?.photoSection ?? null,
+        pins,
+      };
+    });
     if (sortBy === "location") {
       groups.sort((a, b) => {
         const cmp = (a.photoAisle || "").localeCompare(b.photoAisle || "", undefined, { numeric: true });
