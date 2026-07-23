@@ -246,7 +246,7 @@ const cropAiRateLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.user?.claims?.sub ?? ipKeyGenerator(req.ip ?? ""),
+  keyGenerator: (req: any) => req.user?.claims?.sub ?? ipKeyGenerator(req),
   message: { message: "Too many scan requests. Please wait a moment before trying again." },
 });
 
