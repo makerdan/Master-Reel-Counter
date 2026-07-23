@@ -6357,7 +6357,10 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         ws.send(JSON.stringify({ type: "joined", sessionId: msg.sessionId }));
         broadcastPresence(msg.sessionId);
       }
-    } catch {}
+    } catch (err) {
+      console.error("processWsMessage error:", err);
+      try { ws.send(JSON.stringify({ type: "error", message: "Internal error" })); } catch {}
+    }
   };
 
   wss.on("connection", (ws, req: any) => {
