@@ -250,6 +250,15 @@ const cropAiRateLimiter = rateLimit({
   message: { message: "Too many scan requests. Please wait a moment before trying again." },
 });
 
+const helpChatRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: any) => req.user?.claims?.sub ?? ipKeyGenerator(req),
+  message: { message: "Too many chat requests. Please wait a few minutes before sending more messages." },
+});
+
 // Public endpoint rate limiter: prevents DB flooding on unauthenticated routes.
 // Uses ipKeyGenerator (proxy-aware, IPv6-safe) from express-rate-limit so it
 // behaves correctly behind Replit's reverse proxy without IPv6 validation errors.
@@ -6236,7 +6245,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 - Mobile: Set aisle, rapidly tap "Take Photo" — uploads happen in background.
 - Mobile is for capturing; switch to Full Mode on desktop for detailed work.`;
 
-  app.post("/api/help-chat", isAuthenticated, async (req: any, res) => {
+  app.post("/api/help-chat", isAuthenticated, helpChatRateLimiter, async (req: any, res) => {
     try {
       const { messages } = req.body;
       if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
