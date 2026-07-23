@@ -45,7 +45,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run dev",
-    url: BASE_URL,
+    url: `${BASE_URL}/api/healthz`,
     reuseExistingServer: true,
     timeout: 120_000,
   },

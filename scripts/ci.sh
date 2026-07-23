@@ -30,9 +30,9 @@ if [[ "${CI_SKIP_E2E:-}" == "1" ]]; then
   e2e_skip_reason="CI_SKIP_E2E=1 is set"
 else
   echo ""
-  echo "  Pre-flight: checking app server at ${E2E_BASE_URL} ..."
-  if ! curl --silent --fail --max-time 5 "${E2E_BASE_URL}" > /dev/null 2>&1; then
-    e2e_skip_reason="app server unreachable at ${E2E_BASE_URL}"
+  echo "  Pre-flight: checking app server at ${E2E_BASE_URL}/api/healthz ..."
+  if ! curl --silent --fail --max-time 5 "${E2E_BASE_URL}/api/healthz" > /dev/null 2>&1; then
+    e2e_skip_reason="app server unreachable at ${E2E_BASE_URL}/api/healthz"
   else
     echo "  App server is up — e2e will run."
   fi

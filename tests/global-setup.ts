@@ -31,7 +31,7 @@ async function waitForServer(url: string, maxMs = 60_000): Promise<void> {
 }
 
 async function globalSetup() {
-  await waitForServer(BASE_URL);
+  await waitForServer(`${BASE_URL}/api/healthz`);
 
   const seedRes = await fetch(`${BASE_URL}/api/__test__/seed-tester-password`, {
     method: "POST",

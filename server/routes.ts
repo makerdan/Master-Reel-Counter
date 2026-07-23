@@ -284,6 +284,7 @@ export async function registerRoutes(
       "/api/__test__/seed-tester-password",
       "/api/__test__/owner-login",
       "/api/track/pageview",
+      "/api/healthz",
     ];
     const matchesSkip = skipPaths.some(p => req.originalUrl === p || req.originalUrl.startsWith(p + "/") || req.originalUrl.startsWith(p + "?"));
     if (matchesSkip) return next();
@@ -6341,7 +6342,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     });
   });
 
-  const WS_HEARTBEAT_INTERVAL_MS = 30_000;
+  const WS_HEARTBEAT_INTERVAL_MS = 20_000;
   const wsHeartbeat = setInterval(() => {
     wss.clients.forEach((ws: WebSocket) => {
       if (wsAlive.get(ws) === false) {

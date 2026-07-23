@@ -97,7 +97,7 @@ app.use((req, res, next) => {
 
 app.use("/api", (req, res, next) => {
   // /api/health is intentionally exempt so liveness probes can observe drain progress.
-  if (shuttingDown && req.path !== "/health") {
+  if (shuttingDown && req.path !== "/health" && req.path !== "/healthz") {
     return res.status(503).json({ message: "Server is shutting down, please retry shortly." });
   }
   next();
@@ -109,6 +109,15 @@ function crashSummary() {
   if (!c) return null;
   return { timestamp: c.timestamp, type: c.type, fatal: c.fatal };
 }
+
+app.get("/api/healthz", async (_req, res) => {
+  try {
+    await db.execute(sql`SELECT 1`);
+    res.json({ ok: true });
+  } catch {
+    res.status(503).json({ ok: false });
+  }
+});
 
 app.get("/api/health", async (_req, res) => {
   try {
