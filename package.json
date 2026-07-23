@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit && tsc --project tsconfig.playwright.json --noEmit",
     "db:push": "drizzle-kit push",
     "lint:storage": "node scripts/lint-storage.mjs --strict",
-    "test:e2e": "playwright test",
-    "ci": "bash scripts/ci.sh"
+    "test:e2e": "node scripts/serial-lock.mjs -- playwright test",
+    "ci": "node scripts/serial-lock.mjs -- bash scripts/ci.sh"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
