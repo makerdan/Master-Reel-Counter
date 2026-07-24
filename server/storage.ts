@@ -95,6 +95,15 @@ export interface IStorage {
    */
   deletePhoto(id: number): Promise<void>;
   isObjectKeyShared(key: string, excludePhotoId: number): Promise<boolean>;
+  /**
+   * Returns a paginated slice of ALL photo rows across all sessions, ordered by
+   * ascending ID. Used by the admin orphaned-photo-rows scan to walk every row
+   * and check whether the corresponding object-storage file still exists.
+   */
+  getAllPhotosPaginated(limit: number, offset: number): Promise<{
+    photos: Array<Pick<Photo, "id" | "objectStorageKey" | "sessionId" | "createdAt">>;
+    total: number;
+  }>;
 
   createEntry(entry: InsertEntry): Promise<Entry>;
   getEntry(id: number): Promise<Entry | undefined>;
@@ -540,6 +549,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(photos.id, id))
       .returning();
     return result;
+  }
+
+  async getAllPhotosPaginated(limit: number, offset: number): Promise<{
+    photos: Array<Pick<Photo, "id" | "objectStorageKey" | "sessionId" | "createdAt">>;
+    total: number;
+  }> {
+    const [totalResult] = await db.select({ count: count() }).from(photos);
+    const total = totalResult?.count ?? 0;
+    const rows = await db
+      .select({ id: photos.id, objectStorageKey: photos.objectStorageKey, sessionId: photos.sessionId, createdAt: photos.createdAt })
+      .from(photos)
+      .orderBy(asc(photos.id))
+      .limit(limit)
+      .offset(offset);
+    return { photos: rows, total };
   }
 
   async isObjectKeyShared(key: string, excludePhotoId: number): Promise<boolean> {

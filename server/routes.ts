@@ -6773,6 +6773,151 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     }
   });
 
+  // Admin endpoint: scan photo DB rows for orphans where the object-storage
+  // file no longer exists.  This catches rows left behind by old deletions that
+  // removed the file first and then failed during the DB cascade.
+  //
+  // Query params:
+  //   limit  – how many photo rows to check per call (default 100, max 500)
+  //   offset – starting row for pagination (default 0)
+  //
+  // Response:
+  //   { scanned, orphans: [{ id, objectStorageKey, sessionId, createdAt }],
+  //     total, nextOffset }
+  //
+  // Call repeatedly, advancing `offset` by `limit` each time, until
+  // `nextOffset` >= `total` (or `scanned` < `limit`).
+  app.get("/api/admin/orphaned-photo-rows", isAuthenticated, async (req: any, res) => {
+    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
+    const userId = resolveUserId(req as AuthenticatedRequest);
+    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+
+    const MAX_LIMIT = 500;
+    const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt((req.query as any).limit) || 100));
+    const offset = Math.max(0, parseInt((req.query as any).offset) || 0);
+
+    // Normalize legacy "/objects/uploads/<file>" keys → "/uploads/<file>"
+    // so that toStorageObjectName produces the correct GCS path regardless
+    // of which format was stored when the photo was originally uploaded.
+    const normalizeKey = (key: string) =>
+      key.startsWith("/objects/uploads/") ? key.slice("/objects".length) : key;
+
+    try {
+      const { photos: batch, total } = await storage.getAllPhotosPaginated(limit, offset);
+
+      // Check each photo's storage key for existence, up to CONCURRENCY at a time.
+      const CONCURRENCY = 10;
+      const orphans: Array<{ id: number; objectStorageKey: string; sessionId: number; createdAt: Date | null }> = [];
+      let storageCheckErrors = 0;
+
+      for (let i = 0; i < batch.length; i += CONCURRENCY) {
+        const chunk = batch.slice(i, i + CONCURRENCY);
+        await Promise.all(chunk.map(async (photo) => {
+          const objectName = toStorageObjectName(normalizeKey(photo.objectStorageKey));
+          try {
+            const [exists] = await objectStorageClient.bucket(BUCKET_NAME).file(objectName).exists();
+            if (!exists) {
+              orphans.push({
+                id: photo.id,
+                objectStorageKey: photo.objectStorageKey,
+                sessionId: photo.sessionId,
+                createdAt: photo.createdAt,
+              });
+            }
+          } catch {
+            // If we can't reach storage for this file, skip it rather than
+            // falsely flagging it as an orphan; surface count to the caller
+            // so they know results may be partial.
+            storageCheckErrors++;
+          }
+        }));
+      }
+
+      const nextOffset = offset + batch.length;
+      res.json({
+        scanned: batch.length,
+        orphans,
+        storageCheckErrors,
+        total,
+        nextOffset: nextOffset < total ? nextOffset : null,
+      });
+    } catch (err) {
+      console.error("Orphaned photo row scan error:", err);
+      res.status(500).json({ message: "Scan failed" });
+    }
+  });
+
+  // Admin endpoint: delete specific photo rows whose object-storage files are
+  // confirmed missing.  Accepts { photoIds: number[] } and runs the normal
+  // deletePhoto cascade for each, leaving no dangling entry/pin references.
+  //
+  // The caller is responsible for confirming the IDs are genuinely orphaned
+  // (e.g. via the GET endpoint above) before sending this request.
+  app.delete("/api/admin/orphaned-photo-rows", isAuthenticated, async (req: any, res) => {
+    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
+    const userId = resolveUserId(req as AuthenticatedRequest);
+    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+
+    const body = req.body ?? {};
+    if (!Array.isArray(body.photoIds) || body.photoIds.length === 0) {
+      return res.status(400).json({ message: "photoIds must be a non-empty array" });
+    }
+    // Cap to avoid accidentally nuking huge sets in one call.
+    const MAX_BATCH = 200;
+    if (body.photoIds.length > MAX_BATCH) {
+      return res.status(400).json({ message: `photoIds must contain at most ${MAX_BATCH} entries per request` });
+    }
+    const photoIds: number[] = body.photoIds.filter((id: unknown) => typeof id === "number" && Number.isInteger(id) && id > 0);
+    if (photoIds.length === 0) {
+      return res.status(400).json({ message: "photoIds must be positive integers" });
+    }
+
+    // Normalize legacy "/objects/uploads/<file>" keys → "/uploads/<file>"
+    // so toStorageObjectName derives the correct GCS path.
+    const normalizeKey = (key: string) =>
+      key.startsWith("/objects/uploads/") ? key.slice("/objects".length) : key;
+
+    let deleted = 0;
+    let notFound = 0;
+    let errors = 0;
+
+    for (const photoId of photoIds) {
+      const photo = await storage.getPhoto(photoId).catch(() => undefined);
+      if (!photo) { notFound++; continue; }
+
+      // Double-check the storage object is still missing before removing the row.
+      try {
+        const objectName = toStorageObjectName(normalizeKey(photo.objectStorageKey));
+        const [exists] = await objectStorageClient.bucket(BUCKET_NAME).file(objectName).exists();
+        if (exists) {
+          // File was restored or this photo is not actually orphaned; skip it.
+          errors++;
+          console.warn(`orphaned-photo-rows DELETE: photo ${photoId} has a live storage object — skipping`);
+          continue;
+        }
+      } catch {
+        // Storage unreachable; skip rather than delete a potentially valid row.
+        errors++;
+        continue;
+      }
+
+      try {
+        await storage.deletePhoto(photoId);
+        deleted++;
+        console.log(`orphaned-photo-rows DELETE: removed stale photo row ${photoId} (key: ${photo.objectStorageKey})`);
+      } catch (err) {
+        errors++;
+        console.warn(`orphaned-photo-rows DELETE: failed to delete photo row ${photoId}:`, (err as Error).message);
+      }
+    }
+
+    res.json({ deleted, notFound, errors });
+  });
+
   // Admin endpoint: returns the full crash history (up to 10 records) including
   // stack traces and error messages. The public /api/health endpoint only surfaces
   // a redacted summary of the most recent crash; this endpoint gives operators
