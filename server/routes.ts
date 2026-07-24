@@ -1421,7 +1421,6 @@ export async function registerRoutes(
       const localSrcPath = path.join(UPLOADS_DIR, localSrcFilename);
       const localDestPath = path.join(UPLOADS_DIR, newId);
 
-      let copiedKey = newObjectPath;
       try {
         // Server-side GCS copy — no bandwidth cost, works even for large files
         await objectStorageClient.bucket(BUCKET_NAME).file(srcObjectName)
@@ -1430,9 +1429,11 @@ export async function registerRoutes(
         // Fall back to local-disk copy if GCS is unavailable
         try {
           await fs.copyFile(localSrcPath, localDestPath);
-        } catch {
-          // If neither works, keep the original key (shared reference) so the duplicate at least shows the photo
-          copiedKey = original.objectStorageKey!;
+        } catch (copyErr) {
+          // Both copy paths failed — abort so no DB row is created pointing to
+          // the original's storage object (which would cause data loss on delete).
+          console.error("Photo duplicate: storage copy failed, aborting:", copyErr);
+          return res.status(502).json({ message: "Failed to copy photo file — please try again" });
         }
       }
 
@@ -1440,7 +1441,7 @@ export async function registerRoutes(
         sessionId:        original.sessionId,
         userId:           userId,
         uploadedBy:       original.uploadedBy,
-        objectStorageKey: copiedKey,
+        objectStorageKey: newObjectPath,
         originalFilename: original.originalFilename,
         mimeType:         original.mimeType,
         width:            original.width,
