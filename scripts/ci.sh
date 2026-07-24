@@ -10,6 +10,14 @@
 
 set -euo pipefail
 
+# CI_SMOKE_TEST=1 — fast-exit mode used by the serial-lock collision smoke test.
+# Skips all steps and exits 0 immediately to keep the smoke test runtime short
+# without running the full CI suite.
+if [[ "${CI_SMOKE_TEST:-}" == "1" ]]; then
+  echo "[ci.sh] CI_SMOKE_TEST=1 — smoke test mode, exiting 0."
+  exit 0
+fi
+
 STEPS=("startup-smoke" "audit" "typecheck" "lint:storage" "unit-tests" "e2e")
 CMDS=("bash scripts/startup-smoke.sh" "npm audit --audit-level=high" "npm run typecheck" "npm run lint:storage" "node --import tsx/esm --test server/__tests__/routes.test.ts" "node scripts/free-ports.mjs && npm run test:e2e")
 
