@@ -1477,6 +1477,13 @@ export async function registerRoutes(
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
       const keepFile = req.query.keepFile === "1";
+
+      // Step 1: DB cascade first — if this fails, no file is removed.
+      await storage.deletePhoto(photo.id);
+
+      // Step 2: Remove the file from object storage only after the DB delete succeeds.
+      // A failure here leaves an orphaned blob but the DB record is already gone,
+      // so the UI has no broken references. Log and continue rather than re-throw.
       if (!keepFile) {
         try {
           const key = photo.objectStorageKey;
@@ -1488,10 +1495,10 @@ export async function registerRoutes(
             await fs.unlink(filePath).catch(() => {});
           }
         } catch (err) {
-          console.warn("Could not delete uploaded file:", err);
+          console.warn("Orphaned storage blob after DB delete (photo %d, key %s):", photo.id, photo.objectStorageKey, err);
         }
       }
-      await storage.deletePhoto(photo.id);
+
       logActivity(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "photo_deleted", "photo", photo.id, photo.originalFilename || undefined);
       res.json({ success: true });
     } catch (error) {
