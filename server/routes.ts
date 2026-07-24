@@ -83,7 +83,7 @@ function formatPinLabel(label: string): string {
 }
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
-const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null }>();
+const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null; testerOwnerUserId: string | null }>();
 const encodingToggleInProgress = new Set<string>();
 
 /** Derive stable int32 advisory lock keys from a userId (SHA-256, two int4 values). */
@@ -6348,7 +6348,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           ws.close(1008, "Authentication required");
           return;
         }
-        const access = await verifySessionAccess(msg.sessionId, info.userId);
+        const access = await verifySessionAccess(msg.sessionId, info.userId, info.testerOwnerUserId ?? undefined);
         if (!access) {
           ws.send(JSON.stringify({ type: "error", message: "Access denied" }));
           return;
@@ -6373,7 +6373,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   };
 
   wss.on("connection", (ws, req: any) => {
-    wsUserMap.set(ws, { sessionId: null, userId: null, username: null, role: null });
+    wsUserMap.set(ws, { sessionId: null, userId: null, username: null, role: null, testerOwnerUserId: null });
     wsAlive.set(ws, true);
 
     let authDone = false;
@@ -6391,11 +6391,12 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
             ws.close(1008, "Authentication required");
             return;
           }
-          const connUserId: string = user.isTester
-            ? (user.claims?.testerOwnerUserId ?? user.claims?.sub)
-            : user.claims?.sub;
+          const connUserId: string = user.claims?.sub;
+          const connTesterOwnerUserId: string | null = user.isTester
+            ? (user.claims?.testerOwnerUserId ?? null)
+            : null;
           const connUsername: string = user.claims?.username || user.claims?.name || connUserId;
-          wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null });
+          wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null, testerOwnerUserId: connTesterOwnerUserId });
           authDone = true;
           for (const buffered of pendingMessages) {
             processWsMessage(ws, buffered);
