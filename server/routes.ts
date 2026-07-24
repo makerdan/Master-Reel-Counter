@@ -1,4 +1,4 @@
-import type { Express, Request } from "express";
+import type { Express, Request, Response as ExpressResponse, RequestHandler } from "express";
 import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import passport from "passport";
@@ -246,7 +246,7 @@ const cropAiRateLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.user?.claims?.sub ?? ipKeyGenerator(req),
+  keyGenerator: (req: any) => (req as AuthenticatedRequest).user?.claims?.sub ?? ipKeyGenerator(req),
   message: { message: "Too many scan requests. Please wait a moment before trying again." },
 });
 
@@ -255,7 +255,7 @@ const helpChatRateLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.user?.claims?.sub ?? ipKeyGenerator(req),
+  keyGenerator: (req: any) => (req as AuthenticatedRequest).user?.claims?.sub ?? ipKeyGenerator(req),
   message: { message: "Too many chat requests. Please wait a few minutes before sending more messages." },
 });
 
@@ -289,8 +289,9 @@ interface AuthenticatedUser {
   };
 }
 
-/** Generic authenticated request — TBody types req.body for compile-time safety. */
-interface AuthenticatedRequest<TBody = Record<string, unknown>> extends Request {
+/** Generic authenticated request — TBody types req.body for compile-time safety.
+ *  Params defaults to Record<string,string> so req.params.id is always string. */
+interface AuthenticatedRequest<TBody = Record<string, unknown>> extends Request<Record<string, string>> {
   user: AuthenticatedUser;
   body: TBody;
 }
@@ -355,6 +356,65 @@ const patchSessionSchema = z.object({
   expectedLastUpdatedAt: z.union([z.string().datetime(), z.number()]).optional(),
 }).strict();
 
+export const patchPhotoSchema = z.object({
+  aisle: z.string().optional(),
+  section: z.string().optional(),
+  rotation: z.number().optional(),
+  notes: z.string().nullable().optional(),
+  isDetailShot: z.boolean().optional(),
+  parentPhotoId: z.number().nullable().optional(),
+  pinScale: z.number().optional(),
+  linkReason: z.string().nullable().optional(),
+  linkedPinLabel: z.string().nullable().optional(),
+});
+
+export const patchPinSchema = z.object({
+  xPercent: z.number().optional(),
+  yPercent: z.number().optional(),
+  label: z.string().optional(),
+  reelCount: z.number().nullable().optional(),
+  wireDetails: z.string().nullable().optional(),
+  vendorCode: z.string().nullable().optional(),
+  footage: z.number().nullable().optional(),
+  entryId: z.number().nullable().optional(),
+  flagged: z.boolean().optional(),
+  serverUpdatedAt: z.union([z.string(), z.number()]).optional(),
+});
+
+export const patchPinFlagSchema = z.object({
+  flagged: z.boolean().optional(),
+  flagReason: z.string().nullable().optional(),
+  serverUpdatedAt: z.union([z.string(), z.number()]).optional(),
+});
+
+export const patchEntrySchema = z.object({
+  aisle: z.string().optional(),
+  section: z.string().optional(),
+  position: z.string().nullable().optional(),
+  palletId: z.string().nullable().optional(),
+  reelTag: z.string().optional(),
+  wireType: z.string().optional(),
+  gauge: z.string().optional(),
+  footage: z.number().nullable().optional(),
+  reelCount: z.number().nullable().optional(),
+  color: z.string().nullable().optional(),
+  manufacturer: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  conductors: z.number().nullable().optional(),
+  photoId: z.number().nullable().optional(),
+  serverUpdatedAt: z.union([z.string(), z.number()]).optional(),
+});
+
+/** Typed-request wrapper: allows `req` to be declared as AuthenticatedRequest in
+ *  handler bodies without hitting Express's TS2769 contravariance error at the
+ *  call-site where RequestHandler is expected.
+ */
+function typed<TBody = Record<string, unknown>>(
+  handler: (req: AuthenticatedRequest<TBody>, res: ExpressResponse) => Promise<any>
+): RequestHandler {
+  return handler as unknown as RequestHandler;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -386,7 +446,7 @@ export async function registerRoutes(
 
   app.post("/api/auth/tester-login", authRateLimiter, async (req: any, res) => {
     try {
-      const { displayName, password } = req.body;
+      const { displayName, password } = (req.body ?? {}) as any;
       if (!displayName || !password) {
         return res.status(400).json({ message: "Display name and password are required" });
       }
@@ -576,16 +636,16 @@ export async function registerRoutes(
       }
 
       const storageKey = `/uploads/${filename}`;
-      const requestingUserId = req.user.claims.sub;
+      const requestingUserId = (req as AuthenticatedRequest).user.claims.sub;
       const photo = await storage.getPhotoByStorageKey(storageKey);
       if (photo) {
-        const testerOwner = getTesterOwner(req);
+        const testerOwner = getTesterOwner(req as AuthenticatedRequest);
         const access = await verifySessionAccess(photo.sessionId, requestingUserId, testerOwner);
         if (!access) {
           return res.status(403).json({ error: "Access denied" });
         }
       } else {
-        const ownerUserId = getTesterOwner(req) ?? requestingUserId;
+        const ownerUserId = getTesterOwner(req as AuthenticatedRequest) ?? requestingUserId;
         const [userRecord, userSettingsRecord] = await Promise.all([
           authStorage.getUser(ownerUserId),
           storage.getUserSettings(ownerUserId),
@@ -641,7 +701,7 @@ export async function registerRoutes(
   // Sessions CRUD
   app.get("/api/sessions", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const trash = req.query.trash === "true";
       const limit = req.query.limit ? parseInt(req.query.limit) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset) : undefined;
@@ -671,7 +731,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const data = insertSessionSchema.parse({ ...req.body, userId });
       if (data.folderId) {
         const folder = await storage.getFolder(data.folderId);
@@ -687,7 +747,7 @@ export async function registerRoutes(
 
   app.get("/api/sessions/shared", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const sharedSessions = await storage.getSharedSessions(userId);
       const sessionIds = sharedSessions.map(s => s.id);
       const [stats, photoStats, thumbnails, collabUsernames, wireTypesMap] = await Promise.all([
@@ -714,7 +774,7 @@ export async function registerRoutes(
 
   app.get("/api/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const { session, role } = access;
       const photoStats = await storage.getSessionPhotoStats([session.id]);
@@ -732,7 +792,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid request body", errors: parsed.error.errors });
       }
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const { expectedLastUpdatedAt, completedAt, ...rest } = parsed.data;
       const data: Partial<Session> = { ...rest };
@@ -742,7 +802,7 @@ export async function registerRoutes(
       // IDOR guard: if the caller is moving the session to a folder, verify
       // that folder belongs to the requesting user before proceeding.
       if (data.folderId != null) {
-        const userId = resolveUserId(req);
+        const userId = resolveUserId(req as AuthenticatedRequest);
         const targetFolder = await storage.getFolder(data.folderId);
         if (!targetFolder || targetFolder.userId !== userId) {
           return res.status(403).json({ message: "Target folder not found or access denied" });
@@ -777,7 +837,7 @@ export async function registerRoutes(
       }
       if (!isLastPhotoIndexOnly) {
         const changedFields = Object.keys(data).filter(k => k !== "lastPhotoIndex").join(", ");
-        logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "session_updated", "session", access.session.id, changedFields);
+        logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "session_updated", "session", access.session.id, changedFields);
       }
       res.json(updated);
     } catch (error: any) {
@@ -788,13 +848,13 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/lock", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can lock/unlock sessions" });
       if (typeof req.body?.locked !== "boolean") return res.status(400).json({ message: "locked must be a boolean" });
-      const { locked } = req.body;
+      const { locked } = (req.body ?? {}) as any;
       const updated = await storage.updateSession(access.session.id, { isLocked: !!locked });
-      await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, locked ? "locked_session" : "unlocked_session", "session", access.session.id);
+      await logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, locked ? "locked_session" : "unlocked_session", "session", access.session.id);
       broadcastToSession(access.session.id, { type: "session_lock", locked: !!locked });
       res.json(updated);
     } catch (error: any) {
@@ -806,7 +866,7 @@ export async function registerRoutes(
 
   app.delete("/api/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can delete sessions" });
       await storage.softDeleteSession(access.session.id);
@@ -818,7 +878,7 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/restore", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req), true);
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest), true);
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can restore sessions" });
       await storage.restoreSession(access.session.id);
@@ -830,7 +890,7 @@ export async function registerRoutes(
 
   app.delete("/api/sessions/:id/permanent", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req), true);
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest), true);
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can permanently delete sessions" });
       const sessionPhotos = await storage.getSessionPhotos(access.session.id);
@@ -857,14 +917,14 @@ export async function registerRoutes(
 
   app.post("/api/sessions/bulk/status", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const { ids, status } = req.body;
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const { ids, status } = (req.body ?? {}) as any;
       if (!Array.isArray(ids) || !ids.length || !["active", "completed"].includes(status)) {
         return res.status(400).json({ message: "Invalid request" });
       }
       const results = [];
       for (const id of ids) {
-        const access = await verifySessionAccess(id, userId, getTesterOwner(req));
+        const access = await verifySessionAccess(id, userId, getTesterOwner(req as AuthenticatedRequest));
         if (access && isOwner(access.role)) {
           const data: any = { status };
           if (status === "completed") data.completedAt = new Date();
@@ -881,8 +941,8 @@ export async function registerRoutes(
 
   app.post("/api/sessions/bulk/move", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const { ids, folderId } = req.body;
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const { ids, folderId } = (req.body ?? {}) as any;
       if (!Array.isArray(ids) || !ids.length) {
         return res.status(400).json({ message: "Invalid request" });
       }
@@ -894,7 +954,7 @@ export async function registerRoutes(
       }
       const results = [];
       for (const id of ids) {
-        const access = await verifySessionAccess(id, userId, getTesterOwner(req));
+        const access = await verifySessionAccess(id, userId, getTesterOwner(req as AuthenticatedRequest));
         if (access && isOwner(access.role)) {
           await storage.updateSession(id, { folderId: folderId ?? null });
           results.push(id);
@@ -908,14 +968,14 @@ export async function registerRoutes(
 
   app.post("/api/sessions/bulk/delete", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const { ids } = req.body;
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const { ids } = (req.body ?? {}) as any;
       if (!Array.isArray(ids) || !ids.length) {
         return res.status(400).json({ message: "Invalid request" });
       }
       const results = [];
       for (const id of ids) {
-        const access = await verifySessionAccess(id, userId, getTesterOwner(req));
+        const access = await verifySessionAccess(id, userId, getTesterOwner(req as AuthenticatedRequest));
         if (access && isOwner(access.role)) {
           const sessionPhotos = await storage.getSessionPhotos(id);
           for (const photo of sessionPhotos) {
@@ -945,7 +1005,7 @@ export async function registerRoutes(
   // Folders
   app.get("/api/folders", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const userFolders = await storage.getUserFolders(userId);
       res.json(userFolders);
     } catch (error) {
@@ -955,8 +1015,8 @@ export async function registerRoutes(
 
   app.post("/api/folders", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const { name } = req.body;
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const { name } = (req.body ?? {}) as any;
       if (!name || typeof name !== "string") return res.status(400).json({ message: "Name is required" });
       const existing = await storage.getUserFolders(userId);
       const maxOrder = existing.reduce((m, f) => Math.max(m, f.sortOrder), -1);
@@ -969,11 +1029,11 @@ export async function registerRoutes(
 
   app.patch("/api/folders/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
       if (folder.deletedAt) return res.status(400).json({ message: "Cannot modify a trashed folder" });
-      const { name, sortOrder, parentFolderId } = req.body;
+      const { name, sortOrder, parentFolderId } = (req.body ?? {}) as any;
       const updates: any = {};
       if (name !== undefined) updates.name = name;
       if (sortOrder !== undefined) updates.sortOrder = sortOrder;
@@ -1006,7 +1066,7 @@ export async function registerRoutes(
 
   app.delete("/api/folders/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
       await storage.softDeleteFolder(folder.id);
@@ -1018,7 +1078,7 @@ export async function registerRoutes(
 
   app.post("/api/folders/:id/restore", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
       const { relinkedCount, relinkedSessionNames } = await storage.restoreFolder(folder.id);
@@ -1030,7 +1090,7 @@ export async function registerRoutes(
 
   app.delete("/api/folders/:id/permanent", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const folder = await storage.getFolder(parseInt(req.params.id));
       if (!folder || folder.userId !== userId) return res.status(404).json({ message: "Folder not found" });
       if (!folder.deletedAt) return res.status(400).json({ message: "Folder must be in trash before permanent delete" });
@@ -1043,7 +1103,7 @@ export async function registerRoutes(
 
   app.get("/api/folders/trash", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const trashedFolders = await storage.getTrashedFolders(userId);
       res.json(trashedFolders);
     } catch (error) {
@@ -1053,8 +1113,8 @@ export async function registerRoutes(
 
   app.post("/api/folders/reorder", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const { folderIds } = req.body;
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const { folderIds } = (req.body ?? {}) as any;
       if (!Array.isArray(folderIds)) return res.status(400).json({ message: "folderIds array required" });
       const userFolders = await storage.getUserFolders(userId);
       const ownedIds = new Set(userFolders.map(f => f.id));
@@ -1076,10 +1136,10 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/move", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const session = await storage.getSession(parseInt(req.params.id));
       if (!session || session.userId !== userId) return res.status(404).json({ message: "Session not found" });
-      const { folderId } = req.body;
+      const { folderId } = (req.body ?? {}) as any;
       if (folderId !== null && folderId !== undefined) {
         const folder = await storage.getFolder(folderId);
         if (!folder || folder.userId !== userId || folder.deletedAt !== null) return res.status(403).json({ message: "Target folder not found or access denied" });
@@ -1093,10 +1153,10 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/duplicate", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      if (getTesterOwner(req)) return res.status(403).json({ message: "Testers cannot duplicate sessions" });
+      if (getTesterOwner(req as AuthenticatedRequest)) return res.status(403).json({ message: "Testers cannot duplicate sessions" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "Viewers cannot duplicate sessions" });
       const { folderId, name } = req.body || {};
       const targetFolderId = folderId ?? access.session.folderId ?? null;
@@ -1134,12 +1194,12 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/reset-to-photos", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const session = await storage.getSession(parseInt(req.params.id));
       if (!session) return res.status(404).json({ message: "Session not found" });
       if (session.userId !== userId) return res.status(403).json({ message: "Only the session owner can reset" });
       await storage.resetSessionToPhotos(session.id);
-      const displayName = req.user.claims.name || req.user.claims.username || userId;
+      const displayName = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.username || userId;
       await logActivity(session.id, userId, displayName, "session_reset_to_photos", "session", session.id);
       broadcastToSession(session.id, { type: "sync", entity: "session", sessionId: session.id });
       res.json({ message: "Session reset to photos only" });
@@ -1150,7 +1210,7 @@ export async function registerRoutes(
 
   app.get("/api/search/sessions", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const query = String(req.query.q || "");
       const searchInside = req.query.inside === "true";
       const filters: {
@@ -1189,8 +1249,8 @@ export async function registerRoutes(
 
   app.get("/api/sessions/:id/entries/search", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const query = String(req.query.q || "").trim();
       if (!query) return res.json({ matches: [], total: 0, encryptionActive: false });
@@ -1206,7 +1266,7 @@ export async function registerRoutes(
   // Photos - all operations verify session access
   app.get("/api/sessions/:sessionId/photos", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.sessionId), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.sessionId), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (req.query.limit !== undefined || req.query.offset !== undefined) {
         const limit = Math.max(1, parseInt(req.query.limit) || 50);
@@ -1256,16 +1316,20 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/photos/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/photos/:id", isAuthenticated, typed(async (req, res) => {
     try {
       const photo = await storage.getPhoto(parseInt(req.params.id));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit photos" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
 
-      const { aisle, section, rotation, notes, isDetailShot, parentPhotoId, pinScale, linkReason, linkedPinLabel } = req.body;
+      const parsedPhoto = patchPhotoSchema.safeParse(req.body);
+      if (!parsedPhoto.success) {
+        return res.status(400).json({ message: "Invalid photo update data", errors: parsedPhoto.error.flatten().fieldErrors });
+      }
+      const { aisle, section, rotation, notes, isDetailShot, parentPhotoId, pinScale, linkReason, linkedPinLabel } = parsedPhoto.data;
       const safeUpdate: Record<string, any> = {};
       if (aisle !== undefined) safeUpdate.aisle = aisle;
       if (section !== undefined) safeUpdate.section = section;
@@ -1331,19 +1395,19 @@ export async function registerRoutes(
     } catch (error) {
       res.status(500).json({ message: "Failed to update photo" });
     }
-  });
+  }));
 
   app.post("/api/photos/:id/duplicate", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const original = await storage.getPhoto(parseInt(req.params.id));
       if (!original) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(original.sessionId, userId, getTesterOwner(req));
+      const access = await verifySessionAccess(original.sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to duplicate photos" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
-      const displayName = req.user.claims.name || req.user.claims.username || userId;
+      const displayName = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.username || userId;
 
       // Generate a unique storage key for the copied file so the two photos are independent
       const ext = path.extname(original.objectStorageKey || "");
@@ -1405,7 +1469,7 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.id));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete photos" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -1427,7 +1491,7 @@ export async function registerRoutes(
         }
       }
       await storage.deletePhoto(photo.id);
-      logActivity(photo.sessionId, req.user.claims.sub, req.user.claims.username, "photo_deleted", "photo", photo.id, photo.originalFilename || undefined);
+      logActivity(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "photo_deleted", "photo", photo.id, photo.originalFilename || undefined);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete photo" });
@@ -1436,8 +1500,8 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/photos/restore", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      const userId = (req as AuthenticatedRequest).user.claims.sub;
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to restore photos" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -1512,8 +1576,8 @@ export async function registerRoutes(
 
   app.get("/api/sessions/:sessionId/pins", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (req.query.limit !== undefined || req.query.offset !== undefined) {
         const limit = Math.max(1, parseInt(req.query.limit) || 50);
@@ -1532,8 +1596,8 @@ export async function registerRoutes(
   // Entries CRUD - all operations verify session access + encoding
   app.get("/api/sessions/:sessionId/entries", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(parseInt(req.params.sessionId), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const encKey = isOwner(access.role) ? await getEncryptionKey(userId) : await getEncryptionKey(access.session.userId);
       if (req.query.limit) {
@@ -1595,18 +1659,23 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/entries/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/entries/:id", isAuthenticated, typed(async (req, res) => {
     try {
       const userId = resolveUserId(req);
       const entry = await storage.getEntry(parseInt(req.params.id));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const access = await verifySessionAccess(entry.sessionId, userId, getTesterOwner(req));
+      const access = await verifySessionAccess(entry.sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Entry not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit entries" });
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
-      const serverUpdatedAt = req.body?.serverUpdatedAt;
+      const parsedEntry = patchEntrySchema.safeParse(req.body);
+      if (!parsedEntry.success) {
+        return res.status(400).json({ message: "Invalid entry update data", errors: parsedEntry.error.flatten().fieldErrors });
+      }
+
+      const { serverUpdatedAt, ...entryFields } = parsedEntry.data;
       if (serverUpdatedAt) {
         const current = new Date(entry.updatedAt).toISOString();
         const expected = new Date(serverUpdatedAt).toISOString();
@@ -1615,10 +1684,9 @@ export async function registerRoutes(
         }
       }
 
-      const allowedEntryFields = ['aisle', 'section', 'position', 'palletId', 'reelTag', 'wireType', 'gauge', 'footage', 'reelCount', 'color', 'manufacturer', 'notes', 'conductors', 'photoId'];
       const safeBody: Record<string, any> = {};
-      for (const key of allowedEntryFields) {
-        if (req.body[key] !== undefined) safeBody[key] = req.body[key];
+      for (const [key, val] of Object.entries(entryFields)) {
+        if (val !== undefined) safeBody[key] = val;
       }
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
       const { updated, encKey } = await db.transaction(async (tx) => {
@@ -1658,8 +1726,8 @@ export async function registerRoutes(
           const { db } = await import("./db");
           await db.transaction(async () => {
             const photoUpdate: Record<string, any> = {};
-            if (req.body.section !== undefined) photoUpdate.section = req.body.section;
-            if (req.body.aisle !== undefined) photoUpdate.aisle = req.body.aisle;
+            if (safeBody.section !== undefined) photoUpdate.section = safeBody.section;
+            if (safeBody.aisle !== undefined) photoUpdate.aisle = safeBody.aisle;
             await storage.updatePhoto(linkedPin.photoId, photoUpdate);
             const siblingPins = allSessionPins.filter(p => p.photoId === linkedPin.photoId && p.entryId && p.entryId !== entry.id);
             for (const sp of siblingPins) {
@@ -1683,7 +1751,7 @@ export async function registerRoutes(
         }
       }
 
-      const username = req.user.claims.first_name || req.user.claims.email || userId;
+      const username = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.email || userId;
       logActivity(entry.sessionId, userId, username, "entry_updated", "entry", entry.id);
       broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
       res.json(result);
@@ -1694,14 +1762,14 @@ export async function registerRoutes(
       console.error("Error updating entry:", error);
       res.status(500).json({ message: "Failed to update entry" });
     }
-  });
+  }));
 
   app.delete("/api/entries/:id", isAuthenticated, async (req: any, res) => {
     try {
       const entry = await storage.getEntry(parseInt(req.params.id));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(entry.sessionId, userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(entry.sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Entry not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete entries" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -1717,7 +1785,7 @@ export async function registerRoutes(
       }
 
       await storage.deleteEntry(entry.id);
-      const username = req.user.claims.first_name || req.user.claims.email || userId;
+      const username = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.email || userId;
       logActivity(entry.sessionId, userId, username, "entry_deleted", "entry", entry.id);
       broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
       broadcastToSession(entry.sessionId, { type: "sync", entity: "pins", sessionId: entry.sessionId });
@@ -1730,7 +1798,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/incomplete-pins", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const result = await storage.getSessionIncompletePins(sessionId);
       res.json(result);
@@ -1742,7 +1810,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/flagged-pins", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const flaggedPins = await storage.getSessionFlaggedPins(sessionId);
       const sessionPhotos = await storage.getSessionPhotos(sessionId);
@@ -1782,7 +1850,7 @@ export async function registerRoutes(
       const entryId = parseInt(req.params.entryId);
       const entry = await storage.getEntry(entryId);
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      const access = await verifySessionAccess(entry.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(entry.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Entry not found" });
       const sessionPins = await storage.getSessionPins(entry.sessionId);
       const pin = sessionPins.find(p => p.entryId === entryId);
@@ -1793,18 +1861,22 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/pins/:pinId/flag", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/pins/:pinId/flag", isAuthenticated, typed(async (req, res) => {
     try {
       const pin = await storage.getPin(parseInt(req.params.pinId));
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to flag pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
 
-      const { flagged, flagReason, serverUpdatedAt: flagToken } = req.body;
+      const parsedFlag = patchPinFlagSchema.safeParse(req.body);
+      if (!parsedFlag.success) {
+        return res.status(400).json({ message: "Invalid pin flag data", errors: parsedFlag.error.flatten().fieldErrors });
+      }
+      const { flagged, flagReason, serverUpdatedAt: flagToken } = parsedFlag.data;
       if (flagToken && pin.updatedAt) {
         const current = new Date(pin.updatedAt).toISOString();
         const expected = new Date(flagToken).toISOString();
@@ -1816,17 +1888,17 @@ export async function registerRoutes(
         flagged: !!flagged,
         flagReason: flagged ? (flagReason || null) : null,
       });
-      logActivity(photo.sessionId, req.user.claims.sub, req.user.claims.username, flagged ? "pin_flagged" : "pin_unflagged", "pin", pin.id, flagReason || undefined);
+      logActivity(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, flagged ? "pin_flagged" : "pin_unflagged", "pin", pin.id, flagReason || undefined);
       broadcastToSessionOwners(photo.sessionId, { type: flagged ? "pin_flagged" : "pin_unflagged", pinId: pin.id, flagged: !!flagged, flagReason: flagged ? (flagReason || null) : null });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update pin flag" });
     }
-  });
+  }));
 
   app.get("/api/sessions/:id/dismissed-duplicates", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const keys = await storage.getDismissedDuplicates(access.session.id);
       res.json(keys);
@@ -1837,11 +1909,11 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/dismissed-duplicates", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
-      const { key, keys } = req.body;
+      const { key, keys } = (req.body ?? {}) as any;
       if (keys && Array.isArray(keys)) {
         await storage.addDismissedDuplicatesBulk(access.session.id, keys);
         res.json({ success: true });
@@ -1858,11 +1930,11 @@ export async function registerRoutes(
 
   app.delete("/api/sessions/:id/dismissed-duplicates", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
-      const { key } = req.body;
+      const { key } = (req.body ?? {}) as any;
       if (!key || typeof key !== "string") return res.status(400).json({ message: "key required" });
       await storage.removeDismissedDuplicate(access.session.id, key);
       res.json({ success: true });
@@ -1876,7 +1948,7 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       const pins = await storage.getPhotoPins(photo.id);
       res.json(pins);
@@ -1912,18 +1984,23 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/pins/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/pins/:id", isAuthenticated, typed(async (req, res) => {
     try {
       const pin = await storage.getPin(parseInt(req.params.id));
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Pin not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
 
-      const { serverUpdatedAt: pinToken } = req.body || {};
+      const parsedPin = patchPinSchema.safeParse(req.body);
+      if (!parsedPin.success) {
+        return res.status(400).json({ message: "Invalid pin update data", errors: parsedPin.error.flatten().fieldErrors });
+      }
+
+      const pinToken = parsedPin.data.serverUpdatedAt;
       if (pinToken && pin.updatedAt) {
         const current = new Date(pin.updatedAt).toISOString();
         const expected = new Date(pinToken).toISOString();
@@ -1931,18 +2008,17 @@ export async function registerRoutes(
           return res.status(409).json({ message: "This pin was modified by another user — undo skipped." });
         }
       }
-
-      const allowedPinFields = ['xPercent', 'yPercent', 'label', 'reelCount', 'wireDetails', 'vendorCode', 'footage', 'entryId', 'flagged'];
+      const allowedPinFields = ['xPercent', 'yPercent', 'label', 'reelCount', 'wireDetails', 'vendorCode', 'footage', 'entryId', 'flagged'] as const;
       const safeUpdate: Record<string, any> = {};
       for (const key of allowedPinFields) {
-        if (req.body[key] !== undefined) safeUpdate[key] = req.body[key];
+        if (parsedPin.data[key] !== undefined) safeUpdate[key] = parsedPin.data[key];
       }
       const updated = await storage.updatePin(pin.id, safeUpdate);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update pin" });
     }
-  });
+  }));
 
   app.delete("/api/pins/:id", isAuthenticated, async (req: any, res) => {
     try {
@@ -1950,7 +2026,7 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Pin not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
@@ -1969,7 +2045,7 @@ export async function registerRoutes(
         broadcastToSession(photo.sessionId, { type: "sync", entity: "entries", sessionId: photo.sessionId });
       }
       await storage.deletePin(pin.id);
-      logActivity(photo.sessionId, req.user.claims.sub, req.user.claims.username, "pin_deleted", "pin", pin.id);
+      logActivity(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "pin_deleted", "pin", pin.id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete pin" });
@@ -1989,7 +2065,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "pinGroupIds must be an array of integers" });
       }
 
-      const access = await verifySessionAccess(sessionId, resolveUserId(req), getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, resolveUserId(req as AuthenticatedRequest), getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       const lockMsg = checkLocked(access.session, access.role);
@@ -2013,7 +2089,7 @@ export async function registerRoutes(
 
       broadcastToSession(sessionId, { type: "sync", entity: "pins", sessionId });
       broadcastToSession(sessionId, { type: "sync", entity: "entries", sessionId });
-      logActivity(sessionId, resolveUserId(req), req.user?.claims?.username, "pins_batch_kept", "pin", pinIdToKeep);
+      logActivity(sessionId, resolveUserId(req as AuthenticatedRequest), (req as AuthenticatedRequest).user?.claims?.username, "pins_batch_kept", "pin", pinIdToKeep);
 
       res.json({ success: true, deletedCount });
     } catch (error) {
@@ -2026,12 +2102,12 @@ export async function registerRoutes(
     try {
       const photo = await storage.getPhoto(parseInt(req.params.photoId));
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to edit pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
 
-      const { pins: pinData, deletedClientIds } = req.body;
+      const { pins: pinData, deletedClientIds } = (req.body ?? {}) as any;
       if (!Array.isArray(pinData)) return res.status(400).json({ message: "pins must be an array" });
       // replaceDraftPins uses per-row upsert by draftClientId and only deletes
       // pins explicitly listed in deletedClientIds — never by absence from the set.
@@ -2068,13 +2144,13 @@ export async function registerRoutes(
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to analyze labels" });
       _sid = photo.sessionId;
       taskTracker.startSession(_sid, "scan");
 
-      const { pins: pinData } = req.body;
+      const { pins: pinData } = (req.body ?? {}) as any;
       if (!Array.isArray(pinData) || pinData.length === 0) {
         return res.status(400).json({ message: "pins array is required" });
       }
@@ -2136,7 +2212,7 @@ export async function registerRoutes(
             max_tokens: 2000,
           });
 
-          logAiUsage(req.user?.claims?.sub ?? null, "label-scan", "gpt-4o", response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0).catch(() => {});
+          logAiUsage((req as AuthenticatedRequest).user?.claims?.sub ?? null, "label-scan", "gpt-4o", response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0).catch(() => {});
           const content = response.choices?.[0]?.message?.content ?? "{}";
           let parsed: { labels?: (string | null)[] } = {};
           let parseFailed = false;
@@ -2181,7 +2257,7 @@ export async function registerRoutes(
           pinLabel: r.pinLabel,
           rawText: r.rawText,
           readable: r.readable,
-          scannedBy: req.user?.claims?.sub || null,
+          scannedBy: (req as AuthenticatedRequest).user?.claims?.sub || null,
         }));
         await storage.upsertScanResults(scanResultRows);
         broadcastToSession(photo.sessionId, { type: "sync", entity: "scan_results", sessionId: photo.sessionId });
@@ -2204,12 +2280,12 @@ export async function registerRoutes(
     taskTracker.increment();
     try {
       const sessionId = parseInt(req.params.sessionId);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to analyze labels" });
       taskTracker.startSession(_sid, "scan");
 
-      const { pins: pinData } = req.body;
+      const { pins: pinData } = (req.body ?? {}) as any;
       if (!Array.isArray(pinData) || pinData.length === 0) {
         return res.status(400).json({ message: "pins array is required" });
       }
@@ -2301,7 +2377,7 @@ export async function registerRoutes(
             max_tokens: 2000,
           });
 
-          logAiUsage(req.user?.claims?.sub ?? null, "session-scan", "gpt-4o", response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0).catch(() => {});
+          logAiUsage((req as AuthenticatedRequest).user?.claims?.sub ?? null, "session-scan", "gpt-4o", response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0).catch(() => {});
           const content = response.choices?.[0]?.message?.content ?? "{}";
           let parsed: { labels?: (string | null)[] } = {};
           let parseFailed = false;
@@ -2348,7 +2424,7 @@ export async function registerRoutes(
             pinLabel: r.pinLabel,
             rawText: r.rawText,
             readable: r.readable,
-            scannedBy: req.user?.claims?.sub || null,
+            scannedBy: (req as AuthenticatedRequest).user?.claims?.sub || null,
           };
         });
         await storage.upsertScanResults(scanResultRows);
@@ -2372,10 +2448,10 @@ export async function registerRoutes(
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
 
-      const { xPercent, yPercent } = req.body;
+      const { xPercent, yPercent } = (req.body ?? {}) as any;
       if (typeof xPercent !== "number" || typeof yPercent !== "number") {
         return res.status(400).json({ message: "xPercent and yPercent required" });
       }
@@ -2424,7 +2500,7 @@ export async function registerRoutes(
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
 
       const photoBuffer = await loadPhotoBuffer(photo.objectStorageKey);
@@ -2566,7 +2642,7 @@ export async function registerRoutes(
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Photo not found" });
 
       const cached = labelResultsCache.get(photoId);
@@ -2583,7 +2659,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/scan-results", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const results = await storage.getSessionScanResults(sessionId);
       res.json(results);
@@ -2595,7 +2671,7 @@ export async function registerRoutes(
   app.delete("/api/sessions/:id/scan-results", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "No permission" });
       await storage.deleteSessionScanResults(sessionId);
@@ -2612,7 +2688,7 @@ export async function registerRoutes(
   app.post("/api/sessions/:id/review-cohort", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
 
       // If already anchored, return the existing cohort.
@@ -2620,8 +2696,8 @@ export async function registerRoutes(
         return res.json({ cohort: JSON.parse(access.session.reviewCohort) });
       }
 
-      const userId = req.user.claims.sub;
-      const username = req.user.claims.firstName || req.user.claims.username || userId;
+      const userId = (req as AuthenticatedRequest).user.claims.sub;
+      const username = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.username || userId;
       const onlineNow = getOnlineUsers(sessionId).sort((a, b) => a.userId.localeCompare(b.userId));
       // Always include the requesting user (they may not have joined the WS room yet).
       if (!onlineNow.find(u => u.userId === userId)) {
@@ -2647,7 +2723,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/review-responses", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const responses = await storage.getSessionReviewResponses(sessionId);
       res.json(responses);
@@ -2659,9 +2735,9 @@ export async function registerRoutes(
   app.post("/api/sessions/:id/review-responses", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      const { entryId, verdict, flagReason } = req.body;
+      const { entryId, verdict, flagReason } = (req.body ?? {}) as any;
       if (!entryId || !verdict || !["approved", "flagged"].includes(verdict)) {
         return res.status(400).json({ message: "entryId and verdict (approved|flagged) are required" });
       }
@@ -2669,8 +2745,8 @@ export async function registerRoutes(
       if (!entry || entry.sessionId !== sessionId) {
         return res.status(400).json({ message: "Entry does not belong to this session" });
       }
-      const userId = req.user.claims.sub;
-      const username = req.user.claims.firstName || req.user.claims.username || userId;
+      const userId = (req as AuthenticatedRequest).user.claims.sub;
+      const username = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.username || userId;
       const response = await storage.upsertReviewResponse({
         sessionId,
         entryId,
@@ -2710,9 +2786,9 @@ export async function registerRoutes(
     try {
       const sessionId = parseInt(req.params.id);
       const entryId = parseInt(req.params.entryId);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      const userId = req.user.claims.sub;
+      const userId = (req as AuthenticatedRequest).user.claims.sub;
       await storage.deleteReviewResponse(sessionId, entryId, userId);
       res.json({ success: true });
     } catch (error) {
@@ -2723,10 +2799,10 @@ export async function registerRoutes(
   app.post("/api/sessions/:id/review-responses/resolve", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to resolve review flags" });
-      const { entryId } = req.body;
+      const { entryId } = (req.body ?? {}) as any;
       if (!entryId) return res.status(400).json({ message: "entryId is required" });
       const entry = await storage.getEntry(entryId);
       if (!entry || entry.sessionId !== sessionId) {
@@ -2745,7 +2821,7 @@ export async function registerRoutes(
       if (!pin) return res.status(404).json({ message: "Pin not found" });
       const photo = await storage.getPhoto(pin.photoId);
       if (!photo) return res.status(404).json({ message: "Photo not found" });
-      const access = await verifySessionAccess(photo.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Pin not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
@@ -2764,7 +2840,7 @@ export async function registerRoutes(
   // Collaborators
   app.get("/api/sessions/:id/collaborators", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const collaborators = await storage.getSessionCollaborators(access.session.id);
       res.json({ collaborators, owner: { userId: access.session.userId } });
@@ -2775,12 +2851,12 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/collaborators", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can add collaborators" });
-      const { username, role = "editor" } = req.body;
+      const { username, role = "editor" } = (req.body ?? {}) as any;
       if (!username) return res.status(400).json({ message: "Username is required" });
-      if (username === req.user.claims.username) return res.status(400).json({ message: "You cannot add yourself as a collaborator" });
+      if (username === (req as AuthenticatedRequest).user.claims.username) return res.status(400).json({ message: "You cannot add yourself as a collaborator" });
       const existing = await storage.getSessionCollaborators(access.session.id);
       if (existing.find(c => c.username === username)) {
         return res.status(400).json({ message: "This user is already a collaborator" });
@@ -2791,7 +2867,7 @@ export async function registerRoutes(
         username,
         role,
       });
-      logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "collaborator_added", "collaborator", collaborator.id, `${username} as ${role}`);
+      logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "collaborator_added", "collaborator", collaborator.id, `${username} as ${role}`);
       res.json(collaborator);
     } catch (error) {
       console.error("Error adding collaborator:", error);
@@ -2801,12 +2877,12 @@ export async function registerRoutes(
 
   app.delete("/api/sessions/:id/collaborators/:collabId", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can remove collaborators" });
       const collabId = parseInt(req.params.collabId);
       await storage.removeCollaborator(collabId, access.session.id);
-      logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "collaborator_removed", "collaborator", collabId);
+      logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "collaborator_removed", "collaborator", collabId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to remove collaborator" });
@@ -2815,14 +2891,14 @@ export async function registerRoutes(
 
   app.patch("/api/sessions/:id/collaborators/:collabId", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can change roles" });
-      const { role } = req.body;
+      const { role } = (req.body ?? {}) as any;
       if (!role || !["editor", "viewer"].includes(role)) return res.status(400).json({ message: "Role must be editor or viewer" });
       const updated = await storage.updateCollaboratorRole(parseInt(req.params.collabId), access.session.id, role);
       if (!updated) return res.status(404).json({ message: "Collaborator not found" });
-      await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "changed_role", "collaborator", updated.id, `Changed to ${role}`);
+      await logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "changed_role", "collaborator", updated.id, `Changed to ${role}`);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update collaborator role" });
@@ -2831,16 +2907,16 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/transfer-ownership", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can transfer ownership" });
-      const { collaboratorId } = req.body;
+      const { collaboratorId } = (req.body ?? {}) as any;
       if (!collaboratorId) return res.status(400).json({ message: "collaboratorId is required" });
       const collaborators = await storage.getSessionCollaborators(access.session.id);
       const targetCollab = collaborators.find(c => c.id === collaboratorId);
       if (!targetCollab) return res.status(404).json({ message: "Collaborator not found" });
       await storage.transferSessionOwnership(access.session.id, targetCollab.userId, targetCollab.username || "");
-      await logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "transferred_ownership", "session", access.session.id, `Transferred to ${targetCollab.username || targetCollab.userId}`);
+      await logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "transferred_ownership", "session", access.session.id, `Transferred to ${targetCollab.username || targetCollab.userId}`);
       broadcastToSession(access.session.id, { type: "ownership_transfer" });
       res.json({ success: true });
     } catch (error: any) {
@@ -2851,12 +2927,12 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/leave", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const sessionId = parseInt(req.params.id);
       const collab = await storage.getCollaborator(sessionId, userId);
       if (!collab) return res.status(404).json({ message: "Not a collaborator of this session" });
       await storage.removeCollaboratorBySessionAndUser(sessionId, userId);
-      logActivity(sessionId, userId, req.user?.claims?.username, "collaborator_left", "session", sessionId);
+      logActivity(sessionId, userId, (req as AuthenticatedRequest).user?.claims?.username, "collaborator_left", "session", sessionId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to leave session" });
@@ -2866,7 +2942,7 @@ export async function registerRoutes(
   // Invite links
   app.get("/api/sessions/:id/invite-links", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can manage invite links" });
       const links = await storage.getSessionInviteLinks(access.session.id);
@@ -2878,18 +2954,18 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/invite-links", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can create invite links" });
       const token = randomBytes(24).toString("hex");
       const link = await storage.createInviteLink({
         sessionId: access.session.id,
         token,
-        createdBy: req.user.claims.sub,
+        createdBy: (req as AuthenticatedRequest).user.claims.sub,
         isActive: true,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
-      logActivity(access.session.id, req.user.claims.sub, req.user.claims.username, "invite_created", "invite_link", link.id);
+      logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "invite_created", "invite_link", link.id);
       res.json(link);
     } catch (error) {
       console.error("Error creating invite link:", error);
@@ -2901,10 +2977,10 @@ export async function registerRoutes(
     try {
       const link = await storage.getInviteLinkById(parseInt(req.params.id));
       if (!link) return res.status(404).json({ message: "Invite link not found" });
-      const access = await verifySessionAccess(link.sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(link.sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access || !isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can revoke invite links" });
       await storage.revokeInviteLink(link.id);
-      logActivity(link.sessionId, req.user.claims.sub, req.user.claims.username, "invite_deactivated", "invite_link", link.id);
+      logActivity(link.sessionId, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "invite_deactivated", "invite_link", link.id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to revoke invite link" });
@@ -2914,8 +2990,8 @@ export async function registerRoutes(
   // Join via invite token
   app.post("/api/join/:token", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const username = req.user.claims.username || req.user.claims.first_name || userId;
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const username = (req as AuthenticatedRequest).user.claims.username || (req as AuthenticatedRequest).user.claims.first_name || userId;
       const link = await storage.getInviteLinkByToken(req.params.token);
       if (!link || !link.isActive) return res.status(404).json({ message: "Invalid or expired invite link" });
       if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
@@ -2943,8 +3019,8 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/active-tasks", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       res.json(taskTracker.getSessionTasks(sessionId));
     } catch {
@@ -2955,8 +3031,8 @@ export async function registerRoutes(
   // POST /api/sessions/:id/export/pdf/start — create a background PDF job, returns {jobId}
   app.post("/api/sessions/:id/export/pdf/start", isAuthenticated, resourceRateLimiter, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const jobId = randomUUID();
       const sessionId = parseInt(req.params.id);
@@ -2969,7 +3045,7 @@ export async function registerRoutes(
 
   // GET /api/sessions/:id/export/pdf/progress/:jobId — poll generation progress
   app.get("/api/sessions/:id/export/pdf/progress/:jobId", isAuthenticated, (req: any, res) => {
-    const userId = resolveUserId(req);
+    const userId = resolveUserId(req as AuthenticatedRequest);
     const routeSessionId = parseInt(req.params.id);
     const job = pdfJobs.get(req.params.jobId);
     if (!job || job.userId !== userId || job.sessionId !== routeSessionId) return res.status(404).json({ error: "Job not found" });
@@ -2978,7 +3054,7 @@ export async function registerRoutes(
 
   // GET /api/sessions/:id/export/pdf/download/:jobId — retrieve completed PDF buffer
   app.get("/api/sessions/:id/export/pdf/download/:jobId", isAuthenticated, (req: any, res) => {
-    const userId = resolveUserId(req);
+    const userId = resolveUserId(req as AuthenticatedRequest);
     const routeSessionId = parseInt(req.params.id);
     const job = pdfJobs.get(req.params.jobId);
     if (!job || job.userId !== userId || job.sessionId !== routeSessionId) return res.status(404).json({ error: "Job not found" });
@@ -3000,8 +3076,8 @@ export async function registerRoutes(
     const jobId = typeof req.query.jobId === "string" ? req.query.jobId : null;
     const job = jobId ? pdfJobs.get(jobId) : null;
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       taskTracker.startSession(_sid, "pdf");
       if (jobId && !job) return res.status(404).json({ error: "Job not found" });
@@ -4798,7 +4874,7 @@ export async function registerRoutes(
       });
 
       const pdfBuffer = Buffer.concat(pdfChunks);
-      logActivity(session.id, userId, req.user?.claims?.username, "exported_pdf", "session", session.id);
+      logActivity(session.id, userId, (req as AuthenticatedRequest).user?.claims?.username, "exported_pdf", "session", session.id);
       if (job) {
         job.buffer = pdfBuffer;
         job.filename = filename;
@@ -4828,8 +4904,8 @@ export async function registerRoutes(
   // Export session data (authenticated, decrypted)
   app.get("/api/sessions/:id/export", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const session = access.session;
       const rawEntries = await storage.getSessionEntries(session.id);
@@ -4846,8 +4922,8 @@ export async function registerRoutes(
     const _sid = parseInt(req.params.id);
     taskTracker.increment();
     try {
-      const userId = resolveUserId(req);
-      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req));
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       taskTracker.startSession(_sid, "excel");
       const session = access.session;
@@ -5391,7 +5467,7 @@ export async function registerRoutes(
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Length", (buffer as Buffer).length);
-      logActivity(session.id, userId, req.user?.claims?.username, "exported_excel", "session", session.id);
+      logActivity(session.id, userId, (req as AuthenticatedRequest).user?.claims?.username, "exported_excel", "session", session.id);
       res.send(buffer);
     } catch (error) {
       console.error("Error generating Excel:", error);
@@ -5405,8 +5481,8 @@ export async function registerRoutes(
   // Update user profile name
   app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const { firstName, lastName } = req.body;
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const { firstName, lastName } = (req.body ?? {}) as any;
       if (typeof firstName !== "string" || typeof lastName !== "string") {
         return res.status(400).json({ message: "firstName and lastName are required strings" });
       }
@@ -5422,7 +5498,7 @@ export async function registerRoutes(
   app.post("/api/user/profile/avatar", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: req._rejectedMimetype ? `Invalid file type: ${req._rejectedMimetype}. Allowed: image/jpeg, image/png, image/webp.` : "No file provided" });
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const resizedBuffer = await sharp(req.file.buffer)
         .rotate()
         .resize(256, 256, { fit: "cover", position: "center" })
@@ -5445,7 +5521,7 @@ export async function registerRoutes(
   // Delete user avatar (revert to Replit avatar)
   app.delete("/api/user/profile/avatar", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const { authStorage } = await import("./replit_integrations/auth/storage");
       const user = await authStorage.getUser(userId);
       if (user?.customAvatarKey) {
@@ -5462,7 +5538,7 @@ export async function registerRoutes(
   app.post("/api/settings/logo", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ message: req._rejectedMimetype ? `Invalid file type: ${req._rejectedMimetype}. Allowed: image/jpeg, image/png, image/webp.` : "No file provided" });
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const existing = await storage.getUserSettings(userId);
       if (existing?.companyLogoKey) {
         const oldObj = toStorageObjectName(existing.companyLogoKey);
@@ -5490,7 +5566,7 @@ export async function registerRoutes(
 
   app.delete("/api/settings/logo", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const existing = await storage.getUserSettings(userId);
       if (existing?.companyLogoKey) {
         const objName = toStorageObjectName(existing.companyLogoKey);
@@ -5507,7 +5583,7 @@ export async function registerRoutes(
 
   app.get("/api/storage/usage", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const usage = await storage.getStorageUsageForUser(userId);
       res.json(usage);
     } catch (error) {
@@ -5519,7 +5595,7 @@ export async function registerRoutes(
   app.get("/api/storage/global-usage", isAuthenticated, async (req: any, res) => {
     try {
       const replOwner = process.env.REPL_OWNER;
-      const username = req.user.claims.username;
+      const username = (req as AuthenticatedRequest).user.claims.username;
       if (!replOwner || username !== replOwner) {
         return res.status(403).json({ message: "Forbidden" });
       }
@@ -5533,7 +5609,7 @@ export async function registerRoutes(
 
   app.post("/api/storage/backfill-sizes", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const { sessions: userSessions } = await storage.getUserSessions(userId);
       const userSessionIds = userSessions.map(s => s.id);
       if (userSessionIds.length === 0) {
@@ -5578,7 +5654,7 @@ export async function registerRoutes(
   // requesting user owns.  Safe to call multiple times (idempotent).
   app.post("/api/storage/dedupe-pins", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const { sessions: userSessions } = await storage.getUserSessions(userId);
       const userSessionIds = userSessions.map(s => s.id);
       if (userSessionIds.length === 0) return res.json({ removed: 0 });
@@ -5623,7 +5699,7 @@ export async function registerRoutes(
   // User Settings
   app.get("/api/settings", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const settings = await storage.getUserSettings(userId);
       const response = settings
         ? { ...settings, defaultExportFormat: settings.defaultExportFormat === "csv" ? "pdf" : settings.defaultExportFormat, testerPassword: settings.testerPassword ? "********" : null }
@@ -5657,10 +5733,10 @@ export async function registerRoutes(
 
   app.patch("/api/settings", isAuthenticated, async (req: any, res) => {
     try {
-      if (req.user?.isTester) {
+      if ((req as AuthenticatedRequest).user?.isTester) {
         return res.status(403).json({ message: "Testers cannot modify settings" });
       }
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const allowedFields = [
         "defaultExportFormat", "companyName", "exportFooterText",
         "photoQuality", "useReceivingQuality", "receivingPhotoQuality",
@@ -5670,9 +5746,10 @@ export async function registerRoutes(
         "customVendorCodes", "testerPassword",
       ];
       const updates: Record<string, any> = {};
+      const settingsBody = (req.body ?? {}) as any;
       for (const field of allowedFields) {
-        if (req.body[field] !== undefined) {
-          updates[field] = req.body[field];
+        if (settingsBody[field] !== undefined) {
+          updates[field] = settingsBody[field];
         }
       }
       if (updates.testerPassword !== undefined) {
@@ -5714,12 +5791,12 @@ export async function registerRoutes(
   });
 
   app.get("/api/settings/encoding-status", isAuthenticated, (req: any, res) => {
-    const userId = resolveUserId(req);
+    const userId = resolveUserId(req as AuthenticatedRequest);
     res.json({ inProgress: encodingToggleInProgress.has(userId) });
   });
 
   app.post("/api/settings/encoding", isAuthenticated, async (req: any, res) => {
-    const userId = resolveUserId(req);
+    const userId = resolveUserId(req as AuthenticatedRequest);
 
     if (encodingToggleInProgress.has(userId)) {
       return res.status(409).json({
@@ -5731,7 +5808,7 @@ export async function registerRoutes(
 
     encodingToggleInProgress.add(userId);
     try {
-      const { enabled } = req.body;
+      const { enabled } = (req.body ?? {}) as any;
 
       const [lockKey1, lockKey2] = deriveAdvisoryLockKeys(userId);
 
@@ -5944,7 +6021,7 @@ export async function registerRoutes(
 
   app.get("/api/external/sessions/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const access = await verifySessionAccess(parseInt(req.params.id), req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const session = access.session;
       const sessionEntries = await storage.getSessionEntries(session.id);
@@ -5969,7 +6046,7 @@ export async function registerRoutes(
   // Stats
   app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const [stats, sharedPerformance, roleComparison] = await Promise.all([
         storage.getUserStats(userId),
         storage.getSharedSessionPerformance(userId),
@@ -5992,9 +6069,9 @@ export async function registerRoutes(
   // Activity logs
   app.get("/api/sessions/:id/activity", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const limit = parseInt(req.query.limit) || 50;
       const offset = parseInt(req.query.offset) || 0;
@@ -6008,9 +6085,9 @@ export async function registerRoutes(
 
   app.get("/api/sessions/:id/activity-users", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const users = await storage.getSessionActivityUsers(sessionId);
       res.json(users);
@@ -6022,9 +6099,9 @@ export async function registerRoutes(
   // Comments
   app.get("/api/sessions/:id/comments", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const allComments = await storage.getSessionComments(sessionId);
       res.json(allComments);
@@ -6035,14 +6112,14 @@ export async function registerRoutes(
 
   app.post("/api/sessions/:id/comments", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "View-only access" });
-      const { text, entryId, photoId, parentCommentId } = req.body;
+      const { text, entryId, photoId, parentCommentId } = (req.body ?? {}) as any;
       if (!text || !text.trim()) return res.status(400).json({ message: "Comment text required" });
-      const username = req.user.claims.first_name || req.user.claims.email || userId;
+      const username = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.email || userId;
       const comment = await storage.createComment({
         sessionId, userId, username,
         text: text.trim(),
@@ -6060,12 +6137,12 @@ export async function registerRoutes(
 
   app.patch("/api/comments/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const commentId = parseInt(req.params.id);
       const comment = await storage.getComment(commentId);
       if (!comment) return res.status(404).json({ message: "Comment not found" });
       if (comment.userId !== userId) return res.status(403).json({ message: "Not authorized" });
-      const { text } = req.body;
+      const { text } = (req.body ?? {}) as any;
       if (!text || !text.trim()) return res.status(400).json({ message: "Comment text required" });
       const updated = await storage.updateComment(commentId, { text: text.trim() });
       broadcastToSession(comment.sessionId, { type: "comment", action: "updated", comment: updated });
@@ -6077,11 +6154,11 @@ export async function registerRoutes(
 
   app.delete("/api/comments/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const commentId = parseInt(req.params.id);
       const comment = await storage.getComment(commentId);
       if (!comment) return res.status(404).json({ message: "Comment not found" });
-      const access = await verifySessionAccess(comment.sessionId, userId, getTesterOwner(req));
+      const access = await verifySessionAccess(comment.sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (comment.userId !== userId && !isOwner(access.role)) return res.status(403).json({ message: "Not authorized" });
       await storage.deleteComment(commentId);
@@ -6095,7 +6172,7 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/online", isAuthenticated, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const access = await verifySessionAccess(sessionId, req.user.claims.sub, getTesterOwner(req));
+      const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       const users = getOnlineUsers(sessionId);
       res.json(users);
@@ -6107,7 +6184,7 @@ export async function registerRoutes(
   // Feedback
   app.get("/api/wire-catalogs", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const catalogs = await storage.getUserWireCatalogs(userId);
       res.json(catalogs);
     } catch (error) {
@@ -6118,7 +6195,7 @@ export async function registerRoutes(
 
   app.post("/api/wire-catalogs", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       const parsed = insertUserWireCatalogSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid wire catalog data", details: parsed.error.flatten() });
@@ -6133,8 +6210,8 @@ export async function registerRoutes(
 
   app.post("/api/wire-catalogs/bulk", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = resolveUserId(req);
-      const { catalogs } = req.body;
+      const userId = resolveUserId(req as AuthenticatedRequest);
+      const { catalogs } = (req.body ?? {}) as any;
       if (!Array.isArray(catalogs) || catalogs.length === 0) {
         return res.status(400).json({ error: "catalogs must be a non-empty array" });
       }
@@ -6166,7 +6243,7 @@ export async function registerRoutes(
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-      const userId = resolveUserId(req);
+      const userId = resolveUserId(req as AuthenticatedRequest);
       await storage.deleteUserWireCatalog(id, userId);
       res.json({ success: true });
     } catch (error) {
@@ -6177,7 +6254,7 @@ export async function registerRoutes(
 
   app.post("/api/feedback", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertFeedbackSchema.safeParse({ ...req.body, userId: req.user.id });
+      const parsed = insertFeedbackSchema.safeParse({ ...req.body, userId: (req as AuthenticatedRequest).user.claims.sub });
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid feedback data", details: parsed.error.flatten() });
       }
@@ -6190,7 +6267,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/feedback", isAuthenticated, async (req: any, res) => {
-    if (req.user.id !== "52270193") {
+    if ((req as AuthenticatedRequest).user.claims.sub !== "52270193") {
       return res.status(403).json({ error: "Forbidden" });
     }
     try {
@@ -6247,7 +6324,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   app.post("/api/help-chat", isAuthenticated, helpChatRateLimiter, async (req: any, res) => {
     try {
-      const { messages } = req.body;
+      const { messages } = (req.body ?? {}) as any;
       if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
         return res.status(400).json({ error: "messages must be a non-empty array (max 50)" });
       }
@@ -6305,7 +6382,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       if (!aborted) {
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         res.end();
-        logAiUsage(req.user?.claims?.sub ?? null, "help-chat", "gpt-4o-mini", promptTokens, completionTokens).catch(() => {});
+        logAiUsage((req as AuthenticatedRequest).user?.claims?.sub ?? null, "help-chat", "gpt-4o-mini", promptTokens, completionTokens).catch(() => {});
       }
     } catch (error) {
       console.error("Error in help chat:", error);
@@ -6588,7 +6665,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Admin endpoint: manually trigger orphan upload cleanup.
   app.post("/api/admin/purge-orphaned-uploads", isAuthenticated, async (req: any, res) => {
     const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req);
+    const userId = resolveUserId(req as AuthenticatedRequest);
     if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
       return res.status(403).json({ message: "Admin only" });
     }
@@ -6612,7 +6689,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Keep calling until `nextPageToken` is null.
   app.post("/api/admin/sweep-legacy-orphans", isAuthenticated, async (req: any, res) => {
     const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req);
+    const userId = resolveUserId(req as AuthenticatedRequest);
     if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
       return res.status(403).json({ message: "Admin only" });
     }
@@ -6694,7 +6771,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // the complete picture for post-incident analysis.
   app.get("/api/admin/crashes", isAuthenticated, (req: any, res) => {
     const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req);
+    const userId = resolveUserId(req as AuthenticatedRequest);
     if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
       return res.status(403).json({ message: "Admin only" });
     }
@@ -6725,7 +6802,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Settings storage dashboard without waiting for the hourly purge job.
   app.delete("/api/admin/stalled-intents/:userId", isAuthenticated, async (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
-    const username = req.user?.claims?.username;
+    const username = (req as AuthenticatedRequest).user?.claims?.username;
     if (!replOwner || username !== replOwner) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -6746,7 +6823,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // persisted crash log file so operators can acknowledge investigated incidents.
   app.delete("/api/admin/crashes", isAuthenticated, async (req: any, res) => {
     const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req);
+    const userId = resolveUserId(req as AuthenticatedRequest);
     if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
       return res.status(403).json({ message: "Admin only" });
     }
@@ -6765,7 +6842,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // from folder/trash workflow bugs (e.g. tasks #297 and #336).
   app.get("/api/admin/integrity-checks", isAuthenticated, async (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
-    const username = req.user?.claims?.username;
+    const username = (req as AuthenticatedRequest).user?.claims?.username;
     if (!replOwner || username !== replOwner) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -6865,7 +6942,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Runs a targeted UPDATE for the given checkId and returns { fixed } row count.
   app.post("/api/admin/integrity-fix/:checkId", isAuthenticated, async (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
-    const username = req.user?.claims?.username;
+    const username = (req as AuthenticatedRequest).user?.claims?.username;
     if (!replOwner || username !== replOwner) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -6927,7 +7004,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // and the individual job list so operators can cancel stuck jobs.
   app.get("/api/admin/pdf-jobs", isAuthenticated, (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
-    const username = req.user?.claims?.username;
+    const username = (req as AuthenticatedRequest).user?.claims?.username;
     if (!replOwner || username !== replOwner) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -6960,7 +7037,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // freeing any buffer memory immediately without requiring a server restart.
   app.delete("/api/admin/pdf-jobs/:jobId", isAuthenticated, (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
-    const username = req.user?.claims?.username;
+    const username = (req as AuthenticatedRequest).user?.claims?.username;
     if (!replOwner || username !== replOwner) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -6974,7 +7051,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   // Public endpoint: fire-and-forget page view tracking.
   // Hashes the client IP for privacy-safe visitor counting; never blocks the response.
-  app.post("/api/track/pageview", pageviewRateLimiter, async (req, res) => {
+  app.post("/api/track/pageview", pageviewRateLimiter, async (req: any, res) => {
     try {
       const { path } = req.body ?? {};
       if (!path || typeof path !== "string" || path.length > 500) {
@@ -6996,7 +7073,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Admin endpoint: high-level aggregate app stats (owner-only).
   app.get("/api/admin/summary", isAuthenticated, async (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
-    const username = req.user?.claims?.username;
+    const username = (req as AuthenticatedRequest).user?.claims?.username;
     if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
     try {
       const [totalUsers] = (await db.execute(
@@ -7034,7 +7111,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Admin endpoint: AI API usage statistics (owner-only).
   app.get("/api/admin/ai-usage", isAuthenticated, async (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
-    const username = req.user?.claims?.username;
+    const username = (req as AuthenticatedRequest).user?.claims?.username;
     if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
     try {
       const [totals] = (await db.execute(sql`
@@ -7107,7 +7184,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Admin endpoint: page view statistics (owner-only).
   app.get("/api/admin/page-views", isAuthenticated, async (req: any, res) => {
     const replOwner = process.env.REPL_OWNER;
-    const username = req.user?.claims?.username;
+    const username = (req as AuthenticatedRequest).user?.claims?.username;
     if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
     try {
       const [totals] = (await db.execute(sql`

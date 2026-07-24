@@ -1,3 +1,4 @@
 - [Global isApproved middleware](global-isapproved-middleware.md) — all /api/* routes pass through isApproved; exempt public endpoints in the skipPaths array in routes.ts.
 - [E2E test auth — run as owner](e2e-owner-auth.md) — global-setup must log in as the real owner (not tester) for full CRUD permissions; tester gets 403 on DELETE sessions.
 - [Undo delete-entry creates new ID](undo-entry-id.md) — undo for delete-entry POSTs a new entry with a new server-assigned ID; tests must not check for the original entry ID after undo.
+- [Typed-request migration in Express](typed-request-migration.md) — handler signatures must stay req:any; use inline cast (req as AuthenticatedRequest) for typed user access.
