@@ -415,6 +415,56 @@ function typed<TBody = Record<string, unknown>>(
   return handler as unknown as RequestHandler;
 }
 
+/**
+ * Injectable dependencies for executePhotoDeletion.
+ * Separating these enables unit tests to mock the DB and storage layers
+ * independently, exercising the two-step sequencing without real infrastructure.
+ */
+export interface PhotoDeletionDeps {
+  /** Step 1 — DB cascade. Throwing here aborts deletion; storage is NOT touched. */
+  deletePhotoFromDb: (photoId: number) => Promise<void>;
+  /** Returns true if another photo row reuses the same storage key. */
+  isObjectKeyShared: (key: string, excludePhotoId: number) => Promise<boolean>;
+  /**
+   * Step 2 — file removal (cloud + local). Throwing here is swallowed so the
+   * caller still returns success — the DB row is gone so the UI has no broken
+   * reference. An orphaned blob is left in storage but causes no user impact.
+   */
+  deleteStorageFile: (key: string) => Promise<void>;
+}
+
+/**
+ * Core photo deletion logic — DB cascade first, then storage file removal.
+ * Exported so tests can inject mocks at both boundaries without re-implementing
+ * the sequencing logic.
+ *
+ * Throws if Step 1 (DB) fails; callers should return HTTP 500.
+ * Swallows failures from Step 2 (storage); callers should return HTTP 200.
+ */
+export async function executePhotoDeletion(
+  photo: { id: number; objectStorageKey: string },
+  deps: PhotoDeletionDeps,
+  keepFile: boolean = false
+): Promise<void> {
+  // Step 1: DB cascade first — if this throws, no file is removed.
+  await deps.deletePhotoFromDb(photo.id);
+
+  // Step 2: Remove the file from storage only after the DB delete succeeds.
+  // A failure here leaves an orphaned blob but the DB record is already gone,
+  // so the UI has no broken references. Log and continue rather than re-throw.
+  if (!keepFile) {
+    try {
+      const key = photo.objectStorageKey;
+      const shared = await deps.isObjectKeyShared(key, photo.id);
+      if (!shared) {
+        await deps.deleteStorageFile(key);
+      }
+    } catch (err) {
+      console.warn("Orphaned storage blob after DB delete (photo %d, key %s):", photo.id, photo.objectStorageKey, err);
+    }
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1478,26 +1528,16 @@ export async function registerRoutes(
 
       const keepFile = req.query.keepFile === "1";
 
-      // Step 1: DB cascade first — if this fails, no file is removed.
-      await storage.deletePhoto(photo.id);
-
-      // Step 2: Remove the file from object storage only after the DB delete succeeds.
-      // A failure here leaves an orphaned blob but the DB record is already gone,
-      // so the UI has no broken references. Log and continue rather than re-throw.
-      if (!keepFile) {
-        try {
-          const key = photo.objectStorageKey;
-          const shared = await storage.isObjectKeyShared(key, photo.id);
-          if (!shared) {
-            const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
-            const filePath = path.join(UPLOADS_DIR, filename);
-            await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
-            await fs.unlink(filePath).catch(() => {});
-          }
-        } catch (err) {
-          console.warn("Orphaned storage blob after DB delete (photo %d, key %s):", photo.id, photo.objectStorageKey, err);
-        }
-      }
+      await executePhotoDeletion(photo, {
+        deletePhotoFromDb: (id) => storage.deletePhoto(id),
+        isObjectKeyShared: (key, excludeId) => storage.isObjectKeyShared(key, excludeId),
+        deleteStorageFile: async (key) => {
+          const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+          const filePath = path.join(UPLOADS_DIR, filename);
+          await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
+          await fs.unlink(filePath).catch(() => {});
+        },
+      }, keepFile);
 
       logActivity(photo.sessionId, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "photo_deleted", "photo", photo.id, photo.originalFilename || undefined);
       res.json({ success: true });
