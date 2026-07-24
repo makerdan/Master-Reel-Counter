@@ -494,12 +494,18 @@ export async function registerRoutes(
     isApproved(req, res, next);
   });
 
+  const testerLoginSchema = z.object({
+    displayName: z.string().min(1, "Display name is required"),
+    password: z.string().min(1, "Password is required"),
+  });
+
   app.post("/api/auth/tester-login", authRateLimiter, async (req: any, res) => {
     try {
-      const { displayName, password } = (req.body ?? {}) as any;
-      if (!displayName || !password) {
+      const parsed = testerLoginSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
         return res.status(400).json({ message: "Display name and password are required" });
       }
+      const { displayName, password } = parsed.data;
       const candidates = await storage.getAllSettingsWithTesterPassword();
       const matchedOwners: typeof candidates = [];
       for (const candidate of candidates) {
