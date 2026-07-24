@@ -18,8 +18,8 @@ if [[ "${CI_SMOKE_TEST:-}" == "1" ]]; then
   exit 0
 fi
 
-STEPS=("startup-smoke" "audit" "typecheck" "lint:storage" "unit-tests" "e2e")
-CMDS=("bash scripts/startup-smoke.sh" "npm audit --audit-level=high" "npm run typecheck" "npm run lint:storage" "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts" "node scripts/free-ports.mjs && npm run test:e2e")
+STEPS=("startup-smoke" "audit" "typecheck" "lint:storage" "unit-tests" "collision-smoke" "e2e")
+CMDS=("bash scripts/startup-smoke.sh" "npm audit --audit-level=high" "npm run typecheck" "npm run lint:storage" "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts" "node scripts/ci-collision-test.mjs" "node scripts/free-ports.mjs && npm run test:e2e")
 
 declare -A RESULTS
 declare -A SKIP_REASONS
