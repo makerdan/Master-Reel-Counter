@@ -902,13 +902,16 @@ export async function registerRoutes(
     }
   });
 
+  const lockSessionBody = z.object({ locked: z.boolean() });
+
   app.post("/api/sessions/:id/lock", isAuthenticated, async (req: any, res) => {
     try {
       const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can lock/unlock sessions" });
-      if (typeof req.body?.locked !== "boolean") return res.status(400).json({ message: "locked must be a boolean" });
-      const { locked } = (req.body ?? {}) as any;
+      const lockParse = lockSessionBody.safeParse(req.body ?? {});
+      if (!lockParse.success) return res.status(400).json({ message: "Invalid request body", errors: lockParse.error.flatten().fieldErrors });
+      const { locked } = lockParse.data;
       const updated = await storage.updateSession(access.session.id, { isLocked: !!locked });
       await logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, locked ? "locked_session" : "unlocked_session", "session", access.session.id);
       broadcastToSession(access.session.id, { type: "session_lock", locked: !!locked });
@@ -2903,13 +2906,19 @@ export async function registerRoutes(
     }
   });
 
+  const addCollaboratorBody = z.object({
+    username: z.string().min(1, "Username is required"),
+    role: z.enum(["editor", "viewer"]).default("editor"),
+  });
+
   app.post("/api/sessions/:id/collaborators", isAuthenticated, async (req: any, res) => {
     try {
       const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can add collaborators" });
-      const { username, role = "editor" } = (req.body ?? {}) as any;
-      if (!username) return res.status(400).json({ message: "Username is required" });
+      const collabParse = addCollaboratorBody.safeParse(req.body ?? {});
+      if (!collabParse.success) return res.status(400).json({ message: "Invalid request body", errors: collabParse.error.flatten().fieldErrors });
+      const { username, role } = collabParse.data;
       if (username === (req as AuthenticatedRequest).user.claims.username) return res.status(400).json({ message: "You cannot add yourself as a collaborator" });
       const existing = await storage.getSessionCollaborators(access.session.id);
       if (existing.find(c => c.username === username)) {
@@ -2943,13 +2952,18 @@ export async function registerRoutes(
     }
   });
 
+  const updateCollaboratorRoleBody = z.object({
+    role: z.enum(["editor", "viewer"], { errorMap: () => ({ message: "Role must be editor or viewer" }) }),
+  });
+
   app.patch("/api/sessions/:id/collaborators/:collabId", isAuthenticated, async (req: any, res) => {
     try {
       const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can change roles" });
-      const { role } = (req.body ?? {}) as any;
-      if (!role || !["editor", "viewer"].includes(role)) return res.status(400).json({ message: "Role must be editor or viewer" });
+      const roleParse = updateCollaboratorRoleBody.safeParse(req.body ?? {});
+      if (!roleParse.success) return res.status(400).json({ message: "Invalid request body", errors: roleParse.error.flatten().fieldErrors });
+      const { role } = roleParse.data;
       const updated = await storage.updateCollaboratorRole(parseInt(req.params.collabId), access.session.id, role);
       if (!updated) return res.status(404).json({ message: "Collaborator not found" });
       await logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "changed_role", "collaborator", updated.id, `Changed to ${role}`);
@@ -3006,11 +3020,18 @@ export async function registerRoutes(
     }
   });
 
+  const createInviteLinkBody = z.object({
+    label: z.string().max(100).optional(),
+    expiresAt: z.string().datetime({ offset: true }).optional(),
+  });
+
   app.post("/api/sessions/:id/invite-links", isAuthenticated, async (req: any, res) => {
     try {
       const access = await verifySessionAccess(parseInt(req.params.id), (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can create invite links" });
+      const inviteParse = createInviteLinkBody.safeParse(req.body ?? {});
+      if (!inviteParse.success) return res.status(400).json({ message: "Invalid request body", errors: inviteParse.error.flatten().fieldErrors });
       const token = randomBytes(24).toString("hex");
       const link = await storage.createInviteLink({
         sessionId: access.session.id,
@@ -6164,6 +6185,13 @@ export async function registerRoutes(
     }
   });
 
+  const createCommentBody = z.object({
+    text: z.string().trim().min(1, "Comment text required"),
+    entryId: z.number().int().positive().optional().nullable(),
+    photoId: z.number().int().positive().optional().nullable(),
+    parentCommentId: z.number().int().positive().optional().nullable(),
+  });
+
   app.post("/api/sessions/:id/comments", isAuthenticated, async (req: any, res) => {
     try {
       const userId = resolveUserId(req as AuthenticatedRequest);
@@ -6171,8 +6199,9 @@ export async function registerRoutes(
       const access = await verifySessionAccess(sessionId, userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "View-only access" });
-      const { text, entryId, photoId, parentCommentId } = (req.body ?? {}) as any;
-      if (!text || !text.trim()) return res.status(400).json({ message: "Comment text required" });
+      const commentParse = createCommentBody.safeParse(req.body ?? {});
+      if (!commentParse.success) return res.status(400).json({ message: "Invalid request body", errors: commentParse.error.flatten().fieldErrors });
+      const { text, entryId, photoId, parentCommentId } = commentParse.data;
       const username = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.email || userId;
       const comment = await storage.createComment({
         sessionId, userId, username,
