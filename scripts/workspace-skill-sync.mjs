@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Safe account-managed skill projection helper.
+ * Safe workspace-managed skill projection helper.
  *
- * The account source is the only authority. This helper may generate the
+ * The workspace source is the only authority. This helper may generate the
  * workspace projection, but it never writes .local/custom_skills.
  */
 
@@ -26,11 +26,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const DEFAULT_PROJECTION = resolve(ROOT, ".agents/skills/.account-projections");
+const DEFAULT_PROJECTION = resolve(ROOT, ".agents/skills/.workspace-projections");
 const DEFAULT_MIRROR = resolve(ROOT, ".local/custom_skills");
 const MANIFEST_NAME = "manifest.json";
-const MANIFEST_FORMAT = "account-skill-projection/v1";
-const STATUS_FORMAT = "account-skill-metadata/v1";
+const MANIFEST_FORMAT = "workspace-skill-projection/v1";
+const STATUS_FORMAT = "workspace-skill-metadata/v1";
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const REVISION_RE = /\S/;
 const LOCK_STALE_MS = 15 * 60 * 1000;
@@ -43,30 +43,30 @@ export const STATUS_EXIT_CODES = Object.freeze({
   "missing-mirror": 3,
 });
 
-export class AccountSkillError extends Error {
+export class WorkspaceSkillSyncError extends Error {
   constructor(code, message = code) {
     super(message);
-    this.name = "AccountSkillError";
+    this.name = "WorkspaceSkillSyncError";
     this.code = code;
   }
 }
 
 function fail(code, message = code) {
-  throw new AccountSkillError(code, message);
+  throw new WorkspaceSkillSyncError(code, message);
 }
 
 function projectionRoot() {
-  return resolve(process.env.ACCOUNT_SKILLS_PROJECTION_DIR || DEFAULT_PROJECTION);
+  return resolve(process.env.WORKSPACE_SKILLS_PROJECTION_DIR || DEFAULT_PROJECTION);
 }
 
 function mirrorRoot() {
-  return resolve(process.env.ACCOUNT_SKILLS_MIRROR_DIR || DEFAULT_MIRROR);
+  return resolve(process.env.WORKSPACE_SKILLS_MIRROR_DIR || DEFAULT_MIRROR);
 }
 
 function lockPath() {
   return resolve(
-    process.env.ACCOUNT_SKILLS_LOCK_FILE ||
-      join(dirname(projectionRoot()), ".account-projections.lock"),
+    process.env.WORKSPACE_SKILLS_LOCK_FILE ||
+      join(dirname(projectionRoot()), ".workspace-projections.lock"),
   );
 }
 
@@ -114,7 +114,7 @@ function assertRelativePath(value) {
 }
 
 function readRevision(source) {
-  const revisionPath = join(source, ".account-revision");
+  const revisionPath = join(source, ".workspace-revision");
   assertRegular(revisionPath);
   const revision = readFileSync(revisionPath, "utf8").trim();
   if (!REVISION_RE.test(revision)) fail("unavailable-source");
@@ -187,7 +187,7 @@ function discoverSource(source) {
   }
   const skills = [];
   for (const name of names) {
-    if (name === ".account-revision") continue;
+    if (name === ".workspace-revision") continue;
     const absolute = join(source, name);
     let stat;
     try {
@@ -205,7 +205,7 @@ function discoverSource(source) {
 }
 
 function sourceFromEnvironment() {
-  const configured = process.env.ACCOUNT_SKILLS_SOURCE;
+  const configured = process.env.WORKSPACE_SKILLS_SOURCE;
   if (!configured) fail("unavailable-source");
   let source;
   try {
@@ -450,7 +450,7 @@ function tryReclaim(lock, now) {
   })();
   const owner = lockOwner(raw);
   if (owner && pidAlive(owner.pid)) return false;
-  if (!owner && now - stat.mtimeMs < Number(process.env.ACCOUNT_SKILLS_LOCK_STALE_MS || LOCK_STALE_MS)) {
+  if (!owner && now - stat.mtimeMs < Number(process.env.WORKSPACE_SKILLS_LOCK_STALE_MS || LOCK_STALE_MS)) {
     return false;
   }
   const reclaimed = `${lock}.reclaim-${createToken()}`;
@@ -469,10 +469,10 @@ function acquireLock() {
   mkdirSync(dirname(lock), { recursive: true });
   const started = Date.now();
   const token = createToken();
-  while (Date.now() - started <= Number(process.env.ACCOUNT_SKILLS_LOCK_WAIT_MS || LOCK_WAIT_MS)) {
+  while (Date.now() - started <= Number(process.env.WORKSPACE_SKILLS_LOCK_WAIT_MS || LOCK_WAIT_MS)) {
     try {
       const descriptor = openSync(lock, "wx", 0o600);
-      const owner = JSON.stringify({ format: "account-skill-lock/v1", pid: process.pid, token, acquiredAt: Date.now() });
+      const owner = JSON.stringify({ format: "workspace-skill-lock/v1", pid: process.pid, token, acquiredAt: Date.now() });
       writeFileSync(descriptor, `${owner}\n`, "utf8");
       closeSync(descriptor);
       return () => {
@@ -484,7 +484,7 @@ function acquireLock() {
     } catch (error) {
       if (error?.code !== "EEXIST") fail("lock-error");
       if (!tryReclaim(lock, Date.now())) {
-        const delay = Number(process.env.ACCOUNT_SKILLS_LOCK_POLL_MS || 50);
+        const delay = Number(process.env.WORKSPACE_SKILLS_LOCK_POLL_MS || 50);
         const end = Date.now() + Math.max(1, delay);
         while (Date.now() < end) { /* bounded synchronous wait */ }
       }
@@ -493,7 +493,7 @@ function acquireLock() {
   fail("busy");
 }
 
-const OWNED_ARTIFACT_RE = /^\.account-skill-(?:staging|backup)-[a-f0-9]{16}$/;
+const OWNED_ARTIFACT_RE = /^\.workspace-skill-(?:staging|backup)-[a-f0-9]{16}$/;
 
 function cleanupOwnedArtifacts(parent) {
   if (!existsSync(parent)) return;
@@ -543,8 +543,8 @@ export function refreshProjection({ maxAttempts = 2, afterStage, afterInstall } 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const snapshot = readSourceSnapshot();
       const token = createToken();
-      staging = join(parent, `.account-skill-staging-${token}`);
-      backup = join(parent, `.account-skill-backup-${token}`);
+      staging = join(parent, `.workspace-skill-staging-${token}`);
+      backup = join(parent, `.workspace-skill-backup-${token}`);
       copySnapshot(snapshot, staging);
       validateProjectionContents(staging, snapshot);
       if (afterStage) afterStage({ source: sourceFromEnvironment(), staging });
@@ -578,7 +578,7 @@ export function refreshProjection({ maxAttempts = 2, afterStage, afterInstall } 
         } catch {
           fail("rollback-failed");
         }
-        if (error instanceof AccountSkillError) throw error;
+        if (error instanceof WorkspaceSkillSyncError) throw error;
         fail("install-failed");
       } finally {
         if (staging) removeOwnDirectory(staging);
@@ -629,7 +629,7 @@ export function mirrorStatus(skillId) {
   try {
     snapshot = readSourceSnapshot();
   } catch (error) {
-    if (error instanceof AccountSkillError) {
+    if (error instanceof WorkspaceSkillSyncError) {
       return { outcome: "unavailable-source", code: STATUS_EXIT_CODES["unavailable-source"] };
     }
     return { outcome: "unavailable-source", code: STATUS_EXIT_CODES["unavailable-source"] };
@@ -640,7 +640,7 @@ export function mirrorStatus(skillId) {
   } catch {
     return { outcome: "mismatch", code: STATUS_EXIT_CODES.mismatch };
   }
-  const sidecar = join(mirrorRoot(), skillId, ".account-skill-metadata.json");
+  const sidecar = join(mirrorRoot(), skillId, ".workspace-skill-metadata.json");
   if (!existsSync(sidecar)) {
     return { outcome: "missing-mirror", code: STATUS_EXIT_CODES["missing-mirror"] };
   }
@@ -682,7 +682,7 @@ function printResult(command, result, json) {
   if (json) {
     console.log(JSON.stringify({ command, outcome: "pass", skills: result.skills || [] }));
   } else {
-    console.log(`[account-skill] PASS ${command}: ${result.skills?.length || 0} skill(s).`);
+    console.log(`[workspace-skill] PASS ${command}: ${result.skills?.length || 0} skill(s).`);
   }
 }
 
@@ -693,7 +693,7 @@ function main(argv) {
     if (args.skills.length !== 1) fail("skill-required");
     const result = mirrorStatus(args.skills[0]);
     if (args.json) console.log(JSON.stringify({ skill: args.skills[0], outcome: result.outcome }));
-    else console.log(`[account-skill] ${result.outcome}: ${args.skills[0]}`);
+    else console.log(`[workspace-skill] ${result.outcome}: ${args.skills[0]}`);
     return result.code;
   }
   if (args.command === "refresh") {
@@ -717,8 +717,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     process.exitCode = main(process.argv.slice(2));
   } catch (error) {
-    const code = error instanceof AccountSkillError ? error.code : "internal-error";
-    console.error(`[account-skill] FAIL ${code}.`);
+    const code = error instanceof WorkspaceSkillSyncError ? error.code : "internal-error";
+    console.error(`[workspace-skill] FAIL ${code}.`);
     process.exitCode = 1;
   }
 }

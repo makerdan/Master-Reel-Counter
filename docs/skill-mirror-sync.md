@@ -1,35 +1,35 @@
 # Skill Mirror Sync operator guide
 
-Skill Mirror Sync keeps account-managed skills usable without making private
-account content part of the repository. The data flow is one way:
+Skill Mirror Sync keeps workspace-managed skills usable without making private
+workspace content part of the repository. The data flow is one way:
 
-`ACCOUNT_SKILLS_SOURCE` → generated projection → platform runtime mirror
+`WORKSPACE_SKILLS_SOURCE` → generated project projection → platform runtime mirror
 
-The account source is authoritative. `.agents/skills/` remains the home for
-workspace-authored skills, while generated account content is confined to
-`.agents/skills/.account-projections/`. The disposable `.local/custom_skills`
+The workspace source is authoritative. `.agents/skills/` remains the home for
+workspace-authored skills, while generated source content is confined to
+`.agents/skills/.workspace-projections/`. The disposable `.local/custom_skills`
 tree is platform-owned and is never repaired by repository commands.
 
 ## Setup
 
-Set `ACCOUNT_SKILLS_SOURCE` explicitly in the invoking environment. It must be
-a readable directory containing a non-empty `.account-revision` and one or
+Set `WORKSPACE_SKILLS_SOURCE` explicitly in the invoking environment. It must be
+a readable directory containing a non-empty `.workspace-revision` and one or
 more lowercase hyphenated skill directories. Every skill directory must
 contain `SKILL.md`; all nested files must be regular files. Symlinks, special
 files, unexpected source entries, and unsafe paths are rejected.
 
 Do not commit the source, generated projection, mirror contents, sidecars, or
-private account instructions. The projection directory and its refresh lock
+private workspace instructions. The projection directory and its refresh lock
 are ignored by git.
 
 ## Commands
 
 ```sh
-npm run account-skill:refresh
-npm run account-skill:validate
-npm run account-skill:audit -- --json
-npm run account-skill:load -- --skill example-skill
-npm run account-skill:status -- --skill example-skill
+npm run workspace-skill:refresh
+npm run workspace-skill:validate
+npm run workspace-skill:audit -- --json
+npm run workspace-skill:load -- --skill example-skill
+npm run workspace-skill:status -- --skill example-skill
 ```
 
 Refresh discovers every source skill, computes a deterministic SHA-256
@@ -46,13 +46,13 @@ Use `--skill` more than once to load or validate a selected set, or omit it
 for all currently discovered skills.
 
 Status reads the canonical source and the platform-owned
-`.account-skill-metadata.json` sidecar without writing anything. Exit codes:
+`.workspace-skill-metadata.json` sidecar without writing anything. Exit codes:
 
 | Code | Outcome | Meaning |
 | ---: | --- | --- |
 | 0 | `pass` | Exact identity, revision, and fingerprint match |
 | 1 | `mismatch` | Sidecar is invalid or differs |
-| 2 | `unavailable-source` | Source or account revision is unavailable |
+| 2 | `unavailable-source` | Source or workspace revision is unavailable |
 | 3 | `missing-mirror` | Platform sidecar is absent |
 
 Status does not print source paths, sidecar values, skill bodies, secrets, or
@@ -64,10 +64,10 @@ Reports should identify the skill, environment, validation surface, and
 bounded outcome. Opaque revisions and SHA-256 fingerprints may be included
 when an external reporting system requires them, but never fabricate them.
 
-* Wrong account content, revision, or publication: account/platform skill owner.
+* Wrong workspace content, revision, or publication: workspace skill owner.
 * Missing or stale runtime mirror after a supported refresh:
-  account/platform provisioning or sync owner.
-* Missing canonical source or validation metadata: account/platform owner.
+  workspace provisioning or sync owner.
+* Missing canonical source or validation metadata: workspace owner.
 * Projection code, boundary, or contract failure: repository maintainer.
 
 Hand-editing `.local/custom_skills`, reverse-promoting mirror files, writing a
@@ -81,4 +81,4 @@ support files needs no code change. An interrupted refresh leaves only
 ownership-named artifacts; the next supported refresh cleans those artifacts
 under the lock. Do not merge staging contents or manually rescue a partial
 projection. If source validation is unavailable, preserve the fail-closed
-state and escalate to the account/platform owner.
+state and escalate to the workspace owner.

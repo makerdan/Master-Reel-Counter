@@ -1,13 +1,13 @@
 # Skill Mirror Sync capability checklist
 
 Evidence uses the focused contract suite
-`npm run test:account-skill` unless another command is shown.
+`npm run test:workspace-skill` unless another command is shown.
 
 | Requirement | Status | Evidence or boundary |
 |---|---|---|
 | Canonical tracked skill contract | implemented | `.agents/skills/skill-mirror-sync/SKILL.md` |
 | Explicit source only; no fallback | verified | Source-resolution contract tests |
-| Opaque non-empty account revision | verified | Source and revision failure tests |
+| Opaque non-empty workspace revision | verified | Source and revision failure tests |
 | Deterministic immediate skill discovery | verified | Multi-skill and ordering tests |
 | Lowercase slug and `SKILL.md` checks | verified | Invalid slug/entry tests |
 | Recursive regular-file inventory | verified | Nested support-file parity tests |
@@ -29,8 +29,8 @@ Evidence uses the focused contract suite
 | Status `missing-mirror` exit 3 | verified | Status exit-code tests |
 | Bounded redacted reporting | verified | CLI output redaction tests |
 | Platform mirror/sidecar provisioning | unsupported | Platform-owned and explicitly out of repository scope |
-| Account source publication | unsupported | Account/platform-owned and explicitly out of repository scope |
-| Private account content in tracked files | verified | Ignore rules and repository-boundary tests |
+| Workspace source publication | unsupported | Workspace-owned and explicitly out of repository scope |
+| Private workspace content in tracked files | verified | Ignore rules and repository-boundary tests |
 | Editing or promoting `.local/custom_skills` | unsupported | Prohibited platform boundary; helper has no write path |
 | Direct source-to-runtime copy | unsupported | Prohibited shortcut; projection is mandatory |
 | Timestamp/MD5 authority | verified | SHA-256 and opaque revision implementation |

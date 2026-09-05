@@ -2,7 +2,7 @@
 name: Skill Mirror Sync
 title: Skill Mirror Sync
 description: >-
-  Add, audit, project, invoke, validate, verify, or repair account-managed
+  Add, audit, project, invoke, validate, verify, or repair workspace-managed
   skills and their disposable runtime mirrors. Use when source selection,
   projection freshness, metadata, interrupted refreshes, locks, or mirror
   parity are uncertain.
@@ -11,34 +11,34 @@ description: >-
 # Skill Mirror Sync
 
 Use this skill when adding, auditing, invoking, validating, repairing, or
-investigating an account-managed skill projection or runtime mirror. Keep the
-boundary one-way and fail closed: the account source is authoritative, the
+investigating a workspace-managed skill projection or runtime mirror. Keep the
+boundary one-way and fail closed: the workspace source is authoritative, the
 workspace projection is generated, and the runtime mirror is disposable.
 
 ## Authority and boundaries
 
-- `ACCOUNT_SKILLS_SOURCE` is the required, explicit, authoritative
-  account/platform source. Treat its account-wide `.account-revision` as opaque;
+- `WORKSPACE_SKILLS_SOURCE` is the required, explicit, authoritative
+  workspace source. Treat its workspace-wide `.workspace-revision` as opaque;
   it must be present and non-empty. Never invent, infer, or silently substitute
   a fallback source.
-- The generated workspace projection belongs only under
-  `.agents/skills/.account-projections/`. Workspace-authored skills elsewhere
+- The generated project projection belongs only under
+  `.agents/skills/.workspace-projections/`. Workspace-authored skills elsewhere
   under `.agents/skills/` must not be overwritten or removed.
 - `.local/custom_skills/<skill-id>/` is a platform-owned runtime mirror. It is
   downstream and disposable. Never edit it directly, promote it back, or use
-  its body, timestamps, or metadata to claim that the account source is current.
-- The direction is account source → generated projection → runtime mirror.
+  its body, timestamps, or metadata to claim that the workspace source is current.
+- The direction is workspace source → generated projection → runtime mirror.
   A runtime mirror never flows back into either upstream stage, and repository
   automation must not simulate platform provisioning by writing its sidecar.
-- Do not copy private account instructions, credentials, secrets, or a
+- Do not copy private workspace instructions, credentials, secrets, or a
   reconstructed registry into tracked repository files.
 
 ## Source and fingerprint contract
 
 Before loading a skill, validate the source and projection:
 
-1. Resolve only `ACCOUNT_SKILLS_SOURCE`; if it is unset, unreadable, not a
-   directory, or has an empty `.account-revision`, stop with an unavailable or
+1. Resolve only `WORKSPACE_SKILLS_SOURCE`; if it is unset, unreadable, not a
+   directory, or has an empty `.workspace-revision`, stop with an unavailable or
    blocked result. Do not load an older projection.
 2. Discover deterministic immediate source directories. Each skill directory
    must have a valid lowercase slug and `SKILL.md`. Recursively enumerate every
@@ -88,13 +88,13 @@ contents, or load a prior projection while the source is unavailable.
 Use the supported non-mutating command:
 
 ```sh
-pnpm account-skill:status -- --skill <skill-id>
+npm run workspace-skill:status -- --skill <skill-id>
 ```
 
-It reads the account source and the platform-owned
-`.local/custom_skills/<skill-id>/.account-skill-metadata.json` sidecar. The
+It reads the workspace source and the platform-owned
+`.local/custom_skills/<skill-id>/.workspace-skill-metadata.json` sidecar. The
 sidecar's format, skill ID, source revision, and fingerprint must exactly match
-the canonical account metadata. Interpret outcomes as:
+the canonical workspace metadata. Interpret outcomes as:
 
 - `pass` (exit 0): identity, revision, and fingerprint match;
 - `mismatch` (exit 1): mirror metadata is invalid or differs;
@@ -103,7 +103,7 @@ the canonical account metadata. Interpret outcomes as:
 
 Status is read-only. Do not write the mirror, sidecar, projection, or source
 just to make a check pass. Do not print skill contents, source paths, secrets,
-credentials, mirror values, or private account instructions. Missing
+credentials, mirror values, or private workspace instructions. Missing
 authoritative metadata is unknown/unavailable, not a pass. If the platform
 does not expose authoritative mirror metadata, parity is unknown.
 
@@ -113,9 +113,9 @@ Classify before remediating:
 
 | Observation | Owner | Repository action |
 |---|---|---|
-| Account content, revision, or publication is wrong | Account/platform skill owner | Report identity and bounded result; do not patch a mirror |
-| Mirror is missing or stale after supported refresh | Account/platform provisioning or sync owner | Report environment, identity, and opaque metadata; request platform remediation |
-| Canonical source or validation metadata is unavailable | Account/platform owner | Report unavailable and preserve fail-closed loading |
+| Workspace content, revision, or publication is wrong | Workspace skill owner | Report identity and bounded result; do not patch a mirror |
+| Mirror is missing or stale after supported refresh | Workspace provisioning or sync owner | Report environment, identity, and opaque metadata; request platform remediation |
+| Canonical source or validation metadata is unavailable | Workspace owner | Report unavailable and preserve fail-closed loading |
 | Projection implementation, boundary, or focused contract is wrong | Repository maintainer | Fix the repository contract or implementation |
 
 Reports should contain the skill ID, environment, validation surface, bounded
@@ -129,9 +129,9 @@ path, revision, fingerprint, manifest, sidecar, or success result. Hand-editing
 - Do not edit `.local/custom_skills`, reverse-promote its files, or make a
   runtime mirror authoritative.
 - Do not endorse a direct canonical-to-runtime copy as a substitute for the
-  account-source and generated-projection stages.
+  workspace-source and generated-projection stages.
 - Do not use MD5, timestamps, file-body comparison alone, or a made-up
   fallback source as authoritative validation.
-- Do not expose or persist private account-level skill contents.
+- Do not expose or persist private workspace-level skill contents.
 - Do not bypass the lock, atomic rename/rollback, source-change check, recursive
   validation, or fail-closed behavior to make invocation succeed.

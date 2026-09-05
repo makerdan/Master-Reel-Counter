@@ -17,40 +17,40 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
-  AccountSkillError,
+  WorkspaceSkillSyncError,
   loadSkills,
   mirrorStatus,
   readSourceSnapshot,
   refreshProjection,
   validateProjection,
-} from "./account-skill.mjs";
+} from "./workspace-skill-sync.mjs";
 
-const SCRIPT = join(process.cwd(), "scripts/account-skill.mjs");
+const SCRIPT = join(process.cwd(), "scripts/workspace-skill-sync.mjs");
 
 function fixture(t, { revision = "revision-private-7" } = {}) {
-  const root = mkdtempSync(join(tmpdir(), "account-skill-sync-"));
+  const root = mkdtempSync(join(tmpdir(), "workspace-skill-sync-"));
   const source = join(root, "source");
   const projection = join(root, "projection");
   const mirror = join(root, "mirror");
   const lock = join(root, "refresh.lock");
   mkdirSync(source, { recursive: true });
-  writeFileSync(join(source, ".account-revision"), `${revision}\n`);
+  writeFileSync(join(source, ".workspace-revision"), `${revision}\n`);
   const previous = {
-    ACCOUNT_SKILLS_SOURCE: process.env.ACCOUNT_SKILLS_SOURCE,
-    ACCOUNT_SKILLS_PROJECTION_DIR: process.env.ACCOUNT_SKILLS_PROJECTION_DIR,
-    ACCOUNT_SKILLS_MIRROR_DIR: process.env.ACCOUNT_SKILLS_MIRROR_DIR,
-    ACCOUNT_SKILLS_LOCK_FILE: process.env.ACCOUNT_SKILLS_LOCK_FILE,
-    ACCOUNT_SKILLS_LOCK_WAIT_MS: process.env.ACCOUNT_SKILLS_LOCK_WAIT_MS,
-    ACCOUNT_SKILLS_LOCK_POLL_MS: process.env.ACCOUNT_SKILLS_LOCK_POLL_MS,
-    ACCOUNT_SKILLS_LOCK_STALE_MS: process.env.ACCOUNT_SKILLS_LOCK_STALE_MS,
+    WORKSPACE_SKILLS_SOURCE: process.env.WORKSPACE_SKILLS_SOURCE,
+    WORKSPACE_SKILLS_PROJECTION_DIR: process.env.WORKSPACE_SKILLS_PROJECTION_DIR,
+    WORKSPACE_SKILLS_MIRROR_DIR: process.env.WORKSPACE_SKILLS_MIRROR_DIR,
+    WORKSPACE_SKILLS_LOCK_FILE: process.env.WORKSPACE_SKILLS_LOCK_FILE,
+    WORKSPACE_SKILLS_LOCK_WAIT_MS: process.env.WORKSPACE_SKILLS_LOCK_WAIT_MS,
+    WORKSPACE_SKILLS_LOCK_POLL_MS: process.env.WORKSPACE_SKILLS_LOCK_POLL_MS,
+    WORKSPACE_SKILLS_LOCK_STALE_MS: process.env.WORKSPACE_SKILLS_LOCK_STALE_MS,
   };
-  process.env.ACCOUNT_SKILLS_SOURCE = source;
-  process.env.ACCOUNT_SKILLS_PROJECTION_DIR = projection;
-  process.env.ACCOUNT_SKILLS_MIRROR_DIR = mirror;
-  process.env.ACCOUNT_SKILLS_LOCK_FILE = lock;
-  process.env.ACCOUNT_SKILLS_LOCK_WAIT_MS = "250";
-  process.env.ACCOUNT_SKILLS_LOCK_POLL_MS = "1";
-  process.env.ACCOUNT_SKILLS_LOCK_STALE_MS = "25";
+  process.env.WORKSPACE_SKILLS_SOURCE = source;
+  process.env.WORKSPACE_SKILLS_PROJECTION_DIR = projection;
+  process.env.WORKSPACE_SKILLS_MIRROR_DIR = mirror;
+  process.env.WORKSPACE_SKILLS_LOCK_FILE = lock;
+  process.env.WORKSPACE_SKILLS_LOCK_WAIT_MS = "250";
+  process.env.WORKSPACE_SKILLS_LOCK_POLL_MS = "1";
+  process.env.WORKSPACE_SKILLS_LOCK_STALE_MS = "25";
   t.after(() => {
     for (const [key, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[key];
@@ -76,7 +76,7 @@ function errorCode(callback) {
     callback();
     return null;
   } catch (error) {
-    assert.ok(error instanceof AccountSkillError);
+    assert.ok(error instanceof WorkspaceSkillSyncError);
     return error.code;
   }
 }
@@ -113,10 +113,10 @@ test("fails closed for missing source, revision, malformed entries, and unsafe f
   rmSync(fixturePaths.source, { recursive: true, force: true });
   assert.equal(errorCode(readSourceSnapshot), "unavailable-source");
   mkdirSync(fixturePaths.source);
-  writeFileSync(join(fixturePaths.source, ".account-revision"), "\n");
+  writeFileSync(join(fixturePaths.source, ".workspace-revision"), "\n");
   assert.equal(errorCode(readSourceSnapshot), "unavailable-source");
 
-  writeFileSync(join(fixturePaths.source, ".account-revision"), "revision\n");
+  writeFileSync(join(fixturePaths.source, ".workspace-revision"), "revision\n");
   writeFileSync(join(fixturePaths.source, "not-a-skill.txt"), "unexpected\n");
   assert.equal(errorCode(readSourceSnapshot), "unexpected-source-entry");
   rmSync(join(fixturePaths.source, "not-a-skill.txt"));
@@ -125,7 +125,7 @@ test("fails closed for missing source, revision, malformed entries, and unsafe f
   assert.equal(errorCode(readSourceSnapshot), "invalid-skill-id");
   rmSync(join(fixturePaths.source, "BadSlug"), { recursive: true, force: true });
   mkdirSync(join(fixturePaths.source, "safe-skill"));
-  symlinkSync(join(fixturePaths.source, ".account-revision"), join(fixturePaths.source, "safe-skill", "SKILL.md"));
+  symlinkSync(join(fixturePaths.source, ".workspace-revision"), join(fixturePaths.source, "safe-skill", "SKILL.md"));
   assert.equal(errorCode(readSourceSnapshot), "unsafe-file");
 });
 
@@ -164,16 +164,16 @@ test("rejects special source files and cleans only owned interrupted artifacts",
   assert.equal(errorCode(readSourceSnapshot), "unsafe-file");
   rmSync(special);
   const parent = join(fixturePaths.root, "projection-parent");
-  process.env.ACCOUNT_SKILLS_PROJECTION_DIR = join(parent, "projection");
-  process.env.ACCOUNT_SKILLS_LOCK_FILE = join(parent, "lock");
+  process.env.WORKSPACE_SKILLS_PROJECTION_DIR = join(parent, "projection");
+  process.env.WORKSPACE_SKILLS_LOCK_FILE = join(parent, "lock");
   mkdirSync(parent, { recursive: true });
-  mkdirSync(join(parent, ".account-skill-staging-0123456789abcdef"));
-  mkdirSync(join(parent, ".account-skill-backup-fedcba9876543210"));
-  mkdirSync(join(parent, ".account-skill-staging-not-owned"));
+  mkdirSync(join(parent, ".workspace-skill-staging-0123456789abcdef"));
+  mkdirSync(join(parent, ".workspace-skill-backup-fedcba9876543210"));
+  mkdirSync(join(parent, ".workspace-skill-staging-not-owned"));
   refreshProjection();
-  assert.equal(existsSync(join(parent, ".account-skill-staging-0123456789abcdef")), false);
-  assert.equal(existsSync(join(parent, ".account-skill-backup-fedcba9876543210")), false);
-  assert.equal(existsSync(join(parent, ".account-skill-staging-not-owned")), true);
+  assert.equal(existsSync(join(parent, ".workspace-skill-staging-0123456789abcdef")), false);
+  assert.equal(existsSync(join(parent, ".workspace-skill-backup-fedcba9876543210")), false);
+  assert.equal(existsSync(join(parent, ".workspace-skill-staging-not-owned")), true);
 });
 
 test("detects source changes during staging and restores a prior projection on install failure", (t) => {
@@ -191,18 +191,18 @@ test("detects source changes during staging and restores a prior projection on i
     afterInstall: () => { throw new Error("simulated install validation failure"); },
   })), "install-failed");
   assert.equal(readFileSync(join(fixturePaths.projection, "transactional-skill", "SKILL.md"), "utf8"), "old\n");
-  assert.equal(readdirSync(fixturePaths.root).some((name) => name.includes("account-skill-")), false);
+  assert.equal(readdirSync(fixturePaths.root).some((name) => name.includes("workspace-skill-")), false);
 });
 
 test("serializes concurrent refreshes of the same projection", async (t) => {
   const fixturePaths = fixture(t);
   addSkill(fixturePaths.source, "race-skill");
   const env = { ...process.env };
-  env.ACCOUNT_SKILLS_SOURCE = fixturePaths.source;
-  env.ACCOUNT_SKILLS_PROJECTION_DIR = fixturePaths.projection;
-  env.ACCOUNT_SKILLS_LOCK_FILE = fixturePaths.lock;
-  env.ACCOUNT_SKILLS_LOCK_WAIT_MS = "5000";
-  env.ACCOUNT_SKILLS_LOCK_POLL_MS = "2";
+  env.WORKSPACE_SKILLS_SOURCE = fixturePaths.source;
+  env.WORKSPACE_SKILLS_PROJECTION_DIR = fixturePaths.projection;
+  env.WORKSPACE_SKILLS_LOCK_FILE = fixturePaths.lock;
+  env.WORKSPACE_SKILLS_LOCK_WAIT_MS = "5000";
+  env.WORKSPACE_SKILLS_LOCK_POLL_MS = "2";
   const run = () => new Promise((resolvePromise, reject) => {
     const child = spawn(process.execPath, [SCRIPT, "refresh"], { env, stdio: "pipe" });
     let output = "";
@@ -220,7 +220,7 @@ test("recovers only abandoned locks and leaves live work busy", (t) => {
   const fixturePaths = fixture(t);
   addSkill(fixturePaths.source, "locked-skill");
   writeFileSync(fixturePaths.lock, JSON.stringify({
-    format: "account-skill-lock/v1",
+    format: "workspace-skill-lock/v1",
     pid: 999999999,
     token: "dead-owner",
     acquiredAt: Date.now(),
@@ -229,7 +229,7 @@ test("recovers only abandoned locks and leaves live work busy", (t) => {
   assert.equal(lstatSync(fixturePaths.projection).isDirectory(), true);
 
   writeFileSync(fixturePaths.lock, JSON.stringify({
-    format: "account-skill-lock/v1",
+    format: "workspace-skill-lock/v1",
     pid: process.pid,
     token: "live-owner",
     acquiredAt: Date.now(),
@@ -258,9 +258,9 @@ test("status has exact parity outcomes and does not mutate source, projection, o
   mkdirSync(join(fixturePaths.mirror, "status-skill"), { recursive: true });
   const snapshot = readSourceSnapshot();
   const skill = snapshot.skills[0];
-  const sidecar = join(fixturePaths.mirror, "status-skill", ".account-skill-metadata.json");
+  const sidecar = join(fixturePaths.mirror, "status-skill", ".workspace-skill-metadata.json");
   const metadata = {
-    format: "account-skill-metadata/v1",
+    format: "workspace-skill-metadata/v1",
     skillId: "status-skill",
     sourceRevision: snapshot.sourceRevision,
     fingerprint: skill.fingerprint,
@@ -271,11 +271,11 @@ test("status has exact parity outcomes and does not mutate source, projection, o
   assert.deepEqual(mirrorStatus("status-skill"), { outcome: "mismatch", code: 1 });
   rmSync(sidecar);
   assert.deepEqual(mirrorStatus("status-skill"), { outcome: "missing-mirror", code: 3 });
-  const before = readFileSync(join(fixturePaths.source, ".account-revision"), "utf8");
-  delete process.env.ACCOUNT_SKILLS_SOURCE;
+  const before = readFileSync(join(fixturePaths.source, ".workspace-revision"), "utf8");
+  delete process.env.WORKSPACE_SKILLS_SOURCE;
   assert.deepEqual(mirrorStatus("status-skill"), { outcome: "unavailable-source", code: 2 });
-  process.env.ACCOUNT_SKILLS_SOURCE = fixturePaths.source;
-  assert.equal(readFileSync(join(fixturePaths.source, ".account-revision"), "utf8"), before);
+  process.env.WORKSPACE_SKILLS_SOURCE = fixturePaths.source;
+  assert.equal(readFileSync(join(fixturePaths.source, ".workspace-revision"), "utf8"), before);
 });
 
 test("status CLI returns documented codes and redacts private values", (t) => {
@@ -286,13 +286,13 @@ test("status CLI returns documented codes and redacts private values", (t) => {
     env,
     encoding: "utf8",
   });
-  env.ACCOUNT_SKILLS_SOURCE = fixturePaths.source;
-  env.ACCOUNT_SKILLS_PROJECTION_DIR = fixturePaths.projection;
-  env.ACCOUNT_SKILLS_MIRROR_DIR = fixturePaths.mirror;
-  env.ACCOUNT_SKILLS_LOCK_FILE = fixturePaths.lock;
+  env.WORKSPACE_SKILLS_SOURCE = fixturePaths.source;
+  env.WORKSPACE_SKILLS_PROJECTION_DIR = fixturePaths.projection;
+  env.WORKSPACE_SKILLS_MIRROR_DIR = fixturePaths.mirror;
+  env.WORKSPACE_SKILLS_LOCK_FILE = fixturePaths.lock;
   assert.throws(run, (error) => error.status === 3 && !error.stdout.includes("do-not-print-this-revision"));
   mkdirSync(join(fixturePaths.mirror, "cli-skill"), { recursive: true });
-  writeFileSync(join(fixturePaths.mirror, "cli-skill", ".account-skill-metadata.json"), "{}");
+  writeFileSync(join(fixturePaths.mirror, "cli-skill", ".workspace-skill-metadata.json"), "{}");
   assert.throws(run, (error) => error.status === 1 && !error.stdout.includes("private skill body"));
-  chmodSync(join(fixturePaths.source, ".account-revision"), 0o600);
+  chmodSync(join(fixturePaths.source, ".workspace-revision"), 0o600);
 });
