@@ -23,6 +23,7 @@ trap cleanup EXIT
 
 echo "  [startup-smoke] Starting server on port ${SMOKE_PORT} ..."
 
+node scripts/free-ports.mjs "$SMOKE_PORT"
 PORT="$SMOKE_PORT" npx tsx server/index.ts > "$SMOKE_LOG" 2>&1 &
 SERVER_PID=$!
 

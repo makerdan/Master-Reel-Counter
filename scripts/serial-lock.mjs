@@ -1,324 +1,410 @@
 #!/usr/bin/env node
 /**
- * serial-lock.mjs — Port Authority Phase 4 crash-safe serialization lock.
- *
- * Ensures only one heavy test suite runs at a time, preventing port 5000
- * and PostgreSQL collisions between concurrent `ci` and `e2e` workflow runs.
- *
- * Adaptation points (env vars):
- *   SERIAL_LOCK_PATH                 — path to the lockfile
- *                                      (default: /tmp/repl-test-suite.lock)
- *   SERIAL_LOCK_WAIT_INTERVAL_MS     — poll interval while waiting (default: 2000)
- *   SERIAL_LOCK_MAX_WAIT_MS          — give-up timeout (default: 10 min)
- *   SERIAL_LOCK_MAX_HOLD_MS          — retained for config compatibility; no longer
- *                                      used as an eviction trigger. Eviction is
- *                                      based entirely on heartbeat staleness so
- *                                      healthy long-running holders are never
- *                                      prematurely force-evicted.
- *   SERIAL_LOCK_HEARTBEAT_INTERVAL_MS — how often the holder refreshes its heartbeat
- *                                       (default: 30 000)
- *   SERIAL_LOCK_HEARTBEAT_STALE_MS   — evict the holder if its heartbeat has been
- *                                       silent for longer than this (default: 2 ×
- *                                       heartbeat interval = 60 000).
+ * Canonical Port Authority validation lock.
  *
  * Usage:
- *   node scripts/serial-lock.mjs -- <command> [args...]
+ *   node scripts/serial-lock.mjs [--resource name] [--priority 1-9]
+ *     [--timeout-ms milliseconds] -- <command> [args...]
  *
- * Properties guaranteed:
- *  - Reentrancy-safe: holder exports its PID via SERIAL_LOCK_HOLDER_PID;
- *    nested invocations walk their ancestor PIDs and skip acquisition if the
- *    holder is in their ancestry, preventing deadlock.
- *  - Crash-safe: lockfile stores the holder PID + acquire timestamp; waiters
- *    check holder liveness (kill -0) before each poll. A crashed run never
- *    blocks future runs forever.
- *  - Heartbeat-safe: the holder writes a periodic lastHeartbeat timestamp via
- *    setInterval. Force-eviction is based entirely on heartbeat staleness
- *    (HEARTBEAT_STALE_MS), so long-running healthy jobs are never prematurely
- *    evicted. MAX_HOLD_MS is retained for config compatibility only.
- *  - Atomic writes: lock file updates use a temp-file + rename so readers never
- *    observe a partially-written or truncated file.
- *  - Loud on forced takeover: forcibly cleared stale/dead locks are logged as
- *    incidents with full context; never silently absorbed.
- *  - Budgets start after acquisition: the wrapped command's timeout starts only
- *    after the lock is acquired, not during the wait.
- *
- * Manual smoke-test for concurrent safety:
- *   1. In one terminal: npm run ci
- *   2. Immediately in another: npm run test:e2e
- *   3. Expected: the second invocation prints "[serial-lock] waiting for lock…"
- *      and queues; it does NOT start Playwright until the first run releases.
- *   4. Kill the first run (Ctrl-C). The second should detect the dead PID and
- *      acquire within one poll interval (~2 s).
+ * The lock is striped by named resource. A holder heartbeat keeps healthy
+ * long-running checks alive; dead, stale, or overlong holders are reclaimed
+ * loudly. Waiters are represented by JSON manifests so priority decisions are
+ * observable and deterministic.
  */
 
 import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
   readFileSync,
-  writeFileSync,
-  unlinkSync,
+  readdirSync,
   renameSync,
+  unlinkSync,
+  writeFileSync,
 } from "fs";
-import { spawnSync, spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import { randomBytes } from "crypto";
+import { dirname, resolve } from "path";
 
-// ── Config (all tunable via env for testing) ──────────────────────────────────
-const LOCK_PATH =
-  process.env.SERIAL_LOCK_PATH ?? "/tmp/repl-test-suite.lock";
-const LOCK_HOLDER_ENV = "SERIAL_LOCK_HOLDER_PID";
-const WAIT_INTERVAL =
-  parseInt(process.env.SERIAL_LOCK_WAIT_INTERVAL_MS ?? "2000", 10);
-const MAX_WAIT_MS =
-  parseInt(process.env.SERIAL_LOCK_MAX_WAIT_MS ?? String(10 * 60 * 1_000), 10);
-const MAX_HOLD_MS =
-  parseInt(process.env.SERIAL_LOCK_MAX_HOLD_MS ?? String(15 * 60 * 1_000), 10);
-const HEARTBEAT_INTERVAL_MS =
-  parseInt(process.env.SERIAL_LOCK_HEARTBEAT_INTERVAL_MS ?? "30000", 10);
-const HEARTBEAT_STALE_MS =
-  parseInt(
-    process.env.SERIAL_LOCK_HEARTBEAT_STALE_MS ?? String(2 * HEARTBEAT_INTERVAL_MS),
-    10
-  );
+const LEGACY_HOLDER_ENV = "SERIAL_LOCK_HOLDER_PID";
+const DEFAULT_RESOURCE = "global";
+const WAIT_INTERVAL_MS = parseEnvInt("SERIAL_LOCK_WAIT_INTERVAL_MS", 2000);
+const MAX_WAIT_MS = parseEnvInt("SERIAL_LOCK_MAX_WAIT_MS", 10 * 60 * 1000);
+const MAX_HOLD_MS = parseEnvInt("SERIAL_LOCK_MAX_HOLD_MS", 2 * 60 * 60 * 1000);
+const HEARTBEAT_INTERVAL_MS = parseEnvInt("SERIAL_LOCK_HEARTBEAT_INTERVAL_MS", 30_000);
+const HEARTBEAT_STALE_MS = parseEnvInt(
+  "SERIAL_LOCK_HEARTBEAT_STALE_MS",
+  2 * HEARTBEAT_INTERVAL_MS,
+);
+const PRIORITY_GRACE_MS = parseEnvInt("SERIAL_LOCK_PRIORITY_GRACE_MS", 2_000);
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+function parseEnvInt(name, fallback) {
+  const value = process.env[name];
+  const parsed = value === undefined ? fallback : Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    console.error(`[serial-lock] ERROR: ${name} must be a non-negative integer.`);
+    process.exit(2);
+  }
+  return parsed;
+}
 
-/** Parse `--` separator; everything after it is the command to run. */
+function normalizeResource(value) {
+  if (!value || !/^[A-Za-z0-9_-]{1,64}$/.test(value)) {
+    console.error(`[serial-lock] ERROR: invalid resource '${value ?? ""}'.`);
+    process.exit(2);
+  }
+  return value.toLowerCase();
+}
+
 function parseArgs() {
-  const sep = process.argv.indexOf("--");
-  if (sep === -1 || sep === process.argv.length - 1) {
+  const separator = process.argv.indexOf("--");
+  if (separator < 0 || separator === process.argv.length - 1) {
     console.error(
-      "[serial-lock] Usage: node scripts/serial-lock.mjs -- <command> [args...]"
+      "[serial-lock] Usage: node scripts/serial-lock.mjs [options] -- <command> [args...]",
     );
     process.exit(2);
   }
-  return process.argv.slice(sep + 1);
-}
 
-/** Return the set of ancestor PIDs (and self) for the current process. */
-function getSelfAncestors() {
-  const ancestors = new Set();
-  let pid = process.pid;
-  while (pid > 1) {
-    ancestors.add(String(pid));
-    try {
-      const stat = readFileSync(`/proc/${pid}/status`, "utf8");
-      const m = stat.match(/^PPid:\s+(\d+)/m);
-      pid = m ? parseInt(m[1], 10) : 0;
-    } catch {
-      break;
+  const options = process.argv.slice(2, separator);
+  let resource = DEFAULT_RESOURCE;
+  let priority = process.env.SERIAL_LOCK_PRIORITY === undefined
+    ? 5
+    : Number.parseInt(process.env.SERIAL_LOCK_PRIORITY, 10);
+  let timeoutMs = 0;
+  for (let index = 0; index < options.length; index += 1) {
+    const option = options[index];
+    if (option === "--resource") resource = normalizeResource(options[++index]);
+    else if (option === "--priority") priority = Number.parseInt(options[++index], 10);
+    else if (option === "--timeout-ms") timeoutMs = Number.parseInt(options[++index], 10);
+    else {
+      console.error(`[serial-lock] ERROR: unknown option '${option}'.`);
+      process.exit(2);
     }
   }
-  return ancestors;
+  if (!Number.isInteger(priority) || priority < 1 || priority > 9) {
+    console.error("[serial-lock] ERROR: priority must be from 1 (highest) to 9 (lowest).");
+    process.exit(2);
+  }
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 0) {
+    console.error("[serial-lock] ERROR: timeout-ms must be a non-negative integer.");
+    process.exit(2);
+  }
+  return {
+    resource,
+    priority,
+    timeoutMs,
+    command: process.argv.slice(separator + 1),
+  };
 }
 
-/** Return true if the given PID is alive (kill -0). */
+function sleep(ms) {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+}
+
 function isAlive(pid) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (e) {
-    return e.code !== "ESRCH";
+  } catch (error) {
+    return error?.code !== "ESRCH";
   }
 }
 
-/** Sleep ms milliseconds. */
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+function getParentPid(pid) {
+  try {
+    const status = readFileSync(`/proc/${pid}/status`, "utf8");
+    const match = status.match(/^PPid:\s+(\d+)/m);
+    return match ? Number(match[1]) : 0;
+  } catch {
+    return 0;
+  }
 }
 
-/**
- * Read the lockfile.
- * Returns { pid, acquiredAt, lastHeartbeat } or null on any error.
- * lastHeartbeat falls back to acquiredAt for locks written before heartbeat support.
- */
+function getAncestors() {
+  const ancestors = new Set();
+  let pid = process.pid;
+  while (pid > 1) {
+    ancestors.add(String(pid));
+    pid = getParentPid(pid);
+  }
+  return ancestors;
+}
+
+const args = parseArgs();
+const RESOURCE = args.resource;
+const RESOURCE_ENV = RESOURCE.toUpperCase().replace(/[^A-Z0-9]/g, "_");
+const HELD_PID_ENV = `VALIDATION_LOCK_HELD_PID_${RESOURCE_ENV}`;
+const LOCK_PATH = resolve(
+  process.env.VALIDATION_LOCK_FILE ??
+    process.env.SERIAL_LOCK_PATH ??
+    `.local/validation-lock-${RESOURCE}.lock`,
+);
+const WAITERS_DIR = resolve(
+  process.env.VALIDATION_LOCK_WAITERS_DIR ??
+    `.local/validation-waiters-${RESOURCE}`,
+);
+mkdirSync(dirname(LOCK_PATH), { recursive: true });
+mkdirSync(WAITERS_DIR, { recursive: true });
+
+function atomicWrite(path, content) {
+  const temporaryPath = `${path}.${randomBytes(4).toString("hex")}.tmp`;
+  writeFileSync(temporaryPath, content, "utf8");
+  renameSync(temporaryPath, path);
+}
+
 function readLock() {
   try {
     const raw = readFileSync(LOCK_PATH, "utf8").trim();
-    const [pidStr, tsStr, hbStr] = raw.split("\n");
-    const pid = parseInt(pidStr, 10);
-    const acquiredAt = parseInt(tsStr, 10);
-    if (isNaN(pid) || isNaN(acquiredAt)) return null;
-    const lastHeartbeat = hbStr ? parseInt(hbStr, 10) : acquiredAt;
+    if (raw.startsWith("{")) {
+      const parsed = JSON.parse(raw);
+      if (!Number.isInteger(parsed.pid) || !Number.isInteger(parsed.acquiredAt)) return null;
+      return {
+        pid: parsed.pid,
+        acquiredAt: parsed.acquiredAt,
+        lastHeartbeat: Number.isInteger(parsed.lastHeartbeat)
+          ? parsed.lastHeartbeat
+          : parsed.acquiredAt,
+        resource: parsed.resource ?? RESOURCE,
+      };
+    }
+    const [pid, acquiredAt, lastHeartbeat] = raw.split("\n").map(Number);
+    if (!Number.isInteger(pid) || !Number.isInteger(acquiredAt)) return null;
     return {
       pid,
       acquiredAt,
-      lastHeartbeat: isNaN(lastHeartbeat) ? acquiredAt : lastHeartbeat,
+      lastHeartbeat: Number.isInteger(lastHeartbeat) ? lastHeartbeat : acquiredAt,
+      resource: RESOURCE,
     };
   } catch {
-    // Missing or unreadable — no current lock
+    return null;
   }
-  return null;
 }
 
-/**
- * Write data to LOCK_PATH atomically: write to a temp file in the same
- * directory then rename so readers never see a partially-written file.
- */
-function atomicWrite(content) {
-  const tmp = `${LOCK_PATH}.${randomBytes(4).toString("hex")}.tmp`;
-  writeFileSync(tmp, content, "utf8");
-  renameSync(tmp, LOCK_PATH);
-}
-
-/** Write the lockfile with an initial heartbeat equal to the acquire time. */
-function writeLock(pid) {
+function writeLock() {
   const now = Date.now();
-  atomicWrite(`${pid}\n${now}\n${now}\n`);
+  atomicWrite(LOCK_PATH, `${process.pid}\n${now}\n${now}\n`);
 }
 
-/** Refresh the lastHeartbeat field in-place (holder only). */
-function writeHeartbeat() {
+function tryCreateLock() {
   try {
-    const lock = readLock();
-    if (lock && lock.pid === process.pid) {
-      atomicWrite(`${lock.pid}\n${lock.acquiredAt}\n${Date.now()}\n`);
-    }
-  } catch {
-    // Best-effort — a transient write failure is not fatal for the holder.
+    const descriptor = openSync(LOCK_PATH, "wx");
+    closeSync(descriptor);
+    writeLock();
+    return readLock()?.pid === process.pid;
+  } catch (error) {
+    if (error?.code === "EEXIST") return false;
+    throw error;
   }
 }
 
-/** Remove the lockfile, ignoring ENOENT. */
 function clearLock() {
   try {
     unlinkSync(LOCK_PATH);
   } catch {
-    // Already gone — fine
+    // Another contender may already have reclaimed it.
   }
 }
 
-// ── Reentrancy check ─────────────────────────────────────────────────────────
-
-const holderPidStr = process.env[LOCK_HOLDER_ENV];
-if (holderPidStr) {
-  const holderPid = parseInt(holderPidStr, 10);
-  const ancestors = getSelfAncestors();
-  if (ancestors.has(String(holderPid))) {
-    // We are a descendant of the current lock holder — skip acquisition to
-    // prevent deadlock. Just run the command directly.
-    const [cmd, ...args] = parseArgs();
-    const result = spawnSync(cmd, args, { stdio: "inherit", shell: false });
-    process.exit(result.status ?? 1);
+function writeHeartbeat() {
+  try {
+    const lock = readLock();
+    if (lock?.pid === process.pid) {
+      atomicWrite(LOCK_PATH, `${process.pid}\n${lock.acquiredAt}\n${Date.now()}\n`);
+    }
+  } catch {
+    // A transient heartbeat write failure is handled by the stale recovery path.
   }
 }
 
-// ── Lock acquisition ─────────────────────────────────────────────────────────
+function waiterPath(pid = process.pid) {
+  return `${WAITERS_DIR}/${pid}.json`;
+}
 
-const cmdArgs = parseArgs();
-const waitStart = Date.now();
+function writeWaiter() {
+  atomicWrite(
+    waiterPath(),
+    `${JSON.stringify({
+      pid: process.pid,
+      resource: RESOURCE,
+      priority: args.priority,
+      queuedAt: Date.now(),
+      command: args.command,
+    })}\n`,
+  );
+}
+
+function clearWaiter() {
+  try {
+    unlinkSync(waiterPath());
+  } catch {
+    // Already gone.
+  }
+}
+
+function readWaiters() {
+  try {
+    return readdirSync(WAITERS_DIR)
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => {
+        try {
+          return JSON.parse(readFileSync(`${WAITERS_DIR}/${file}`, "utf8"));
+        } catch {
+          return null;
+        }
+      })
+      .filter((waiter) => waiter && waiter.pid !== process.pid);
+  } catch {
+    return [];
+  }
+}
+
+function higherPriorityWaiterIsDue() {
+  const now = Date.now();
+  for (const waiter of readWaiters()) {
+    if (!isAlive(waiter.pid)) {
+      try { unlinkSync(waiterPath(waiter.pid)); } catch { /* already gone */ }
+      continue;
+    }
+    if (
+      Number.isInteger(waiter.priority) &&
+      waiter.priority < args.priority &&
+      now - Number(waiter.queuedAt) >= PRIORITY_GRACE_MS
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function runDirect() {
+  const [command, ...commandArgs] = args.command;
+  const result = spawnSync(command, commandArgs, {
+    stdio: "inherit",
+    shell: false,
+    env: process.env,
+  });
+  process.exit(result.status ?? (result.signal ? 1 : 0));
+}
+
+const inheritedHolder = process.env[HELD_PID_ENV] ??
+  (RESOURCE === DEFAULT_RESOURCE ? process.env[LEGACY_HOLDER_ENV] : undefined);
+if (inheritedHolder && getAncestors().has(String(Number(inheritedHolder)))) {
+  console.log(`[serial-lock] reentrant resource '${RESOURCE}'; running without reacquiring.`);
+  runDirect();
+}
+
+let waiterWritten = false;
+const waitStartedAt = Date.now();
 
 async function acquireLock() {
   while (true) {
     const lock = readLock();
-
     if (!lock) {
-      // Lock is free — take it.
-      writeLock(process.pid);
-      // Double-check we won the race (last writer wins — tolerable for our use
-      // case since concurrent writes are atomic and only one PID will survive).
-      const verify = readLock();
-      if (verify && verify.pid === process.pid) {
-        return; // We own it.
+      if (higherPriorityWaiterIsDue()) {
+        if (!waiterWritten) {
+          writeWaiter();
+          waiterWritten = true;
+        }
+        await sleep(WAIT_INTERVAL_MS);
+        continue;
       }
-      // Lost a race; fall through and wait.
+      if (tryCreateLock()) return;
     } else {
-      const { pid: holderPid, acquiredAt, lastHeartbeat } = lock;
-      const heldMs = Date.now() - acquiredAt;
-      const heartbeatStaleMs = Date.now() - lastHeartbeat;
+      const heldMs = Date.now() - lock.acquiredAt;
+      const heartbeatAgeMs = Date.now() - lock.lastHeartbeat;
+      let takeoverReason = "";
+      if (!isAlive(lock.pid)) takeoverReason = "holder PID is dead";
+      else if (heartbeatAgeMs > HEARTBEAT_STALE_MS) takeoverReason = "heartbeat is stale";
+      else if (heldMs > MAX_HOLD_MS) takeoverReason = "maximum hold duration exceeded";
 
-      if (!isAlive(holderPid)) {
-        // Holder is dead — forced takeover.
+      if (takeoverReason) {
         console.error(
-          `\n[serial-lock] INCIDENT: lock held by PID ${holderPid}` +
-            ` (acquired ${Math.round(heldMs / 1000)}s ago) is no longer alive.` +
-            ` Forcing takeover for PID ${process.pid}.\n`
+          `\n[serial-lock] INCIDENT: reclaiming resource '${RESOURCE}' from PID ${lock.pid}; ` +
+          `${takeoverReason} (held ${Math.round(heldMs / 1000)}s).\n`,
         );
         clearLock();
-        writeLock(process.pid);
-        const verify = readLock();
-        if (verify && verify.pid === process.pid) return;
-      } else if (heartbeatStaleMs > HEARTBEAT_STALE_MS) {
-        // Holder is alive by OS signal but its heartbeat has gone stale — hung.
-        console.error(
-          `\n[serial-lock] INCIDENT: lock held by PID ${holderPid}` +
-            ` (acquired ${Math.round(heldMs / 1000)}s ago)` +
-            ` has not refreshed its heartbeat in ${Math.round(heartbeatStaleMs / 1000)}s` +
-            ` (threshold ${HEARTBEAT_STALE_MS / 1000}s). Forcing takeover for PID ${process.pid}.\n`
-        );
-        clearLock();
-        writeLock(process.pid);
-        const verify = readLock();
-        if (verify && verify.pid === process.pid) return;
+        if (tryCreateLock()) return;
       } else {
-        // Holder is alive, heartbeat is fresh, and within budget — wait our turn.
-        const elapsed = Date.now() - waitStart;
-        if (elapsed >= MAX_WAIT_MS) {
+        const waitedMs = Date.now() - waitStartedAt;
+        if (waitedMs >= MAX_WAIT_MS) {
           console.error(
-            `[serial-lock] ERROR: waited ${Math.round(elapsed / 1000)}s for lock` +
-              ` (MAX_WAIT_MS=${MAX_WAIT_MS / 1000}s). Aborting.`
+            `[serial-lock] ERROR: waited ${Math.round(waitedMs / 1000)}s for resource '${RESOURCE}' ` +
+            `(MAX_WAIT_MS=${Math.round(MAX_WAIT_MS / 1000)}s).`,
           );
+          clearWaiter();
           process.exit(1);
         }
+        if (!waiterWritten) {
+          writeWaiter();
+          waiterWritten = true;
+        }
         console.log(
-          `[serial-lock] waiting for lock held by PID ${holderPid}` +
-            ` (held ${Math.round(heldMs / 1000)}s,` +
-            ` heartbeat ${Math.round(heartbeatStaleMs / 1000)}s ago)…` +
-            ` (elapsed ${Math.round(elapsed / 1000)}s)`
+          `[serial-lock] waiting for resource '${RESOURCE}' held by PID ${lock.pid}` +
+          ` (held ${Math.round(heldMs / 1000)}s, heartbeat ${Math.round(heartbeatAgeMs / 1000)}s ago)` +
+          ` (elapsed ${Math.round(waitedMs / 1000)}s)`,
         );
       }
     }
-
-    await sleep(WAIT_INTERVAL);
+    await sleep(WAIT_INTERVAL_MS);
   }
 }
-
-// ── Main ─────────────────────────────────────────────────────────────────────
 
 await acquireLock();
-
+clearWaiter();
 console.log(
-  `[serial-lock] PID ${process.pid} acquired lock. Running: ${cmdArgs.join(" ")}`
+  `[serial-lock] PID ${process.pid} acquired lock for resource '${RESOURCE}'. ` +
+  `Running: ${args.command.join(" ")}`,
 );
+process.env[LEGACY_HOLDER_ENV] = String(process.pid);
+process.env[HELD_PID_ENV] = String(process.pid);
 
-// Export our PID so nested invocations can detect reentrancy.
-process.env[LOCK_HOLDER_ENV] = String(process.pid);
-
-// Start periodic heartbeat. The command is spawned asynchronously (below) so
-// the Node event loop stays alive and this interval can fire while the child runs.
 let heartbeatTimer = setInterval(writeHeartbeat, HEARTBEAT_INTERVAL_MS);
 heartbeatTimer.unref();
-
-/** Release the lock and stop the heartbeat. Safe to call multiple times. */
+let released = false;
 function release() {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  }
+  if (released) return;
+  released = true;
+  clearInterval(heartbeatTimer);
   const lock = readLock();
-  if (lock && lock.pid === process.pid) {
+  if (lock?.pid === process.pid) {
     clearLock();
-    console.log(`[serial-lock] PID ${process.pid} released lock.`);
+    console.log(`[serial-lock] PID ${process.pid} released lock for resource '${RESOURCE}'.`);
   }
+  clearWaiter();
 }
 
-// Run the wrapped command asynchronously so the event loop stays live for heartbeats.
-const [cmd, ...args] = cmdArgs;
-const child = spawn(cmd, args, {
+const [command, ...commandArgs] = args.command;
+const child = spawn(command, commandArgs, {
   stdio: "inherit",
   shell: false,
   env: process.env,
 });
+let timeoutTimer;
+if (args.timeoutMs > 0) {
+  timeoutTimer = setTimeout(() => {
+    console.error(
+      `[serial-lock] INCIDENT: resource '${RESOURCE}' command exceeded post-acquisition ` +
+      `budget of ${args.timeoutMs}ms; terminating child.`,
+    );
+    child.kill("SIGTERM");
+    setTimeout(() => {
+      if (child.exitCode === null) child.kill("SIGKILL");
+    }, 2_000).unref();
+  }, args.timeoutMs);
+  timeoutTimer.unref();
+}
 
-child.on("error", (err) => {
-  console.error(`[serial-lock] Failed to spawn '${cmd}': ${err.message}`);
+child.on("error", (error) => {
+  if (timeoutTimer) clearTimeout(timeoutTimer);
+  console.error(`[serial-lock] Failed to spawn '${command}': ${error.message}`);
   release();
   process.exit(1);
 });
-
 child.on("close", (code, signal) => {
+  if (timeoutTimer) clearTimeout(timeoutTimer);
   release();
-  // Mirror the child's exit: prefer its exit code; fall back to 1 on signal.
   process.exit(code ?? (signal ? 1 : 0));
 });
-
-// Forward signals to the child so Ctrl-C propagates correctly.
 process.on("SIGINT", () => child.kill("SIGINT"));
 process.on("SIGTERM", () => child.kill("SIGTERM"));

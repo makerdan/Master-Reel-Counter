@@ -5,9 +5,8 @@
  * Validates two things:
  *
  * Part 1 — Integration check:
- *   Reads package.json and asserts that both `ci` and `test:e2e` npm scripts
- *   still route through serial-lock.mjs. If someone removes the lock from
- *   either entrypoint this test fails immediately.
+ *   Reads package.json and asserts that `ci` routes through the canonical
+ *   test-heavy tier runner and `test:e2e` routes through serial-lock.mjs.
  *
  * Part 2 — Concurrent npm run invocation test:
  *   Launches `npm run ci` and `npm run test:e2e` simultaneously with:
@@ -47,15 +46,19 @@ const pkg = JSON.parse(readFileSync(PKG_PATH, "utf8"));
 const scripts = pkg.scripts ?? {};
 let integrationOk = true;
 
-for (const name of ["ci", "test:e2e"]) {
+const expectedRoutes = {
+  ci: "test-heavy",
+  "test:e2e": "serial-lock.mjs",
+};
+for (const [name, expected] of Object.entries(expectedRoutes)) {
   const script = scripts[name] ?? "";
-  if (!script.includes("serial-lock.mjs")) {
+  if (!script.includes(expected)) {
     console.error(
-      `  FAIL: npm run ${name} does not route through serial-lock.mjs (got: "${script}")`
+      `  FAIL: npm run ${name} does not route through ${expected} (got: "${script}")`
     );
     integrationOk = false;
   } else {
-    console.log(`  PASS: npm run ${name} → routes through serial-lock.mjs`);
+    console.log(`  PASS: npm run ${name} → routes through ${expected}`);
   }
 }
 

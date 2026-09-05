@@ -60,7 +60,7 @@ const pdfJobs = new Map<string, {
   userId: string;
   sessionId: number;
 }>();
-setInterval(() => {
+const pdfCleanupTimer = setInterval(() => {
   const now = Date.now();
   const staleCutoff = now - 15 * 60 * 1000;      // 15 min for in-progress jobs
   const completedCutoff = now - 2 * 60 * 1000;   // 2 min for completed-but-undownloaded
@@ -70,6 +70,7 @@ setInterval(() => {
     }
   }
 }, 60 * 1000); // run every minute so completed-job TTL (2 min) is honoured promptly
+pdfCleanupTimer.unref();
 
 function formatPinLabel(label: string): string {
   if (/^\d+$/.test(label)) {
@@ -6626,6 +6627,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       }
     });
   }, WS_HEARTBEAT_INTERVAL_MS);
+  wsHeartbeat.unref();
   wss.on("close", () => { clearInterval(wsHeartbeat); });
 
   // Defensive ghost-entry pruner: walks sessionRooms and wsUserMap every
@@ -6652,6 +6654,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       }
     }
   }, WS_PRUNE_INTERVAL_MS);
+  wsGhostPruner.unref();
   wss.on("close", () => { clearInterval(wsGhostPruner); });
 
   const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000;
@@ -7512,8 +7515,10 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     });
   }
 
-  setInterval(purgeExpiredTrash, TRASH_PURGE_INTERVAL_MS);
-  setTimeout(purgeExpiredTrash, 30000);
+  const trashPurgeTimer = setInterval(purgeExpiredTrash, TRASH_PURGE_INTERVAL_MS);
+  trashPurgeTimer.unref();
+  const initialTrashPurgeTimer = setTimeout(purgeExpiredTrash, 30000);
+  initialTrashPurgeTimer.unref();
 
   return httpServer;
 }

@@ -11,8 +11,13 @@
     "typecheck": "tsc --noEmit && tsc --project tsconfig.playwright.json --noEmit",
     "db:push": "drizzle-kit push",
     "lint:storage": "node scripts/lint-storage.mjs --strict",
-    "test:e2e": "node scripts/serial-lock.mjs -- playwright test",
-    "ci": "node scripts/serial-lock.mjs -- bash scripts/ci.sh"
+    "test:unit": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts",
+    "test:e2e": "node scripts/serial-lock.mjs --resource e2e-port --priority 3 --timeout-ms 900000 -- npx playwright test",
+    "test-fast": "node scripts/run-tier.mjs test-fast",
+    "test-standard": "node scripts/run-tier.mjs test-standard",
+    "test-standard-plus": "node scripts/run-tier.mjs test-standard-plus",
+    "test-heavy": "node scripts/run-tier.mjs test-heavy",
+    "ci": "npm run test-heavy"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",

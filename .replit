@@ -37,85 +37,81 @@ build = ["npm", "run", "build"]
 runButton = "Project"
 
 [[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "lint-storage"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "typecheck"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "ci"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "e2e"
-
-[[workflows.workflow]]
 name = "Start application"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "while true; do npm run dev; echo '[supervisor] Server exited — restarting in 2s...'; sleep 2; done"
+args = "npm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
 
 [[workflows.workflow]]
-name = "lint-storage"
+name = "Project"
+mode = "parallel"
 author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-fast"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-standard"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-standard-plus"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-heavy"
+
+[[workflows.workflow]]
+name = "test-fast"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test-fast"
 
 [workflows.workflow.metadata]
 isValidation = true
 
+[[workflows.workflow]]
+name = "test-standard"
+author = "agent"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run lint:storage"
-
-[[workflows.workflow]]
-name = "typecheck"
-author = "agent"
+args = "npm run test-standard"
 
 [workflows.workflow.metadata]
 isValidation = true
 
+[[workflows.workflow]]
+name = "test-standard-plus"
+author = "agent"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run typecheck"
-
-[[workflows.workflow]]
-name = "ci"
-author = "agent"
+args = "npm run test-standard-plus"
 
 [workflows.workflow.metadata]
 isValidation = true
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run ci"
-
 [[workflows.workflow]]
-name = "e2e"
+name = "test-heavy"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node scripts/free-ports.mjs && npm run test:e2e"
+args = "npm run test-heavy"
 
 [workflows.workflow.metadata]
-outputType = "console"
+isValidation = true
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0", "github:1.0.0"]

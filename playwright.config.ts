@@ -44,7 +44,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
+    command: "node scripts/free-ports.mjs 5000 && npm run dev",
     url: `${BASE_URL}/api/healthz`,
     reuseExistingServer: true,
     timeout: 120_000,

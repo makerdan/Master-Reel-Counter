@@ -8,6 +8,14 @@ import {
   patchPinFlagSchema,
   patchEntrySchema,
 } from "../routes.js";
+import { pool } from "../db.js";
+
+// The route module opens a PostgreSQL pool even when the real-server checks
+// are skipped. Close this test process's pool so the unit tier cannot hang
+// after all assertions have passed.
+after(async () => {
+  await pool.end().catch(() => {});
+});
 
 // ---------------------------------------------------------------------------
 // Unit tests — schema validation in isolation

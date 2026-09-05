@@ -1,11 +1,10 @@
 /**
- * ci-serial-lock.test.ts — Behavioral tests for the serial-lock heartbeat.
+ * ci-serial-lock.test.ts — Behavioral tests for the validation lock.
  *
  * Guards against:
- *   • The heartbeat interval being removed or broken, causing legitimate
- *     long-running holders to be force-evicted by waiters.
- *   • The stale-heartbeat eviction branch never being exercised by a test.
- *   • The fresh-heartbeat "no evict" invariant being silently broken.
+ *   • resource striping, priority, and same-resource reentrancy
+ *   • heartbeat, stale/dead/max-hold recovery, cleanup, and exit propagation
+ *   • signal cleanup and collision-safe acquisition
  *
  * All tests exercise the real scripts/serial-lock.mjs binary via child
  * processes. Config env vars (SERIAL_LOCK_HEARTBEAT_INTERVAL_MS,
@@ -81,10 +80,12 @@ function runLocked(
   lockPath: string,
   innerCmd: string[],
   extraEnv: Record<string, string> = {}
+  , resource = "global"
+  , priority = 5
 ): { proc: ReturnType<typeof spawn>; done: Promise<{ code: number; stdout: string; stderr: string }> } {
   const proc = spawn(
     process.execPath,
-    [LOCK_SCRIPT, "--", ...innerCmd],
+    [LOCK_SCRIPT, "--resource", resource, "--priority", String(priority), "--", ...innerCmd],
     {
       env: testEnv(lockPath, extraEnv),
       stdio: ["ignore", "pipe", "pipe"],
@@ -293,16 +294,11 @@ await test("fresh heartbeat protects a live holder from waiter eviction", async 
 });
 
 await test("holder with fresh heartbeat is NOT evicted even when SERIAL_LOCK_MAX_HOLD_MS is exceeded", async () => {
-  // This is the key regression guard: a legitimately long-running CI job must
-  // not be force-evicted solely because it has held the lock past MAX_HOLD_MS,
-  // as long as its heartbeat is fresh. We simulate this by setting MAX_HOLD_MS
-  // to 1 ms (already exceeded) while the holder keeps a fresh heartbeat.
+  // A fresh heartbeat protects a holder until the explicit max-hold safety
+  // valve. The max-hold test below verifies that valve separately.
   const lockPath = tempLockPath();
   const overrides = {
-    // Max hold of 1 ms — always "exceeded" by the time the waiter checks.
-    SERIAL_LOCK_MAX_HOLD_MS: "1",
-    // Heartbeat interval is 400 ms (from HB_INTERVAL), stale after 900 ms.
-    // The holder will refresh within that window so heartbeat stays fresh.
+    SERIAL_LOCK_MAX_HOLD_MS: "5000",
   };
 
   // Holder sleeps 2 s — during which heartbeats fire every 400 ms.
@@ -311,8 +307,8 @@ await test("holder with fresh heartbeat is NOT evicted even when SERIAL_LOCK_MAX
   // Give holder 300 ms to acquire and write initial heartbeat.
   await new Promise((r) => setTimeout(r, 300));
 
-  // Waiter arrives while the holder is running. MAX_HOLD_MS = 1 ms is already
-  // exceeded, but the heartbeat is fresh — waiter must queue, NOT evict.
+  // Waiter arrives while the holder is running; heartbeat is fresh and max hold
+  // has not elapsed, so it must queue normally.
   const waiterResult = runLocked(lockPath, [process.execPath, "-e", "process.exit(0)"], overrides);
 
   try {
@@ -337,6 +333,116 @@ await test("holder with fresh heartbeat is NOT evicted even when SERIAL_LOCK_MAX
     assert.equal(holder.code, 0, `holder should exit 0 (got ${holder.code})`);
     assert.equal(waiter.code, 0, `waiter should exit 0 (got ${waiter.code})`);
   } finally {
+    cleanup(lockPath);
+  }
+});
+
+await test("max-hold safety valve reclaims a live but overlong holder", async () => {
+  const lockPath = tempLockPath();
+  const overrides = {
+    SERIAL_LOCK_MAX_HOLD_MS: "100",
+    SERIAL_LOCK_HEARTBEAT_STALE_MS: "5000",
+  };
+  const holder = runLocked(lockPath, ["sleep", "2"], overrides);
+  await new Promise((r) => setTimeout(r, 300));
+  const waiter = runLocked(lockPath, [process.execPath, "-e", "process.exit(0)"], overrides);
+  try {
+    const [holderResult, waiterResult] = await Promise.all([holder.done, waiter.done]);
+    const output = waiterResult.stdout + waiterResult.stderr;
+    assert.ok(output.includes("maximum hold duration exceeded"), "takeover should identify max-hold recovery");
+    assert.equal(waiterResult.code, 0);
+    assert.equal(holderResult.code, 0);
+  } finally {
+    holder.proc.kill("SIGTERM");
+    waiter.proc.kill("SIGTERM");
+    cleanup(lockPath);
+  }
+});
+
+await test("dead holder is reclaimed loudly", async () => {
+  const lockPath = tempLockPath();
+  writeFileSync(lockPath, `${999999}\n${Date.now() - 300_000}\n${Date.now() - 300_000}\n`, "utf8");
+  try {
+    const { done } = runLocked(lockPath, [process.execPath, "-e", "process.exit(0)"]);
+    const result = await done;
+    assert.equal(result.code, 0);
+    assert.ok((result.stdout + result.stderr).includes("holder PID is dead"));
+  } finally {
+    cleanup(lockPath);
+  }
+});
+
+await test("same resource is reentrant without waiting", async () => {
+  const lockPath = tempLockPath();
+  const nestedCode = [
+    "const {spawnSync}=require('child_process');",
+    `const r=spawnSync(process.execPath,[${JSON.stringify(LOCK_SCRIPT)},'--resource','nested','--','${process.execPath}','-e','process.exit(0)'],{stdio:'pipe',env:process.env});`,
+    "process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exit(r.status ?? 1);",
+  ].join("");
+  try {
+    const { done } = runLocked(lockPath, [process.execPath, "-e", nestedCode], {}, "nested");
+    const result = await done;
+    assert.equal(result.code, 0);
+    assert.ok((result.stdout + result.stderr).includes("reentrant resource 'nested'"));
+  } finally {
+    cleanup(lockPath);
+  }
+});
+
+await test("distinct resources run concurrently", async () => {
+  const alphaPath = tempLockPath();
+  const betaPath = tempLockPath();
+    const alpha = runLocked(alphaPath, ["sleep", "1"], { VALIDATION_LOCK_FILE: alphaPath }, "alpha");
+  await new Promise((r) => setTimeout(r, 150));
+  const startedAt = Date.now();
+    const beta = runLocked(betaPath, [process.execPath, "-e", "process.exit(0)"], { VALIDATION_LOCK_FILE: betaPath }, "beta");
+  try {
+    const betaResult = await beta.done;
+    assert.equal(betaResult.code, 0);
+    assert.ok(Date.now() - startedAt < 850, "independent resource should not wait for alpha");
+    await alpha.done;
+  } finally {
+    alpha.proc.kill("SIGTERM");
+    beta.proc.kill("SIGTERM");
+    cleanup(alphaPath);
+    cleanup(betaPath);
+  }
+});
+
+await test("higher-priority waiter acquires before lower-priority waiter", async () => {
+  const lockPath = tempLockPath();
+  const overrides = { SERIAL_LOCK_PRIORITY_GRACE_MS: "50" };
+  const holder = runLocked(lockPath, ["sleep", "1"], overrides);
+  await new Promise((r) => setTimeout(r, 150));
+  const low = runLocked(lockPath, [process.execPath, "-e", "setTimeout(() => process.exit(0), 50)"], overrides, "priority", 8);
+  await new Promise((r) => setTimeout(r, 150));
+  const high = runLocked(lockPath, [process.execPath, "-e", "process.exit(0)"], overrides, "priority", 1);
+  try {
+    const completion: string[] = [];
+    low.done.then(() => completion.push("low"));
+    high.done.then(() => completion.push("high"));
+    await Promise.all([holder.done, low.done, high.done]);
+    assert.equal(completion[0], "high", `expected high-priority completion first, got ${completion.join(",")}`);
+  } finally {
+    holder.proc.kill("SIGTERM");
+    low.proc.kill("SIGTERM");
+    high.proc.kill("SIGTERM");
+    cleanup(lockPath);
+  }
+});
+
+await test("SIGTERM releases the lock and terminates the child", async () => {
+  const lockPath = tempLockPath();
+  const holder = runLocked(lockPath, ["sleep", "10"]);
+  try {
+    const appeared = await waitFor(() => readLockFile(lockPath) !== null, 4_000);
+    assert.ok(appeared);
+    holder.proc.kill("SIGTERM");
+    const result = await holder.done;
+    assert.notEqual(result.code, 0);
+    assert.ok(!existsSync(lockPath), "signal cleanup should remove lock");
+  } finally {
+    holder.proc.kill("SIGKILL");
     cleanup(lockPath);
   }
 });

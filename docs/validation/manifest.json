@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "description": "Canonical validation tiers for Master Reel Counter.",
+  "tiers": {
+    "test-fast": {
+      "packageScript": "npm run test-fast",
+      "resource": "validation",
+      "priority": 1,
+      "timeoutMs": 180000,
+      "steps": [
+        { "name": "typecheck", "command": ["npm", "run", "typecheck"] },
+        { "name": "storage-lint", "command": ["npm", "run", "lint:storage"] }
+      ]
+    },
+    "test-standard": {
+      "packageScript": "npm run test-standard",
+      "resource": "validation",
+      "priority": 2,
+      "timeoutMs": 300000,
+      "steps": [
+        { "name": "typecheck", "command": ["npm", "run", "typecheck"] },
+        { "name": "storage-lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "unit-tests", "command": ["npm", "run", "test:unit"] },
+        { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
+      ]
+    },
+    "test-standard-plus": {
+      "packageScript": "npm run test-standard-plus",
+      "resource": "validation",
+      "priority": 2,
+      "timeoutMs": 420000,
+      "steps": [
+        { "name": "typecheck", "command": ["npm", "run", "typecheck"] },
+        { "name": "storage-lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "unit-tests", "command": ["npm", "run", "test:unit"] },
+        { "name": "serial-lock-tests", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
+        { "name": "port-authority-tests", "command": ["node", "scripts/port-authority-test.mjs"] },
+        { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
+      ]
+    },
+    "test-heavy": {
+      "packageScript": "npm run test-heavy",
+      "resource": "validation",
+      "priority": 3,
+      "timeoutMs": 900000,
+      "steps": [
+        { "name": "startup-smoke", "command": ["bash", "scripts/startup-smoke.sh"] },
+        { "name": "security-audit", "command": ["npm", "audit", "--audit-level=high"] },
+        { "name": "schema-check", "command": ["node", "scripts/validate-schema.mjs"] },
+        { "name": "typecheck", "command": ["npm", "run", "typecheck"] },
+        { "name": "storage-lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "unit-tests", "command": ["npm", "run", "test:unit"] },
+        { "name": "serial-lock-tests", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
+        { "name": "port-authority-tests", "command": ["node", "scripts/port-authority-test.mjs"] },
+        { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] },
+        { "name": "collision-smoke", "command": ["node", "scripts/ci-collision-test.mjs"] },
+        { "name": "browser-tests", "command": ["npx", "playwright", "test"] }
+      ]
+    }
+  }
+}

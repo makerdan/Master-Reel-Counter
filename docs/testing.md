@@ -49,7 +49,7 @@ npx playwright show-report
 
 ## Authentication Setup
 
-Tests authenticate as a *tester* user via `/tester-login`. The global setup script (`tests/global-setup.ts`) calls the dev-only endpoint `POST /api/__test__/seed-tester-password` to install a known bcrypt-hashed tester password for the first owner account, then logs in once and saves the session cookie to `tests/.auth/user.json`.
+Tests seed the tester password for the first owner account, then authenticate as the real owner through the dev-only `/api/__test__/owner-login` endpoint. This keeps CRUD and trash cleanup permissions available to the full suite. The global setup script (`tests/global-setup.ts`) saves that session cookie to `tests/.auth/user.json`.
 
 **Important:** you must log in to the app at least once via Replit Auth before running tests, so the seed endpoint has an owner user to configure.
 
@@ -153,3 +153,20 @@ The suite is designed to run locally and in the Replit environment without a sep
 - `CI=true` — enables `forbidOnly` and `retries: 2`
 - `TEST_TESTER_PASSWORD` — a secret password distinct from dev
 - Ensure the dev server and database are running before `npm run test:e2e`
+
+## Canonical validation tiers
+
+The tracked source of truth is `docs/validation/manifest.json`. Each tier is
+registered as an on-demand validation command and acquires one resource-aware
+lock before running its steps. The timeout budget begins after lock acquisition,
+so queue time is reported separately from test duration.
+
+| Tier | Scope | Post-lock budget |
+|---|---|---:|
+| `npm run test-fast` | TypeScript and storage-key lint | 3 minutes |
+| `npm run test-standard` | Fast checks, unit tests, and manifest parity | 5 minutes |
+| `npm run test-standard-plus` | Standard checks plus lock, cleanup, and resource-isolation tests | 7 minutes |
+| `npm run test-heavy` | Startup, high-severity audit, schema check, all static/unit checks, collision checks, and Playwright | 15 minutes |
+
+Do not run tier scripts inside another tier step. The public tier command owns
+the lock; inner commands are deliberately unwrapped to avoid double-locking.
