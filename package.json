@@ -119,6 +119,7 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.2.5",
+    "uuid": "^11.1.1",
     "vaul": "^1.1.2",
     "wouter": "^3.3.5",
     "ws": "^8.21.1",
@@ -156,7 +157,8 @@
       "@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
     },
     "minimatch": ">=10.2.3",
-    "@tootallnate/once": ">=3.0.1"
+    "@tootallnate/once": ">=3.0.1",
+    "uuid": "$uuid"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
