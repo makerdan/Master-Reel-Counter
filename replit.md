@@ -55,3 +55,22 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **OpenAI Vision (gpt-4o):** Used for AI label scanning.
 - **ExcelJS:** For generating Excel (.xlsx) exports.
 - **PWA Support:** Web app manifest, service worker (caches app shell and static assets), offline photo/entry queue via IndexedDB, network status indicator with auto-sync on reconnect. Service worker registered in production only. Session data cached in React Query with 30-minute gc time for offline viewing.
+
+## Account-managed skill projections
+
+The tracked Skill Mirror Sync capability is implemented by
+`scripts/account-skill.mjs`. It requires an explicit `ACCOUNT_SKILLS_SOURCE`
+for every operation; there is no fallback source. Use the discoverable npm
+commands `account-skill:refresh`, `account-skill:validate`,
+`account-skill:audit`, `account-skill:load`, and `account-skill:status`.
+Refresh generates only `.agents/skills/.account-projections/`, which is
+ignored because it can contain private account instructions. Validation uses
+recursive SHA-256 manifests and an opaque `.account-revision`, and refuses
+stale or partial projections.
+
+`.local/custom_skills` is a platform-owned, disposable runtime mirror. The
+repository never writes it or its `.account-skill-metadata.json` sidecars.
+`account-skill:status -- --skill <slug>` is read-only and reports only bounded
+`pass`, `mismatch`, `unavailable-source`, or `missing-mirror` outcomes. Mirror
+repair and source publication belong to the account/platform owner; only
+projection implementation defects belong in this repository.

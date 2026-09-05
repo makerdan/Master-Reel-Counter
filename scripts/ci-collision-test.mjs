@@ -80,6 +80,10 @@ const LOCK_PATH = `/tmp/repl-collision-test-${randomBytes(4).toString("hex")}.lo
 const testEnv = {
   ...process.env,
   SERIAL_LOCK_PATH: LOCK_PATH,
+  // serial-lock.mjs gives VALIDATION_LOCK_FILE precedence over
+  // SERIAL_LOCK_PATH. Override both so the nested smoke invocations cannot
+  // wait on the validation harness's own lock.
+  VALIDATION_LOCK_FILE: LOCK_PATH,
   // Short poll interval so queuing is visible quickly.
   SERIAL_LOCK_WAIT_INTERVAL_MS: "500",
   // ci.sh checks this and exits 0 immediately — keeps the test fast.
