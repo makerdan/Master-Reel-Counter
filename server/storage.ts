@@ -151,8 +151,6 @@ export interface IStorage {
   resolveParentPinForDetailShot(detailPhotoId: number, entryId: number): Promise<void>;
   getSessionFlaggedPins(sessionId: number): Promise<Pin[]>;
   getUserSettings(userId: string): Promise<UserSettings | undefined>;
-  findSettingsByTesterPassword(password: string): Promise<UserSettings | undefined>;
-  getAllSettingsWithTesterPassword(): Promise<UserSettings[]>;
   upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings>;
   getAllUserEntries(userId: string): Promise<Entry[]>;
   bulkUpdateEntries(entriesToUpdate: { id: number; data: Partial<Entry> }[]): Promise<void>;
@@ -952,17 +950,6 @@ export class DatabaseStorage implements IStorage {
   async getUserSettings(userId: string): Promise<UserSettings | undefined> {
     const [result] = await db.select().from(userSettings).where(eq(userSettings.userId, userId));
     return result;
-  }
-
-  async findSettingsByTesterPassword(_password: string): Promise<UserSettings | undefined> {
-    const results = await db.select().from(userSettings)
-      .where(sql`${userSettings.testerPassword} IS NOT NULL`);
-    return results[0];
-  }
-
-  async getAllSettingsWithTesterPassword(): Promise<UserSettings[]> {
-    return db.select().from(userSettings)
-      .where(sql`${userSettings.testerPassword} IS NOT NULL`);
   }
 
   async upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings> {

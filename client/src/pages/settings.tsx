@@ -48,6 +48,7 @@ import { CATALOG, parseCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel, unitLabelFull } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import type { UserWireCatalog } from "@shared/schema";
+import { buildTesterLoginUrl } from "@/lib/testerAccess";
 
 interface UserSettingsResponse {
   userId: string;
@@ -1836,14 +1837,15 @@ export default function SettingsPage() {
                     <>
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground">Tester login URL:</span>
-                        <code className="bg-muted px-2 py-0.5 rounded text-xs">/tester-login</code>
+                        <code className="bg-muted px-2 py-0.5 rounded text-xs">/tester-login?owner=...</code>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0"
                           data-testid="button-copy-tester-url"
                           onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/tester-login`);
+                            if (!user?.id) return;
+                            navigator.clipboard.writeText(buildTesterLoginUrl(window.location.origin, user.id));
                             toast({ title: "Copied to clipboard" });
                           }}
                         >

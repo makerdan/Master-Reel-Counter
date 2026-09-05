@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Cable, LogIn } from "lucide-react";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { getTesterOwnerFromSearch } from "@/lib/testerAccess";
 
 export default function TesterLoginPage() {
   const [, setLocation] = useLocation();
@@ -15,22 +16,10 @@ export default function TesterLoginPage() {
   const search = useSearch();
   const displayNameRef = useRef<HTMLInputElement>(null);
 
-  const prefillPassword = (() => {
-    try {
-      const params = new URLSearchParams(search);
-      return params.get("pw") || "";
-    } catch { return ""; }
-  })();
-
+  const linkedOwner = getTesterOwnerFromSearch(search);
   const [displayName, setDisplayName] = useState("");
-  const [password, setPassword] = useState(prefillPassword);
-
-  useEffect(() => {
-    if (prefillPassword) {
-      window.history.replaceState({}, "", window.location.pathname);
-      displayNameRef.current?.focus();
-    }
-  }, []);
+  const [ownerUserId, setOwnerUserId] = useState(linkedOwner);
+  const [password, setPassword] = useState("");
 
   const loginMutation = useMutation({
     mutationFn: async () => {
@@ -38,7 +27,11 @@ export default function TesterLoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ displayName: displayName.trim(), password: password.trim() }),
+        body: JSON.stringify({
+          displayName: displayName.trim(),
+          ownerUserId: ownerUserId.trim(),
+          password: password.trim(),
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -61,7 +54,7 @@ export default function TesterLoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!displayName.trim() || !password.trim()) return;
+    if (!displayName.trim() || !ownerUserId.trim() || !password.trim()) return;
     loginMutation.mutate();
   };
 
@@ -93,6 +86,18 @@ export default function TesterLoginPage() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="ownerUserId">Owner Access Code</Label>
+              <Input
+                id="ownerUserId"
+                data-testid="input-owner-access-code"
+                placeholder="Enter the owner's access code"
+                value={ownerUserId}
+                onChange={(e) => setOwnerUserId(e.target.value)}
+                autoComplete="off"
+                readOnly={Boolean(linkedOwner)}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="password">Tester Password</Label>
               <Input
                 id="password"
@@ -107,7 +112,7 @@ export default function TesterLoginPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={loginMutation.isPending || !displayName.trim() || !password.trim()}
+              disabled={loginMutation.isPending || !displayName.trim() || !ownerUserId.trim() || !password.trim()}
               data-testid="button-tester-login"
             >
               {loginMutation.isPending ? (

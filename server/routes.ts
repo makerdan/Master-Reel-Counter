@@ -9,7 +9,6 @@ import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/route
 import { authStorage } from "./replit_integrations/auth/storage";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -35,6 +34,7 @@ import {
 
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session, type UserSettings } from "@shared/schema";
 async function logAiUsage(
   userId: string | null,
   feature: string,
@@ -483,6 +483,7 @@ export async function executePhotoDeletion(
   }
 }
 
+const TESTER_LOGIN_DUMMY_HASH = "$2b$10$lAFb311fxS137sB1dRXSLO/PuLciY.N6I1qM4Hdbgv9NDozRWWLr.";
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -513,31 +514,22 @@ export async function registerRoutes(
   });
 
   const testerLoginSchema = z.object({
-    displayName: z.string().min(1, "Display name is required"),
-    password: z.string().min(1, "Password is required"),
+    displayName: z.string().trim().min(1, "Display name is required").max(100),
+    ownerUserId: z.string().trim().min(1, "Owner access code is required").max(255),
+    password: z.string().trim().min(1, "Password is required").max(256),
   });
 
   app.post("/api/auth/tester-login", authRateLimiter, async (req: any, res) => {
     try {
       const parsed = testerLoginSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
-        return res.status(400).json({ message: "Display name and password are required" });
+        return res.status(400).json({ message: "Display name, owner access code, and password are required" });
       }
-      const { displayName, password } = parsed.data;
-      const candidates = await storage.getAllSettingsWithTesterPassword();
-      const matchedOwners: typeof candidates = [];
-      for (const candidate of candidates) {
-        if (candidate.testerPassword && await bcrypt.compare(password.trim(), candidate.testerPassword)) {
-          matchedOwners.push(candidate);
-        }
+      const { displayName, ownerUserId, password } = parsed.data;
+      const ownerSettings = await verifyTesterCredentials(ownerUserId.trim(), password);
+      if (!ownerSettings) {
+        return res.status(401).json({ message: "Invalid owner access code or tester password" });
       }
-      if (matchedOwners.length === 0) {
-        return res.status(401).json({ message: "Invalid tester password" });
-      }
-      if (matchedOwners.length > 1) {
-        return res.status(409).json({ message: "This password is shared by multiple accounts — contact the app owner to set a unique tester password" });
-      }
-      const ownerSettings = matchedOwners[0];
       const testerId = `tester-${createHash("sha256").update(`${ownerSettings.userId}:${displayName.trim().toLowerCase()}`).digest("hex").slice(0, 16)}`;
       await authStorage.upsertUser({
         id: testerId,
@@ -5856,12 +5848,6 @@ export async function registerRoutes(
       if (updates.testerPassword !== undefined) {
         if (updates.testerPassword && typeof updates.testerPassword === "string" && updates.testerPassword.trim()) {
           const plain = updates.testerPassword.trim();
-          const allWithPw = await storage.getAllSettingsWithTesterPassword();
-          for (const other of allWithPw) {
-            if (other.userId !== userId && other.testerPassword && await bcrypt.compare(plain, other.testerPassword)) {
-              return res.status(409).json({ message: "This password is already in use by another account. Please choose a different tester password." });
-            }
-          }
           updates.testerPassword = await bcrypt.hash(plain, 10);
         } else {
           updates.testerPassword = null;
@@ -7522,6 +7508,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
     app.post("/api/__test__/seed-tester-password", async (req: any, res) => {
       try {
+        authRateLimiter.resetKey(ipKeyGenerator(req.ip));
         const { password } = req.body ?? {};
         if (!password || typeof password !== "string") {
           return res.status(400).json({ message: "password required" });
@@ -7550,4 +7537,16 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   initialTrashPurgeTimer.unref();
 
   return httpServer;
+}
+
+export async function verifyTesterCredentials(
+  ownerUserId: string,
+  password: string,
+  getUserSettings: (userId: string) => Promise<UserSettings | undefined> = (userId) => storage.getUserSettings(userId),
+  comparePassword: (password: string, hash: string) => Promise<boolean> = bcrypt.compare,
+): Promise<UserSettings | undefined> {
+  const ownerSettings = await getUserSettings(ownerUserId);
+  const testerPasswordHash = ownerSettings?.testerPassword ?? TESTER_LOGIN_DUMMY_HASH;
+  const matches = await comparePassword(password.trim(), testerPasswordHash);
+  return ownerSettings?.testerPassword && matches ? ownerSettings : undefined;
 }

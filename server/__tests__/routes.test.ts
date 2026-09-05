@@ -7,12 +7,15 @@ import {
   patchPinSchema,
   patchPinFlagSchema,
   patchEntrySchema,
+  verifyTesterCredentials,
 } from "../routes.js";
 import {
   evictAllSessionSockets,
   evictSessionUserSockets,
   RealtimeAuthorizationTracker,
 } from "../realtime-authorization.js";
+import { buildTesterLoginUrl, getTesterOwnerFromSearch } from "../../client/src/lib/testerAccess.js";
+import bcrypt from "bcrypt";
 import { pool } from "../db.js";
 
 // The route module opens a PostgreSQL pool even when the real-server checks
@@ -280,6 +283,58 @@ describe("body guard — safeParse-first pattern (regression guard)", () => {
       const result = patchPhotoSchema.safeParse(body);
       assert.equal(result.success, false, `body ${JSON.stringify(body)} should fail schema validation`);
     }
+  });
+});
+
+describe("tester access security", () => {
+  test("shared login links contain an owner scope but never a password", () => {
+    const url = buildTesterLoginUrl("https://example.com", "owner-123");
+    assert.equal(url, "https://example.com/tester-login?owner=owner-123");
+    assert.equal(getTesterOwnerFromSearch(new URL(url).search), "owner-123");
+    assert.equal(url.includes("pw="), false);
+    assert.equal(url.includes("secret-password"), false);
+  });
+
+  test("credential verification fetches and checks only the requested owner", async () => {
+    const hash = await bcrypt.hash("correct-password", 4);
+    const requestedOwners: string[] = [];
+    const result = await verifyTesterCredentials("owner-123", "correct-password", async (userId) => {
+      requestedOwners.push(userId);
+      return { userId, testerPassword: hash } as any;
+    });
+
+    assert.equal(result?.userId, "owner-123");
+    assert.deepEqual(requestedOwners, ["owner-123"]);
+  });
+
+  test("credential verification rejects missing and mismatched owner credentials", async () => {
+    const hash = await bcrypt.hash("correct-password", 4);
+    let lookups = 0;
+    const comparedHashes: string[] = [];
+    const comparePassword = async (password: string, candidateHash: string) => {
+      comparedHashes.push(candidateHash);
+      return bcrypt.compare(password, candidateHash);
+    };
+    const missing = await verifyTesterCredentials(
+      "unknown-owner",
+      "correct-password",
+      async () => {
+        lookups++;
+        return undefined;
+      },
+      comparePassword,
+    );
+    const mismatch = await verifyTesterCredentials("owner-123", "wrong-password", async (userId) => {
+      lookups++;
+      return { userId, testerPassword: hash } as any;
+    }, comparePassword);
+
+    assert.equal(missing, undefined);
+    assert.equal(mismatch, undefined);
+    assert.equal(lookups, 2);
+    assert.equal(comparedHashes.length, 2, "every attempt must perform exactly one bcrypt comparison");
+    assert.notEqual(comparedHashes[0], hash, "unknown owners must be checked against the dummy hash");
+    assert.equal(comparedHashes[1], hash);
   });
 });
 
@@ -589,5 +644,52 @@ describe("PATCH real-server integration — body guard wired into actual routes"
     });
     assert.equal(status, 200);
     assert.equal(body.wireType, "NM-B", "real route must apply the update");
+  });
+});
+
+describe("tester login real-server integration — owner-scoped authentication", () => {
+  let ownerUserId = "";
+  let skip = false;
+  const password = "routes-test-owner-scoped-password";
+
+  before(async () => {
+    if (!(await devServerReachable())) {
+      skip = true;
+      return;
+    }
+    const seed = await devReq("POST", "/api/__test__/seed-tester-password", {
+      body: { password },
+    });
+    if (seed.status !== 200 || !seed.body.ownerUserId) {
+      skip = true;
+      return;
+    }
+    ownerUserId = seed.body.ownerUserId;
+  });
+
+  test("requires an owner access code", async () => {
+    if (skip) return;
+    const response = await devReq("POST", "/api/auth/tester-login", {
+      body: { displayName: "ScopedTester", password },
+    });
+    assert.equal(response.status, 400);
+  });
+
+  test("accepts the password only for its selected owner", async () => {
+    if (skip) return;
+    const response = await devReq("POST", "/api/auth/tester-login", {
+      body: { displayName: "ScopedTester", ownerUserId, password },
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.testerOwnerUserId, ownerUserId);
+  });
+
+  test("returns the same unauthorized response for an unknown owner", async () => {
+    if (skip) return;
+    const response = await devReq("POST", "/api/auth/tester-login", {
+      body: { displayName: "ScopedTester", ownerUserId: "unknown-owner", password },
+    });
+    assert.equal(response.status, 401);
+    assert.equal(response.body.message, "Invalid owner access code or tester password");
   });
 });
