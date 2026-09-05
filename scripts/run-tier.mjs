@@ -1,64 +1,107 @@
 #!/usr/bin/env node
 /**
- * Execute one of the tracked validation tiers.
+ * Execute a registered validation tier.
  *
- * The public invocation acquires exactly one resource-aware lock. The
- * --execute form is private to that lock wrapper and runs the manifest steps
- * without wrapping any inner step again.
+ * The incoming validation manifest is the runtime source of truth for the
+ * resource-aware tiers. The Failure Gate registry remains the source for the
+ * project-local light tier and for plan-lock compatibility. Task-driven runs
+ * validate the plan before acquiring the outer serial lock; ad-hoc package
+ * scripts pass --allow-no-plan explicitly.
  */
 
 import { readFileSync } from "fs";
-import { spawn, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import { resolve } from "path";
+import { loadTiers } from "./lib/tiers.mjs";
+import { assertRequestedTier } from "./lib/tier-lock-check.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const manifest = JSON.parse(readFileSync(resolve(root, "docs/validation/manifest.json"), "utf8"));
+const localTiers = loadTiers();
 const executeOnly = process.argv.includes("--execute");
 const executeIndex = process.argv.indexOf("--execute");
-const tier = executeOnly
-  ? process.argv[executeIndex + 1]
-  : process.argv[2];
-const entry = manifest.tiers[tier];
+const requested = executeOnly ? process.argv[executeIndex + 1] : process.argv[2];
+const allowNoPlan = process.argv.includes("--allow-no-plan");
+const packageAdHoc = !process.env.TASK_PLAN_FILE && process.env.npm_lifecycle_event === requested;
+const manifestEntry = manifest.tiers[requested];
+const localEntry = localTiers[requested];
+const entry = manifestEntry ?? (localEntry ? {
+  packageScript: `npm run ${requested}`,
+  resource: "validation",
+  priority: localEntry.serial ? 2 : 1,
+  timeoutMs: localEntry.serial ? 300000 : 180000,
+  steps: localEntry.steps.map((step) => ({
+    name: step.name,
+    kind: step.kind,
+    command: ["bash", "-lc", step.command],
+  })),
+} : undefined);
 
 if (!entry) {
-  console.error(`[validation] ERROR: unknown tier '${tier ?? ""}'.`);
+  console.error(`[validation] ERROR: unknown tier '${requested ?? ""}'.`);
   process.exit(2);
 }
 
+function runPlanGuards() {
+  if (process.env.TASK_PLAN_FILE) {
+    assertRequestedTier(process.env.TASK_PLAN_FILE, requested);
+    for (const script of ["scripts/check-failure-gate.mjs", "scripts/check-regression-guard.mjs"]) {
+      const fix = spawnSync(process.execPath, [script, "--fix-stub"], { cwd: root, stdio: "inherit", env: process.env });
+      if (fix.status !== 0) process.exit(fix.status ?? 1);
+      const strict = spawnSync(process.execPath, [script], { cwd: root, stdio: "inherit", env: process.env });
+      if (strict.status !== 0) process.exit(strict.status ?? 1);
+    }
+  } else if (!allowNoPlan && !packageAdHoc) {
+    console.error("TIER-LOCK VIOLATION: TASK_PLAN_FILE is required; use --allow-no-plan only for ad-hoc runs");
+    process.exit(2);
+  } else {
+    console.log(`[validation] ad-hoc run explicitly allowed${packageAdHoc ? " by package tier wrapper" : ""}; no task plan is in force`);
+  }
+}
+
 if (!executeOnly) {
+  try {
+    runPlanGuards();
+  } catch (error) {
+    console.error(error.message);
+    process.exit(2);
+  }
   const lockArgs = [
     resolve(root, "scripts/serial-lock.mjs"),
-    "--resource", entry.resource,
-    "--priority", String(entry.priority),
-    "--timeout-ms", String(entry.timeoutMs),
+    "--resource", entry.resource ?? "validation",
+    "--priority", String(entry.priority ?? 2),
+    "--timeout-ms", String(entry.timeoutMs ?? 300000),
     "--",
     process.execPath,
     resolve(root, "scripts/run-tier.mjs"),
     "--execute",
-    tier,
+    requested,
   ];
   const child = spawnSync(process.execPath, lockArgs, {
     cwd: root,
     stdio: "inherit",
-    env: process.env,
+    env: { ...process.env, FAILURE_GATE_PLAN_GUARDS_DONE: "1" },
   });
   process.exit(child.status ?? 1);
 }
 
-console.log(`[validation] Running ${tier} (budget ${entry.timeoutMs}ms starts after lock acquisition).`);
+if (process.env.FAILURE_GATE_PLAN_GUARDS_DONE !== "1") {
+  try {
+    runPlanGuards();
+  } catch (error) {
+    console.error(error.message);
+    process.exit(2);
+  }
+}
+console.log(`[validation] Running ${requested} (budget ${entry.timeoutMs ?? "unbounded"}ms starts after lock acquisition).`);
 if (process.env.CI_SMOKE_TEST === "1") {
   console.log("[validation] CI_SMOKE_TEST=1 — lock acquisition smoke mode; steps intentionally skipped.");
   process.exit(0);
 }
 
-// The tier owns one outer lock. Do not leak its reentrancy markers into
-// independent regression harnesses, which intentionally create isolated
-// temporary locks to test acquisition and collision behavior.
 const stepEnv = { ...process.env };
 for (const key of Object.keys(stepEnv)) {
-  if (key === "SERIAL_LOCK_HOLDER_PID" || key.startsWith("VALIDATION_LOCK_HELD_PID_")) {
-    delete stepEnv[key];
-  }
+  if (key === "SERIAL_LOCK_HOLDER_PID" || key.startsWith("VALIDATION_LOCK_HELD_PID_")) delete stepEnv[key];
 }
 
 for (const step of entry.steps) {
@@ -77,5 +120,4 @@ for (const step of entry.steps) {
   }
   console.log(`[validation] PASS: ${step.name} (${durationMs}ms).`);
 }
-
-console.log(`\n[validation] PASS: ${tier} completed.`);
+console.log(`\n[validation] PASS: ${requested} completed.`);

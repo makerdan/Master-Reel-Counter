@@ -154,6 +154,37 @@ The suite is designed to run locally and in the Replit environment without a sep
 - `TEST_TESTER_PASSWORD` — a secret password distinct from dev
 - Ensure the dev server and database are running before `npm run test:e2e`
 
+
+## Failure Gate validation
+
+Task plans are created with `npm run new-plan -- --name <slug> --why
+"<reason>"`. Before editing, record exact pre-existing failures in
+`docs/validation/failure-baseline.json` only when an active, unexpired record
+matches the suite, test, and signature. A passing retry means intermittent,
+not pre-existing.
+
+Run the tier locked by the plan:
+
+```bash
+TASK_PLAN_FILE=.local/tasks/<name>.md node scripts/run-locked-tier.mjs
+```
+
+The registered tiers are `test-light`, `test-standard`, and `test-heavy`.
+Task validation cannot be escalated above the plan. Completion validation is a
+separate platform check. Missing, malformed, unreadable, or mismatched plans
+fail before any suite starts. An ad-hoc caller must opt in explicitly with
+`node scripts/run-tier.mjs test-standard --allow-no-plan`.
+
+The plan guards run as an auto-remediate plus strict pair. `--fix-stub` adds
+structure only; the strict pass still requires a real tier, rationale,
+ownership, and exact baseline resolution. Archive inspection is opt-in with
+`node scripts/check-failure-gate.mjs --archive`. Baseline review and stale
+verification reporting is opt-in with `npm run maintain:validation-baseline`.
+
+The Failure Gate capability map is maintained in
+`docs/validation/failure-gate-capabilities.md`. Add future suites and tiers to
+`.agents/skills/validation-tiers/tiers.json`, with a contract test, rather
+than adding runner-specific branching.
 ## Canonical validation tiers
 
 The tracked source of truth is `docs/validation/manifest.json`. Each tier is

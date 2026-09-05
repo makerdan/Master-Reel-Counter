@@ -23,7 +23,18 @@
     "test-standard": "node scripts/run-tier.mjs test-standard",
     "test-standard-plus": "node scripts/run-tier.mjs test-standard-plus",
     "test-heavy": "node scripts/run-tier.mjs test-heavy",
-    "ci": "npm run test-heavy"
+    "ci": "npm run test-heavy",
+    "test-light": "node scripts/run-tier.mjs test-light --allow-no-plan",
+    "new-plan": "node scripts/new-plan.mjs",
+    "check-failure-gate": "node scripts/check-failure-gate.mjs",
+    "check-regression-guard": "node scripts/check-regression-guard.mjs",
+    "run-locked-tier": "node scripts/run-locked-tier.mjs",
+    "check-baseline": "node scripts/check-baseline.mjs",
+    "maintain:validation-baseline": "node scripts/maintain-validation-baseline.mjs",
+    "publish:failure-gate": "node scripts/publish-failure-gate.mjs",
+    "verify:failure-gate": "npm run check-baseline && npm run publish:failure-gate && npm run check-failure-gate-parity",
+    "check-failure-gate-parity": "node scripts/check-failure-gate-parity.mjs",
+    "test:failure-gate": "node --test scripts/__tests__/failure-gate.test.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",

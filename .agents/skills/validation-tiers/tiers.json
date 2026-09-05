@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "tiers": {
+    "test-light": {
+      "description": "Fast static and storage checks.",
+      "serial": false,
+      "steps": [
+        {"name": "typecheck", "kind": "typecheck", "command": "npm run typecheck"},
+        {"name": "storage-lint", "kind": "lint", "command": "npm run lint:storage"}
+      ]
+    },
+    "test-standard": {
+      "description": "Application checks and backend tests.",
+      "serial": true,
+      "steps": [
+        {"name": "typecheck", "kind": "typecheck", "command": "npm run typecheck"},
+        {"name": "storage-lint", "kind": "lint", "command": "npm run lint:storage"},
+        {"name": "backend-tests", "kind": "test", "command": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts"}
+      ]
+    },
+    "test-heavy": {
+      "description": "Complete registered validation including CI and browser coverage.",
+      "serial": true,
+      "steps": [
+        {"name": "ci", "kind": "ci", "command": "npm run ci"}
+      ]
+    }
+  }
+}

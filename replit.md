@@ -47,6 +47,33 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Data Encoding:** AES-256-GCM encryption with key wrapping for sensitive fields.
 - **Cascade Deletion:** Comprehensive cleanup of related data upon deletion of sessions, photos, or entries.
 
+## Agent Validation Contract
+
+Failure Gate applies to every task plan and execution. Plans are created with
+`npm run new-plan -- --name <slug> --why "<reason>"`, must document
+`## Pre-existing failures to ignore` and `## Validation`, and may reference
+only exact, active, unexpired records in
+`docs/validation/failure-baseline.json`. The plan's registered command is the
+validation ceiling.
+
+Use `TASK_PLAN_FILE=.local/tasks/<name>.md node scripts/run-locked-tier.mjs`
+for task validation. Missing or malformed plans, unregistered tiers, and tier
+mismatches fail closed. The only no-plan escape hatch is an explicit
+`node scripts/run-tier.mjs <tier> --allow-no-plan` for ad-hoc work.
+
+`test-light`, `test-standard`, and `test-heavy` are declarative registered
+tiers. Heavy validation retains the existing `serial-lock.mjs`, `free-ports.mjs`,
+startup smoke, CI collision, and Playwright controls. Task validation and
+platform completion validation are separate: completion checks may be broader
+and are not a reason to escalate the task tier.
+
+Failure classification requires exact baseline matching, and a passing retry
+establishes intermittency only. An unlisted failure needs two of three
+provenance factors before it can be self-classified as pre-existing. Do not
+promote a task-local observation directly into the catalog. Run
+`npm run maintain:validation-baseline` for opt-in review/staleness reporting;
+maintenance findings do not fail unrelated task validation.
+
 ## External Dependencies
 - **Replit Auth:** For user authentication (OpenID Connect).
 - **Replit Object Storage:** For storing uploaded photos and user avatars.
