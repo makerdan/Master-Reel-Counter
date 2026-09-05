@@ -165,7 +165,7 @@ export interface IStorage {
   addCollaborator(data: InsertCollaborator): Promise<Collaborator>;
   getSessionCollaborators(sessionId: number): Promise<Collaborator[]>;
   getCollaborator(sessionId: number, userId: string): Promise<Collaborator | undefined>;
-  removeCollaborator(id: number, sessionId: number): Promise<void>;
+  removeCollaborator(id: number, sessionId: number): Promise<Collaborator | undefined>;
   removeCollaboratorBySessionAndUser(sessionId: number, userId: string): Promise<void>;
   updateCollaboratorRole(id: number, sessionId: number, role: string): Promise<Collaborator | undefined>;
   transferSessionOwnership(sessionId: number, newOwnerId: string, newOwnerUsername: string): Promise<void>;
@@ -1110,8 +1110,11 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async removeCollaborator(id: number, sessionId: number): Promise<void> {
-    await db.delete(sessionCollaborators).where(and(eq(sessionCollaborators.id, id), eq(sessionCollaborators.sessionId, sessionId)));
+  async removeCollaborator(id: number, sessionId: number): Promise<Collaborator | undefined> {
+    const [result] = await db.delete(sessionCollaborators)
+      .where(and(eq(sessionCollaborators.id, id), eq(sessionCollaborators.sessionId, sessionId)))
+      .returning();
+    return result;
   }
 
   async removeCollaboratorBySessionAndUser(sessionId: number, userId: string): Promise<void> {

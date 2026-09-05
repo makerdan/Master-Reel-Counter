@@ -8,6 +8,11 @@ import {
   patchPinFlagSchema,
   patchEntrySchema,
 } from "../routes.js";
+import {
+  evictAllSessionSockets,
+  evictSessionUserSockets,
+  RealtimeAuthorizationTracker,
+} from "../realtime-authorization.js";
 import { pool } from "../db.js";
 
 // The route module opens a PostgreSQL pool even when the real-server checks
@@ -15,6 +20,100 @@ import { pool } from "../db.js";
 // after all assertions have passed.
 after(async () => {
   await pool.end().catch(() => {});
+});
+
+describe("RealtimeAuthorizationTracker", () => {
+  test("evicts every socket for the affected user without removing other collaborators", () => {
+    const sent: string[] = [];
+    const affected = {
+      readyState: 1,
+      send: (data: string) => sent.push(data),
+      closeCode: 0,
+      closeReason: "",
+      close(code: number, reason: string) {
+        this.closeCode = code;
+        this.closeReason = reason;
+      },
+    };
+    const unaffected = {
+      readyState: 1,
+      send: (_data: string) => {},
+      close: (_code: number, _reason: string) => {},
+    };
+    const rooms = new Map([[42, new Set([affected, unaffected])]]);
+    const users = new Map([
+      [affected, { sessionId: 42, userId: "revoked-user", role: "editor" }],
+      [unaffected, { sessionId: 42, userId: "other-user", role: "viewer" }],
+    ]);
+
+    evictSessionUserSockets(rooms, users, 42, "revoked-user", 1, "Session access revoked");
+
+    assert.deepEqual([...rooms.get(42)!], [unaffected]);
+    assert.deepEqual(users.get(affected), { sessionId: null, userId: "revoked-user", role: null });
+    assert.deepEqual(JSON.parse(sent[0]), { type: "authorization_changed" });
+    assert.equal(affected.closeCode, 1008);
+    assert.equal(affected.closeReason, "Session access revoked");
+  });
+
+  test("evicts every room member when the session is deleted", () => {
+    const closed: string[] = [];
+    const makeSocket = (name: string) => ({
+      readyState: 1,
+      send: (_data: string) => {},
+      close: (_code: number, _reason: string) => closed.push(name),
+    });
+    const owner = makeSocket("owner");
+    const collaborator = makeSocket("collaborator");
+    const rooms = new Map([[42, new Set([owner, collaborator])]]);
+    const users = new Map([
+      [owner, { sessionId: 42, userId: "owner", role: "owner" }],
+      [collaborator, { sessionId: 42, userId: "collaborator", role: "viewer" }],
+    ]);
+
+    evictAllSessionSockets(rooms, users, 42, 1, "Session deleted");
+
+    assert.equal(rooms.has(42), false);
+    assert.deepEqual(closed.sort(), ["collaborator", "owner"]);
+    assert.equal(users.get(owner)?.sessionId, null);
+    assert.equal(users.get(owner)?.role, null);
+    assert.equal(users.get(collaborator)?.sessionId, null);
+    assert.equal(users.get(collaborator)?.role, null);
+  });
+
+  test("retries an in-flight authorization after the session is invalidated", async () => {
+    const tracker = new RealtimeAuthorizationTracker();
+    let resolveFirst!: (value: string) => void;
+    let calls = 0;
+
+    const authorization = tracker.authorizeConsistently(42, async () => {
+      calls++;
+      if (calls === 1) {
+        return new Promise<string>((resolve) => { resolveFirst = resolve; });
+      }
+      return "viewer";
+    });
+
+    await Promise.resolve();
+    tracker.invalidate(42);
+    resolveFirst("editor");
+
+    assert.equal(await authorization, "viewer");
+    assert.equal(calls, 2);
+  });
+
+  test("does not invalidate authorization checks for other sessions", async () => {
+    const tracker = new RealtimeAuthorizationTracker();
+    let calls = 0;
+
+    const authorization = tracker.authorizeConsistently(7, async () => {
+      calls++;
+      tracker.invalidate(8);
+      return "editor";
+    });
+
+    assert.equal(await authorization, "editor");
+    assert.equal(calls, 1);
+  });
 });
 
 // ---------------------------------------------------------------------------

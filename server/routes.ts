@@ -27,6 +27,11 @@ import { cropPhoto } from "./lib/cropPhoto";
 import ExcelJS from "exceljs";
 import { openai } from "./replit_integrations/image/client";
 import { taskTracker } from "./lib/taskTracker";
+import {
+  evictAllSessionSockets as evictAllSessionSocketsFromRoom,
+  evictSessionUserSockets as evictSessionUserSocketsFromRoom,
+  RealtimeAuthorizationTracker,
+} from "./realtime-authorization";
 
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
@@ -85,7 +90,19 @@ function formatPinLabel(label: string): string {
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
 const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null; testerOwnerUserId: string | null }>();
+const realtimeAuthorization = new RealtimeAuthorizationTracker();
 const encodingToggleInProgress = new Set<string>();
+
+function evictSessionUserSockets(sessionId: number, userId: string, reason: string): void {
+  realtimeAuthorization.invalidate(sessionId);
+  evictSessionUserSocketsFromRoom(sessionRooms, wsUserMap, sessionId, userId, WebSocket.OPEN, reason);
+  broadcastPresence(sessionId);
+}
+
+function evictAllSessionSockets(sessionId: number, reason: string): void {
+  realtimeAuthorization.invalidate(sessionId);
+  evictAllSessionSocketsFromRoom(sessionRooms, wsUserMap, sessionId, WebSocket.OPEN, reason);
+}
 
 /** Derive stable int32 advisory lock keys from a userId (SHA-256, two int4 values). */
 function deriveAdvisoryLockKeys(userId: string): [number, number] {
@@ -930,6 +947,7 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can delete sessions" });
       await storage.softDeleteSession(access.session.id);
+      evictAllSessionSockets(access.session.id, "Session deleted");
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete session" });
@@ -969,6 +987,7 @@ export async function registerRoutes(
         }
       }
       await storage.deleteSession(access.session.id);
+      evictAllSessionSockets(access.session.id, "Session deleted");
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to permanently delete session" });
@@ -1053,6 +1072,7 @@ export async function registerRoutes(
             }
           }
           await storage.deleteSession(id);
+          evictAllSessionSockets(id, "Session deleted");
           results.push(id);
         }
       }
@@ -2945,7 +2965,9 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can remove collaborators" });
       const collabId = parseInt(req.params.collabId);
-      await storage.removeCollaborator(collabId, access.session.id);
+      const removed = await storage.removeCollaborator(collabId, access.session.id);
+      if (!removed) return res.status(404).json({ message: "Collaborator not found" });
+      evictSessionUserSockets(access.session.id, removed.userId, "Session access revoked");
       logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "collaborator_removed", "collaborator", collabId);
       res.json({ success: true });
     } catch (error) {
@@ -2967,6 +2989,7 @@ export async function registerRoutes(
       const { role } = roleParse.data;
       const updated = await storage.updateCollaboratorRole(parseInt(req.params.collabId), access.session.id, role);
       if (!updated) return res.status(404).json({ message: "Collaborator not found" });
+      evictSessionUserSockets(access.session.id, updated.userId, "Session role changed");
       await logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "changed_role", "collaborator", updated.id, `Changed to ${role}`);
       res.json(updated);
     } catch (error) {
@@ -2985,6 +3008,7 @@ export async function registerRoutes(
       const targetCollab = collaborators.find(c => c.id === collaboratorId);
       if (!targetCollab) return res.status(404).json({ message: "Collaborator not found" });
       await storage.transferSessionOwnership(access.session.id, targetCollab.userId, targetCollab.username || "");
+      evictAllSessionSockets(access.session.id, "Session ownership transferred");
       await logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "transferred_ownership", "session", access.session.id, `Transferred to ${targetCollab.username || targetCollab.userId}`);
       broadcastToSession(access.session.id, { type: "ownership_transfer" });
       res.json({ success: true });
@@ -3001,6 +3025,7 @@ export async function registerRoutes(
       const collab = await storage.getCollaborator(sessionId, userId);
       if (!collab) return res.status(404).json({ message: "Not a collaborator of this session" });
       await storage.removeCollaboratorBySessionAndUser(sessionId, userId);
+      evictSessionUserSockets(sessionId, collab.userId, "Session access revoked");
       logActivity(sessionId, userId, (req as AuthenticatedRequest).user?.claims?.username, "collaborator_left", "session", sessionId);
       res.json({ success: true });
     } catch (error) {
@@ -6509,7 +6534,10 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           ws.close(1008, "Authentication required");
           return;
         }
-        const access = await verifySessionAccess(msg.sessionId, info.userId, info.testerOwnerUserId ?? undefined);
+        const access = await realtimeAuthorization.authorizeConsistently(
+          msg.sessionId,
+          () => verifySessionAccess(msg.sessionId, info.userId!, info.testerOwnerUserId ?? undefined),
+        );
         if (!access) {
           ws.send(JSON.stringify({ type: "error", message: "Access denied" }));
           return;
@@ -6713,6 +6741,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
             }
           }
           await storage.deleteSession(session.id);
+          evictAllSessionSockets(session.id, "Session deleted");
           console.log(`Purged expired trashed session ${session.id} (${session.name})`);
         } catch (err) {
           console.error(`Failed to purge trashed session ${session.id}:`, err);
