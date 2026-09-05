@@ -7,5 +7,7 @@ vite.config.ts.*
 playwright-report/
 test-results/
 tests/.auth/
+.agents/skills/.account-projections/
+.agents/skills/.account-projections.lock
 .crash_log.json
 .crash_log.json
