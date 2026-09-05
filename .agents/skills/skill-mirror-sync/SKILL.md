@@ -88,7 +88,7 @@ contents, or load a prior projection while the source is unavailable.
 Use the supported non-mutating command:
 
 ```sh
-npm run account-skill:status -- --skill <skill-id>
+pnpm account-skill:status -- --skill <skill-id>
 ```
 
 It reads the account source and the platform-owned
