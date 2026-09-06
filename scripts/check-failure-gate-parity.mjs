@@ -8,8 +8,9 @@ if (!existsSync(canonical) || !existsSync(mirror)) {
   console.error("Failure Gate parity: canonical source or generated mirror is missing.");
   process.exit(1);
 }
-const canonicalText = readFileSync(canonical, "utf8").replace(/\r\n/g, "\n");
-const mirrorText = readFileSync(mirror, "utf8").replace(/\r\n/g, "\n");
+const normalize = (text) => text.replace(/\r\n/g, "\n");
+const canonicalText = normalize(readFileSync(canonical, "utf8"));
+const mirrorText = normalize(readFileSync(mirror, "utf8"));
 const requiredContract = [
   "name: Failure Gate",
   "Non-negotiable contract",
@@ -28,9 +29,27 @@ if (!existsSync(published)) {
   console.error("Failure Gate parity: published snapshot is missing; run npm run publish:failure-gate.");
   process.exit(1);
 }
-const publishedSkill = execFileSync("unzip", ["-p", published, "SKILL.md"], { encoding: "utf8" });
-if (publishedSkill.trim() !== canonicalText.trim()) {
-  console.error("Failure Gate parity: published SKILL.md differs from the canonical source.");
-  process.exit(1);
+const publishedEntries = [
+  { archiveName: "SKILL.md", sourcePath: canonical },
+  {
+    archiveName: "validation-tiers.md",
+    sourcePath: resolve(".agents/skills/validation-tiers/SKILL.md"),
+  },
+  {
+    archiveName: "tiers.json",
+    sourcePath: resolve(".agents/skills/validation-tiers/tiers.json"),
+  },
+];
+
+for (const { archiveName, sourcePath } of publishedEntries) {
+  const sourceText = normalize(readFileSync(sourcePath, "utf8"));
+  const publishedText = normalize(
+    execFileSync("unzip", ["-p", published, archiveName], { encoding: "utf8" }),
+  );
+  if (publishedText.trim() !== sourceText.trim()) {
+    console.error(`Failure Gate parity: published ${archiveName} differs from its canonical source.`);
+    process.exit(1);
+  }
 }
+
 console.log("Failure Gate parity: canonical and generated mirror contain the required contract anchors.");
