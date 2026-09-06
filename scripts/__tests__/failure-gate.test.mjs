@@ -40,6 +40,28 @@ test("registry exposes extensible light, standard, and heavy tiers", () => {
   assert.equal(tiers["test-heavy"].serial, true);
 });
 
+test("Failure Gate package regeneration is byte-for-byte stable", () => {
+  const first = run("scripts/publish-failure-gate.mjs", []);
+  assert.equal(first.status, 0, first.stderr);
+  const packagePath = join(ROOT, "artifacts/bathyscan/public/failure-gate-skill.zip");
+  const firstBytes = readFileSync(packagePath);
+
+  const second = run("scripts/publish-failure-gate.mjs", []);
+  assert.equal(second.status, 0, second.stderr);
+  assert.deepEqual(readFileSync(packagePath), firstBytes);
+
+  const entries = spawnSync("unzip", ["-Z1", packagePath], {
+    cwd: ROOT,
+    encoding: "utf8",
+  });
+  assert.equal(entries.status, 0, entries.stderr);
+  assert.deepEqual(entries.stdout.trim().split("\n"), [
+    "SKILL.md",
+    "validation-tiers.md",
+    "tiers.json",
+  ]);
+});
+
 test("plan scaffold rejects unknown tiers and creates exact baseline markers", () => {
   const invalid = run("scripts/new-plan.mjs", ["--name", "fixture-invalid", "--why", "test", "--tier", "not-registered"]);
   assert.equal(invalid.status, 1);
