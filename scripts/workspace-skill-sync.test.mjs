@@ -26,6 +26,7 @@ import {
 } from "./workspace-skill-sync.mjs";
 
 const SCRIPT = join(process.cwd(), "scripts/workspace-skill-sync.mjs");
+const APP_SUPPORT_OPS = join(process.cwd(), ".agents", "skills", "app-support-ops");
 
 function fixture(t, { revision = "revision-private-7" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "workspace-skill-sync-"));
@@ -95,6 +96,27 @@ test("refreshes a complete recursive projection and loads selected or all skills
   assert.equal(loadSkills(["alpha-skill"])[0].files["references/nested.md"], "nested support\n");
   assert.equal(loadSkills().length, 2);
   assert.equal(readFileSync(join(fixturePaths.projection, "manifest.json"), "utf8").includes("nested.md"), true);
+});
+
+test("discovers and validates the tracked App Support Ops package recursively", (t) => {
+  const fixturePaths = fixture(t, { revision: "tracked-app-support-ops" });
+  const skill = readFileSync(join(APP_SUPPORT_OPS, "SKILL.md"), "utf8");
+  const evals = readFileSync(join(APP_SUPPORT_OPS, "evals", "evals.json"), "utf8");
+  addSkill(fixturePaths.source, "app-support-ops", {
+    "SKILL.md": skill,
+    "evals/evals.json": evals,
+  });
+
+  const parsed = JSON.parse(evals);
+  assert.equal(parsed.skill_name, "app-support-ops");
+  assert.deepEqual(parsed.evals.map(({ id }) => id), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.equal(parsed.evals.every(({ expectations }) => expectations.length >= 2), true);
+
+  refreshProjection();
+  assert.deepEqual(validateProjection().skills, ["app-support-ops"]);
+  const [loaded] = loadSkills(["app-support-ops"]);
+  assert.equal(loaded.files["SKILL.md"], skill);
+  assert.equal(loaded.files["evals/evals.json"], evals);
 });
 
 test("supports arbitrary future skill counts without touching workspace-authored skills", (t) => {

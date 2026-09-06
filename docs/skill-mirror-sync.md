@@ -10,6 +10,12 @@ workspace-authored skills, while generated source content is confined to
 `.agents/skills/.workspace-projections/`. The disposable `.local/custom_skills`
 tree is platform-owned and is never repaired by repository commands.
 
+Repository-owned skills are installed directly as tracked lowercase-slug
+packages under `.agents/skills/<skill-id>/`. For example, App Support Ops is
+canonically stored in `.agents/skills/app-support-ops/`, including its nested
+evaluation fixtures. This tracked package—not a disposable runtime mirror—is
+the reviewable source for repository-owned skill content.
+
 ## Setup
 
 Set `WORKSPACE_SKILLS_SOURCE` explicitly in the invoking environment. It must be
@@ -57,6 +63,12 @@ Status reads the canonical source and the platform-owned
 
 Status does not print source paths, sidecar values, skill bodies, secrets, or
 private instructions.
+
+These commands verify workspace-source projections and platform mirror
+metadata; they do not publish repository-owned packages into platform-owned
+runtime mirrors. A missing sidecar or unavailable workspace source is an
+evidence-gated status result, never permission to fabricate metadata or claim
+publication succeeded.
 
 ## Diagnostics and ownership
 
