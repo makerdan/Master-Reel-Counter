@@ -154,6 +154,15 @@ The suite is designed to run locally and in the Replit environment without a sep
 - `TEST_TESTER_PASSWORD` — a secret password distinct from dev
 - Ensure the dev server and database are running before `npm run test:e2e`
 
+The repository now includes a read-only GitHub Actions workflow at
+`.github/workflows/validation.yml`. It provisions a test PostgreSQL service,
+installs Chromium, runs the workflow contract test, and then routes validation
+through the canonical `npm run ci` command. See
+`docs/validation/github-actions.md` for the local-to-remote coverage table,
+private-repository and fork boundaries, manual activation evidence, and
+rollback procedure. The workflow file itself is not evidence that GitHub has
+run the check or that branch protection requires it.
+
 
 ## Failure Gate validation
 

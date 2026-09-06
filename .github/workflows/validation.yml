@@ -1,0 +1,163 @@
+name: Canonical validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  merge_group:
+  workflow_dispatch:
+
+# This workflow only reads source code and publishes diagnostic artifacts.
+permissions:
+  contents: read
+
+# Do not cancel an older run: a run that is being considered by branch policy
+# must finish with a real result instead of being replaced by a newer run.
+concurrency:
+  group: canonical-validation-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate canonical contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: master_reel_counter_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d master_reel_counter_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      CI: true
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/master_reel_counter_test
+      SESSION_SECRET: github-actions-test-session-secret-not-production
+      TEST_TESTER_PASSWORD: github-actions-tester-password
+      REPL_ID: github-actions-validation
+      # These are intentionally test-only values. The suite mocks AI calls and
+      # does not access Replit object storage or production credentials.
+      AI_INTEGRATIONS_OPENAI_API_KEY: test-only-unavailable
+      AI_INTEGRATIONS_OPENAI_BASE_URL: http://127.0.0.1:9
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install frozen dependencies
+        run: npm ci
+
+      - name: Verify PostgreSQL readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..30}; do
+            if pg_isready --host=localhost --port=5432 --username=postgres --dbname=master_reel_counter_test; then
+              break
+            fi
+            if [[ "$attempt" -eq 30 ]]; then
+              echo "PostgreSQL did not become ready in time." >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          psql "$DATABASE_URL" --command='SELECT 1;' >/dev/null
+
+      - name: Create test database schema
+        run: npx drizzle-kit push --force
+
+      - name: Seed synthetic test owner
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" --command="
+            INSERT INTO users (id, email, first_name, approved, rejected, is_tester)
+            VALUES (
+              'github-actions-owner',
+              'github-actions-owner@example.invalid',
+              'GitHub Actions Owner',
+              true,
+              false,
+              false
+            )
+            ON CONFLICT (id) DO UPDATE
+              SET approved = true, rejected = false, is_tester = false;
+          "
+
+      - name: Install and verify Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium
+          node --input-type=module <<'NODE'
+          import { chromium } from "@playwright/test";
+          const browser = await chromium.launch({ headless: true });
+          await browser.close();
+          console.log("Chromium launch check passed.");
+          NODE
+
+      - name: Check workflow contract
+        run: node --test scripts/__tests__/github-actions-workflow.test.mjs
+
+      - name: Run canonical validation
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ci-artifacts
+          npm run ci 2>&1 | tee ci-artifacts/canonical-validation.log
+
+      - name: Upload diagnostic validation artifacts
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: canonical-validation-diagnostics-${{ github.run_id }}
+          path: |
+            ci-artifacts/
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7
+          include-hidden-files: false
+
+  validation-result:
+    name: Validation result
+    if: ${{ always() }}
+    needs:
+      - validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Require the validation job to succeed
+        env:
+          VALIDATION_RESULT: ${{ needs.validate.result }}
+        run: |
+          set -euo pipefail
+          case "$VALIDATION_RESULT" in
+            success)
+              echo "Canonical validation passed."
+              ;;
+            *)
+              echo "Canonical validation did not complete successfully: $VALIDATION_RESULT" >&2
+              exit 1
+              ;;
+          esac
