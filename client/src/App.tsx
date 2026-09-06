@@ -1,8 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { THEME_MODE_KEY } from "@/lib/storageKeys";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ClerkProvider, SignIn, SignUp, useClerk } from "@clerk/react";
+import { publishableKeyFromHost } from "@clerk/react/internal";
+import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider, useTheme } from "@/lib/theme-provider";
@@ -21,6 +24,71 @@ import PendingApproval from "@/pages/pending-approval";
 import NotFound from "@/pages/not-found";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { WsReconnectProvider } from "@/hooks/use-ws-reconnect";
+
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function stripBase(path: string): string {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || "/"
+    : path;
+}
+
+if (!clerkPubKey) {
+  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in .env file");
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  options: {
+    logoPlacement: "inside" as const,
+    logoLinkUrl: basePath || "/",
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: "#b45309",
+    colorForeground: "#292524",
+    colorMutedForeground: "#78716c",
+    colorDanger: "#b91c1c",
+    colorBackground: "#fffbeb",
+    colorInput: "#ffffff",
+    colorInputForeground: "#292524",
+    colorNeutral: "#d6d3d1",
+    fontFamily: "Inter, sans-serif",
+    borderRadius: "0.5rem",
+  },
+  elements: {
+    rootBox: "w-full flex justify-center",
+    cardBox: "bg-amber-50 rounded-2xl w-[440px] max-w-full overflow-hidden border border-amber-700/20 shadow-2xl",
+    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    headerTitle: "text-stone-900 font-bold",
+    headerSubtitle: "text-stone-600",
+    socialButtonsBlockButtonText: "text-stone-800",
+    formFieldLabel: "text-stone-800",
+    footerActionLink: "text-amber-700 font-semibold",
+    footerActionText: "text-stone-600",
+    dividerText: "text-stone-500",
+    identityPreviewEditButton: "text-amber-700",
+    formFieldSuccessText: "text-green-700",
+    alertText: "text-stone-800",
+    logoBox: "mb-4",
+    logoImage: "h-14 w-14 rounded-xl",
+    socialButtonsBlockButton: "border-stone-300 bg-white",
+    formButtonPrimary: "bg-amber-700 hover:bg-amber-800 text-white",
+    formFieldInput: "bg-white border-stone-300 text-stone-900",
+    footerAction: "bg-amber-100/70",
+    dividerLine: "bg-stone-300",
+    alert: "bg-amber-100 border-amber-300",
+    otpCodeFieldInput: "bg-white border-stone-300 text-stone-900",
+    formFieldRow: "gap-2",
+    main: "gap-4",
+  },
+};
 
 const TEXT_SIZE_MAP: Record<string, string> = {
   small: "14px",
@@ -77,7 +145,7 @@ function PageViewTracker() {
 }
 
 function AuthRouter() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, accessDenied } = useAuth();
 
   if (isLoading) {
     return (
@@ -88,6 +156,9 @@ function AuthRouter() {
   }
 
   const isApproved = !user || user.approved || user.isTester;
+  if (accessDenied || user?.rejected) {
+    return <PendingApproval status="rejected" />;
+  }
 
   return (
     <Switch>
@@ -95,7 +166,7 @@ function AuthRouter() {
         {user ? (isApproved ? <Dashboard /> : <PendingApproval />) : <Landing />}
       </Route>
       <Route path="/tester-login">
-        {user ? (isApproved ? <Dashboard /> : <PendingApproval />) : <TesterLoginPage />}
+        <TesterLoginPage />
       </Route>
       <Route path="/session/:id">
         {user ? (isApproved ? <SessionPage /> : <PendingApproval />) : <Landing />}
@@ -117,25 +188,80 @@ function AuthRouter() {
   );
 }
 
-function App() {
+function SignInPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-neutral-900 via-stone-900 to-amber-950 px-4">
+      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+    </div>
+  );
+}
+
+function SignUpPage() {
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-neutral-900 via-stone-900 to-amber-950 px-4">
+      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+    </div>
+  );
+}
+
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const client = useQueryClient();
+  const previousUserId = useRef<string | null | undefined>(undefined);
+  useEffect(() => addListener(({ user }) => {
+    const userId = user?.id ?? null;
+    if (previousUserId.current !== undefined && previousUserId.current !== userId) {
+      client.clear();
+    }
+    previousUserId.current = userId;
+  }), [addListener, client]);
+  return null;
+}
+
+function Application() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <WsReconnectProvider>
-            <TooltipProvider>
-              <Toaster />
-              <ThemeSyncer />
-              <TextSizeSyncer />
-              <PageViewTracker />
-              <NetworkStatusIndicator />
-              <AuthRouter />
-            </TooltipProvider>
-          </WsReconnectProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
+      <ThemeProvider>
+        <WsReconnectProvider>
+          <TooltipProvider>
+            <Toaster />
+            <ThemeSyncer />
+            <TextSizeSyncer />
+            <PageViewTracker />
+            <NetworkStatusIndicator />
+            <AuthRouter />
+          </TooltipProvider>
+        </WsReconnectProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
 
-export default App;
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      appearance={clerkAppearance}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+      localization={{ signIn: { start: { title: "Welcome back", subtitle: "Sign in to access Master Reel Counter" } }, signUp: { start: { title: "Create your account", subtitle: "Start counting with your team" } } }}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <QueryClientProvider client={queryClient}>
+        <ClerkQueryClientCacheInvalidator />
+        <Switch>
+          <Route path="/sign-in/*?" component={SignInPage} />
+          <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route component={Application} />
+        </Switch>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}
+
+export default function App() {
+  return <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>;
+}

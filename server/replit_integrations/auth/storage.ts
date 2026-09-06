@@ -4,6 +4,7 @@ import { eq, ne, count } from "drizzle-orm";
 
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
+  createUserIfMissing(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserAvatar(id: string, customAvatarKey: string | null): Promise<User>;
   getAllUsers(): Promise<User[]>;
@@ -31,6 +32,13 @@ class AuthStorage implements IAuthStorage {
         },
       })
       .returning();
+    return user;
+  }
+
+  async createUserIfMissing(userData: UpsertUser): Promise<User> {
+    await db.insert(users).values(userData).onConflictDoNothing({ target: users.id });
+    const user = await this.getUser(userData.id!);
+    if (!user) throw new Error("Failed to create local user");
     return user;
   }
 

@@ -10,7 +10,7 @@ Master Reel Counter is a full-stack warehouse wire reel counting application des
 - Orange accent color (#ea580c)
 
 ## System Architecture
-The application is built with a React frontend, an Express.js backend, and PostgreSQL as the database. Authentication is handled via Replit Auth (OIDC).
+The application is built with a React frontend, an Express.js backend, and PostgreSQL as the database. Normal user authentication is handled by Replit-managed Clerk, while the owner-scoped tester login remains an application-managed session.
 
 **UI/UX Decisions:**
 - **Theme:** Copper/industrial warm tones with dark mode support, using shadcn/ui components.
@@ -33,7 +33,7 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Flagged Reels Workflow:** Pins can be flagged for re-shoot/review with notes, and a dedicated tab allows viewing and resolving flagged pins.
 - **Review Tab:** A "Review" tab on the session page assigns entries round-robin to online users for accuracy review. Each entry shows a 60-second sync spinner before revealing its image. AI Scanner entries display a cropped thumbnail at the pin location; other entries display the full section photo. Users can approve or flag entries (with optional reason). Responses are persisted in the `review_responses` table and support upsert (users can change verdicts). A progress indicator shows review completion.
 - **Duplicate Detection:** Identifies potential duplicate pins based on label matching (same label in same aisle/section) and same-reel detection (multiple pins on the same photo for the same physical reel). Dismissed duplicates are persisted to the `dismissed_duplicates` DB table (per session), shared across all users. Undo/Redo supports dismiss/undismiss actions. Old localStorage dismissals are auto-migrated to DB on first load.
-- **Tester Password Login:** Account owners can set a tester password in Settings to allow testers to log in without a Replit account via `/tester-login`. Passwords are bcrypt-hashed. Testers see the owner's sessions as editors but cannot modify settings. Logout redirects to `/api/auth/tester-logout`.
+- **Tester Password Login:** Account owners can set a tester password in Settings to allow testers to log in without a Clerk account via `/tester-login`. Passwords are bcrypt-hashed. Testers see the owner's sessions as editors but cannot modify settings. Logout clears the isolated tester session through `/api/auth/tester-logout`.
 - **User Settings:** Comprehensive settings for display (theme, thumbnail size), accessibility, data entry (aisle prefix, section advance), photo capture quality, export defaults, data encryption, tester access password, and storage usage dashboard.
 - **Storage Usage Dashboard:** Settings page shows per-user cloud storage consumption with a visual progress bar (10 GB limit), photo/session counts, and a collapsible all-users breakdown table. Photo file sizes are stored in the `photos.fileSize` DB column and populated on upload. A backfill endpoint (`POST /api/storage/backfill-sizes`) fetches GCS metadata for existing photos missing sizes.
 - **User Profile Avatar:** Users can upload custom profile photos stored in Replit Object Storage.
@@ -75,7 +75,7 @@ promote a task-local observation directly into the catalog. Run
 maintenance findings do not fail unrelated task validation.
 
 ## External Dependencies
-- **Replit Auth:** For user authentication (OpenID Connect).
+- **Replit-managed Clerk:** Cookie-based authentication for normal web users, with managed development/production keys and the canonical production proxy.
 - **Replit Object Storage:** For storing uploaded photos and user avatars.
 - **PostgreSQL:** Relational database.
 - **Client-side Wire Catalog:** Approximately 180 hardcoded entries for category lookup and autofill.

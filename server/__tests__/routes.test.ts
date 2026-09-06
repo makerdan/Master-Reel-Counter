@@ -17,12 +17,42 @@ import {
 import { buildTesterLoginUrl, getTesterOwnerFromSearch } from "../../client/src/lib/testerAccess.js";
 import bcrypt from "bcrypt";
 import { pool } from "../db.js";
+import { isProtectedOwnerIdentity } from "../replit_integrations/auth/replitAuth.js";
+import { isIdentityApproved, isOwnerIdentity } from "../replit_integrations/auth/routes.js";
 
 // The route module opens a PostgreSQL pool even when the real-server checks
 // are skipped. Close this test process's pool so the unit tier cannot hang
 // after all assertions have passed.
 after(async () => {
   await pool.end().catch(() => {});
+});
+
+describe("Clerk owner and approval regression guard", () => {
+  test("retains owner only for the existing migrated legacy identity", () => {
+    const base = {
+      existing: { isTester: false },
+      userId: "legacy-owner-subject",
+      username: "dan",
+      replOwner: "dan",
+    };
+    assert.equal(isProtectedOwnerIdentity(base), true);
+    assert.equal(isProtectedOwnerIdentity({ ...base, existing: undefined }), false);
+    assert.equal(isProtectedOwnerIdentity({ ...base, userId: "user_new-clerk-id" }), false);
+    assert.equal(isProtectedOwnerIdentity({ ...base, username: "someone-else" }), false);
+    assert.equal(isProtectedOwnerIdentity({ ...base, existing: { isTester: true } }), false);
+  });
+
+  test("owner authorization trusts only normalized isOwner, never username claims", () => {
+    assert.equal(isOwnerIdentity({ isOwner: true, claims: { username: "dan" } }), true);
+    assert.equal(isOwnerIdentity({ isOwner: false, claims: { username: "dan" } }), false);
+    assert.equal(isOwnerIdentity({ claims: { username: "dan" } }), false);
+  });
+
+  test("approval admits normalized owner and tester identities but rejects missing identity", async () => {
+    assert.equal(await isIdentityApproved({ isOwner: true }), true);
+    assert.equal(await isIdentityApproved({ isTester: true }), true);
+    assert.equal(await isIdentityApproved({}), false);
+  });
 });
 
 describe("RealtimeAuthorizationTracker", () => {

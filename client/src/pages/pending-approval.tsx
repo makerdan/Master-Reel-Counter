@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 
-export default function PendingApproval() {
+export default function PendingApproval({ status = "pending" }: { status?: "pending" | "rejected" }) {
   const { user, logout } = useAuth();
+  const isRejected = status === "rejected";
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
@@ -18,10 +19,12 @@ export default function PendingApproval() {
 
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-foreground" data-testid="text-pending-title">
-              Pending Approval
+              {isRejected ? "Access Denied" : "Pending Approval"}
             </h1>
             <p className="text-muted-foreground" data-testid="text-pending-message">
-              Hi {user?.firstName || "there"}, your account is awaiting approval from the app owner. You'll be able to access the app once you've been approved.
+              {isRejected
+                ? "This account is not authorized to access Master Reel Counter. Contact the app owner if you believe this is an error."
+                : `Hi ${user?.firstName || "there"}, your account is awaiting approval from the app owner. You'll be able to access the app once you've been approved.`}
             </p>
           </div>
 

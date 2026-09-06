@@ -71,8 +71,8 @@ type SharedSessionWithStats = SessionWithStats & {
 };
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
-  const { pendingCount } = useNetworkStatus(user?.id);
+  const { user, identityId, logout } = useAuth();
+  const { pendingCount } = useNetworkStatus(identityId);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();

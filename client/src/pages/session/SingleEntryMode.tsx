@@ -64,7 +64,7 @@ export default function SingleEntryMode({
   onIsDirtyChange?: (isDirty: boolean) => void;
   onTriggerUndo?: () => void;
 }) {
-  const { user } = useAuth();
+  const { identityId } = useAuth();
   const { toast } = useToast();
   const onTriggerUndoRef = useRef(onTriggerUndo);
   useEffect(() => { onTriggerUndoRef.current = onTriggerUndo; }, [onTriggerUndo]);
@@ -384,7 +384,7 @@ export default function SingleEntryMode({
           await saveToQueue({
             id: queueId,
             sessionId,
-            userId: user?.id,
+            userId: identityId,
             blob,
             aisle: form.aisle,
             section: form.section,
@@ -509,7 +509,7 @@ export default function SingleEntryMode({
         const updated = await patchRes.json().catch(() => null);
         result = { type: "update" as const, body, previousData: editingEntry, queued: false, serverUpdatedAt: updated?.updatedAt ?? undefined };
       } else {
-        const { entry: created, queued } = await createEntryWithOfflineFallback(sessionId, body, user?.id);
+        const { entry: created, queued } = await createEntryWithOfflineFallback(sessionId, body, identityId);
         result = { type: "create" as const, body, id: created.id, queued, serverUpdatedAt: queued ? undefined : (created?.updatedAt ?? undefined) };
       }
       return result;

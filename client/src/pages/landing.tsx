@@ -12,6 +12,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 const coreFeatures = [
   {
     icon: Camera,
@@ -311,13 +313,13 @@ export default function Landing() {
             </p>
 
             <div className="flex items-center justify-center gap-3 flex-wrap pt-4">
-              <a href="/api/login">
+              <a href={`${basePath}/sign-in`}>
                 <Button size="lg" data-testid="button-login" className="bg-amber-600 border-amber-700 text-white h-12 px-8 text-base">
-                  Sign in with Replit
+                  Sign In
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </a>
-              <a href="/tester-login">
+              <a href={`${basePath}/tester-login`}>
                 <Button size="lg" variant="outline" data-testid="button-tester-login" className="border-amber-500/40 text-amber-100 backdrop-blur-sm bg-white/5 h-12 px-8 text-base">
                   Tester Login
                 </Button>
@@ -415,7 +417,7 @@ export default function Landing() {
             Sign in to create your first session and see how Master Reel Counter streamlines your warehouse wire inventory process.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
-            <a href="/api/login">
+            <a href={`${basePath}/sign-up`}>
               <Button size="lg" className="bg-amber-600 border-amber-700 text-white h-12 px-8 text-base" data-testid="button-login-cta">
                 Get Started
                 <ArrowRight className="h-4 w-4 ml-2" />

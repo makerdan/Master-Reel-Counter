@@ -74,8 +74,8 @@ interface UserSettingsResponse {
 }
 
 export default function SettingsPage() {
-  const { user, logout } = useAuth();
-  const { pendingCount } = useNetworkStatus(user?.id);
+  const { user, identityId, logout } = useAuth();
+  const { pendingCount } = useNetworkStatus(identityId);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -1844,8 +1844,8 @@ export default function SettingsPage() {
                           className="h-6 w-6 p-0"
                           data-testid="button-copy-tester-url"
                           onClick={() => {
-                            if (!user?.id) return;
-                            navigator.clipboard.writeText(buildTesterLoginUrl(window.location.origin, user.id));
+                            if (!identityId) return;
+                            navigator.clipboard.writeText(buildTesterLoginUrl(window.location.origin, identityId));
                             toast({ title: "Copied to clipboard" });
                           }}
                         >
@@ -2404,7 +2404,7 @@ export default function SettingsPage() {
                   ) : (
                     <div className="space-y-2">
                       {adminUsers.map((u: any) => {
-                        const isOwner = u.id === user?.id;
+                        const isOwner = u.id === identityId;
                         return (
                           <div
                             key={u.id}

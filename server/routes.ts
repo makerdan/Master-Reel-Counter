@@ -1,14 +1,26 @@
 import type { Express, Request, Response as ExpressResponse, RequestHandler } from "express";
 import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import passport from "passport";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
-import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
-import { registerAuthRoutes, isApproved } from "./replit_integrations/auth/routes";
+import {
+  authenticateWebSocketRequest,
+  destroyTesterSession,
+  establishTesterSession,
+  setupAuth,
+  isAuthenticated,
+} from "./replit_integrations/auth";
+import {
+  registerAuthRoutes,
+  isApproved,
+  isIdentityApproved,
+  isOwnerIdentity,
+} from "./replit_integrations/auth/routes";
 import { authStorage } from "./replit_integrations/auth/storage";
-import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
-import { objectStorageClient } from "./replit_integrations/object_storage/objectStorage";
+import {
+  objectStorageClient,
+  registerObjectStorageRoutes,
+} from "./replit_integrations/object_storage";
 import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -496,12 +508,9 @@ export async function registerRoutes(
   });
 
   const { sessionParser } = await setupAuth(app);
-  registerAuthRoutes(app);
-  registerObjectStorageRoutes(app);
 
   app.use("/api", (req, res, next) => {
     const skipPaths = [
-      "/api/login", "/api/callback", "/api/logout",
       "/api/auth/user", "/api/auth/tester-login", "/api/auth/tester-logout",
       "/api/__test__/seed-tester-password",
       "/api/__test__/owner-login",
@@ -510,8 +519,14 @@ export async function registerRoutes(
     ];
     const matchesSkip = skipPaths.some(p => req.originalUrl === p || req.originalUrl.startsWith(p + "/") || req.originalUrl.startsWith(p + "?"));
     if (matchesSkip) return next();
-    isApproved(req, res, next);
+    isAuthenticated(req, res, (authError?: unknown) => {
+      if (authError) return next(authError);
+      isApproved(req, res, next);
+    });
   });
+
+  registerAuthRoutes(app);
+  registerObjectStorageRoutes(app);
 
   const testerLoginSchema = z.object({
     displayName: z.string().trim().min(1, "Display name is required").max(100),
@@ -548,21 +563,16 @@ export async function registerRoutes(
         expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
         isTester: true,
       };
-      req.login(testerUser, (err: any) => {
-        if (err) {
-          console.error("Tester login error:", err);
-          return res.status(500).json({ message: "Login failed" });
-        }
-        return res.json({
-          id: testerId,
-          email: null,
-          firstName: displayName.trim(),
-          lastName: null,
-          profileImageUrl: null,
-          customAvatarKey: null,
-          isTester: true,
-          testerOwnerUserId: ownerSettings.userId,
-        });
+      await establishTesterSession(req, testerUser);
+      return res.json({
+        id: testerId,
+        email: null,
+        firstName: displayName.trim(),
+        lastName: null,
+        profileImageUrl: null,
+        customAvatarKey: null,
+        isTester: true,
+        testerOwnerUserId: ownerSettings.userId,
       });
     } catch (error) {
       console.error("Tester login error:", error);
@@ -570,10 +580,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/auth/tester-logout", (req: any, res) => {
-    req.logout(() => {
+  app.get("/api/auth/tester-logout", async (req: any, res) => {
+    try {
+      await destroyTesterSession(req);
       res.redirect("/");
-    });
+    } catch {
+      res.status(500).json({ message: "Logout failed" });
+    }
   });
 
   const UPLOADS_DIR = path.join(process.cwd(), "uploads");
@@ -5687,9 +5700,7 @@ export async function registerRoutes(
 
   app.get("/api/storage/global-usage", isAuthenticated, async (req: any, res) => {
     try {
-      const replOwner = process.env.REPL_OWNER;
-      const username = (req as AuthenticatedRequest).user.claims.username;
-      if (!replOwner || username !== replOwner) {
+      if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const usage = await storage.getGlobalStorageUsage();
@@ -6555,55 +6566,53 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     const pendingMessages: (Buffer | string)[] = [];
     let revalidateTimer: ReturnType<typeof setInterval> | null = null;
 
-    sessionParser(req, {} as any, () => {
-      passport.initialize()(req, {} as any, () => {
-        passport.session()(req, {} as any, () => {
-          const user = req.user as any;
-          const now = Math.floor(Date.now() / 1000);
-          const isAuth = user && user.expires_at && now <= user.expires_at;
-          if (!isAuth) {
-            ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
-            ws.close(1008, "Authentication required");
-            return;
-          }
-          const connUserId: string = user.claims?.sub;
-          const connTesterOwnerUserId: string | null = user.isTester
-            ? (user.claims?.testerOwnerUserId ?? null)
-            : null;
-          const connUsername: string = user.claims?.username || user.claims?.name || connUserId;
-          wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null, testerOwnerUserId: connTesterOwnerUserId });
-          authDone = true;
-          for (const buffered of pendingMessages) {
-            processWsMessage(ws, buffered);
-          }
-          pendingMessages.length = 0;
+    const loadSocketIdentity = async () => {
+      await new Promise<void>((resolve, reject) =>
+        sessionParser(req, {} as any, (error?: unknown) => error ? reject(error) : resolve()),
+      );
+      return authenticateWebSocketRequest(req);
+    };
 
-          // Periodic session re-validation: terminates ghost editor presence
-          // when the underlying auth session expires without the WS closing.
-          const WS_REVALIDATE_MS = 10 * 60 * 1000;
-          revalidateTimer = setInterval(() => {
-            if (ws.readyState !== WebSocket.OPEN) {
-              if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
-              return;
-            }
-            sessionParser(req, {} as any, () => {
-              passport.initialize()(req, {} as any, () => {
-                passport.session()(req, {} as any, () => {
-                  const freshUser = req.user as any;
-                  const freshNow = Math.floor(Date.now() / 1000);
-                  const stillValid = freshUser && freshUser.expires_at && freshNow <= freshUser.expires_at;
-                  if (!stillValid) {
-                    console.log("[WS] auth session expired for user %s — terminating socket", connUserId);
-                    try { ws.send(JSON.stringify({ type: "auth_expired" })); } catch {}
-                    ws.close(1008, "Session expired");
-                    if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
-                  }
-                });
-              });
-            });
-          }, WS_REVALIDATE_MS);
+    loadSocketIdentity().then(async (user) => {
+      if (!user || !(await isIdentityApproved(user))) {
+        ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
+        ws.close(1008, "Authentication required");
+        return;
+      }
+      const connUserId = user.claims.sub;
+      const connTesterOwnerUserId = user.isTester ? (user.claims.testerOwnerUserId ?? null) : null;
+      const connUsername = user.claims.username || user.claims.firstName || connUserId;
+      wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null, testerOwnerUserId: connTesterOwnerUserId });
+      authDone = true;
+      for (const buffered of pendingMessages) processWsMessage(ws, buffered);
+      pendingMessages.length = 0;
+
+      // Re-read Clerk/tester cookies; never trust the identity captured at
+      // upgrade time after a long-lived socket has been established.
+      const WS_REVALIDATE_MS = 10 * 60 * 1000;
+      revalidateTimer = setInterval(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
+          return;
+        }
+        loadSocketIdentity().then(async (freshUser) => {
+          if (
+            !freshUser ||
+            freshUser.claims.sub !== connUserId ||
+            freshUser.isTester !== user.isTester ||
+            !(await isIdentityApproved(freshUser))
+          ) {
+            try { ws.send(JSON.stringify({ type: "auth_expired" })); } catch {}
+            ws.close(1008, "Session expired");
+            if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
+          }
+        }).catch(() => {
+          ws.close(1008, "Session expired");
+          if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
         });
-      });
+      }, WS_REVALIDATE_MS);
+    }).catch(() => {
+      ws.close(1008, "Authentication required");
     });
 
     ws.on("pong", () => { wsAlive.set(ws, true); });
@@ -6765,9 +6774,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   // Admin endpoint: manually trigger orphan upload cleanup.
   app.post("/api/admin/purge-orphaned-uploads", isAuthenticated, async (req: any, res) => {
-    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req as AuthenticatedRequest);
-    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Admin only" });
     }
     try {
@@ -6789,9 +6796,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // `{ pageToken: "..." }` to continue from where the previous call left off.
   // Keep calling until `nextPageToken` is null.
   app.post("/api/admin/sweep-legacy-orphans", isAuthenticated, async (req: any, res) => {
-    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req as AuthenticatedRequest);
-    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Admin only" });
     }
 
@@ -6881,9 +6886,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Call repeatedly, advancing `offset` by `limit` each time, until
   // `nextOffset` >= `total` (or `scanned` < `limit`).
   app.get("/api/admin/orphaned-photo-rows", isAuthenticated, async (req: any, res) => {
-    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req as AuthenticatedRequest);
-    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Admin only" });
     }
 
@@ -6949,9 +6952,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // The caller is responsible for confirming the IDs are genuinely orphaned
   // (e.g. via the GET endpoint above) before sending this request.
   app.delete("/api/admin/orphaned-photo-rows", isAuthenticated, async (req: any, res) => {
-    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req as AuthenticatedRequest);
-    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Admin only" });
     }
 
@@ -7016,9 +7017,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // a redacted summary of the most recent crash; this endpoint gives operators
   // the complete picture for post-incident analysis.
   app.get("/api/admin/crashes", isAuthenticated, (req: any, res) => {
-    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req as AuthenticatedRequest);
-    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Admin only" });
     }
     const history = taskTracker.crashHistory();
@@ -7047,9 +7046,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // specific user. Allows admins to clean up per-user stalls directly from the
   // Settings storage dashboard without waiting for the hourly purge job.
   app.delete("/api/admin/stalled-intents/:userId", isAuthenticated, async (req: any, res) => {
-    const replOwner = process.env.REPL_OWNER;
-    const username = (req as AuthenticatedRequest).user?.claims?.username;
-    if (!replOwner || username !== replOwner) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     const { userId } = req.params;
@@ -7068,9 +7065,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Admin endpoint: clears the in-memory crash history ring buffer and the
   // persisted crash log file so operators can acknowledge investigated incidents.
   app.delete("/api/admin/crashes", isAuthenticated, async (req: any, res) => {
-    const ADMIN_USER_ID = process.env.ADMIN_USER_ID;
-    const userId = resolveUserId(req as AuthenticatedRequest);
-    if (!ADMIN_USER_ID || userId !== ADMIN_USER_ID) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Admin only" });
     }
     taskTracker.clearCrashHistory();
@@ -7087,9 +7082,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // with a count of anomalous rows (0 = healthy). Useful for catching regressions
   // from folder/trash workflow bugs (e.g. tasks #297 and #336).
   app.get("/api/admin/integrity-checks", isAuthenticated, async (req: any, res) => {
-    const replOwner = process.env.REPL_OWNER;
-    const username = (req as AuthenticatedRequest).user?.claims?.username;
-    if (!replOwner || username !== replOwner) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     try {
@@ -7187,9 +7180,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Admin endpoint: one-click repair for flagged integrity issues.
   // Runs a targeted UPDATE for the given checkId and returns { fixed } row count.
   app.post("/api/admin/integrity-fix/:checkId", isAuthenticated, async (req: any, res) => {
-    const replOwner = process.env.REPL_OWNER;
-    const username = (req as AuthenticatedRequest).user?.claims?.username;
-    if (!replOwner || username !== replOwner) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     const { checkId } = req.params;
@@ -7249,9 +7240,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Returns active/completed job counts, total buffer memory, oldest job age,
   // and the individual job list so operators can cancel stuck jobs.
   app.get("/api/admin/pdf-jobs", isAuthenticated, (req: any, res) => {
-    const replOwner = process.env.REPL_OWNER;
-    const username = (req as AuthenticatedRequest).user?.claims?.username;
-    if (!replOwner || username !== replOwner) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     const now = Date.now();
@@ -7282,9 +7271,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   // Removes the job from the in-memory map regardless of its current state,
   // freeing any buffer memory immediately without requiring a server restart.
   app.delete("/api/admin/pdf-jobs/:jobId", isAuthenticated, (req: any, res) => {
-    const replOwner = process.env.REPL_OWNER;
-    const username = (req as AuthenticatedRequest).user?.claims?.username;
-    if (!replOwner || username !== replOwner) {
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     const { jobId } = req.params;
@@ -7318,9 +7305,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   // Admin endpoint: high-level aggregate app stats (owner-only).
   app.get("/api/admin/summary", isAuthenticated, async (req: any, res) => {
-    const replOwner = process.env.REPL_OWNER;
-    const username = (req as AuthenticatedRequest).user?.claims?.username;
-    if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) return res.status(403).json({ message: "Forbidden" });
     try {
       const [totalUsers] = (await db.execute(
         sql`SELECT COUNT(*)::int AS count FROM users WHERE NOT is_tester`
@@ -7356,9 +7341,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   // Admin endpoint: AI API usage statistics (owner-only).
   app.get("/api/admin/ai-usage", isAuthenticated, async (req: any, res) => {
-    const replOwner = process.env.REPL_OWNER;
-    const username = (req as AuthenticatedRequest).user?.claims?.username;
-    if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) return res.status(403).json({ message: "Forbidden" });
     try {
       const [totals] = (await db.execute(sql`
         SELECT
@@ -7429,9 +7412,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
   // Admin endpoint: page view statistics (owner-only).
   app.get("/api/admin/page-views", isAuthenticated, async (req: any, res) => {
-    const replOwner = process.env.REPL_OWNER;
-    const username = (req as AuthenticatedRequest).user?.claims?.username;
-    if (!replOwner || username !== replOwner) return res.status(403).json({ message: "Forbidden" });
+    if (!isOwnerIdentity((req as AuthenticatedRequest).user)) return res.status(403).json({ message: "Forbidden" });
     try {
       const [totals] = (await db.execute(sql`
         SELECT COUNT(*)::int AS total_views
@@ -7484,7 +7465,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         const allUsers = await authStorage.getAllUsers();
         const owners = allUsers.filter((u: any) => !u.isTester);
         if (owners.length === 0) {
-          return res.status(404).json({ message: "No owner found. Log in once with Replit Auth first." });
+          return res.status(404).json({ message: "No owner found. Sign in with Clerk once first." });
         }
         const owner = owners[0];
         const ownerUser = {
@@ -7495,11 +7476,13 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           },
           expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
           isTester: false,
+          isOwner: true,
+          isTestOwner: true,
         };
-        req.login(ownerUser, (err: any) => {
-          if (err) return res.status(500).json({ message: "Login failed" });
-          res.json({ ok: true, userId: owner.id });
-        });
+        // This development-only compatibility identity exercises owner-only
+        // application behavior without weakening production Clerk checks.
+        await establishTesterSession(req, ownerUser);
+        res.json({ ok: true, userId: owner.id });
       } catch (err) {
         console.error("[test-owner-login] error:", err);
         res.status(500).json({ message: "Failed to create owner session" });
@@ -7517,7 +7500,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         const owners = allUsers.filter((u: any) => !u.isTester);
         if (owners.length === 0) {
           return res.status(404).json({
-            message: "No owner users found. Log in with Replit Auth once first.",
+            message: "No owner users found. Sign in with Clerk once first.",
           });
         }
         const owner = owners[0];

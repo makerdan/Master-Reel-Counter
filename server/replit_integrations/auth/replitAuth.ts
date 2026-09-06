@@ -1,72 +1,58 @@
-import * as client from "openid-client";
-import { Strategy, type VerifyFunction } from "openid-client/passport";
-
-import passport from "passport";
 import session from "express-session";
-import type { Express, RequestHandler } from "express";
-import rateLimit from "express-rate-limit";
-import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
+import {
+  authenticateRequest,
+  clerkClient,
+  getAuth,
+} from "@clerk/express";
+import { publishableKeyFromHost } from "@clerk/shared/keys";
+import type { Express, Request, RequestHandler } from "express";
 import { authStorage } from "./storage";
+import { getClerkProxyHost } from "../../middlewares/clerkProxyMiddleware";
 
-const loginRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many login attempts, please try again later." },
-  skipSuccessfulRequests: false,
-});
+const TESTER_SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 
-const getOidcConfig = memoize(
-  async () => {
-    return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
-    );
-  },
-  { maxAge: 3600 * 1000 }
-);
+type NormalizedUser = {
+  claims: {
+    sub: string;
+    email?: string;
+    firstName?: string;
+    first_name?: string;
+    lastName?: string;
+    last_name?: string;
+    profileImageUrl?: string;
+    username?: string;
+    testerOwnerUserId?: string;
+  };
+  expires_at: number;
+  isTester: boolean;
+  isOwner?: boolean;
+  isTestOwner?: boolean;
+};
+
+declare module "express-session" {
+  interface SessionData {
+    testerIdentity?: NormalizedUser;
+  }
+}
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
   return session({
     secret: process.env.SESSION_SECRET!,
-    store: sessionStore,
+    store: new pgStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: false,
+      ttl: TESTER_SESSION_TTL / 1000,
+      tableName: "sessions",
+    }),
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: sessionTtl,
+      maxAge: TESTER_SESSION_TTL,
     },
-  });
-}
-
-function updateUserSession(
-  user: any,
-  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
-) {
-  user.claims = tokens.claims();
-  user.access_token = tokens.access_token;
-  user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
-}
-
-async function upsertUser(claims: any) {
-  await authStorage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
   });
 }
 
@@ -74,108 +60,130 @@ export async function setupAuth(app: Express): Promise<{ sessionParser: ReturnTy
   app.set("trust proxy", 1);
   const sessionParser = getSession();
   app.use(sessionParser);
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  const config = await getOidcConfig();
-
-  const verify: VerifyFunction = async (
-    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
-  ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
-  };
-
-  // Keep track of registered strategies
-  const registeredStrategies = new Set<string>();
-
-  // Helper function to ensure strategy exists for a domain
-  const ensureStrategy = (domain: string) => {
-    const strategyName = `replitauth:${domain}`;
-    if (!registeredStrategies.has(strategyName)) {
-      const strategy = new Strategy(
-        {
-          name: strategyName,
-          config,
-          scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
-        },
-        verify
-      );
-      passport.use(strategy);
-      registeredStrategies.add(strategyName);
-    }
-  };
-
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
-
-  app.get("/api/login", loginRateLimiter, (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
-  });
-
-  app.get("/api/callback", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
-    })(req, res, next);
-  });
-
-  app.get("/api/logout", (req, res) => {
-    req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
-    });
-  });
-
   return { sessionParser };
 }
 
+function claimsValue(claims: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = claims[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return undefined;
+}
+
+export function isProtectedOwnerIdentity(input: {
+  existing: { isTester?: boolean } | undefined;
+  userId: string;
+  username?: string;
+  replOwner?: string;
+}): boolean {
+  return Boolean(
+    input.existing &&
+    !input.existing.isTester &&
+    !input.userId.startsWith("user_") &&
+    input.username &&
+    input.replOwner === input.username,
+  );
+}
+
+async function clerkIdentity(req: Request): Promise<NormalizedUser | undefined> {
+  const auth = getAuth(req);
+  if (!auth.userId) return undefined;
+  const claims = (auth.sessionClaims ?? {}) as Record<string, unknown>;
+  const userId = claimsValue(claims, "userId");
+  if (!userId) return undefined;
+
+  // `userId` is the legacy Replit subject for migrated accounts and the local
+  // bridge value for newly-created accounts. Never use Clerk's native userId
+  // for local database records.
+  const existing = await authStorage.getUser(userId);
+  if (!existing) {
+    await authStorage.createUserIfMissing({
+      id: userId,
+      email: claimsValue(claims, "email"),
+      firstName: claimsValue(claims, "firstName", "first_name"),
+      lastName: claimsValue(claims, "lastName", "last_name"),
+      profileImageUrl: claimsValue(claims, "profileImageUrl", "profile_image_url"),
+    });
+  }
+
+  // Owner access is only retained for the migrated local record. A new Clerk
+  // identity with the same username must not become owner through JIT creation.
+  const username = claimsValue(claims, "username");
+  const isOwner = isProtectedOwnerIdentity({
+    existing,
+    userId,
+    username,
+    replOwner: process.env.REPL_OWNER,
+  });
+  return {
+    claims: {
+      sub: userId,
+      email: claimsValue(claims, "email"),
+      firstName: claimsValue(claims, "firstName", "first_name"),
+      first_name: claimsValue(claims, "firstName", "first_name"),
+      lastName: claimsValue(claims, "lastName", "last_name"),
+      last_name: claimsValue(claims, "lastName", "last_name"),
+      profileImageUrl: claimsValue(claims, "profileImageUrl", "profile_image_url"),
+      username,
+    },
+    expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
+    isTester: false,
+    isOwner,
+  };
+}
+
+function testerIdentity(req: Request): NormalizedUser | undefined {
+  const tester = req.session?.testerIdentity;
+  const validDevelopmentOwner =
+    process.env.NODE_ENV !== "production" && tester?.isTestOwner === true;
+  if (
+    (!tester?.isTester && !validDevelopmentOwner) ||
+    !tester.claims?.sub ||
+    tester.expires_at < Math.floor(Date.now() / 1000)
+  ) {
+    return undefined;
+  }
+  return tester;
+}
+
+async function resolveIdentity(req: Request): Promise<NormalizedUser | undefined> {
+  // Clerk wins if both cookies are supplied. This deliberately prevents a
+  // tester session from inheriting a concurrently signed-in Clerk identity.
+  return (await clerkIdentity(req)) ?? testerIdentity(req);
+}
+
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-
-  if (!req.isAuthenticated() || !user.expires_at) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (user.isTester) {
-    const now = Math.floor(Date.now() / 1000);
-    if (now <= user.expires_at) {
-      return next();
-    }
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    return next();
-  }
-
-  const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
-
   try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
-    return next();
+    const user = await resolveIdentity(req);
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    (req as Request & { user?: NormalizedUser }).user = user;
+    next();
   } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+    next(error);
   }
 };
+
+export function establishTesterSession(req: Request, identity: NormalizedUser): Promise<void> {
+  req.session.testerIdentity = identity;
+  return new Promise((resolve, reject) => req.session.save((error) => error ? reject(error) : resolve()));
+}
+
+export function destroyTesterSession(req: Request): Promise<void> {
+  return new Promise((resolve, reject) => req.session.destroy((error) => error ? reject(error) : resolve()));
+}
+
+export async function authenticateWebSocketRequest(req: Request): Promise<NormalizedUser | undefined> {
+  const state = await authenticateRequest({
+    clerkClient,
+    request: req,
+    options: {
+      publishableKey: publishableKeyFromHost(
+        getClerkProxyHost(req) ?? "",
+        process.env.CLERK_PUBLISHABLE_KEY,
+      ),
+    },
+  });
+  (req as any).auth = state.toAuth();
+  return resolveIdentity(req);
+}

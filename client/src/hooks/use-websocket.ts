@@ -164,7 +164,7 @@ export function useSessionWebSocket(
         const msg = JSON.parse(event.data);
         if (msg.type === "auth_expired") {
           shouldReconnectRef.current = false;
-          window.location.href = "/api/login";
+          window.location.assign(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/sign-in`);
           return;
         }
         // pong is only a heartbeat acknowledgement; no further processing needed.

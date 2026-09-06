@@ -137,7 +137,7 @@ export function useUndoRedo(sessionId: number) {
   const [undoStack, setUndoStack] = useState<UndoAction[]>(() => loadStack(undoStackKey(sessionId)));
   const [redoStack, setRedoStack] = useState<UndoAction[]>(() => loadStack(redoStackKey(sessionId)));
   const busyRef = useRef(false);
-  const { user } = useAuth();
+  const { identityId } = useAuth();
   const { toast } = useToast();
 
   // Rehydrate stacks when sessionId changes (guards against a component instance
@@ -351,13 +351,13 @@ export function useUndoRedo(sessionId: number) {
   const tryQueueOffline = useCallback(async (action: UndoAction): Promise<number | false> => {
     if (!isQueueSafeOffline(action)) return false;
     if (action.type === "delete-entry") {
-      const result = await createEntryWithOfflineFallback(action.sessionId, action.previousData, user?.id);
+      const result = await createEntryWithOfflineFallback(action.sessionId, action.previousData, identityId);
       const placeholderId = result.placeholderId ?? result.entry.id;
       optimisticallyApplyOffline(action, placeholderId);
       return placeholderId;
     }
     return false;
-  }, [optimisticallyApplyOffline, user?.id]);
+  }, [optimisticallyApplyOffline, identityId]);
 
   const performStep = useCallback(async (
     action: UndoAction,

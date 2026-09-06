@@ -1,4 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 
 async function fetchUser(): Promise<User | null> {
@@ -17,39 +19,60 @@ async function fetchUser(): Promise<User | null> {
   return response.json();
 }
 
-async function logout(isTester?: boolean): Promise<void> {
+function clearClientState(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.clear();
   if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({ type: "CLEAR_API_CACHE" });
   }
-  window.location.href = isTester ? "/api/auth/tester-logout" : "/api/logout";
 }
 
+/**
+ * App-state compatibility layer for Clerk identity.
+ *
+ * Clerk owns the browser session. The one local request is retained only for
+ * approval/rejection and the deliberately separate tester session.
+ */
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { isLoaded, isSignedIn } = useClerkAuth();
+  const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
+  const { data: localUser, isLoading: isLocalUserLoading } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",
-    // Poll every 5 minutes so an expired session is caught proactively and the
-    // login page appears cleanly instead of leaving the user seeing 401 errors
-    // on individual mutations with no explanation.
-    refetchInterval: 5 * 60 * 1000,
+    // Wait for Clerk before asking the app server. Tester sessions are still
+    // queried while Clerk is signed out, so they remain independent.
+    enabled: isLoaded,
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      queryClient.clear();
-      await logout(user?.isTester);
-    },
-  });
+  const logout = useCallback(async () => {
+    clearClientState(queryClient);
+    if (localUser?.isTester) {
+      // Tester auth is the app's separate, password-based session.
+      window.location.assign("/api/auth/tester-logout");
+      return;
+    }
+    await signOut({ redirectUrl: import.meta.env.BASE_URL });
+  }, [localUser?.isTester, queryClient, signOut]);
+
+  // Existing app data uses the local user ID. For Clerk-native users that is
+  // Clerk's external ID when present, otherwise its Clerk ID.
+  const identityId = localUser?.id ?? clerkUser?.externalId ?? clerkUser?.id;
+  const isLoading = !isLoaded || isLocalUserLoading;
 
   return {
-    user,
+    user: localUser,
+    identityId,
     isLoading,
-    isAuthenticated: !!user,
-    logout: logoutMutation.mutate,
-    isLoggingOut: logoutMutation.isPending,
+    isAuthenticated: !!localUser,
+    isClerkSignedIn: isSignedIn,
+    // A signed-in Clerk identity with no authorized app user is terminal; it
+    // must not fall through to the public landing page.
+    accessDenied: !!isSignedIn && !localUser && !isLoading,
+    logout,
+    isLoggingOut: false,
   };
 }

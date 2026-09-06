@@ -51,7 +51,7 @@ export default function Comments({
   onPushUndo?: (action: any) => void;
 }) {
   const tz = useTimezone();
-  const { user } = useAuth();
+  const { identityId } = useAuth();
   const { toast } = useToast();
   const [newText, setNewText] = useState("");
   const [replyTo, setReplyTo] = useState<number | null>(null);
@@ -158,7 +158,7 @@ export default function Comments({
   };
 
   const renderComment = (comment: CommentData, isReply = false) => {
-    const isOwn = user?.id === comment.userId;
+    const isOwn = identityId === comment.userId;
     const commentReplies = replies.filter(r => r.parentCommentId === comment.id);
 
     if (editingId === comment.id) {

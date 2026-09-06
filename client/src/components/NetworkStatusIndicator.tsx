@@ -24,8 +24,8 @@ export function NetworkStatusIndicator({
   wsStatus: wsProp,
   reconnectCountdown: countdownProp,
 }: NetworkStatusIndicatorProps = {}) {
-  const { user } = useAuth();
-  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, discardFailedEntry, failedEntries } = useNetworkStatus(user?.id);
+  const { identityId } = useAuth();
+  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, discardFailedEntry, failedEntries } = useNetworkStatus(identityId);
   const ctx = useWsReconnect();
   // Props take priority over context (allows direct rendering with explicit values).
   const wsStatus = wsProp !== undefined ? wsProp : ctx.wsStatus;

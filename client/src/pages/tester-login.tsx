@@ -8,11 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { getTesterOwnerFromSearch } from "@/lib/testerAccess";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth as useClerkAuth, useClerk } from "@clerk/react";
 
 export default function TesterLoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isSignedIn } = useClerkAuth();
+  const { signOut } = useClerk();
   const search = useSearch();
   const displayNameRef = useRef<HTMLInputElement>(null);
 
@@ -23,23 +27,20 @@ export default function TesterLoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/auth/tester-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          displayName: displayName.trim(),
-          ownerUserId: ownerUserId.trim(),
-          password: password.trim(),
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Login failed");
+      if (isSignedIn) {
+        await signOut();
       }
+      const res = await apiRequest("POST", "/api/auth/tester-login", {
+        displayName: displayName.trim(),
+        ownerUserId: ownerUserId.trim(),
+        password: password.trim(),
+      });
       return res.json();
     },
     onSuccess: () => {
+      // A tester may be taking over a browser previously used by another
+      // identity; never retain that user's app data in the query cache.
+      queryClient.clear();
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setLocation("/");
     },

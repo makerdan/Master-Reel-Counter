@@ -2,25 +2,22 @@ import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 
-function isAppOwner(user: any): boolean {
-  const replOwner = process.env.REPL_OWNER;
-  if (!replOwner) return false;
-  const claims = user?.claims || {};
-  const username = claims.username || "";
-  return username === replOwner;
+export function isOwnerIdentity(user: any): boolean {
+  return user?.isOwner === true;
+}
+
+export async function isIdentityApproved(user: any): Promise<boolean> {
+  if (user?.isTester || isOwnerIdentity(user)) return true;
+  const userId = user?.claims?.sub;
+  if (!userId) return false;
+  const dbUser = await authStorage.getUser(userId);
+  return Boolean(dbUser?.approved && !dbUser.rejected);
 }
 
 export const isApproved: RequestHandler = async (req: any, res, next) => {
   const user = req.user as any;
-  if (user?.isTester) return next();
-
-  const userId = user?.claims?.sub;
-  if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
-  if (isAppOwner(user)) return next();
-
-  const dbUser = await authStorage.getUser(userId);
-  if (!dbUser || !dbUser.approved) {
+  if (!user?.claims?.sub) return res.status(401).json({ message: "Unauthorized" });
+  if (!(await isIdentityApproved(user))) {
     return res.status(403).json({ message: "pending_approval" });
   }
   return next();
@@ -34,7 +31,7 @@ export function registerAuthRoutes(app: Express): void {
         return res.json({
           id: user.claims.sub,
           email: null,
-          firstName: user.claims.firstName,
+          firstName: user.claims.firstName || user.claims.first_name,
           lastName: null,
           profileImageUrl: null,
           customAvatarKey: null,
@@ -48,7 +45,7 @@ export function registerAuthRoutes(app: Express): void {
       const userId = req.user.claims.sub;
       const dbUser = await authStorage.getUser(userId);
 
-      if (dbUser && isAppOwner(req.user) && !dbUser.approved) {
+      if (dbUser && isOwnerIdentity(req.user) && !dbUser.approved) {
         const updatedUser = await authStorage.setUserApproved(userId, true);
         return res.json(updatedUser);
       }
@@ -62,7 +59,7 @@ export function registerAuthRoutes(app: Express): void {
 
   app.get("/api/admin/users", isAuthenticated, isApproved, async (req: any, res) => {
     try {
-      if (!isAppOwner(req.user)) {
+      if (!isOwnerIdentity(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const allUsers = await authStorage.getAllUsers();
@@ -75,7 +72,7 @@ export function registerAuthRoutes(app: Express): void {
 
   app.get("/api/admin/rejected-users/count", isAuthenticated, isApproved, async (req: any, res) => {
     try {
-      if (!isAppOwner(req.user)) {
+      if (!isOwnerIdentity(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const rejectedCount = await authStorage.getRejectedCount();
@@ -88,7 +85,7 @@ export function registerAuthRoutes(app: Express): void {
 
   app.post("/api/admin/users/clear-rejected", isAuthenticated, isApproved, async (req: any, res) => {
     try {
-      if (!isAppOwner(req.user)) {
+      if (!isOwnerIdentity(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       await authStorage.clearAllRejected();
@@ -101,7 +98,7 @@ export function registerAuthRoutes(app: Express): void {
 
   app.delete("/api/admin/users/:id", isAuthenticated, isApproved, async (req: any, res) => {
     try {
-      if (!isAppOwner(req.user)) {
+      if (!isOwnerIdentity(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const targetId = req.params.id;
@@ -123,7 +120,7 @@ export function registerAuthRoutes(app: Express): void {
 
   app.patch("/api/admin/users/:id/approval", isAuthenticated, isApproved, async (req: any, res) => {
     try {
-      if (!isAppOwner(req.user)) {
+      if (!isOwnerIdentity(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
       const { approved } = req.body;

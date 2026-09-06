@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { ObjectStorageService } from "./objectStorage";
-import { isAuthenticated } from "../auth/replitAuth";
+import { isAuthenticated } from "../auth";
 
 /**
  * Register object storage routes.

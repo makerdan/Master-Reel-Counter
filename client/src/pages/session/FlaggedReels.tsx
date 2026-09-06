@@ -305,7 +305,7 @@ function DupPinTile({
 }
 
 export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, onViewInPhoto, pushUndo }: FlaggedReelsProps) {
-  const { user } = useAuth();
+  const { identityId } = useAuth();
   const { toast } = useToast();
   const { allCodes: vendorCodes } = useVendorCodes();
   const { catalogs: userCatalogs } = useWireCatalogs();
@@ -505,7 +505,7 @@ export default function FlaggedReels({ sessionId, onBack: _onBack, onReshoot, on
             reelCount: parsedReelCount > 0 ? parsedReelCount : 1,
             photoId,
             notes: notesWithMarker,
-          }, user?.id);
+          }, identityId);
           resolvedEntryId = newEntry.id;
           if (!entryQueued) {
             await apiRequest("PATCH", `/api/pins/${pinId}`, { entryId: resolvedEntryId });

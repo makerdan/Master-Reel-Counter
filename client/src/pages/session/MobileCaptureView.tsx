@@ -43,7 +43,7 @@ type UploadQueueItem = {
 };
 
 function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured, onBackToFlagged, onClearUndoHistory }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void; onBackToFlagged?: () => void; onClearUndoHistory?: () => void }) {
-  const { user } = useAuth();
+  const { identityId } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -168,7 +168,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
   useEffect(() => {
     let cancelled = false;
-    getQueuedPhotos(sessionId, user?.id).then(items => {
+    getQueuedPhotos(sessionId, identityId).then(items => {
       if (cancelled || items.length === 0) return;
       const restored: UploadQueueItem[] = items.map(item => ({
         queueId: item.id,
@@ -192,7 +192,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       toast({ title: "Could not restore queued photos", variant: "destructive" });
     });
     return () => { cancelled = true; };
-  }, [sessionId, user?.id]);
+  }, [sessionId, identityId]);
 
   useEffect(() => {
     if (photos.length > 0) {
@@ -394,8 +394,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       }
       return [];
     });
-    clearAllQueuedPhotos(user?.id).catch(() => {});
-  }, [user?.id]);
+    clearAllQueuedPhotos(identityId).catch(() => {});
+  }, [identityId]);
 
   const getNextReceivingSection = useCallback(() => {
     const allReceivingPhotos = [
@@ -446,7 +446,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       saveToQueue({
         id: item.queueId,
         sessionId,
-        userId: user?.id,
+        userId: identityId,
         blob: item.file,
         aisle: item.aisle,
         section: item.section,

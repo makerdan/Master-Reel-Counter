@@ -341,7 +341,7 @@ function SessionWorkspace({
   const isOwner = (session as any).role === "owner";
   const canEditSession = !isLocked || isOwner;
 
-  const { user } = useAuth();
+  const { user, identityId } = useAuth();
   const { setWsReconnect, setForceReconnect } = useWsReconnect();
   const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
 
@@ -349,7 +349,7 @@ function SessionWorkspace({
     if (msg.type === "presence") {
       setOnlineUsers(msg.users || []);
     }
-  }, user ? { userId: (user as any).id, username: (user as any).firstName || (user as any).id } : undefined);
+  }, user && identityId ? { userId: identityId, username: (user as any).firstName || identityId } : undefined);
 
   // Live countdown: ticks once per second from the initial reconnect delay down to 0,
   // then holds at 0 until the socket reconnects (wsStatus returns to "connected").
@@ -1013,7 +1013,7 @@ function SessionWorkspace({
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <ActivityLog sessionId={sessionId} currentUserId={user?.id as string | undefined} isOwner={isOwner} onPushUndo={pushUndo} />
+            <ActivityLog sessionId={sessionId} currentUserId={identityId} isOwner={isOwner} onPushUndo={pushUndo} />
           </div>
         </div>
       )}

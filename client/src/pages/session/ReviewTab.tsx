@@ -314,8 +314,8 @@ export default function ReviewTab({
   serverReviewCohort?: string | null;
 }) {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const currentUserId = user?.id || "";
+  const { user, identityId } = useAuth();
+  const currentUserId = identityId || "";
 
   const { data: sessionPins = [] } = useQuery<Pin[]>({
     queryKey: ["/api/sessions", sessionId.toString(), "pins"],
