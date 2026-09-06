@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -27,6 +27,8 @@ import {
 
 const SCRIPT = join(process.cwd(), "scripts/workspace-skill-sync.mjs");
 const APP_SUPPORT_OPS = join(process.cwd(), ".agents", "skills", "app-support-ops");
+const PACKAGE_JSON = join(process.cwd(), "package.json");
+const MAX_CLI_OUTPUT_BYTES = 1024;
 
 function fixture(t, { revision = "revision-private-7" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "workspace-skill-sync-"));
@@ -80,6 +82,27 @@ function errorCode(callback) {
     assert.ok(error instanceof WorkspaceSkillSyncError);
     return error.code;
   }
+}
+
+function npmCommand(fixturePaths, script, args = [], { source = fixturePaths.source, unsetSource = false } = {}) {
+  const env = { ...process.env };
+  if (unsetSource) delete env.WORKSPACE_SKILLS_SOURCE;
+  else env.WORKSPACE_SKILLS_SOURCE = source;
+  env.WORKSPACE_SKILLS_PROJECTION_DIR = fixturePaths.projection;
+  env.WORKSPACE_SKILLS_MIRROR_DIR = fixturePaths.mirror;
+  env.WORKSPACE_SKILLS_LOCK_FILE = fixturePaths.lock;
+  const result = spawnSync("npm", ["run", "--silent", script, "--", ...args], {
+    env,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 300_000,
+  });
+  if (result.error) throw result.error;
+  const stdout = result.stdout || "";
+  const stderr = result.stderr || "";
+  assert.ok(Buffer.byteLength(stdout, "utf8") <= MAX_CLI_OUTPUT_BYTES);
+  assert.ok(Buffer.byteLength(stderr, "utf8") <= MAX_CLI_OUTPUT_BYTES);
+  return { status: result.status, stdout, stderr };
 }
 
 test("refreshes a complete recursive projection and loads selected or all skills", (t) => {
@@ -317,4 +340,93 @@ test("status CLI returns documented codes and redacts private values", (t) => {
   writeFileSync(join(fixturePaths.mirror, "cli-skill", ".workspace-skill-metadata.json"), "{}");
   assert.throws(run, (error) => error.status === 1 && !error.stdout.includes("private skill body"));
   chmodSync(join(fixturePaths.source, ".workspace-revision"), 0o600);
+});
+
+test("public workspace-skill npm commands run against isolated fixtures", (t) => {
+  const fixturePaths = fixture(t, { revision: "private-cli-revision" });
+  addSkill(fixturePaths.source, "cli-alpha", {
+    "SKILL.md": "private cli skill body\n",
+    "references/private.md": "private cli reference\n",
+  });
+  addSkill(fixturePaths.source, "cli-beta");
+
+  const refresh = npmCommand(fixturePaths, "workspace-skill:refresh", ["--json"]);
+  assert.equal(refresh.status, 0);
+  assert.deepEqual(JSON.parse(refresh.stdout), {
+    command: "refresh",
+    outcome: "pass",
+    skills: ["cli-alpha", "cli-beta"],
+  });
+  assert.doesNotMatch(refresh.stdout, /private-cli-revision|private cli skill body|private cli reference/);
+  assert.doesNotMatch(refresh.stdout, /workspace-skill-sync-[^/]+/);
+  const successfulCommands = [
+    ["workspace-skill:validate", ["--json"], ["cli-alpha", "cli-beta"]],
+    ["workspace-skill:audit", ["--json"], ["cli-alpha", "cli-beta"]],
+    ["workspace-skill:load", ["--skill", "cli-alpha", "--json"], ["cli-alpha"]],
+  ];
+  for (const [script, args, skills] of successfulCommands) {
+    const result = npmCommand(fixturePaths, script, args);
+    assert.equal(result.status, 0, `${script} should succeed: ${result.stderr}`);
+    const payload = JSON.parse(result.stdout);
+    assert.deepEqual(payload.skills, skills);
+    assert.equal(payload.outcome, "pass");
+    assert.doesNotMatch(result.stdout, /private-cli-revision|private cli skill body|private cli reference/);
+    assert.doesNotMatch(result.stdout, /workspace-skill-sync-[^/]+/);
+  }
+
+  const snapshot = readSourceSnapshot();
+  const skill = snapshot.skills.find(({ skillId }) => skillId === "cli-alpha");
+  mkdirSync(join(fixturePaths.mirror, "cli-alpha"), { recursive: true });
+  writeFileSync(
+    join(fixturePaths.mirror, "cli-alpha", ".workspace-skill-metadata.json"),
+    JSON.stringify({
+      format: "workspace-skill-metadata/v1",
+      skillId: "cli-alpha",
+      sourceRevision: snapshot.sourceRevision,
+      fingerprint: skill.fingerprint,
+    }),
+  );
+  const status = npmCommand(fixturePaths, "workspace-skill:status", ["--skill", "cli-alpha", "--json"]);
+  assert.equal(status.status, 0);
+  assert.deepEqual(JSON.parse(status.stdout), { skill: "cli-alpha", outcome: "pass" });
+  assert.doesNotMatch(status.stdout, /private-cli-revision|private cli skill body|private cli reference/);
+  assert.doesNotMatch(status.stdout, /workspace-skill-sync-[^/]+/);
+});
+
+test("workspace-skill npm commands fail closed for unavailable and invalid inputs", (t) => {
+  const fixturePaths = fixture(t);
+  addSkill(fixturePaths.source, "cli-skill");
+
+  for (const script of [
+    "workspace-skill:refresh",
+    "workspace-skill:validate",
+    "workspace-skill:audit",
+    "workspace-skill:load",
+  ]) {
+    const result = npmCommand(fixturePaths, script, ["--json"], { unsetSource: true });
+    assert.notEqual(result.status, 0, `${script} must reject an unavailable source`);
+    assert.match(result.stderr, /\[workspace-skill\] FAIL unavailable-source\./);
+  }
+
+  const refresh = npmCommand(fixturePaths, "workspace-skill:refresh");
+  assert.equal(refresh.status, 0);
+  const missingSkill = npmCommand(fixturePaths, "workspace-skill:load", ["--skill", "missing-skill"]);
+  assert.equal(missingSkill.status, 1);
+  assert.match(missingSkill.stderr, /\[workspace-skill\] FAIL missing-skill\./);
+
+  const missingMirror = npmCommand(fixturePaths, "workspace-skill:status", ["--skill", "cli-skill"]);
+  assert.equal(missingMirror.status, 3);
+  assert.match(missingMirror.stdout, /\[workspace-skill\] missing-mirror: cli-skill/);
+
+  const unavailableStatus = npmCommand(fixturePaths, "workspace-skill:status", ["--skill", "cli-skill"], {
+    unsetSource: true,
+  });
+  assert.equal(unavailableStatus.status, 2);
+  assert.match(unavailableStatus.stdout, /\[workspace-skill\] unavailable-source: cli-skill/);
+});
+
+test("package scripts do not register retired account-managed skill aliases", () => {
+  const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
+  const retiredAliases = Object.keys(packageJson.scripts).filter((name) => /^account-skill(?::|$)/.test(name));
+  assert.deepEqual(retiredAliases, []);
 });
