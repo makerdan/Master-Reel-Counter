@@ -25,6 +25,59 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { HELP_ARTICLES, HELP_CONTENT_VERSION } from "@shared/help-content";
+import { helpGuideStateKey, readKey, writeKey } from "@/lib/storageKeys";
+
+/** Concise first-run guidance shared across dashboard and session surfaces. */
+export function HelpOnboarding() {
+  const [open, setOpen] = useState(false);
+  const [, setLocation] = useLocation();
+  const { user, identityId } = useAuth();
+
+  useEffect(() => {
+    if (!identityId || !user) return;
+    setOpen(readKey(helpGuideStateKey(identityId)) !== `dismissed:${HELP_CONTENT_VERSION}`);
+  }, [identityId, user]);
+
+  useEffect(() => {
+    const replay = () => setOpen(true);
+    window.addEventListener("help-guide-reset", replay);
+    return () => window.removeEventListener("help-guide-reset", replay);
+  }, []);
+
+  const dismiss = () => {
+    if (identityId) writeKey(helpGuideStateKey(identityId), `dismissed:${HELP_CONTENT_VERSION}`);
+    setOpen(false);
+  };
+
+  if (!user || user.isTestOwner) return null;
+  return (
+    <Dialog modal={false} open={open} onOpenChange={(next) => { if (!next) dismiss(); }}>
+      <DialogContent overlayClassName="pointer-events-none" className="max-w-md" data-testid="dialog-help-onboarding">
+        <DialogHeader>
+          <DialogTitle>Welcome to Master Reel Counter</DialogTitle>
+          <DialogDescription>
+            Start on the Dashboard, capture photos in Mobile Flow, then annotate and review reels in Full Mode.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2 text-sm text-muted-foreground" aria-label="Getting started steps">
+          {HELP_ARTICLES.slice(0, 3).map((article, index) => (
+            <div key={article.id} className="flex gap-2">
+              <span className="font-semibold text-foreground">{index + 1}.</span>
+              <span><strong className="text-foreground">{article.title}:</strong> {article.summary}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={dismiss} data-testid="button-dismiss-help-onboarding">Not now</Button>
+          <Button onClick={() => { dismiss(); setLocation("/help"); }} data-testid="button-open-help-onboarding">
+            Open full guide
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function FeedbackDialog({ page }: { page: string }) {
   const [open, setOpen] = useState(false);

@@ -43,6 +43,8 @@
  * themeMode                         LS     global   user preference (never auto-cleared)
  * theme                             LS     global   legacy theme key; one-time migration to themeMode
  * sweepMinAgeDays                   LS     global   admin preference (never auto-cleared)
+ * help-guide-state-{uid}             LS     user     user dismiss/revisit preference
+ * pageview-last-{path}               SS     global   duplicate suppression (session)
  * disregarded-dups-{sid}            LS     session  clearSessionKeys; legacy key — cleared once migrated to DB
  * ────────────────────────────────────────────────────────────────────────────
  *
@@ -115,6 +117,12 @@ export const THEME_MODE_KEY = "themeMode";
 
 /** Admin preference for the minimum orphan age (days) used in the legacy-orphan sweep. */
 export const SWEEP_MIN_AGE_DAYS_KEY = "sweepMinAgeDays";
+
+/** First-run help state is scoped by user so accounts never share dismissal state. */
+export const helpGuideStateKey = (userId: string) => `help-guide-state-${userId}`;
+
+/** Last tracked route and timestamp; prevents reload/rerender duplicates. */
+export const PAGEVIEW_LAST_KEY = "pageview-last";
 
 // ─── Session-scoped localStorage key factories ────────────────────────────────
 

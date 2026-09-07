@@ -7,9 +7,21 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
+import { findHardcodedPortReferences } from "./port-reference-scan.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const cleanupScript = resolve(root, "scripts/free-ports.mjs");
+
+// Scanner fixtures: a fixed service bind/URL fails closed, while an
+// environment-driven bind and an ephemeral test listener remain valid.
+assert.deepEqual(
+  findHardcodedPortReferences("server.listen(5000); fetch('http://localhost:5000/api/healthz')"),
+  ["listen(5000", "localhost:5000"],
+);
+assert.deepEqual(
+  findHardcodedPortReferences("server.listen(Number(process.env.PORT || 5000)); server.listen(0)"),
+  [],
+);
 
 function run(command, args, env = {}) {
   return new Promise((resolvePromise) => {

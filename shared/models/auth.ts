@@ -32,4 +32,5 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect & {
   testerOwnerUserId?: string;
+  isTestOwner?: boolean;
 };

@@ -30,6 +30,10 @@ route `/api/healthz`.
 - Playwright cleanup is part of its `webServer.command`, before the server is
   created; `globalSetup` only waits for and exercises the already healthy
   backend.
+- `scripts/port-reference-scan.mjs` is the focused scanner contract for
+  executable service references. Its synthetic fixtures reject fixed bind ports
+  and fixed localhost URLs while accepting `process.env.PORT` and ephemeral
+  port `0`.
 
 ## Capability checklist
 

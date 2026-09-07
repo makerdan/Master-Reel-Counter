@@ -35,7 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SWEEP_MIN_AGE_DAYS_KEY, readKey, writeKey } from "@/lib/storageKeys";
+import { SWEEP_MIN_AGE_DAYS_KEY, readKey, writeKey, clearKey, helpGuideStateKey } from "@/lib/storageKeys";
 import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/lib/theme-provider";
@@ -71,6 +71,8 @@ interface UserSettingsResponse {
   textSize: string;
   timezone: string;
   testerPassword: string | null;
+  helpGuideVersion: number;
+  helpGuideCompletedAt: string | null;
 }
 
 export default function SettingsPage() {
@@ -391,6 +393,25 @@ export default function SettingsPage() {
     queryKey: ["/api/admin/page-views"],
     queryFn: async () => {
       const res = await fetch("/api/admin/page-views", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const { data: adminFeedback } = useQuery<Array<{
+    id: number;
+    topic: string;
+    message: string;
+    page: string | null;
+    status: string;
+    createdAt: string;
+  }>>({
+    queryKey: ["/api/admin/feedback"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/feedback", { credentials: "include" });
       if (!res.ok) throw new Error("Not authorized");
       return res.json();
     },
@@ -2311,6 +2332,27 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 )}
+                <Separator />
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Welcome guide</p>
+                    <p className="text-xs text-muted-foreground">Review the short introduction to the dashboard and counting workflows.</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (identityId) {
+                        clearKey(helpGuideStateKey(identityId));
+                        window.dispatchEvent(new Event("help-guide-reset"));
+                      }
+                      toast({ title: "Welcome guide reopened" });
+                    }}
+                    data-testid="button-replay-help-guide"
+                  >
+                    Replay guide
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -2369,6 +2411,30 @@ export default function SettingsPage() {
                   })()}
                 </div>
               </div>
+
+              <Card data-testid="card-admin-feedback">
+                <CardHeader>
+                  <CardTitle className="text-base">Recent Feedback</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!adminFeedback?.length ? (
+                    <p className="text-sm text-muted-foreground">No feedback received in the retained window.</p>
+                  ) : (
+                    <div className="space-y-2" role="table" aria-label="Recent feedback">
+                      {adminFeedback.slice(0, 20).map((item) => (
+                        <div key={item.id} className="rounded-md border p-2 text-sm" role="row">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{item.topic.replaceAll("_", " ")}</span>
+                            <Badge variant="outline">{item.status}</Badge>
+                          </div>
+                          <p className="mt-1 text-muted-foreground break-words">{item.message}</p>
+                          {item.page && <p className="mt-1 text-xs text-muted-foreground">{item.page}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Manage Users */}
               <Card data-testid="card-manage-users">

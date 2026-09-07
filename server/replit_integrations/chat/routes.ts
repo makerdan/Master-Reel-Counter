@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import OpenAI from "openai";
 import { chatStorage } from "./storage";
+import { isAuthenticated } from "../auth/replitAuth";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -9,9 +10,10 @@ const openai = new OpenAI({
 
 export function registerChatRoutes(app: Express): void {
   // Get all conversations
-  app.get("/api/conversations", async (_req: Request, res: Response) => {
+  app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const conversations = await chatStorage.getAllConversations();
+      const userId = (req as any).user.claims.sub as string;
+      const conversations = await chatStorage.getAllConversations(userId);
       res.json(conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
@@ -20,10 +22,11 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Get single conversation with messages
-  app.get("/api/conversations/:id", async (req: Request, res: Response) => {
+  app.get("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const id = parseInt(String(req.params.id));
-      const conversation = await chatStorage.getConversation(id);
+      const userId = (req as any).user.claims.sub as string;
+      const conversation = await chatStorage.getConversation(id, userId);
       if (!conversation) {
         return res.status(404).json({ error: "Conversation not found" });
       }
@@ -36,10 +39,11 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Create new conversation
-  app.post("/api/conversations", async (req: Request, res: Response) => {
+  app.post("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const { title } = req.body;
-      const conversation = await chatStorage.createConversation(title || "New Chat");
+      const userId = (req as any).user.claims.sub as string;
+      const conversation = await chatStorage.createConversation(userId, title || "New Chat");
       res.status(201).json(conversation);
     } catch (error) {
       console.error("Error creating conversation:", error);
@@ -48,10 +52,11 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Delete conversation
-  app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
+  app.delete("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const id = parseInt(String(req.params.id));
-      await chatStorage.deleteConversation(id);
+      const userId = (req as any).user.claims.sub as string;
+      await chatStorage.deleteConversation(id, userId);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting conversation:", error);
@@ -60,13 +65,20 @@ export function registerChatRoutes(app: Express): void {
   });
 
   // Send message and get AI response (streaming)
-  app.post("/api/conversations/:id/messages", async (req: Request, res: Response) => {
+  app.post("/api/conversations/:id/messages", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const conversationId = parseInt(String(req.params.id));
+      const userId = (req as any).user.claims.sub as string;
       const { content } = req.body;
+      if (typeof content !== "string" || content.trim().length === 0 || content.length > 1200) {
+        return res.status(400).json({ error: "Message content is required and must be at most 1200 characters" });
+      }
+      if (!(await chatStorage.getConversation(conversationId, userId))) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
 
       // Save user message
-      await chatStorage.createMessage(conversationId, "user", content);
+      await chatStorage.createMessage(conversationId, "user", content.trim());
 
       // Get conversation history for context
       const messages = await chatStorage.getMessagesByConversation(conversationId);

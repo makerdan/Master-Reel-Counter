@@ -1,15 +1,17 @@
 import express, { type Express, type Request, type Response } from "express";
 import { chatStorage } from "../chat/storage";
 import { openai, speechToText, ensureCompatibleFormat } from "./client";
+import { isAuthenticated } from "../auth/replitAuth";
 
 // Body parser with 50MB limit for audio payloads
 const audioBodyParser = express.json({ limit: "50mb" });
 
 export function registerAudioRoutes(app: Express): void {
   // Get all conversations
-  app.get("/api/conversations", async (_req: Request, res: Response) => {
+  app.get("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const conversations = await chatStorage.getAllConversations();
+      const userId = (req as any).user.claims.sub as string;
+      const conversations = await chatStorage.getAllConversations(userId);
       res.json(conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
@@ -18,10 +20,11 @@ export function registerAudioRoutes(app: Express): void {
   });
 
   // Get single conversation with messages
-  app.get("/api/conversations/:id", async (req: Request, res: Response) => {
+  app.get("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const id = parseInt(String(req.params.id));
-      const conversation = await chatStorage.getConversation(id);
+      const userId = (req as any).user.claims.sub as string;
+      const conversation = await chatStorage.getConversation(id, userId);
       if (!conversation) {
         return res.status(404).json({ error: "Conversation not found" });
       }
@@ -34,10 +37,11 @@ export function registerAudioRoutes(app: Express): void {
   });
 
   // Create new conversation
-  app.post("/api/conversations", async (req: Request, res: Response) => {
+  app.post("/api/conversations", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const { title } = req.body;
-      const conversation = await chatStorage.createConversation(title || "New Chat");
+      const userId = (req as any).user.claims.sub as string;
+      const conversation = await chatStorage.createConversation(userId, title || "New Chat");
       res.status(201).json(conversation);
     } catch (error) {
       console.error("Error creating conversation:", error);
@@ -46,10 +50,11 @@ export function registerAudioRoutes(app: Express): void {
   });
 
   // Delete conversation
-  app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
+  app.delete("/api/conversations/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       const id = parseInt(String(req.params.id));
-      await chatStorage.deleteConversation(id);
+      const userId = (req as any).user.claims.sub as string;
+      await chatStorage.deleteConversation(id, userId);
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting conversation:", error);
@@ -60,13 +65,17 @@ export function registerAudioRoutes(app: Express): void {
   // Send voice message and get streaming audio response
   // Auto-detects audio format and converts WebM/MP4/OGG to WAV
   // Uses gpt-4o-mini-transcribe for STT, gpt-audio for voice response
-  app.post("/api/conversations/:id/messages", audioBodyParser, async (req: Request, res: Response) => {
+  app.post("/api/conversations/:id/messages", isAuthenticated, audioBodyParser, async (req: Request, res: Response) => {
     try {
       const conversationId = parseInt(String(req.params.id));
+      const userId = (req as any).user.claims.sub as string;
       const { audio, voice = "alloy" } = req.body;
 
       if (!audio) {
         return res.status(400).json({ error: "Audio data (base64) is required" });
+      }
+      if (!(await chatStorage.getConversation(conversationId, userId))) {
+        return res.status(404).json({ error: "Conversation not found" });
       }
 
       // 1. Auto-detect format and convert to OpenAI-compatible format

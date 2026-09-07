@@ -241,6 +241,8 @@ export const userSettings = pgTable("user_settings", {
   timezone: varchar("timezone", { length: 50 }).notNull().default("America/Chicago"),
   customVendorCodes: text("custom_vendor_codes").array().notNull().default(sql`'{}'::text[]`),
   testerPassword: text("tester_password"),
+  helpGuideVersion: integer("help_guide_version").notNull().default(0),
+  helpGuideCompletedAt: timestamp("help_guide_completed_at"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
   index("user_settings_user_id_idx").on(table.userId),
@@ -498,9 +500,12 @@ export type UploadIntent = typeof uploadIntents.$inferSelect;
 
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
   title: text("title").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("conversations_user_id_idx").on(table.userId),
+]);
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),

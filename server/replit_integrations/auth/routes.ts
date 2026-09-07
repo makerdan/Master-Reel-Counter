@@ -23,6 +23,14 @@ export const isApproved: RequestHandler = async (req: any, res, next) => {
   return next();
 };
 
+/** Shared server-authoritative owner boundary for support/admin operations. */
+export const ownerOnly: RequestHandler = (req: any, res, next) => {
+  if (!isOwnerIdentity(req.user)) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  return next();
+};
+
 export function registerAuthRoutes(app: Express): void {
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
@@ -50,7 +58,12 @@ export function registerAuthRoutes(app: Express): void {
         return res.json(updatedUser);
       }
 
-      res.json(dbUser);
+      res.json({
+        ...dbUser,
+        // Development-only owner-login compatibility is intentionally
+        // observable only as a client test marker, never as a permission.
+        isTestOwner: req.user.isTestOwner === true ? true : undefined,
+      });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });

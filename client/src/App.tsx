@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { THEME_MODE_KEY } from "@/lib/storageKeys";
+import { THEME_MODE_KEY, PAGEVIEW_LAST_KEY, readSessionKey, writeSessionKey } from "@/lib/storageKeys";
 import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +24,7 @@ import PendingApproval from "@/pages/pending-approval";
 import NotFound from "@/pages/not-found";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { WsReconnectProvider } from "@/hooks/use-ws-reconnect";
+import { HelpOnboarding } from "@/components/HelpMenu";
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -129,6 +130,14 @@ function ThemeSyncer() {
 function PageViewTracker() {
   const [location] = useLocation();
   useEffect(() => {
+    const now = Date.now();
+    try {
+      const previous = JSON.parse(readSessionKey(PAGEVIEW_LAST_KEY) || "null") as { path?: string; at?: number } | null;
+      if (previous?.path === location && typeof previous.at === "number" && now - previous.at < 30_000) return;
+      writeSessionKey(PAGEVIEW_LAST_KEY, JSON.stringify({ path: location, at: now }));
+    } catch {
+      // Tracking must never affect navigation.
+    }
     // Defer tracking by 2 s so the POST fires after the page has reached
     // network-idle. This prevents the request from delaying load-state checks.
     const t = setTimeout(() => {
@@ -228,6 +237,7 @@ function Application() {
             <ThemeSyncer />
             <TextSizeSyncer />
             <PageViewTracker />
+            <HelpOnboarding />
             <NetworkStatusIndicator />
             <AuthRouter />
           </TooltipProvider>

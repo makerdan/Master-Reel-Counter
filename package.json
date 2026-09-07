@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit && tsc --project tsconfig.playwright.json --noEmit",
     "db:push": "drizzle-kit push",
     "lint:storage": "node scripts/lint-storage.mjs --strict",
-    "test:unit": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts",
+    "test:unit": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts server/__tests__/support-ops.test.ts",
     "test:workspace-skill": "node --test scripts/workspace-skill-sync.test.mjs",
     "workspace-skill:refresh": "node scripts/workspace-skill-sync.mjs refresh",
     "workspace-skill:validate": "node scripts/workspace-skill-sync.mjs validate",

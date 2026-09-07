@@ -15,6 +15,7 @@ import {
   isApproved,
   isIdentityApproved,
   isOwnerIdentity,
+  ownerOnly,
 } from "./replit_integrations/auth/routes";
 import { authStorage } from "./replit_integrations/auth/storage";
 import {
@@ -43,6 +44,7 @@ import {
   evictSessionUserSockets as evictSessionUserSocketsFromRoom,
   RealtimeAuthorizationTracker,
 } from "./realtime-authorization";
+import { HELP_SOURCE_TEXT } from "@shared/help-content";
 
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
@@ -300,6 +302,7 @@ const pageviewRateLimiter = rateLimit({
   keyGenerator: (req) => ipKeyGenerator(req.ip ?? ""),
   message: { ok: false, message: "Too many pageview requests, please try again later." },
 });
+const recentPageViews = new Map<string, number>();
 
 /**
  * Typed wrapper for Express requests that have been authenticated.
@@ -524,6 +527,9 @@ export async function registerRoutes(
       isApproved(req, res, next);
     });
   });
+  // All admin operations share one deny-by-default owner boundary. Individual
+  // handlers still validate their own inputs and resource scope.
+  app.use("/api/admin", ownerOnly);
 
   registerAuthRoutes(app);
   registerObjectStorageRoutes(app);
@@ -5828,6 +5834,8 @@ export async function registerRoutes(
           textSize: "default",
           customVendorCodes: [],
           testerPassword: null,
+          helpGuideVersion: 0,
+          helpGuideCompletedAt: null,
         };
       res.json(response);
     } catch (error) {
@@ -5848,6 +5856,7 @@ export async function registerRoutes(
         "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
         "defaultTheme", "thumbnailSize", "largerTouchTargets", "textSize", "timezone",
         "customVendorCodes", "testerPassword",
+        "helpGuideVersion", "helpGuideCompletedAt",
       ];
       const updates: Record<string, any> = {};
       const settingsBody = (req.body ?? {}) as any;
@@ -6372,15 +6381,30 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/feedback", isAuthenticated, async (req: any, res) => {
-    if ((req as AuthenticatedRequest).user.claims.sub !== "52270193") {
-      return res.status(403).json({ error: "Forbidden" });
-    }
+  app.get("/api/feedback", isAuthenticated, ownerOnly, async (_req: any, res) => {
     try {
       const rows = await storage.listFeedback();
-      return res.json(rows);
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      return res.json(rows
+        .filter((row) => new Date(row.createdAt).getTime() >= cutoff)
+        .slice(0, 100)
+        .map(({ userId: _userId, ...row }) => row));
     } catch (error) {
       console.error("Error listing feedback:", error);
+      return res.status(500).json({ error: "Failed to list feedback" });
+    }
+  });
+
+  app.get("/api/admin/feedback", isAuthenticated, async (_req: any, res) => {
+    try {
+      const rows = await storage.listFeedback();
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      return res.json(rows
+        .filter((row) => new Date(row.createdAt).getTime() >= cutoff)
+        .slice(0, 100)
+        .map(({ userId: _userId, ...row }) => row));
+    } catch (error) {
+      console.error("Error listing admin feedback:", error);
       return res.status(500).json({ error: "Failed to list feedback" });
     }
   });
@@ -6431,25 +6455,33 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   app.post("/api/help-chat", isAuthenticated, helpChatRateLimiter, async (req: any, res) => {
     try {
       const { messages } = (req.body ?? {}) as any;
-      if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
-        return res.status(400).json({ error: "messages must be a non-empty array (max 50)" });
+      if (!Array.isArray(messages) || messages.length === 0 || messages.length > 12) {
+        return res.status(400).json({ error: "messages must be a non-empty array (max 12)" });
       }
 
       const validRoles = new Set(["user", "assistant"]);
       const sanitized: { role: "user" | "assistant"; content: string }[] = [];
+      let totalCharacters = 0;
       for (const m of messages) {
         if (!m || typeof m.content !== "string" || !validRoles.has(m.role)) {
           return res.status(400).json({ error: "Each message must have role (user/assistant) and content (string)" });
         }
-        const content = m.content.trim().slice(0, 2000);
+        const content = m.content.trim().slice(0, 1200);
         if (!content) {
           return res.status(400).json({ error: "Message content cannot be empty" });
+        }
+        totalCharacters += content.length;
+        if (totalCharacters > 8_000) {
+          return res.status(400).json({ error: "Conversation is too long; start a new question." });
         }
         sanitized.push({ role: m.role as "user" | "assistant", content });
       }
 
       const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
-        { role: "system", content: HELP_SYSTEM_PROMPT },
+        {
+          role: "system",
+          content: `${HELP_SYSTEM_PROMPT}\n\nApproved current help source (use only this source for product facts):\n${HELP_SOURCE_TEXT}\n\nNever invent settings, permissions, integrations, or recovery steps. If the answer is not in the approved source, say that you do not know and direct the user to Feedback.`,
+        },
         ...sanitized,
       ];
 
@@ -6465,8 +6497,8 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         messages: chatMessages,
         stream: true,
         stream_options: { include_usage: true },
-        max_completion_tokens: 1024,
-      });
+        max_completion_tokens: 512,
+      }, { signal: AbortSignal.timeout(15_000) });
 
       let promptTokens = 0;
       let completionTokens = 0;
@@ -7293,6 +7325,18 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";
       const salt = process.env.SESSION_SECRET || "pv-salt";
       const hash = createHash("sha256").update(ip + salt).digest("hex").slice(0, 16);
+      const dedupeKey = `${hash}:${path.slice(0, 200)}`;
+      const now = Date.now();
+      const previous = recentPageViews.get(dedupeKey);
+      if (previous && now - previous < 30_000) {
+        return res.json({ ok: true, deduplicated: true });
+      }
+      recentPageViews.set(dedupeKey, now);
+      if (recentPageViews.size > 10_000) {
+        for (const [key, timestamp] of recentPageViews) {
+          if (now - timestamp >= 30_000) recentPageViews.delete(key);
+        }
+      }
       db.execute(sql`
         INSERT INTO page_views (path, visitor_hash, created_at)
         VALUES (${path.slice(0, 200)}, ${hash}, NOW())
@@ -7349,6 +7393,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           COALESCE(SUM(prompt_tokens), 0)::int AS total_prompt_tokens,
           COALESCE(SUM(completion_tokens), 0)::int AS total_completion_tokens
         FROM ai_usage_logs
+        WHERE created_at > NOW() - INTERVAL '30 days'
       `)).rows as [{ total_requests: number; total_prompt_tokens: number; total_completion_tokens: number }];
 
       const byFeatureRows = (await db.execute(sql`
@@ -7357,6 +7402,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           COALESCE(SUM(prompt_tokens), 0)::int AS prompt_tokens,
           COALESCE(SUM(completion_tokens), 0)::int AS completion_tokens
         FROM ai_usage_logs
+        WHERE created_at > NOW() - INTERVAL '30 days'
         GROUP BY feature
         ORDER BY requests DESC
       `)).rows as Array<{ feature: string; requests: number; prompt_tokens: number; completion_tokens: number }>;
@@ -7373,6 +7419,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           COALESCE(SUM(al.prompt_tokens + al.completion_tokens), 0)::int AS tokens
         FROM ai_usage_logs al
         LEFT JOIN users u ON u.id = al.user_id
+        WHERE al.created_at > NOW() - INTERVAL '30 days'
         GROUP BY al.user_id, display_name
         ORDER BY requests DESC
         LIMIT 20
@@ -7397,7 +7444,9 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           completionTokens: Number(r.completion_tokens),
         })),
         byUser: byUserRows.map(r => ({
-          userId: r.user_id,
+          // Keep analytics aggregate-only; stable user identifiers are not
+          // useful to this chart and would increase disclosure risk.
+          userId: null,
           displayName: r.display_name,
           requests: Number(r.requests),
           tokens: Number(r.tokens),
