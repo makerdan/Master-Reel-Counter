@@ -50,6 +50,8 @@ export default defineConfig({
   use: {
     baseURL: target.origin,
     ignoreHTTPSErrors: isInternalCandidate,
+    // Native traces include cookies and request payloads. The smoke attaches a
+    // bounded path-only browser trace instead.
     trace: "off",
     screenshot: "only-on-failure",
     actionTimeout: 15_000,

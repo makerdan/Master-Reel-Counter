@@ -2,11 +2,13 @@ import { expect, test } from "@playwright/test";
 import { createClerkClient } from "@clerk/backend";
 import { randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
+import { setupCandidateClerkTestingToken } from "../support/clerk-candidate-testing";
 import { fillSecret } from "../support/secret-safe-actions";
 
 const { Client } = pg;
 const SMOKE_ID_PREFIX = "release-smoke-";
 const STALE_SMOKE_AGE_MS = 60 * 60 * 1000;
+const CLIENT_TRUST_TIMEOUT_MS = 10_000;
 
 const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
@@ -21,6 +23,39 @@ function requireReleaseEnvironment(): void {
       `Managed Clerk release smoke is missing required environment variables: ${missing.join(", ")}`,
     );
   }
+}
+
+function safeBrowserPath(rawUrl: string): string {
+  const url = new URL(rawUrl);
+  return url.pathname;
+}
+
+async function waitForCompletedSignIn(
+  page: import("@playwright/test").Page,
+  routeStates: string[],
+): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  let clientTrustStartedAt: number | undefined;
+
+  while (Date.now() < deadline) {
+    const path = safeBrowserPath(page.url());
+    if (routeStates.at(-1) !== path) routeStates.push(path);
+    if (!path.startsWith("/sign-in")) return;
+
+    if (path.startsWith("/sign-in/client-trust")) {
+      clientTrustStartedAt ??= Date.now();
+      if (Date.now() - clientTrustStartedAt >= CLIENT_TRUST_TIMEOUT_MS) {
+        throw new Error(
+          "Managed Clerk sign-in did not complete the supported testing-token client-trust step at /sign-in/client-trust",
+        );
+      }
+    }
+    await page.waitForTimeout(250);
+  }
+
+  throw new Error(
+    `Managed Clerk sign-in did not complete from Clerk state ${safeBrowserPath(page.url())}`,
+  );
 }
 
 async function removeStaleSmokeUsers(
@@ -60,7 +95,7 @@ async function removeStaleSmokeUsers(
   );
 }
 
-test("managed Clerk sign-in preserves local authorization and protected navigation", async ({ page }) => {
+test("managed Clerk sign-in preserves local authorization and protected navigation", async ({ page }, testInfo) => {
   requireReleaseEnvironment();
 
   const baseURL = new URL(process.env.PRODUCTION_BASE_URL!).origin;
@@ -73,6 +108,22 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   });
   let clerkUserId: string | undefined;
   let localUserCreated = false;
+  const proxyRequests: string[] = [];
+  const routeStates: string[] = [];
+  const requestFailures: string[] = [];
+
+  page.on("requestfailed", (request) => {
+    const url = new URL(request.url());
+    requestFailures.push(
+      `${request.method()} ${url.pathname} (${request.failure()?.errorText ?? "unknown failure"})`,
+    );
+  });
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) {
+      const path = safeBrowserPath(frame.url());
+      if (routeStates.at(-1) !== path) routeStates.push(path);
+    }
+  });
 
   await database.connect();
   try {
@@ -96,7 +147,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     localUserCreated = true;
 
     const testingToken = await clerk.testingTokens.createTestingToken();
-    const proxyRequests: string[] = [];
+    process.env.CLERK_TESTING_TOKEN = testingToken.token;
     page.on("request", (request) => {
       const url = new URL(request.url());
       if (url.origin === baseURL && url.pathname.startsWith("/api/__clerk")) {
@@ -104,8 +155,14 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       }
     });
 
+    await setupCandidateClerkTestingToken({
+      page,
+      candidateOrigin: baseURL,
+      proxyPath: "/api/__clerk",
+      localCandidateOrigin: process.env.RELEASE_SMOKE_CANDIDATE_APP_ORIGIN,
+    });
     await page
-      .goto(`/sign-in?__clerk_testing_token=${encodeURIComponent(testingToken.token)}`)
+      .goto("/sign-in")
       .catch(() => {
         throw new Error("Managed Clerk sign-in page failed to load");
       });
@@ -130,10 +187,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     );
     await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-    await expect(page, "Clerk did not leave the sign-in route after password submission").not.toHaveURL(
-      /\/sign-in(?:\/|$)/,
-      { timeout: 30_000 },
-    );
+    await waitForCompletedSignIn(page, routeStates);
     const authResponse = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", {
         credentials: "same-origin",
@@ -194,6 +248,24 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     });
     expect(signedOutStatus).toBe(401);
   } finally {
+    delete process.env.CLERK_TESTING_TOKEN;
+    // Native Playwright traces retain cookies and request payloads. This bounded
+    // path-only trace is safe to upload when the workflow fails.
+    await testInfo.attach("managed-clerk-browser-trace", {
+      body: Buffer.from(
+        JSON.stringify(
+          {
+            finalPath: safeBrowserPath(page.url()),
+            routeStates: routeStates.slice(-20),
+            proxyRequestPaths: proxyRequests.slice(-50),
+            requestFailures: requestFailures.slice(-20),
+          },
+          null,
+          2,
+        ),
+      ),
+      contentType: "application/json",
+    });
     const cleanupErrors: Error[] = [];
     if (localUserCreated) {
       try {

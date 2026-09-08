@@ -10,8 +10,27 @@ proxy_log="$(mktemp /tmp/managed-clerk-release-proxy.XXXXXX.log)"
 tls_dir="$(mktemp -d /tmp/managed-clerk-release-tls.XXXXXX)"
 server_pid=""
 proxy_pid=""
+release_status=0
+
+retain_failure_diagnostics() {
+  local diagnostics_dir="test-results/release-diagnostics"
+  mkdir -p "$diagnostics_dir"
+  for source_and_name in "$server_log:candidate.log" "$proxy_log:proxy.log"; do
+    local source="${source_and_name%%:*}"
+    local name="${source_and_name#*:}"
+    tail -n 300 "$source" |
+      node scripts/redact-release-diagnostics.mjs >"$diagnostics_dir/$name"
+  done
+}
+
+print_safe_log() {
+  tail -n 300 "$1" | node scripts/redact-release-diagnostics.mjs >&2
+}
 
 cleanup() {
+  if [[ "$release_status" -ne 0 ]]; then
+    retain_failure_diagnostics
+  fi
   if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
     kill "$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
@@ -23,7 +42,15 @@ cleanup() {
   rm -f "$server_log" "$proxy_log"
   rm -rf "$tls_dir"
 }
-trap cleanup EXIT INT TERM
+on_exit() {
+  release_status=$?
+  trap - EXIT
+  cleanup
+  exit "$release_status"
+}
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 export VITE_CLERK_PROXY_URL="/api/__clerk"
 export VITE_CLERK_PUBLIC_HOST="$candidate_host"
@@ -35,7 +62,7 @@ server_pid="$!"
 
 if ! node scripts/wait-for-release-candidate.mjs \
   "http://127.0.0.1:${candidate_port}/api/healthz" "$candidate_id" "$server_pid" 60000; then
-  cat "$server_log" >&2
+  print_safe_log "$server_log"
   exit 1
 fi
 kill -0 "$server_pid"
@@ -57,13 +84,14 @@ proxy_pid="$!"
 if ! node scripts/wait-for-release-candidate.mjs \
   "https://127.0.0.1:${tls_port}/api/healthz" "$candidate_id" "$proxy_pid" 10000 \
   --insecure-tls; then
-  cat "$proxy_log" >&2
+  print_safe_log "$proxy_log"
   exit 1
 fi
 
 RELEASE_SMOKE_INTERNAL_CANDIDATE=1 \
 RELEASE_SMOKE_CANDIDATE_HOST="$candidate_host" \
 RELEASE_SMOKE_CANDIDATE_TLS_PORT="$tls_port" \
+RELEASE_SMOKE_CANDIDATE_APP_ORIGIN="http://127.0.0.1:${candidate_port}" \
 RELEASE_SMOKE_CANDIDATE_ID="$candidate_id" \
 PRODUCTION_BASE_URL="$candidate_url" \
 npm run verify:managed-clerk-release

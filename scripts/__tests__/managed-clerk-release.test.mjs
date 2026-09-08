@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { redactReleaseDiagnostics } from "../redact-release-diagnostics.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
@@ -14,6 +15,7 @@ const smoke = readFileSync(resolve(root, "tests/release/managed-clerk-auth.spec.
 const workflow = readFileSync(resolve(root, ".github/workflows/managed-clerk-release.yml"), "utf8");
 const candidateBuild = readFileSync(resolve(root, "scripts/build-and-verify-release.sh"), "utf8");
 const candidateProxy = readFileSync(resolve(root, "scripts/release-candidate-https-proxy.mjs"), "utf8");
+const diagnosticRedactor = readFileSync(resolve(root, "scripts/redact-release-diagnostics.mjs"), "utf8");
 const execFileAsync = promisify(execFile);
 
 function listTests(configPath, environment = {}) {
@@ -52,6 +54,7 @@ test("every Replit deployment build gates the exact production candidate", () =>
   assert.match(candidateBuild, /wait-for-release-candidate\.mjs/);
   assert.match(candidateBuild, /RELEASE_SMOKE_INTERNAL_CANDIDATE=1/);
   assert.match(candidateBuild, /RELEASE_SMOKE_CANDIDATE_HOST="\$candidate_host"/);
+  assert.match(candidateBuild, /RELEASE_SMOKE_CANDIDATE_APP_ORIGIN="http:\/\/127\.0\.0\.1:\$\{candidate_port\}"/);
   assert.match(candidateBuild, /PRODUCTION_BASE_URL="\$candidate_url"/);
   assert.match(candidateBuild, /RELEASE_SMOKE_CANDIDATE_TLS_PORT="\$tls_port"/);
   assert.match(candidateBuild, /RELEASE_SMOKE_CANDIDATE_ID="\$candidate_id"/);
@@ -59,7 +62,9 @@ test("every Replit deployment build gates the exact production candidate", () =>
   assert.match(candidateProxy, /"x-forwarded-proto": "https"/);
   assert.match(config, /--host-resolver-rules=MAP \$\{target\.hostname\}:443 127\.0\.0\.1:\$\{candidateTlsPort\}/);
   assert.match(candidateBuild, /npm run verify:managed-clerk-release/);
-  assert.match(candidateBuild, /trap cleanup EXIT INT TERM/);
+  assert.match(candidateBuild, /trap on_exit EXIT/);
+  assert.match(candidateBuild, /trap 'exit 130' INT/);
+  assert.match(candidateBuild, /trap 'exit 143' TERM/);
 });
 
 test("candidate readiness rejects a healthy process with the wrong build identity", async () => {
@@ -119,6 +124,54 @@ test("smoke uses disposable managed identity and preserves local authorization s
   );
   assert.doesNotMatch(smoke, /name: \/continue\/i/);
   assert.doesNotMatch(smoke, /rejectUnauthorized: false/);
+});
+
+test("smoke uses Clerk's supported client-trust helper and keeps safe failure evidence", () => {
+  assert.equal(packageJson.dependencies["@clerk/backend"], "^3.17.1");
+  assert.equal(packageJson.devDependencies["@clerk/testing"], "^2.2.33");
+  assert.match(smoke, /setupCandidateClerkTestingToken\(\{/);
+  assert.match(smoke, /localCandidateOrigin: process\.env\.RELEASE_SMOKE_CANDIDATE_APP_ORIGIN/);
+  assert.match(smoke, /CLERK_TESTING_TOKEN/);
+  assert.match(smoke, /\/sign-in\/client-trust/);
+  assert.match(smoke, /managed-clerk-browser-trace/);
+  assert.match(smoke, /proxyRequestPaths/);
+  assert.match(smoke, /Native Playwright traces retain cookies and request payloads/);
+  assert.doesNotMatch(smoke, /goto\(`\/sign-in\?__clerk_testing_token=/);
+  assert.match(candidateBuild, /test-results\/release-diagnostics/);
+  assert.match(candidateBuild, /redact-release-diagnostics\.mjs/);
+  assert.doesNotMatch(candidateBuild, /cat "\$(?:server|proxy)_log"/);
+  assert.equal(candidateBuild.match(/print_safe_log "\$(?:server|proxy)_log"/g)?.length, 2);
+  assert.match(diagnosticRedactor, /\[REDACTED\]/);
+  assert.match(candidateBuild, /tail -n 300/);
+  assert.match(workflow, /test-results\//);
+});
+
+test("release diagnostic redaction removes complete auth and cookie values", () => {
+  const redacted = redactReleaseDiagnostics(
+    [
+      "Authorization: Bearer abc.def.ghi",
+      "Cookie: session=first; testing_token=second; other=third",
+      "Set-Cookie: __session=fourth; HttpOnly; Secure",
+      "GET /sign-in?__clerk_testing_token=fifth&other=safe",
+      "password=sixth token: seventh secret=eighth",
+    ].join("\n"),
+  );
+  for (const secret of [
+    "abc.def.ghi",
+    "first",
+    "second",
+    "third",
+    "fourth",
+    "fifth",
+    "sixth",
+    "seventh",
+    "eighth",
+  ]) {
+    assert(!redacted.includes(secret));
+  }
+  assert.match(redacted, /Authorization: \[REDACTED\]/);
+  assert.match(redacted, /Cookie: \[REDACTED\]/);
+  assert.match(redacted, /__clerk_testing_token=\[REDACTED\]&other=safe/);
 });
 
 test("smoke proves proxy, cookie-only API, protected pages, and sign-out", () => {

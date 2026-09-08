@@ -22,7 +22,7 @@
     "workspace-skill:status": "node scripts/workspace-skill-sync.mjs status",
     "test:e2e": "node scripts/serial-lock.mjs --resource e2e-port --priority 3 --timeout-ms 900000 -- npx playwright test",
     "verify:managed-clerk-release": "node scripts/serial-lock.mjs --resource managed-clerk-release --priority 3 --timeout-ms 900000 -- npx playwright test --config playwright.release.config.ts",
-    "test:managed-clerk-release-contract": "node --test scripts/__tests__/managed-clerk-release.test.mjs && node --import tsx/esm --test scripts/__tests__/secret-safe-actions.test.ts",
+    "test:managed-clerk-release-contract": "node --test scripts/__tests__/managed-clerk-release.test.mjs && node --import tsx/esm --test scripts/__tests__/secret-safe-actions.test.ts scripts/__tests__/clerk-candidate-testing.test.ts",
     "test-fast": "node scripts/run-tier.mjs test-fast",
     "test-standard": "node scripts/run-tier.mjs test-standard",
     "test-standard-plus": "node scripts/run-tier.mjs test-standard-plus",
@@ -41,6 +41,7 @@
     "test:failure-gate": "node --test scripts/__tests__/failure-gate.test.mjs"
   },
   "dependencies": {
+    "@clerk/backend": "^3.17.1",
     "@clerk/express": "^2.1.66",
     "@clerk/react": "^6.15.1",
     "@clerk/shared": "^4.31.0",
@@ -133,6 +134,7 @@
     "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.2.33",
     "@playwright/test": "^1.60.0",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
