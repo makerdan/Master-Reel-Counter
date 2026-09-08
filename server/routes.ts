@@ -38,7 +38,6 @@ import fs from "fs/promises";
 import { PassThrough } from "stream";
 import { cropPhoto } from "./lib/cropPhoto";
 import ExcelJS from "exceljs";
-import { openai } from "./replit_integrations/image/client";
 import { taskTracker } from "./lib/taskTracker";
 import {
   evictAllSessionSockets as evictAllSessionSocketsFromRoom,
@@ -50,24 +49,7 @@ import { HELP_SOURCE_TEXT } from "@shared/help-content";
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session, type UserSettings } from "@shared/schema";
-async function logAiUsage(
-  userId: string | null,
-  feature: string,
-  model: string,
-  promptTokens: number,
-  completionTokens: number,
-): Promise<void> {
-  try {
-    await db.execute(sql`
-      INSERT INTO ai_usage_logs (user_id, feature, model, prompt_tokens, completion_tokens, created_at)
-      VALUES (${userId}, ${feature}, ${model}, ${promptTokens}, ${completionTokens}, NOW())
-    `);
-  } catch {
-    // intentionally silent
-  }
-}
-
-// In-memory PDF generation job tracker
+import { getPoeProvider, PoeProviderError, type PoeTextMessage } from "./providers/poe";
 const pdfJobs = new Map<string, {
   done: number;
   total: number;
@@ -2283,39 +2265,29 @@ export async function registerRoutes(
             image_url: { url: `data:image/jpeg;base64,${crop.base64}`, detail: "high" as const },
           }));
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            response_format: { type: "json_object" },
+          const response = await getPoeProvider().completeVision({
             messages: [
-              {
-                role: "system",
-                content: "You are reading wire reel labels in a warehouse. The labels may be printed on curved cylindrical reel surfaces, at various angles, upside down, or partially obscured. Read all visible text regardless of orientation. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
-              },
               {
                 role: "user",
                 content: [
-                  { type: "text", text: `Read the text on each of these ${crops.length} wire reel label images. Return the result as a JSON object: {"labels": ["text from image 1", "text from image 2", ...]}` },
+                  {
+                    type: "text",
+                    text: `Read the text on each of these ${crops.length} wire reel label images. Return a JSON object with a "labels" array in the same order. Use an empty string when a label is unreadable.`,
+                  },
                   ...imageMessages,
                 ],
               },
             ],
-            max_tokens: 2000,
+            expectedLabels: crops.length,
+            useCase: "label-scan",
+            maxTokens: 2000,
+            userId: (req as AuthenticatedRequest).user?.claims?.sub ?? null,
           });
-
-          logAiUsage((req as AuthenticatedRequest).user?.claims?.sub ?? null, "label-scan", "gpt-4o", response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0).catch(() => {});
-          const content = response.choices?.[0]?.message?.content ?? "{}";
-          let parsed: { labels?: (string | null)[] } = {};
-          let parseFailed = false;
-          try {
-            parsed = JSON.parse(content);
-          } catch {
-            parseFailed = true;
-            console.error("[analyze-labels] Failed to parse OpenAI response:", content);
-          }
-
-          const labels = parseFailed ? [] : (parsed.labels ?? []);
+          const labelsByPinId = new Map(crops.map((crop, index) => [crop.pinId, response.labels[index] ?? ""]));
           for (let j = 0; j < batch.length; j++) {
-            const rawText = parseFailed ? null : (labels[j] ?? null);
+            const rawText = labelsByPinId.has(batch[j].pinId)
+              ? (labelsByPinId.get(batch[j].pinId) || null)
+              : null;
             allResults.push({
               pinId: batch[j].pinId,
               pinLabel: batch[j].pinLabel || `P${String(j + i + 1).padStart(3, "0")}`,
@@ -2324,7 +2296,7 @@ export async function registerRoutes(
             });
           }
         } catch (subErr) {
-          console.error(`[analyze-labels] sub-batch starting at ${i} failed:`, subErr);
+          if (subErr instanceof PoeProviderError) throw subErr;
           for (let j = 0; j < batch.length; j++) {
             allResults.push({
               pinId: batch[j].pinId,
@@ -2357,7 +2329,10 @@ export async function registerRoutes(
 
       res.json({ ...cacheEntry, truncated: anyTruncated, truncatedCount: totalSkipped });
     } catch (error) {
-      console.error("Error analyzing labels:", error);
+      if (error instanceof PoeProviderError) {
+        return res.status(error.statusCode).json({ message: "Label analysis is temporarily unavailable", code: error.code });
+      }
+      console.error("Error analyzing labels:", error instanceof Error ? error.message : "unknown error");
       res.status(500).json({ message: "Failed to analyze labels" });
     } finally {
       taskTracker.decrement();
@@ -2448,39 +2423,27 @@ export async function registerRoutes(
             image_url: { url: `data:image/jpeg;base64,${crop.base64}`, detail: "high" as const },
           }));
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            response_format: { type: "json_object" },
-            messages: [
-              {
-                role: "system",
-                content: "You are reading wire reel labels in a warehouse. The labels may be printed on curved cylindrical reel surfaces, at various angles, upside down, or partially obscured. Read all visible text regardless of orientation. For each image, read all text visible on the label exactly as printed. Do not interpret, reformat, or infer anything. Return a JSON object with a \"labels\" key containing an array of strings in the same order as the images. If a label is unreadable, return null for that entry.",
-              },
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: `Read the text on each of these ${orderedCrops.length} wire reel label images. Return the result as a JSON object: {"labels": ["text from image 1", "text from image 2", ...]}` },
-                  ...imageMessages,
-                ],
-              },
-            ],
-            max_tokens: 2000,
+          const response = await getPoeProvider().completeVision({
+            messages: [{
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `Read the text on each of these ${orderedCrops.length} wire reel label images. Return a JSON object with a "labels" array in the same order. Use an empty string when a label is unreadable.`,
+                },
+                ...imageMessages,
+              ],
+            }],
+            expectedLabels: orderedCrops.length,
+            useCase: "session-scan",
+            maxTokens: 2000,
+            userId: (req as AuthenticatedRequest).user?.claims?.sub ?? null,
           });
-
-          logAiUsage((req as AuthenticatedRequest).user?.claims?.sub ?? null, "session-scan", "gpt-4o", response.usage?.prompt_tokens ?? 0, response.usage?.completion_tokens ?? 0).catch(() => {});
-          const content = response.choices?.[0]?.message?.content ?? "{}";
-          let parsed: { labels?: (string | null)[] } = {};
-          let parseFailed = false;
-          try {
-            parsed = JSON.parse(content);
-          } catch {
-            parseFailed = true;
-            console.error("[session-analyze-labels] Failed to parse OpenAI response:", content);
-          }
-
-          const labels = parseFailed ? [] : (parsed.labels ?? []);
+          const labelsByPinId = new Map(orderedCrops.map((crop, index) => [crop.pinId, response.labels[index] ?? ""]));
           for (let j = 0; j < batch.length; j++) {
-            const rawText = parseFailed ? null : (labels[j] ?? null);
+            const rawText = labelsByPinId.has(batch[j].pinId)
+              ? (labelsByPinId.get(batch[j].pinId) || null)
+              : null;
             allResults.push({
               pinId: batch[j].pinId,
               pinLabel: batch[j].pinLabel,
@@ -2489,7 +2452,7 @@ export async function registerRoutes(
             });
           }
         } catch (subErr) {
-          console.error(`[session-analyze-labels] sub-batch starting at ${i} failed:`, subErr);
+          if (subErr instanceof PoeProviderError) throw subErr;
           for (let j = 0; j < batch.length; j++) {
             allResults.push({
               pinId: batch[j].pinId,
@@ -2525,7 +2488,10 @@ export async function registerRoutes(
 
       res.json({ results: allResults, totalBatches, truncated: anyTruncated, truncatedCount: totalSkipped });
     } catch (error) {
-      console.error("Error analyzing session labels:", error);
+      if (error instanceof PoeProviderError) {
+        return res.status(error.statusCode).json({ message: "Label analysis is temporarily unavailable", code: error.code });
+      }
+      console.error("Error analyzing session labels:", error instanceof Error ? error.message : "unknown error");
       res.status(500).json({ message: "Failed to analyze labels" });
     } finally {
       taskTracker.decrement();
@@ -6478,7 +6444,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         sanitized.push({ role: m.role as "user" | "assistant", content });
       }
 
-      const chatMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      const chatMessages: PoeTextMessage[] = [
         {
           role: "system",
           content: `${HELP_SYSTEM_PROMPT}\n\nApproved current help source (use only this source for product facts):\n${HELP_SOURCE_TEXT}\n\nNever invent settings, permissions, integrations, or recovery steps. If the answer is not in the approved source, say that you do not know and direct the user to Feedback.`,
@@ -6491,28 +6457,24 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       res.setHeader("Connection", "keep-alive");
 
       let aborted = false;
-      req.on("close", () => { aborted = true; });
+      const requestAbort = new AbortController();
+      let providerStream: Awaited<ReturnType<ReturnType<typeof getPoeProvider>["streamText"]>> | undefined;
+      req.on("close", () => {
+        aborted = true;
+        requestAbort.abort();
+        providerStream?.abort();
+      });
 
-      const stream = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+      providerStream = await getPoeProvider().streamText({
         messages: chatMessages,
-        stream: true,
-        stream_options: { include_usage: true },
-        max_completion_tokens: 512,
-      }, { signal: AbortSignal.timeout(15_000) });
+        useCase: "help-chat",
+        maxTokens: 512,
+        signal: requestAbort.signal,
+        userId: (req as AuthenticatedRequest).user?.claims?.sub ?? null,
+      });
 
-      let promptTokens = 0;
-      let completionTokens = 0;
-      for await (const chunk of stream) {
-        if (aborted) {
-          stream.controller.abort();
-          break;
-        }
-        if (chunk.usage) {
-          promptTokens = chunk.usage.prompt_tokens ?? 0;
-          completionTokens = chunk.usage.completion_tokens ?? 0;
-        }
-        const content = chunk.choices[0]?.delta?.content || "";
+      for await (const content of providerStream.stream) {
+        if (aborted) break;
         if (content) {
           res.write(`data: ${JSON.stringify({ content })}\n\n`);
         }
@@ -6521,10 +6483,9 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       if (!aborted) {
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         res.end();
-        logAiUsage((req as AuthenticatedRequest).user?.claims?.sub ?? null, "help-chat", "gpt-4o-mini", promptTokens, completionTokens).catch(() => {});
       }
     } catch (error) {
-      console.error("Error in help chat:", error);
+      console.error("Error in help chat:", error instanceof PoeProviderError ? error.code : "unknown error");
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ error: "Failed to get response" })}\n\n`);
         res.end();
@@ -7432,6 +7393,29 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         ORDER BY date
       `)).rows as Array<{ date: string; requests: number }>;
 
+      const providerRows = (await db.execute(sql`
+        SELECT provider, endpoint, route, status,
+          COUNT(*)::int AS requests,
+          COALESCE(SUM(prompt_tokens), 0)::int AS prompt_tokens,
+          COALESCE(SUM(completion_tokens), 0)::int AS completion_tokens,
+          COALESCE(AVG(latency_ms), 0)::int AS average_latency_ms,
+          COALESCE(SUM(retry_count), 0)::int AS retries
+        FROM ai_usage_logs
+        WHERE created_at > NOW() - INTERVAL '30 days'
+        GROUP BY provider, endpoint, route, status
+        ORDER BY requests DESC
+      `)).rows as Array<{
+        provider: string;
+        endpoint: string | null;
+        route: string | null;
+        status: string;
+        requests: number;
+        prompt_tokens: number;
+        completion_tokens: number;
+        average_latency_ms: number;
+        retries: number;
+      }>;
+
       res.json({
         totalRequests: Number(totals.total_requests),
         totalPromptTokens: Number(totals.total_prompt_tokens),
@@ -7451,6 +7435,17 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           tokens: Number(r.tokens),
         })),
         dailyTrend: dailyRows.map(r => ({ date: r.date, requests: Number(r.requests) })),
+        byProvider: providerRows.map(r => ({
+          provider: r.provider,
+          endpoint: r.endpoint,
+          route: r.route,
+          status: r.status,
+          requests: Number(r.requests),
+          promptTokens: Number(r.prompt_tokens),
+          completionTokens: Number(r.completion_tokens),
+          averageLatencyMs: Number(r.average_latency_ms),
+          retries: Number(r.retries),
+        })),
       });
     } catch (err) {
       console.error("[admin-ai-usage]", err);

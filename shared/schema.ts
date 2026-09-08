@@ -528,11 +528,20 @@ export const aiUsageLogs = pgTable("ai_usage_logs", {
   model: text("model").notNull(),
   promptTokens: integer("prompt_tokens").notNull().default(0),
   completionTokens: integer("completion_tokens").notNull().default(0),
+  provider: text("provider").notNull().default("replit-openai-compatible"),
+  endpoint: text("endpoint"),
+  route: text("route"),
+  status: text("status").notNull().default("success"),
+  latencyMs: integer("latency_ms"),
+  retryCount: integer("retry_count").notNull().default(0),
+  fallbackState: text("fallback_state").notNull().default("none"),
+  cacheState: text("cache_state").notNull().default("not-applicable"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("ai_usage_logs_user_id_idx").on(table.userId),
   index("ai_usage_logs_created_at_idx").on(table.createdAt),
   index("ai_usage_logs_feature_idx").on(table.feature),
+  index("ai_usage_logs_provider_idx").on(table.provider),
 ]);
 
 // ─── Page Views ───────────────────────────────────────────────────────────────

@@ -1,12 +1,7 @@
 import type { Express, Request, Response } from "express";
-import OpenAI from "openai";
 import { chatStorage } from "./storage";
 import { isAuthenticated } from "../auth/replitAuth";
-
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+import { getPoeProvider, PoeProviderError, type PoeTextMessage } from "../../providers/poe";
 
 export function registerChatRoutes(app: Express): void {
   // Get all conversations
@@ -82,7 +77,7 @@ export function registerChatRoutes(app: Express): void {
 
       // Get conversation history for context
       const messages = await chatStorage.getMessagesByConversation(conversationId);
-      const chatMessages = messages.map((m) => ({
+      const chatMessages: PoeTextMessage[] = messages.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       }));
@@ -92,31 +87,40 @@ export function registerChatRoutes(app: Express): void {
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      // Stream response from OpenAI
-      const stream = await openai.chat.completions.create({
-        model: "gpt-5.1",
+      let aborted = false;
+      const requestAbort = new AbortController();
+      let providerStream: Awaited<ReturnType<ReturnType<typeof getPoeProvider>["streamText"]>> | undefined;
+      req.on("close", () => {
+        aborted = true;
+        requestAbort.abort();
+        providerStream?.abort();
+      });
+
+      providerStream = await getPoeProvider().streamText({
         messages: chatMessages,
-        stream: true,
-        max_completion_tokens: 2048,
+        useCase: "help-chat",
+        maxTokens: 2048,
+        signal: requestAbort.signal,
+        userId,
       });
 
       let fullResponse = "";
 
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        if (content) {
-          fullResponse += content;
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
-        }
+      for await (const content of providerStream.stream) {
+        if (aborted) break;
+        fullResponse += content;
+        res.write(`data: ${JSON.stringify({ content })}\n\n`);
       }
 
       // Save assistant message
-      await chatStorage.createMessage(conversationId, "assistant", fullResponse);
+      if (!aborted) await chatStorage.createMessage(conversationId, "assistant", fullResponse);
 
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-      res.end();
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+      }
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Error sending message:", error instanceof PoeProviderError ? error.code : "unknown error");
       // Check if headers already sent (SSE streaming started)
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ error: "Failed to send message" })}\n\n`);
