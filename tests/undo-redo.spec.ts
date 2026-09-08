@@ -17,8 +17,9 @@ test.describe("undo/redo parity @undo", () => {
     const entry = await createEntryViaApi(request, sess.id);
 
     await page.goto(`/session/${sess.id}`);
-    await page.waitForLoadState("networkidle");
-    await page.click('[data-testid="tab-photo-mode"]');
+    const photoTab = page.locator('[data-testid="tab-photo-mode"]');
+    await expect(photoTab).toBeVisible({ timeout: 30_000 });
+    await photoTab.click();
 
     // Entry sections are collapsed by default — expand the section first
     const sectionToggle = page.locator('[data-testid="section-toggle-A-1"]');

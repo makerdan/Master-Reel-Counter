@@ -38,6 +38,7 @@ export function registerObjectStorageRoutes(app: Express): void {
    * checks before streaming the file.  All other /objects/ paths are blocked.
    */
   app.get("/objects/{*objectPath}", isAuthenticated, isApproved, (req, res) => {
+    res.set("Cache-Control", "private, no-store, no-cache, must-revalidate");
     const p = req.path; // e.g. "/objects/uploads/abc.jpg"
 
     // Only serve /objects/uploads/<filename> — every other sub-path has no

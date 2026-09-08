@@ -751,7 +751,7 @@ export async function registerRoutes(
       };
       const headers = {
         "Content-Type": mimeTypes[ext] || "application/octet-stream",
-        "Cache-Control": "private, max-age=86400",
+        "Cache-Control": "private, no-store, no-cache, must-revalidate",
       };
       let servedFromGcs = false;
       try {

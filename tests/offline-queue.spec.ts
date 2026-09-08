@@ -4,7 +4,99 @@
  * unsynced offline items must show a warning dialog. After cancelling and
  * clearing the queue the pending-count badge must return to 0 (or hide).
  */
-import { test, expect, createSessionViaApi } from "./fixtures";
+import { BASE_URL, test, expect, createSessionViaApi } from "./fixtures";
+import { TESTER_NAME, TESTER_PASSWORD } from "./global-setup";
+
+const protectedPaths = (sessionId: number) => [
+  `/api/sessions/${sessionId}`,
+  `/api/sessions/${sessionId}/entries`,
+  `/api/sessions/${sessionId}/photos`,
+  `/api/sessions/${sessionId}/pins`,
+];
+
+async function createProtectedUpload(
+  request: import("@playwright/test").APIRequestContext,
+  sessionId: number,
+) {
+  const pngBuffer = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  const uploadResponse = await request.post("/api/uploads/direct", {
+    multipart: {
+      file: {
+        name: "offline-cache-test.png",
+        mimeType: "image/png",
+        buffer: pngBuffer,
+      },
+    },
+  });
+  if (!uploadResponse.ok()) {
+    throw new Error(
+      `protected upload failed: ${uploadResponse.status()} ${await uploadResponse.text()}`,
+    );
+  }
+  const upload = await uploadResponse.json();
+  const photoResponse = await request.post(`/api/sessions/${sessionId}/photos`, {
+    data: {
+      objectStorageKey: upload.objectPath,
+      originalFilename: "offline-cache-test.png",
+      mimeType: "image/png",
+      fileSize: pngBuffer.byteLength,
+      aisle: "A",
+      section: "1",
+      notes: "",
+      isDetailShot: false,
+    },
+  });
+  if (!photoResponse.ok()) {
+    throw new Error(
+      `photo registration failed: ${photoResponse.status()} ${await photoResponse.text()}`,
+    );
+  }
+  return upload.objectPath as string;
+}
+
+async function installServiceWorker(page: import("@playwright/test").Page) {
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+  });
+  if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller)))) {
+    await page.reload();
+  }
+  await expect.poll(
+    () => page.evaluate(() => Boolean(navigator.serviceWorker.controller)),
+  ).toBe(true);
+}
+
+async function putLegacyProtectedCache(
+  page: import("@playwright/test").Page,
+  paths: string[],
+  uploadPath: string,
+  identity: string,
+) {
+  await page.evaluate(async ({ paths, uploadPath, identity }) => {
+    const apiCache = await caches.open("reel-counter-api-v1");
+    await Promise.all(
+      paths.map((path) =>
+        apiCache.put(
+          path,
+          new Response(JSON.stringify({ secret: `${identity}:${path}` }), {
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+    const shellCache = await caches.open("reel-counter-v1");
+    await shellCache.put(
+      uploadPath,
+      new Response(`previous-user-photo:${identity}`, {
+        headers: { "Content-Type": "image/png" },
+      }),
+    );
+  }, { paths, uploadPath, identity });
+}
 
 async function clearOfflineQueue(page: import("@playwright/test").Page) {
   await page.evaluate(() => {
@@ -24,6 +116,126 @@ async function clearOfflineQueue(page: import("@playwright/test").Page) {
 }
 
 test.describe("offline queue warning @offline-queue", () => {
+  test("logout and identity changes cannot expose legacy protected caches offline", async ({
+    browser,
+    request,
+  }) => {
+    const context = await browser.newContext({
+      baseURL: BASE_URL,
+      storageState: { cookies: [], origins: [] },
+    });
+    const ownerLogin = await context.request.post("/api/__test__/owner-login");
+    expect(ownerLogin.ok()).toBe(true);
+    const page = await context.newPage();
+    const sess = await createSessionViaApi(request, `Offline Isolation ${Date.now()}`);
+    try {
+      const paths = protectedPaths(sess.id);
+      const objectPath = await createProtectedUpload(request, sess.id);
+      const uploadPath = objectPath.startsWith("/")
+        ? objectPath
+        : `/uploads/${objectPath}`;
+
+      await page.goto("/");
+      await installServiceWorker(page);
+
+      for (const path of paths) {
+        const response = await page.request.get(path);
+        expect(response.headers()["cache-control"]).toContain("no-store");
+      }
+
+      const uploadResponse = await page.evaluate(async (uploadPath) => {
+        const response = await fetch(uploadPath);
+        return {
+          status: response.status,
+          cacheControl: response.headers.get("cache-control"),
+          byteLength: (await response.arrayBuffer()).byteLength,
+        };
+      }, uploadPath);
+      expect(uploadResponse.status).toBe(200);
+      expect(uploadResponse.cacheControl).toContain("no-store");
+      expect(uploadResponse.byteLength).toBeGreaterThan(0);
+      expect(await page.evaluate((path) => caches.match(path).then(Boolean), uploadPath)).toBe(false);
+
+      await putLegacyProtectedCache(page, paths, uploadPath, "owner");
+      const seedResponse = await request.post("/api/__test__/seed-tester-password", {
+        data: { password: TESTER_PASSWORD },
+      });
+      expect(seedResponse.ok()).toBe(true);
+      const { ownerUserId } = await seedResponse.json();
+
+      await page.goto("/api/auth/tester-logout");
+      await expect(page.locator('[data-testid="button-login"]')).toBeVisible();
+      await expect.poll(
+        () => page.evaluate(() => caches.has("reel-counter-api-v1")),
+      ).toBe(false);
+      expect(await page.evaluate((path) => caches.match(path).then(Boolean), uploadPath)).toBe(false);
+
+      await page.goto("/tester-login");
+      await putLegacyProtectedCache(page, paths, uploadPath, "signed-out");
+      await page.locator('[data-testid="input-display-name"]').fill(TESTER_NAME);
+      await page.locator('[data-testid="input-owner-access-code"]').fill(ownerUserId);
+      await page.locator('[data-testid="input-tester-password"]').fill(TESTER_PASSWORD);
+      await page.locator('[data-testid="button-tester-login"]').click();
+      await expect(page.locator('[data-testid="text-dashboard-title"]')).toBeVisible();
+      await expect.poll(
+        () => page.evaluate(() => caches.has("reel-counter-api-v1")),
+      ).toBe(false);
+      expect(await page.evaluate((path) => caches.match(path).then(Boolean), uploadPath)).toBe(false);
+
+      await putLegacyProtectedCache(page, paths, uploadPath, "tester");
+      const authenticatedUser = await context.request.get("/api/auth/user");
+      expect(authenticatedUser.ok()).toBe(true);
+      expect((await authenticatedUser.json()).isTester).toBe(true);
+      await page.locator('[data-testid="button-logout"]').click();
+      const guardConfirm = page.locator('[data-testid="button-logout-guard-confirm"]');
+      if (await guardConfirm.isVisible({ timeout: 1_000 }).catch(() => false)) {
+        await guardConfirm.click();
+      }
+      await expect.poll(
+        () => page.evaluate(() => caches.has("reel-counter-api-v1")).catch(() => null),
+        { timeout: 15_000 },
+      ).toBe(false);
+      expect(await page.evaluate((path) => caches.match(path).then(Boolean), uploadPath)).toBe(false);
+      const testerLogout = await context.request.get("/api/auth/tester-logout", {
+        maxRedirects: 0,
+      });
+      expect(testerLogout.status()).toBe(302);
+      expect((await context.request.get("/api/auth/user")).status()).toBe(401);
+      await page.goto("/");
+      await expect(page.locator('[data-testid="button-login"]')).toBeVisible();
+
+      // Even if stale protected responses appear after cleanup, the current
+      // network-only worker must never consult them during offline fallback.
+      await putLegacyProtectedCache(page, paths, uploadPath, "pre-logout");
+      await context.setOffline(true);
+      const results = await page.evaluate(async (paths) =>
+        Promise.all(paths.map(async (path) => {
+          const response = await fetch(path);
+          return { status: response.status, body: await response.text() };
+        })), paths);
+      expect(results).toEqual(
+        paths.map(() => ({ status: 503, body: '{"error":"offline"}' })),
+      );
+      const offlineUpload = await page.evaluate(async (path) => {
+        const response = await fetch(path);
+        return { status: response.status, body: await response.text() };
+      }, uploadPath);
+      expect(offlineUpload).toEqual({ status: 503, body: "" });
+
+      const shellResponse = await page.evaluate(async () => {
+        const response = await fetch("/", { headers: { Accept: "text/html" } });
+        return { status: response.status, text: await response.text() };
+      });
+      expect(shellResponse.status).toBe(200);
+      expect(shellResponse.text).toContain('<div id="root"></div>');
+    } finally {
+      await context.setOffline(false);
+      await context.close();
+      await request.delete(`/api/sessions/${sess.id}`).catch(() => {});
+      await request.delete(`/api/sessions/${sess.id}/permanent`).catch(() => {});
+    }
+  });
+
   test("logout guard dialog appears when there are pending offline items", async ({
     page,
     request,
@@ -36,7 +248,7 @@ test.describe("offline queue warning @offline-queue", () => {
     // In dev mode there is no service worker, so page.goto() while offline would
     // fail with a network error. Loading the page first avoids that.
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await expect(page.locator('[data-testid="text-dashboard-title"]')).toBeVisible();
 
     // Plant a queued entry in IndexedDB (works on any page; IndexedDB is browser-wide)
     await page.evaluate((sid) => {

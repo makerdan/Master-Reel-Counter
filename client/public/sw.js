@@ -1,5 +1,5 @@
 const CACHE_NAME = "reel-counter-v1";
-const API_CACHE_NAME = "reel-counter-api-v1";
+const LEGACY_API_CACHE_PREFIX = "reel-counter-api-";
 const STATIC_ASSETS = [
   "/",
   "/favicon.png",
@@ -8,7 +8,32 @@ const STATIC_ASSETS = [
   "/icon-512.svg",
 ];
 
-const CACHEABLE_SESSION_API = /^\/api\/sessions\/\d+($|\/entries$|\/photos$|\/pins$)/;
+function isProtectedRead(url) {
+  const u = new URL(url);
+  return (
+    u.origin === self.location.origin &&
+    (u.pathname.startsWith("/api/") ||
+      u.pathname.startsWith("/uploads/") ||
+      u.pathname.startsWith("/objects/"))
+  );
+}
+
+async function clearProtectedCaches() {
+  const keys = await caches.keys();
+  await Promise.all(
+    keys
+      .filter((key) => key.startsWith(LEGACY_API_CACHE_PREFIX))
+      .map((key) => caches.delete(key))
+  );
+
+  const shellCache = await caches.open(CACHE_NAME);
+  const requests = await shellCache.keys();
+  await Promise.all(
+    requests
+      .filter((request) => isProtectedRead(request.url))
+      .map((request) => shellCache.delete(request))
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -19,20 +44,28 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
+    caches.keys().then(async (keys) => {
+      await Promise.all(
         keys
-          .filter((k) => k !== CACHE_NAME && k !== API_CACHE_NAME)
+          .filter((k) => k !== CACHE_NAME && !k.startsWith(LEGACY_API_CACHE_PREFIX))
           .map((k) => caches.delete(k))
-      )
-    )
+      );
+      await clearProtectedCaches();
+      await self.clients.claim();
+    })
   );
-  self.clients.claim();
 });
 
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "CLEAR_API_CACHE") {
-    caches.delete(API_CACHE_NAME);
+    const cleanup = clearProtectedCaches();
+    event.waitUntil(cleanup);
+    if (event.ports[0]) {
+      cleanup.then(
+        () => event.ports[0].postMessage({ ok: true }),
+        () => event.ports[0].postMessage({ ok: false })
+      );
+    }
   }
 });
 
@@ -54,15 +87,25 @@ function isStaticAsset(url) {
   );
 }
 
-function isCacheableSessionApi(url) {
-  const path = new URL(url).pathname;
-  return CACHEABLE_SESSION_API.test(path);
-}
-
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
   if (request.method !== "GET") return;
+
+  if (isProtectedRead(request.url)) {
+    const path = new URL(request.url).pathname;
+    event.respondWith(
+      fetch(request, { cache: "no-store" }).catch(() =>
+        path.startsWith("/api/")
+          ? new Response('{"error":"offline"}', {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            })
+          : new Response("", { status: 503 })
+      )
+    );
+    return;
+  }
 
   if (isNavigationRequest(request)) {
     event.respondWith(
@@ -92,39 +135,4 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isCacheableSessionApi(request.url)) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(API_CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() =>
-          caches.match(request).then(
-            (cached) =>
-              cached ||
-              new Response('{"error":"offline"}', {
-                status: 503,
-                headers: { "Content-Type": "application/json" },
-              })
-          )
-        )
-    );
-    return;
-  }
-
-  if (request.url.includes("/api/")) {
-    event.respondWith(
-      fetch(request).catch(() =>
-        new Response('{"error":"offline"}', {
-          status: 503,
-          headers: { "Content-Type": "application/json" },
-        })
-      )
-    );
-    return;
-  }
 });

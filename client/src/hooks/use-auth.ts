@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
@@ -19,11 +19,41 @@ async function fetchUser(): Promise<User | null> {
   return response.json();
 }
 
-function clearClientState(queryClient: ReturnType<typeof useQueryClient>) {
-  queryClient.clear();
-  if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({ type: "CLEAR_API_CACHE" });
+async function clearProtectedOfflineData() {
+  if (!("serviceWorker" in navigator)) return;
+
+  const controller = navigator.serviceWorker.controller;
+  if (controller) {
+    await new Promise<void>((resolve) => {
+      const channel = new MessageChannel();
+      const timeout = window.setTimeout(resolve, 2_000);
+      channel.port1.onmessage = () => {
+        window.clearTimeout(timeout);
+        resolve();
+      };
+      controller.postMessage({ type: "CLEAR_API_CACHE" }, [channel.port2]);
+    });
   }
+
+  void navigator.serviceWorker.getRegistration().then((registration) => {
+    const workers = new Set([
+      registration?.active,
+      registration?.waiting,
+      registration?.installing,
+    ]);
+    workers.forEach((worker) => {
+      if (worker !== controller) {
+        worker?.postMessage({ type: "CLEAR_API_CACHE" });
+      }
+    });
+  }).catch(() => {});
+}
+
+let lastObservedIdentity: string | null | undefined;
+
+async function clearClientState(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.clear();
+  await clearProtectedOfflineData();
 }
 
 /**
@@ -54,7 +84,7 @@ export function useAuth() {
   });
 
   const logout = useCallback(async () => {
-    clearClientState(queryClient);
+    await clearClientState(queryClient);
     if (localUser?.isTester) {
       // Tester auth is the app's separate, password-based session.
       window.location.assign("/api/auth/tester-logout");
@@ -66,7 +96,19 @@ export function useAuth() {
   // Existing app data uses the local user ID. For Clerk-native users that is
   // Clerk's external ID when present, otherwise its Clerk ID.
   const identityId = localUser?.id ?? clerkUser?.externalId ?? clerkUser?.id;
+  const authIdentity = clerkUser?.id ?? (localUser?.isTester ? localUser.id : null);
   const isLoading = !isLoaded || isLocalUserLoading;
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (
+      lastObservedIdentity !== undefined &&
+      lastObservedIdentity !== authIdentity
+    ) {
+      void clearClientState(queryClient);
+    }
+    lastObservedIdentity = authIdentity;
+  }, [authIdentity, isLoaded, queryClient]);
 
   return {
     user: localUser,

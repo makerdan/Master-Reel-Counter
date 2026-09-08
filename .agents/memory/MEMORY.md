@@ -9,3 +9,4 @@
 - [Canonical HTTPS candidate routing](canonical-https-candidate-routing.md) — use Chromium host/port resolver mapping to test a local TLS candidate under the exact production browser origin.
 - [Shared HTTP WebSocket upgrades](shared-http-websocket-upgrades.md) — path-scoped WebSocket servers must ignore unmatched upgrades so other protocols can share the HTTP server.
 - [Clerk testing through the production proxy](clerk-testing-production-proxy.md) — target the same-origin proxy path so testing tokens exercise the exact release candidate.
+- [Playwright logout isolation](playwright-logout-isolation.md) — logout tests need fresh server-session cookies; copied storage state can invalidate authentication for later tests.

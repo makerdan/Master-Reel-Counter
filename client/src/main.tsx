@@ -8,10 +8,11 @@ if (import.meta.hot) {
   });
 }
 
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.controller?.postMessage({ type: "CLEAR_API_CACHE" });
+  if (import.meta.env.PROD) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
-  });
+  }
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
