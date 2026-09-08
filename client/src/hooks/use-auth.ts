@@ -38,7 +38,12 @@ export function useAuth() {
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
   const { data: localUser, isLoading: isLocalUserLoading } = useQuery<User | null>({
-    queryKey: ["/api/auth/user"],
+    // Include Clerk identity state so a completed sign-in cannot reuse a
+    // signed-out null result that was cached before the redirect.
+    queryKey: [
+      "/api/auth/user",
+      clerkUser?.id ?? (isSignedIn ? "signed-in" : "signed-out"),
+    ],
     queryFn: fetchUser,
     retry: false,
     staleTime: 0,

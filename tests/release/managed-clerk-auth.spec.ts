@@ -130,9 +130,10 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     );
     await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-    await expect(page.getByTestId("text-dashboard-title")).toBeVisible({ timeout: 30_000 });
-    expect(proxyRequests.length, "Clerk browser traffic must pass through the production proxy").toBeGreaterThan(0);
-
+    await expect(page, "Clerk did not leave the sign-in route after password submission").not.toHaveURL(
+      /\/sign-in(?:\/|$)/,
+      { timeout: 30_000 },
+    );
     const authResponse = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", {
         credentials: "same-origin",
@@ -152,7 +153,10 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
           : null,
       };
     });
-    expect(authResponse.status).toBe(200);
+    expect(
+      authResponse.status,
+      `Post-sign-in local authorization failed at ${page.url()}: ${JSON.stringify(authResponse.user)}`,
+    ).toBe(200);
     const appUser = authResponse.user;
     expect(appUser).toMatchObject({
       id: localUserId,
@@ -161,6 +165,8 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       rejected: false,
       isTester: false,
     });
+    await expect(page.getByTestId("text-dashboard-title")).toBeVisible({ timeout: 30_000 });
+    expect(proxyRequests.length, "Clerk browser traffic must pass through the production proxy").toBeGreaterThan(0);
 
     const authorization = await database.query(
       "SELECT approved, rejected, is_tester FROM users WHERE id = $1",
