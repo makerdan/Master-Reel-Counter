@@ -14,6 +14,18 @@ export async function isIdentityApproved(user: any): Promise<boolean> {
   return Boolean(dbUser?.approved && !dbUser.rejected);
 }
 
+export async function isWebSocketIdentityAuthorized(
+  user: any,
+  connectedUser?: any,
+): Promise<boolean> {
+  if (!user || !(await isIdentityApproved(user))) return false;
+  if (!connectedUser) return true;
+  return (
+    user.claims?.sub === connectedUser.claims?.sub &&
+    user.isTester === connectedUser.isTester
+  );
+}
+
 export const isApproved: RequestHandler = async (req: any, res, next) => {
   const user = req.user as any;
   if (!user?.claims?.sub) return res.status(401).json({ message: "Unauthorized" });

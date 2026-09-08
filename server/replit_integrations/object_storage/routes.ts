@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { ObjectStorageService } from "./objectStorage";
 import { isAuthenticated } from "../auth";
+import { isApproved } from "../auth/routes";
 
 /**
  * Register object storage routes.
@@ -36,7 +37,7 @@ export function registerObjectStorageRoutes(app: Express): void {
    * to /uploads/:filename, which enforces session-membership and ownership
    * checks before streaming the file.  All other /objects/ paths are blocked.
    */
-  app.get("/objects/{*objectPath}", isAuthenticated, (req, res) => {
+  app.get("/objects/{*objectPath}", isAuthenticated, isApproved, (req, res) => {
     const p = req.path; // e.g. "/objects/uploads/abc.jpg"
 
     // Only serve /objects/uploads/<filename> — every other sub-path has no

@@ -18,7 +18,14 @@ import { buildTesterLoginUrl, getTesterOwnerFromSearch } from "../../client/src/
 import bcrypt from "bcrypt";
 import { pool } from "../db.js";
 import { isProtectedOwnerIdentity } from "../replit_integrations/auth/replitAuth.js";
-import { isIdentityApproved, isOwnerIdentity } from "../replit_integrations/auth/routes.js";
+import {
+  isApproved,
+  isIdentityApproved,
+  isOwnerIdentity,
+  isWebSocketIdentityAuthorized,
+} from "../replit_integrations/auth/routes.js";
+import { authStorage } from "../replit_integrations/auth/storage.js";
+import { registerObjectStorageRoutes } from "../replit_integrations/object_storage/routes.js";
 
 // The route module opens a PostgreSQL pool even when the real-server checks
 // are skipped. Close this test process's pool so the unit tier cannot hang
@@ -52,6 +59,116 @@ describe("Clerk owner and approval regression guard", () => {
     assert.equal(await isIdentityApproved({ isOwner: true }), true);
     assert.equal(await isIdentityApproved({ isTester: true }), true);
     assert.equal(await isIdentityApproved({}), false);
+  });
+
+  test("rejects pending and rejected collaborators from WebSocket authorization", async () => {
+    const originalGetUser = authStorage.getUser;
+    const records = new Map([
+      ["pending-user", { approved: false, rejected: false }],
+      ["rejected-user", { approved: false, rejected: true }],
+      ["approved-user", { approved: true, rejected: false }],
+    ]);
+    authStorage.getUser = async (userId: string) => records.get(userId) as any;
+
+    try {
+      assert.equal(
+        await isWebSocketIdentityAuthorized({ claims: { sub: "pending-user" } }),
+        false,
+      );
+      assert.equal(
+        await isWebSocketIdentityAuthorized({ claims: { sub: "rejected-user" } }),
+        false,
+      );
+      assert.equal(
+        await isWebSocketIdentityAuthorized({ claims: { sub: "approved-user" } }),
+        true,
+      );
+      assert.equal(await isWebSocketIdentityAuthorized({ isOwner: true }), true);
+      assert.equal(await isWebSocketIdentityAuthorized({ isTester: true }), true);
+    } finally {
+      authStorage.getUser = originalGetUser;
+    }
+  });
+
+  test("fails WebSocket revalidation after a connected collaborator is rejected", async () => {
+    const originalGetUser = authStorage.getUser;
+    let rejected = false;
+    authStorage.getUser = async () => ({ approved: !rejected, rejected });
+
+    try {
+      const connectedUser = { claims: { sub: "collaborator-user" } };
+      assert.equal(await isWebSocketIdentityAuthorized(connectedUser), true);
+      rejected = true;
+      assert.equal(
+        await isWebSocketIdentityAuthorized({ claims: { sub: "collaborator-user" } }, connectedUser),
+        false,
+      );
+    } finally {
+      authStorage.getUser = originalGetUser;
+    }
+  });
+
+  test("approval middleware blocks pending/rejected photo viewers but admits approved collaborators", async () => {
+    const originalGetUser = authStorage.getUser;
+    const records = new Map([
+      ["pending-photo-user", { approved: false, rejected: false }],
+      ["rejected-photo-user", { approved: false, rejected: true }],
+      ["approved-photo-user", { approved: true, rejected: false }],
+    ]);
+    authStorage.getUser = async (userId: string) => records.get(userId) as any;
+
+    try {
+      const run = async (user: any) => {
+        let nextCalled = false;
+        let statusCode = 0;
+        let body: any;
+        await isApproved(
+          { user } as any,
+          {
+            status(code: number) {
+              statusCode = code;
+              return this;
+            },
+            json(value: any) {
+              body = value;
+              return this;
+            },
+          } as any,
+          () => { nextCalled = true; },
+        );
+        return { nextCalled, statusCode, body };
+      };
+
+      for (const userId of ["pending-photo-user", "rejected-photo-user"]) {
+        const result = await run({ claims: { sub: userId } });
+        assert.equal(result.nextCalled, false);
+        assert.equal(result.statusCode, 403);
+        assert.deepEqual(result.body, { message: "pending_approval" });
+      }
+      assert.deepEqual(await run({ claims: { sub: "approved-photo-user" }}), {
+        nextCalled: true,
+        statusCode: 0,
+        body: undefined,
+      });
+      assert.equal((await run({ isOwner: true, claims: { sub: "owner" } })).nextCalled, true);
+      assert.equal((await run({ isTester: true, claims: { sub: "tester" } })).nextCalled, true);
+    } finally {
+      authStorage.getUser = originalGetUser;
+    }
+  });
+
+  test("protected object route wires local approval after authentication", () => {
+    const app = express();
+    registerObjectStorageRoutes(app);
+    const router = (app as any).router ?? (app as any)._router;
+    const routeLayer = router.stack.find(
+      (layer: any) => layer.route?.path === "/objects/{*objectPath}",
+    );
+    assert.ok(routeLayer, "protected object route should be registered");
+    assert.deepEqual(
+      routeLayer.route.stack.slice(0, 2).map((layer: any) => layer.handle.name),
+      ["isAuthenticated", "isApproved"],
+    );
   });
 });
 

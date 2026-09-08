@@ -13,7 +13,7 @@ import {
 import {
   registerAuthRoutes,
   isApproved,
-  isIdentityApproved,
+  isWebSocketIdentityAuthorized,
   isOwnerIdentity,
   ownerOnly,
 } from "./replit_integrations/auth/routes";
@@ -713,7 +713,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/uploads/:filename", isAuthenticated, async (req: any, res) => {
+  app.get("/uploads/:filename", isAuthenticated, isApproved, async (req: any, res) => {
     try {
       const filename = req.params.filename;
       if (typeof filename !== "string" || !/^[A-Za-z0-9._-]+$/.test(filename) || filename.length > 255 || filename === "." || filename === "..") {
@@ -6606,7 +6606,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     };
 
     loadSocketIdentity().then(async (user) => {
-      if (!user || !(await isIdentityApproved(user))) {
+      if (!user || !(await isWebSocketIdentityAuthorized(user))) {
         ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
         ws.close(1008, "Authentication required");
         return;
@@ -6629,10 +6629,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         }
         loadSocketIdentity().then(async (freshUser) => {
           if (
-            !freshUser ||
-            freshUser.claims.sub !== connUserId ||
-            freshUser.isTester !== user.isTester ||
-            !(await isIdentityApproved(freshUser))
+            !(await isWebSocketIdentityAuthorized(freshUser, user))
           ) {
             try { ws.send(JSON.stringify({ type: "auth_expired" })); } catch {}
             ws.close(1008, "Session expired");
