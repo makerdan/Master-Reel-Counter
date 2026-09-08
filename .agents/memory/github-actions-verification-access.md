@@ -15,3 +15,8 @@ not granted to that connection.
 **How to apply:** Record the exact repository, revision, endpoint result, and
 unverified evidence categories. Do not treat `/user` success, workflow files,
 or local contract tests as proof of remote activation or merge protection.
+After the one permitted connector reauthorization retry, check whether the
+workspace's authenticated GitHub CLI can read the repository before declaring
+the task blocked; the CLI authorization is independent from the connector's
+repository grant. Use only the path that proves repository-scoped access, and
+do not repeat the failed connector reauthorization.

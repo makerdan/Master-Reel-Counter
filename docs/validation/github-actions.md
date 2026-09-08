@@ -89,23 +89,23 @@ revision `7823fdffae6126c897f05d4c32fe8a0c60a23e3f`.
 
 | Evidence item | Result |
 | --- | --- |
-| GitHub identity | **Observed**: the installed GitHub connection authenticated as `makerdan`. |
-| Repository access | **Blocked**: repository-scoped requests for `makerdan/masterreelcounter` returned HTTP 403, including repository metadata, workflow metadata, workflow runs, check runs, pull requests, and branch protection. |
-| Accessible repository inventory | **Observed**: the same connection could list 14 repositories, but `makerdan/masterreelcounter` was not present. This confirms the limitation is repository access, not an empty run history. |
-| Manual dispatch for `7823fdffae6126c897f05d4c32fe8a0c60a23e3f` | **Not attempted**: the connection cannot read or dispatch this repository's workflow. No run ID or conclusion is claimed. |
+| GitHub identity | **Observed**: the repository-authorized GitHub CLI session authenticated as `makerdan`. The Replit OAuth connector still returned HTTP 403 for this repository after one reauthorization attempt, so the CLI session was used for repository administration. |
+| Repository access | **Observed**: the authorized session read the private `makerdan/Master-Reel-Counter` repository and reported admin, maintain, pull, push, and triage permissions. |
+| Manual dispatch for `7823fdffae6126c897f05d4c32fe8a0c60a23e3f` | **Observed**: run [`34277195405`](https://github.com/makerdan/Master-Reel-Counter/actions/runs/34277195405) used event `workflow_dispatch`, attempt `1`, and exact `head_sha` `7823fdffae6126c897f05d4c32fe8a0c60a23e3f`. It completed with conclusion `failure`. A temporary branch pointing at the exact revision was required because GitHub's dispatch API accepts a branch or tag ref rather than a raw SHA; the branch was deleted after the run completed. |
+| Manual-run failure | **Observed**: `Validate canonical contract` failed in `Create test database schema` because `npx drizzle-kit push --force` reported `drizzle-kit: not found` and exited `127`; subsequent validation steps were skipped. |
+| Manual-run diagnostic artifact | **Observed**: the upload step completed successfully with `continue-on-error`, but warned that none of `ci-artifacts/`, `playwright-report/`, or `test-results/` existed. The run artifacts API returned `total_count: 0`, so no diagnostic artifact was available. |
 | Pull-request event | **Unknown**: no revision-aware run, job conclusion, or diagnostic-artifact result was available. |
-| `main` push event | **Unknown**: no revision-aware run, job conclusion, or diagnostic-artifact result was available. |
+| `main` push event | **Observed**: run [`34277159329`](https://github.com/makerdan/Master-Reel-Counter/actions/runs/34277159329) used event `push` at merged `main` revision `56bbb4dd29a4bb4788dbb4a9b798d8f66eb26a54` and completed with conclusion `failure`. Its stable aggregate job failed and its artifacts API also returned `total_count: 0`. |
 | `merge_group` event | **Unknown**: merge-queue enablement and a merge-group run could not be inspected. |
-| Stable `Validation result` fail-closed behavior | **Static contract only**: the checked-in workflow and local contract test require `failure`, `cancelled`, and `skipped` validation results to fail. A deliberately cancelled or skipped GitHub job was not remotely exercised. |
-| Branch policy | **Unknown and unchanged**: branch protection/ruleset status could not be read. `Validation result` must not be made merge-required from this evidence. |
+| Stable `Validation result` fail-closed behavior | **Observed for an upstream failure**: manual run `34277195405` passed `failure` from `Validate canonical contract` into the stable `Validation result` job, whose `Require the validation job to succeed` step failed as designed. Deliberately cancelled and skipped upstream jobs were not remotely exercised. |
+| Branch policy | **Observed and unchanged**: GitHub reported `main` as unprotected. Repository rulesets are unavailable for this private repository on its current GitHub plan. `Validation result` must not be made merge-required from this failing evidence. |
 
-Because no remote run evidence was available, this verification attempt does
-not establish that the workflow is enabled, that any event reaches the
-expected revision, that diagnostic artifacts upload, or that `Validation
-result` is available to branch policy. An administrator with access to
-`makerdan/masterreelcounter` must repeat the checklist below using a
-repository-authorized GitHub account and record the run IDs, revisions, event
-types, job conclusions, and artifact results before changing merge
+This verification establishes that the workflow is active, manual dispatch
+reaches the exact target revision, a `main` push creates a run, and the stable
+`Validation result` job fails closed when its required job fails. It does not
+establish a successful canonical validation run, diagnostic artifact creation,
+pull-request delivery, merge-queue delivery, or cancelled/skipped upstream-job
+behavior. Those gaps must be resolved and observed before changing merge
 requirements.
 
 ## Manual activation and verification
