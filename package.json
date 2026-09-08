@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development tsx server/index.ts",
+    "dev": "node scripts/dev-supervisor.mjs",
     "build": "tsx script/build.ts",
     "release:build": "bash scripts/build-and-verify-release.sh",
     "start": "NODE_ENV=production node dist/index.cjs",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit && tsc --project tsconfig.playwright.json --noEmit",
     "db:push": "drizzle-kit push",
     "lint:storage": "node scripts/lint-storage.mjs --strict",
-    "test:unit": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts server/__tests__/support-ops.test.ts",
+    "test:unit": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts server/__tests__/support-ops.test.ts scripts/__tests__/dev-supervisor.test.mjs",
     "test:workspace-skill": "node --test scripts/workspace-skill-sync.test.mjs",
     "workspace-skill:refresh": "node scripts/workspace-skill-sync.mjs refresh",
     "workspace-skill:validate": "node scripts/workspace-skill-sync.mjs validate",
