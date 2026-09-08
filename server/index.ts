@@ -132,7 +132,12 @@ function crashSummary() {
 app.get("/api/healthz", async (_req, res) => {
   try {
     await db.execute(sql`SELECT 1`);
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      ...(process.env.RELEASE_CANDIDATE_ID
+        ? { candidateId: process.env.RELEASE_CANDIDATE_ID }
+        : {}),
+    });
   } catch {
     res.status(503).json({ ok: false });
   }

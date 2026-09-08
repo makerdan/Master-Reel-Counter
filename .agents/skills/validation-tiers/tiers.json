@@ -15,7 +15,8 @@
       "steps": [
         {"name": "typecheck", "kind": "typecheck", "command": "npm run typecheck"},
         {"name": "storage-lint", "kind": "lint", "command": "npm run lint:storage"},
-        {"name": "backend-tests", "kind": "test", "command": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts"}
+        {"name": "backend-tests", "kind": "test", "command": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts"},
+        {"name": "managed-clerk-release-contract", "kind": "test", "command": "npm run test:managed-clerk-release-contract"}
       ]
     },
     "test-heavy": {

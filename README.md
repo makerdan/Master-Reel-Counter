@@ -114,6 +114,12 @@ Start the Express server and Vite dev server as configured in the project. The s
 
 The application is intended for deployment on Replit, leveraging Replit Auth, Replit Object Storage, and a managed PostgreSQL instance. PWA assets (manifest and service worker) are served in production for offline-capable installs.
 
+### Managed Clerk release gate
+
+Every Replit production deployment runs `npm run release:build`. That command embeds the canonical production Clerk host, builds the exact candidate, starts the compiled artifact in production mode with a unique build identity, and blocks promotion unless the managed Clerk smoke passes against that artifact. The gate creates and removes a disposable Clerk/local user, verifies the production Clerk proxy, cookie-only authentication, protected Settings and Stats pages, and sign-out. It fails closed when any required managed setting is absent and does not print secret values.
+
+The **Managed Clerk production release gate** GitHub workflow remains available for an additional check against the currently published URL. Configure `PRODUCTION_BASE_URL` as a protected-environment variable and provide `CLERK_SECRET_KEY` and `DATABASE_URL` as protected-environment secrets.
+
 ## Conventions
 
 - **Aesthetic:** Industrial/warehouse, copper/orange accent (`#ea580c`), dark mode supported

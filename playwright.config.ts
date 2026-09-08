@@ -21,6 +21,7 @@ const chromiumExecutable = findChromium();
 
 export default defineConfig({
   testDir: "./tests",
+  testIgnore: ["release/**"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

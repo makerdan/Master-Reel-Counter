@@ -1,0 +1,67 @@
+name: Managed Clerk production release gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: managed-clerk-production-release
+  cancel-in-progress: false
+
+jobs:
+  require-trusted-main:
+    name: Require trusted main branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Reject untrusted release refs
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Managed Clerk release verification must run from refs/heads/main." >&2
+            exit 1
+          fi
+
+  verify-managed-clerk:
+    name: Verify managed Clerk sign-in
+    needs:
+      - require-trusted-main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install frozen dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify managed Clerk production sign-in
+        env:
+          PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:managed-clerk-release
+
+      - name: Upload failure diagnostics
+        if: ${{ failure() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: managed-clerk-release-${{ github.run_id }}
+          path: |
+            test-results/
+          if-no-files-found: warn
+          retention-days: 3
+          include-hidden-files: false
