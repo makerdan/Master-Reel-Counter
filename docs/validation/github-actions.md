@@ -150,6 +150,29 @@ repository-authorized administrator must still repeat the merge-queue checklist
 below and record a revision-aware `merge_group` run before making `Validation
 result` required.
 
+
+## Task 551 decision
+
+The repository-authorized GitHub CLI was used for the latest verification on
+September 8, 2026. The stable check is present with the exact name
+`Validation result`, but the evidence gate for making it required did not pass:
+
+| Evidence item | Result |
+| --- | --- |
+| Latest revision-aware validation run | **Observed failure**: push run [`34277624987`](https://github.com/makerdan/Master-Reel-Counter/actions/runs/34277624987) ran at `110e17071b32620f5e9555332f6020ef75188514`, not as a `merge_group` event. |
+| Validation failure | **Observed**: `Validate canonical contract` failed during `Verify blank-database startup and test authentication`; later validation steps were skipped. |
+| Stable check | **Observed and fail-closed**: the `Validation result` job ran and failed because its upstream `validate` result was `failure`. |
+| Diagnostic artifact | **Not available**: the run's artifacts API returned `total_count: 0`; the upload step warned that none of the configured paths existed. |
+| Successful `merge_group` evidence | **Not observed**: the repository's `merge_group` workflow-runs query returned zero runs. |
+| Branch policy administration | **Not attempted**: branch-protection and ruleset APIs return HTTP 403 because this private repository's current GitHub plan does not provide those features. |
+
+**Decision:** Keep `Validation result` non-required. The required successful
+`merge_group` run and diagnostic artifact have not been recorded, and the
+latest revision-aware run failed. No branch protection or ruleset policy was
+changed. A future administrator should repeat the merge-queue verification
+after a successful run and artifact upload, then require the exact check name
+`Validation result` only if that evidence remains stable.
+
 ## Manual activation and verification
 
 After merging these files, an administrator must verify the following in
