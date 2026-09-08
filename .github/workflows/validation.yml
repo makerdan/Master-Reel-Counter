@@ -80,6 +80,9 @@ jobs:
           done
           psql "$DATABASE_URL" --command='SELECT 1;' >/dev/null
 
+      - name: Verify blank-database startup and test authentication
+        run: node --test scripts/__tests__/github-actions-empty-database.test.mjs
+
       - name: Create test database schema
         run: npx drizzle-kit push --force
 

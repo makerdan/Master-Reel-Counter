@@ -81,6 +81,8 @@ test("workflow provisions and checks the test prerequisites", () => {
   assert.match(workflow, /playwright install --with-deps chromium/);
   assert.match(workflow, /chromium\.launch/);
   assert.match(workflow, /DATABASE_URL:\s+postgresql:\/\/postgres:postgres@localhost:5432\/master_reel_counter_test/);
+  assert.match(workflow, /Verify blank-database startup and test authentication/);
+  assert.match(workflow, /node --test scripts\/__tests__\/github-actions-empty-database\.test\.mjs/);
 });
 
 test("workflow routes validation through the canonical command", () => {

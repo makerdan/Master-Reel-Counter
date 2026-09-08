@@ -52,6 +52,7 @@ lock, plan behavior, ordering, and exit status.
 | `port-authority-tests` | `npm run ci` → `test-heavy` | **Indirect**; owns only ephemeral runner ports. |
 | `manifest-parity` | `npm run ci` → `test-heavy` | **Indirect**; verifies the tracked validation manifest. |
 | `collision-smoke` | `npm run ci` → `test-heavy` | **Indirect**; nested commands use isolated temporary lock paths. |
+| `empty-database-startup` | `node --test scripts/__tests__/github-actions-empty-database.test.mjs` | **Direct** preflight; creates a local disposable PostgreSQL database, applies the same forced Drizzle schema push, inserts the synthetic owner, starts the app with the workflow's non-secret test values, verifies health/password seeding/owner login, and terminates connections before dropping the database. |
 | `browser-tests` | `npm run ci` → `test-heavy` | **Indirect**; the isolated service receives a schema push and a synthetic non-tester owner, then Chromium is installed with Playwright and launched before the suite as a readiness check. |
 | GitHub workflow contract | `node --test scripts/__tests__/github-actions-workflow.test.mjs` | **Direct** preflight; it inspects triggers, permissions, pins, routing, prerequisites, aggregation, and artifact safety before the canonical run. |
 | Replit Auth owner session | Synthetic test owner row | **Intentional test substitute**; the isolated database receives a non-production owner row so the existing test-only owner-login endpoint can create a full-permission test session without Replit Auth. |
