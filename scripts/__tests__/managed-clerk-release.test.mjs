@@ -16,7 +16,22 @@ const workflow = readFileSync(resolve(root, ".github/workflows/managed-clerk-rel
 const candidateBuild = readFileSync(resolve(root, "scripts/build-and-verify-release.sh"), "utf8");
 const candidateProxy = readFileSync(resolve(root, "scripts/release-candidate-https-proxy.mjs"), "utf8");
 const diagnosticRedactor = readFileSync(resolve(root, "scripts/redact-release-diagnostics.mjs"), "utf8");
+const serverIndex = readFileSync(resolve(root, "server/index.ts"), "utf8");
+const clerkProxyMiddleware = readFileSync(
+  resolve(root, "server/middlewares/clerkProxyMiddleware.ts"),
+  "utf8",
+);
 const execFileAsync = promisify(execFile);
+const proxyConstructionProgram = [
+  'import { clerkProxyMiddleware } from "./server/middlewares/clerkProxyMiddleware.ts";',
+  "clerkProxyMiddleware();",
+].join("\n");
+
+function proxyConstructionEnvironment(overrides = {}) {
+  const environment = { ...process.env };
+  delete environment.CLERK_SECRET_KEY;
+  return { ...environment, ...overrides };
+}
 
 function listTests(configPath, environment = {}) {
   return execFileSync(
@@ -62,9 +77,76 @@ test("every Replit deployment build gates the exact production candidate", () =>
   assert.match(candidateProxy, /"x-forwarded-proto": "https"/);
   assert.match(config, /--host-resolver-rules=MAP \$\{target\.hostname\}:443 127\.0\.0\.1:\$\{candidateTlsPort\}/);
   assert.match(candidateBuild, /npm run verify:managed-clerk-release/);
+  assert.match(candidateBuild, /\/api\/__clerk\/healthz/);
   assert.match(candidateBuild, /trap on_exit EXIT/);
   assert.match(candidateBuild, /trap 'exit 130' INT/);
   assert.match(candidateBuild, /trap 'exit 143' TERM/);
+});
+
+test("production Clerk proxy fails closed and exposes public readiness before auth", () => {
+  assert.match(
+    clerkProxyMiddleware,
+    /NODE_ENV === "production" && !environment\.CLERK_SECRET_KEY/,
+  );
+  assert.match(clerkProxyMiddleware, /CLERK_SECRET_KEY is required/);
+  assert.doesNotMatch(clerkProxyMiddleware, /if \(!secretKey\) \{\s*return .*next/);
+
+  const readinessRoute = serverIndex.indexOf("app.get(CLERK_PROXY_READINESS_PATH");
+  const proxyMount = serverIndex.indexOf("app.use(CLERK_PROXY_PATH");
+  const clerkAuth = serverIndex.indexOf("clerkMiddleware((req)");
+  const routeRegistration = serverIndex.indexOf("await registerRoutes");
+  assert(readinessRoute >= 0);
+  assert(readinessRoute < proxyMount);
+  assert(proxyMount < clerkAuth);
+  assert(readinessRoute < routeRegistration);
+  assert.match(serverIndex, /candidateId: process\.env\.RELEASE_CANDIDATE_ID/);
+});
+
+test("development retains its proxy-free Clerk path", () => {
+  assert.match(
+    clerkProxyMiddleware,
+    /if \(process\.env\.NODE_ENV !== "production"\) \{\s*return \(_req, _res, next\) => next\(\)/,
+  );
+});
+
+test("production proxy construction rejects missing configuration with a safe error", async () => {
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["--import", "tsx/esm", "--input-type=module", "--eval", proxyConstructionProgram],
+      {
+        cwd: root,
+        env: proxyConstructionEnvironment({ NODE_ENV: "production" }),
+      },
+    ),
+    (error) => {
+      assert.match(error.stderr, /CLERK_SECRET_KEY is required/);
+      assert.doesNotMatch(error.stderr, /sk_(?:live|test)_/);
+      return true;
+    },
+  );
+});
+
+test("configured production and proxy-free development construct Clerk middleware", async () => {
+  await execFileAsync(
+    process.execPath,
+    ["--import", "tsx/esm", "--input-type=module", "--eval", proxyConstructionProgram],
+    {
+      cwd: root,
+      env: proxyConstructionEnvironment({
+        NODE_ENV: "production",
+        CLERK_SECRET_KEY: "not-logged-test-value",
+      }),
+    },
+  );
+  await execFileAsync(
+    process.execPath,
+    ["--import", "tsx/esm", "--input-type=module", "--eval", proxyConstructionProgram],
+    {
+      cwd: root,
+      env: proxyConstructionEnvironment({ NODE_ENV: "development" }),
+    },
+  );
 });
 
 test("candidate readiness rejects a healthy process with the wrong build identity", async () => {

@@ -82,7 +82,7 @@ node scripts/release-candidate-https-proxy.mjs >"$proxy_log" 2>&1 &
 proxy_pid="$!"
 
 if ! node scripts/wait-for-release-candidate.mjs \
-  "https://127.0.0.1:${tls_port}/api/healthz" "$candidate_id" "$proxy_pid" 10000 \
+  "https://127.0.0.1:${tls_port}/api/__clerk/healthz" "$candidate_id" "$proxy_pid" 10000 \
   --insecure-tls; then
   print_safe_log "$proxy_log"
   exit 1

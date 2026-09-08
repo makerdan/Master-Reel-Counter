@@ -14,6 +14,7 @@ import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import {
   CLERK_PROXY_PATH,
+  CLERK_PROXY_READINESS_PATH,
   clerkProxyMiddleware,
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
@@ -65,8 +66,17 @@ app.use(helmet({
   },
 }));
 
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+app.get(CLERK_PROXY_READINESS_PATH, (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    ok: true,
+    ...(process.env.RELEASE_CANDIDATE_ID
+      ? { candidateId: process.env.RELEASE_CANDIDATE_ID }
+      : {}),
+  });
+});
 
+app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use(
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
