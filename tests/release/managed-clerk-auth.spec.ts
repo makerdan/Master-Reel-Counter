@@ -122,13 +122,13 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       expect(candidateId).toBe(expectedCandidateId);
     }
     await page.locator('input[name="identifier"]').fill(email);
-    await page.getByRole("button", { name: /continue/i }).click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
     await fillSecret(
       page.locator('input[name="password"]'),
       password,
       "Managed Clerk password field could not be completed",
     );
-    await page.getByRole("button", { name: /continue/i }).click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
 
     await expect(page.getByTestId("text-dashboard-title")).toBeVisible({ timeout: 30_000 });
     expect(proxyRequests.length, "Clerk browser traffic must pass through the production proxy").toBeGreaterThan(0);

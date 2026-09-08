@@ -113,6 +113,11 @@ test("smoke uses disposable managed identity and preserves local authorization s
   assert.match(smoke, /removeStaleSmokeUsers/);
   assert.match(smoke, /createdAtBefore: cutoff/);
   assert.match(smoke, /externalId\?\.startsWith\(SMOKE_ID_PREFIX\)/);
+  assert.equal(
+    smoke.match(/getByRole\("button", \{ name: "Continue", exact: true \}\)/g)?.length,
+    2,
+  );
+  assert.doesNotMatch(smoke, /name: \/continue\/i/);
   assert.doesNotMatch(smoke, /rejectUnauthorized: false/);
 });
 
