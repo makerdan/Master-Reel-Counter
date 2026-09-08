@@ -10,6 +10,8 @@ import {
 const root = resolve(import.meta.dirname, "../..");
 const workflowPath = resolve(root, ".github/workflows/validation.yml");
 const workflow = readFileSync(workflowPath, "utf8");
+const startupSmokePath = resolve(root, "scripts/startup-smoke.sh");
+const startupSmoke = readFileSync(startupSmokePath, "utf8");
 
 function sectionBetween(start, end) {
   const startIndex = workflow.indexOf(start);
@@ -112,6 +114,22 @@ test("workflow checks its contract before database and application validation", 
 test("PostgreSQL contract derives the service image from its supported major version", () => {
   assert.match(String(SUPPORTED_POSTGRES_MAJOR_VERSION), /^\d+$/);
   assert.equal(SUPPORTED_POSTGRES_IMAGE, `postgres:${SUPPORTED_POSTGRES_MAJOR_VERSION}`);
+});
+
+test("startup smoke verifies the connected PostgreSQL major before launching the server", () => {
+  const preflight = startupSmoke.indexOf("check_postgres_version");
+  const serverLaunch = startupSmoke.indexOf('npx tsx server/index.ts');
+  assert.ok(preflight >= 0, "startup smoke is missing its PostgreSQL preflight");
+  assert.ok(serverLaunch > preflight, "PostgreSQL preflight must run before the server launches");
+  assert.match(startupSmoke, /DATABASE_URL is required/);
+  assert.match(startupSmoke, /psql "\$DATABASE_URL"/);
+  assert.match(startupSmoke, /current_setting\('server_version'\)/);
+  assert.match(startupSmoke, /current_setting\('server_version_num'\)/);
+  assert.match(startupSmoke, /postgresMajorVersion/);
+  assert.match(startupSmoke, /Connected server: PostgreSQL \$\{server_version\}/);
+  assert.match(startupSmoke, /Supported validation version: PostgreSQL \$\{supported_major\}/);
+  assert.match(startupSmoke, /Intentional upgrade path:/);
+  assert.match(startupSmoke, /Refusing to start rather than silently falling back/);
 });
 
 test("workflow routes validation through the canonical command", () => {

@@ -21,6 +21,77 @@ cleanup() {
 }
 trap cleanup EXIT
 
+check_postgres_version() {
+  if [[ -z "${DATABASE_URL:-}" ]]; then
+    echo "  [startup-smoke] FAIL — DATABASE_URL is required for the PostgreSQL compatibility preflight." >&2
+    echo "  [startup-smoke] Refusing to start without an explicit database connection; configure DATABASE_URL for the local or externally managed PostgreSQL instance." >&2
+    exit 1
+  fi
+
+  if ! command -v psql >/dev/null 2>&1; then
+    echo "  [startup-smoke] FAIL — psql is required for the PostgreSQL compatibility preflight." >&2
+    echo "  [startup-smoke] Refusing to start because the database client is unavailable; install PostgreSQL client tools or use the project-supported environment." >&2
+    exit 1
+  fi
+
+  local server_probe
+  if ! server_probe="$(psql "$DATABASE_URL" \
+    --no-align \
+    --tuples-only \
+    --field-separator=$'\t' \
+    --set=ON_ERROR_STOP=1 \
+    --command="SELECT current_setting('server_version'), current_setting('server_version_num')" 2>&1
+  )"; then
+    echo "  [startup-smoke] FAIL — unable to query the configured database as PostgreSQL." >&2
+    echo "  [startup-smoke] Refusing to start because the local database is unreachable, non-PostgreSQL, or externally managed with incompatible connection settings." >&2
+    exit 1
+  fi
+
+  local server_version server_version_num
+  if [[ "$server_probe" != *$'\t'* ]]; then
+    echo "  [startup-smoke] FAIL — the configured database did not return PostgreSQL server version metadata." >&2
+    echo "  [startup-smoke] Refusing to start rather than silently falling back to an unverified database." >&2
+    exit 1
+  fi
+  IFS=$'\t' read -r server_version server_version_num _ <<< "$server_probe"
+  if [[ -z "$server_version" || -z "$server_version_num" ]]; then
+    echo "  [startup-smoke] FAIL — PostgreSQL server version metadata was incomplete." >&2
+    echo "  [startup-smoke] Refusing to start rather than silently falling back to an unverified database." >&2
+    exit 1
+  fi
+
+  local contract_probe
+  if ! contract_probe="$(
+    POSTGRES_SERVER_VERSION_NUM="$server_version_num" node --input-type=module <<'NODE'
+import {
+  postgresMajorVersion,
+  SUPPORTED_POSTGRES_MAJOR_VERSION,
+} from "./scripts/lib/github-actions-validation-contract.mjs";
+
+const detectedMajor = postgresMajorVersion(process.env.POSTGRES_SERVER_VERSION_NUM);
+process.stdout.write(`${detectedMajor}\t${SUPPORTED_POSTGRES_MAJOR_VERSION}`);
+NODE
+  )"; then
+    echo "  [startup-smoke] FAIL — could not load the shared PostgreSQL validation contract." >&2
+    echo "  [startup-smoke] Refusing to start because the connected database version cannot be compared with the CI contract." >&2
+    exit 1
+  fi
+
+  local detected_major supported_major
+  IFS=$'\t' read -r detected_major supported_major _ <<< "$contract_probe"
+  if [[ "$detected_major" != "$supported_major" ]]; then
+    echo "  [startup-smoke] FAIL — PostgreSQL major version drift detected." >&2
+    echo "  [startup-smoke] Connected server: PostgreSQL ${server_version} (major ${detected_major}, server_version_num ${server_version_num})." >&2
+    echo "  [startup-smoke] Supported validation version: PostgreSQL ${supported_major}." >&2
+    echo "  [startup-smoke] Intentional upgrade path: update SUPPORTED_POSTGRES_MAJOR_VERSION in scripts/lib/github-actions-validation-contract.mjs and the postgres:<major> image in .github/workflows/validation.yml together, then rerun startup smoke." >&2
+    exit 1
+  fi
+
+  echo "  [startup-smoke] PostgreSQL ${server_version} matches the validation contract (major ${supported_major})."
+}
+
+check_postgres_version
+
 echo "  [startup-smoke] Starting server on port ${SMOKE_PORT} ..."
 
 node scripts/free-ports.mjs "$SMOKE_PORT"

@@ -10,6 +10,29 @@ Master Reel Counter uses [Playwright](https://playwright.dev/) for end-to-end te
 - A running PostgreSQL database (same as dev)
 - At least one Replit Auth login on the dev instance so the seed endpoint has an owner user to configure
 
+### Local PostgreSQL compatibility
+
+The startup smoke check verifies the connected database before starting the
+application. It requires an explicit `DATABASE_URL`, the `psql` client, and a
+PostgreSQL server whose major version matches the shared GitHub Actions
+validation contract (currently PostgreSQL 16).
+
+```bash
+DATABASE_URL=postgresql://... bash scripts/startup-smoke.sh
+```
+
+Missing connection details, an unavailable `psql` client, a non-PostgreSQL or
+unreachable database, incomplete server metadata, and a PostgreSQL major
+version mismatch all fail explicitly before the application boots. This is
+intentional for externally managed databases too: startup smoke must not
+silently validate against a different database or version.
+
+To intentionally upgrade the validation version, update
+`SUPPORTED_POSTGRES_MAJOR_VERSION` in
+`scripts/lib/github-actions-validation-contract.mjs` and the matching
+`postgres:<major>` image in `.github/workflows/validation.yml` together, then
+rerun the workflow contract test and the locked validation tier.
+
 ## Running the Tests
 
 ### 1. Start the dev server (if not already running)
