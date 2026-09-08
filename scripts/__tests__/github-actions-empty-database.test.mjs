@@ -7,6 +7,10 @@ import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Pool } from "pg";
 import test from "node:test";
+import {
+  postgresMajorVersion,
+  SUPPORTED_POSTGRES_MAJOR_VERSION,
+} from "../lib/github-actions-validation-contract.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const EXPECTED_DATABASE = "master_reel_counter_test";
@@ -110,6 +114,15 @@ async function waitForHealth(child, port, output) {
   throw new Error(`application did not become healthy within 60 seconds\n${redact(output())}`);
 }
 
+test("PostgreSQL contract parses server version numbers by major version", () => {
+  assert.equal(postgresMajorVersion("160004"), SUPPORTED_POSTGRES_MAJOR_VERSION);
+  assert.equal(postgresMajorVersion("170000"), 17);
+  assert.throws(
+    () => postgresMajorVersion("not-a-version"),
+    /invalid PostgreSQL server_version_num/,
+  );
+});
+
 test("GitHub Actions boots the app against a blank disposable database", async (t) => {
   if (!process.env.CI) {
     t.skip("the disposable-database guard runs only in the isolated GitHub Actions PostgreSQL service");
@@ -154,6 +167,17 @@ test("GitHub Actions boots the app against a blank disposable database", async (
   const cleanupErrors = [];
 
   try {
+    const versionResult = await adminPool.query(
+      "SELECT current_setting('server_version') AS version, current_setting('server_version_num') AS version_num",
+    );
+    const serverVersion = versionResult.rows[0]?.version;
+    const serverVersionNum = versionResult.rows[0]?.version_num;
+    assert.equal(
+      postgresMajorVersion(serverVersionNum),
+      SUPPORTED_POSTGRES_MAJOR_VERSION,
+      `PostgreSQL major version drift detected: the CI service reports ${serverVersion} (${serverVersionNum}), but the validation contract supports PostgreSQL ${SUPPORTED_POSTGRES_MAJOR_VERSION}. Update scripts/lib/github-actions-validation-contract.mjs and the workflow image together only when intentionally upgrading the test harness.`,
+    );
+
     await adminPool.query(`CREATE DATABASE ${quoteIdentifier(disposableDatabase)}`);
 
     const disposableUrl = databaseUrlWithName(databaseUrl, disposableDatabase);

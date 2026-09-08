@@ -32,6 +32,24 @@ Actions. Current application startup does perform public Replit OIDC metadata
 discovery. The workflow supplies a non-secret test client identifier for that
 discovery, not a Replit credential.
 
+
+## PostgreSQL compatibility contract
+
+The GitHub Actions service and the disposable-database startup guard are
+required to use PostgreSQL major version 16. The single supported-version
+declaration is
+`scripts/lib/github-actions-validation-contract.mjs`; the workflow contract
+test compares the service image with that declaration before database startup
+validation begins, and the disposable-database guard checks the live server
+version before creating its temporary database.
+
+To intentionally upgrade PostgreSQL, update
+`SUPPORTED_POSTGRES_MAJOR_VERSION` in the contract and the `postgres:<major>`
+service image in `.github/workflows/validation.yml` together, then run the
+workflow contract test and the locked validation tier. Do not update only the
+workflow image: the contract is designed to fail with an actionable drift
+message when those assumptions diverge.
+
 ## Local-to-remote coverage
 
 The remote job invokes the same `npm run ci` entrypoint used locally. That

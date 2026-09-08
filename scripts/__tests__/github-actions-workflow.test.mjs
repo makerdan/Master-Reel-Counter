@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
+import {
+  SUPPORTED_POSTGRES_IMAGE,
+  SUPPORTED_POSTGRES_MAJOR_VERSION,
+} from "../lib/github-actions-validation-contract.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const workflowPath = resolve(root, ".github/workflows/validation.yml");
@@ -71,7 +75,16 @@ test("workflow installs the declared runtime with frozen dependencies", () => {
 });
 
 test("workflow provisions and checks the test prerequisites", () => {
-  assert.match(workflow, /postgres:16/);
+  assert.match(
+    workflow,
+    new RegExp(`image:\\s+${SUPPORTED_POSTGRES_IMAGE.replace(":", "\\:")}\\b`),
+    `PostgreSQL service image drifted from the validation contract (expected ${SUPPORTED_POSTGRES_IMAGE}); update scripts/lib/github-actions-validation-contract.mjs only when intentionally upgrading the test harness`,
+  );
+  assert.equal(
+    [...workflow.matchAll(/image:\s+postgres:\d+\b/g)].length,
+    1,
+    "workflow must declare exactly one PostgreSQL service image",
+  );
   assert.match(workflow, /POSTGRES_DB:\s+master_reel_counter_test/);
   assert.match(workflow, /pg_isready/);
   assert.match(workflow, /psql "\$DATABASE_URL"/);
@@ -83,6 +96,22 @@ test("workflow provisions and checks the test prerequisites", () => {
   assert.match(workflow, /DATABASE_URL:\s+postgresql:\/\/postgres:postgres@localhost:5432\/master_reel_counter_test/);
   assert.match(workflow, /Verify blank-database startup and test authentication/);
   assert.match(workflow, /node --test scripts\/__tests__\/github-actions-empty-database\.test\.mjs/);
+});
+
+test("workflow checks its contract before database and application validation", () => {
+  const contractCheck = workflow.indexOf("run: node --test scripts/__tests__/github-actions-workflow.test.mjs");
+  const readinessCheck = workflow.indexOf("name: Verify PostgreSQL readiness");
+  assert.ok(contractCheck >= 0, "workflow contract check is missing");
+  assert.ok(readinessCheck >= 0, "PostgreSQL readiness check is missing");
+  assert.ok(
+    contractCheck < readinessCheck,
+    "workflow contract check must run before PostgreSQL readiness and application validation",
+  );
+});
+
+test("PostgreSQL contract derives the service image from its supported major version", () => {
+  assert.match(String(SUPPORTED_POSTGRES_MAJOR_VERSION), /^\d+$/);
+  assert.equal(SUPPORTED_POSTGRES_IMAGE, `postgres:${SUPPORTED_POSTGRES_MAJOR_VERSION}`);
 });
 
 test("workflow routes validation through the canonical command", () => {

@@ -64,6 +64,9 @@ jobs:
       - name: Install frozen dependencies
         run: npm ci
 
+      - name: Check workflow contract
+        run: node --test scripts/__tests__/github-actions-workflow.test.mjs
+
       - name: Verify PostgreSQL readiness
         shell: bash
         run: |
@@ -115,9 +118,6 @@ jobs:
           await browser.close();
           console.log("Chromium launch check passed.");
           NODE
-
-      - name: Check workflow contract
-        run: node --test scripts/__tests__/github-actions-workflow.test.mjs
 
       - name: Run canonical validation
         shell: bash
