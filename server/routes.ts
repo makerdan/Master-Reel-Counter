@@ -1,6 +1,7 @@
 import type { Express, Request, Response as ExpressResponse, RequestHandler } from "express";
 import { type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import { attachWebSocketServerAtPath } from "./websocket-upgrade";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
 import {
@@ -6534,7 +6535,8 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   });
 
   // WebSocket
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+  const wss = new WebSocketServer({ noServer: true });
+  attachWebSocketServerAtPath(httpServer, wss, "/ws");
 
   const wsAlive = new WeakMap<WebSocket, boolean>();
 

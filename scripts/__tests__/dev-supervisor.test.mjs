@@ -83,7 +83,9 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   try {
     await waitForFile(
       state,
-      (content) => content.trim().split("\n").length >= 2,
+      (content) =>
+        content.trim().split("\n").length >= 2 &&
+        /Server ready on port/.test(output),
     );
     assert.match(output, /stopped unexpectedly/);
     assert.match(output, /Server ready on port/);

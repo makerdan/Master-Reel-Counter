@@ -21,6 +21,7 @@
         { "name": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "command": ["npm", "run", "lint:storage"] },
         { "name": "unit-tests", "command": ["npm", "run", "test:unit"] },
+        { "name": "vite-hmr-tests", "command": ["npm", "run", "test:vite-hmr"] },
         { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
       ]
     },
@@ -33,6 +34,7 @@
         { "name": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "command": ["npm", "run", "lint:storage"] },
         { "name": "unit-tests", "command": ["npm", "run", "test:unit"] },
+        { "name": "vite-hmr-tests", "command": ["npm", "run", "test:vite-hmr"] },
         { "name": "serial-lock-tests", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
         { "name": "port-authority-tests", "command": ["node", "scripts/port-authority-test.mjs"] },
         { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
@@ -51,6 +53,7 @@
         { "name": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "command": ["npm", "run", "lint:storage"] },
         { "name": "unit-tests", "command": ["npm", "run", "test:unit"] },
+        { "name": "vite-hmr-tests", "command": ["npm", "run", "test:vite-hmr"] },
         { "name": "serial-lock-tests", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
         { "name": "port-authority-tests", "command": ["node", "scripts/port-authority-test.mjs"] },
         { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] },

@@ -5,18 +5,14 @@ import viteConfig from "../vite.config";
 import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
+import { createHmrOptions } from "./vite-hmr";
 
 const viteLogger = createLogger();
 
 export async function setupVite(server: Server, app: Express) {
-  const isReplitPreview = Boolean(process.env.REPLIT_DEV_DOMAIN);
   const serverOptions = {
     middlewareMode: true,
-    hmr: {
-      server,
-      path: "/vite-hmr",
-      ...(isReplitPreview ? { clientPort: 443 } : {}),
-    },
+    hmr: createHmrOptions(server),
     allowedHosts: true as const,
   };
 

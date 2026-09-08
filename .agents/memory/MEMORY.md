@@ -7,3 +7,4 @@
 - [Support operations schema](support-ops-schema.md) — schema validation checks files, not the live dev DB; apply support migrations before authenticated runtime validation.
 - [GitHub Actions verification access](github-actions-verification-access.md) — an installed GitHub connection can authenticate while lacking repository-scoped access to a private repo.
 - [Canonical HTTPS candidate routing](canonical-https-candidate-routing.md) — use Chromium host/port resolver mapping to test a local TLS candidate under the exact production browser origin.
+- [Shared HTTP WebSocket upgrades](shared-http-websocket-upgrades.md) — path-scoped WebSocket servers must ignore unmatched upgrades so other protocols can share the HTTP server.
