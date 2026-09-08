@@ -108,6 +108,30 @@ pull-request delivery, merge-queue delivery, or cancelled/skipped upstream-job
 behavior. Those gaps must be resolved and observed before changing merge
 requirements.
 
+
+## Current merge-queue verification attempt
+
+A follow-up read-only check was performed on September 8, 2026 through the
+installed GitHub connection after repository-access work was completed. The
+connection still authenticated the `makerdan` identity, but every
+repository-scoped request for `makerdan/masterreelcounter` returned HTTP 403,
+including repository metadata, workflow metadata, workflow runs, the `main`
+commit list, branch protection, and rulesets.
+
+| Evidence item | Result |
+| --- | --- |
+| Merge-queue enablement | **Unavailable to verify**: the GitHub connection cannot inspect repository settings or rulesets. The checked-in workflow declares `merge_group`, but that declaration is not evidence that a merge queue is enabled. |
+| `merge_group` run | **Unavailable to verify**: the workflow-runs endpoint returned HTTP 403, so no merge-group run ID, merge reference, `head_sha`, status, or conclusion is claimed. |
+| `Validation result` conclusion | **Unavailable to verify**: no repository-scoped run or job data could be read. |
+| Diagnostic artifact outcome | **Unavailable to verify**: no run or artifact listing could be read. |
+| Branch protection or ruleset change | **Not attempted**: no merge requirement was added or changed. |
+
+This explicitly records merge-queue verification as unavailable from the current
+connection; it does not claim that GitHub merge queues are disabled. A
+repository-authorized administrator must still repeat the merge-queue checklist
+below and record a revision-aware `merge_group` run before making `Validation
+result` required.
+
 ## Manual activation and verification
 
 After merging these files, an administrator must verify the following in
