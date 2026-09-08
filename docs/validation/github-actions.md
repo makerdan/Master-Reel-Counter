@@ -81,6 +81,32 @@ request any. A fork can run the read-only source validation only if GitHub
 permits the workflow for that fork/event; that event behavior is not claimed
 until a revision-aware run is observed.
 
+## Verification evidence
+
+The first repository verification attempt was made against the merged `main`
+revision `7823fdffae6126c897f05d4c32fe8a0c60a23e3f`.
+
+| Evidence item | Result |
+| --- | --- |
+| GitHub identity | **Observed**: the installed GitHub connection authenticated as `makerdan`. |
+| Repository access | **Blocked**: repository-scoped requests for `makerdan/masterreelcounter` returned HTTP 403, including repository metadata, workflow metadata, workflow runs, check runs, pull requests, and branch protection. |
+| Accessible repository inventory | **Observed**: the same connection could list 14 repositories, but `makerdan/masterreelcounter` was not present. This confirms the limitation is repository access, not an empty run history. |
+| Manual dispatch for `7823fdffae6126c897f05d4c32fe8a0c60a23e3f` | **Not attempted**: the connection cannot read or dispatch this repository's workflow. No run ID or conclusion is claimed. |
+| Pull-request event | **Unknown**: no revision-aware run, job conclusion, or diagnostic-artifact result was available. |
+| `main` push event | **Unknown**: no revision-aware run, job conclusion, or diagnostic-artifact result was available. |
+| `merge_group` event | **Unknown**: merge-queue enablement and a merge-group run could not be inspected. |
+| Stable `Validation result` fail-closed behavior | **Static contract only**: the checked-in workflow and local contract test require `failure`, `cancelled`, and `skipped` validation results to fail. A deliberately cancelled or skipped GitHub job was not remotely exercised. |
+| Branch policy | **Unknown and unchanged**: branch protection/ruleset status could not be read. `Validation result` must not be made merge-required from this evidence. |
+
+Because no remote run evidence was available, this verification attempt does
+not establish that the workflow is enabled, that any event reaches the
+expected revision, that diagnostic artifacts upload, or that `Validation
+result` is available to branch policy. An administrator with access to
+`makerdan/masterreelcounter` must repeat the checklist below using a
+repository-authorized GitHub account and record the run IDs, revisions, event
+types, job conclusions, and artifact results before changing merge
+requirements.
+
 ## Manual activation and verification
 
 After merging these files, an administrator must verify the following in

@@ -5,3 +5,4 @@
 - [Failure Gate validation](failure-gate-validation.md) — unchanged dependency audit failures stop the tier; preserve evidence instead of weakening audit thresholds.
 - [Validation lock waiter isolation](validation-lock-waiters.md) — parallel tiers need isolated waiter manifests so nested collision smoke tests do not stall behind unrelated queues.
 - [Support operations schema](support-ops-schema.md) — schema validation checks files, not the live dev DB; apply support migrations before authenticated runtime validation.
+- [GitHub Actions verification access](github-actions-verification-access.md) — an installed GitHub connection can authenticate while lacking repository-scoped access to a private repo.
