@@ -49,7 +49,7 @@ import { HELP_SOURCE_TEXT } from "@shared/help-content";
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session, type UserSettings } from "@shared/schema";
-import { getPoeProvider, PoeProviderError, type PoeTextMessage } from "./providers/poe";
+import { getPoeProvider, PoeProviderError, type PoeProvider, type PoeTextMessage } from "./providers/poe";
 const pdfJobs = new Map<string, {
   done: number;
   total: number;
@@ -194,8 +194,135 @@ async function verifySessionAccess(sessionId: number, userId: string, testerOwne
   return null;
 }
 
-function canEdit(role: string): boolean {
+export function canEdit(role: string): boolean {
   return role === "owner" || role === "editor";
+}
+
+export type ScanResult = {
+  pinId: number;
+  pinLabel: string;
+  rawText: string | null;
+  readable: boolean;
+};
+
+/**
+ * Turn a provider response into persisted scan rows only after checking that it
+ * contains one string result for every crop. Keeping this boundary separate
+ * makes it impossible for malformed provider output to reach storage and
+ * preserves the request order used by the scanner UI.
+ */
+export function buildScanResultsForPins(
+  pins: Array<{ pinId: number; pinLabel: string }>,
+  orderedCrops: Array<{ pinId: number }>,
+  labels: unknown,
+): ScanResult[] {
+  if (
+    !Array.isArray(labels) ||
+    labels.length !== orderedCrops.length ||
+    labels.some((label) => typeof label !== "string")
+  ) {
+    throw new PoeProviderError("validation", "Poe returned invalid structured output.", 502);
+  }
+
+  const labelsByPinId = new Map(
+    orderedCrops.map((crop, index) => [crop.pinId, labels[index] as string]),
+  );
+  return pins.map((pin) => {
+    const rawText = labelsByPinId.has(pin.pinId)
+      ? (labelsByPinId.get(pin.pinId) || null)
+      : null;
+    return {
+      pinId: pin.pinId,
+      pinLabel: pin.pinLabel,
+      rawText,
+      readable: rawText !== null,
+    };
+  });
+}
+
+export function createHelpChatHandler(
+  provider: PoeProvider = getPoeProvider(),
+  helpSystemPrompt = "",
+): RequestHandler {
+  return async (req: any, res: any) => {
+    let aborted = false;
+    try {
+      const { messages } = (req.body ?? {}) as any;
+      if (!Array.isArray(messages) || messages.length === 0 || messages.length > 12) {
+        return res.status(400).json({ error: "messages must be a non-empty array (max 12)" });
+      }
+
+      const validRoles = new Set(["user", "assistant"]);
+      const sanitized: PoeTextMessage[] = [];
+      let totalCharacters = 0;
+      for (const m of messages) {
+        if (!m || typeof m.content !== "string" || !validRoles.has(m.role)) {
+          return res.status(400).json({ error: "Each message must have role (user/assistant) and content (string)" });
+        }
+        const content = m.content.trim().slice(0, 1200);
+        if (!content) return res.status(400).json({ error: "Message content cannot be empty" });
+        totalCharacters += content.length;
+        if (totalCharacters > 8_000) {
+          return res.status(400).json({ error: "Conversation is too long; start a new question." });
+        }
+        sanitized.push({ role: m.role as "user" | "assistant", content });
+      }
+
+      const chatMessages: PoeTextMessage[] = [
+        {
+          role: "system",
+          content: `${helpSystemPrompt}\n\nApproved current help source (use only this source for product facts):\n${HELP_SOURCE_TEXT}\n\nNever invent settings, permissions, integrations, or recovery steps. If the answer is not in the approved source, say that you do not know and direct the user to Feedback.`,
+        },
+        ...sanitized,
+      ];
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const requestAbort = new AbortController();
+      let providerStream: Awaited<ReturnType<PoeProvider["streamText"]>> | undefined;
+      const abortForDisconnect = () => {
+        if (res.writableEnded) return;
+        aborted = true;
+        requestAbort.abort();
+        providerStream?.abort();
+      };
+      req.on("aborted", abortForDisconnect);
+      res.on("close", abortForDisconnect);
+
+      providerStream = await provider.streamText({
+        messages: chatMessages,
+        useCase: "help-chat",
+        maxTokens: 512,
+        signal: requestAbort.signal,
+        userId: (req as AuthenticatedRequest).user?.claims?.sub ?? null,
+      });
+
+      for await (const content of providerStream.stream) {
+        if (aborted) break;
+        if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      }
+
+      if (!aborted) {
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+      }
+    } catch (error) {
+      console.error("Error in help chat:", error instanceof PoeProviderError ? error.code : "unknown error");
+      if (aborted || abortedOrEnded(res)) return;
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: "Failed to get response" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: "Failed to get response" });
+      }
+    }
+  };
+}
+
+function abortedOrEnded(res: any): boolean {
+  return res.writableEnded === true || res.destroyed === true;
 }
 
 function isOwner(role: string): boolean {
@@ -265,7 +392,7 @@ const cropAiRateLimiter = rateLimit({
   message: { message: "Too many scan requests. Please wait a moment before trying again." },
 });
 
-const helpChatRateLimiter = rateLimit({
+export const helpChatRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
@@ -2283,18 +2410,14 @@ export async function registerRoutes(
             maxTokens: 2000,
             userId: (req as AuthenticatedRequest).user?.claims?.sub ?? null,
           });
-          const labelsByPinId = new Map(crops.map((crop, index) => [crop.pinId, response.labels[index] ?? ""]));
-          for (let j = 0; j < batch.length; j++) {
-            const rawText = labelsByPinId.has(batch[j].pinId)
-              ? (labelsByPinId.get(batch[j].pinId) || null)
-              : null;
-            allResults.push({
-              pinId: batch[j].pinId,
-              pinLabel: batch[j].pinLabel || `P${String(j + i + 1).padStart(3, "0")}`,
-              rawText,
-              readable: rawText !== null,
-            });
-          }
+          allResults.push(...buildScanResultsForPins(
+            batch.map((pin, index) => ({
+              pinId: pin.pinId,
+              pinLabel: pin.pinLabel || `P${String(index + i + 1).padStart(3, "0")}`,
+            })),
+            crops,
+            response.labels,
+          ));
         } catch (subErr) {
           if (subErr instanceof PoeProviderError) throw subErr;
           for (let j = 0; j < batch.length; j++) {
@@ -2439,18 +2562,11 @@ export async function registerRoutes(
             maxTokens: 2000,
             userId: (req as AuthenticatedRequest).user?.claims?.sub ?? null,
           });
-          const labelsByPinId = new Map(orderedCrops.map((crop, index) => [crop.pinId, response.labels[index] ?? ""]));
-          for (let j = 0; j < batch.length; j++) {
-            const rawText = labelsByPinId.has(batch[j].pinId)
-              ? (labelsByPinId.get(batch[j].pinId) || null)
-              : null;
-            allResults.push({
-              pinId: batch[j].pinId,
-              pinLabel: batch[j].pinLabel,
-              rawText,
-              readable: rawText !== null,
-            });
-          }
+          allResults.push(...buildScanResultsForPins(
+            batch.map((pin) => ({ pinId: pin.pinId, pinLabel: pin.pinLabel })),
+            orderedCrops,
+            response.labels,
+          ));
         } catch (subErr) {
           if (subErr instanceof PoeProviderError) throw subErr;
           for (let j = 0; j < batch.length; j++) {
@@ -6419,81 +6535,12 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 - Mobile: Set aisle, rapidly tap "Take Photo" — uploads happen in background.
 - Mobile is for capturing; switch to Full Mode on desktop for detailed work.`;
 
-  app.post("/api/help-chat", isAuthenticated, helpChatRateLimiter, async (req: any, res) => {
-    try {
-      const { messages } = (req.body ?? {}) as any;
-      if (!Array.isArray(messages) || messages.length === 0 || messages.length > 12) {
-        return res.status(400).json({ error: "messages must be a non-empty array (max 12)" });
-      }
-
-      const validRoles = new Set(["user", "assistant"]);
-      const sanitized: { role: "user" | "assistant"; content: string }[] = [];
-      let totalCharacters = 0;
-      for (const m of messages) {
-        if (!m || typeof m.content !== "string" || !validRoles.has(m.role)) {
-          return res.status(400).json({ error: "Each message must have role (user/assistant) and content (string)" });
-        }
-        const content = m.content.trim().slice(0, 1200);
-        if (!content) {
-          return res.status(400).json({ error: "Message content cannot be empty" });
-        }
-        totalCharacters += content.length;
-        if (totalCharacters > 8_000) {
-          return res.status(400).json({ error: "Conversation is too long; start a new question." });
-        }
-        sanitized.push({ role: m.role as "user" | "assistant", content });
-      }
-
-      const chatMessages: PoeTextMessage[] = [
-        {
-          role: "system",
-          content: `${HELP_SYSTEM_PROMPT}\n\nApproved current help source (use only this source for product facts):\n${HELP_SOURCE_TEXT}\n\nNever invent settings, permissions, integrations, or recovery steps. If the answer is not in the approved source, say that you do not know and direct the user to Feedback.`,
-        },
-        ...sanitized,
-      ];
-
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-
-      let aborted = false;
-      const requestAbort = new AbortController();
-      let providerStream: Awaited<ReturnType<ReturnType<typeof getPoeProvider>["streamText"]>> | undefined;
-      req.on("close", () => {
-        aborted = true;
-        requestAbort.abort();
-        providerStream?.abort();
-      });
-
-      providerStream = await getPoeProvider().streamText({
-        messages: chatMessages,
-        useCase: "help-chat",
-        maxTokens: 512,
-        signal: requestAbort.signal,
-        userId: (req as AuthenticatedRequest).user?.claims?.sub ?? null,
-      });
-
-      for await (const content of providerStream.stream) {
-        if (aborted) break;
-        if (content) {
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
-        }
-      }
-
-      if (!aborted) {
-        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-        res.end();
-      }
-    } catch (error) {
-      console.error("Error in help chat:", error instanceof PoeProviderError ? error.code : "unknown error");
-      if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ error: "Failed to get response" })}\n\n`);
-        res.end();
-      } else {
-        res.status(500).json({ error: "Failed to get response" });
-      }
-    }
-  });
+  app.post(
+    "/api/help-chat",
+    isAuthenticated,
+    helpChatRateLimiter,
+    createHelpChatHandler(getPoeProvider(), HELP_SYSTEM_PROMPT),
+  );
 
   // WebSocket
   const wss = new WebSocketServer({ noServer: true });

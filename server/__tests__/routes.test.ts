@@ -1,38 +1,141 @@
-import { test, describe, before, after } from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import http from "node:http";
-import express from "express";
-import helmet from "helmet";
-import {
+import 
+{
+ test, describe, before, after 
+}
+ from "node:test"
+;
+
+import assert from "node:assert/strict"
+;
+
+import 
+{
+ readFileSync 
+}
+ from "node:fs"
+;
+
+import http from "node:http"
+;
+
+import express from "express"
+;
+
+import helmet from "helmet"
+;
+
+import 
+{
+ clerkMiddleware 
+}
+ from "@clerk/express"
+;
+
+import 
+{
+
   patchPhotoSchema,
   patchPinSchema,
   patchPinFlagSchema,
   patchEntrySchema,
+  buildScanResultsForPins,
+  canEdit,
+  createHelpChatHandler,
+  helpChatRateLimiter,
   verifyTesterCredentials,
-} from "../routes.js";
-import {
+}
+ from "../routes.js"
+;
+
+import 
+{
+ PoeProviderError, type PoeProvider 
+}
+ from "../providers/poe.js"
+;
+
+import 
+{
+ isAuthenticated 
+}
+ from "../replit_integrations/auth/replitAuth.js"
+;
+
+import 
+{
+
   evictAllSessionSockets,
   evictSessionUserSockets,
   RealtimeAuthorizationTracker,
-} from "../realtime-authorization.js";
-import { buildTesterLoginUrl, getTesterOwnerFromSearch } from "../../client/src/lib/testerAccess.js";
-import bcrypt from "bcrypt";
-import { pool } from "../db.js";
-import { isProtectedOwnerIdentity } from "../replit_integrations/auth/replitAuth.js";
-import {
+}
+ from "../realtime-authorization.js"
+;
+
+import 
+{
+ buildTesterLoginUrl, getTesterOwnerFromSearch 
+}
+ from "../../client/src/lib/testerAccess.js"
+;
+
+import bcrypt from "bcrypt"
+;
+
+import 
+{
+ pool 
+}
+ from "../db.js"
+;
+
+import 
+{
+ isProtectedOwnerIdentity 
+}
+ from "../replit_integrations/auth/replitAuth.js"
+;
+
+import 
+{
+
   isApproved,
   isIdentityApproved,
   isOwnerIdentity,
   isWebSocketIdentityAuthorized,
-} from "../replit_integrations/auth/routes.js";
-import { authStorage } from "../replit_integrations/auth/storage.js";
-import { registerObjectStorageRoutes } from "../replit_integrations/object_storage/routes.js";
-import { createContentSecurityPolicyDirectives } from "../contentSecurityPolicy.js";
-import {
+}
+ from "../replit_integrations/auth/routes.js"
+;
+
+import 
+{
+ authStorage 
+}
+ from "../replit_integrations/auth/storage.js"
+;
+
+import 
+{
+ registerObjectStorageRoutes 
+}
+ from "../replit_integrations/object_storage/routes.js"
+;
+
+import 
+{
+ createContentSecurityPolicyDirectives 
+}
+ from "../contentSecurityPolicy.js"
+;
+
+import 
+{
+
   CLERK_PROXY_PATH,
   createClerkProxyMiddleware,
-} from "../middlewares/clerkProxyMiddleware.js";
+}
+ from "../middlewares/clerkProxyMiddleware.js"
+;
+
 
 // The route module opens a PostgreSQL pool even when the real-server checks
 // are skipped. Close this test process's pool so the unit tier cannot hang
@@ -970,6 +1073,289 @@ describe("PATCH synthetic integration — body validation returns 400, not 500",
   });
 });
 
+describe("authenticated Poe route contracts", () => {
+  function stubProvider(overrides: Partial<PoeProvider> = {}): PoeProvider {
+    return {
+      listModels: async () => [],
+      streamText: async () => ({
+        model: "stub-text",
+        retries: 0,
+        usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
+        stream: (async function* () { yield "stub response"; })(),
+        abort: () => {},
+      }),
+      completeVision: async () => ({ model: "stub-vision", retries: 0, labels: ["stub"] }),
+      ...overrides,
+    };
+  }
+
+  async function withHelpRoute<T>(
+    provider: PoeProvider,
+    callback: (port: number) => Promise<T>,
+    userId = "owner-user",
+  ): Promise<T> {
+    const app = express();
+    app.use(express.json());
+    app.post(
+      "/api/help-chat",
+      (req, _res, next) => {
+        req.user = { claims: { sub: userId } };
+        next();
+      },
+      helpChatRateLimiter,
+      createHelpChatHandler(provider, "stub help prompt"),
+    );
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as { port: number }).port;
+    try {
+      return await callback(port);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  }
+
+  test("does not invoke the provider through unauthenticated, pending, or viewer gates", async () => {
+    let calls = 0;
+    const provider = stubProvider({
+      streamText: async () => {
+        calls++;
+        return {
+          model: "stub-text",
+          retries: 0,
+          usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
+          stream: (async function* () { yield "should not run"; })(),
+          abort: () => {},
+        };
+      },
+    });
+    const app = express();
+    app.use(clerkMiddleware());
+    app.use(express.json());
+    const handler = createHelpChatHandler(provider, "stub help prompt");
+    app.post("/unauthenticated", isAuthenticated, handler);
+    app.post(
+      "/pending",
+      (req, _res, next) => {
+        req.user = { claims: { sub: "pending-poe-user" } };
+        next();
+      },
+      isApproved,
+      handler,
+    );
+    app.post(
+      "/viewer",
+      (_req, res, next) => {
+        if (!canEdit("viewer")) return res.status(403).json({ message: "viewer cannot scan" });
+        next();
+      },
+      handler,
+    );
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as { port: number }).port;
+    const originalGetUser = authStorage.getUser;
+    authStorage.getUser = async (userId: string) =>
+      userId === "pending-poe-user" ? ({ approved: false, rejected: false } as any) : undefined;
+    try {
+      const request = () => fetch(`http://127.0.0.1:${port}/pending`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "test" }] }),
+      });
+      const unauthenticated = await fetch(`http://127.0.0.1:${port}/unauthenticated`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "test" }] }),
+      });
+      const pending = await request();
+      const viewer = await fetch(`http://127.0.0.1:${port}/viewer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "test" }] }),
+      });
+      await Promise.all([unauthenticated.text(), pending.text(), viewer.text()]);
+      assert.equal(unauthenticated.status, 401);
+      assert.equal(pending.status, 403);
+      assert.equal(viewer.status, 403);
+      assert.equal(calls, 0);
+    } finally {
+      authStorage.getUser = originalGetUser;
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  test("streams the existing SSE wire format and terminates with done", async () => {
+    let calls = 0;
+    const provider = stubProvider({
+      streamText: async () => {
+        calls++;
+        return {
+          model: "stub-text",
+          retries: 0,
+          usage: Promise.resolve({ promptTokens: 1, completionTokens: 2 }),
+          stream: (async function* () {
+            yield "Hello";
+            yield " world";
+          })(),
+          abort: () => {},
+        };
+      },
+    });
+
+    const body = await withHelpRoute(provider, async (port) => {
+      const response = await fetch(`http://127.0.0.1:${port}/api/help-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "How do I place pins?" }] }),
+      });
+      assert.equal(response.status, 200);
+      return response.text();
+    });
+
+    assert.equal(calls, 1);
+    assert.match(body, /data: \{"content":"Hello"\}\n\n/);
+    assert.match(body, /data: \{"content":" world"\}\n\n/);
+    assert.match(body, /data: \{"done":true\}\n\n/);
+  });
+
+  test("normalizes an upstream stream failure as an SSE error frame", async () => {
+    const provider = stubProvider({
+      streamText: async () => ({
+        model: "stub-text",
+        retries: 1,
+        usage: Promise.resolve({ promptTokens: 1, completionTokens: 0 }),
+        stream: (async function* () {
+          yield "partial";
+          throw new PoeProviderError("upstream", "private upstream detail", 502);
+        })(),
+        abort: () => {},
+      }),
+    });
+
+    const body = await withHelpRoute(provider, async (port) => {
+      const response = await fetch(`http://127.0.0.1:${port}/api/help-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "What is Mobile Flow?" }] }),
+      });
+      assert.equal(response.status, 200);
+      return response.text();
+    });
+
+    assert.match(body, /data: \{"content":"partial"\}\n\n/);
+    assert.match(body, /data: \{"error":"Failed to get response"\}\n\n/);
+    assert.doesNotMatch(body, /"done":true/);
+    assert.doesNotMatch(body, /private upstream detail/);
+  });
+
+  test("does not invoke the provider for a rate-limited request", async () => {
+    let calls = 0;
+    const provider = stubProvider({
+      streamText: async () => {
+        calls++;
+        return {
+          model: "stub-text",
+          retries: 0,
+          usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
+          stream: (async function* () { yield "ok"; })(),
+          abort: () => {},
+        };
+      },
+    });
+
+    const statuses = await withHelpRoute(provider, async (port) => {
+      const results: number[] = [];
+      for (let i = 0; i < 21; i++) {
+        const response = await fetch(`http://127.0.0.1:${port}/api/help-chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: [{ role: "user", content: `Request ${i}` }] }),
+        });
+        results.push(response.status);
+        await response.text();
+      }
+      return results;
+    }, `rate-limit-${Date.now()}`);
+
+    assert.equal(statuses.at(-1), 429);
+    assert.equal(calls, 20);
+  });
+
+  test("aborts the provider and does not write a late frame after client disconnect", async () => {
+    let abortCalled = false;
+    let release!: () => void;
+    const provider = stubProvider({
+      streamText: async () => ({
+        model: "stub-text",
+        retries: 0,
+        usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
+        stream: (async function* () {
+          yield "partial";
+          await new Promise<void>((resolve) => { release = resolve; });
+        })(),
+        abort: () => {
+          abortCalled = true;
+          release?.();
+        },
+      }),
+    });
+
+    await withHelpRoute(provider, async (port) => {
+      await new Promise<void>((resolve, reject) => {
+        const request = http.request(
+          {
+            hostname: "127.0.0.1",
+            port,
+            path: "/api/help-chat",
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          },
+          (response) => {
+            response.once("data", () => request.destroy());
+            response.once("close", () => resolve());
+          },
+        );
+        request.once("error", (error) => {
+          if ((error as NodeJS.ErrnoException).code !== "ECONNRESET") reject(error);
+        });
+        request.end(JSON.stringify({ messages: [{ role: "user", content: "Disconnect me" }] }));
+      });
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    });
+
+    assert.equal(abortCalled, true);
+  });
+
+  test("rejects malformed scanner output before persistence and preserves pin order", () => {
+    assert.throws(
+      () => buildScanResultsForPins(
+        [{ pinId: 11, pinLabel: "P011" }],
+        [{ pinId: 11 }],
+        [{ rawText: "not a string" }],
+      ),
+      (error: unknown) => error instanceof PoeProviderError && error.code === "validation",
+    );
+
+    assert.deepEqual(
+      buildScanResultsForPins(
+        [
+          { pinId: 22, pinLabel: "P022" },
+          { pinId: 11, pinLabel: "P011" },
+          { pinId: 33, pinLabel: "P033" },
+        ],
+        [{ pinId: 11 }, { pinId: 33 }],
+        ["first", ""],
+      ),
+      [
+        { pinId: 22, pinLabel: "P022", rawText: null, readable: false },
+        { pinId: 11, pinLabel: "P011", rawText: "first", readable: true },
+        { pinId: 33, pinLabel: "P033", rawText: null, readable: false },
+      ],
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Real-server integration tests — hit the actual registerRoutes() handlers
 // running on the dev server at localhost:5000 to verify end-to-end that the
@@ -1015,7 +1401,7 @@ async function devReq(
         res.on("end", () => {
           let parsed: any;
           try { parsed = JSON.parse(data); } catch { parsed = data; }
-          const setCookie = res.headers["set-cookie"]?.[0]?.split(";")[0];
+          const setCookie = res.headers["set-cookie"]?.[0]?.split("\n")[0];
           resolve({ status: res.statusCode ?? 0, body: parsed, cookie: setCookie });
         });
       }
