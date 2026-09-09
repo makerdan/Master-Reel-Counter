@@ -8,18 +8,41 @@ type SetupCandidateTestingTokenOptions = {
   localCandidateOrigin?: string;
 };
 
-function createLocalCandidateContext(
+const CLERK_FRONTEND_API_ORIGIN = "https://frontend-api.clerk.dev";
+
+type CandidateTransportOptions = {
   context: BrowserContext,
-  candidateOrigin: string,
-  localCandidateOrigin: string,
-  proxyPath: string,
-): BrowserContext {
+  candidateOrigin: string;
+  proxyPath: string;
+  sourceOrigin: string;
+  sourcePathPrefix: string;
+  localCandidateOrigin?: string;
+};
+
+function createCandidateTransportContext({
+  context,
+  candidateOrigin,
+  proxyPath,
+  sourceOrigin,
+  sourcePathPrefix,
+  localCandidateOrigin,
+}: CandidateTransportOptions): BrowserContext {
   const canonical = new URL(candidateOrigin);
-  const local = new URL(localCandidateOrigin);
+  const source = new URL(sourceOrigin);
+  const local = localCandidateOrigin ? new URL(localCandidateOrigin) : canonical;
+  if (canonical.protocol !== "https:") {
+    throw new Error("Clerk candidate transport must use an explicit HTTPS origin");
+  }
+  if (!proxyPath.startsWith("/") || proxyPath.endsWith("/")) {
+    throw new Error(
+      "Clerk candidate proxy path must be an absolute path without a trailing slash",
+    );
+  }
   if (
-    local.protocol !== "http:" ||
-    local.hostname !== "127.0.0.1" ||
-    !local.port
+    localCandidateOrigin &&
+    (local.protocol !== "http:" ||
+      local.hostname !== "127.0.0.1" ||
+      !local.port)
   ) {
     throw new Error("Local Clerk candidate transport must be an explicit HTTP loopback origin");
   }
@@ -33,15 +56,19 @@ function createLocalCandidateContext(
               return async (options: Parameters<Route["fetch"]>[0] = {}) => {
                 const requested = new URL(options.url ?? request.url());
                 if (
-                  requested.origin !== canonical.origin ||
-                  !requested.pathname.startsWith(`${proxyPath}/v1/`)
+                  requested.origin !== source.origin ||
+                  !requested.pathname.startsWith(sourcePathPrefix)
                 ) {
                   throw new Error(
                     `Refusing to forward unexpected Clerk testing request ${requested.pathname}`,
                   );
                 }
 
-                const forwarded = new URL(`${requested.pathname}${requested.search}`, local);
+                const clerkPath = requested.pathname.slice(sourcePathPrefix.length - 4);
+                const forwarded = new URL(
+                  `${proxyPath}${clerkPath}${requested.search}`,
+                  local,
+                );
                 return target.fetch({
                   ...options,
                   url: forwarded.href,
@@ -50,7 +77,7 @@ function createLocalCandidateContext(
                     ...options.headers,
                     host: canonical.host,
                     "x-forwarded-host": canonical.host,
-                    "x-forwarded-proto": "https",
+                    "x-forwarded-proto": canonical.protocol.slice(0, -1),
                   },
                 });
               };
@@ -72,24 +99,31 @@ export async function setupCandidateClerkTestingToken({
   localCandidateOrigin,
 }: SetupCandidateTestingTokenOptions): Promise<void> {
   const candidate = new URL(candidateOrigin);
-  const frontendApiUrl = `${candidate.host}${proxyPath}`;
+  const transports = [
+    {
+      frontendApiUrl: `${candidate.host}${proxyPath}`,
+      sourceOrigin: candidate.origin,
+      sourcePathPrefix: `${proxyPath}/v1/`,
+    },
+    {
+      frontendApiUrl: new URL(CLERK_FRONTEND_API_ORIGIN).host,
+      sourceOrigin: CLERK_FRONTEND_API_ORIGIN,
+      sourcePathPrefix: "/v1/",
+    },
+  ];
 
-  if (!localCandidateOrigin) {
-    await setupClerkTestingToken({
-      page,
-      options: { frontendApiUrl },
+  for (const transport of transports) {
+    const context = createCandidateTransportContext({
+      context: page.context(),
+      candidateOrigin: candidate.origin,
+      proxyPath,
+      sourceOrigin: transport.sourceOrigin,
+      sourcePathPrefix: transport.sourcePathPrefix,
+      localCandidateOrigin,
     });
-    return;
+    await setupClerkTestingToken({
+      context,
+      options: { frontendApiUrl: transport.frontendApiUrl },
+    });
   }
-
-  const context = createLocalCandidateContext(
-    page.context(),
-    candidate.origin,
-    localCandidateOrigin,
-    proxyPath,
-  );
-  await setupClerkTestingToken({
-    context,
-    options: { frontendApiUrl },
-  });
 }

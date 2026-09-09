@@ -40,7 +40,24 @@ async function waitForCompletedSignIn(
   while (Date.now() < deadline) {
     const path = safeBrowserPath(page.url());
     if (routeStates.at(-1) !== path) routeStates.push(path);
-    if (!path.startsWith("/sign-in")) return;
+    const clerkState = await page.evaluate(() => {
+      const clerk = (
+        window as typeof window & {
+          Clerk?: { loaded?: boolean; session?: { id?: string } | null };
+        }
+      ).Clerk;
+      return {
+        loaded: clerk?.loaded === true,
+        hasActiveSession: Boolean(clerk?.session?.id),
+      };
+    });
+    if (
+      !path.startsWith("/sign-in") &&
+      clerkState.loaded &&
+      clerkState.hasActiveSession
+    ) {
+      return;
+    }
 
     if (path.startsWith("/sign-in/client-trust")) {
       clientTrustStartedAt ??= Date.now();
@@ -54,7 +71,9 @@ async function waitForCompletedSignIn(
   }
 
   throw new Error(
-    `Managed Clerk sign-in did not complete from Clerk state ${safeBrowserPath(page.url())}`,
+    `Managed Clerk sign-in did not reach a loaded Clerk instance with an active session from ${safeBrowserPath(
+      page.url(),
+    )}`,
   );
 }
 
