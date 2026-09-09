@@ -10,6 +10,8 @@ import {
 const root = resolve(import.meta.dirname, "../..");
 const workflowPath = resolve(root, ".github/workflows/validation.yml");
 const workflow = readFileSync(workflowPath, "utf8");
+const dependabotPath = resolve(root, ".github/dependabot.yml");
+const dependabot = readFileSync(dependabotPath, "utf8");
 const startupSmokePath = resolve(root, "scripts/startup-smoke.sh");
 const startupSmoke = readFileSync(startupSmokePath, "utf8");
 
@@ -49,6 +51,29 @@ test("workflow covers every required GitHub event", () => {
   assert.match(triggers, /push:\s+branches:\s+- main/s);
   assert.match(triggers, /merge_group:/);
   assert.match(triggers, /workflow_dispatch:/);
+});
+
+test("Dependabot proposes npm updates and groups only security patches", () => {
+  assert.match(dependabot, /^version:\s*2$/m);
+  assert.match(dependabot, /package-ecosystem:\s*npm/);
+  assert.match(dependabot, /directory:\s*\/$/m);
+  assert.match(dependabot, /interval:\s*weekly/);
+
+  const securityPatchGroup = dependabot.match(
+    /security-patches:\s*\n([\s\S]*?)(?=\n {4}\S|\n\S|$)/,
+  );
+  assert.ok(securityPatchGroup, "Dependabot must define the security-patches group");
+  assert.match(securityPatchGroup[1], /applies-to:\s*security-updates/);
+  assert.match(securityPatchGroup[1], /patterns:\s*\n\s+- "\*"/);
+  assert.match(securityPatchGroup[1], /update-types:\s*\n\s+- patch/);
+  assert.doesNotMatch(securityPatchGroup[1], /-\s+(minor|major)\b/);
+});
+
+test("Dependabot pull requests run the canonical validation command", () => {
+  const triggers = sectionBetween("on:\n", "\n\n# This workflow");
+  assert.match(triggers, /pull_request:/);
+  assert.match(workflow, /npm run ci/);
+  assert.doesNotMatch(triggers, /paths(?:-ignore)?:/);
 });
 
 test("workflow is read-only and cannot replace an in-flight result", () => {
