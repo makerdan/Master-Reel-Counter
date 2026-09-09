@@ -7,8 +7,9 @@
 import type { IncomingHttpHeaders } from "http";
 import type { RequestHandler } from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import { CLERK_FRONTEND_API_ORIGIN } from "@shared/clerk-config";
 
-const CLERK_FAPI = "https://frontend-api.clerk.dev";
+export const CLERK_PROXY_TARGET = CLERK_FRONTEND_API_ORIGIN;
 export const CLERK_PROXY_PATH = "/api/__clerk";
 export const CLERK_PROXY_READINESS_PATH = `${CLERK_PROXY_PATH}/healthz`;
 
@@ -38,7 +39,7 @@ export function clerkProxyMiddleware(): RequestHandler {
   const secretKey = process.env.CLERK_SECRET_KEY!;
 
   return createProxyMiddleware({
-    target: CLERK_FAPI,
+    target: CLERK_PROXY_TARGET,
     changeOrigin: true,
     selfHandleResponse: true,
     pathRewrite: (path: string) => path.replace(new RegExp(`^${CLERK_PROXY_PATH}`), ""),

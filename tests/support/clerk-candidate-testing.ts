@@ -1,5 +1,9 @@
 import { setupClerkTestingToken } from "@clerk/testing/playwright";
 import type { BrowserContext, Page, Route } from "@playwright/test";
+import {
+  CLERK_FRONTEND_API_HOST,
+  CLERK_FRONTEND_API_ORIGIN,
+} from "../../shared/clerk-config";
 
 type SetupCandidateTestingTokenOptions = {
   page: Page;
@@ -8,7 +12,7 @@ type SetupCandidateTestingTokenOptions = {
   localCandidateOrigin?: string;
 };
 
-const CLERK_FRONTEND_API_ORIGIN = "https://frontend-api.clerk.dev";
+export const CLERK_TESTING_FRONTEND_API_ORIGIN = CLERK_FRONTEND_API_ORIGIN;
 
 type CandidateTransportOptions = {
   context: BrowserContext,
@@ -106,8 +110,8 @@ export async function setupCandidateClerkTestingToken({
       sourcePathPrefix: `${proxyPath}/v1/`,
     },
     {
-      frontendApiUrl: new URL(CLERK_FRONTEND_API_ORIGIN).host,
-      sourceOrigin: CLERK_FRONTEND_API_ORIGIN,
+      frontendApiUrl: CLERK_FRONTEND_API_HOST,
+      sourceOrigin: CLERK_TESTING_FRONTEND_API_ORIGIN,
       sourcePathPrefix: "/v1/",
     },
   ];

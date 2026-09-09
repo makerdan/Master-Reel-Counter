@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import test from "node:test";
-import { setupCandidateClerkTestingToken } from "../../tests/support/clerk-candidate-testing";
+import { CLERK_PROXY_TARGET } from "../../server/middlewares/clerkProxyMiddleware";
+import {
+  CLERK_TESTING_FRONTEND_API_ORIGIN,
+  setupCandidateClerkTestingToken,
+} from "../../tests/support/clerk-candidate-testing";
+
+test("production proxy and release testing transport share the trusted Clerk origin", () => {
+  assert.equal(CLERK_PROXY_TARGET, CLERK_TESTING_FRONTEND_API_ORIGIN);
+});
 
 test("testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate", async () => {
   const received: Array<{
@@ -61,7 +69,7 @@ test("testing-token transport covers the Clerk sign-in and client-trust sequence
     const requestSequence = [
       {
         method: "POST",
-        sourceUrl: "https://frontend-api.clerk.dev/v1/client/handshake",
+        sourceUrl: `${CLERK_TESTING_FRONTEND_API_ORIGIN}/v1/client/handshake`,
         candidatePath: "/api/__clerk/v1/client/handshake",
       },
       {
