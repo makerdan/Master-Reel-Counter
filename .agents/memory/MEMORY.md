@@ -11,3 +11,4 @@
 - [Clerk testing through the production proxy](clerk-testing-production-proxy.md) — target the same-origin proxy path so testing tokens exercise the exact release candidate.
 - [Playwright logout isolation](playwright-logout-isolation.md) — logout tests need fresh server-session cookies; copied storage state can invalidate authentication for later tests.
 - [Vite development CSP allowances](csp-vite-development-allowances.md) — dev HTML injects inline bootstrap scripts and Clerk may load from a bounded accounts.dev instance origin.
+- [Service-worker validation](service-worker-validation.md) — rebuild generated public worker output before focused browser checks, then run the locked heavy tier.

@@ -87,6 +87,13 @@ function isStaticAsset(url) {
   );
 }
 
+function cachePublicResponse(request, response) {
+  return caches
+    .open(CACHE_NAME)
+    .then((cache) => cache.put(request, response))
+    .catch(() => {});
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
@@ -108,29 +115,41 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isNavigationRequest(request)) {
+    const networkResponse = fetch(request).then((response) => ({
+      response,
+      cacheResponse: response.clone(),
+    }));
+    event.waitUntil(
+      networkResponse.then(
+        ({ cacheResponse }) => cachePublicResponse(request, cacheResponse),
+        () => {},
+      ),
+    );
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return response;
-        })
+      networkResponse
+        .then(({ response }) => response)
         .catch(() => caches.match("/").then((r) => r || new Response("Offline", { status: 503 })))
     );
     return;
   }
 
   if (isStaticAsset(request.url)) {
+    const responsePromise = caches.match(request).then((cached) => {
+      if (cached) return { response: cached, cacheResponse: null };
+      return fetch(request).then((response) => ({
+        response,
+        cacheResponse: response.clone(),
+      }));
+    });
+    event.waitUntil(
+      responsePromise.then(({ cacheResponse }) =>
+        cacheResponse ? cachePublicResponse(request, cacheResponse) : undefined,
+      ).catch(() => {}),
+    );
     event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((response) => {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-            return response;
-          }).catch(() => new Response("", { status: 503 }))
-      )
+      responsePromise
+        .then(({ response }) => response)
+        .catch(() => new Response("", { status: 503 }))
     );
     return;
   }
