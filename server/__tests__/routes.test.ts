@@ -29,6 +29,10 @@ import {
 import { authStorage } from "../replit_integrations/auth/storage.js";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage/routes.js";
 import { createContentSecurityPolicyDirectives } from "../contentSecurityPolicy.js";
+import {
+  CLERK_PROXY_PATH,
+  createClerkProxyMiddleware,
+} from "../middlewares/clerkProxyMiddleware.js";
 
 // The route module opens a PostgreSQL pool even when the real-server checks
 // are skipped. Close this test process's pool so the unit tier cannot hang
@@ -647,6 +651,221 @@ async function httpReq(
     req.end();
   });
 }
+
+async function rawHttpReq(
+  baseUrl: string,
+  method: string,
+  path: string,
+): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(path, baseUrl);
+    const req = http.request(
+      { hostname: url.hostname, port: url.port, path: `${url.pathname}${url.search}`, method },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let ended = false;
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          ended = true;
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: res.headers,
+            body: Buffer.concat(chunks).toString(),
+          });
+        });
+        res.once("aborted", () => reject(new Error("downstream response aborted")));
+        res.once("error", reject);
+        res.once("close", () => {
+          if (!ended) reject(new Error("downstream response closed before completion"));
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+async function listenOnLoopback(server: http.Server): Promise<string> {
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as { port: number };
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function closeHttpServer(server: http.Server): Promise<void> {
+  await new Promise<void>((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
+}
+
+describe("production Clerk proxy lifecycle guards", () => {
+  const originalSecretKey = process.env.CLERK_SECRET_KEY;
+
+  before(() => {
+    process.env.CLERK_SECRET_KEY = "routes-test-clerk-secret";
+  });
+
+  after(() => {
+    if (originalSecretKey === undefined) delete process.env.CLERK_SECRET_KEY;
+    else process.env.CLERK_SECRET_KEY = originalSecretKey;
+  });
+
+  test("returns a bounded 504 for an upstream that never returns headers", async () => {
+    const target = http.createServer(() => {
+      // Deliberately stall until the proxy's response deadline destroys this request.
+    });
+    const targetUrl = await listenOnLoopback(target);
+    const app = express();
+    app.use(
+      CLERK_PROXY_PATH,
+      createClerkProxyMiddleware({
+        target: targetUrl,
+        connectTimeoutMs: 200,
+        responseTimeoutMs: 35,
+      }),
+    );
+    const proxy = http.createServer(app);
+    const proxyUrl = await listenOnLoopback(proxy);
+
+    try {
+      const started = Date.now();
+      const response = await rawHttpReq(proxyUrl, "GET", `${CLERK_PROXY_PATH}/v1/client`);
+      assert.equal(response.status, 504);
+      assert.equal(response.body, "");
+      assert.ok(Date.now() - started < 1_000, "stalled upstream must not hang the browser request");
+    } finally {
+      await closeHttpServer(proxy);
+      await closeHttpServer(target);
+    }
+  });
+
+  test("terminates an upstream response that stalls after sending part of its body", async () => {
+    const target = http.createServer((_req, res) => {
+      res.writeHead(200, {
+        "content-length": "100",
+        "content-type": "application/json",
+      });
+      res.write('{"partial":true');
+      // Deliberately omit the rest of the body and end event.
+    });
+    const targetUrl = await listenOnLoopback(target);
+    const app = express();
+    app.use(
+      CLERK_PROXY_PATH,
+      createClerkProxyMiddleware({
+        target: targetUrl,
+        connectTimeoutMs: 200,
+        responseTimeoutMs: 35,
+      }),
+    );
+    const proxy = http.createServer(app);
+    const proxyUrl = await listenOnLoopback(proxy);
+
+    try {
+      const started = Date.now();
+      await assert.rejects(
+        rawHttpReq(proxyUrl, "GET", `${CLERK_PROXY_PATH}/v1/client`),
+      );
+      assert.ok(Date.now() - started < 1_000, "partial response must not keep the browser request open");
+    } finally {
+      await closeHttpServer(proxy);
+      await closeHttpServer(target);
+    }
+  });
+
+  test("destroys upstream work when the downstream browser disconnects", async () => {
+    let upstreamReceived!: () => void;
+    let upstreamClosed!: () => void;
+    const received = new Promise<void>((resolve) => { upstreamReceived = resolve; });
+    const closed = new Promise<void>((resolve) => { upstreamClosed = resolve; });
+    const target = http.createServer((req) => {
+      upstreamReceived();
+      req.once("close", upstreamClosed);
+    });
+    const targetUrl = await listenOnLoopback(target);
+    const app = express();
+    app.use(
+      CLERK_PROXY_PATH,
+      createClerkProxyMiddleware({
+        target: targetUrl,
+        connectTimeoutMs: 200,
+        responseTimeoutMs: 500,
+      }),
+    );
+    const proxy = http.createServer(app);
+    const proxyUrl = await listenOnLoopback(proxy);
+
+    try {
+      const url = new URL(`${CLERK_PROXY_PATH}/v1/client`, proxyUrl);
+      const downstream = http.request({
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: "GET",
+      });
+      downstream.on("error", () => {});
+      downstream.end();
+      await received;
+      downstream.destroy();
+      await Promise.race([
+        closed,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("upstream request was not destroyed")), 1_000),
+        ),
+      ]);
+      assert.ok(true, "downstream disconnect closed the upstream request");
+    } finally {
+      await closeHttpServer(proxy);
+      await closeHttpServer(target);
+    }
+  });
+
+  test("preserves successful and bodyless Clerk response headers and bodies", async () => {
+    const target = http.createServer((req, res) => {
+      if (req.url === "/empty") {
+        res.writeHead(204, { "x-clerk-test": "bodyless" });
+        res.end();
+        return;
+      }
+      const body = "clerk-ok";
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "content-length": String(Buffer.byteLength(body)),
+        "x-clerk-test": "preserved",
+      });
+      res.end(body);
+    });
+    const targetUrl = await listenOnLoopback(target);
+    const app = express();
+    app.use(
+      CLERK_PROXY_PATH,
+      createClerkProxyMiddleware({
+        target: targetUrl,
+        connectTimeoutMs: 200,
+        responseTimeoutMs: 200,
+      }),
+    );
+    const proxy = http.createServer(app);
+    const proxyUrl = await listenOnLoopback(proxy);
+
+    try {
+      const successful = await rawHttpReq(proxyUrl, "GET", `${CLERK_PROXY_PATH}/ok`);
+      assert.equal(successful.status, 200);
+      assert.equal(successful.body, "clerk-ok");
+      assert.equal(successful.headers["content-type"], "application/json");
+      assert.equal(successful.headers["content-length"], "8");
+      assert.equal(successful.headers["x-clerk-test"], "preserved");
+
+      const bodyless = await rawHttpReq(proxyUrl, "GET", `${CLERK_PROXY_PATH}/empty`);
+      assert.equal(bodyless.status, 204);
+      assert.equal(bodyless.body, "");
+      assert.equal(bodyless.headers["x-clerk-test"], "bodyless");
+      assert.equal(bodyless.headers["content-length"], undefined);
+    } finally {
+      await closeHttpServer(proxy);
+      await closeHttpServer(target);
+    }
+  });
+});
 
 describe("PATCH synthetic integration — body validation returns 400, not 500", () => {
   let server: http.Server;
