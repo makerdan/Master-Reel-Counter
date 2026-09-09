@@ -18,6 +18,7 @@ import {
   clerkProxyMiddleware,
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
+import { createContentSecurityPolicyDirectives } from "./contentSecurityPolicy";
 
 // Fail fast if SESSION_SECRET is absent or too weak.
 validateSessionSecret();
@@ -51,18 +52,7 @@ declare module "http" {
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
   contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "wss:", "ws:", "https:"],
-      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'", "blob:"],
-      workerSrc: ["'self'", "blob:"],
-      frameSrc: ["'self'", "https://challenges.cloudflare.com", "https:"],
-    },
+    directives: createContentSecurityPolicyDirectives(),
   },
 }));
 

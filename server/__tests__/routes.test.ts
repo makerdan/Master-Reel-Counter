@@ -1,7 +1,9 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import http from "node:http";
 import express from "express";
+import helmet from "helmet";
 import {
   patchPhotoSchema,
   patchPinSchema,
@@ -26,6 +28,7 @@ import {
 } from "../replit_integrations/auth/routes.js";
 import { authStorage } from "../replit_integrations/auth/storage.js";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage/routes.js";
+import { createContentSecurityPolicyDirectives } from "../contentSecurityPolicy.js";
 
 // The route module opens a PostgreSQL pool even when the real-server checks
 // are skipped. Close this test process's pool so the unit tier cannot hang
@@ -169,6 +172,89 @@ describe("Clerk owner and approval regression guard", () => {
       routeLayer.route.stack.slice(0, 2).map((layer: any) => layer.handle.name),
       ["isAuthenticated", "isApproved"],
     );
+  });
+});
+
+function getDirective(header: string, directive: string): string {
+  const value = header
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${directive} `));
+  assert.ok(value, `CSP should include ${directive}`);
+  return value;
+}
+
+async function getCspHeader(isProduction: boolean): Promise<string> {
+  const app = express();
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: createContentSecurityPolicyDirectives(isProduction),
+    },
+  }));
+  app.get("/", (_req, res) => {
+    res.type("html").send(
+      '<div id="root"></div><script type="module" src="/src/main.tsx"></script>',
+    );
+  });
+
+  const server = http.createServer(app);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+
+  try {
+    const response = await new Promise<{ headers: http.IncomingHttpHeaders }>((resolve, reject) => {
+      const request = http.get(
+        { hostname: "127.0.0.1", port: address.port, path: "/" },
+        (incoming) => {
+          incoming.resume();
+          incoming.on("end", () => resolve({ headers: incoming.headers }));
+        },
+      );
+      request.on("error", reject);
+    });
+    const csp = response.headers["content-security-policy"];
+    if (typeof csp !== "string") {
+      assert.fail("response should include a string Content-Security-Policy header");
+    }
+    return csp;
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
+
+describe("Content Security Policy", () => {
+  test("production script-src is an exact Clerk and app allow-list", async () => {
+    const csp = await getCspHeader(true);
+    assert.equal(
+      getDirective(csp, "script-src"),
+      "script-src 'self' https://frontend-api.clerk.dev https://*.clerk.accounts.dev https://challenges.cloudflare.com https://*.protect.clerk.com",
+    );
+    const scriptSrc = getDirective(csp, "script-src");
+    assert.doesNotMatch(scriptSrc, /unsafe-eval/);
+    assert.doesNotMatch(scriptSrc, /unsafe-inline/);
+    assert.doesNotMatch(scriptSrc, /(^| )https:(;|$)/);
+    assert.match(csp, /style-src[^;]*'unsafe-inline'/);
+    assert.match(csp, /frame-src[^;]*https:\/\/challenges\.cloudflare\.com/);
+  });
+
+  test("development adds only Vite's eval allowance to the same explicit sources", async () => {
+    const csp = await getCspHeader(false);
+    assert.equal(
+      getDirective(csp, "script-src"),
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://frontend-api.clerk.dev https://*.clerk.accounts.dev https://challenges.cloudflare.com https://*.protect.clerk.com",
+    );
+    assert.match(getDirective(csp, "script-src"), /unsafe-inline/);
+    assert.match(csp, /style-src[^;]*'unsafe-inline'/);
+  });
+
+  test("the managed-Clerk entry page uses an external module script allowed by self", () => {
+    const entryPage = readFileSync(
+      new URL("../../client/index.html", import.meta.url),
+      "utf8",
+    );
+    assert.match(entryPage, /<script type="module" src="\/src\/main\.tsx"><\/script>/);
+    assert.doesNotMatch(entryPage, /<script(?![^>]*\bsrc=)[^>]*>/);
   });
 });
 
