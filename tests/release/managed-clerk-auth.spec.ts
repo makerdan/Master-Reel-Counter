@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createClerkClient } from "@clerk/backend";
 import { randomBytes, randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
 import pg from "pg";
 import { setupCandidateClerkTestingToken } from "../support/clerk-candidate-testing";
 import { fillSecret } from "../support/secret-safe-actions";
@@ -28,6 +29,25 @@ function requireReleaseEnvironment(): void {
 function safeBrowserPath(rawUrl: string): string {
   const url = new URL(rawUrl);
   return url.pathname;
+}
+
+function safeDiagnosticPath(rawUrl: string): string {
+  const path = safeBrowserPath(rawUrl);
+  const containsCredential =
+    /\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+/.test(path) ||
+    /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/.test(path);
+  return containsCredential ? "/[REDACTED-INVALID-PATH]" : path;
+}
+
+function normalizedFailureClass(errorText: string | undefined): string {
+  const match = errorText?.match(/\b(?:net::)?ERR_[A-Z_]+\b/);
+  return match?.[0] ?? "REQUEST_FAILED";
+}
+
+function normalizedPageError(error: Error): string {
+  return error.name && /^[A-Za-z]+Error$/.test(error.name)
+    ? error.name
+    : "PageError";
 }
 
 async function waitForCompletedSignIn(
@@ -130,12 +150,24 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   const proxyRequests: string[] = [];
   const routeStates: string[] = [];
   const requestFailures: string[] = [];
+  const pageErrors: string[] = [];
 
   page.on("requestfailed", (request) => {
-    const url = new URL(request.url());
     requestFailures.push(
-      `${request.method()} ${url.pathname} (${request.failure()?.errorText ?? "unknown failure"})`,
+      `${request.method()} ${safeDiagnosticPath(request.url())} ${normalizedFailureClass(request.failure()?.errorText)}`,
     );
+  });
+  page.on("response", (response) => {
+    const request = response.request();
+    const url = new URL(response.url());
+    if (url.origin === baseURL && url.pathname.startsWith("/api/__clerk")) {
+      proxyRequests.push(
+        `${request.method()} ${safeDiagnosticPath(response.url())} ${response.status()}`,
+      );
+    }
+  });
+  page.on("pageerror", (error) => {
+    pageErrors.push(normalizedPageError(error));
   });
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame()) {
@@ -167,13 +199,6 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
 
     const testingToken = await clerk.testingTokens.createTestingToken();
     process.env.CLERK_TESTING_TOKEN = testingToken.token;
-    page.on("request", (request) => {
-      const url = new URL(request.url());
-      if (url.origin === baseURL && url.pathname.startsWith("/api/__clerk")) {
-        proxyRequests.push(url.pathname);
-      }
-    });
-
     await setupCandidateClerkTestingToken({
       page,
       candidateOrigin: baseURL,
@@ -268,21 +293,25 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     expect(signedOutStatus).toBe(401);
   } finally {
     delete process.env.CLERK_TESTING_TOKEN;
+    const browserDiagnostic = {
+      finalPath: safeDiagnosticPath(page.url()),
+      routeStates: routeStates.slice(-20).map((path) =>
+        safeDiagnosticPath(new URL(path, baseURL).href),
+      ),
+      clerkRequests: proxyRequests.slice(-50),
+      requestFailures: requestFailures.slice(-20),
+      pageErrors: pageErrors.slice(-20),
+    };
+    await mkdir("test-results/release-diagnostics", { recursive: true });
+    await writeFile(
+      "test-results/release-diagnostics/browser.json",
+      JSON.stringify(browserDiagnostic, null, 2),
+      { encoding: "utf8", mode: 0o600 },
+    );
     // Native Playwright traces retain cookies and request payloads. This bounded
     // path-only trace is safe to upload when the workflow fails.
     await testInfo.attach("managed-clerk-browser-trace", {
-      body: Buffer.from(
-        JSON.stringify(
-          {
-            finalPath: safeBrowserPath(page.url()),
-            routeStates: routeStates.slice(-20),
-            proxyRequestPaths: proxyRequests.slice(-50),
-            requestFailures: requestFailures.slice(-20),
-          },
-          null,
-          2,
-        ),
-      ),
+      body: Buffer.from(JSON.stringify(browserDiagnostic, null, 2)),
       contentType: "application/json",
     });
     const cleanupErrors: Error[] = [];

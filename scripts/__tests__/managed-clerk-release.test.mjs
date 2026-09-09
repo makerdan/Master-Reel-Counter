@@ -2,10 +2,17 @@ import assert from "node:assert/strict";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import http from "node:http";
 import { readFileSync } from "node:fs";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { redactReleaseDiagnostics } from "../redact-release-diagnostics.mjs";
+import {
+  formatReleaseDiagnostics,
+  MAX_DIAGNOSTIC_BYTES,
+  MAX_DIAGNOSTIC_LINES,
+} from "../print-release-diagnostics.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
@@ -216,15 +223,28 @@ test("smoke uses Clerk's supported client-trust helper and keeps safe failure ev
   assert.match(smoke, /CLERK_TESTING_TOKEN/);
   assert.match(smoke, /\/sign-in\/client-trust/);
   assert.match(smoke, /managed-clerk-browser-trace/);
-  assert.match(smoke, /proxyRequestPaths/);
+  assert.match(smoke, /clerkRequests/);
+  assert.match(
+    smoke,
+    /request\.method\(\).*safeDiagnosticPath\(request\.url\(\)\).*normalizedFailureClass/s,
+  );
+  assert.match(
+    smoke,
+    /request\.method\(\).*safeDiagnosticPath\(response\.url\(\)\).*response\.status\(\)/s,
+  );
   assert.match(smoke, /Native Playwright traces retain cookies and request payloads/);
   assert.doesNotMatch(smoke, /goto\(`\/sign-in\?__clerk_testing_token=/);
   assert.match(candidateBuild, /test-results\/release-diagnostics/);
   assert.match(candidateBuild, /redact-release-diagnostics\.mjs/);
   assert.doesNotMatch(candidateBuild, /cat "\$(?:server|proxy)_log"/);
   assert.equal(candidateBuild.match(/print_safe_log "\$(?:server|proxy)_log"/g)?.length, 2);
+  assert.doesNotMatch(
+    candidateBuild,
+    /tail -n 300 "\$(?:source|1)"\s*\|\s*node scripts\/redact-release-diagnostics\.mjs/,
+  );
   assert.match(diagnosticRedactor, /\[REDACTED\]/);
   assert.match(candidateBuild, /tail -n 300/);
+  assert.match(candidateBuild, /print-release-diagnostics\.mjs/);
   assert.match(workflow, /test-results\//);
 });
 
@@ -236,6 +256,18 @@ test("release diagnostic redaction removes complete auth and cookie values", () 
       "Set-Cookie: __session=fourth; HttpOnly; Secure",
       "GET /sign-in?__clerk_testing_token=fifth&other=safe",
       "password=sixth token: seventh secret=eighth",
+      'requestBody={"identifier":"ninth"} responseBody: tenth',
+      "CLERK_SECRET_KEY=sk_test_eleventh",
+      "VITE_CLERK_PUBLISHABLE_KEY=pk_test_twelfth",
+      "safe prefix sk_test_thirteenth and sk_test_fourteenth",
+      "CLERK_TESTING_TOKEN=underscore-label-fifteenth",
+      "responseBody:",
+      '{"identifier":"multiline-sixteenth"}',
+      "-----BEGIN PRIVATE KEY-----",
+      "private-key-seventeenth",
+      "-----END PRIVATE KEY-----",
+      "-----BEGIN PRIVATE KEY-----",
+      "incomplete-private-key-eighteenth",
     ].join("\n"),
   );
   for (const secret of [
@@ -248,12 +280,157 @@ test("release diagnostic redaction removes complete auth and cookie values", () 
     "sixth",
     "seventh",
     "eighth",
+    "ninth",
+    "tenth",
+    "eleventh",
+    "twelfth",
+    "thirteenth",
+    "fourteenth",
+    "fifteenth",
+    "sixteenth",
+    "seventeenth",
+    "eighteenth",
   ]) {
     assert(!redacted.includes(secret));
   }
-  assert.match(redacted, /Authorization: \[REDACTED\]/);
-  assert.match(redacted, /Cookie: \[REDACTED\]/);
-  assert.match(redacted, /__clerk_testing_token=\[REDACTED\]&other=safe/);
+  assert.match(redacted, /\[REDACTED UNSAFE LINE\]/);
+});
+
+test("complete logs are sanitized before tail selection", () => {
+  const secret = "multiline-body-secret";
+  const input = [
+    "responseBody:",
+    ...Array(350).fill(`identifier=${secret}`),
+  ].join("\n");
+  const retainedTail = redactReleaseDiagnostics(input)
+    .split(/\r?\n/)
+    .slice(-300)
+    .join("\n");
+  assert(!retainedTail.includes(secret));
+  assert.match(retainedTail, /\[REDACTED BODY CONTENT\]/);
+});
+
+test("failed release diagnostics are structured, bounded, and secret-redacted", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-diagnostics-"));
+  const browserPath = resolve(directory, "browser.json");
+  const candidateLogPath = resolve(directory, "candidate.log");
+  const proxyLogPath = resolve(directory, "proxy.log");
+  const secrets = [
+    "testing-token-value",
+    "cookie-value",
+    "password-value",
+    "sk_test_secret-key-value",
+    "query-value",
+    "authorization-value",
+    "request-body-value",
+    "response-body-value",
+  ];
+  await writeFile(
+    browserPath,
+    JSON.stringify({
+      finalPath: "/sign-in/client-trust",
+      routeStates: ["/sign-in", "/sign-in/client-trust"],
+      clerkRequests: ["POST /api/__clerk/v1/client/sign_ins 200"],
+      requestFailures: ["GET /api/__clerk/v1/client ERR_CONNECTION_RESET"],
+      pageErrors: ["TypeError"],
+    }),
+  );
+  const injected = [
+    `token=${secrets[0]}`,
+    `Cookie: __session=${secrets[1]}`,
+    `password=${secrets[2]}`,
+    `CLERK_SECRET_KEY=${secrets[3]}`,
+    `GET /path?unsafe=${secrets[4]}`,
+    `Authorization: Bearer ${secrets[5]}`,
+    `requestBody=${secrets[6]}`,
+    `responseBody=${secrets[7]}`,
+  ];
+  await writeFile(candidateLogPath, Array(100).fill(injected.join("\n")).join("\n"));
+  await writeFile(proxyLogPath, Array(100).fill("proxy line").join("\n"));
+
+  const output = await formatReleaseDiagnostics({
+    browserPath,
+    candidateLogPath,
+    proxyLogPath,
+  });
+  assert.match(output, /MANAGED CLERK RELEASE DIAGNOSTICS/);
+  assert.match(output, /finalPath="\/sign-in\/client-trust"/);
+  assert.match(output, /POST \/api\/__clerk\/v1\/client\/sign_ins 200/);
+  assert.match(output, /ERR_CONNECTION_RESET/);
+  assert.match(output, /\[candidate tail\]/);
+  assert.match(output, /\[proxy tail\]/);
+  assert.match(output, /END MANAGED CLERK RELEASE DIAGNOSTICS/);
+  assert(Buffer.byteLength(output) <= MAX_DIAGNOSTIC_BYTES);
+  assert(output.split(/\r?\n/).length <= MAX_DIAGNOSTIC_LINES);
+  for (const secret of secrets) assert(!output.includes(secret));
+});
+
+test("browser diagnostic values fail closed and cannot crowd out log tails", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-diagnostics-invalid-"));
+  const browserPath = resolve(directory, "browser.json");
+  const candidateLogPath = resolve(directory, "candidate.log");
+  const proxyLogPath = resolve(directory, "proxy.log");
+  const unsafe = "private-browser-value";
+  const credentialPath = "/sk_test_browser-credential-value";
+  await writeFile(
+    browserPath,
+    JSON.stringify({
+      finalPath: `/safe?query=${unsafe}`,
+      routeStates: [credentialPath, ...Array(100).fill(`/safe?query=${unsafe}`)],
+      clerkRequests: Array(100).fill(`POST /api/__clerk/path 200 ${unsafe}`),
+      requestFailures: [`GET /api/__clerk/path arbitrary-${unsafe}`],
+      pageErrors: [`TypeError ${unsafe}`],
+    }),
+  );
+  await writeFile(candidateLogPath, "candidate evidence");
+  await writeFile(proxyLogPath, "proxy evidence");
+  const output = await formatReleaseDiagnostics({
+    browserPath,
+    candidateLogPath,
+    proxyLogPath,
+  });
+  assert(!output.includes(unsafe));
+  assert(!output.includes("browser-credential-value"));
+  assert.match(output, /\[REDACTED INVALID ENTRY\]/);
+  assert.match(output, /candidate evidence/);
+  assert.match(output, /proxy evidence/);
+  assert.match(output, /END MANAGED CLERK RELEASE DIAGNOSTICS/);
+});
+
+test("maximum valid diagnostic input preserves every bounded section", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-diagnostics-max-"));
+  const browserPath = resolve(directory, "browser.json");
+  const candidateLogPath = resolve(directory, "candidate.log");
+  const proxyLogPath = resolve(directory, "proxy.log");
+  const longPath = `/${"a".repeat(150)}`;
+  await writeFile(
+    browserPath,
+    JSON.stringify({
+      finalPath: longPath,
+      routeStates: Array(50).fill(longPath),
+      clerkRequests: Array(50).fill(`POST ${longPath} 200`),
+      requestFailures: Array(50).fill(`GET ${longPath} ERR_CONNECTION_RESET`),
+      pageErrors: Array(50).fill("TypeError"),
+    }),
+  );
+  await writeFile(candidateLogPath, Array(40).fill("c".repeat(256)).join("\n"));
+  await writeFile(proxyLogPath, Array(40).fill("p".repeat(256)).join("\n"));
+  const output = await formatReleaseDiagnostics({
+    browserPath,
+    candidateLogPath,
+    proxyLogPath,
+  });
+  assert.match(output, /\[browser\]/);
+  assert.match(output, /finalPath=/);
+  assert.match(output, /routeStates=/);
+  assert.match(output, /clerkRequests=/);
+  assert.match(output, /requestFailures=/);
+  assert.match(output, /pageErrors=/);
+  assert.match(output, /\[candidate tail\]/);
+  assert.match(output, /\[proxy tail\]/);
+  assert.match(output, /END MANAGED CLERK RELEASE DIAGNOSTICS/);
+  assert(Buffer.byteLength(`${output}\n`) <= MAX_DIAGNOSTIC_BYTES);
+  assert(output.split(/\r?\n/).length <= MAX_DIAGNOSTIC_LINES);
 });
 
 test("smoke proves proxy, cookie-only API, protected pages, and sign-out", () => {

@@ -8,6 +8,7 @@ candidate_id="$(node -e 'console.log(require("crypto").randomUUID())')"
 server_log="$(mktemp /tmp/managed-clerk-release-server.XXXXXX.log)"
 proxy_log="$(mktemp /tmp/managed-clerk-release-proxy.XXXXXX.log)"
 tls_dir="$(mktemp -d /tmp/managed-clerk-release-tls.XXXXXX)"
+browser_diagnostic="test-results/release-diagnostics/browser.json"
 server_pid=""
 proxy_pid=""
 release_status=0
@@ -18,18 +19,22 @@ retain_failure_diagnostics() {
   for source_and_name in "$server_log:candidate.log" "$proxy_log:proxy.log"; do
     local source="${source_and_name%%:*}"
     local name="${source_and_name#*:}"
-    tail -n 300 "$source" |
-      node scripts/redact-release-diagnostics.mjs >"$diagnostics_dir/$name"
+    node scripts/redact-release-diagnostics.mjs <"$source" |
+      tail -n 300 >"$diagnostics_dir/$name"
   done
 }
 
 print_safe_log() {
-  tail -n 300 "$1" | node scripts/redact-release-diagnostics.mjs >&2
+  node scripts/redact-release-diagnostics.mjs <"$1" | tail -n 300 >&2
 }
 
 cleanup() {
   if [[ "$release_status" -ne 0 ]]; then
-    retain_failure_diagnostics
+    retain_failure_diagnostics || \
+      echo "Managed Clerk release diagnostic artifact retention failed." >&2
+    node scripts/print-release-diagnostics.mjs \
+      "$browser_diagnostic" "$server_log" "$proxy_log" >&2 || \
+      echo "Managed Clerk release diagnostic printing failed." >&2
   fi
   if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
     kill "$server_pid" 2>/dev/null || true
