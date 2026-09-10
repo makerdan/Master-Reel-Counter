@@ -118,10 +118,33 @@ test("workflow provisions and checks the test prerequisites", () => {
   assert.match(workflow, /drizzle-kit push --force/);
   assert.match(workflow, /github-actions-owner/);
   assert.match(workflow, /REPL_ID:\s+github-actions-validation/);
-  assert.match(workflow, /playwright install --with-deps chromium webkit/);
-  assert.match(workflow, /import \{ chromium, webkit \} from "@playwright\/test"/);
-  assert.match(workflow, /webkit\.launch/);
-  assert.match(workflow, /chromium\.launch/);
+  const browserCache = sectionBetween(
+    "      - name: Cache Playwright browser engines",
+    "      - name: Check workflow contract",
+  );
+  assert.match(browserCache, /uses:\s+actions\/cache@[0-9a-f]{40}/);
+  assert.match(browserCache, /id:\s+playwright-cache/);
+  assert.match(browserCache, /path:\s+~\/\.cache\/ms-playwright/);
+  assert.match(
+    browserCache,
+    /key:\s+playwright-browsers-\$\{\{\s*runner\.os\s*\}\}-\$\{\{\s*runner\.arch\s*\}\}-\$\{\{\s*hashFiles\(['"]package-lock\.json['"]\)\s*\}\}/,
+  );
+  const browserInstall = sectionBetween(
+    "      - name: Install Playwright browser engines on cache miss",
+    "      - name: Launch-check Playwright browser engines",
+  );
+  assert.match(
+    browserInstall,
+    /if:\s+\$\{\{\s*steps\.playwright-cache\.outputs\.cache-hit\s+!=\s+'true'\s*\}\}/,
+  );
+  assert.match(browserInstall, /playwright install --with-deps chromium webkit/);
+  const browserLaunch = sectionBetween(
+    "      - name: Launch-check Playwright browser engines",
+    "      - name: Run canonical validation",
+  );
+  assert.match(browserLaunch, /import \{ chromium, webkit \} from "@playwright\/test"/);
+  assert.match(browserLaunch, /webkit\.launch/);
+  assert.match(browserLaunch, /chromium\.launch/);
   assert.match(workflow, /DATABASE_URL:\s+postgresql:\/\/postgres:postgres@localhost:5432\/master_reel_counter_test/);
   assert.match(workflow, /Verify blank-database startup and test authentication/);
   assert.match(workflow, /node --test scripts\/__tests__\/github-actions-empty-database\.test\.mjs/);

@@ -64,6 +64,14 @@ jobs:
       - name: Install frozen dependencies
         run: npm ci
 
+      - name: Cache Playwright browser engines
+        id: playwright-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          # package-lock.json records the exact Playwright version used by npm ci.
+          key: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
+
       - name: Check workflow contract
         run: node --test scripts/__tests__/github-actions-workflow.test.mjs
 
@@ -107,11 +115,17 @@ jobs:
               SET approved = true, rejected = false, is_tester = false;
           "
 
-      - name: Install and verify browser engines
+      - name: Install Playwright browser engines on cache miss
+        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
           npx playwright install --with-deps chromium webkit
+
+      - name: Launch-check Playwright browser engines
+        shell: bash
+        run: |
+          set -euo pipefail
           node --input-type=module <<'NODE'
           import { chromium, webkit } from "@playwright/test";
           const chromiumBrowser = await chromium.launch({ headless: true });
