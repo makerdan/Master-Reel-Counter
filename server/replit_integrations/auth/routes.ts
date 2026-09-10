@@ -2,7 +2,7 @@ import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 import type { User } from "@shared/models/auth";
-import {
+import { notifyAuthorizationChange } from "../../realtime-authorization";
 
 export function isOwnerIdentity(user: any): boolean {
   return user?.isOwner === true;

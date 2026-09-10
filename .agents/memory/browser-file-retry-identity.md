@@ -3,8 +3,8 @@ name: Browser file retry identity
 description: Stable identity for user-selected files across browser retry events.
 ---
 
-When a retry must reuse an idempotency key for the same selected file, derive the pending identity from file content rather than mutable `File` metadata.
+When a retry must reuse an idempotency key for the same selected file, derive the pending identity from file content rather than mutable `File` metadata. Retain both the operation key and any successfully created remote object reference under that identity until confirmation.
 
-**Why:** Browsers and browser-test APIs can recreate a selected `File` with a different `lastModified` value on each input event, even when the filename, type, size, and bytes are unchanged.
+**Why:** Browsers and browser-test APIs can recreate a selected `File` with a different `lastModified` value on each input event, even when the filename, type, size, and bytes are unchanged. Reusing only the registration key still repeats the upload side effect and leaves an extra remote object.
 
-**How to apply:** Hash the bytes before the first side effect, retain the generated operation key by that hash until confirmation, and clear it only after the server confirms the operation.
+**How to apply:** Hash the bytes before the first side effect, retain the generated operation key and successful upload result by that hash, reuse both for retries, and clear them only after the server confirms the operation.

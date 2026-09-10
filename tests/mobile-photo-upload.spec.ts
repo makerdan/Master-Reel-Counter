@@ -125,6 +125,21 @@ async function queuedRegistrationKeys(page: import("@playwright/test").Page): Pr
   }));
 }
 
+async function queuedUploadedObjectPaths(page: import("@playwright/test").Page): Promise<string[]> {
+  return page.evaluate(() => new Promise<string[]>((resolve, reject) => {
+    const request = indexedDB.open("reel-counter-offline", 2);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction("photo-queue", "readonly");
+      const getAll = transaction.objectStore("photo-queue").getAll();
+      getAll.onsuccess = () => resolve(getAll.result
+        .map(item => item.uploadedObjectPath)
+        .filter((path): path is string => typeof path === "string"));
+      getAll.onerror = () => reject(getAll.error);
+    };
+    request.onerror = () => reject(request.error);
+  }));
+}
+
 async function ageQueuedPhotoClaims(
   page: import("@playwright/test").Page,
   ageMs: number,
@@ -298,6 +313,7 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
   }) => {
     const session = await createSessionViaApi(request, `Interrupted Registration ${Date.now()}`);
     cleanupIds.push(session.id);
+    let uploadAttempts = 0;
     let registrationAttempts = 0;
     const registrationKeys: string[] = [];
     let releaseRestoredUpload!: () => void;
@@ -307,6 +323,7 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
     let holdNextUpload = false;
 
     await context.route("**/api/uploads/direct", async route => {
+      uploadAttempts++;
       if (holdNextUpload) {
         holdNextUpload = false;
         await restoredUploadGate;
@@ -363,6 +380,7 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
           body: JSON.stringify(payload),
         });
         expect(committedResponse.ok).toBe(true);
+        await expect.poll(() => queuedUploadedObjectPaths(restoredPage)).toHaveLength(1);
         await route.abort("connectionreset");
         return;
       }
@@ -373,6 +391,7 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
     await expect.poll(() => registrationAttempts, { timeout: 20_000 }).toBe(2);
     await expect.poll(() => queuedPhotoCount(restoredPage), { timeout: 20_000 }).toBe(0);
     expect(registrationKeys).toEqual([persistedKeys[0], persistedKeys[0]]);
+    expect(uploadAttempts).toBe(1);
     const photosResponse = await request.get(`/api/sessions/${session.id}/photos`);
     expect(photosResponse.ok()).toBe(true);
     expect(await photosResponse.json()).toHaveLength(1);

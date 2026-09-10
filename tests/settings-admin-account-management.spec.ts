@@ -22,8 +22,20 @@ async function fulfillJson(
   });
 }
 
+async function mockOwnerAuth(page: import("@playwright/test").Page): Promise<void> {
+  await page.route("**/api/auth/user", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({
+      response,
+      body: JSON.stringify({ ...body, isOwner: true }),
+    });
+  });
+}
+
 test.describe("owner account-management loading", () => {
   test("shows loading and a retryable owner error before succeeding", async ({ page }) => {
+    await mockOwnerAuth(page);
     let requestCount = 0;
     await page.route("**/api/admin/users", async (route) => {
       requestCount += 1;
@@ -65,6 +77,7 @@ test.describe("owner account-management loading", () => {
 });
 
 test("keeps block-list confirmation accurate when its count request fails", async ({ page }) => {
+  await mockOwnerAuth(page);
   let countRequestCount = 0;
   await page.route("**/api/admin/users", async (route) => {
     await fulfillJson(route, [ownerUser]);

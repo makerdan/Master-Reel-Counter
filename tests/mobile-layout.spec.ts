@@ -29,12 +29,18 @@ test.describe("mobile layout parity @mobile", () => {
     cleanupIds,
   }) => {
     const sess = await createSessionViaApi(request, `Mobile denied join ${Date.now()}`);
+    cleanupIds.push(sess.id);
+
+    await page.goto(`/session/${sess.id}`);
+    await page.waitForLoadState("networkidle");
 
     const currentUserId = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", { credentials: "same-origin" });
       if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
       return (await response.json()).id as string;
     });
+    await page.evaluate(({ sid, currentUserId }) => {
+      return new Promise<void>((resolve, reject) => {
         const req = indexedDB.open("reel-counter-offline", 2);
         req.onsuccess = () => {
           const db = req.result;
@@ -94,11 +100,6 @@ test.describe("mobile layout parity @mobile", () => {
   }) => {
     const sess = await createSessionViaApi(request, `Mobile denied join ${Date.now()}`);
 
-    const currentUserId = await page.evaluate(async () => {
-      const response = await fetch("/api/auth/user", { credentials: "same-origin" });
-      if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
-      return (await response.json()).id as string;
-    });
     cleanupIds.push(sess.id);
 
     // Track WS instances so we can close the live socket without going offline
@@ -160,11 +161,6 @@ test.describe("mobile layout parity @mobile", () => {
     await installWebSocketMockCompatibility(page);
     const sess = await createSessionViaApi(request, `Mobile denied join ${Date.now()}`);
 
-    const currentUserId = await page.evaluate(async () => {
-      const response = await fetch("/api/auth/user", { credentials: "same-origin" });
-      if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
-      return (await response.json()).id as string;
-    });
     cleanupIds.push(sess.id);
 
     let connectionCount = 0;

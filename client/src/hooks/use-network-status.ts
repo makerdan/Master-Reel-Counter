@@ -10,6 +10,7 @@ import {
   claimPhotoInFlight,
   clearPhotoInFlight,
   ensurePhotoRegistrationKey,
+  persistPhotoUploadedObjectPath,
   claimEntryInFlight,
   clearEntryInFlight,
   clearStaleInFlight,
@@ -226,43 +227,55 @@ export function useNetworkStatus(currentUserId?: string) {
         }
 
         try {
-          const registrationKey = await ensurePhotoRegistrationKey(photo);
-          const formData = new FormData();
-          formData.append("file", photo.blob, photo.uploadFilename || `photo-${photo.id}.jpg`);
+          const claimedPhoto = (await getQueuedPhotos(photo.sessionId, currentUserId))
+            .find(item => item.id === photo.id);
+          if (!claimedPhoto) continue;
+          const registrationKey = await ensurePhotoRegistrationKey(claimedPhoto);
+          let uploadedObjectPath = claimedPhoto.uploadedObjectPath;
+          if (!uploadedObjectPath) {
+            const formData = new FormData();
+            formData.append("file", claimedPhoto.blob, claimedPhoto.uploadFilename || `photo-${photo.id}.jpg`);
 
-          const uploadRes = await fetch("/api/uploads/direct", {
-            method: "POST",
-            body: formData,
-            credentials: "include",
-            signal: abortController.signal,
-          });
+            const uploadRes = await fetch("/api/uploads/direct", {
+              method: "POST",
+              body: formData,
+              credentials: "include",
+              signal: abortController.signal,
+            });
 
-          if (uploadRes.status === 401) {
-            await clearPhotoInFlight(photo.id);
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-            break;
+            if (uploadRes.status === 401) {
+              await clearPhotoInFlight(photo.id);
+              queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+              break;
+            }
+            if (!uploadRes.ok) {
+              // Server-side error for this photo — release claim and try the next.
+              await clearPhotoInFlight(photo.id);
+              continue;
+            }
+            const uploadData = await uploadRes.json();
+            if (typeof uploadData.objectPath !== "string" || uploadData.objectPath.length === 0) {
+              throw new Error("Upload response did not include an object path");
+            }
+            uploadedObjectPath = uploadData.objectPath;
+            await persistPhotoUploadedObjectPath(photo.id, uploadData.objectPath);
           }
-          if (!uploadRes.ok) {
-            // Server-side error for this photo — release claim and try the next.
-            await clearPhotoInFlight(photo.id);
-            continue;
-          }
-          const uploadData = await uploadRes.json();
+          if (!uploadedObjectPath) throw new Error("Uploaded object path is unavailable");
 
           const photoRes = await fetch(`/api/sessions/${photo.sessionId}/photos`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               registrationKey,
-              objectStorageKey: uploadData.objectPath,
-              originalFilename: photo.originalFilename || `offline-${photo.id}.jpg`,
+              objectStorageKey: uploadedObjectPath,
+              originalFilename: claimedPhoto.originalFilename || `offline-${photo.id}.jpg`,
               mimeType: "image/jpeg",
-              fileSize: photo.blob.size,
-              width: photo.width,
-              height: photo.height,
-              aisle: photo.aisle,
-              section: photo.section,
-              notes: photo.notes || undefined,
+              fileSize: claimedPhoto.blob.size,
+              width: claimedPhoto.width,
+              height: claimedPhoto.height,
+              aisle: claimedPhoto.aisle,
+              section: claimedPhoto.section,
+              notes: claimedPhoto.notes || undefined,
             }),
             credentials: "include",
             signal: abortController.signal,

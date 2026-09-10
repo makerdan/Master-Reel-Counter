@@ -33,6 +33,9 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     storageState: "tests/.auth/user.json",
+    extraHTTPHeaders: {
+      "x-replit-e2e": "1",
+    },
     trace: "on-first-retry",
     actionTimeout: 10_000,
     navigationTimeout: 20_000,

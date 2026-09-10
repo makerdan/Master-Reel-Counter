@@ -19,6 +19,7 @@ import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { createDirectPhotoRegistrationKey, directPhotoFileKey } from "@/lib/directPhotoRegistration";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
+import type { UploadResponse } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { lookupCatalog, PARSED_CATALOG, userWireCatalogToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
@@ -74,6 +75,7 @@ export default function SingleEntryMode({
   const singleFileRef = useRef<HTMLInputElement>(null);
   const singleCameraRef = useRef<HTMLInputElement>(null);
   const pendingRegistrationKeysRef = useRef(new Map<string, string>());
+  const pendingUploadResultsRef = useRef(new Map<string, UploadResponse>());
   const [capturedPhoto, setCapturedPhoto] = useState<{ url: string; objectPath: string; photoId: number } | null>(null);
   const [keepLocation, setKeepLocation] = useState(false);
   const prevDefaultsRef = useRef({ aisle: defaultAisle || "", section: defaultSection || "" });
@@ -381,35 +383,42 @@ export default function SingleEntryMode({
     const registrationKey = pendingRegistrationKeysRef.current.get(fileKey)
       ?? createDirectPhotoRegistrationKey();
     pendingRegistrationKeysRef.current.set(fileKey, registrationKey);
-    const uploadResult = await uploadFile(file);
-    if (!uploadResult.success) {
-      if (uploadResult.networkError) {
-        try {
-          const blob = file.slice(0, file.size, file.type);
-          const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          await saveToQueue({
-            id: queueId,
-            registrationKey: queueId,
-            sessionId,
-            userId: identityId,
-            blob,
-            aisle: form.aisle,
-            section: form.section,
-            notes: "",
-            isReceiving: form.aisle.trim().toLowerCase() === "receiving",
-            isOnFloor: false,
-            createdAt: Date.now(),
-          });
-          toast({ title: "Photo queued for upload when back online" });
-        } catch {
-          toast({ title: "Failed to queue photo", variant: "destructive" });
+    let result = pendingUploadResultsRef.current.get(fileKey);
+    if (!result) {
+      const uploadResult = await uploadFile(file);
+      if (!uploadResult.success) {
+        if (uploadResult.networkError) {
+          try {
+            const blob = file.slice(0, file.size, file.type);
+            const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            await saveToQueue({
+              id: queueId,
+              registrationKey: queueId,
+              sessionId,
+              userId: identityId,
+              blob,
+              aisle: form.aisle,
+              section: form.section,
+              notes: "",
+              isReceiving: form.aisle.trim().toLowerCase() === "receiving",
+              isOnFloor: false,
+              createdAt: Date.now(),
+            });
+            toast({ title: "Photo queued for upload when back online" });
+          } catch {
+            toast({ title: "Failed to queue photo", variant: "destructive" });
+          }
+        } else {
+          toast({ title: "Upload failed", variant: "destructive" });
         }
-      } else {
-        toast({ title: "Upload failed", variant: "destructive" });
+        if (singleFileRef.current) singleFileRef.current.value = "";
+        if (singleCameraRef.current) singleCameraRef.current.value = "";
+        return;
       }
-    } else {
-      try {
-        const result = uploadResult.data;
+      result = uploadResult.data;
+      pendingUploadResultsRef.current.set(fileKey, result);
+    }
+    try {
         const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
           registrationKey,
           objectStorageKey: result.objectPath,
@@ -421,6 +430,7 @@ export default function SingleEntryMode({
         });
         const savedPhoto = await res.json();
         pendingRegistrationKeysRef.current.delete(fileKey);
+        pendingUploadResultsRef.current.delete(fileKey);
         await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
         if (onSwitchToPhoto) {
           toast({ title: "Photo captured — switching to pin mode" });
@@ -429,9 +439,8 @@ export default function SingleEntryMode({
           setCapturedPhoto({ url: result.objectPath, objectPath: result.objectPath, photoId: savedPhoto.id });
           toast({ title: "Photo captured" });
         }
-      } catch {
-        toast({ title: "Photo upload failed", variant: "destructive" });
-      }
+    } catch {
+      toast({ title: "Photo upload failed", variant: "destructive" });
     }
     if (singleFileRef.current) singleFileRef.current.value = "";
     if (singleCameraRef.current) singleCameraRef.current.value = "";

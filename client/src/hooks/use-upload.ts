@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 
-interface UploadResponse {
+export interface UploadResponse {
   objectPath: string;
   metadata: {
     name: string;

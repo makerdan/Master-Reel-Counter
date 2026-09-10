@@ -426,6 +426,9 @@ const resourceRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many requests, please try again later." },
+  skip: (req) =>
+    process.env.NODE_ENV !== "production"
+    && req.get("x-replit-e2e") === "1",
 });
 
 const MAX_PINS_PER_CROP_REQUEST = 50;

@@ -30,6 +30,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
+import type { UploadResponse } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { lookupCatalog, userWireCatalogToParsedEntry, type ParsedCatalogEntry } from "@/lib/wireReference";
@@ -84,6 +85,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const pendingRegistrationKeysRef = useRef(new Map<string, string>());
+  const pendingUploadResultsRef = useRef(new Map<string, UploadResponse>());
   const [aisle, setAisle] = useState("");
   const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number; linkedPinLabel?: string; pinScale?: number; rotation?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
@@ -903,21 +905,25 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         ?? createDirectPhotoRegistrationKey();
       pendingRegistrationKeysRef.current.set(fileKey, registrationKey);
       try {
-        const uploadResult = await uploadFile(file);
-        if (!uploadResult.success) {
-          if (uploadResult.networkError) {
-            const blob = file.slice(0, file.size, file.type);
-            const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            let sectionVal = "";
-            if (isRec) { sectionVal = String(nextRecNum).padStart(3, "0"); nextRecNum++; }
-            await saveToQueue({ id: queueId, registrationKey: queueId, sessionId, userId: identityId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, isOnFloor: false, createdAt: Date.now() });
-            toast({ title: "Photo queued", description: `${file.name} will upload when back online` });
-          } else {
-            toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
+        let result = pendingUploadResultsRef.current.get(fileKey);
+        if (!result) {
+          const uploadResult = await uploadFile(file);
+          if (!uploadResult.success) {
+            if (uploadResult.networkError) {
+              const blob = file.slice(0, file.size, file.type);
+              const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+              let sectionVal = "";
+              if (isRec) { sectionVal = String(nextRecNum).padStart(3, "0"); nextRecNum++; }
+              await saveToQueue({ id: queueId, registrationKey: queueId, sessionId, userId: identityId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, isOnFloor: false, createdAt: Date.now() });
+              toast({ title: "Photo queued", description: `${file.name} will upload when back online` });
+            } else {
+              toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
+            }
+            continue;
           }
-          continue;
+          result = uploadResult.data;
+          pendingUploadResultsRef.current.set(fileKey, result);
         }
-        const result = uploadResult.data;
         let sectionVal = "";
         if (isRec) {
           sectionVal = String(nextRecNum).padStart(3, "0");
@@ -934,6 +940,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         });
         const savedPhoto = await res.json();
         pendingRegistrationKeysRef.current.delete(fileKey);
+        pendingUploadResultsRef.current.delete(fileKey);
         const savedObjectPath = savedPhoto.objectStorageKey || result.objectPath;
         const savedPhotoView = {
           url: savedObjectPath.startsWith("/uploads/") || savedObjectPath.startsWith("/objects/")

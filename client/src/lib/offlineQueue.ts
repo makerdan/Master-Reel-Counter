@@ -33,6 +33,7 @@ export interface QueuedPhoto {
   createdAt: number;
   inFlight?: boolean;
   claimedAt?: number;
+  uploadedObjectPath?: string;
 }
 
 export interface QueuedEntry {
@@ -93,6 +94,9 @@ export async function ensurePhotoRegistrationKey(item: QueuedPhoto): Promise<str
   return registrationKey;
 }
 
+export async function persistPhotoUploadedObjectPath(id: string, uploadedObjectPath: string): Promise<void> {
+  return patchPhotoRecord(id, { uploadedObjectPath });
+}
 export async function removeFromQueue(id: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {

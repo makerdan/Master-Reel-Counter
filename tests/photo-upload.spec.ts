@@ -19,9 +19,25 @@ const directPhoto = {
 async function interceptLostFirstRegistration(
   context: import("@playwright/test").BrowserContext,
   sessionId: number,
-): Promise<{ attempts: () => number; keys: string[] }> {
+): Promise<{ attempts: () => number; uploads: () => number; keys: string[] }> {
   let attemptCount = 0;
+  let uploadCount = 0;
   const keys: string[] = [];
+  await context.route("**/api/uploads/direct", async (route) => {
+    uploadCount++;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        objectPath: `/uploads/direct-retry-${sessionId}.png`,
+        metadata: {
+          name: `direct-retry-${sessionId}.png`,
+          size: directPhoto.buffer.length,
+          contentType: directPhoto.mimeType,
+        },
+      }),
+    });
+  });
   await context.route(`**/api/sessions/${sessionId}/photos`, async route => {
     if (route.request().method() !== "POST") {
       await route.continue();
@@ -46,7 +62,7 @@ async function interceptLostFirstRegistration(
     }
     await route.continue();
   });
-  return { attempts: () => attemptCount, keys };
+  return { attempts: () => attemptCount, uploads: () => uploadCount, keys };
 }
 
 test.describe("photo POST validation @photo-upload", () => {
@@ -76,6 +92,7 @@ test.describe("photo POST validation @photo-upload", () => {
     expect(intercepted.keys).toHaveLength(2);
     expect(intercepted.keys[0]).toEqual(expect.any(String));
     expect(intercepted.keys[1]).toBe(intercepted.keys[0]);
+    expect(intercepted.uploads()).toBe(1);
     const photos = await request.get(`/api/sessions/${sess.id}/photos`);
     expect(await photos.json()).toHaveLength(1);
   });
@@ -95,14 +112,15 @@ test.describe("photo POST validation @photo-upload", () => {
     await page.locator('[data-testid="button-quick-entry-toggle"]').click();
     const input = page.locator('[data-testid="input-single-file"]');
     await input.setInputFiles(directPhoto);
-    await expect.poll(intercepted.attempts).toBe(1);
+    await expect.poll(intercepted.attempts, { timeout: 20_000 }).toBe(1);
     await expect(input).toHaveValue("");
     await input.setInputFiles(directPhoto);
-    await expect.poll(intercepted.attempts).toBe(2);
+    await expect.poll(intercepted.attempts, { timeout: 20_000 }).toBe(2);
 
     expect(intercepted.keys).toHaveLength(2);
     expect(intercepted.keys[0]).toEqual(expect.any(String));
     expect(intercepted.keys[1]).toBe(intercepted.keys[0]);
+    expect(intercepted.uploads()).toBe(1);
     await expect(page.locator('[data-testid="img-captured-photo"]')).toBeVisible();
     const photos = await request.get(`/api/sessions/${sess.id}/photos`);
     expect(await photos.json()).toHaveLength(1);

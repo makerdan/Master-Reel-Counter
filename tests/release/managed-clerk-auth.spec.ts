@@ -198,8 +198,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       candidateOrigin: baseURL,
       localCandidateOrigin: process.env.RELEASE_SMOKE_CANDIDATE_APP_ORIGIN,
     });
-    await page
-      .goto("/settings")
+    await page.goto("/settings")
       .catch(() => {
         throw new Error("Managed Clerk protected entry page failed to load");
       });

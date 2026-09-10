@@ -24,7 +24,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos, claimPhotoInFlight, clearPhotoInFlight, ensurePhotoRegistrationKey, onQueueChange } from "@/lib/offlineQueue";
+import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos, claimPhotoInFlight, clearPhotoInFlight, ensurePhotoRegistrationKey, persistPhotoUploadedObjectPath, onQueueChange } from "@/lib/offlineQueue";
 import { MobileImageFormatError, prepareMobileImage } from "@/lib/prepareMobileImage";
 import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
@@ -48,6 +48,7 @@ type UploadQueueItem = {
   status: "pending" | "uploading" | "failed" | "terminal";
   errorMessage?: string;
   retries: number;
+  uploadedObjectPath?: string;
 };
 
 function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured, onBackToFlagged, onClearUndoHistory }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void; onBackToFlagged?: () => void; onClearUndoHistory?: () => void }) {
@@ -186,6 +187,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         isOnFloor: item.isOnFloor ?? false,
         status: "pending" as const,
         retries: 0,
+        uploadedObjectPath: item.uploadedObjectPath,
       }));
       void Promise.all(items
         .filter(item => !item.registrationKey)
@@ -265,11 +267,28 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         const abortController = new AbortController();
         activeUploadAbortRef.current = abortController;
 
-        const formData = new FormData();
-        formData.append("file", nextItem.file);
-        const uploadRes = await fetch("/api/uploads/direct", { method: "POST", body: formData, credentials: "include", signal: abortController.signal });
-        if (!uploadRes.ok) throw new Error("Upload failed");
-        const uploadResult = await uploadRes.json();
+        const claimedPhoto = (await getQueuedPhotos(sessionId, identityId))
+          .find(item => item.id === nextItem.queueId);
+        if (!claimedPhoto) return;
+        let uploadedObjectPath = claimedPhoto.uploadedObjectPath;
+        let uploadedSize: number | undefined;
+        if (!uploadedObjectPath) {
+          const formData = new FormData();
+          formData.append("file", nextItem.file);
+          const uploadRes = await fetch("/api/uploads/direct", { method: "POST", body: formData, credentials: "include", signal: abortController.signal });
+          if (!uploadRes.ok) throw new Error("Upload failed");
+          const uploadResult = await uploadRes.json();
+          if (typeof uploadResult.objectPath !== "string" || uploadResult.objectPath.length === 0) {
+            throw new Error("Upload response did not include an object path");
+          }
+          uploadedObjectPath = uploadResult.objectPath;
+          uploadedSize = uploadResult.metadata?.size;
+          await persistPhotoUploadedObjectPath(nextItem.queueId, uploadResult.objectPath);
+          setUploadQueue(prev => prev.map(item =>
+            item.queueId === nextItem.queueId ? { ...item, uploadedObjectPath } : item
+          ));
+        }
+        if (!uploadedObjectPath) throw new Error("Uploaded object path is unavailable");
 
         if (discardedIdsRef.current.has(nextItem.queueId)) {
           processingRef.current = false;
@@ -278,10 +297,10 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
         const photoPayload: Record<string, any> = {
           registrationKey: nextItem.registrationKey,
-          objectStorageKey: uploadResult.objectPath,
+          objectStorageKey: uploadedObjectPath,
           originalFilename: nextItem.originalFilename,
           mimeType: "image/jpeg",
-          fileSize: uploadResult.metadata?.size || nextItem.file.size,
+          fileSize: uploadedSize || nextItem.file.size,
           width: nextItem.width,
           height: nextItem.height,
           aisle: nextItem.aisle,
@@ -318,7 +337,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
             if (mountedRef.current) {
               const reviewBlobUrl = URL.createObjectURL(nextItem.file);
               blobUrlsRef.current.add(reviewBlobUrl);
-              setDetailReviewPhoto({ id: savedPhoto.id, objectPath: uploadResult.objectPath, blobUrl: reviewBlobUrl });
+              setDetailReviewPhoto({ id: savedPhoto.id, objectPath: uploadedObjectPath, blobUrl: reviewBlobUrl });
               setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
               queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
             }
@@ -342,7 +361,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         if (!mountedRef.current) return;
         setRecentPhotos(prev => [...prev, {
           id: savedPhoto.id,
-          objectPath: uploadResult.objectPath,
+          objectPath: uploadedObjectPath,
           notes: nextItem.notes,
           aisle: nextItem.aisle,
           section: nextItem.section,
