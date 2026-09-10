@@ -313,6 +313,12 @@
   .mono {
     font-family: var(--font-mono);
   }
+
+  /* Keep the approved Mobile Flow input size stable across phone orientation changes. */
+  .mobile-flow-large-input {
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+  }
 }
 
 @keyframes slideIn {

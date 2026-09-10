@@ -23,6 +23,93 @@ async function installWebSocketMockCompatibility(page: Page) {
 test.describe("mobile layout parity @mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
+  test("Mobile Flow input text size remains stable across rotation @mobile-image-orientation", async ({
+    page,
+    request,
+    cleanupIds,
+  }) => {
+    const sess = await createSessionViaApi(request, `Mobile input sizing ${Date.now()}`);
+    cleanupIds.push(sess.id);
+
+    await page.goto(`/session/${sess.id}`);
+    await page.waitForLoadState("networkidle");
+    const mobileHeader = page.locator('[data-testid="header-mobile-flow"]');
+    if (!(await mobileHeader.isVisible().catch(() => false))) {
+      await page.locator('[data-testid="button-toggle-mobile"]').click();
+    }
+    await expect(mobileHeader).toBeVisible();
+
+    const aisle = page.locator('[data-testid="input-mobile-aisle"]');
+    const section = page.locator('[data-testid="input-mobile-section"]');
+    await aisle.fill("A-12");
+    await section.fill("7");
+
+    const portraitMetrics = await page.evaluate(() => {
+      const getMetrics = (testId: string) => {
+        const input = document.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`);
+        if (!input) throw new Error(`Missing ${testId}`);
+        const styles = getComputedStyle(input);
+        return {
+          value: input.value,
+          fontSize: styles.fontSize,
+          height: input.getBoundingClientRect().height,
+        };
+      };
+      const label = document.querySelector("label");
+      const cameraButton = document.querySelector('[data-testid="button-mobile-camera"]');
+      if (!label || !cameraButton) throw new Error("Missing Mobile Flow surrounding controls");
+      return {
+        aisle: getMetrics("input-mobile-aisle"),
+        section: getMetrics("input-mobile-section"),
+        labelFontSize: getComputedStyle(label).fontSize,
+        cameraButtonFontSize: getComputedStyle(cameraButton).fontSize,
+      };
+    });
+
+    expect(portraitMetrics.aisle).toMatchObject({ value: "A-12", fontSize: "60px" });
+    expect(portraitMetrics.section).toMatchObject({ value: "7", fontSize: "60px" });
+    expect(portraitMetrics.aisle.height).toBe(72);
+    expect(portraitMetrics.section.height).toBe(72);
+
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect.poll(async () => page.evaluate(() => ({
+      aisle: (document.querySelector('[data-testid="input-mobile-aisle"]') as HTMLInputElement)?.value,
+      section: (document.querySelector('[data-testid="input-mobile-section"]') as HTMLInputElement)?.value,
+      aisleFontSize: getComputedStyle(document.querySelector('[data-testid="input-mobile-aisle"]')!).fontSize,
+      sectionFontSize: getComputedStyle(document.querySelector('[data-testid="input-mobile-section"]')!).fontSize,
+    }))).toEqual({
+      aisle: "A-12",
+      section: "7",
+      aisleFontSize: "60px",
+      sectionFontSize: "60px",
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const returnedMetrics = await page.evaluate(() => {
+      const getMetrics = (testId: string) => {
+        const input = document.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`);
+        if (!input) throw new Error(`Missing ${testId}`);
+        const styles = getComputedStyle(input);
+        return {
+          value: input.value,
+          fontSize: styles.fontSize,
+          height: input.getBoundingClientRect().height,
+        };
+      };
+      const label = document.querySelector("label");
+      const cameraButton = document.querySelector('[data-testid="button-mobile-camera"]');
+      if (!label || !cameraButton) throw new Error("Missing Mobile Flow surrounding controls");
+      return {
+        aisle: getMetrics("input-mobile-aisle"),
+        section: getMetrics("input-mobile-section"),
+        labelFontSize: getComputedStyle(label).fontSize,
+        cameraButtonFontSize: getComputedStyle(cameraButton).fontSize,
+      };
+    });
+
+    expect(returnedMetrics).toEqual(portraitMetrics);
+  });
+
   test("offline pending-count badge is visible on mobile", async ({
     page,
     request,
