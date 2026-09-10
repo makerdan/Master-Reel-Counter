@@ -58,7 +58,6 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 export VITE_CLERK_PROXY_URL="/api/__clerk"
-export VITE_CLERK_PUBLIC_HOST="$candidate_host"
 npm run build
 
 NODE_ENV=production PORT="$candidate_port" RELEASE_CANDIDATE_ID="$candidate_id" \

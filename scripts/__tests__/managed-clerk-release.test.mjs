@@ -72,7 +72,7 @@ test("every Replit deployment build gates the exact production candidate", () =>
   assert.match(candidateBuild, /npm run build/);
   assert.match(candidateBuild, /NODE_ENV=production PORT="\$candidate_port" RELEASE_CANDIDATE_ID="\$candidate_id"/);
   assert.match(candidateBuild, /master-reel-counter-ai\.replit\.app/);
-  assert.match(candidateBuild, /VITE_CLERK_PUBLIC_HOST="\$candidate_host"/);
+  assert.doesNotMatch(candidateBuild, /VITE_CLERK_PUBLIC_HOST/);
   assert.match(candidateBuild, /wait-for-release-candidate\.mjs/);
   assert.match(candidateBuild, /RELEASE_SMOKE_INTERNAL_CANDIDATE=1/);
   assert.match(candidateBuild, /RELEASE_SMOKE_CANDIDATE_HOST="\$candidate_host"/);
@@ -207,21 +207,19 @@ test("smoke uses disposable managed identity and preserves local authorization s
   assert.match(smoke, /removeStaleSmokeUsers/);
   assert.match(smoke, /createdAtBefore: cutoff/);
   assert.match(smoke, /externalId\?\.startsWith\(SMOKE_ID_PREFIX\)/);
-  assert.equal(
-    smoke.match(/getByRole\("button", \{ name: "Continue", exact: true \}\)/g)?.length,
-    2,
-  );
+  assert.match(smoke, /clerkTesting\.signIn\(\{/);
   assert.doesNotMatch(smoke, /name: \/continue\/i/);
   assert.doesNotMatch(smoke, /rejectUnauthorized: false/);
 });
 
-test("smoke uses Clerk's supported client-trust helper and keeps safe failure evidence", () => {
-  assert.equal(packageJson.dependencies["@clerk/backend"], "^3.17.1");
+test("smoke uses Clerk's supported testing sign-in and keeps safe failure evidence", () => {
+  assert.equal(packageJson.dependencies["@clerk/backend"], "^3.17.2");
   assert.equal(packageJson.devDependencies["@clerk/testing"], "^2.2.33");
   assert.match(smoke, /setupCandidateClerkTestingToken\(\{/);
   assert.match(smoke, /localCandidateOrigin: process\.env\.RELEASE_SMOKE_CANDIDATE_APP_ORIGIN/);
   assert.match(smoke, /CLERK_TESTING_TOKEN/);
-  assert.match(smoke, /\/sign-in\/client-trust/);
+  assert.match(smoke, /clerkTesting\.signIn\(\{/);
+  assert.match(smoke, /frontendApiUrl: new URL\(CLERK_TESTING_FRONTEND_API_ORIGIN\)\.host/);
   assert.match(smoke, /managed-clerk-browser-trace/);
   assert.match(smoke, /clerkRequests/);
   assert.match(
@@ -443,7 +441,7 @@ test("smoke proves proxy, cookie-only API, protected pages, and sign-out", () =>
   assert.match(smoke, /page\.goto\("\/stats"\)/);
   assert.match(smoke, /button-login/);
   assert.match(smoke, /toBe\(401\)/);
-  assert.match(smoke, /fillSecret/);
+  assert.match(smoke, /clerkTesting\.signIn/);
   assert.doesNotMatch(smoke, /\.fill\(password\)/);
   assert.doesNotMatch(smoke, /Authorization|__test__|owner-login|tester-login/);
 });

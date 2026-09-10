@@ -1,15 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { createClerkClient } from "@clerk/backend";
+import { clerk as clerkTesting } from "@clerk/testing/playwright";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import pg from "pg";
-import { setupCandidateClerkTestingToken } from "../support/clerk-candidate-testing";
-import { fillSecret } from "../support/secret-safe-actions";
+import {
+  CLERK_TESTING_FRONTEND_API_ORIGIN,
+  setupCandidateClerkTestingToken,
+} from "../support/clerk-candidate-testing";
 
 const { Client } = pg;
 const SMOKE_ID_PREFIX = "release-smoke-";
 const STALE_SMOKE_AGE_MS = 60 * 60 * 1000;
-const CLIENT_TRUST_TIMEOUT_MS = 10_000;
 
 const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
@@ -55,7 +57,6 @@ async function waitForCompletedSignIn(
   routeStates: string[],
 ): Promise<void> {
   const deadline = Date.now() + 30_000;
-  let clientTrustStartedAt: number | undefined;
 
   while (Date.now() < deadline) {
     const path = safeBrowserPath(page.url());
@@ -79,14 +80,6 @@ async function waitForCompletedSignIn(
       return;
     }
 
-    if (path.startsWith("/sign-in/client-trust")) {
-      clientTrustStartedAt ??= Date.now();
-      if (Date.now() - clientTrustStartedAt >= CLIENT_TRUST_TIMEOUT_MS) {
-        throw new Error(
-          "Managed Clerk sign-in did not complete the supported testing-token client-trust step at /sign-in/client-trust",
-        );
-      }
-    }
     await page.waitForTimeout(250);
   }
 
@@ -222,14 +215,13 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       });
       expect(candidateId).toBe(expectedCandidateId);
     }
-    await page.locator('input[name="identifier"]').fill(email);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await fillSecret(
-      page.locator('input[name="password"]'),
-      password,
-      "Managed Clerk password field could not be completed",
-    );
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await clerkTesting.signIn({
+      page,
+      emailAddress: email,
+      setupClerkTestingTokenOptions: {
+        frontendApiUrl: new URL(CLERK_TESTING_FRONTEND_API_ORIGIN).host,
+      },
+    });
 
     await waitForCompletedSignIn(page, routeStates);
     const authResponse = await page.evaluate(async () => {
