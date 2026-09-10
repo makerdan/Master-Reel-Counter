@@ -9,6 +9,7 @@ import {
   dispatchEntrySynced,
   claimPhotoInFlight,
   clearPhotoInFlight,
+  ensurePhotoRegistrationKey,
   claimEntryInFlight,
   clearEntryInFlight,
   clearStaleInFlight,
@@ -192,6 +193,7 @@ export function useNetworkStatus(currentUserId?: string) {
         if (!claimed) continue;
 
         try {
+          const registrationKey = await ensurePhotoRegistrationKey(photo);
           const formData = new FormData();
           formData.append("file", photo.blob, photo.uploadFilename || `photo-${photo.id}.jpg`);
 
@@ -217,6 +219,7 @@ export function useNetworkStatus(currentUserId?: string) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              registrationKey,
               objectStorageKey: uploadData.objectPath,
               originalFilename: photo.originalFilename || `offline-${photo.id}.jpg`,
               mimeType: "image/jpeg",

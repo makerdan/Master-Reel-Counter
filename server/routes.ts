@@ -450,6 +450,7 @@ interface UploadBody {
 
 /** Body shape for POST /api/sessions/:sessionId/photos */
 interface PhotoCreateBody {
+  registrationKey?: string;
   objectStorageKey?: string;
   originalFilename?: string;
   objectPath?: string;

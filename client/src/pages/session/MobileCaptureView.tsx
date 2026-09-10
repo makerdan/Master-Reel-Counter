@@ -24,7 +24,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos, claimPhotoInFlight, clearPhotoInFlight, onQueueChange } from "@/lib/offlineQueue";
+import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos, claimPhotoInFlight, clearPhotoInFlight, ensurePhotoRegistrationKey, onQueueChange } from "@/lib/offlineQueue";
 import { MobileImageFormatError, prepareMobileImage } from "@/lib/prepareMobileImage";
 import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
@@ -33,6 +33,7 @@ const MAX_AUTO_RETRIES = 3;
 
 type UploadQueueItem = {
   queueId: string;
+  registrationKey: string;
   file: File;
   originalFilename: string;
   uploadFilename: string;
@@ -171,6 +172,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       if (cancelled || items.length === 0) return;
       const restored: UploadQueueItem[] = items.map(item => ({
         queueId: item.id,
+        registrationKey: item.registrationKey || item.id,
         file: new File([item.blob], item.uploadFilename || `restored-${item.id}.jpg`, { type: "image/jpeg" }),
         originalFilename: item.originalFilename || `restored-${item.id}.jpg`,
         uploadFilename: item.uploadFilename || `restored-${item.id}.jpg`,
@@ -185,6 +187,10 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         status: "pending" as const,
         retries: 0,
       }));
+      void Promise.all(items
+        .filter(item => !item.registrationKey)
+        .map(item => ensurePhotoRegistrationKey(item)))
+        .catch(err => console.error("Failed to persist restored photo registration keys:", err));
       for (const r of restored) blobUrlsRef.current.add(r.blobUrl);
       setUploadQueue(prev => {
         const existingIds = new Set(prev.map(q => q.queueId));
@@ -271,6 +277,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         }
 
         const photoPayload: Record<string, any> = {
+          registrationKey: nextItem.registrationKey,
           objectStorageKey: uploadResult.objectPath,
           originalFilename: nextItem.originalFilename,
           mimeType: "image/jpeg",
@@ -458,6 +465,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         blobUrlsRef.current.add(blobUrl);
         const item: UploadQueueItem = {
           queueId,
+          registrationKey: queueId,
           file: prepared.file,
           originalFilename: sourceFile.name,
           uploadFilename: prepared.file.name,
@@ -474,6 +482,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         };
         await saveToQueue({
           id: item.queueId,
+          registrationKey: item.registrationKey,
           sessionId,
           userId: identityId,
           blob: item.file,
@@ -498,6 +507,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         blobUrlsRef.current.add(blobUrl);
         const terminalItem: UploadQueueItem = {
           queueId,
+          registrationKey: queueId,
           file: sourceFile,
           originalFilename: sourceFile.name,
           uploadFilename: sourceFile.name,

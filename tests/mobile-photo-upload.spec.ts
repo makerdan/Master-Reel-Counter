@@ -36,6 +36,19 @@ async function queuedUploadFilenames(page: import("@playwright/test").Page): Pro
   }));
 }
 
+async function queuedRegistrationKeys(page: import("@playwright/test").Page): Promise<string[]> {
+  return page.evaluate(() => new Promise<string[]>((resolve, reject) => {
+    const request = indexedDB.open("reel-counter-offline", 2);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction("photo-queue", "readonly");
+      const getAll = transaction.objectStore("photo-queue").getAll();
+      getAll.onsuccess = () => resolve(getAll.result.map(item => item.registrationKey).sort());
+      getAll.onerror = () => reject(getAll.error);
+    };
+    request.onerror = () => reject(request.error);
+  }));
+}
+
 async function ageQueuedPhotoClaims(
   page: import("@playwright/test").Page,
   ageMs: number,
@@ -196,9 +209,97 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
     expect(uploadAttempts).toBe(2);
     expect(registrationAttempts).toBe(2);
     expect(registrationPayloads).toEqual(expect.arrayContaining([
-      expect.objectContaining({ originalFilename: "mobile-source.png", width: 37, height: 23 }),
-      expect.objectContaining({ originalFilename: "mobile-source.jpg", width: 19, height: 31 }),
+      expect.objectContaining({ originalFilename: "mobile-source.png", width: 37, height: 23, registrationKey: expect.any(String) }),
+      expect.objectContaining({ originalFilename: "mobile-source.jpg", width: 19, height: 31, registrationKey: expect.any(String) }),
     ]));
+  });
+
+  test("reuses the durable registration key after the first response is lost", async ({
+    page,
+    context,
+    request,
+    cleanupIds,
+  }) => {
+    const session = await createSessionViaApi(request, `Interrupted Registration ${Date.now()}`);
+    cleanupIds.push(session.id);
+    let registrationAttempts = 0;
+    const registrationKeys: string[] = [];
+    let releaseRestoredUpload!: () => void;
+    const restoredUploadGate = new Promise<void>(resolve => {
+      releaseRestoredUpload = resolve;
+    });
+    let holdNextUpload = false;
+
+    await context.route("**/api/uploads/direct", async route => {
+      if (holdNextUpload) {
+        holdNextUpload = false;
+        await restoredUploadGate;
+      }
+      await route.continue();
+    });
+
+    await page.goto(`/session/${session.id}`);
+    await enterMobileFlow(page);
+    await page.locator('[data-testid="input-mobile-aisle"]').fill("A");
+    const jpeg = await sharp({
+      create: {
+        width: 17,
+        height: 13,
+        channels: 3,
+        background: { r: 80, g: 120, b: 200 },
+      },
+    }).jpeg().toBuffer();
+    await context.setOffline(true);
+    await page.locator('[data-testid="input-mobile-file"]').setInputFiles({
+      name: "interrupted.jpg",
+      mimeType: "image/jpeg",
+      buffer: jpeg,
+    });
+
+    await expect.poll(() => queuedPhotoCount(page)).toBe(1);
+    const persistedKeys = await queuedRegistrationKeys(page);
+    expect(persistedKeys).toHaveLength(1);
+    expect(persistedKeys[0]).toEqual(expect.any(String));
+
+    await page.close();
+    await context.setOffline(false);
+    holdNextUpload = true;
+    const restoredPage = await context.newPage();
+    await restoredPage.goto(`/session/${session.id}`);
+    await enterMobileFlow(restoredPage);
+    await expect.poll(() => queuedRegistrationKeys(restoredPage)).toEqual(persistedKeys);
+    await context.route(`**/api/sessions/${session.id}/photos`, async route => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      registrationAttempts++;
+      const payload = route.request().postDataJSON();
+      registrationKeys.push(payload.registrationKey);
+      if (registrationAttempts === 1) {
+        const cookies = await context.cookies(route.request().url());
+        const committedResponse = await fetch(route.request().url(), {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: cookies.map(cookie => `${cookie.name}=${cookie.value}`).join("; "),
+          },
+          body: JSON.stringify(payload),
+        });
+        expect(committedResponse.ok).toBe(true);
+        await route.abort("connectionreset");
+        return;
+      }
+      await route.continue();
+    });
+    releaseRestoredUpload();
+
+    await expect.poll(() => registrationAttempts, { timeout: 20_000 }).toBe(2);
+    await expect.poll(() => queuedPhotoCount(restoredPage), { timeout: 20_000 }).toBe(0);
+    expect(registrationKeys).toEqual([persistedKeys[0], persistedKeys[0]]);
+    const photosResponse = await request.get(`/api/sessions/${session.id}/photos`);
+    expect(photosResponse.ok()).toBe(true);
+    expect(await photosResponse.json()).toHaveLength(1);
   });
 
   test("does not retain stale items while an online multi-file selection is still preparing", async ({

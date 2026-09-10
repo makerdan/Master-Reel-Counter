@@ -500,7 +500,21 @@ export class DatabaseStorage implements IStorage {
 
   async atomicCreatePhoto(photo: InsertPhoto, ext: string): Promise<Photo> {
     return db.transaction(async (tx) => {
-      const [inserted] = await tx.insert(photos).values(photo).returning();
+      const insert = tx.insert(photos).values(photo);
+      const [inserted] = photo.registrationKey
+        ? await insert.onConflictDoNothing({
+            target: [photos.sessionId, photos.registrationKey],
+          }).returning()
+        : await insert.returning();
+      if (!inserted && photo.registrationKey) {
+        const [existing] = await tx.select().from(photos).where(and(
+          eq(photos.sessionId, photo.sessionId),
+          eq(photos.registrationKey, photo.registrationKey),
+        ));
+        if (existing) return existing;
+        throw new Error("Photo registration conflict did not resolve to an existing photo");
+      }
+      if (!inserted) throw new Error("Photo registration did not create a photo");
       const uniqueFilename = `S${inserted.sessionId}_P${String(inserted.id).padStart(4, "0")}${ext}`;
       const [updated] = await tx.update(photos)
         .set({ originalFilename: uniqueFilename })

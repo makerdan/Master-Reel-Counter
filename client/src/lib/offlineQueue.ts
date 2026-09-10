@@ -16,6 +16,7 @@ export function onQueueChange(callback: () => void): () => void {
 
 export interface QueuedPhoto {
   id: string;
+  registrationKey: string;
   sessionId: number;
   userId?: string;
   blob: Blob;
@@ -80,6 +81,13 @@ export async function saveToQueue(item: QueuedPhoto): Promise<void> {
     tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
+}
+
+export async function ensurePhotoRegistrationKey(item: QueuedPhoto): Promise<string> {
+  if (item.registrationKey) return item.registrationKey;
+  const registrationKey = item.id;
+  await patchPhotoRecord(item.id, { registrationKey });
+  return registrationKey;
 }
 
 export async function removeFromQueue(id: string): Promise<void> {

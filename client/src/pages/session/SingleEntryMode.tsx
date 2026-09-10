@@ -383,6 +383,7 @@ export default function SingleEntryMode({
           const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
           await saveToQueue({
             id: queueId,
+            registrationKey: queueId,
             sessionId,
             userId: identityId,
             blob,

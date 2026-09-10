@@ -105,6 +105,7 @@ export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").notNull().references(() => countingSessions.id, { onDelete: "cascade" }),
   userId: varchar("user_id").notNull(),
+  registrationKey: varchar("registration_key", { length: 128 }),
   uploadedBy: text("uploaded_by"),
   objectStorageKey: text("object_storage_key").notNull(),
   originalFilename: text("original_filename"),
@@ -128,6 +129,7 @@ export const photos = pgTable("photos", {
   index("photos_session_id_idx").on(table.sessionId),
   index("photos_parent_photo_id_idx").on(table.parentPhotoId),
   index("photos_object_storage_key_idx").on(table.objectStorageKey),
+  uniqueIndex("photos_session_registration_key_unique").on(table.sessionId, table.registrationKey),
   foreignKey({ columns: [table.parentPhotoId], foreignColumns: [table.id] }).onDelete("set null"),
 ]);
 
@@ -301,6 +303,7 @@ export const insertPhotoSchema = createInsertSchema(photos).omit({
 });
 
 export const insertPhotoBodySchema = insertPhotoSchema.pick({
+  registrationKey: true,
   objectStorageKey: true,
   originalFilename: true,
   mimeType: true,

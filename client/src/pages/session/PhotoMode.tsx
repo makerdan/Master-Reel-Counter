@@ -904,7 +904,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
             const queueId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             let sectionVal = "";
             if (isRec) { sectionVal = String(nextRecNum).padStart(3, "0"); nextRecNum++; }
-            await saveToQueue({ id: queueId, sessionId, userId: identityId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, isOnFloor: false, createdAt: Date.now() });
+            await saveToQueue({ id: queueId, registrationKey: queueId, sessionId, userId: identityId, blob, aisle, section: sectionVal, notes: "", isReceiving: isRec, isOnFloor: false, createdAt: Date.now() });
             toast({ title: "Photo queued", description: `${file.name} will upload when back online` });
           } else {
             toast({ title: "Upload failed", description: `Could not upload ${file.name}. Please try again.`, variant: "destructive" });
