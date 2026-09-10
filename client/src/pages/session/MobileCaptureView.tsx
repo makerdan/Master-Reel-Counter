@@ -24,7 +24,8 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos } from "@/lib/offlineQueue";
+import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos, claimPhotoInFlight, clearPhotoInFlight, onQueueChange } from "@/lib/offlineQueue";
+import { MobileImageFormatError, prepareMobileImage } from "@/lib/prepareMobileImage";
 import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
 
@@ -33,12 +34,18 @@ const MAX_AUTO_RETRIES = 3;
 type UploadQueueItem = {
   queueId: string;
   file: File;
+  originalFilename: string;
+  uploadFilename: string;
+  width?: number;
+  height?: number;
+  photoQuality: number;
   blobUrl: string;
   aisle: string;
   section: string;
   notes: string;
   isOnFloor: boolean;
-  status: "pending" | "uploading" | "failed";
+  status: "pending" | "uploading" | "failed" | "terminal";
+  errorMessage?: string;
   retries: number;
 };
 
@@ -55,21 +62,13 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     sectionAdvanceStep: number;
     largerTouchTargets: boolean;
     photoQuality: number;
-    useReceivingQuality: boolean;
-    receivingPhotoQuality: number;
-    useOnFloorQuality: boolean;
-    onFloorPhotoQuality: number;
   }>({
     queryKey: ["/api/settings"],
     select: (data: any) => ({
       defaultAislePrefix: data?.defaultAislePrefix ?? null,
       sectionAdvanceStep: data?.sectionAdvanceStep ?? 1,
       largerTouchTargets: data?.largerTouchTargets ?? false,
-      photoQuality: data?.photoQuality ?? 85,
-      useReceivingQuality: data?.useReceivingQuality ?? true,
-      receivingPhotoQuality: data?.receivingPhotoQuality ?? 40,
-      useOnFloorQuality: data?.useOnFloorQuality ?? true,
-      onFloorPhotoQuality: data?.onFloorPhotoQuality ?? 40,
+      photoQuality: data?.photoQuality ?? 95,
     }),
   });
 
@@ -172,7 +171,12 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       if (cancelled || items.length === 0) return;
       const restored: UploadQueueItem[] = items.map(item => ({
         queueId: item.id,
-        file: new File([item.blob], `restored-${item.id}.jpg`, { type: "image/jpeg" }),
+        file: new File([item.blob], item.uploadFilename || `restored-${item.id}.jpg`, { type: "image/jpeg" }),
+        originalFilename: item.originalFilename || `restored-${item.id}.jpg`,
+        uploadFilename: item.uploadFilename || `restored-${item.id}.jpg`,
+        width: item.width,
+        height: item.height,
+        photoQuality: item.photoQuality ?? 95,
         blobUrl: URL.createObjectURL(item.blob),
         aisle: item.aisle,
         section: item.section,
@@ -194,6 +198,25 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     return () => { cancelled = true; };
   }, [sessionId, identityId]);
 
+  useEffect(() => onQueueChange(() => {
+    getQueuedPhotos(sessionId, identityId).then(items => {
+      const persistedById = new Map(items.map(item => [item.id, item]));
+      setUploadQueue(prev => prev.flatMap(item => {
+        if (item.status === "terminal") return [item];
+        const persisted = persistedById.get(item.queueId);
+        if (!persisted) {
+          URL.revokeObjectURL(item.blobUrl);
+          blobUrlsRef.current.delete(item.blobUrl);
+          return [];
+        }
+        if (!persisted.inFlight && item.status === "uploading" && !processingRef.current) {
+          return [{ ...item, status: "pending" as const }];
+        }
+        return [item];
+      }));
+    }).catch(() => {});
+  }), [sessionId, identityId]);
+
   useEffect(() => {
     if (photos.length > 0) {
       const mapped = photos.map(p => ({
@@ -209,67 +232,35 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   }, [photos]);
 
   useEffect(() => {
-    if (!isOnline) return;
-
-    let itemToProcess: UploadQueueItem | undefined;
-    setUploadQueue(prev => {
-      if (processingRef.current) return prev;
-      const nextItem = prev.find(q => q.status === "pending");
-      if (!nextItem) return prev;
-      processingRef.current = true;
-      itemToProcess = nextItem;
-      return prev.map(q => q.queueId === nextItem.queueId ? { ...q, status: "uploading" as const } : q);
-    });
-    if (!itemToProcess) return;
-    const nextItem = itemToProcess;
+    if (!isOnline || processingRef.current) return;
+    const nextItem = uploadQueue.find(q => q.status === "pending");
+    if (!nextItem) return;
+    processingRef.current = true;
+    setUploadQueue(prev =>
+      prev.map(q =>
+        q.queueId === nextItem.queueId ? { ...q, status: "uploading" as const } : q,
+      ),
+    );
 
     (async () => {
       try {
-        const isReceiving = nextItem.aisle.toLowerCase() === "receiving";
-        const isOnFloorItem = nextItem.isOnFloor;
-        const baseQuality = isReceiving && captureSettings?.useReceivingQuality
-          ? (captureSettings.receivingPhotoQuality ?? 40)
-          : isOnFloorItem && captureSettings?.useOnFloorQuality
-          ? (captureSettings.onFloorPhotoQuality ?? 40)
-          : (captureSettings?.photoQuality ?? 85);
-        const quality = baseQuality / 100;
-        let fileToUpload: File | Blob = nextItem.file;
-        if (quality < 1 && nextItem.file.type.startsWith("image/")) {
-          try {
-            if (typeof OffscreenCanvas !== "undefined") {
-              const bmp = await createImageBitmap(nextItem.file);
-              const canvas = new OffscreenCanvas(bmp.width, bmp.height);
-              const ctx = canvas.getContext("2d");
-              if (ctx) {
-                ctx.drawImage(bmp, 0, 0);
-                const compressed = await canvas.convertToBlob({ type: "image/jpeg", quality });
-                fileToUpload = new File([compressed], nextItem.file.name, { type: "image/jpeg" });
-              }
-              bmp.close();
-            } else {
-              const img = new Image();
-              const loadedUrl = URL.createObjectURL(nextItem.file);
-              await new Promise<void>((resolve) => { img.onload = () => resolve(); img.src = loadedUrl; });
-              const canvas = document.createElement("canvas");
-              canvas.width = img.naturalWidth;
-              canvas.height = img.naturalHeight;
-              const ctx = canvas.getContext("2d");
-              if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                const compressed = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-                if (compressed) fileToUpload = new File([compressed], nextItem.file.name, { type: "image/jpeg" });
-              }
-              URL.revokeObjectURL(loadedUrl);
-            }
-          } catch {
-            fileToUpload = nextItem.file;
+        const claimed = await claimPhotoInFlight(nextItem.queueId);
+        if (!claimed) {
+          const persisted = (await getQueuedPhotos(sessionId, identityId))
+            .find(item => item.id === nextItem.queueId);
+          if (!persisted) {
+            URL.revokeObjectURL(nextItem.blobUrl);
+            blobUrlsRef.current.delete(nextItem.blobUrl);
+            setUploadQueue(prev => prev.filter(item => item.queueId !== nextItem.queueId));
           }
+          return;
         }
+
         const abortController = new AbortController();
         activeUploadAbortRef.current = abortController;
 
         const formData = new FormData();
-        formData.append("file", fileToUpload);
+        formData.append("file", nextItem.file);
         const uploadRes = await fetch("/api/uploads/direct", { method: "POST", body: formData, credentials: "include", signal: abortController.signal });
         if (!uploadRes.ok) throw new Error("Upload failed");
         const uploadResult = await uploadRes.json();
@@ -281,9 +272,11 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
         const photoPayload: Record<string, any> = {
           objectStorageKey: uploadResult.objectPath,
-          originalFilename: nextItem.file.name,
-          mimeType: nextItem.file.type,
+          originalFilename: nextItem.originalFilename,
+          mimeType: "image/jpeg",
           fileSize: uploadResult.metadata?.size || nextItem.file.size,
+          width: nextItem.width,
+          height: nextItem.height,
           aisle: nextItem.aisle,
           section: nextItem.section,
           notes: nextItem.notes || undefined,
@@ -303,18 +296,42 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         }
 
         if (isDetail) {
-          if (!mountedRef.current) { processingRef.current = false; return; }
           try {
-            setDetailReviewPhoto({ id: savedPhoto.id, objectPath: uploadResult.objectPath, blobUrl: nextItem.blobUrl });
-            setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
-            removeFromQueue(nextItem.queueId).catch(() => {});
-            queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+            try {
+              await removeFromQueue(nextItem.queueId);
+            } catch {
+              setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? {
+                ...q,
+                status: "terminal" as const,
+                errorMessage: "Photo uploaded, but its offline copy could not be cleared. Tap dismiss to try cleanup again.",
+              } : q));
+              toast({ title: "Photo uploaded but queue cleanup failed", variant: "destructive" });
+              return;
+            }
+            if (mountedRef.current) {
+              const reviewBlobUrl = URL.createObjectURL(nextItem.file);
+              blobUrlsRef.current.add(reviewBlobUrl);
+              setDetailReviewPhoto({ id: savedPhoto.id, objectPath: uploadResult.objectPath, blobUrl: reviewBlobUrl });
+              setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
+              queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
+            }
           } finally {
             processingRef.current = false;
           }
           return;
         }
 
+        try {
+          await removeFromQueue(nextItem.queueId);
+        } catch {
+          setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? {
+            ...q,
+            status: "terminal" as const,
+            errorMessage: "Photo uploaded, but its offline copy could not be cleared. Tap dismiss to try cleanup again.",
+          } : q));
+          toast({ title: "Photo uploaded but queue cleanup failed", variant: "destructive" });
+          return;
+        }
         if (!mountedRef.current) return;
         setRecentPhotos(prev => [...prev, {
           id: savedPhoto.id,
@@ -327,9 +344,9 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         URL.revokeObjectURL(nextItem.blobUrl);
         blobUrlsRef.current.delete(nextItem.blobUrl);
         setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
-        removeFromQueue(nextItem.queueId).catch(() => {});
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       } catch (err) {
+        await clearPhotoInFlight(nextItem.queueId).catch(() => {});
         if (err instanceof Error && err.name === "AbortError") {
           return;
         }
@@ -356,13 +373,19 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         processingRef.current = false;
       }
     })();
-  }, [uploadQueue, sessionId, toast, isOnline]);
+  }, [uploadQueue, sessionId, identityId, toast, isOnline]);
 
   const retryUpload = useCallback((queueId: string) => {
     setUploadQueue(prev => prev.map(q => q.queueId === queueId ? { ...q, status: "pending" as const, retries: 0 } : q));
   }, []);
 
-  const dismissFailedUpload = useCallback((queueId: string) => {
+  const dismissFailedUpload = useCallback(async (queueId: string) => {
+    try {
+      await removeFromQueue(queueId);
+    } catch {
+      toast({ title: "Could not clear the offline photo. Please try again.", variant: "destructive" });
+      return;
+    }
     const timer = retryTimersRef.current.get(queueId);
     if (timer !== undefined) {
       clearTimeout(timer);
@@ -376,8 +399,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       }
       return prev.filter(q => q.queueId !== queueId);
     });
-    removeFromQueue(queueId).catch(() => {});
-  }, []);
+  }, [toast]);
 
   const handleDiscardAll = useCallback(() => {
     activeUploadAbortRef.current?.abort();
@@ -415,50 +437,88 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     return String(maxSection + step).padStart(3, "0");
   }, [photos, recentPhotos, uploadQueue, captureSettings?.sectionAdvanceStep]);
 
-  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const newItems: UploadQueueItem[] = [];
+    const selectedFiles = Array.from(files);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    let queuedCount = 0;
     let nextReceivingNum = isReceiving ? parseInt(getNextReceivingSection(), 10) : 0;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const blobUrl = URL.createObjectURL(file);
-      blobUrlsRef.current.add(blobUrl);
+    for (const sourceFile of selectedFiles) {
       let sectionValue = section;
       if (isReceiving && !section.trim()) {
         sectionValue = String(nextReceivingNum).padStart(3, "0");
         nextReceivingNum++;
       }
-      newItems.push({
-        queueId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        file,
-        blobUrl,
-        aisle,
-        section: sectionValue,
-        notes: captureNotes,
-        isOnFloor: onFloorChecked,
-        status: "pending",
-        retries: 0,
-      });
+      const queueId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      try {
+        const prepared = await prepareMobileImage(sourceFile, captureSettings?.photoQuality ?? 95);
+        const blobUrl = URL.createObjectURL(prepared.file);
+        blobUrlsRef.current.add(blobUrl);
+        const item: UploadQueueItem = {
+          queueId,
+          file: prepared.file,
+          originalFilename: sourceFile.name,
+          uploadFilename: prepared.file.name,
+          width: prepared.width,
+          height: prepared.height,
+          photoQuality: prepared.quality,
+          blobUrl,
+          aisle,
+          section: sectionValue,
+          notes: captureNotes,
+          isOnFloor: onFloorChecked,
+          status: "pending",
+          retries: 0,
+        };
+        await saveToQueue({
+          id: item.queueId,
+          sessionId,
+          userId: identityId,
+          blob: item.file,
+          originalFilename: item.originalFilename,
+          uploadFilename: item.uploadFilename,
+          width: item.width,
+          height: item.height,
+          photoQuality: item.photoQuality,
+          aisle: item.aisle,
+          section: item.section,
+          notes: item.notes,
+          isReceiving: item.aisle.toLowerCase() === "receiving",
+          isOnFloor: item.isOnFloor,
+          createdAt: Date.now(),
+        });
+        queuedCount++;
+        setUploadQueue(prev =>
+          prev.some(existing => existing.queueId === item.queueId) ? prev : [...prev, item],
+        );
+      } catch (error) {
+        const blobUrl = URL.createObjectURL(sourceFile);
+        blobUrlsRef.current.add(blobUrl);
+        const terminalItem: UploadQueueItem = {
+          queueId,
+          file: sourceFile,
+          originalFilename: sourceFile.name,
+          uploadFilename: sourceFile.name,
+          photoQuality: captureSettings?.photoQuality ?? 95,
+          blobUrl,
+          aisle,
+          section: sectionValue,
+          notes: captureNotes,
+          isOnFloor: onFloorChecked,
+          status: "terminal",
+          retries: MAX_AUTO_RETRIES,
+          errorMessage: error instanceof MobileImageFormatError
+            ? error.message
+            : "This photo could not be saved to the offline queue. Free device storage and try again.",
+        };
+        setUploadQueue(prev => [...prev, terminalItem]);
+      }
     }
-    setUploadQueue(prev => [...prev, ...newItems]);
-    for (const item of newItems) {
-      saveToQueue({
-        id: item.queueId,
-        sessionId,
-        userId: identityId,
-        blob: item.file,
-        aisle: item.aisle,
-        section: item.section,
-        notes: item.notes,
-        isReceiving: item.aisle.toLowerCase() === "receiving",
-        isOnFloor: item.isOnFloor,
-        createdAt: Date.now(),
-      }).catch(() => {});
+    if (queuedCount > 0) {
+      toast({ title: `${queuedCount} photo${queuedCount > 1 ? "s" : ""} queued` });
     }
-    toast({ title: `${newItems.length} photo${newItems.length > 1 ? "s" : ""} queued` });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   useEffect(() => {
@@ -477,7 +537,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     ((q.status === "pending" || q.status === "uploading") && q.retries > 0) ||
     (q.status === "failed" && q.retries < MAX_AUTO_RETRIES)
   );
-  const permanentlyFailedItems = uploadQueue.filter(q => q.status === "failed" && q.retries >= MAX_AUTO_RETRIES);
+  const permanentlyFailedItems = uploadQueue.filter(q => q.status === "terminal" || (q.status === "failed" && q.retries >= MAX_AUTO_RETRIES));
 
   const handleOnFloorToggle = useCallback((checked: boolean) => {
     setOnFloorChecked(checked);
@@ -862,10 +922,12 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
                   {permanentlyFailedItems.map(item => (
                     <div key={item.queueId} className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2" data-testid={`upload-failed-${item.queueId}`}>
                       <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-                      <span className="text-xs flex-1 truncate">{item.file.name} failed</span>
-                      <Button size="sm" variant="outline" onClick={() => retryUpload(item.queueId)} data-testid={`button-retry-${item.queueId}`}>
-                        <RotateCw className="h-3 w-3 mr-1" /> Retry
-                      </Button>
+                      <span className="text-xs flex-1">{item.errorMessage || `${item.originalFilename} failed`}</span>
+                      {item.status !== "terminal" && (
+                        <Button size="sm" variant="outline" onClick={() => retryUpload(item.queueId)} data-testid={`button-retry-${item.queueId}`}>
+                          <RotateCw className="h-3 w-3 mr-1" /> Retry
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => dismissFailedUpload(item.queueId)} data-testid={`button-dismiss-${item.queueId}`}>
                         <X className="h-3 w-3" />
                       </Button>

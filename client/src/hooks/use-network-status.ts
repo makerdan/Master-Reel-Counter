@@ -193,7 +193,7 @@ export function useNetworkStatus(currentUserId?: string) {
 
         try {
           const formData = new FormData();
-          formData.append("file", photo.blob, `photo-${photo.id}.jpg`);
+          formData.append("file", photo.blob, photo.uploadFilename || `photo-${photo.id}.jpg`);
 
           const uploadRes = await fetch("/api/uploads/direct", {
             method: "POST",
@@ -218,8 +218,11 @@ export function useNetworkStatus(currentUserId?: string) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               objectStorageKey: uploadData.objectPath,
-              originalFilename: `offline-${photo.id}.jpg`,
+              originalFilename: photo.originalFilename || `offline-${photo.id}.jpg`,
               mimeType: "image/jpeg",
+              fileSize: photo.blob.size,
+              width: photo.width,
+              height: photo.height,
               aisle: photo.aisle,
               section: photo.section,
               notes: photo.notes || undefined,
@@ -309,8 +312,20 @@ export function useNetworkStatus(currentUserId?: string) {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
+    const recoverExpiredClaims = () => {
+      clearStaleInFlight()
+        .catch(() => {})
+        .then(() => {
+          refreshPendingCount();
+          if (navigator.onLine) syncQueue();
+        });
+    };
+
     refreshPendingCount();
-    const interval = setInterval(refreshPendingCount, 5000);
+    // A claim can still be fresh when a replacement page starts. Keep sweeping
+    // while the app is open so an interrupted owner is retried once its claim
+    // expires, without resetting active work in another tab.
+    const interval = setInterval(recoverExpiredClaims, 5000);
     const unsubQueue = onQueueChange(refreshPendingCount);
 
     // Stamp any legacy queue items (created before user-scoping) with the

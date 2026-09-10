@@ -226,7 +226,7 @@ export const userSettings = pgTable("user_settings", {
   companyName: text("company_name"),
   companyLogoKey: text("company_logo_key"),
   exportFooterText: text("export_footer_text"),
-  photoQuality: integer("photo_quality").notNull().default(85),
+  photoQuality: integer("photo_quality").notNull().default(95),
   useReceivingQuality: boolean("use_receiving_quality").notNull().default(true),
   receivingPhotoQuality: integer("receiving_photo_quality").notNull().default(40),
   useOnFloorQuality: boolean("use_on_floor_quality").notNull().default(true),

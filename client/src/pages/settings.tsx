@@ -1541,10 +1541,10 @@ export default function SettingsPage() {
                       <Label className="text-sm font-medium">Photo Quality</Label>
                       <p className="text-xs text-muted-foreground">Lower quality saves bandwidth but may reduce zoom clarity on reel labels. Higher quality preserves detail for accurate reading.</p>
                     </div>
-                    <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-photo-quality-value">{localPhotoQuality ?? settings?.photoQuality ?? 85}%</span>
+                    <span className="text-sm font-mono font-semibold tabular-nums w-[3ch] text-right" data-testid="text-photo-quality-value">{localPhotoQuality ?? settings?.photoQuality ?? 95}%</span>
                   </div>
                   <Slider
-                    value={[localPhotoQuality ?? settings?.photoQuality ?? 85]}
+                    value={[localPhotoQuality ?? settings?.photoQuality ?? 95]}
                     onValueChange={(val) => setLocalPhotoQuality(val[0])}
                     onValueCommit={(val) => { saveSetting("photoQuality", val[0]); setLocalPhotoQuality(null); }}
                     min={30}
@@ -1556,7 +1556,7 @@ export default function SettingsPage() {
                   <div className="relative w-full h-4 mt-0.5">
                     {[30, 40, 50, 60, 70, 80, 85, 90, 95, 100].map((tick) => {
                       const pct = ((tick - 30) / 70) * 100;
-                      const isSelected = (localPhotoQuality ?? settings?.photoQuality ?? 85) === tick;
+                      const isSelected = (localPhotoQuality ?? settings?.photoQuality ?? 95) === tick;
                       return (
                         <div
                           key={tick}
@@ -1577,7 +1577,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between gap-4 mb-2">
                     <div className="flex-1">
                       <Label className="text-sm font-medium">Receiving — Quality Override</Label>
-                      <p className="text-xs text-muted-foreground">Reels in Receiving are typically photographed up close, so high zoom clarity isn't needed. Enable this to automatically use a lower quality for Receiving photos, saving bandwidth and storage.</p>
+                      <p className="text-xs text-muted-foreground">Use a lower quality for Receiving photos outside Mobile Flow. Mobile Flow always uses the main Photo Quality value.</p>
                     </div>
                     <Switch
                       checked={settings?.useReceivingQuality ?? true}
@@ -1627,7 +1627,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between gap-4 mb-2">
                     <div className="flex-1">
                       <Label className="text-sm font-medium">On Floor, In Front Of — Quality Override</Label>
-                      <p className="text-xs text-muted-foreground">Reels sitting on the floor in front of a section are typically photographed up close, so high zoom clarity isn't needed. Enable this to automatically use a lower quality for these photos, saving bandwidth and storage.</p>
+                      <p className="text-xs text-muted-foreground">Use a lower quality for On Floor photos outside Mobile Flow. Mobile Flow always uses the main Photo Quality value.</p>
                     </div>
                     <Switch
                       checked={settings?.useOnFloorQuality ?? true}

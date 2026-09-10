@@ -5911,7 +5911,7 @@ export async function registerRoutes(
           companyName: null,
           companyLogoKey: null,
           exportFooterText: null,
-          photoQuality: 85,
+          photoQuality: 95,
           useReceivingQuality: true,
           receivingPhotoQuality: 40,
           useOnFloorQuality: true,

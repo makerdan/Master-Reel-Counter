@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ALTER COLUMN "photo_quality" SET DEFAULT 95;

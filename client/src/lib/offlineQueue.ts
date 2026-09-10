@@ -19,6 +19,11 @@ export interface QueuedPhoto {
   sessionId: number;
   userId?: string;
   blob: Blob;
+  originalFilename?: string;
+  uploadFilename?: string;
+  width?: number;
+  height?: number;
+  photoQuality?: number;
   aisle: string;
   section: string;
   notes: string;
@@ -276,7 +281,7 @@ async function patchPhotoRecord(id: string, patch: Partial<QueuedPhoto>): Promis
     req.onsuccess = () => {
       if (req.result) store.put({ ...req.result, ...patch });
     };
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -308,7 +313,7 @@ export async function clearEntryInFlight(id: string): Promise<void> {
 // tab or rapid-reconnect event cannot reset a claim that is actively in use.
 // Chosen to be comfortably longer than a realistic single-item submit cycle
 // (upload + record create).  Crashed-page claims expire after this period.
-const CLAIM_STALENESS_MS = 2 * 60 * 1000; // 2 minutes
+export const CLAIM_STALENESS_MS = 2 * 60 * 1000; // 2 minutes
 
 // Resets inFlight flags ONLY for claims that are demonstrably stale (older
 // than CLAIM_STALENESS_MS or missing a claimedAt timestamp).
@@ -319,25 +324,28 @@ export async function clearStaleInFlight(): Promise<void> {
   const now = Date.now();
 
   const resetStore = (storeName: string) =>
-    new Promise<void>((resolve, reject) => {
+    new Promise<boolean>((resolve, reject) => {
       const tx = db.transaction(storeName, "readwrite");
       const store = tx.objectStore(storeName);
       const req = store.getAll();
+      let resetAny = false;
       req.onsuccess = () => {
         for (const item of req.result as Array<Record<string, unknown>>) {
           if (!item.inFlight) continue;
           const age = typeof item.claimedAt === "number" ? now - item.claimedAt : Infinity;
-          if (age > CLAIM_STALENESS_MS) {
+          if (age >= CLAIM_STALENESS_MS) {
             store.put({ ...item, inFlight: false, claimedAt: undefined });
+            resetAny = true;
           }
         }
       };
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => resolve(resetAny);
       tx.onerror = () => reject(tx.error);
     });
 
-  await resetStore(PHOTO_STORE);
-  await resetStore(ENTRY_STORE);
+  const photoReset = await resetStore(PHOTO_STORE);
+  const entryReset = await resetStore(ENTRY_STORE);
+  if (photoReset || entryReset) notifyQueueChange();
 }
 
 // ─── Permanently-failed entry helpers ────────────────────────────────────────
