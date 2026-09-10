@@ -70,13 +70,10 @@ for (const fixtureCase of orientedJpegFixtureCases) {
         if (green > red && green > blue) return "green";
         return "blue";
       });
-      const expectedCorners = fixture.name.includes("exif-6")
-        ? ["blue", "red", "yellow", "green"]
-        : ["green", "yellow", "red", "blue"];
       expect(
         dominantChannels,
         `${testInfo.project.name} ${fixture.name} final pixel orientation`,
-      ).toEqual(expectedCorners);
+      ).toEqual(fixture.expectedCorners);
     });
   });
 }

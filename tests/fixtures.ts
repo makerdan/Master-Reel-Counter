@@ -75,22 +75,73 @@ export type OrientedJpegFixture = {
   sourceHeight: number;
   preparedWidth: number;
   preparedHeight: number;
+  expectedCorners: readonly OrientedJpegCornerColor[];
 };
 
+export type OrientedJpegCornerColor = "red" | "green" | "blue" | "yellow";
+
 export const orientedJpegFixtureCases = [
-  { name: "portrait-exif-6.jpg", sourceWidth: 40, sourceHeight: 24, orientation: 6 as const },
-  { name: "landscape-exif-8.jpg", sourceWidth: 24, sourceHeight: 40, orientation: 8 as const },
+  {
+    name: "mirrored-horizontal-exif-2.jpg",
+    sourceWidth: 40,
+    sourceHeight: 24,
+    orientation: 2,
+    expectedCorners: ["green", "red", "yellow", "blue"],
+  },
+  {
+    name: "mirrored-vertical-exif-4.jpg",
+    sourceWidth: 40,
+    sourceHeight: 24,
+    orientation: 4,
+    expectedCorners: ["blue", "yellow", "red", "green"],
+  },
+  {
+    name: "mirrored-90-transpose-exif-5.jpg",
+    sourceWidth: 40,
+    sourceHeight: 24,
+    orientation: 5,
+    expectedCorners: ["red", "blue", "green", "yellow"],
+  },
+  {
+    name: "portrait-exif-6.jpg",
+    sourceWidth: 40,
+    sourceHeight: 24,
+    orientation: 6,
+    expectedCorners: ["blue", "red", "yellow", "green"],
+  },
+  {
+    name: "mirrored-90-transverse-exif-7.jpg",
+    sourceWidth: 40,
+    sourceHeight: 24,
+    orientation: 7,
+    expectedCorners: ["yellow", "green", "blue", "red"],
+  },
+  {
+    name: "landscape-exif-8.jpg",
+    sourceWidth: 24,
+    sourceHeight: 40,
+    orientation: 8,
+    expectedCorners: ["green", "yellow", "red", "blue"],
+  },
 ] satisfies ReadonlyArray<{
   name: string;
   sourceWidth: number;
   sourceHeight: number;
-  orientation: 6 | 8;
+  orientation: 2 | 4 | 5 | 6 | 7 | 8;
+  expectedCorners: readonly OrientedJpegCornerColor[];
 }>;
 
 export async function createOrientedJpegFixture(
   fixtureCase: (typeof orientedJpegFixtureCases)[number],
 ): Promise<OrientedJpegFixture> {
-  const { name, sourceWidth, sourceHeight, orientation } = fixtureCase;
+  const {
+    name,
+    sourceWidth,
+    sourceHeight,
+    orientation,
+    expectedCorners,
+  } = fixtureCase;
+  const swapsDimensions = orientation >= 5;
   const svg = Buffer.from(`
     <svg width="${sourceWidth}" height="${sourceHeight}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${sourceWidth / 2}" height="${sourceHeight / 2}" x="0" y="0" fill="#ff0000"/>
@@ -109,8 +160,9 @@ export async function createOrientedJpegFixture(
     buffer,
     sourceWidth,
     sourceHeight,
-    preparedWidth: sourceHeight,
-    preparedHeight: sourceWidth,
+    preparedWidth: swapsDimensions ? sourceHeight : sourceWidth,
+    preparedHeight: swapsDimensions ? sourceWidth : sourceHeight,
+    expectedCorners,
   };
 }
 
