@@ -34,3 +34,15 @@ export function createContentSecurityPolicyDirectives(isProduction = process.env
     frameSrc: ["'self'", "https://challenges.cloudflare.com", "https:"],
   };
 }
+
+export function createSecurityHeadersOptions(isProduction = process.env.NODE_ENV === "production") {
+  return {
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: {
+      policy: "same-origin-allow-popups" as const,
+    },
+    contentSecurityPolicy: {
+      directives: createContentSecurityPolicyDirectives(isProduction),
+    },
+  };
+}

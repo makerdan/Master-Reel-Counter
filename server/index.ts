@@ -18,7 +18,7 @@ import {
   clerkProxyMiddleware,
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
-import { createContentSecurityPolicyDirectives } from "./contentSecurityPolicy";
+import { createSecurityHeadersOptions } from "./contentSecurityPolicy";
 
 // Fail fast if SESSION_SECRET is absent or too weak.
 validateSessionSecret();
@@ -49,12 +49,7 @@ declare module "http" {
   }
 }
 
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: {
-    directives: createContentSecurityPolicyDirectives(),
-  },
-}));
+app.use(helmet(createSecurityHeadersOptions()));
 
 app.get(CLERK_PROXY_READINESS_PATH, (_req, res) => {
   res.setHeader("Cache-Control", "no-store");

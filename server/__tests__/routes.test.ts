@@ -122,7 +122,7 @@ import
 
 import 
 {
- createContentSecurityPolicyDirectives 
+ createSecurityHeadersOptions
 }
  from "../contentSecurityPolicy.js"
 ;
@@ -292,13 +292,9 @@ function getDirective(header: string, directive: string): string {
   return value;
 }
 
-async function getCspHeader(isProduction: boolean): Promise<string> {
+async function getSecurityHeaders(isProduction: boolean): Promise<http.IncomingHttpHeaders> {
   const app = express();
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: createContentSecurityPolicyDirectives(isProduction),
-    },
-  }));
+  app.use(helmet(createSecurityHeadersOptions(isProduction)));
   app.get("/", (_req, res) => {
     res.type("html").send(
       '<div id="root"></div><script type="module" src="/src/main.tsx"></script>',
@@ -321,11 +317,7 @@ async function getCspHeader(isProduction: boolean): Promise<string> {
       );
       request.on("error", reject);
     });
-    const csp = response.headers["content-security-policy"];
-    if (typeof csp !== "string") {
-      assert.fail("response should include a string Content-Security-Policy header");
-    }
-    return csp;
+    return response.headers;
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -333,7 +325,10 @@ async function getCspHeader(isProduction: boolean): Promise<string> {
 
 describe("Content Security Policy", () => {
   test("production script-src is an exact Clerk and app allow-list", async () => {
-    const csp = await getCspHeader(true);
+    const csp = (await getSecurityHeaders(true))["content-security-policy"];
+    if (typeof csp !== "string") {
+      assert.fail("response should include a string Content-Security-Policy header");
+    }
     assert.equal(
       getDirective(csp, "script-src"),
       "script-src 'self' https://frontend-api.clerk.dev https://*.clerk.accounts.dev https://challenges.cloudflare.com https://*.protect.clerk.com",
@@ -347,13 +342,24 @@ describe("Content Security Policy", () => {
   });
 
   test("development adds only Vite's eval allowance to the same explicit sources", async () => {
-    const csp = await getCspHeader(false);
+    const csp = (await getSecurityHeaders(false))["content-security-policy"];
+    if (typeof csp !== "string") {
+      assert.fail("response should include a string Content-Security-Policy header");
+    }
     assert.equal(
       getDirective(csp, "script-src"),
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://frontend-api.clerk.dev https://*.clerk.accounts.dev https://challenges.cloudflare.com https://*.protect.clerk.com",
     );
     assert.match(getDirective(csp, "script-src"), /unsafe-inline/);
     assert.match(csp, /style-src[^;]*'unsafe-inline'/);
+  });
+
+  test("allows Clerk OAuth popups to communicate with the app window", async () => {
+    const headers = await getSecurityHeaders(false);
+    assert.equal(
+      headers["cross-origin-opener-policy"],
+      "same-origin-allow-popups",
+    );
   });
 
   test("the managed-Clerk entry page uses an external module script allowed by self", () => {
