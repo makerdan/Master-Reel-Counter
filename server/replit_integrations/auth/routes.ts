@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
+import type { User } from "@shared/models/auth";
 
 export function isOwnerIdentity(user: any): boolean {
   return user?.isOwner === true;
@@ -12,6 +13,24 @@ export async function isIdentityApproved(user: any): Promise<boolean> {
   if (!userId) return false;
   const dbUser = await authStorage.getUser(userId);
   return Boolean(dbUser?.approved && !dbUser.rejected);
+}
+
+export type AuthUserLookupResult =
+  | { kind: "user"; user: User; isTestOwner?: true }
+  | { kind: "not_provisioned" };
+
+export function classifyAuthUserLookup(
+  user: any,
+  dbUser: User | undefined,
+): AuthUserLookupResult {
+  if (!dbUser) return { kind: "not_provisioned" };
+  return {
+    kind: "user",
+    user: dbUser,
+    // Development-only owner-login compatibility is intentionally observable
+    // only as a client test marker, never as a permission.
+    ...(user?.isTestOwner === true ? { isTestOwner: true } : {}),
+  };
 }
 
 export async function isWebSocketIdentityAuthorized(
@@ -70,15 +89,14 @@ export function registerAuthRoutes(app: Express): void {
         return res.json(updatedUser);
       }
 
-      res.json({
-        ...dbUser,
-        // Development-only owner-login compatibility is intentionally
-        // observable only as a client test marker, never as a permission.
-        isTestOwner: req.user.isTestOwner === true ? true : undefined,
-      });
+      const result = classifyAuthUserLookup(req.user, dbUser);
+      if (result.kind === "not_provisioned") {
+        return res.status(404).json({ message: "not_provisioned" });
+      }
+      return res.json({ ...result.user, isTestOwner: result.isTestOwner });
     } catch (error) {
       console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      res.status(503).json({ message: "identity_bridge_unavailable" });
     }
   });
 

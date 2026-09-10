@@ -99,12 +99,15 @@ import
 {
 
   isApproved,
+  classifyAuthUserLookup,
   isIdentityApproved,
   isOwnerIdentity,
   isWebSocketIdentityAuthorized,
 }
  from "../replit_integrations/auth/routes.js"
 ;
+
+import { buildSignInPath, getSafeReturnPath } from "../../shared/auth-routing.js";
 
 import 
 {
@@ -146,6 +149,19 @@ after(async () => {
 });
 
 describe("Clerk owner and approval regression guard", () => {
+  test("keeps missing local users distinct from provisioned approval states", () => {
+    assert.deepEqual(classifyAuthUserLookup({ claims: { sub: "missing" } }, undefined), {
+      kind: "not_provisioned",
+    });
+    assert.equal(
+      classifyAuthUserLookup(
+        { claims: { sub: "pending" } },
+        { id: "pending", approved: false, rejected: false } as any,
+      ).kind,
+      "user",
+    );
+  });
+
   test("retains owner only for the existing migrated legacy identity", () => {
     const base = {
       existing: { isTester: false },
@@ -280,6 +296,26 @@ describe("Clerk owner and approval regression guard", () => {
       routeLayer.route.stack.slice(0, 2).map((layer: any) => layer.handle.name),
       ["isAuthenticated", "isApproved"],
     );
+  });
+});
+
+describe("protected sign-in return paths", () => {
+  test("allows only known internal destinations", () => {
+    for (const path of ["/session/42", "/join/invite-token", "/settings", "/stats", "/help"]) {
+      assert.equal(getSafeReturnPath(path), path);
+    }
+    assert.equal(getSafeReturnPath("https://evil.example/session/42"), null);
+    assert.equal(getSafeReturnPath("//evil.example/session/42"), null);
+    assert.equal(getSafeReturnPath("/api/auth/user"), null);
+    assert.equal(getSafeReturnPath("/join/token/extra"), null);
+  });
+
+  test("encodes a validated destination without exposing arbitrary query values", () => {
+    assert.equal(
+      buildSignInPath("/session/42?tab=photos", "/app"),
+      "/app/sign-in?redirect_url=%2Fsession%2F42%3Ftab%3Dphotos",
+    );
+    assert.equal(buildSignInPath("https://evil.example", "/app"), "/app/sign-in");
   });
 });
 

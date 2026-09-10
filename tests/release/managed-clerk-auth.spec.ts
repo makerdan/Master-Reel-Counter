@@ -199,10 +199,11 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       localCandidateOrigin: process.env.RELEASE_SMOKE_CANDIDATE_APP_ORIGIN,
     });
     await page
-      .goto("/sign-in")
+      .goto("/settings")
       .catch(() => {
-        throw new Error("Managed Clerk sign-in page failed to load");
+        throw new Error("Managed Clerk protected entry page failed to load");
       });
+    await page.getByTestId("button-login").click();
     await page.evaluate(() => {
       history.replaceState(null, "", `${location.pathname}${location.hash}`);
     });
@@ -255,7 +256,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       rejected: false,
       isTester: false,
     });
-    await expect(page.getByTestId("text-dashboard-title")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("text-settings-title")).toBeVisible({ timeout: 30_000 });
     expect(proxyRequests.length, "Clerk browser traffic must pass through the production proxy").toBeGreaterThan(0);
 
     const authorization = await database.query(
@@ -266,12 +267,11 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       { approved: true, rejected: false, is_tester: false },
     ]);
 
-    await page.goto("/settings");
-    await expect(page.getByTestId("text-settings-title")).toBeVisible();
     await page.goto("/stats");
     await expect(page.getByTestId("text-stats-title")).toBeVisible();
 
     await page.goto("/");
+    await expect(page.getByTestId("text-dashboard-title")).toBeVisible();
     await page.getByTestId("button-logout").click();
     await expect(page).toHaveURL(`${baseURL}/`);
     await expect(page.getByTestId("button-login")).toBeVisible();

@@ -271,7 +271,7 @@ function ContactSection() {
   );
 }
 
-export default function Landing() {
+export default function Landing({ signInHref = `${basePath}/sign-in` }: { signInHref?: string }) {
   return (
     <div className="min-h-screen flex flex-col">
       <div className="relative flex flex-col">
@@ -313,7 +313,7 @@ export default function Landing() {
             </p>
 
             <div className="flex items-center justify-center gap-3 flex-wrap pt-4">
-              <a href={`${basePath}/sign-in`}>
+              <a href={signInHref}>
                 <Button size="lg" data-testid="button-login" className="bg-amber-600 border-amber-700 text-white h-12 px-8 text-base">
                   Sign In
                   <ArrowRight className="h-4 w-4 ml-2" />

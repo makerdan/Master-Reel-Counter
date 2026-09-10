@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { THEME_MODE_KEY, PAGEVIEW_LAST_KEY, readSessionKey, writeSessionKey } from "@/lib/storageKeys";
-import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
+import { Switch, Route, useLocation, useSearch, Router as WouterRouter } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClerkProvider, SignIn, SignUp, useClerk } from "@clerk/react";
@@ -25,6 +25,7 @@ import NotFound from "@/pages/not-found";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { WsReconnectProvider } from "@/hooks/use-ws-reconnect";
 import { HelpOnboarding } from "@/components/HelpMenu";
+import { buildSignInPath, getReturnPathFromSearch } from "@shared/auth-routing";
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -154,7 +155,14 @@ function PageViewTracker() {
 }
 
 function AuthRouter() {
-  const { user, isLoading, accessDenied } = useAuth();
+  const [location] = useLocation();
+  const {
+    user,
+    isLoading,
+    accessDenied,
+    identityError,
+    isNotProvisioned,
+  } = useAuth();
 
   if (isLoading) {
     return (
@@ -162,6 +170,14 @@ function AuthRouter() {
         <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loading-spinner" />
       </div>
     );
+  }
+
+  if (identityError) {
+    return <PendingApproval status="service-error" />;
+  }
+
+  if (isNotProvisioned) {
+    return <PendingApproval status="not-provisioned" />;
   }
 
   const isApproved = !user || user.approved || user.isTester;
@@ -178,19 +194,19 @@ function AuthRouter() {
         <TesterLoginPage />
       </Route>
       <Route path="/session/:id">
-        {user ? (isApproved ? <SessionPage /> : <PendingApproval />) : <Landing />}
+        {user ? (isApproved ? <SessionPage /> : <PendingApproval />) : <Landing signInHref={buildSignInPath(location, basePath)} />}
       </Route>
       <Route path="/settings">
-        {user ? (isApproved ? <SettingsPage /> : <PendingApproval />) : <Landing />}
+        {user ? (isApproved ? <SettingsPage /> : <PendingApproval />) : <Landing signInHref={buildSignInPath(location, basePath)} />}
       </Route>
       <Route path="/stats">
-        {user ? (isApproved ? <StatsPage /> : <PendingApproval />) : <Landing />}
+        {user ? (isApproved ? <StatsPage /> : <PendingApproval />) : <Landing signInHref={buildSignInPath(location, basePath)} />}
       </Route>
       <Route path="/join/:token">
-        {user ? (isApproved ? <JoinPage /> : <PendingApproval />) : <Landing />}
+        {user ? (isApproved ? <JoinPage /> : <PendingApproval />) : <Landing signInHref={buildSignInPath(location, basePath)} />}
       </Route>
       <Route path="/help">
-        {user ? (isApproved ? <HelpPage /> : <PendingApproval />) : <Landing />}
+        {user ? (isApproved ? <HelpPage /> : <PendingApproval />) : <Landing signInHref={buildSignInPath(location, basePath)} />}
       </Route>
       <Route component={NotFound} />
     </Switch>
@@ -198,9 +214,16 @@ function AuthRouter() {
 }
 
 function SignInPage() {
+  const search = useSearch();
+  const returnPath = getReturnPathFromSearch(search);
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-neutral-900 via-stone-900 to-amber-950 px-4">
-      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+      <SignIn
+        routing="path"
+        path={`${basePath}/sign-in`}
+        signUpUrl={`${basePath}/sign-up`}
+        fallbackRedirectUrl={returnPath ?? `${basePath}/`}
+      />
     </div>
   );
 }

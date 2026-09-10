@@ -96,16 +96,10 @@ async function clerkIdentity(req: Request): Promise<NormalizedUser | undefined> 
   // `userId` is the legacy Replit subject for migrated accounts and the local
   // bridge value for newly-created accounts. Never use Clerk's native userId
   // for local database records.
+  // Do not create a local row during authentication. A missing local account
+  // is a meaningful not-provisioned state that the auth-user route must
+  // communicate to the client, not a pending account with default values.
   const existing = await authStorage.getUser(userId);
-  if (!existing) {
-    await authStorage.createUserIfMissing({
-      id: userId,
-      email: claimsValue(claims, "email"),
-      firstName: claimsValue(claims, "firstName", "first_name"),
-      lastName: claimsValue(claims, "lastName", "last_name"),
-      profileImageUrl: claimsValue(claims, "profileImageUrl", "profile_image_url"),
-    });
-  }
 
   // Owner access is only retained for the migrated local record. A new Clerk
   // identity with the same username must not become owner through JIT creation.
@@ -160,6 +154,10 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     (req as Request & { user?: NormalizedUser }).user = user;
     next();
   } catch (error) {
+    if (req.originalUrl === "/api/auth/user" || req.originalUrl.startsWith("/api/auth/user?")) {
+      console.error("Identity bridge lookup failed:", error);
+      return res.status(503).json({ message: "identity_bridge_unavailable" });
+    }
     next(error);
   }
 };

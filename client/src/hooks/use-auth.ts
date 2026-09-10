@@ -1,22 +1,46 @@
 import { useCallback, useEffect } from "react";
 import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryObserverResult } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 
-async function fetchUser(): Promise<User | null> {
-  const response = await fetch("/api/auth/user", {
-    credentials: "include",
-  });
+export type AuthUserState =
+  | { kind: "unauthenticated"; user: null }
+  | { kind: "not_provisioned"; user: null }
+  | { kind: "authenticated"; user: User };
 
-  if (response.status === 401) {
-    return null;
+class IdentityBridgeError extends Error {
+  constructor() {
+    super("The identity service is temporarily unavailable.");
+    this.name = "IdentityBridgeError";
   }
+}
 
-  if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
+async function fetchUser(): Promise<AuthUserState> {
+  try {
+    const response = await fetch("/api/auth/user", {
+      credentials: "include",
+    });
+
+    if (response.status === 401) {
+      return { kind: "unauthenticated", user: null };
+    }
+
+    if (response.status === 404) {
+      const body = await response.json().catch(() => null);
+      if (body?.message === "not_provisioned") {
+        return { kind: "not_provisioned", user: null };
+      }
+    }
+
+    if (!response.ok) {
+      throw new IdentityBridgeError();
+    }
+
+    return { kind: "authenticated", user: await response.json() };
+  } catch (error) {
+    if (error instanceof IdentityBridgeError) throw error;
+    throw new IdentityBridgeError();
   }
-
-  return response.json();
 }
 
 async function clearProtectedOfflineData() {
@@ -67,7 +91,13 @@ export function useAuth() {
   const { isLoaded, isSignedIn } = useClerkAuth();
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
-  const { data: localUser, isLoading: isLocalUserLoading } = useQuery<User | null>({
+  const {
+    data: authState,
+    error: identityError,
+    isLoading: isLocalUserLoading,
+    isFetching: isRefreshingIdentity,
+    refetch,
+  } = useQuery<AuthUserState>({
     // Include Clerk identity state so a completed sign-in cannot reuse a
     // signed-out null result that was cached before the redirect.
     queryKey: [
@@ -83,6 +113,11 @@ export function useAuth() {
     enabled: isLoaded,
   });
 
+  const refreshIdentity = useCallback(async (): Promise<QueryObserverResult<AuthUserState, Error>> => {
+    return refetch();
+  }, [refetch]);
+
+  const localUser = authState?.kind === "authenticated" ? authState.user : null;
   const logout = useCallback(async () => {
     await clearClientState(queryClient);
     if (localUser?.isTester) {
@@ -116,9 +151,14 @@ export function useAuth() {
     isLoading,
     isAuthenticated: !!localUser,
     isClerkSignedIn: isSignedIn,
-    // A signed-in Clerk identity with no authorized app user is terminal; it
-    // must not fall through to the public landing page.
-    accessDenied: !!isSignedIn && !localUser && !isLoading,
+    authState: authState?.kind ?? (identityError ? "bridge_error" : undefined),
+    identityError: identityError instanceof IdentityBridgeError,
+    isNotProvisioned: authState?.kind === "not_provisioned",
+    // A 401 after Clerk has established a session is a genuine unauthorized
+    // response. It is distinct from a missing local row and a bridge failure.
+    accessDenied: !!isSignedIn && authState?.kind === "unauthenticated" && !isLoading,
+    isRefreshingIdentity,
+    refreshIdentity,
     logout,
     isLoggingOut: false,
   };
