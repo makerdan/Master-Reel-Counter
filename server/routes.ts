@@ -13,6 +13,7 @@ import {
 } from "./replit_integrations/auth";
 import {
   registerAuthRoutes,
+  getIdentityAuthorizationOutcome,
   isApproved,
   isWebSocketIdentityAuthorized,
   isOwnerIdentity,
@@ -42,7 +43,10 @@ import { taskTracker } from "./lib/taskTracker";
 import {
   evictAllSessionSockets as evictAllSessionSocketsFromRoom,
   evictSessionUserSockets as evictSessionUserSocketsFromRoom,
+  evictUserSockets as evictUserSocketsFromRooms,
+  registerAuthorizationChangeHandler,
   RealtimeAuthorizationTracker,
+  type AuthorizationChangeOutcome,
 } from "./realtime-authorization";
 import { HELP_SOURCE_TEXT } from "@shared/help-content";
 import {
@@ -94,9 +98,22 @@ const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string 
 const realtimeAuthorization = new RealtimeAuthorizationTracker();
 const encodingToggleInProgress = new Set<string>();
 
-function evictSessionUserSockets(sessionId: number, userId: string, reason: string): void {
+function evictSessionUserSockets(
+  sessionId: number,
+  userId: string,
+  reason: string,
+  outcome: AuthorizationChangeOutcome = "removed_collaborator",
+): void {
   realtimeAuthorization.invalidate(sessionId);
-  evictSessionUserSocketsFromRoom(sessionRooms, wsUserMap, sessionId, userId, WebSocket.OPEN, reason);
+  evictSessionUserSocketsFromRoom(
+    sessionRooms,
+    wsUserMap,
+    sessionId,
+    userId,
+    WebSocket.OPEN,
+    reason,
+    outcome,
+  );
   broadcastPresence(sessionId);
 }
 
@@ -105,6 +122,27 @@ function evictAllSessionSockets(sessionId: number, reason: string): void {
   evictAllSessionSocketsFromRoom(sessionRooms, wsUserMap, sessionId, WebSocket.OPEN, reason);
 }
 
+function evictUserSockets(userId: string, outcome: AuthorizationChangeOutcome): void {
+  const reasonByOutcome: Record<string, string> = {
+    account_rejected: "Account access rejected",
+    approval_removed: "Account approval removed",
+    rejected_users_cleared: "Account access changed",
+  };
+  const affectedSessionIds = new Set(
+    [...wsUserMap.values()]
+      .filter((info) => info.userId === userId && info.sessionId !== null)
+      .map((info) => info.sessionId as number),
+  );
+  evictUserSocketsFromRooms(
+    sessionRooms,
+    wsUserMap,
+    userId,
+    WebSocket.OPEN,
+    reasonByOutcome[outcome] || "Authorization changed",
+    outcome,
+  );
+  for (const sessionId of affectedSessionIds) broadcastPresence(sessionId);
+}
 /** Derive stable int32 advisory lock keys from a userId (SHA-256, two int4 values). */
 function deriveAdvisoryLockKeys(userId: string): [number, number] {
   const h = createHash("sha256").update(userId).digest();
@@ -631,6 +669,9 @@ export async function registerRoutes(
   });
 
   const { sessionParser } = await setupAuth(app);
+  registerAuthorizationChangeHandler((userId, outcome) => {
+    evictUserSockets(userId, outcome);
+  });
 
   app.use("/api", (req, res, next) => {
     const skipPaths = [
@@ -3099,7 +3140,12 @@ export async function registerRoutes(
       const { role } = roleParse.data;
       const updated = await storage.updateCollaboratorRole(parseInt(req.params.collabId), access.session.id, role);
       if (!updated) return res.status(404).json({ message: "Collaborator not found" });
-      evictSessionUserSockets(access.session.id, updated.userId, "Session role changed");
+      evictSessionUserSockets(
+        access.session.id,
+        updated.userId,
+        "Session role changed",
+        "role_changed",
+      );
       await logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "changed_role", "collaborator", updated.id, `Changed to ${role}`);
       res.json(updated);
     } catch (error) {
@@ -6594,7 +6640,12 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           () => verifySessionAccess(msg.sessionId, info.userId!, info.testerOwnerUserId ?? undefined),
         );
         if (!access) {
-          ws.send(JSON.stringify({ type: "error", message: "Access denied" }));
+          ws.send(JSON.stringify({
+            type: "authorization_changed",
+            outcome: "denied_join",
+            message: "You are not authorized to join this session.",
+          }));
+          ws.close(1008, "Session access denied");
           return;
         }
         const prevSessionId = info.sessionId;
@@ -6632,9 +6683,18 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     };
 
     loadSocketIdentity().then(async (user) => {
-      if (!user || !(await isWebSocketIdentityAuthorized(user))) {
-        ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
-        ws.close(1008, "Authentication required");
+      const outcome = await getIdentityAuthorizationOutcome(user);
+      if (!user || outcome !== "approved") {
+        ws.send(JSON.stringify({
+          type: "authorization_changed",
+          outcome,
+          message: outcome === "rejected"
+            ? "Your account access was rejected."
+            : outcome === "identity_changed"
+              ? "Your signed-in identity changed."
+              : "Your account is waiting for approval.",
+        }));
+        ws.close(1008, "Authorization required");
         return;
       }
       const connUserId = user.claims.sub;
@@ -6654,11 +6714,21 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
           return;
         }
         loadSocketIdentity().then(async (freshUser) => {
+          const freshOutcome = await getIdentityAuthorizationOutcome(freshUser);
           if (
+            freshOutcome !== "approved" ||
             !(await isWebSocketIdentityAuthorized(freshUser, user))
           ) {
-            try { ws.send(JSON.stringify({ type: "auth_expired" })); } catch {}
-            ws.close(1008, "Session expired");
+            try {
+              ws.send(JSON.stringify({
+                type: "authorization_changed",
+                outcome: freshOutcome,
+                message: freshOutcome === "identity_changed"
+                  ? "Your signed-in identity changed."
+                  : "Your realtime access changed.",
+              }));
+            } catch {}
+            ws.close(1008, "Authorization changed");
             if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
           }
         }).catch(() => {

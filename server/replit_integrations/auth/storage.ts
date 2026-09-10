@@ -11,7 +11,7 @@ export interface IAuthStorage {
   getRejectedCount(): Promise<number>;
   setUserApproved(id: string, approved: boolean): Promise<User>;
   rejectUser(id: string): Promise<User>;
-  clearAllRejected(): Promise<void>;
+  clearAllRejected(): Promise<string[]>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -78,11 +78,13 @@ class AuthStorage implements IAuthStorage {
     return user;
   }
 
-  async clearAllRejected(): Promise<void> {
-    await db
+  async clearAllRejected(): Promise<string[]> {
+    const updatedUsers = await db
       .update(users)
       .set({ rejected: false, updatedAt: new Date() })
-      .where(eq(users.rejected, true));
+      .where(eq(users.rejected, true))
+      .returning({ id: users.id });
+    return updatedUsers.map((user) => user.id);
   }
 }
 

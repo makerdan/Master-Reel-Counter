@@ -18,3 +18,4 @@
 - [Managed Clerk release key boundary](managed-clerk-release-key-boundary.md) — exact production-host auth needs publish-time live keys; dev keys cannot validate that candidate locally.
 - [Playwright WebKit on NixOS](playwright-webkit-nixos.md) — run Ubuntu WebKit in canonical CI; the downloaded Ubuntu browser has incompatible shared-library ABIs in this Nix workspace.
 - [Browser file retry identity](browser-file-retry-identity.md) — recreated File objects may change metadata; use content identity when retries must reuse an idempotency key.
+- [Playwright WebSocket mocks](playwright-websocket-mocks.md) — install the URL.parse compatibility shim on every fresh page that uses routeWebSocket.

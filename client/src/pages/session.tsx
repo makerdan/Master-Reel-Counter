@@ -339,17 +339,28 @@ function SessionWorkspace({
 
   const isLocked = !!(session as any).isLocked;
   const isOwner = (session as any).role === "owner";
-  const canEditSession = !isLocked || isOwner;
 
   const { user, identityId } = useAuth();
   const { setWsReconnect, setForceReconnect } = useWsReconnect();
   const [onlineUsers, setOnlineUsers] = useState<{ userId: string; username: string }[]>([]);
 
-  const { wsStatus, reconnectDelayMs, forceReconnect, isRefreshing } = useSessionWebSocket(sessionId, (msg) => {
+  const {
+    wsStatus,
+    reconnectDelayMs,
+    forceReconnect,
+    isRefreshing,
+    accessOutcome,
+  } = useSessionWebSocket(sessionId, (msg) => {
     if (msg.type === "presence") {
       setOnlineUsers(msg.users || []);
     }
   }, user && identityId ? { userId: identityId, username: (user as any).firstName || identityId } : undefined);
+  const isTerminalAccessOutcome = Boolean(
+    accessOutcome &&
+    !["role_changed", "ownership_changed"].includes(accessOutcome.code),
+  );
+  const canEditSession = !isTerminalAccessOutcome && (!isLocked || isOwner) &&
+    (session.role === "owner" || session.role === "editor");
 
   // Live countdown: ticks once per second from the initial reconnect delay down to 0,
   // then holds at 0 until the socket reconnects (wsStatus returns to "connected").
@@ -832,6 +843,14 @@ function SessionWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {accessOutcome && (
+              <span
+                className={`text-xs ${isTerminalAccessOutcome ? "text-destructive" : "text-amber-500"}`}
+                data-testid="text-ws-access-outcome"
+              >
+                {accessOutcome.message}
+              </span>
+            )}
             {wsStatus === "reconnecting" && (
               <span className="flex items-center gap-1 text-xs text-amber-500" data-testid="text-ws-reconnecting">
                 <Loader2 className="h-3 w-3 animate-spin" />

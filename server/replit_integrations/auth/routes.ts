@@ -2,18 +2,21 @@ import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { isAuthenticated } from "./replitAuth";
 import type { User } from "@shared/models/auth";
+import {
 
 export function isOwnerIdentity(user: any): boolean {
   return user?.isOwner === true;
 }
 
 export async function isIdentityApproved(user: any): Promise<boolean> {
-  if (user?.isTester || isOwnerIdentity(user)) return true;
-  const userId = user?.claims?.sub;
-  if (!userId) return false;
-  const dbUser = await authStorage.getUser(userId);
-  return Boolean(dbUser?.approved && !dbUser.rejected);
+  return (await getIdentityAuthorizationOutcome(user)) === "approved";
 }
+
+export type IdentityAuthorizationOutcome =
+  | "approved"
+  | "pending"
+  | "rejected"
+  | "identity_changed";
 
 export type AuthUserLookupResult =
   | { kind: "user"; user: User; isTestOwner?: true }
@@ -131,7 +134,10 @@ export function registerAuthRoutes(app: Express): void {
       if (!isOwnerIdentity(req.user)) {
         return res.status(403).json({ message: "Forbidden" });
       }
-      await authStorage.clearAllRejected();
+      const restoredUserIds = await authStorage.clearAllRejected();
+      for (const userId of restoredUserIds) {
+        notifyAuthorizationChange(userId, "rejected_users_cleared");
+      }
       res.json({ success: true });
     } catch (error) {
       console.error("Error clearing rejected users:", error);
@@ -154,6 +160,7 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(404).json({ message: "User not found" });
       }
       await authStorage.rejectUser(targetId);
+      notifyAuthorizationChange(targetId, "account_rejected");
       res.json({ success: true });
     } catch (error) {
       console.error("Error rejecting user:", error);
@@ -180,10 +187,23 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(404).json({ message: "User not found" });
       }
       const updatedUser = await authStorage.setUserApproved(targetId, approved);
+      if (!approved) notifyAuthorizationChange(targetId, "approval_removed");
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating user approval:", error);
       res.status(500).json({ message: "Failed to update user approval" });
     }
   });
+}
+
+export async function getIdentityAuthorizationOutcome(
+  user: any,
+): Promise<IdentityAuthorizationOutcome> {
+  if (user?.isTester || isOwnerIdentity(user)) return "approved";
+  const userId = user?.claims?.sub;
+  if (!userId) return "identity_changed";
+  const dbUser = await authStorage.getUser(userId);
+  if (dbUser?.rejected) return "rejected";
+  if (!dbUser?.approved) return "pending";
+  return "approved";
 }

@@ -6,6 +6,19 @@
  *      wsStatus=reconnecting (browser online, WS dropped).
  */
 import { test, expect, createSessionViaApi } from "./fixtures";
+import type { Page } from "@playwright/test";
+
+async function installWebSocketMockCompatibility(page: Page) {
+  await page.addInitScript(() => {
+    // Playwright's routeWebSocket mock (_WebSocketMock) calls URL.parse() internally.
+    // URL.parse is only available in Chrome 120+; polyfill it for older Chromium builds.
+    if (typeof (URL as unknown as Record<string, unknown>).parse !== "function") {
+      (URL as unknown as Record<string, unknown>).parse = (url: string, base?: string) => {
+        try { return new URL(url, base); } catch { return null; }
+      };
+    }
+  });
+}
 
 test.describe("mobile layout parity @mobile", () => {
   test.use({ viewport: { width: 390, height: 844 } });
@@ -85,15 +98,8 @@ test.describe("mobile layout parity @mobile", () => {
 
     // Track WS instances so we can close the live socket without going offline
     // (offline shows a different indicator; reconnecting shows while online but WS dropped).
+    await installWebSocketMockCompatibility(page);
     await page.addInitScript(() => {
-      // Playwright's routeWebSocket mock (_WebSocketMock) calls URL.parse() internally.
-      // URL.parse is only available in Chrome 120+; polyfill it for older Chromium builds.
-      if (typeof (URL as unknown as Record<string, unknown>).parse !== "function") {
-        (URL as unknown as Record<string, unknown>).parse = (url: string, base?: string) => {
-          try { return new URL(url, base); } catch { return null; }
-        };
-      }
-
       const tracked: WebSocket[] = [];
       (window as unknown as Record<string, unknown>).__testWsSockets = tracked;
       const OrigWS = window.WebSocket;
@@ -139,5 +145,40 @@ test.describe("mobile layout parity @mobile", () => {
       page.locator('[data-testid="text-ws-reconnecting-mobile"]'),
       "WS reconnect countdown banner must be visible at 390px when wsStatus=reconnecting",
     ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("denied join shows an access outcome without reconnecting", async ({
+    page,
+    request,
+    cleanupIds,
+  }) => {
+    await installWebSocketMockCompatibility(page);
+    const sess = await createSessionViaApi(request, `Mobile denied join ${Date.now()}`);
+    cleanupIds.push(sess.id);
+
+    let connectionCount = 0;
+    await page.routeWebSocket(/\/ws/, (ws) => {
+      connectionCount++;
+      ws.onMessage((message) => {
+        const parsed = JSON.parse(String(message));
+        if (parsed.type === "join") {
+          ws.send(JSON.stringify({
+            type: "authorization_changed",
+            outcome: "denied_join",
+            message: "You are not authorized to join this session.",
+          }));
+        }
+      });
+    });
+
+    await page.goto(`/session/${sess.id}`);
+    await expect(
+      page.locator('[data-testid="text-ws-access-outcome"]'),
+      "denied joins must expose a stable access outcome",
+    ).toContainText("not authorized", { timeout: 10_000 });
+
+    await page.waitForTimeout(1_500);
+    expect(connectionCount, "terminal authorization changes must not reconnect").toBe(1);
+    await expect(page.locator('[data-testid="text-ws-reconnecting"]')).toHaveCount(0);
   });
 });

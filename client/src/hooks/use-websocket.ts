@@ -10,7 +10,8 @@ type MessageHandler = (msg: any) => void;
  *                    is running. This is the state consumers should use to
  *                    show a "Reconnecting…" indicator.
  */
-export type WsStatus = "connecting" | "connected" | "reconnecting";
+export type WsStatus = "connecting" | "connected" | "reconnecting" | "access-denied";
+export type WsAccessOutcome = { code: string; message: string } | null;
 
 const WS_RECONNECT_BASE_MS = 1_000;
 const WS_RECONNECT_CAP_MS = 30_000;
@@ -62,6 +63,7 @@ export function useSessionWebSocket(
   userInfoRef.current = userInfo;
 
   const [wsStatus, setWsStatus] = useState<WsStatus>("connecting");
+  const [accessOutcome, setAccessOutcome] = useState<WsAccessOutcome>(null);
   const [reconnectDelayMs, setReconnectDelayMs] = useState<number | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const refreshingTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -119,11 +121,14 @@ export function useSessionWebSocket(
       hasEverConnectedRef.current = true;
       setWsStatus("connected");
       setReconnectDelayMs(null);
+      setAccessOutcome(null);
 
       // On reconnect, proactively invalidate session caches so collaborators
       // never see stale entries, photos, or pins after a silent reconnect.
       if (isReconnect && sessionId) {
         const sid = sessionId.toString();
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid] });
+        queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "collaborators"] });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "entries"] });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "photos"] });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sid, "pins"] });
@@ -165,6 +170,36 @@ export function useSessionWebSocket(
         if (msg.type === "auth_expired") {
           shouldReconnectRef.current = false;
           window.location.assign(`${import.meta.env.BASE_URL.replace(/\/$/, "")}/sign-in`);
+          return;
+        }
+        if (msg.type === "authorization_changed") {
+          const code = typeof msg.outcome === "string" ? msg.outcome : "identity_changed";
+          const message = typeof msg.message === "string"
+            ? msg.message
+            : "Your access to this session changed.";
+          setAccessOutcome({ code, message });
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "collaborators"] });
+
+          const terminal = new Set([
+            "account_rejected",
+            "approval_removed",
+            "rejected_users_cleared",
+            "pending",
+            "rejected",
+            "denied_join",
+            "removed_collaborator",
+            "identity_changed",
+          ]);
+          if (terminal.has(code)) {
+            shouldReconnectRef.current = false;
+            clearTimeout(reconnectTimerRef.current);
+            pendingBufferRef.current = [];
+            setWsStatus("access-denied");
+            setReconnectDelayMs(null);
+          }
+          onMessageRef.current?.(msg);
+          if (ws.readyState === WebSocket.OPEN) ws.close(1008, message);
           return;
         }
         // pong is only a heartbeat acknowledgement; no further processing needed.
@@ -242,9 +277,18 @@ export function useSessionWebSocket(
   }, [safeSend]);
 
   const forceReconnect = useCallback(() => {
+    if (!shouldReconnectRef.current) return;
     clearTimeout(reconnectTimerRef.current);
     connect();
   }, [connect]);
 
-  return { wsRef, sendMessage, wsStatus, reconnectDelayMs, forceReconnect, isRefreshing };
+  return {
+    wsRef,
+    sendMessage,
+    wsStatus,
+    reconnectDelayMs,
+    forceReconnect,
+    isRefreshing,
+    accessOutcome,
+  };
 }

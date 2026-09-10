@@ -67,6 +67,7 @@ import
 {
 
   evictAllSessionSockets,
+  evictUserSockets,
   evictSessionUserSockets,
   RealtimeAuthorizationTracker,
 }
@@ -103,6 +104,7 @@ import
   isApproved,
   classifyAuthUserLookup,
   isIdentityApproved,
+  getIdentityAuthorizationOutcome,
   isOwnerIdentity,
   isWebSocketIdentityAuthorized,
 }
@@ -188,6 +190,34 @@ describe("Clerk owner and approval regression guard", () => {
     assert.equal(await isIdentityApproved({ isOwner: true }), true);
     assert.equal(await isIdentityApproved({ isTester: true }), true);
     assert.equal(await isIdentityApproved({}), false);
+  });
+
+  test("exposes stable authorization outcomes for pending, rejected, and changed identities", async () => {
+    const originalGetUser = authStorage.getUser;
+    const records = new Map([
+      ["pending-user", { approved: false, rejected: false }],
+      ["rejected-user", { approved: false, rejected: true }],
+      ["approved-user", { approved: true, rejected: false }],
+    ]);
+    authStorage.getUser = async (userId: string) => records.get(userId) as any;
+
+    try {
+      assert.equal(
+        await getIdentityAuthorizationOutcome({ claims: { sub: "pending-user" } }),
+        "pending",
+      );
+      assert.equal(
+        await getIdentityAuthorizationOutcome({ claims: { sub: "rejected-user" } }),
+        "rejected",
+      );
+      assert.equal(
+        await getIdentityAuthorizationOutcome({ claims: { sub: "approved-user" } }),
+        "approved",
+      );
+      assert.equal(await getIdentityAuthorizationOutcome(undefined), "identity_changed");
+    } finally {
+      authStorage.getUser = originalGetUser;
+    }
   });
 
   test("rejects pending and rejected collaborators from WebSocket authorization", async () => {
@@ -462,9 +492,63 @@ describe("RealtimeAuthorizationTracker", () => {
 
     assert.deepEqual([...rooms.get(42)!], [unaffected]);
     assert.deepEqual(users.get(affected), { sessionId: null, userId: "revoked-user", role: null });
-    assert.deepEqual(JSON.parse(sent[0]), { type: "authorization_changed" });
+    assert.deepEqual(JSON.parse(sent[0]), {
+      type: "authorization_changed",
+      outcome: "removed_collaborator",
+      message: "Your access to this session was removed.",
+    });
     assert.equal(affected.closeCode, 1008);
     assert.equal(affected.closeReason, "Session access revoked");
+  });
+
+  test("evicts the same account from every active session", () => {
+    const closed: string[] = [];
+    const sent: Array<{ sessionId: number; message: any }> = [];
+    const makeSocket = (sessionId: number) => ({
+      readyState: 1,
+      send: (data: string) => sent.push({ sessionId, message: JSON.parse(data) }),
+      close: (_code: number, _reason: string) => closed.push(String(sessionId)),
+    });
+    const first = makeSocket(1);
+    const second = makeSocket(2);
+    const other = makeSocket(2);
+    const rooms = new Map([
+      [1, new Set([first])],
+      [2, new Set([second, other])],
+    ]);
+    const users = new Map([
+      [first, { sessionId: 1, userId: "revoked-user", role: "editor" }],
+      [second, { sessionId: 2, userId: "revoked-user", role: "viewer" }],
+      [other, { sessionId: 2, userId: "other-user", role: "viewer" }],
+    ]);
+
+    evictUserSockets(
+      rooms,
+      users,
+      "revoked-user",
+      1,
+      "Account approval removed",
+      "approval_removed",
+    );
+
+    assert.deepEqual(closed.sort(), ["1", "2"]);
+    assert.equal(rooms.has(1), false);
+    assert.deepEqual([...rooms.get(2)!], [other]);
+    assert.deepEqual(sent.map(({ message }) => message), [
+      {
+        type: "authorization_changed",
+        outcome: "approval_removed",
+        message: "Your account approval was removed.",
+      },
+      {
+        type: "authorization_changed",
+        outcome: "approval_removed",
+        message: "Your account approval was removed.",
+      },
+    ]);
+    assert.equal(users.get(first)?.sessionId, null);
+    assert.equal(users.get(second)?.sessionId, null);
+    assert.equal(users.get(other)?.sessionId, 2);
   });
 
   test("evicts every room member when the session is deleted", () => {
