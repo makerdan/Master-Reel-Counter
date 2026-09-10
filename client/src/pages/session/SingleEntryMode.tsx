@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
+import { createDirectPhotoRegistrationKey, directPhotoFileKey } from "@/lib/directPhotoRegistration";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
@@ -72,6 +73,7 @@ export default function SingleEntryMode({
   const { allCodes: vendorCodes } = useVendorCodes();
   const singleFileRef = useRef<HTMLInputElement>(null);
   const singleCameraRef = useRef<HTMLInputElement>(null);
+  const pendingRegistrationKeysRef = useRef(new Map<string, string>());
   const [capturedPhoto, setCapturedPhoto] = useState<{ url: string; objectPath: string; photoId: number } | null>(null);
   const [keepLocation, setKeepLocation] = useState(false);
   const prevDefaultsRef = useRef({ aisle: defaultAisle || "", section: defaultSection || "" });
@@ -375,6 +377,10 @@ export default function SingleEntryMode({
   const handleSinglePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const fileKey = await directPhotoFileKey(file);
+    const registrationKey = pendingRegistrationKeysRef.current.get(fileKey)
+      ?? createDirectPhotoRegistrationKey();
+    pendingRegistrationKeysRef.current.set(fileKey, registrationKey);
     const uploadResult = await uploadFile(file);
     if (!uploadResult.success) {
       if (uploadResult.networkError) {
@@ -405,6 +411,7 @@ export default function SingleEntryMode({
       try {
         const result = uploadResult.data;
         const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
+          registrationKey,
           objectStorageKey: result.objectPath,
           originalFilename: file.name,
           mimeType: file.type,
@@ -413,6 +420,7 @@ export default function SingleEntryMode({
           section: form.section,
         });
         const savedPhoto = await res.json();
+        pendingRegistrationKeysRef.current.delete(fileKey);
         await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
         if (onSwitchToPhoto) {
           toast({ title: "Photo captured — switching to pin mode" });

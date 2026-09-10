@@ -43,6 +43,7 @@ import { deriveVendorCode, formatPinLabel, generateDetailPinLabel } from "./util
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatFullTimestamp } from "@/lib/timezone";
+import { createDirectPhotoRegistrationKey, directPhotoFileKey } from "@/lib/directPhotoRegistration";
 import SingleEntryMode from "./SingleEntryMode";
 import LabelScannerTab from "./LabelScannerTab";
 import { scanPanelOpenKey, scannerBatchKey } from "@/lib/storageKeys";
@@ -82,6 +83,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
   const [customCodePinId, setCustomCodePinId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const pendingRegistrationKeysRef = useRef(new Map<string, string>());
   const [aisle, setAisle] = useState("");
   const [uploadedPhotos, setUploadedPhotos] = useState<Array<{ url: string; objectPath: string; section: string; aisle?: string; dbId?: number; filename?: string; timestamp?: string; notes?: string; isDetailShot?: boolean; parentPhotoId?: number; linkedPinLabel?: string; pinScale?: number; rotation?: number }>>([]);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
@@ -896,6 +898,10 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     let nextRecNum = isRec ? parseInt(getNextReceivingSection(), 10) : 0;
 
     for (const file of files) {
+      const fileKey = await directPhotoFileKey(file);
+      const registrationKey = pendingRegistrationKeysRef.current.get(fileKey)
+        ?? createDirectPhotoRegistrationKey();
+      pendingRegistrationKeysRef.current.set(fileKey, registrationKey);
       try {
         const uploadResult = await uploadFile(file);
         if (!uploadResult.success) {
@@ -918,6 +924,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           nextRecNum++;
         }
         const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, {
+          registrationKey,
           objectStorageKey: result.objectPath,
           originalFilename: file.name,
           mimeType: file.type,
@@ -926,22 +933,29 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           section: sectionVal,
         });
         const savedPhoto = await res.json();
-        const photoUrl = result.objectPath;
+        pendingRegistrationKeysRef.current.delete(fileKey);
+        const savedObjectPath = savedPhoto.objectStorageKey || result.objectPath;
+        const savedPhotoView = {
+          url: savedObjectPath.startsWith("/uploads/") || savedObjectPath.startsWith("/objects/")
+            ? savedObjectPath
+            : `/uploads/${savedObjectPath}`,
+          objectPath: savedObjectPath,
+          section: savedPhoto.section || "",
+          aisle: savedPhoto.aisle || "",
+          dbId: savedPhoto.id,
+          filename: savedPhoto.originalFilename || `Photo_${savedPhoto.id}`,
+          timestamp: savedPhoto.createdAt ? formatFullTimestamp(savedPhoto.createdAt, tz) : undefined,
+          notes: savedPhoto.notes || "",
+          isDetailShot: savedPhoto.isDetailShot || false,
+          parentPhotoId: savedPhoto.parentPhotoId || undefined,
+          linkedPinLabel: savedPhoto.linkedPinLabel || undefined,
+          pinScale: savedPhoto.pinScale ?? 1,
+          rotation: savedPhoto.rotation ?? 0,
+        };
         setUploadedPhotos((prev) => {
-          const existingCount = prev.filter((p) => p.filename?.replace(/_\d+(?=\.\w+$)/, "") === file.name || p.filename === file.name).length;
-          const dotIdx = file.name.lastIndexOf(".");
-          const base = dotIdx > 0 ? file.name.substring(0, dotIdx) : file.name;
-          const ext = dotIdx > 0 ? file.name.substring(dotIdx) : "";
-          const numberedName = `${base}_${String(existingCount + prev.length + 1).padStart(4, "0")}${ext}`;
-          return [...prev, {
-            url: photoUrl,
-            objectPath: result.objectPath,
-            section: sectionVal,
-            aisle: aisle || "",
-            dbId: savedPhoto.id,
-            filename: numberedName,
-            timestamp: formatFullTimestamp(new Date(), tz),
-          }];
+          const existingIndex = prev.findIndex(photo => photo.dbId === savedPhoto.id);
+          if (existingIndex === -1) return [...prev, savedPhotoView];
+          return prev.map((photo, index) => index === existingIndex ? savedPhotoView : photo);
         });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString()] });
@@ -1762,6 +1776,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         multiple
         className="hidden"
         onChange={handleFileUpload}
+        data-testid="input-photo-file"
       />
       <input
         ref={cameraInputRef}
@@ -1770,6 +1785,7 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
         capture="environment"
         className="hidden"
         onChange={handleFileUpload}
+        data-testid="input-photo-camera"
       />
       <h2 className="sm:hidden text-lg font-semibold underline text-center mb-2">Reel IDs</h2>
       <div className="space-y-2 sm:space-y-0">
