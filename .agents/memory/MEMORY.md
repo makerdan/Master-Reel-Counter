@@ -21,3 +21,4 @@
 - [Playwright WebSocket mocks](playwright-websocket-mocks.md) — install the URL.parse compatibility shim on every fresh page that uses routeWebSocket.
 - [Auth transition cleanup](auth-transition-cleanup.md) — wait for settled local identity, then clear protected app state without removing the auth query.
 - [Durable queue claim rereads](durable-queue-claim-rereads.md) — after claiming a queued item, reread it before side effects so concurrent drainers do not act on stale snapshots.
+- [Agent build failure evidence](agent-build-failure-evidence.md) — count only explicit dated validation records; missing artifacts make historical root cause inconclusive.
