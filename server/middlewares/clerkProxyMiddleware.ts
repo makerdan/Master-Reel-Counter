@@ -13,12 +13,15 @@ import type {
 import type { Socket } from "net";
 import type { RequestHandler } from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
-import { CLERK_FRONTEND_API_ORIGIN } from "@shared/clerk-config";
+import {
+  CLERK_FRONTEND_API_ORIGIN,
+  CLERK_PROXY_PATH,
+  CLERK_PROXY_READINESS_PATH,
+} from "@shared/clerk-config";
 
 export const CLERK_PROXY_TARGET = CLERK_FRONTEND_API_ORIGIN;
-export const CLERK_PROXY_PATH = "/api/__clerk";
-export const CLERK_PROXY_READINESS_PATH = `${CLERK_PROXY_PATH}/healthz`;
 export const CLERK_PROXY_HEALTH_PATH = "/api/admin/clerk-proxy/health";
+export { CLERK_PROXY_PATH, CLERK_PROXY_READINESS_PATH };
 
 export const CLERK_PROXY_CONNECT_TIMEOUT_MS = 3_000;
 export function assertClerkProxyConfiguration(

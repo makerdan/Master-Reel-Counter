@@ -8,6 +8,7 @@ import {
   CLERK_TESTING_FRONTEND_API_ORIGIN,
   setupCandidateClerkTestingToken,
 } from "../support/clerk-candidate-testing";
+import { CLERK_PROXY_PATH } from "../../shared/clerk-config";
 
 const { Client } = pg;
 const SMOKE_ID_PREFIX = "release-smoke-";
@@ -153,7 +154,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   page.on("response", (response) => {
     const request = response.request();
     const url = new URL(response.url());
-    if (url.origin === baseURL && url.pathname.startsWith("/api/__clerk")) {
+    if (url.origin === baseURL && url.pathname.startsWith(CLERK_PROXY_PATH)) {
       proxyRequests.push(
         `${request.method()} ${safeDiagnosticPath(response.url())} ${response.status()}`,
       );
@@ -195,7 +196,6 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     await setupCandidateClerkTestingToken({
       page,
       candidateOrigin: baseURL,
-      proxyPath: "/api/__clerk",
       localCandidateOrigin: process.env.RELEASE_SMOKE_CANDIDATE_APP_ORIGIN,
     });
     await page

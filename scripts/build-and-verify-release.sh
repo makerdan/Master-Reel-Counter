@@ -24,6 +24,8 @@ redact_log() {
       node scripts/redact-release-diagnostics.mjs
   fi
 }
+clerk_proxy_path="$(node --import tsx/esm --input-type=module -e 'import { CLERK_PROXY_PATH } from "./shared/clerk-config.ts"; process.stdout.write(CLERK_PROXY_PATH)')"
+clerk_proxy_readiness_path="$(node --import tsx/esm --input-type=module -e 'import { CLERK_PROXY_READINESS_PATH } from "./shared/clerk-config.ts"; process.stdout.write(CLERK_PROXY_READINESS_PATH)')"
 
 retain_failure_diagnostics() {
   mkdir -p "$diagnostics_dir"
@@ -97,7 +99,7 @@ if [[ "${RELEASE_CLEANUP_HARNESS:-0}" == "1" ]]; then
   exit "${RELEASE_CLEANUP_EXIT_STATUS:-1}"
 fi
 
-export VITE_CLERK_PROXY_URL="/api/__clerk"
+export VITE_CLERK_PROXY_URL="$clerk_proxy_path"
 npm run build
 
 NODE_ENV=production PORT="$candidate_port" RELEASE_CANDIDATE_ID="$candidate_id" \
@@ -126,7 +128,7 @@ node scripts/release-candidate-https-proxy.mjs >"$proxy_log" 2>&1 &
 proxy_pid="$!"
 
 if ! node scripts/wait-for-release-candidate.mjs \
-  "https://127.0.0.1:${tls_port}/api/__clerk/healthz" "$candidate_id" "$proxy_pid" 10000 \
+  "https://127.0.0.1:${tls_port}${clerk_proxy_readiness_path}" "$candidate_id" "$proxy_pid" 10000 \
   --insecure-tls; then
   print_safe_log "$proxy_log"
   exit 1

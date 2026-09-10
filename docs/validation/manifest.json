@@ -21,6 +21,7 @@
         { "name": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "command": ["npm", "run", "lint:storage"] },
         { "name": "unit-tests", "command": ["npm", "run", "test:unit"] },
+        { "name": "clerk-release-contract", "command": ["npm", "run", "test:managed-clerk-release-contract"] },
         { "name": "vite-hmr-tests", "command": ["npm", "run", "test:vite-hmr"] },
         { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
       ]

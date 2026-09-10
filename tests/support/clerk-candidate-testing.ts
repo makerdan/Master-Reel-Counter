@@ -3,12 +3,12 @@ import type { BrowserContext, Page, Route } from "@playwright/test";
 import {
   CLERK_FRONTEND_API_HOST,
   CLERK_FRONTEND_API_ORIGIN,
+  CLERK_PROXY_PATH,
 } from "../../shared/clerk-config";
 
 type SetupCandidateTestingTokenOptions = {
   page: Page;
   candidateOrigin: string;
-  proxyPath: string;
   localCandidateOrigin?: string;
 };
 
@@ -17,7 +17,6 @@ export const CLERK_TESTING_FRONTEND_API_ORIGIN = CLERK_FRONTEND_API_ORIGIN;
 type CandidateTransportOptions = {
   context: BrowserContext,
   candidateOrigin: string;
-  proxyPath: string;
   sourceOrigin: string;
   sourcePathPrefix: string;
   localCandidateOrigin?: string;
@@ -26,7 +25,6 @@ type CandidateTransportOptions = {
 function createCandidateTransportContext({
   context,
   candidateOrigin,
-  proxyPath,
   sourceOrigin,
   sourcePathPrefix,
   localCandidateOrigin,
@@ -36,11 +34,6 @@ function createCandidateTransportContext({
   const local = localCandidateOrigin ? new URL(localCandidateOrigin) : canonical;
   if (canonical.protocol !== "https:") {
     throw new Error("Clerk candidate transport must use an explicit HTTPS origin");
-  }
-  if (!proxyPath.startsWith("/") || proxyPath.endsWith("/")) {
-    throw new Error(
-      "Clerk candidate proxy path must be an absolute path without a trailing slash",
-    );
   }
   if (
     localCandidateOrigin &&
@@ -70,7 +63,7 @@ function createCandidateTransportContext({
 
                 const clerkPath = requested.pathname.slice(sourcePathPrefix.length - 4);
                 const forwarded = new URL(
-                  `${proxyPath}${clerkPath}${requested.search}`,
+                  `${CLERK_PROXY_PATH}${clerkPath}${requested.search}`,
                   local,
                 );
                 return target.fetch({
@@ -99,15 +92,14 @@ function createCandidateTransportContext({
 export async function setupCandidateClerkTestingToken({
   page,
   candidateOrigin,
-  proxyPath,
   localCandidateOrigin,
 }: SetupCandidateTestingTokenOptions): Promise<void> {
   const candidate = new URL(candidateOrigin);
   const transports = [
     {
-      frontendApiUrl: `${candidate.host}${proxyPath}`,
+      frontendApiUrl: `${candidate.host}${CLERK_PROXY_PATH}`,
       sourceOrigin: candidate.origin,
-      sourcePathPrefix: `${proxyPath}/v1/`,
+      sourcePathPrefix: `${CLERK_PROXY_PATH}/v1/`,
     },
     {
       frontendApiUrl: CLERK_FRONTEND_API_HOST,
@@ -120,7 +112,6 @@ export async function setupCandidateClerkTestingToken({
     const context = createCandidateTransportContext({
       context: page.context(),
       candidateOrigin: candidate.origin,
-      proxyPath,
       sourceOrigin: transport.sourceOrigin,
       sourcePathPrefix: transport.sourcePathPrefix,
       localCandidateOrigin,

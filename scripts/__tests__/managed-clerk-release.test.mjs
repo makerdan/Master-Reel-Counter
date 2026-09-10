@@ -23,6 +23,9 @@ const workflow = readFileSync(resolve(root, ".github/workflows/managed-clerk-rel
 const candidateBuild = readFileSync(resolve(root, "scripts/build-and-verify-release.sh"), "utf8");
 const candidateProxy = readFileSync(resolve(root, "scripts/release-candidate-https-proxy.mjs"), "utf8");
 const diagnosticRedactor = readFileSync(resolve(root, "scripts/redact-release-diagnostics.mjs"), "utf8");
+const candidateTesting = readFileSync(resolve(root, "tests/support/clerk-candidate-testing.ts"), "utf8");
+const releaseSmoke = readFileSync(resolve(root, "tests/release/managed-clerk-auth.spec.ts"), "utf8");
+const sharedClerkConfig = readFileSync(resolve(root, "shared/clerk-config.ts"), "utf8");
 const serverIndex = readFileSync(resolve(root, "server/index.ts"), "utf8");
 const clerkProxyMiddleware = readFileSync(
   resolve(root, "server/middlewares/clerkProxyMiddleware.ts"),
@@ -135,10 +138,34 @@ test("every Replit deployment build gates the exact production candidate", () =>
   assert.match(candidateProxy, /"x-forwarded-proto": "https"/);
   assert.match(config, /--host-resolver-rules=MAP \$\{target\.hostname\}:443 127\.0\.0\.1:\$\{candidateTlsPort\}/);
   assert.match(candidateBuild, /npm run verify:managed-clerk-release/);
-  assert.match(candidateBuild, /\/api\/__clerk\/healthz/);
+  assert.match(candidateBuild, /import \{ CLERK_PROXY_PATH \} from "\.\/shared\/clerk-config\.ts"/);
+  assert.match(candidateBuild, /import \{ CLERK_PROXY_READINESS_PATH \} from "\.\/shared\/clerk-config\.ts"/);
+  assert.match(candidateBuild, /VITE_CLERK_PROXY_URL="\$clerk_proxy_path"/);
+  assert.match(candidateBuild, /\$\{clerk_proxy_readiness_path\}/);
+  assert.doesNotMatch(candidateBuild, /\/api\/__clerk\/healthz/);
   assert.match(candidateBuild, /trap on_exit EXIT/);
   assert.match(candidateBuild, /trap 'exit 130' INT/);
   assert.match(candidateBuild, /trap 'exit 143' TERM/);
+});
+
+test("production and release testing derive the proxy path from one shared source", () => {
+  assert.match(sharedClerkConfig, /export const CLERK_PROXY_PATH = "\/api\/__clerk";/);
+  assert.match(clerkProxyMiddleware, /CLERK_PROXY_PATH[\s\S]*from "@shared\/clerk-config"/);
+  assert.match(candidateTesting, /CLERK_PROXY_PATH[\s\S]*from "\.\.\/\.\.\/shared\/clerk-config"/);
+  assert.match(releaseSmoke, /CLERK_PROXY_PATH[\s\S]*from "\.\.\/\.\.\/shared\/clerk-config"/);
+  assert.match(candidateTesting, /frontendApiUrl: `\$\{candidate\.host\}\$\{CLERK_PROXY_PATH\}`/);
+  assert.doesNotMatch(releaseSmoke, /proxyPath:\s*["'`]\/api\/__clerk/);
+});
+
+test("standard validation runs the deterministic release proxy contract before live smoke", () => {
+  assert.match(
+    packageJson.scripts["test:managed-clerk-release-contract"],
+    /clerk-candidate-testing\.test\.ts/,
+  );
+  assert.match(
+    readFileSync(resolve(root, "docs/validation/manifest.json"), "utf8"),
+    /"name": "clerk-release-contract"[\s\S]*"npm", "run", "test:managed-clerk-release-contract"/,
+  );
 });
 
 test("production Clerk proxy fails closed and exposes public readiness before auth", () => {
@@ -608,7 +635,7 @@ test("maximum valid diagnostic input preserves every bounded section", async () 
 });
 
 test("smoke proves proxy, cookie-only API, protected pages, and sign-out", () => {
-  assert.match(smoke, /\/api\/__clerk/);
+  assert.match(smoke, /CLERK_PROXY_PATH/);
   assert.match(smoke, /fetch\("\/api\/auth\/user"/);
   assert.match(smoke, /fetch\("\/api\/healthz"/);
   assert.match(smoke, /credentials: "same-origin"/);
