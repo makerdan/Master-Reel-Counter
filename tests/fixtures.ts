@@ -6,6 +6,8 @@ import {
 
 export const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5000";
 
+const cleanupIdsByRequest = new WeakMap<APIRequestContext, number[]>();
+
 export async function createSessionViaApi(
   request: APIRequestContext,
   name?: string,
@@ -16,7 +18,9 @@ export async function createSessionViaApi(
   });
   if (!res.ok())
     throw new Error(`createSession failed: ${res.status()} ${await res.text()}`);
-  return res.json();
+  const session = (await res.json()) as { id: number; name: string };
+  cleanupIdsByRequest.get(request)?.push(session.id);
+  return session;
 }
 
 export async function createEntryViaApi(
@@ -72,16 +76,31 @@ export const test = base.extend<E2EFixtures>({
   cleanupIds: [
     async ({ request }, use) => {
       const ids: number[] = [];
-      await use(ids);
-      for (const id of ids) {
-        await request.delete(`/api/sessions/${id}`).catch(() => {});
+      cleanupIdsByRequest.set(request, ids);
+      try {
+        await use(ids);
+      } finally {
+        cleanupIdsByRequest.delete(request);
+        const failures: string[] = [];
+        for (const id of new Set(ids)) {
+          try {
+            const response = await request.delete(`/api/sessions/${id}/permanent`);
+            if (response.status() !== 200 && response.status() !== 404) {
+              failures.push(`${id}: HTTP ${response.status()} ${await response.text()}`);
+            }
+          } catch (error) {
+            failures.push(`${id}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+        if (failures.length > 0) {
+          throw new Error(`Failed to permanently clean up E2E sessions:\n${failures.join("\n")}`);
+        }
       }
     },
-    { auto: false },
+    { auto: true },
   ],
-  sessionId: async ({ request, cleanupIds }, use) => {
+  sessionId: async ({ request }, use) => {
     const sess = await createSessionViaApi(request);
-    cleanupIds.push(sess.id);
     await use(sess.id);
   },
 });
