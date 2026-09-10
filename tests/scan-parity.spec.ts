@@ -85,6 +85,43 @@ test.describe("scan result parity @scan", () => {
     });
   });
 
+  test("per-photo scan tells the user when results were not saved and offers retry", async ({
+    page,
+    request,
+    cleanupIds,
+  }) => {
+    const sess = await createSessionViaApi(request, `Scan Save Error ${Date.now()}`);
+    cleanupIds.push(sess.id);
+    const photo = await uploadTestPhoto(request, sess.id);
+    if (!photo) {
+      test.skip(true, "Photo upload unavailable");
+      return;
+    }
+
+    await request.post(`/api/sessions/${sess.id}/pins`, {
+      data: { photoId: photo.id, label: "P1", xPercent: 50, yPercent: 50, reelCount: 1, isDraft: true },
+    });
+    await page.route(`**/api/photos/${photo.id}/analyze-labels`, (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          message: "Label analysis completed, but the results could not be saved. Please retry.",
+          code: "scan_results_persistence",
+          retryable: true,
+        }),
+      }),
+    );
+
+    await page.goto(`/session/${sess.id}?tab=scanner`);
+    await expect(page.locator('[data-testid="btn-analyze-labels"]')).toBeVisible({ timeout: 8_000 });
+    await page.click('[data-testid="btn-analyze-labels"]');
+    await expect(page.locator('[role="status"]').getByText("Scan results not saved").first()).toBeVisible({
+      timeout: 12_000,
+    });
+    await expect(page.locator('[data-testid^="btn-retry-"]').first()).toBeVisible({ timeout: 2_000 });
+  });
+
   test("per-photo scan toast shows skipped-pin count", async ({
     page,
     request,

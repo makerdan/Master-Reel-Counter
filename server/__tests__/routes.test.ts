@@ -42,6 +42,8 @@ import
   canEdit,
   createHelpChatHandler,
   helpChatRateLimiter,
+  respondWithScanResultsPersistenceFailure,
+  SCAN_RESULTS_PERSISTENCE_ERROR,
   verifyTesterCredentials,
 }
  from "../routes.js"
@@ -319,6 +321,30 @@ describe("protected sign-in return paths", () => {
   });
 });
 
+describe("scan result persistence contract", () => {
+  test("returns an explicit retryable response when persistence fails", () => {
+    let statusCode: number | undefined;
+    let body: unknown;
+    const response = {
+      status(code: number) {
+        statusCode = code;
+        return {
+          json(payload: unknown) {
+            body = payload;
+            return payload;
+          },
+        };
+      },
+    } as any;
+
+    respondWithScanResultsPersistenceFailure(response);
+
+    assert.equal(statusCode, 503);
+    assert.deepEqual(body, SCAN_RESULTS_PERSISTENCE_ERROR);
+    assert.equal((body as any).retryable, true);
+    assert.equal((body as any).code, "scan_results_persistence");
+  });
+});
 function getDirective(header: string, directive: string): string {
   const value = header
     .split(";")

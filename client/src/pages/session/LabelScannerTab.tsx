@@ -16,7 +16,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, parseApiErrorPayload, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useVendorCodes } from "@/hooks/use-vendor-codes";
 import { useWireCatalogs } from "@/hooks/use-wire-catalogs";
@@ -166,7 +166,7 @@ interface SavedCardResult {
   confidence: string;
   timestamp: number;
   // Persisted so badges + Retry buttons survive a page reload.
-  // Only "excluded" | "cancelled" | "failed" are saved — "new" is
+  // Only completed or retryable states are saved — "new" is
   // a transient in-progress marker and is never written to storage.
   notAnalyzedReason?: NotAnalyzedReason;
 }
@@ -219,7 +219,7 @@ interface AnalysisResult {
   readable: boolean;
 }
 
-type NotAnalyzedReason = "excluded" | "cancelled" | "failed" | "new";
+type NotAnalyzedReason = "excluded" | "cancelled" | "failed" | "save-failed" | "new";
 
 interface PinCard {
   pin: Pin;
@@ -242,6 +242,7 @@ function notAnalyzedCopy(reason: NotAnalyzedReason | undefined): string {
     case "excluded": return "Not sent — was excluded before analysis";
     case "cancelled": return "Cancelled before this photo was scanned";
     case "failed": return "Analysis failed — tap Retry";
+    case "save-failed": return "Results not saved — tap Retry";
     case "new":
     default: return "Not analyzed yet";
   }
@@ -259,6 +260,10 @@ function isRetryableAnalyzeError(err: unknown): boolean {
   if (status === 408 || status === 429) return true;
   if (status >= 500 && status < 600) return true;
   return false;
+}
+
+function isScanResultsPersistenceError(err: unknown): boolean {
+  return parseApiErrorPayload(err)?.code === "scan_results_persistence";
 }
 
 const imageCache = new Map<string, HTMLImageElement>();
@@ -1243,6 +1248,7 @@ export default function LabelScannerTab({
     let totalResults = 0;
     let succeededPhotos = 0;
     let failedPhotos = 0;
+    let failedSavePhotos = 0;
     let anyTruncated = false;
     let totalSkippedPins = 0;
 
@@ -1300,11 +1306,15 @@ export default function LabelScannerTab({
             return;
           }
           failedPhotos++;
+          const failedReason: NotAnalyzedReason = isScanResultsPersistenceError(err)
+            ? "save-failed"
+            : "failed";
+          if (failedReason === "save-failed") failedSavePhotos++;
           const failedPinIds = new Set(photoCards.map((c) => c.pin.id));
           setCards((prev) => {
             const updated = prev.map((c) =>
               failedPinIds.has(c.pin.id) && !c.result
-                ? { ...c, notAnalyzedReason: "failed" as const }
+                ? { ...c, notAnalyzedReason: failedReason }
                 : c
             );
             saveAnalysisResults(sessionId, updated);
@@ -1328,8 +1338,12 @@ export default function LabelScannerTab({
       if (failedPhotos > 0) {
         const totalPhotos = succeededPhotos + failedPhotos;
         toast({
-          title: `Analyzed ${succeededPhotos} of ${totalPhotos} photo${totalPhotos !== 1 ? "s" : ""}`,
-          description: `${failedPhotos} failed — tap Retry on affected cards.`,
+          title: failedSavePhotos > 0
+            ? "Scan results not saved"
+            : `Analyzed ${succeededPhotos} of ${totalPhotos} photo${totalPhotos !== 1 ? "s" : ""}`,
+          description: failedSavePhotos > 0
+            ? `${failedSavePhotos} result${failedSavePhotos !== 1 ? "s were" : " was"} not saved — tap Retry.`
+            : `${failedPhotos} failed — tap Retry on affected cards.`,
           variant: "destructive",
         });
       } else if (totalResults > 0) {
@@ -1346,7 +1360,14 @@ export default function LabelScannerTab({
         });
       }
     } catch (error: any) {
-      toast({ title: "Analysis failed", description: error?.message ?? "Unknown error", variant: "destructive" });
+      const persistenceFailure = isScanResultsPersistenceError(error);
+      toast({
+        title: persistenceFailure ? "Scan results not saved" : "Analysis failed",
+        description: persistenceFailure
+          ? "The scan completed, but its results were not saved. Tap Retry to try again."
+          : error?.message ?? "Unknown error",
+        variant: "destructive",
+      });
     } finally {
       setAnalyzing(false);
       setAnalyzeProgress(null);
@@ -2138,7 +2159,7 @@ export default function LabelScannerTab({
                                       className={`py-1 px-2 text-wrap text-[11px] ${
                                         isRetrying
                                           ? "bg-blue-900/40 text-blue-300 border-blue-700/50"
-                                          : card.notAnalyzedReason === "failed"
+                                          : card.notAnalyzedReason === "failed" || card.notAnalyzedReason === "save-failed"
                                           ? "bg-red-900/40 text-red-300 border-red-700/50"
                                           : card.notAnalyzedReason === "cancelled"
                                           ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
@@ -2157,7 +2178,7 @@ export default function LabelScannerTab({
                                         notAnalyzedCopy(card.notAnalyzedReason)
                                       )}
                                     </Badge>
-                                    {card.notAnalyzedReason === "failed" && (
+                                    {(card.notAnalyzedReason === "failed" || card.notAnalyzedReason === "save-failed") && (
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -2252,7 +2273,8 @@ export default function LabelScannerTab({
           );
           const photoGroupIsRetrying = batchMode && phase === "results" && retryingPhotoIds.has(card.pin.photoId);
           const photoGroupHasFailures = isFirstInPhotoGroup && displayCards.some(
-            c => c.pin.photoId === card.pin.photoId && c.notAnalyzedReason === "failed"
+            c => c.pin.photoId === card.pin.photoId &&
+              (c.notAnalyzedReason === "failed" || c.notAnalyzedReason === "save-failed")
           );
           return (
             <Fragment key={card.pin.id}>
@@ -2483,7 +2505,7 @@ export default function LabelScannerTab({
                             className={`py-1 px-2 text-wrap text-[11px] ${
                               isRetrying
                                 ? "bg-blue-900/40 text-blue-300 border-blue-700/50"
-                                : card.notAnalyzedReason === "failed"
+                                : card.notAnalyzedReason === "failed" || card.notAnalyzedReason === "save-failed"
                                 ? "bg-red-900/40 text-red-300 border-red-700/50"
                                 : card.notAnalyzedReason === "cancelled"
                                 ? "bg-amber-900/40 text-amber-300 border-amber-700/50"
@@ -2500,7 +2522,7 @@ export default function LabelScannerTab({
                               notAnalyzedCopy(card.notAnalyzedReason)
                             )}
                           </Badge>
-                          {card.notAnalyzedReason === "failed" && (
+                          {(card.notAnalyzedReason === "failed" || card.notAnalyzedReason === "save-failed") && (
                             <Button
                               size="sm"
                               variant="outline"

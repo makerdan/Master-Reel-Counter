@@ -209,6 +209,11 @@ export type ScanResult = {
   readable: boolean;
 };
 
+export const SCAN_RESULTS_PERSISTENCE_ERROR = Object.freeze({
+  message: "Label analysis completed, but the results could not be saved. Please retry.",
+  code: "scan_results_persistence",
+  retryable: true,
+});
 /**
  * Turn a provider response into persisted scan rows only after checking that it
  * contains one string result for every crop. Keeping this boundary separate
@@ -2441,7 +2446,6 @@ export async function registerRoutes(
       }
 
       const cacheEntry = { results: allResults };
-      labelResultsCache.set(photoId, cacheEntry);
 
       try {
         const scanResultRows = allResults.map((r) => ({
@@ -2454,9 +2458,11 @@ export async function registerRoutes(
           scannedBy: (req as AuthenticatedRequest).user?.claims?.sub || null,
         }));
         await storage.upsertScanResults(scanResultRows);
+        labelResultsCache.set(photoId, cacheEntry);
         broadcastToSession(photo.sessionId, { type: "sync", entity: "scan_results", sessionId: photo.sessionId });
       } catch (e) {
         console.error("[analyze-labels] Failed to persist scan results:", e);
+        return respondWithScanResultsPersistenceFailure(res);
       }
 
       res.json({ ...cacheEntry, truncated: anyTruncated, truncatedCount: totalSkipped });
@@ -2609,6 +2615,7 @@ export async function registerRoutes(
         broadcastToSession(sessionId, { type: "sync", entity: "scan_results", sessionId });
       } catch (e) {
         console.error("[session-analyze-labels] Failed to persist scan results:", e);
+        return respondWithScanResultsPersistenceFailure(res);
       }
 
       res.json({ results: allResults, totalBatches, truncated: anyTruncated, truncatedCount: totalSkipped });
@@ -7631,4 +7638,10 @@ export async function verifyTesterCredentials(
   const testerPasswordHash = ownerSettings?.testerPassword ?? TESTER_LOGIN_DUMMY_HASH;
   const matches = await comparePassword(password.trim(), testerPasswordHash);
   return ownerSettings?.testerPassword && matches ? ownerSettings : undefined;
+}
+
+export function respondWithScanResultsPersistenceFailure(
+  res: Pick<ExpressResponse, "status">,
+): ReturnType<ExpressResponse["status"]> {
+  return res.status(503).json(SCAN_RESULTS_PERSISTENCE_ERROR);
 }
