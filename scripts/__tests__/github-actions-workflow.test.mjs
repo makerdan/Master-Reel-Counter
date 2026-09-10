@@ -118,7 +118,9 @@ test("workflow provisions and checks the test prerequisites", () => {
   assert.match(workflow, /drizzle-kit push --force/);
   assert.match(workflow, /github-actions-owner/);
   assert.match(workflow, /REPL_ID:\s+github-actions-validation/);
-  assert.match(workflow, /playwright install --with-deps chromium/);
+  assert.match(workflow, /playwright install --with-deps chromium webkit/);
+  assert.match(workflow, /import \{ chromium, webkit \} from "@playwright\/test"/);
+  assert.match(workflow, /webkit\.launch/);
   assert.match(workflow, /chromium\.launch/);
   assert.match(workflow, /DATABASE_URL:\s+postgresql:\/\/postgres:postgres@localhost:5432\/master_reel_counter_test/);
   assert.match(workflow, /Verify blank-database startup and test authentication/);

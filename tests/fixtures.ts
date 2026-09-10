@@ -3,6 +3,7 @@ import {
   expect,
   type APIRequestContext,
 } from "@playwright/test";
+import sharp from "sharp";
 
 export const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5000";
 
@@ -65,6 +66,52 @@ export async function uploadTestPhoto(
   });
   if (!res.ok()) return null;
   return res.json();
+}
+
+export type OrientedJpegFixture = {
+  name: string;
+  buffer: Buffer;
+  sourceWidth: number;
+  sourceHeight: number;
+  preparedWidth: number;
+  preparedHeight: number;
+};
+
+export const orientedJpegFixtureCases = [
+  { name: "portrait-exif-6.jpg", sourceWidth: 40, sourceHeight: 24, orientation: 6 as const },
+  { name: "landscape-exif-8.jpg", sourceWidth: 24, sourceHeight: 40, orientation: 8 as const },
+] satisfies ReadonlyArray<{
+  name: string;
+  sourceWidth: number;
+  sourceHeight: number;
+  orientation: 6 | 8;
+}>;
+
+export async function createOrientedJpegFixture(
+  fixtureCase: (typeof orientedJpegFixtureCases)[number],
+): Promise<OrientedJpegFixture> {
+  const { name, sourceWidth, sourceHeight, orientation } = fixtureCase;
+  const svg = Buffer.from(`
+    <svg width="${sourceWidth}" height="${sourceHeight}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${sourceWidth / 2}" height="${sourceHeight / 2}" x="0" y="0" fill="#ff0000"/>
+      <rect width="${sourceWidth / 2}" height="${sourceHeight / 2}" x="${sourceWidth / 2}" y="0" fill="#00ff00"/>
+      <rect width="${sourceWidth / 2}" height="${sourceHeight / 2}" x="0" y="${sourceHeight / 2}" fill="#0000ff"/>
+      <rect width="${sourceWidth / 2}" height="${sourceHeight / 2}" x="${sourceWidth / 2}" y="${sourceHeight / 2}" fill="#ffff00"/>
+    </svg>
+  `);
+  const buffer = await sharp(svg)
+    .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+    .withMetadata({ orientation })
+    .toBuffer();
+
+  return {
+    name,
+    buffer,
+    sourceWidth,
+    sourceHeight,
+    preparedWidth: sourceHeight,
+    preparedHeight: sourceWidth,
+  };
 }
 
 type E2EFixtures = {

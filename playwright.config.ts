@@ -18,6 +18,8 @@ function findChromium(): string | undefined {
   }
 }
 const chromiumExecutable = findChromium();
+const webkitEnabled = process.env.CI === "true"
+  || process.env.PLAYWRIGHT_WEBKIT_ENABLED === "true";
 
 export default defineConfig({
   testDir: "./tests",
@@ -38,11 +40,29 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      grepInvert: /@mobile-image-orientation/,
       use: {
         ...devices["Desktop Chrome"],
         ...(chromiumExecutable ? { launchOptions: { executablePath: chromiumExecutable } } : {}),
       },
     },
+    {
+      name: "mobile-chromium",
+      grep: /@mobile-image-orientation/,
+      use: {
+        ...devices["Pixel 5"],
+        ...(chromiumExecutable ? { launchOptions: { executablePath: chromiumExecutable } } : {}),
+      },
+    },
+    ...(webkitEnabled
+      ? [{
+          name: "mobile-webkit",
+          grep: /@mobile-image-orientation/,
+          use: {
+            ...devices["iPhone 13"],
+          },
+        }]
+      : []),
   ],
   webServer: {
     command: "node scripts/free-ports.mjs 5000 && npm run dev",

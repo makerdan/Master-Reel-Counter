@@ -3,7 +3,83 @@
  * Guards Mobile Flow's browser image preparation and durable queue lifecycle.
  */
 import sharp from "sharp";
-import { test, expect, createSessionViaApi } from "./fixtures";
+import {
+  test,
+  expect,
+  createOrientedJpegFixture,
+  createSessionViaApi,
+  orientedJpegFixtureCases,
+} from "./fixtures";
+
+for (const fixtureCase of orientedJpegFixtureCases) {
+  test(`prepares ${fixtureCase.name} with oriented pixels and dimensions @mobile-image-orientation`, async ({
+    page,
+  }, testInfo) => {
+    const fixture = await createOrientedJpegFixture(fixtureCase);
+    await test.step(`${testInfo.project.name}: ${fixture.name}`, async () => {
+      await page.goto("/");
+      const prepared = await page.evaluate(async ({ bytes, name }) => {
+        const moduleUrl = "/src/lib/prepareMobileImage.ts";
+        const { prepareMobileImage } = await import(/* @vite-ignore */ moduleUrl);
+        const source = new File([new Uint8Array(bytes)], name, { type: "image/jpeg" });
+        const result = await prepareMobileImage(source, 95);
+        return {
+          width: result.width,
+          height: result.height,
+          bytes: Array.from(new Uint8Array(await result.file.arrayBuffer())),
+        };
+      }, { bytes: Array.from(fixture.buffer), name: fixture.name });
+
+      expect(prepared.width, `${testInfo.project.name} ${fixture.name} prepared width`)
+        .toBe(fixture.preparedWidth);
+      expect(prepared.height, `${testInfo.project.name} ${fixture.name} prepared height`)
+        .toBe(fixture.preparedHeight);
+
+      const sourceMetadata = await sharp(fixture.buffer).metadata();
+      expect(sourceMetadata.width, `${testInfo.project.name} ${fixture.name} source pixel width`)
+        .toBe(fixture.sourceWidth);
+      expect(sourceMetadata.height, `${testInfo.project.name} ${fixture.name} source pixel height`)
+        .toBe(fixture.sourceHeight);
+
+      const preparedImage = sharp(Buffer.from(prepared.bytes));
+      const preparedMetadata = await preparedImage.metadata();
+      expect(preparedMetadata.width, `${testInfo.project.name} ${fixture.name} encoded width`)
+        .toBe(fixture.preparedWidth);
+      expect(preparedMetadata.height, `${testInfo.project.name} ${fixture.name} encoded height`)
+        .toBe(fixture.preparedHeight);
+
+      const { data, info } = await preparedImage.raw().toBuffer({ resolveWithObject: true });
+      const corner = (x: number, y: number): [number, number, number] => {
+        const offset = (y * info.width + x) * info.channels;
+        return [
+          data[offset] ?? 0,
+          data[offset + 1] ?? 0,
+          data[offset + 2] ?? 0,
+        ];
+      };
+      const inset = 4;
+      const corners = [
+        corner(inset, inset),
+        corner(info.width - inset - 1, inset),
+        corner(inset, info.height - inset - 1),
+        corner(info.width - inset - 1, info.height - inset - 1),
+      ];
+      const dominantChannels = corners.map(([red, green, blue]) => {
+        if (red > 180 && green > 180 && blue < 100) return "yellow";
+        if (red > green && red > blue) return "red";
+        if (green > red && green > blue) return "green";
+        return "blue";
+      });
+      const expectedCorners = fixture.name.includes("exif-6")
+        ? ["blue", "red", "yellow", "green"]
+        : ["green", "yellow", "red", "blue"];
+      expect(
+        dominantChannels,
+        `${testInfo.project.name} ${fixture.name} final pixel orientation`,
+      ).toEqual(expectedCorners);
+    });
+  });
+}
 
 async function queuedPhotoCount(page: import("@playwright/test").Page): Promise<number> {
   return page.evaluate(() => new Promise<number>((resolve, reject) => {

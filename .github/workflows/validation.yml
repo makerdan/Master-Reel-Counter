@@ -107,16 +107,19 @@ jobs:
               SET approved = true, rejected = false, is_tester = false;
           "
 
-      - name: Install and verify Chromium
+      - name: Install and verify browser engines
         shell: bash
         run: |
           set -euo pipefail
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
           node --input-type=module <<'NODE'
-          import { chromium } from "@playwright/test";
-          const browser = await chromium.launch({ headless: true });
-          await browser.close();
+          import { chromium, webkit } from "@playwright/test";
+          const chromiumBrowser = await chromium.launch({ headless: true });
+          await chromiumBrowser.close();
           console.log("Chromium launch check passed.");
+          const webkitBrowser = await webkit.launch({ headless: true });
+          await webkitBrowser.close();
+          console.log("WebKit launch check passed.");
           NODE
 
       - name: Run canonical validation
