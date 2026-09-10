@@ -173,6 +173,32 @@ changed. A future administrator should repeat the merge-queue verification
 after a successful run and artifact upload, then require the exact check name
 `Validation result` only if that evidence remains stable.
 
+## Task 570 automatic security-update verification
+
+The repository-authorized GitHub CLI session was used on September 10, 2026
+because the installed Replit GitHub connector still returned HTTP 403 for
+repository-scoped requests. The session authenticated as `makerdan` and
+reported administrator access to the private `makerdan/Master-Reel-Counter`
+repository.
+
+| Evidence item | Result |
+| --- | --- |
+| Dependabot alerts | **Enabled**: `PUT /repos/makerdan/masterreelcounter/vulnerability-alerts` succeeded; the follow-up `GET` returned HTTP 204, GitHub's enabled response. |
+| Dependabot security updates | **Enabled**: `PUT /repos/makerdan/masterreelcounter/automated-security-fixes` succeeded; the follow-up response was `enabled: true`, `paused: false`. |
+| Dependabot alerts after activation | **Observed**: GitHub reported 28 open npm alerts with available patched versions after activation. |
+| npm grouping policy | **Local-only**: the workspace `.github/dependabot.yml` defines the `security-patches` group for `security-updates`, all packages, and patch updates only, but GitHub's `main` tree does not currently contain that file. The remote policy cannot be claimed active. |
+| Dependabot npm pull request | **Observed**: PRs [#1](https://github.com/makerdan/Master-Reel-Counter/pull/1), [#2](https://github.com/makerdan/Master-Reel-Counter/pull/2), and [#3](https://github.com/makerdan/Master-Reel-Counter/pull/3) were opened by `dependabot[bot]` for `artifacts/mockup-sandbox`. They are separate PRs, so they do not demonstrate the local grouping policy. |
+| Pull-request validation run | **Observed**: workflow runs `34467854741`, `34467866019`, and `34467874529` used the `pull_request` event for those Dependabot heads. |
+| Remote canonical validation command | **Blocked**: all three runs failed at `Verify blank-database startup and test authentication`; the `Run canonical validation` step was skipped, so remote `npm run ci` execution was not observed. |
+| Workflow contract | **Observed locally**: `node --test scripts/__tests__/github-actions-workflow.test.mjs` passed all 13 tests, including the pull-request trigger and `npm run ci` routing. |
+| Stable `Validation result` branch requirement | **Unavailable to verify**: branch protection and ruleset requests returned HTTP 403 with the private-plan message, “Upgrade to GitHub Pro or make this repository public to enable this feature.” No merge requirement was changed. |
+
+This activation proves that GitHub's alert and automatic security-update
+controls are on and that Dependabot is opening security PRs. It does not yet
+prove that the workspace grouping policy is active on GitHub or that a
+Dependabot PR reaches `npm run ci`; the policy must first be present on the
+remote default branch, and the blank-database preflight must pass.
+
 ## Manual activation and verification
 
 After merging these files, an administrator must verify the following in
