@@ -28,15 +28,13 @@ test.describe("mobile layout parity @mobile", () => {
     request,
     cleanupIds,
   }) => {
-    const sess = await createSessionViaApi(request, `Mobile Offline ${Date.now()}`);
-    cleanupIds.push(sess.id);
+    const sess = await createSessionViaApi(request, `Mobile denied join ${Date.now()}`);
 
-    await page.goto(`/session/${sess.id}`);
-    await page.waitForLoadState("networkidle");
-
-    // Plant a pending entry into the offline queue
-    await page.evaluate((sid) => {
-      return new Promise<void>((resolve, reject) => {
+    const currentUserId = await page.evaluate(async () => {
+      const response = await fetch("/api/auth/user", { credentials: "same-origin" });
+      if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
+      return (await response.json()).id as string;
+    });
         const req = indexedDB.open("reel-counter-offline", 2);
         req.onsuccess = () => {
           const db = req.result;
@@ -44,6 +42,7 @@ test.describe("mobile layout parity @mobile", () => {
           tx.objectStore("entry-queue").put({
             id: `mobile-test-${Date.now()}`,
             sessionId: sid,
+            userId: currentUserId,
             data: { aisle: "A", section: "1", category: "TEST", footage: 100, reelCount: 1 },
             createdAt: Date.now(),
           });
@@ -52,7 +51,7 @@ test.describe("mobile layout parity @mobile", () => {
         };
         req.onerror = () => reject(req.error);
       });
-    }, sess.id);
+    }, { sid: sess.id, currentUserId });
 
     await page.context().setOffline(true);
     await page.evaluate(() => window.dispatchEvent(new Event("offline-queue-change")));
@@ -93,7 +92,13 @@ test.describe("mobile layout parity @mobile", () => {
     request,
     cleanupIds,
   }) => {
-    const sess = await createSessionViaApi(request, `Mobile WS ${Date.now()}`);
+    const sess = await createSessionViaApi(request, `Mobile denied join ${Date.now()}`);
+
+    const currentUserId = await page.evaluate(async () => {
+      const response = await fetch("/api/auth/user", { credentials: "same-origin" });
+      if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
+      return (await response.json()).id as string;
+    });
     cleanupIds.push(sess.id);
 
     // Track WS instances so we can close the live socket without going offline
@@ -128,7 +133,7 @@ test.describe("mobile layout parity @mobile", () => {
 
     // Wait until the app has created at least one WebSocket (tracked by PatchedWS)
     await page.waitForFunction(() => {
-      const sockets = (window as unknown as Record<string, WebSocket[]>).__testWsSockets;
+      const sockets = (window as unknown as Record<string, WebSocket[]>).__testWsSockets ?? [];
       return Array.isArray(sockets) && sockets.length > 0;
     }, undefined, { timeout: 10_000 });
 
@@ -154,6 +159,12 @@ test.describe("mobile layout parity @mobile", () => {
   }) => {
     await installWebSocketMockCompatibility(page);
     const sess = await createSessionViaApi(request, `Mobile denied join ${Date.now()}`);
+
+    const currentUserId = await page.evaluate(async () => {
+      const response = await fetch("/api/auth/user", { credentials: "same-origin" });
+      if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
+      return (await response.json()).id as string;
+    });
     cleanupIds.push(sess.id);
 
     let connectionCount = 0;

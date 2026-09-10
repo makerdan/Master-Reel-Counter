@@ -158,6 +158,7 @@ function AuthRouter() {
   const [location] = useLocation();
   const {
     user,
+    identityId,
     isLoading,
     accessDenied,
     identityError,
@@ -188,7 +189,7 @@ function AuthRouter() {
   return (
     <Switch>
       <Route path="/">
-        {user ? (isApproved ? <Dashboard /> : <PendingApproval />) : <Landing />}
+        {user ? (isApproved ? <Dashboard key={identityId ?? user.id} /> : <PendingApproval />) : <Landing />}
       </Route>
       <Route path="/tester-login">
         <TesterLoginPage />

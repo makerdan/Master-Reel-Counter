@@ -6,7 +6,7 @@ import {
   Lock, Check, Loader2, AlertTriangle, Flag, Users, TabletSmartphone, Monitor, Trash2, LayoutGrid, X, ClipboardCheck, BarChart2,
 } from "lucide-react";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
-import { LAST_SESSION_KEY, sessionTabKey, PDF_EXPORT_QUALITY_KEY } from "@/lib/storageKeys";
+import { lastSessionKey, sessionTabKey, PDF_EXPORT_QUALITY_KEY } from "@/lib/storageKeys";
 import type { UnitType } from "@/lib/unit-conversion";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -55,15 +55,16 @@ import { useSessionWebSocket } from "@/hooks/use-websocket";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function SessionPage() {
+  const { identityId } = useAuth();
   const [, params] = useRoute("/session/:id");
   const [, setLocation] = useLocation();
   const sessionId = params?.id ? parseInt(params.id) : 0;
 
   useEffect(() => {
-    if (sessionId > 0) {
-      try { localStorage.setItem(LAST_SESSION_KEY, String(sessionId)); } catch {}
+    if (sessionId > 0 && identityId) {
+      try { localStorage.setItem(lastSessionKey(identityId), String(sessionId)); } catch {}
     }
-  }, [sessionId]);
+  }, [identityId, sessionId]);
 
   const { data: session, isLoading: sessionLoading, isError: sessionError } = useQuery<Session & { firstPhotoAt: string | null; lastPhotoAt: string | null; role: "owner" | "editor" | "viewer"; collaboratorCount: number }>({
     queryKey: ["/api/sessions", sessionId.toString()],
@@ -1512,5 +1513,4 @@ function SessionWorkspace({
     </div>
   );
 }
-
 

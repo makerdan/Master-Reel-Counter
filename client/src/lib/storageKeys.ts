@@ -21,8 +21,8 @@
  * ────────────────────────────────────────────────────────────────────────────
  * Key                               Store  Scope    Cleared on
  * ────────────────────────────────────────────────────────────────────────────
- * reel-counter-last-session         LS     global   (never — latest-visit hint)
- * reel-counter-recent-searches      LS     global   user action (clear button)
+ * reel-counter-last-session:{uid}   LS     user     logout / identity change
+ * reel-counter-recent-searches:{uid} LS    user     user action / identity change
  * pdfExportQuality                  LS     global   user action (setting change)
  * offlinePlaceholderSeed            LS     global   (never — monotonic counter)
  * session-progress-collapsed        LS     global   (never — UI preference)
@@ -39,7 +39,7 @@
  * rr_pos_{sid}_{uid}                SS     session  clearSessionKeys / ReviewTab unmount
  * incomplete-banner-dismissed-{sid} SS     session  clearSessionKeys / user dismiss action
  * notes-closed-{photoId}            SS     photo    user action (toggle notes open)
- * dash:*                            SS     global   resets on every page load (no risk)
+ * dash:{field}:{uid}                SS     user     logout / identity change
  * themeMode                         LS     global   user preference (never auto-cleared)
  * theme                             LS     global   legacy theme key; one-time migration to themeMode
  * sweepMinAgeDays                   LS     global   admin preference (never auto-cleared)
@@ -88,13 +88,46 @@ export function clearSessionKey(key: string): void {
   try { sessionStorage.removeItem(key); } catch {}
 }
 
-// ─── Global (non-session-scoped) keys ─────────────────────────────────────────
+// ─── Identity-scoped dashboard keys ───────────────────────────────────────────
 
-/** ID of the most recently visited session. Used to display a resume link. */
+/**
+ * These legacy unscoped names are retained only so the cleanup helper can
+ * remove values written by older releases. New reads and writes must use the
+ * identity-scoped factories below.
+ */
 export const LAST_SESSION_KEY = "reel-counter-last-session";
-
-/** MRU list of recent search terms displayed in the dashboard search dropdown. */
 export const RECENT_SEARCHES_KEY = "reel-counter-recent-searches";
+
+const identityStorageSuffix = (userId: string) => encodeURIComponent(userId);
+
+/** ID of the most recently visited session for one application identity. */
+export const lastSessionKey = (userId: string) =>
+  `${LAST_SESSION_KEY}:${identityStorageSuffix(userId)}`;
+
+/** MRU list of recent search terms for one application identity. */
+export const recentSearchesKey = (userId: string) =>
+  `${RECENT_SEARCHES_KEY}:${identityStorageSuffix(userId)}`;
+
+export const DASHBOARD_STATE_FIELDS = [
+  "openFolders",
+  "searchQuery",
+  "searchInside",
+  "showFilterBar",
+  "filterStatus",
+  "filterCollaborator",
+  "filterWireType",
+  "filterMinFootage",
+  "filterDateMonth",
+  "filterDateYear",
+  "sortField",
+  "sortDirection",
+] as const;
+
+export type DashboardStateField = (typeof DASHBOARD_STATE_FIELDS)[number];
+
+/** Dashboard search/filter/sort/folder state for one application identity. */
+export const dashboardStateKey = (field: DashboardStateField, userId: string) =>
+  `dash:${field}:${identityStorageSuffix(userId)}`;
 
 /** User-chosen PDF export quality preference ("full" | "standard"). */
 export const PDF_EXPORT_QUALITY_KEY = "pdfExportQuality";
@@ -184,6 +217,43 @@ export const reviewQueueKey = (sid: number, uid: string) => `rr_queue_${sid}_${u
 export const reviewPosKey = (sid: number, uid: string) => `rr_pos_${sid}_${uid}`;
 
 // ─── Lifecycle bulk-clear helpers ─────────────────────────────────────────────
+
+/**
+ * Remove browser hints that can identify or navigate to another account's
+ * data. Clearing all identity-scoped variants is intentional: it also handles
+ * logout after the app-server identity has already expired.
+ */
+export function clearIdentityScopedBrowserState(): void {
+  const localPrefixes = [
+    `${LAST_SESSION_KEY}:`,
+    `${RECENT_SEARCHES_KEY}:`,
+  ];
+  const sessionPrefixes = ["dash:"];
+
+  try {
+    localStorage.removeItem(LAST_SESSION_KEY);
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+    const localKeys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && localPrefixes.some(prefix => key.startsWith(prefix))) {
+        localKeys.push(key);
+      }
+    }
+    localKeys.forEach(key => localStorage.removeItem(key));
+  } catch {}
+
+  try {
+    const sessionKeys: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && sessionPrefixes.some(prefix => key.startsWith(prefix))) {
+        sessionKeys.push(key);
+      }
+    }
+    sessionKeys.forEach(key => sessionStorage.removeItem(key));
+  } catch {}
+}
 
 /**
  * Remove every session-scoped localStorage and sessionStorage key for `sid`.

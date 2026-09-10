@@ -51,6 +51,9 @@ export async function createEntryWithOfflineFallback(
   userId?: string,
 ): Promise<OfflineEntryResult> {
   if (!navigator.onLine) {
+    if (!userId) {
+      throw new Error("Cannot queue an offline entry without an authenticated application identity");
+    }
     const id = `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const placeholderId = nextPlaceholderId();
     await saveEntryToQueue({ id, sessionId, userId, data, createdAt: Date.now(), placeholderId });
@@ -63,6 +66,9 @@ export async function createEntryWithOfflineFallback(
     return { entry, queued: false };
   } catch (err) {
     if (isNetworkFailure(err)) {
+      if (!userId) {
+        throw new Error("Cannot queue an offline entry without an authenticated application identity");
+      }
       const id = `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const placeholderId = nextPlaceholderId();
       await saveEntryToQueue({ id, sessionId, userId, data, createdAt: Date.now(), placeholderId });

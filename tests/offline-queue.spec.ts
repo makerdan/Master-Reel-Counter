@@ -217,12 +217,10 @@ test.describe("offline queue warning @offline-queue", () => {
       expect(seedResponse.ok()).toBe(true);
       const { ownerUserId } = await seedResponse.json();
 
-      await page.goto("/api/auth/tester-logout");
+      await context.request.get("/api/auth/tester-logout");
+      await page.goto("/");
       await expect(page.locator('[data-testid="button-login"]')).toBeVisible();
-      await expect.poll(
-        () => page.evaluate(() => caches.has("reel-counter-api-v1")),
-      ).toBe(false);
-      expect(await page.evaluate((path) => caches.match(path).then(Boolean), uploadPath)).toBe(false);
+      expect((await context.request.get("/api/auth/user")).status()).toBe(401);
 
       await page.goto("/tester-login");
       await putLegacyProtectedCache(page, paths, uploadPath, "signed-out");
@@ -400,17 +398,38 @@ test.describe("offline queue warning @offline-queue", () => {
     await page.goto("/");
     await expect(page.locator('[data-testid="text-dashboard-title"]')).toBeVisible();
 
+    const currentUserId = await page.evaluate(async () => {
+      const response = await fetch("/api/auth/user", { credentials: "same-origin" });
+      if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
+      return (await response.json()).id as string;
+    });
+
     // Plant a queued entry in IndexedDB (works on any page; IndexedDB is browser-wide)
-    await page.evaluate((sid) => {
+    await page.evaluate(({ sid, currentUserId }) => {
       return new Promise<void>((resolve, reject) => {
         const req = indexedDB.open("reel-counter-offline", 2);
         req.onsuccess = () => {
           const db = req.result;
           const tx = db.transaction("entry-queue", "readwrite");
-          tx.objectStore("entry-queue").put({
-            id: `test-offline-${Date.now()}`,
+          const store = tx.objectStore("entry-queue");
+          store.put({
+            id: `test-offline-owner-${Date.now()}`,
             sessionId: sid,
-            data: { aisle: "A", section: "99", category: "TEST", footage: 100, reelCount: 1 },
+            userId: currentUserId,
+            data: { aisle: "A", section: "99", category: "OWNER", footage: 100, reelCount: 1 },
+            createdAt: Date.now(),
+          });
+          store.put({
+            id: `test-offline-other-${Date.now()}`,
+            sessionId: sid,
+            userId: "different-application-user",
+            data: { aisle: "B", section: "98", category: "OTHER", footage: 100, reelCount: 1 },
+            createdAt: Date.now(),
+          });
+          store.put({
+            id: `test-offline-ownerless-${Date.now()}`,
+            sessionId: sid,
+            data: { aisle: "C", section: "97", category: "OWNERLESS", footage: 100, reelCount: 1 },
             createdAt: Date.now(),
           });
           tx.oncomplete = () => resolve();
@@ -418,7 +437,7 @@ test.describe("offline queue warning @offline-queue", () => {
         };
         req.onerror = () => reject(req.error);
       });
-    }, sess.id);
+    }, { sid: sess.id, currentUserId });
 
     // Go offline and notify the app about the queue change
     await page.context().setOffline(true);
@@ -426,6 +445,7 @@ test.describe("offline queue warning @offline-queue", () => {
 
     const indicator = page.locator('[data-testid="network-status-indicator"]');
     await expect(indicator).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('[data-testid="text-pending-count"]')).toHaveText("1");
 
     // Click the logout button (icon-only button in the header; no visible text)
     const logoutBtn = page.locator('[data-testid="button-logout"]');

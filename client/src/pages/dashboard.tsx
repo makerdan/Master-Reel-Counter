@@ -1,5 +1,17 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { RECENT_SEARCHES_KEY, PDF_EXPORT_QUALITY_KEY, LAST_SESSION_KEY, clearSessionKeys, clearSessionResetKeys } from "@/lib/storageKeys";
+import {
+  PDF_EXPORT_QUALITY_KEY,
+  clearSessionKeys,
+  clearSessionResetKeys,
+  dashboardStateKey,
+  lastSessionKey,
+  recentSearchesKey,
+  readKey,
+  readSessionKey,
+  writeKey,
+  writeSessionKey,
+  clearIdentityScopedBrowserState,
+} from "@/lib/storageKeys";
 import reelIconPath from "@assets/Master_Reel_Counter_-_i001_1776633528982.png";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -72,6 +84,7 @@ type SharedSessionWithStats = SessionWithStats & {
 
 export default function Dashboard() {
   const { user, identityId, logout } = useAuth();
+  const storageUserId = identityId ?? user?.id;
   const { pendingCount } = useNetworkStatus(identityId);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [, setLocation] = useLocation();
@@ -95,27 +108,30 @@ export default function Dashboard() {
   const [newFolderName, setNewFolderName] = useState("");
   const [renamingFolder, setRenamingFolder] = useState<FolderType | null>(null);
   const [renameFolderName, setRenameFolderName] = useState("");
+  const readDashboardState = useCallback((field: Parameters<typeof dashboardStateKey>[0]): string | null => {
+    return storageUserId ? readSessionKey(dashboardStateKey(field, storageUserId)) : null;
+  }, [storageUserId]);
   const [openFolders, setOpenFolders] = useState<Set<number>>(() => {
     try {
-      const stored = sessionStorage.getItem("dash:openFolders");
+      const stored = storageUserId ? readSessionKey(dashboardStateKey("openFolders", storageUserId)) : null;
       return stored ? new Set<number>(JSON.parse(stored)) : new Set();
     } catch { return new Set(); }
   });
-  const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem("dash:searchQuery") || "");
-  const [searchInside, setSearchInside] = useState(() => sessionStorage.getItem("dash:searchInside") === "true");
+  const [searchQuery, setSearchQuery] = useState(() => readDashboardState("searchQuery") || "");
+  const [searchInside, setSearchInside] = useState(() => readDashboardState("searchInside") === "true");
   const [showRecentSearches, setShowRecentSearches] = useState(false);
-  const [showFilterBar, setShowFilterBar] = useState(() => sessionStorage.getItem("dash:showFilterBar") === "true");
-  const [filterStatus, setFilterStatus] = useState<"" | "active" | "completed">(() => (sessionStorage.getItem("dash:filterStatus") as "" | "active" | "completed") || "");
-  const [filterCollaborator, setFilterCollaborator] = useState(() => sessionStorage.getItem("dash:filterCollaborator") || "");
-  const [filterWireType, setFilterWireType] = useState(() => sessionStorage.getItem("dash:filterWireType") || "");
-  const [filterMinFootage, setFilterMinFootage] = useState(() => sessionStorage.getItem("dash:filterMinFootage") || "");
-  const [filterDateMonth, setFilterDateMonth] = useState(() => sessionStorage.getItem("dash:filterDateMonth") || "");
-  const [filterDateYear, setFilterDateYear] = useState(() => sessionStorage.getItem("dash:filterDateYear") || "");
+  const [showFilterBar, setShowFilterBar] = useState(() => readDashboardState("showFilterBar") === "true");
+  const [filterStatus, setFilterStatus] = useState<"" | "active" | "completed">(() => (readDashboardState("filterStatus") as "" | "active" | "completed") || "");
+  const [filterCollaborator, setFilterCollaborator] = useState(() => readDashboardState("filterCollaborator") || "");
+  const [filterWireType, setFilterWireType] = useState(() => readDashboardState("filterWireType") || "");
+  const [filterMinFootage, setFilterMinFootage] = useState(() => readDashboardState("filterMinFootage") || "");
+  const [filterDateMonth, setFilterDateMonth] = useState(() => readDashboardState("filterDateMonth") || "");
+  const [filterDateYear, setFilterDateYear] = useState(() => readDashboardState("filterDateYear") || "");
 
   type SortField = "date" | "name" | "entries" | "footage";
   type SortDirection = "asc" | "desc";
-  const [sortField, setSortField] = useState<SortField>(() => (sessionStorage.getItem("dash:sortField") as SortField) || "date");
-  const [sortDirection, setSortDirection] = useState<SortDirection>(() => (sessionStorage.getItem("dash:sortDirection") as SortDirection) || "desc");
+  const [sortField, setSortField] = useState<SortField>(() => (readDashboardState("sortField") as SortField) || "date");
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => (readDashboardState("sortDirection") as SortDirection) || "desc");
 
   const [inlineRenameId, setInlineRenameId] = useState<number | null>(null);
   const [inlineRenameValue, setInlineRenameValue] = useState("");
@@ -126,10 +142,10 @@ export default function Dashboard() {
 
   const getRecentSearches = useCallback((): string[] => {
     try {
-      const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+      const stored = storageUserId ? readKey(recentSearchesKey(storageUserId)) : null;
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
-  }, []);
+  }, [storageUserId]);
 
   const [recentSearches, setRecentSearches] = useState<string[]>(getRecentSearches);
 
@@ -139,23 +155,25 @@ export default function Dashboard() {
     setRecentSearches(prev => {
       const filtered = prev.filter(s => s !== trimmed);
       const updated = [trimmed, ...filtered].slice(0, MAX_RECENT);
-      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      if (storageUserId) writeKey(recentSearchesKey(storageUserId), JSON.stringify(updated));
       return updated;
     });
-  }, []);
+  }, [storageUserId]);
 
   const removeRecentSearch = useCallback((query: string) => {
     setRecentSearches(prev => {
       const updated = prev.filter(s => s !== query);
-      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      if (storageUserId) writeKey(recentSearchesKey(storageUserId), JSON.stringify(updated));
       return updated;
     });
-  }, []);
+  }, [storageUserId]);
 
   const clearRecentSearches = useCallback(() => {
-    localStorage.removeItem(RECENT_SEARCHES_KEY);
+    if (storageUserId) {
+      try { localStorage.removeItem(recentSearchesKey(storageUserId)); } catch {}
+    }
     setRecentSearches([]);
-  }, []);
+  }, [storageUserId]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -172,18 +190,18 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  useEffect(() => { try { sessionStorage.setItem("dash:searchQuery", searchQuery); } catch {} }, [searchQuery]);
-  useEffect(() => { try { sessionStorage.setItem("dash:searchInside", String(searchInside)); } catch {} }, [searchInside]);
-  useEffect(() => { try { sessionStorage.setItem("dash:showFilterBar", String(showFilterBar)); } catch {} }, [showFilterBar]);
-  useEffect(() => { try { sessionStorage.setItem("dash:filterStatus", filterStatus); } catch {} }, [filterStatus]);
-  useEffect(() => { try { sessionStorage.setItem("dash:filterCollaborator", filterCollaborator); } catch {} }, [filterCollaborator]);
-  useEffect(() => { try { sessionStorage.setItem("dash:filterWireType", filterWireType); } catch {} }, [filterWireType]);
-  useEffect(() => { try { sessionStorage.setItem("dash:filterMinFootage", filterMinFootage); } catch {} }, [filterMinFootage]);
-  useEffect(() => { try { sessionStorage.setItem("dash:filterDateMonth", filterDateMonth); } catch {} }, [filterDateMonth]);
-  useEffect(() => { try { sessionStorage.setItem("dash:filterDateYear", filterDateYear); } catch {} }, [filterDateYear]);
-  useEffect(() => { try { sessionStorage.setItem("dash:sortField", sortField); } catch {} }, [sortField]);
-  useEffect(() => { try { sessionStorage.setItem("dash:sortDirection", sortDirection); } catch {} }, [sortDirection]);
-  useEffect(() => { try { sessionStorage.setItem("dash:openFolders", JSON.stringify([...openFolders])); } catch {} }, [openFolders]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("searchQuery", storageUserId), searchQuery); }, [searchQuery, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("searchInside", storageUserId), String(searchInside)); }, [searchInside, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("showFilterBar", storageUserId), String(showFilterBar)); }, [showFilterBar, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("filterStatus", storageUserId), filterStatus); }, [filterStatus, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("filterCollaborator", storageUserId), filterCollaborator); }, [filterCollaborator, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("filterWireType", storageUserId), filterWireType); }, [filterWireType, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("filterMinFootage", storageUserId), filterMinFootage); }, [filterMinFootage, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("filterDateMonth", storageUserId), filterDateMonth); }, [filterDateMonth, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("filterDateYear", storageUserId), filterDateYear); }, [filterDateYear, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("sortField", storageUserId), sortField); }, [sortField, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("sortDirection", storageUserId), sortDirection); }, [sortDirection, storageUserId]);
+  useEffect(() => { if (storageUserId) writeSessionKey(dashboardStateKey("openFolders", storageUserId), JSON.stringify([...openFolders])); }, [openFolders, storageUserId]);
 
   const [_moveSessionTarget, setMoveSessionTarget] = useState<SessionWithStats | null>(null);
   const [createFolderForSession, setCreateFolderForSession] = useState<SessionWithStats | null>(null);
@@ -1655,10 +1673,8 @@ export default function Dashboard() {
                     if (pendingCount > 0) {
                       setLogoutDialogOpen(true);
                     } else {
-                      try {
-                        ["dash:searchQuery","dash:searchInside","dash:showFilterBar","dash:filterStatus","dash:filterCollaborator","dash:filterWireType","dash:filterMinFootage","dash:filterDateMonth","dash:filterDateYear","dash:sortField","dash:sortDirection","dash:openFolders"].forEach(k => sessionStorage.removeItem(k));
-                      } catch {}
-                      logout();
+                      clearIdentityScopedBrowserState();
+                      void logout();
                     }
                   }}
                   data-testid="button-logout"
@@ -2279,7 +2295,7 @@ export default function Dashboard() {
         <>
         {(() => {
           try {
-            const lastId = localStorage.getItem(LAST_SESSION_KEY);
+            const lastId = storageUserId ? readKey(lastSessionKey(storageUserId)) : null;
             if (!lastId || !sessions?.length) return null;
             const lastSession = sessions.find(s => s.id === parseInt(lastId));
             if (!lastSession || lastSession.status === "completed") return null;
@@ -2660,10 +2676,8 @@ export default function Dashboard() {
         open={logoutDialogOpen}
         onOpenChange={setLogoutDialogOpen}
         onConfirm={() => {
-          try {
-            ["dash:searchQuery","dash:searchInside","dash:showFilterBar","dash:filterStatus","dash:filterCollaborator","dash:filterWireType","dash:filterMinFootage","dash:filterDateMonth","dash:filterDateYear","dash:sortField","dash:sortDirection","dash:openFolders"].forEach(k => sessionStorage.removeItem(k));
-          } catch {}
-          logout();
+          clearIdentityScopedBrowserState();
+          void logout();
         }}
       />
 

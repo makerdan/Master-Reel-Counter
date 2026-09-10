@@ -101,8 +101,22 @@ self.addEventListener("fetch", (event) => {
 
   if (isProtectedRead(request.url)) {
     const path = new URL(request.url).pathname;
+    const responsePromise =
+      path === "/api/auth/tester-logout"
+        ? clearProtectedCaches()
+            .catch(() => {})
+            .then(() => fetch(request, { cache: "no-store" }))
+        : fetch(request, { cache: "no-store" });
+    if (path === "/api/auth/tester-logout") {
+      // A direct tester logout is a navigation to an API endpoint, so the
+      // React logout handler is not mounted to clear protected caches. Make
+      // the service-worker boundary enforce the same cleanup contract.
+      event.waitUntil(
+        responsePromise.then(() => clearProtectedCaches()).catch(() => {})
+      );
+    }
     event.respondWith(
-      fetch(request, { cache: "no-store" }).catch(() =>
+      responsePromise.catch(() =>
         path.startsWith("/api/")
           ? new Response('{"error":"offline"}', {
               status: 503,

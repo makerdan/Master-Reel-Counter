@@ -16,15 +16,12 @@ import {
   markEntryPermanentlyFailed,
   clearEntryPermanentlyFailed,
   getFailedQueuedEntries,
-  migrateQueueUserIds,
+  clearLegacyQueueItems,
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
 
-// Tracks which userIds have already had their legacy queue items migrated in
-// this page session. Module-level so the migration runs once even when
-// useNetworkStatus is called from multiple components simultaneously.
-const migratedUserIds = new Set<string>();
-
+// Legacy records have no safe owner. Purge them once per page session, even
+// though multiple components subscribe to the network status hook.
 const MAX_ENTRY_RETRIES = 3;
 
 export interface FailedEntryInfo {
@@ -59,10 +56,30 @@ export function useNetworkStatus(currentUserId?: string) {
   const [failedEntries, setFailedEntries] = useState<FailedEntryInfo[]>([]);
 
   const syncingRef = useRef(false);
+  const currentUserRef = useRef(currentUserId);
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
   const entryRetryCountsRef = useRef<Map<string, number>>(new Map());
   const permanentlyFailedRef = useRef<Set<string>>(new Set());
   const failedEntriesRef = useRef<Map<string, FailedEntryInfo>>(new Map());
   const entryRetryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    if (currentUserRef.current !== currentUserId) {
+      activeAbortControllerRef.current?.abort();
+      entryRetryCountsRef.current.clear();
+      permanentlyFailedRef.current.clear();
+      failedEntriesRef.current.clear();
+      setEntryRetryAttempt(null);
+      setPermanentlyFailedCount(0);
+      setFailedEntries([]);
+      for (const timer of entryRetryTimersRef.current.values()) clearTimeout(timer);
+      entryRetryTimersRef.current.clear();
+    }
+    currentUserRef.current = currentUserId;
+    return () => {
+      activeAbortControllerRef.current?.abort();
+    };
+  }, [currentUserId]);
 
   const refreshPendingCount = useCallback(async () => {
     try {
@@ -78,10 +95,13 @@ export function useNetworkStatus(currentUserId?: string) {
     if (syncingRef.current || !navigator.onLine) return;
     syncingRef.current = true;
     setIsSyncing(true);
+    const abortController = new AbortController();
+    activeAbortControllerRef.current = abortController;
 
     try {
       const entries = await getQueuedEntries(undefined, currentUserId);
       for (const entry of entries) {
+        if (currentUserRef.current !== currentUserId) break;
         // Fast path: skip items the snapshot already shows as in-flight.
         if (entry.inFlight) continue;
         // Check both the in-memory ref and the IDB-persisted flag so that
@@ -101,6 +121,10 @@ export function useNetworkStatus(currentUserId?: string) {
         // false, so it skips the item without double-submitting.
         const claimed = await claimEntryInFlight(entry.id);
         if (!claimed) continue;
+        if (currentUserRef.current !== currentUserId) {
+          await clearEntryInFlight(entry.id);
+          break;
+        }
 
         let fetchFailed = false;
         try {
@@ -109,6 +133,7 @@ export function useNetworkStatus(currentUserId?: string) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(entry.data),
             credentials: "include",
+            signal: abortController.signal,
           });
 
           if (res.ok) {
@@ -155,9 +180,12 @@ export function useNetworkStatus(currentUserId?: string) {
               scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
             }
           }
-        } catch {
+        } catch (error) {
           await clearEntryInFlight(entry.id);
           fetchFailed = true;
+          if (abortController.signal.aborted || currentUserRef.current !== currentUserId) {
+            break;
+          }
           const nextRetries = currentRetries + 1;
           entryRetryCountsRef.current.set(entry.id, nextRetries);
           if (nextRetries >= MAX_ENTRY_RETRIES) {
@@ -184,6 +212,7 @@ export function useNetworkStatus(currentUserId?: string) {
 
       const photos = await getQueuedPhotos(undefined, currentUserId);
       for (const photo of photos) {
+        if (currentUserRef.current !== currentUserId) break;
         // Fast path: snapshot already shows this item as in-flight.
         if (photo.inFlight) continue;
         if (!navigator.onLine) break;
@@ -191,6 +220,10 @@ export function useNetworkStatus(currentUserId?: string) {
         // Atomically claim the photo item before submitting.
         const claimed = await claimPhotoInFlight(photo.id);
         if (!claimed) continue;
+        if (currentUserRef.current !== currentUserId) {
+          await clearPhotoInFlight(photo.id);
+          break;
+        }
 
         try {
           const registrationKey = await ensurePhotoRegistrationKey(photo);
@@ -201,6 +234,7 @@ export function useNetworkStatus(currentUserId?: string) {
             method: "POST",
             body: formData,
             credentials: "include",
+            signal: abortController.signal,
           });
 
           if (uploadRes.status === 401) {
@@ -231,6 +265,7 @@ export function useNetworkStatus(currentUserId?: string) {
               notes: photo.notes || undefined,
             }),
             credentials: "include",
+            signal: abortController.signal,
           });
 
           if (photoRes.status === 401) {
@@ -255,6 +290,9 @@ export function useNetworkStatus(currentUserId?: string) {
         }
       }
     } finally {
+      if (activeAbortControllerRef.current === abortController) {
+        activeAbortControllerRef.current = null;
+      }
       syncingRef.current = false;
       setIsSyncing(false);
       setEntryRetryAttempt(null);
@@ -331,17 +369,6 @@ export function useNetworkStatus(currentUserId?: string) {
     const interval = setInterval(recoverExpiredClaims, 5000);
     const unsubQueue = onQueueChange(refreshPendingCount);
 
-    // Stamp any legacy queue items (created before user-scoping) with the
-    // current userId. Fire-and-forget: items without a userId are still drained
-    // correctly via the !r.userId fallback, so the migration is best-effort
-    // cleanup rather than a required gate. Guarded by migratedUserIds so it
-    // only touches IDB once per user per page session.
-    if (currentUserId && !migratedUserIds.has(currentUserId)) {
-      migrateQueueUserIds(currentUserId)
-        .then(() => { migratedUserIds.add(currentUserId!); })
-        .catch(() => {}); // transient IDB error — userId not added, so retry on next startup
-    }
-
     // Clear STALE inFlight flags (older than 2 min) from a previous page crash
     // BEFORE the initial drain, so stranded items are retried.  We use a
     // staleness threshold rather than clearing all flags so that active claims
@@ -353,7 +380,9 @@ export function useNetworkStatus(currentUserId?: string) {
     // and must be surfaced to the user immediately — before the first drain —
     // so the warning panel appears right away instead of after the next retry
     // cycle exhausts its attempts again.
-    clearStaleInFlight()
+    ensureLegacyQueueCleanup()
+      .catch(() => {})
+      .then(() => clearStaleInFlight())
       .catch(() => {})
       .then(async () => {
         try {
@@ -440,4 +469,11 @@ export function useNetworkStatus(currentUserId?: string) {
     discardFailedEntry,
     failedEntries,
   };
+}
+
+let legacyCleanupPromise: Promise<void> | null = null;
+
+function ensureLegacyQueueCleanup(): Promise<void> {
+  legacyCleanupPromise ??= clearLegacyQueueItems();
+  return legacyCleanupPromise;
 }

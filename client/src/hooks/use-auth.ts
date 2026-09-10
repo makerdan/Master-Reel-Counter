@@ -2,6 +2,7 @@ import { useCallback, useEffect } from "react";
 import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/react";
 import { useQuery, useQueryClient, type QueryObserverResult } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
+import { clearIdentityScopedBrowserState } from "@/lib/storageKeys";
 
 export type AuthUserState =
   | { kind: "unauthenticated"; user: null }
@@ -77,9 +78,21 @@ let lastObservedIdentity: string | null | undefined;
 
 async function clearClientState(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.clear();
+  clearIdentityScopedBrowserState();
   await clearProtectedOfflineData();
 }
 
+async function clearIdentityTransitionState(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  // Keep the auth query that is resolving the new identity. Removing it here
+  // would turn an account switch into a refetch loop.
+  queryClient.removeQueries({
+    predicate: ({ queryKey }) => queryKey[0] !== "/api/auth/user",
+  });
+  clearIdentityScopedBrowserState();
+  await clearProtectedOfflineData();
+}
 /**
  * App-state compatibility layer for Clerk identity.
  *
@@ -132,18 +145,28 @@ export function useAuth() {
   // Clerk's external ID when present, otherwise its Clerk ID.
   const identityId = localUser?.id ?? clerkUser?.externalId ?? clerkUser?.id;
   const authIdentity = clerkUser?.id ?? (localUser?.isTester ? localUser.id : null);
+  const observedAuthState = [
+    authIdentity ?? "",
+    localUser?.id ?? "",
+    localUser ? "authorized" : "unauthorized",
+  ].join(":");
   const isLoading = !isLoaded || isLocalUserLoading;
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || isLocalUserLoading) return;
     if (
       lastObservedIdentity !== undefined &&
-      lastObservedIdentity !== authIdentity
+      lastObservedIdentity !== observedAuthState
     ) {
-      void clearClientState(queryClient);
+      // Wait for the local-user query to settle before recording the baseline.
+      // Later settled changes represent logout, expiry, rejected access, or
+      // an account switch and must clear protected browser state.
+      lastObservedIdentity = observedAuthState;
+      void clearIdentityTransitionState(queryClient);
+      return;
     }
-    lastObservedIdentity = authIdentity;
-  }, [authIdentity, isLoaded, queryClient]);
+    lastObservedIdentity = observedAuthState;
+  }, [isLoaded, isLocalUserLoading, observedAuthState, queryClient]);
 
   return {
     user: localUser,

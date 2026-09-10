@@ -74,6 +74,9 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 export async function saveToQueue(item: QueuedPhoto): Promise<void> {
+  if (!item.userId) {
+    throw new Error("Cannot queue an offline photo without an authenticated application identity");
+  }
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PHOTO_STORE, "readwrite");
@@ -119,7 +122,9 @@ export async function getQueuedPhotos(sessionId?: number, userId?: string): Prom
         results = results.filter(r => r.sessionId === sessionId);
       }
       if (userId !== undefined) {
-        results = results.filter(r => !r.userId || r.userId === userId);
+        // Ownerless records are legacy data and must never be adopted by the
+        // current identity. They are purged during startup migration below.
+        results = results.filter(r => r.userId === userId);
       }
       resolve(results.sort((a, b) => a.createdAt - b.createdAt));
     };
@@ -151,6 +156,9 @@ export async function clearQueue(sessionId?: number, userId?: string): Promise<v
 }
 
 export async function saveEntryToQueue(item: QueuedEntry): Promise<void> {
+  if (!item.userId) {
+    throw new Error("Cannot queue an offline entry without an authenticated application identity");
+  }
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ENTRY_STORE, "readwrite");
@@ -189,7 +197,9 @@ export async function getQueuedEntries(sessionId?: number, userId?: string): Pro
         results = results.filter(r => r.sessionId === sessionId);
       }
       if (userId !== undefined) {
-        results = results.filter(r => !r.userId || r.userId === userId);
+        // Ownerless records are not eligible for display or submission by any
+        // authenticated identity.
+        results = results.filter(r => r.userId === userId);
       }
       resolve(results.sort((a, b) => a.createdAt - b.createdAt));
     };
@@ -374,30 +384,24 @@ export async function getFailedQueuedEntries(userId?: string): Promise<QueuedEnt
   return all.filter(e => e.permanentlyFailed === true);
 }
 
-// ─── Legacy migration ─────────────────────────────────────────────────────────
-// Queue items saved before user-scoping was introduced have no userId field.
-// This one-time helper stamps them with the provided userId so they are
-// unambiguously owned and can never be drained by a different user.
-// It is idempotent: items that already have a userId are left untouched.
-export async function migrateQueueUserIds(userId: string): Promise<void> {
+export async function clearLegacyQueueItems(): Promise<void> {
   const db = await openDB();
 
-  const migrateStore = (storeName: string) =>
+  const clearStore = (storeName: string) =>
     new Promise<void>((resolve, reject) => {
       const tx = db.transaction(storeName, "readwrite");
       const store = tx.objectStore(storeName);
       const req = store.getAll();
       req.onsuccess = () => {
-        for (const item of req.result as Array<Record<string, unknown>>) {
-          if (!item.userId) {
-            store.put({ ...item, userId });
-          }
+        for (const item of req.result as Array<{ id: IDBValidKey; userId?: unknown }>) {
+          if (!item.userId) store.delete(item.id);
         }
       };
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
 
-  await migrateStore(PHOTO_STORE);
-  await migrateStore(ENTRY_STORE);
+  await clearStore(PHOTO_STORE);
+  await clearStore(ENTRY_STORE);
+  notifyQueueChange();
 }

@@ -272,9 +272,40 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
 
     await page.goto("/");
     await expect(page.getByTestId("text-dashboard-title")).toBeVisible();
+    await page.evaluate((id) => {
+      const suffix = encodeURIComponent(id);
+      localStorage.setItem(`reel-counter-recent-searches:${suffix}`, JSON.stringify(["prior-user-term"]));
+      localStorage.setItem(`reel-counter-last-session:${suffix}`, "123");
+      localStorage.setItem("reel-counter-recent-searches", JSON.stringify(["legacy-term"]));
+      sessionStorage.setItem(`dash:searchQuery:${suffix}`, "prior-user-query");
+      sessionStorage.setItem(`dash:filterStatus:${suffix}`, "active");
+      sessionStorage.setItem(`dash:openFolders:${suffix}`, "[123]");
+      sessionStorage.setItem("dash:searchQuery", "legacy-query");
+    }, localUserId);
     await page.getByTestId("button-logout").click();
     await expect(page).toHaveURL(`${baseURL}/`);
     await expect(page.getByTestId("button-login")).toBeVisible();
+    const clearedBrowserState = await page.evaluate((id) => {
+      const suffix = encodeURIComponent(id);
+      return {
+        recentSearches: localStorage.getItem(`reel-counter-recent-searches:${suffix}`),
+        lastSession: localStorage.getItem(`reel-counter-last-session:${suffix}`),
+        legacySearches: localStorage.getItem("reel-counter-recent-searches"),
+        searchQuery: sessionStorage.getItem(`dash:searchQuery:${suffix}`),
+        filterStatus: sessionStorage.getItem(`dash:filterStatus:${suffix}`),
+        openFolders: sessionStorage.getItem(`dash:openFolders:${suffix}`),
+        legacyQuery: sessionStorage.getItem("dash:searchQuery"),
+      };
+    }, localUserId);
+    expect(clearedBrowserState).toEqual({
+      recentSearches: null,
+      lastSession: null,
+      legacySearches: null,
+      searchQuery: null,
+      filterStatus: null,
+      openFolders: null,
+      legacyQuery: null,
+    });
     const signedOutStatus = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", {
         credentials: "same-origin",
