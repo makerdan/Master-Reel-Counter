@@ -255,37 +255,43 @@ export default function SettingsPage() {
     retry: false,
   });
 
-  const { data: adminUsers, isLoading: adminUsersLoading } = useQuery<any[]>({
+  const {
+    data: adminUsers,
+    isLoading: adminUsersLoading,
+    error: adminUsersError,
+    refetch: refetchAdminUsers,
+  } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/users", { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
+    queryFn: () => fetchAdminResource<any[]>("/api/admin/users"),
     retry: false,
   });
+
+  const isOwnerUser = user?.isOwner === true;
 
   // isAdmin must be declared after adminUsers (the query result it depends on)
   const isAdmin = !user?.isTester && !!adminUsers && Array.isArray(adminUsers);
 
-  // Guard: redirect non-admins off #admin — only after the admin-users query has settled
-  // (adminUsers is undefined while loading; we wait for it to resolve before judging)
+  // Guard: redirect non-admins after an intentional denial or a successful
+  // non-admin response. Preserve the tab for owner-side failures so the owner
+  // can see and retry the problem.
   useEffect(() => {
-    if (adminUsers !== undefined && !isAdmin && activeTab === "admin") {
+    const denied = adminUsersError instanceof AdminRequestError && adminUsersError.status === 403;
+    if ((denied || (adminUsers !== undefined && !isAdmin)) && activeTab === "admin") {
       setActiveTab("settings");
       if (typeof window !== "undefined") {
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
     }
-  }, [adminUsers, isAdmin, activeTab]);
+  }, [adminUsers, adminUsersError, isAdmin, activeTab]);
 
-  const { data: rejectedCountData } = useQuery<{ count: number }>({
+  const {
+    data: rejectedCountData,
+    isLoading: rejectedCountLoading,
+    error: rejectedCountError,
+    refetch: refetchRejectedCount,
+  } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/rejected-users/count"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/rejected-users/count", { credentials: "include" });
-      if (!res.ok) return { count: 0 };
-      return res.json();
-    },
+    queryFn: () => fetchAdminResource<{ count: number }>("/api/admin/rejected-users/count"),
     enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
     retry: false,
   });
@@ -496,6 +502,7 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rejected-users/count"] });
       toast({ title: "User approval updated" });
     },
     onError: () => {
@@ -510,6 +517,7 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rejected-users/count"] });
       toast({ title: "User rejected" });
     },
     onError: () => {
@@ -893,7 +901,7 @@ export default function SettingsPage() {
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList data-testid="tabs-settings">
             <TabsTrigger value="settings" data-testid="tab-trigger-settings">Settings</TabsTrigger>
-            {isAdmin && (
+            {(isAdmin || isOwnerUser) && (
               <TabsTrigger value="admin" data-testid="tab-trigger-admin">Admin</TabsTrigger>
             )}
           </TabsList>
@@ -2357,6 +2365,14 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
+          {isOwnerUser && adminUsersLoading && (
+            <TabsContent value="admin" className="mt-6">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="admin-users-loading">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading users...
+              </div>
+            </TabsContent>
+          )}
+
           {/* ── Admin Tab ── */}
           {isAdmin && (
             <TabsContent value="admin" className="mt-6 space-y-6">
@@ -2449,7 +2465,12 @@ export default function SettingsPage() {
                       variant="outline"
                       className="h-7 text-xs shrink-0"
                       onClick={() => setConfirmClearRejectedOpen(true)}
-                      disabled={clearRejected.isPending}
+                      disabled={
+                        clearRejected.isPending ||
+                        rejectedCountLoading ||
+                        !rejectedCountData ||
+                        Boolean(rejectedCountError)
+                      }
                       data-testid="button-clear-rejected"
                     >
                       {clearRejected.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
@@ -2459,6 +2480,26 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground mt-1">
                     Approve or reject users who have signed in. Only approved users can access the app.
                   </p>
+                  {rejectedCountLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground" data-testid="rejected-count-loading">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Loading blocked-user count...
+                    </div>
+                  ) : rejectedCountError ? (
+                    <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs" data-testid="rejected-count-error">
+                      <span>We couldn’t load the block-list count, so clearing it is temporarily unavailable.</span>
+                      {isRetryableOwnerFailure(rejectedCountError, isOwnerUser) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 shrink-0"
+                          onClick={() => void refetchRejectedCount()}
+                          data-testid="button-retry-rejected-count"
+                        >
+                          Retry
+                        </Button>
+                      )}
+                    </div>
+                  ) : null}
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {adminUsersLoading ? (
@@ -3186,6 +3227,24 @@ export default function SettingsPage() {
 
             </TabsContent>
           )}
+
+          {isOwnerUser && isRetryableOwnerFailure(adminUsersError, isOwnerUser) && activeTab === "admin" && (
+            <div
+              className="mt-6 flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+              data-testid="admin-users-error"
+            >
+              <span>We couldn’t load account management. Check your connection and try again.</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => void refetchAdminUsers()}
+                data-testid="button-retry-admin-users"
+              >
+                Retry
+              </Button>
+            </div>
+          )}
         </Tabs>
       </main>
 
@@ -3336,4 +3395,41 @@ export default function SettingsPage() {
       />
     </div>
   );
+}
+
+class AdminRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "AdminRequestError";
+  }
+}
+
+async function fetchAdminResource<T>(url: string): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(url, { credentials: "include" });
+  } catch {
+    throw new AdminRequestError("The account-management request could not reach the server.");
+  }
+
+  if (!response.ok) {
+    throw new AdminRequestError(
+      `Account-management request failed with status ${response.status}.`,
+      response.status,
+    );
+  }
+
+  try {
+    return await response.json() as T;
+  } catch {
+    throw new AdminRequestError("The account-management response was invalid.");
+  }
+}
+
+function isRetryableOwnerFailure(error: unknown, isOwner: boolean): boolean {
+  if (!isOwner || !(error instanceof AdminRequestError)) return false;
+  return error.status === undefined || error.status === 401 || error.status >= 500;
 }

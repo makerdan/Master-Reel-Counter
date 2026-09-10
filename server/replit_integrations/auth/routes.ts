@@ -81,6 +81,7 @@ export function registerAuthRoutes(app: Express): void {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           isTester: true,
+          isOwner: false,
           testerOwnerUserId: user.claims.testerOwnerUserId,
         });
       }
@@ -96,7 +97,13 @@ export function registerAuthRoutes(app: Express): void {
       if (result.kind === "not_provisioned") {
         return res.status(404).json({ message: "not_provisioned" });
       }
-      return res.json({ ...result.user, isTestOwner: result.isTestOwner });
+      return res.json({
+        ...result.user,
+        isOwner: isOwnerIdentity(req.user),
+        // Development-only owner-login compatibility is intentionally
+        // observable only as a client test marker, never as a permission.
+        isTestOwner: result.isTestOwner,
+      });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(503).json({ message: "identity_bridge_unavailable" });
