@@ -1,12 +1,12 @@
 import { pathToFileURL } from "node:url";
 
 const SENSITIVE_ASSIGNMENT =
-  /(?:authorization|cookie|password|token|secret|session|api[-_]?key|publishable[-_]?key|request[-_]?body|response[-_]?body)/i;
+  /(?:authorization|cookie|password|token|secret|session|api[\s_-]*key|publishable[\s_-]*key|request[\s_-]*body|response[\s_-]*body)/i;
 const CREDENTIAL_SHAPE =
-  /(?:\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+|-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})/g;
+  /(?:\b(?:sk|pk)_(?:live|test)_[A-Za-z0-9_-]+|-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})/gi;
 const PRIVATE_KEY_BLOCK =
-  /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY-----/g;
-const PRIVATE_KEY_START = /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/;
+  /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY-----/gi;
+const PRIVATE_KEY_START = /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/i;
 const STRUCTURED_PAYLOAD_LINE = /^\s*[[{"]|^\s*"[A-Za-z0-9_.-]+"\s*:/;
 
 export function redactReleaseDiagnostics(input) {
@@ -22,7 +22,7 @@ export function redactReleaseDiagnostics(input) {
         return "[REDACTED PRIVATE KEY CONTENT]";
       }
       if (bodyStarted) return "[REDACTED BODY CONTENT]";
-      if (/(?:request|response)[-_]?body/i.test(line)) {
+      if (/(?:request|response)[\s_-]*body/i.test(line)) {
         bodyStarted = true;
         return "[REDACTED BODY CONTENT]";
       }

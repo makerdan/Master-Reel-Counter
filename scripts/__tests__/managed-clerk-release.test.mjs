@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFile, execFileSync, spawn } from "node:child_process";
 import http from "node:http";
 import { readFileSync } from "node:fs";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -33,6 +33,57 @@ const proxyConstructionProgram = [
   'import { clerkProxyMiddleware } from "./server/middlewares/clerkProxyMiddleware.ts";',
   "clerkProxyMiddleware();",
 ].join("\n");
+
+function seededGenerator(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state;
+  };
+}
+
+function generatedRedactionCases() {
+  const next = seededGenerator(0x595a11);
+  const separators = [" ", "-", "_"];
+  const casings = [
+    (value) => value,
+    (value) => value.toUpperCase(),
+    (value) => value.replace(/[a-z]/g, (character, index) =>
+      index % 2 === 0 ? character.toUpperCase() : character,
+    ),
+  ];
+  const cases = [];
+  for (let index = 0; index < 36; index += 1) {
+    const caseId = `seed-${index.toString(36).padStart(2, "0")}-${(next() % 0xfff)
+      .toString(16)
+      .padStart(3, "0")}`;
+    const secret = `sentinel-${caseId}-${(next() % 1_000_000).toString(36)}`;
+    const separator = separators[next() % separators.length];
+    const label = casings[next() % casings.length](
+      index % 3 === 0
+        ? `api${separator}key`
+        : index % 3 === 1
+          ? `request${separator}body`
+          : "Authorization",
+    );
+    const credential =
+      index % 3 === 0
+        ? `sk_test_${secret}`
+        : index % 3 === 1
+          ? `pk_live_${secret}`
+          : `eyJ${secret}payload.eyJ${secret}claims.eyJ${secret}signature`;
+    const placement =
+      index % 4 === 0
+        ? `${label}: ${credential}; second=${credential}`
+        : index % 4 === 1
+          ? `prefix ${credential} suffix`
+          : index % 4 === 2
+            ? `GET /sign-in?token=${secret}&credential=${credential}`
+            : `${label}:\n{"credential":"${credential}","marker":"${secret}"}`;
+    cases.push({ caseId, secrets: [secret, credential], input: placement });
+  }
+  return cases;
+}
 
 function proxyConstructionEnvironment(overrides = {}) {
   const environment = { ...process.env };
@@ -246,6 +297,90 @@ test("smoke uses Clerk's supported testing sign-in and keeps safe failure eviden
   assert.match(workflow, /test-results\//);
 });
 
+test("failed EXIT cleanup keeps the release status and removes its fixtures", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-cleanup-harness-"));
+  const browserPath = resolve(directory, "browser.json");
+  const candidateLogPath = resolve(directory, "candidate.log");
+  const proxyLogPath = resolve(directory, "proxy.log");
+  const tlsDirectory = resolve(directory, "tls");
+  const markerPath = resolve(directory, "cleanup-attempts.log");
+  const redactorPath = resolve(directory, "failing-redactor.sh");
+  const diagnosticsPath = resolve(directory, "failing-diagnostics.sh");
+  const retainedDiagnosticsDirectory = resolve(directory, "retained-diagnostics");
+  await mkdir(tlsDirectory);
+  await writeFile(browserPath, "{}");
+  await writeFile(candidateLogPath, "candidate evidence");
+  await writeFile(proxyLogPath, "proxy evidence");
+  await writeFile(
+    redactorPath,
+    [
+      "#!/usr/bin/env bash",
+      'printf "redactor\\n" >> "$RELEASE_CLEANUP_MARKER"',
+      "exit 71",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    diagnosticsPath,
+    [
+      "#!/usr/bin/env bash",
+      'printf "diagnostics\\n" >> "$RELEASE_CLEANUP_MARKER"',
+      "exit 72",
+      "",
+    ].join("\n"),
+  );
+  await chmod(redactorPath, 0o755);
+  await chmod(diagnosticsPath, 0o755);
+  const candidateProcess = spawn(process.execPath, ["-e", "setInterval(() => {}, 60000)"], {
+    stdio: "ignore",
+  });
+  const proxyProcess = spawn(process.execPath, ["-e", "setInterval(() => {}, 60000)"], {
+    stdio: "ignore",
+  });
+  try {
+    const failure = await execFileAsync(
+      "bash",
+      [resolve(root, "scripts/build-and-verify-release.sh")],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          RELEASE_CLEANUP_HARNESS: "1",
+          RELEASE_CLEANUP_EXIT_STATUS: "23",
+          RELEASE_CLEANUP_TIMEOUT_SECONDS: "2",
+          RELEASE_SERVER_PID: String(candidateProcess.pid),
+          RELEASE_PROXY_PID: String(proxyProcess.pid),
+          RELEASE_SERVER_LOG: candidateLogPath,
+          RELEASE_PROXY_LOG: proxyLogPath,
+          RELEASE_BROWSER_DIAGNOSTIC: browserPath,
+          RELEASE_TLS_DIR: tlsDirectory,
+          RELEASE_DIAGNOSTICS_DIR: retainedDiagnosticsDirectory,
+          RELEASE_REDACT_COMMAND: redactorPath,
+          RELEASE_DIAGNOSTICS_COMMAND: diagnosticsPath,
+          RELEASE_CLEANUP_MARKER: markerPath,
+        },
+      },
+    ).then(
+      () => null,
+      (error) => error,
+    );
+    assert(failure);
+    assert.equal(failure.code, 23);
+    assert.match(failure.stderr, /diagnostic artifact retention failed/);
+    assert.match(failure.stderr, /diagnostic printing failed/);
+    assert.equal(await readFile(markerPath, "utf8"), "redactor\nredactor\ndiagnostics\n");
+    assert.throws(() => process.kill(candidateProcess.pid, 0), /ESRCH/);
+    assert.throws(() => process.kill(proxyProcess.pid, 0), /ESRCH/);
+    await assert.rejects(readFile(candidateLogPath, "utf8"));
+    await assert.rejects(readFile(proxyLogPath, "utf8"));
+    await assert.rejects(readFile(tlsDirectory, "utf8"));
+  } finally {
+    if (candidateProcess.exitCode === null) candidateProcess.kill("SIGKILL");
+    if (proxyProcess.exitCode === null) proxyProcess.kill("SIGKILL");
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("release diagnostic redaction removes complete auth and cookie values", () => {
   const redacted = redactReleaseDiagnostics(
     [
@@ -292,6 +427,47 @@ test("release diagnostic redaction removes complete auth and cookie values", () 
     assert(!redacted.includes(secret));
   }
   assert.match(redacted, /\[REDACTED UNSAFE LINE\]/);
+});
+
+test("seeded redaction cases cover supported credentials and bounded truncation", async () => {
+  const cases = generatedRedactionCases();
+  const generatedInput = cases.map(({ input }) => input).join("\n");
+  const redacted = redactReleaseDiagnostics(generatedInput);
+  for (const { caseId, secrets } of cases) {
+    for (const secret of secrets) {
+      assert(!redacted.includes(secret), `redaction case ${caseId} leaked a sentinel`);
+    }
+  }
+
+  const boundaryCases = cases.slice(-6).map(({ caseId, secrets }) => ({
+    caseId,
+    secret: secrets[1],
+    input: `${"x".repeat(255)}${secrets[1]}${"y".repeat(255)}`,
+  }));
+  const directory = await mkdtemp(resolve(tmpdir(), "release-diagnostics-generated-"));
+  const browserPath = resolve(directory, "browser.json");
+  const candidateLogPath = resolve(directory, "candidate.log");
+  const proxyLogPath = resolve(directory, "proxy.log");
+  try {
+    await writeFile(browserPath, "{}");
+    await writeFile(
+      candidateLogPath,
+      boundaryCases.map(({ input }) => input).join("\n"),
+    );
+    await writeFile(proxyLogPath, boundaryCases.map(({ input }) => input).join("\n"));
+    const output = await formatReleaseDiagnostics({
+      browserPath,
+      candidateLogPath,
+      proxyLogPath,
+    });
+    assert(Buffer.byteLength(output) <= MAX_DIAGNOSTIC_BYTES);
+    assert(output.split(/\r?\n/).length <= MAX_DIAGNOSTIC_LINES);
+    for (const { caseId, secret } of boundaryCases) {
+      assert(!output.includes(secret), `truncation case ${caseId} leaked a sentinel`);
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("complete logs are sanitized before tail selection", () => {
