@@ -18,6 +18,7 @@ import { CLERK_FRONTEND_API_ORIGIN } from "@shared/clerk-config";
 export const CLERK_PROXY_TARGET = CLERK_FRONTEND_API_ORIGIN;
 export const CLERK_PROXY_PATH = "/api/__clerk";
 export const CLERK_PROXY_READINESS_PATH = `${CLERK_PROXY_PATH}/healthz`;
+export const CLERK_PROXY_HEALTH_PATH = "/api/admin/clerk-proxy/health";
 
 export const CLERK_PROXY_CONNECT_TIMEOUT_MS = 3_000;
 export function assertClerkProxyConfiguration(
@@ -37,24 +38,79 @@ export function getClerkProxyHost(req: { headers: IncomingHttpHeaders }): string
   return firstHop || req.headers.host?.trim() || undefined;
 }
 
-function requestPath(req: IncomingMessage): string {
-  return (req.url ?? "/").split("?", 1)[0] || "/";
-}
-
 export const CLERK_PROXY_RESPONSE_TIMEOUT_MS = 10_000;
 
-function logProxyDiagnostic(req: IncomingMessage, errorClass: ClerkProxyErrorClass): void {
-  // Keep diagnostics deliberately normalized: never log the upstream error,
-  // target, headers, cookies, query values, or response body.
-  console.warn(`[clerk-proxy] ${errorClass} ${requestPath(req)}`);
-}
-
-type ClerkProxyErrorClass =
+export type ClerkProxyErrorClass =
   | "upstream-connect-timeout"
   | "upstream-response-timeout"
   | "upstream-error"
-  | "upstream-response-error"
   | "downstream-aborted";
+
+const CLERK_PROXY_ERROR_CLASSES = [
+  "upstream-connect-timeout",
+  "upstream-response-timeout",
+  "upstream-error",
+  "downstream-aborted",
+] as const satisfies readonly ClerkProxyErrorClass[];
+
+export const CLERK_PROXY_MAX_FAILURES_PER_CLASS = 1_000;
+
+export type ClerkProxyHealthSnapshot = {
+  counters: Record<ClerkProxyErrorClass, number>;
+  total: number;
+  capped: boolean;
+};
+
+/**
+ * Process-local aggregate health for the proxy. It intentionally stores only
+ * bounded failure-class counters; request and response data never enters this
+ * object.
+ */
+export class ClerkProxyHealth {
+  private readonly maxFailuresPerClass: number;
+  private readonly counters: Record<ClerkProxyErrorClass, number> = {
+    "upstream-connect-timeout": 0,
+    "upstream-response-timeout": 0,
+    "upstream-error": 0,
+    "downstream-aborted": 0,
+  };
+  private capped = false;
+
+  constructor(maxFailuresPerClass = CLERK_PROXY_MAX_FAILURES_PER_CLASS) {
+    this.maxFailuresPerClass = Math.min(
+      CLERK_PROXY_MAX_FAILURES_PER_CLASS,
+      Number.isFinite(maxFailuresPerClass) ? Math.max(1, Math.floor(maxFailuresPerClass)) : CLERK_PROXY_MAX_FAILURES_PER_CLASS,
+    );
+  }
+
+  record(errorClass: ClerkProxyErrorClass): void {
+    if (this.counters[errorClass] >= this.maxFailuresPerClass) {
+      this.capped = true;
+      return;
+    }
+    this.counters[errorClass] += 1;
+  }
+
+  snapshot(): ClerkProxyHealthSnapshot {
+    const counters = Object.fromEntries(
+      CLERK_PROXY_ERROR_CLASSES.map((errorClass) => [errorClass, this.counters[errorClass]]),
+    ) as Record<ClerkProxyErrorClass, number>;
+    return {
+      counters,
+      total: Object.values(counters).reduce((sum, count) => sum + count, 0),
+      capped: this.capped,
+    };
+  }
+
+  reset(): void {
+    for (const errorClass of CLERK_PROXY_ERROR_CLASSES) {
+      this.counters[errorClass] = 0;
+    }
+    this.capped = false;
+  }
+}
+
+export const clerkProxyHealth = new ClerkProxyHealth();
 
 interface ClerkProxyState {
   req: IncomingMessage;
@@ -74,6 +130,7 @@ export interface ClerkProxyMiddlewareOptions {
   target?: string;
   connectTimeoutMs?: number;
   responseTimeoutMs?: number;
+  health?: ClerkProxyHealth;
 }
 
 export function createClerkProxyMiddleware(
@@ -82,6 +139,7 @@ export function createClerkProxyMiddleware(
   const target = options.target ?? CLERK_PROXY_TARGET;
   const connectTimeoutMs = options.connectTimeoutMs ?? CLERK_PROXY_CONNECT_TIMEOUT_MS;
   const responseTimeoutMs = options.responseTimeoutMs ?? CLERK_PROXY_RESPONSE_TIMEOUT_MS;
+  const health = options.health ?? clerkProxyHealth;
   const secretKey = process.env.CLERK_SECRET_KEY ?? "";
   const states = new WeakMap<IncomingMessage, ClerkProxyState>();
 
@@ -111,7 +169,10 @@ export function createClerkProxyMiddleware(
     if (state.finished) return;
     state.finished = true;
     clearTimers(state);
-    logProxyDiagnostic(state.req, errorClass);
+    health.record(errorClass);
+    // Keep diagnostics deliberately normalized: never log the request path,
+    // target, headers, cookies, query values, or response body.
+    console.warn(`[clerk-proxy] ${errorClass}`);
     destroyUpstream(state);
 
     if (state.res.destroyed || state.res.writableEnded) return;
@@ -128,7 +189,8 @@ export function createClerkProxyMiddleware(
     if (state.finished) return;
     state.finished = true;
     clearTimers(state);
-    logProxyDiagnostic(state.req, "downstream-aborted");
+    health.record("downstream-aborted");
+    console.warn("[clerk-proxy] downstream-aborted");
     destroyUpstream(state);
   };
 
@@ -209,10 +271,10 @@ export function createClerkProxyMiddleware(
         armResponseTimer(state);
         proxyRes.on("data", () => armResponseTimer(state));
         proxyRes.once("aborted", () => {
-          fail(state, 502, "upstream-response-error");
+          fail(state, 502, "upstream-error");
         });
         proxyRes.once("error", () => {
-          fail(state, 502, "upstream-response-error");
+          fail(state, 502, "upstream-error");
         });
 
         const headers = { ...proxyRes.headers };

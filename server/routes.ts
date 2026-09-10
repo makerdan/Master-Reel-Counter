@@ -45,6 +45,10 @@ import {
   RealtimeAuthorizationTracker,
 } from "./realtime-authorization";
 import { HELP_SOURCE_TEXT } from "@shared/help-content";
+import {
+  CLERK_PROXY_HEALTH_PATH,
+  clerkProxyHealth,
+} from "./middlewares/clerkProxyMiddleware";
 
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
@@ -640,6 +644,10 @@ export async function registerRoutes(
   // All admin operations share one deny-by-default owner boundary. Individual
   // handlers still validate their own inputs and resource scope.
   app.use("/api/admin", ownerOnly);
+  app.get(CLERK_PROXY_HEALTH_PATH, ownerOnly, (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, ...clerkProxyHealth.snapshot() });
+  });
 
   registerAuthRoutes(app);
   registerObjectStorageRoutes(app);

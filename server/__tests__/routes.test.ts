@@ -131,6 +131,7 @@ import
 {
 
   CLERK_PROXY_PATH,
+  ClerkProxyHealth,
   createClerkProxyMiddleware,
 }
  from "../middlewares/clerkProxyMiddleware.js"
@@ -813,6 +814,7 @@ describe("production Clerk proxy lifecycle guards", () => {
   });
 
   test("returns a bounded 504 for an upstream that never returns headers", async () => {
+    const health = new ClerkProxyHealth();
     const target = http.createServer(() => {
       // Deliberately stall until the proxy's response deadline destroys this request.
     });
@@ -824,6 +826,7 @@ describe("production Clerk proxy lifecycle guards", () => {
         target: targetUrl,
         connectTimeoutMs: 200,
         responseTimeoutMs: 35,
+        health,
       }),
     );
     const proxy = http.createServer(app);
@@ -834,6 +837,7 @@ describe("production Clerk proxy lifecycle guards", () => {
       const response = await rawHttpReq(proxyUrl, "GET", `${CLERK_PROXY_PATH}/v1/client`);
       assert.equal(response.status, 504);
       assert.equal(response.body, "");
+      assert.equal(health.snapshot().counters["upstream-response-timeout"], 1);
       assert.ok(Date.now() - started < 1_000, "stalled upstream must not hang the browser request");
     } finally {
       await closeHttpServer(proxy);
@@ -842,6 +846,7 @@ describe("production Clerk proxy lifecycle guards", () => {
   });
 
   test("terminates an upstream response that stalls after sending part of its body", async () => {
+    const health = new ClerkProxyHealth();
     const target = http.createServer((_req, res) => {
       res.writeHead(200, {
         "content-length": "100",
@@ -858,6 +863,7 @@ describe("production Clerk proxy lifecycle guards", () => {
         target: targetUrl,
         connectTimeoutMs: 200,
         responseTimeoutMs: 35,
+        health,
       }),
     );
     const proxy = http.createServer(app);
@@ -868,6 +874,7 @@ describe("production Clerk proxy lifecycle guards", () => {
       await assert.rejects(
         rawHttpReq(proxyUrl, "GET", `${CLERK_PROXY_PATH}/v1/client`),
       );
+      assert.equal(health.snapshot().counters["upstream-response-timeout"], 1);
       assert.ok(Date.now() - started < 1_000, "partial response must not keep the browser request open");
     } finally {
       await closeHttpServer(proxy);
@@ -876,6 +883,7 @@ describe("production Clerk proxy lifecycle guards", () => {
   });
 
   test("destroys upstream work when the downstream browser disconnects", async () => {
+    const health = new ClerkProxyHealth();
     let upstreamReceived!: () => void;
     let upstreamClosed!: () => void;
     const received = new Promise<void>((resolve) => { upstreamReceived = resolve; });
@@ -892,6 +900,7 @@ describe("production Clerk proxy lifecycle guards", () => {
         target: targetUrl,
         connectTimeoutMs: 200,
         responseTimeoutMs: 500,
+        health,
       }),
     );
     const proxy = http.createServer(app);
@@ -916,6 +925,7 @@ describe("production Clerk proxy lifecycle guards", () => {
         ),
       ]);
       assert.ok(true, "downstream disconnect closed the upstream request");
+      assert.equal(health.snapshot().counters["downstream-aborted"], 1);
     } finally {
       await closeHttpServer(proxy);
       await closeHttpServer(target);
@@ -967,6 +977,109 @@ describe("production Clerk proxy lifecycle guards", () => {
       await closeHttpServer(proxy);
       await closeHttpServer(target);
     }
+  });
+
+  test("preserves a healthy streamed response while each chunk arrives before the deadline", async () => {
+    const target = http.createServer((_req, res) => {
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "x-clerk-test": "streamed",
+      });
+      res.write('{"first":');
+      setTimeout(() => {
+        res.write('"chunk"');
+        setTimeout(() => {
+          res.end(',"last":true}');
+        }, 5);
+      }, 5);
+    });
+    const targetUrl = await listenOnLoopback(target);
+    const app = express();
+    app.use(
+      CLERK_PROXY_PATH,
+      createClerkProxyMiddleware({
+        target: targetUrl,
+        connectTimeoutMs: 200,
+        responseTimeoutMs: 30,
+      }),
+    );
+    const proxy = http.createServer(app);
+    const proxyUrl = await listenOnLoopback(proxy);
+
+    try {
+      const response = await rawHttpReq(proxyUrl, "GET", `${CLERK_PROXY_PATH}/stream`);
+      assert.equal(response.status, 200);
+      assert.equal(response.body, '{"first":"chunk","last":true}');
+      assert.equal(response.headers["content-type"], "application/json");
+      assert.equal(response.headers["x-clerk-test"], "streamed");
+      assert.equal(response.headers["content-length"], "29");
+    } finally {
+      await closeHttpServer(proxy);
+      await closeHttpServer(target);
+    }
+  });
+
+  test("normalizes upstream errors and does not log sensitive request material", async () => {
+    const health = new ClerkProxyHealth();
+    const target = http.createServer((req, _res) => {
+      req.socket.destroy();
+    });
+    const targetUrl = await listenOnLoopback(target);
+    const app = express();
+    app.use(
+      CLERK_PROXY_PATH,
+      createClerkProxyMiddleware({
+        target: targetUrl,
+        connectTimeoutMs: 200,
+        responseTimeoutMs: 200,
+        health,
+      }),
+    );
+    const proxy = http.createServer(app);
+    const proxyUrl = await listenOnLoopback(proxy);
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(args.join(" "));
+
+    try {
+      const response = await rawHttpReq(
+        proxyUrl,
+        "GET",
+        `${CLERK_PROXY_PATH}/sensitive/path?cookie=secret-cookie&token=secret-token`,
+      ).catch(() => ({ status: 0, headers: {}, body: "" }));
+      assert.ok(response.status === 502 || response.status === 504);
+      assert.equal(health.snapshot().counters["upstream-error"], 1);
+      const diagnostic = warnings.join("\n");
+      assert.match(diagnostic, /\[clerk-proxy\] upstream-error/);
+      assert.doesNotMatch(diagnostic, /sensitive|secret-cookie|secret-token/);
+      assert.doesNotMatch(JSON.stringify(health.snapshot()), /sensitive|secret-cookie|secret-token/);
+    } finally {
+      console.warn = originalWarn;
+      await closeHttpServer(proxy);
+      await closeHttpServer(target);
+    }
+  });
+
+  test("keeps each health failure class distinct and caps aggregate counters", () => {
+    const health = new ClerkProxyHealth(2);
+    health.record("upstream-connect-timeout");
+    health.record("upstream-connect-timeout");
+    health.record("upstream-connect-timeout");
+    health.record("upstream-response-timeout");
+    health.record("upstream-error");
+    health.record("downstream-aborted");
+    health.record("downstream-aborted");
+
+    assert.deepEqual(health.snapshot(), {
+      counters: {
+        "upstream-connect-timeout": 2,
+        "upstream-response-timeout": 1,
+        "upstream-error": 1,
+        "downstream-aborted": 2,
+      },
+      total: 6,
+      capped: true,
+    });
   });
 });
 
