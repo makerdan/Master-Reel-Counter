@@ -13,3 +13,4 @@
 - [Vite development CSP allowances](csp-vite-development-allowances.md) — dev HTML injects inline bootstrap scripts and Clerk may load from a bounded accounts.dev instance origin.
 - [Service-worker validation](service-worker-validation.md) — rebuild generated public worker output before focused browser checks, then run the locked heavy tier.
 - [React state updater queue race](react-state-updater-queue-race.md) — queue drainers must not synchronously read values assigned inside a React state updater.
+- [Clerk key resync sessions](clerk-key-resync-sessions.md) — after managed-key synchronization, old browser sessions can report key mismatch; verify in a fresh context.
