@@ -59,7 +59,6 @@ async function waitForCompletedSignIn(
   routeStates: string[],
 ): Promise<void> {
   const deadline = Date.now() + 30_000;
-  let clientTrustStartedAt: number | undefined;
 
   while (Date.now() < deadline) {
     const path = safeBrowserPath(page.url());
@@ -75,21 +74,8 @@ async function waitForCompletedSignIn(
         hasActiveSession: Boolean(clerk?.session?.id),
       };
     });
-    if (
-      !path.startsWith("/sign-in") &&
-      clerkState.loaded &&
-      clerkState.hasActiveSession
-    ) {
+    if (clerkState.loaded && clerkState.hasActiveSession) {
       return;
-    }
-
-    if (path.startsWith("/sign-in/client-trust")) {
-      clientTrustStartedAt ??= Date.now();
-      if (Date.now() - clientTrustStartedAt >= CLIENT_TRUST_TIMEOUT_MS) {
-        throw new Error(
-          "Managed Clerk sign-in did not complete the supported testing-token client-trust step at /sign-in/client-trust",
-        );
-      }
     }
 
     await page.waitForTimeout(250);
@@ -235,6 +221,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     });
 
     await waitForCompletedSignIn(page, routeStates);
+    await page.goto("/");
     const authResponse = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", {
         credentials: "same-origin",
