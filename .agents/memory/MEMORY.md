@@ -24,3 +24,4 @@
 - [Agent build failure evidence](agent-build-failure-evidence.md) — count only explicit dated validation records; missing artifacts make historical root cause inconclusive.
 - [Clerk Playwright session lifecycle](clerk-playwright-session-lifecycle.md) — refresh each browser context and share its live cookies with API fixtures.
 - [External Clerk browser configuration](external-clerk-browser-config.md) — keep tenant hosts out of tracked config; browser validation needs a valid env-provided key or host.
+- [Offline queue identity barrier](offline-queue-identity-barrier.md) — reconcile only server-verified aliases before any owner-scoped read, claim recovery, cleanup, or drain.

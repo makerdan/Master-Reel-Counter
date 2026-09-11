@@ -14,6 +14,7 @@ import { getClerkProxyHost } from "../../middlewares/clerkProxyMiddleware";
 type NormalizedUser = {
   claims: {
     sub: string;
+    identityAliases?: string[];
     email?: string;
     firstName?: string;
     first_name?: string;
@@ -60,11 +61,16 @@ type ClerkProfile = {
 };
 
 const CLERK_PROFILE_CACHE_LIMIT = 100;
-const clerkProfileCache = new Map<string, Promise<ClerkProfile>>();
+const CLERK_PROFILE_CACHE_TTL_MS = 60_000;
+const clerkProfileCache = new Map<string, {
+  expiresAt: number;
+  promise: Promise<ClerkProfile>;
+}>();
 
 async function getClerkProfile(clerkUserId: string): Promise<ClerkProfile> {
   const cached = clerkProfileCache.get(clerkUserId);
-  if (cached) return cached;
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  if (cached) clerkProfileCache.delete(clerkUserId);
   const pending = clerkClient.users.getUser(clerkUserId).then((user) => {
     const privateUsername =
       typeof user.privateMetadata.username === "string"
@@ -91,7 +97,10 @@ async function getClerkProfile(clerkUserId: string): Promise<ClerkProfile> {
       profileImageUrl: user.imageUrl,
     };
   });
-  clerkProfileCache.set(clerkUserId, pending);
+  clerkProfileCache.set(clerkUserId, {
+    expiresAt: Date.now() + CLERK_PROFILE_CACHE_TTL_MS,
+    promise: pending,
+  });
   try {
     const profile = await pending;
     if (clerkProfileCache.size > CLERK_PROFILE_CACHE_LIMIT) {
@@ -100,9 +109,23 @@ async function getClerkProfile(clerkUserId: string): Promise<ClerkProfile> {
     }
     return profile;
   } catch (error) {
-    clerkProfileCache.delete(clerkUserId);
+    if (clerkProfileCache.get(clerkUserId)?.promise === pending) {
+      clerkProfileCache.delete(clerkUserId);
+    }
     throw error;
   }
+}
+
+export async function getVerifiedIdentityAliases(req: Request, canonicalUserId: string): Promise<string[]> {
+  const auth = getAuth(req);
+  if (!auth.userId) return [];
+  const aliases = [auth.userId];
+  try {
+    aliases.push((await getClerkProfile(auth.userId)).externalId ?? "");
+  } catch {
+    // Alias recovery fails closed without taking down ordinary authenticated API access.
+  }
+  return Array.from(new Set(aliases.filter(value => value && value !== canonicalUserId)));
 }
 
 async function clerkIdentity(req: Request): Promise<NormalizedUser | undefined> {
@@ -136,7 +159,6 @@ async function clerkIdentity(req: Request): Promise<NormalizedUser | undefined> 
       existing = await authStorage.getUser(userId);
     }
   }
-
   const email =
     claimsValue(claims, "email") ??
     clerkProfile?.email;

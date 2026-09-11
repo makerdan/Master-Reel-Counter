@@ -18,11 +18,12 @@ import {
   clearEntryPermanentlyFailed,
   getFailedQueuedEntries,
   clearLegacyQueueItems,
+  initializeOfflineQueueIdentity,
 } from "@/lib/offlineQueue";
 import { queryClient } from "@/lib/queryClient";
 
-// Legacy records have no safe owner. Purge them once per page session, even
-// though multiple components subscribe to the network status hook.
+// Ownerless legacy records remain quarantined. Run the compatibility check once
+// per page session even though multiple components subscribe to this hook.
 const MAX_ENTRY_RETRIES = 3;
 
 export interface FailedEntryInfo {
@@ -48,15 +49,18 @@ function scheduleEntryRetry(
   timersRef.current.set(entryId, timer);
 }
 
-export function useNetworkStatus(currentUserId?: string) {
+export function useNetworkStatus(currentUserId?: string, identityAliases: readonly string[] = []) {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [entryRetryAttempt, setEntryRetryAttempt] = useState<number | null>(null);
   const [permanentlyFailedCount, setPermanentlyFailedCount] = useState(0);
   const [failedEntries, setFailedEntries] = useState<FailedEntryInfo[]>([]);
+  const [queueRecoveryError, setQueueRecoveryError] = useState(false);
 
   const syncingRef = useRef(false);
+  const identityReadyRef = useRef(false);
+  const onlineRef = useRef(navigator.onLine);
   const currentUserRef = useRef(currentUserId);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
   const entryRetryCountsRef = useRef<Map<string, number>>(new Map());
@@ -66,6 +70,7 @@ export function useNetworkStatus(currentUserId?: string) {
 
   useEffect(() => {
     if (currentUserRef.current !== currentUserId) {
+      identityReadyRef.current = false;
       activeAbortControllerRef.current?.abort();
       entryRetryCountsRef.current.clear();
       permanentlyFailedRef.current.clear();
@@ -73,6 +78,7 @@ export function useNetworkStatus(currentUserId?: string) {
       setEntryRetryAttempt(null);
       setPermanentlyFailedCount(0);
       setFailedEntries([]);
+      setQueueRecoveryError(false);
       for (const timer of entryRetryTimersRef.current.values()) clearTimeout(timer);
       entryRetryTimersRef.current.clear();
     }
@@ -92,8 +98,8 @@ export function useNetworkStatus(currentUserId?: string) {
   const syncQueue = useCallback(async () => {
     // Never drain without a confirmed user identity — would risk submitting
     // another user's queued items under the current auth cookie.
-    if (!currentUserId) return;
-    if (syncingRef.current || !navigator.onLine) return;
+    if (!currentUserId || !identityReadyRef.current) return;
+    if (syncingRef.current || !onlineRef.current) return;
     syncingRef.current = true;
     setIsSyncing(true);
     const abortController = new AbortController();
@@ -120,10 +126,10 @@ export function useNetworkStatus(currentUserId?: string) {
         // will have its own readwrite transaction queued behind this one; once
         // ours commits with inFlight=true, theirs will see the flag and return
         // false, so it skips the item without double-submitting.
-        const claimed = await claimEntryInFlight(entry.id);
+        const claimed = await claimEntryInFlight(entry.id, currentUserId);
         if (!claimed) continue;
         if (currentUserRef.current !== currentUserId) {
-          await clearEntryInFlight(entry.id);
+          await clearEntryInFlight(entry.id, currentUserId);
           break;
         }
 
@@ -146,7 +152,7 @@ export function useNetworkStatus(currentUserId?: string) {
               entryRetryTimersRef.current.delete(entry.id);
             }
             // Item deleted from IDB — the inFlight flag goes with it.
-            await removeEntryFromQueue(entry.id);
+            await removeEntryFromQueue(entry.id, currentUserId);
             if (entry.placeholderId != null && created?.id != null) {
               dispatchEntrySynced(entry.placeholderId, created.id, entry.sessionId);
             }
@@ -156,11 +162,11 @@ export function useNetworkStatus(currentUserId?: string) {
           } else if (res.status === 401) {
             // Session expired — retrying won't help. Force re-auth and keep
             // the item in the queue for the next authenticated session.
-            await clearEntryInFlight(entry.id);
+            await clearEntryInFlight(entry.id, currentUserId);
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             fetchFailed = true;
           } else {
-            await clearEntryInFlight(entry.id);
+            await clearEntryInFlight(entry.id, currentUserId);
             const nextRetries = currentRetries + 1;
             entryRetryCountsRef.current.set(entry.id, nextRetries);
             if (nextRetries >= MAX_ENTRY_RETRIES) {
@@ -176,13 +182,13 @@ export function useNetworkStatus(currentUserId?: string) {
               failedEntriesRef.current.set(entry.id, info);
               setFailedEntries(Array.from(failedEntriesRef.current.values()));
               // Persist the failure to IDB so the warning survives a page reload.
-              markEntryPermanentlyFailed(entry.id, reason).catch(() => {});
+              markEntryPermanentlyFailed(entry.id, reason, currentUserId).catch(() => {});
             } else {
               scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
             }
           }
         } catch (error) {
-          await clearEntryInFlight(entry.id);
+          await clearEntryInFlight(entry.id, currentUserId);
           fetchFailed = true;
           if (abortController.signal.aborted || currentUserRef.current !== currentUserId) {
             break;
@@ -202,7 +208,7 @@ export function useNetworkStatus(currentUserId?: string) {
             failedEntriesRef.current.set(entry.id, info);
             setFailedEntries(Array.from(failedEntriesRef.current.values()));
             // Persist the failure to IDB so the warning survives a page reload.
-            markEntryPermanentlyFailed(entry.id, reason).catch(() => {});
+            markEntryPermanentlyFailed(entry.id, reason, currentUserId).catch(() => {});
           } else {
             scheduleEntryRetry(entry.id, nextRetries, entryRetryTimersRef, syncQueue);
           }
@@ -219,10 +225,10 @@ export function useNetworkStatus(currentUserId?: string) {
         if (!navigator.onLine) break;
 
         // Atomically claim the photo item before submitting.
-        const claimed = await claimPhotoInFlight(photo.id);
+        const claimed = await claimPhotoInFlight(photo.id, currentUserId);
         if (!claimed) continue;
         if (currentUserRef.current !== currentUserId) {
-          await clearPhotoInFlight(photo.id);
+          await clearPhotoInFlight(photo.id, currentUserId);
           break;
         }
 
@@ -244,13 +250,13 @@ export function useNetworkStatus(currentUserId?: string) {
             });
 
             if (uploadRes.status === 401) {
-              await clearPhotoInFlight(photo.id);
+              await clearPhotoInFlight(photo.id, currentUserId);
               queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
               break;
             }
             if (!uploadRes.ok) {
               // Server-side error for this photo — release claim and try the next.
-              await clearPhotoInFlight(photo.id);
+              await clearPhotoInFlight(photo.id, currentUserId);
               continue;
             }
             const uploadData = await uploadRes.json();
@@ -258,7 +264,7 @@ export function useNetworkStatus(currentUserId?: string) {
               throw new Error("Upload response did not include an object path");
             }
             uploadedObjectPath = uploadData.objectPath;
-            await persistPhotoUploadedObjectPath(photo.id, uploadData.objectPath);
+            await persistPhotoUploadedObjectPath(photo.id, uploadData.objectPath, currentUserId);
           }
           if (!uploadedObjectPath) throw new Error("Uploaded object path is unavailable");
 
@@ -282,23 +288,23 @@ export function useNetworkStatus(currentUserId?: string) {
           });
 
           if (photoRes.status === 401) {
-            await clearPhotoInFlight(photo.id);
+            await clearPhotoInFlight(photo.id, currentUserId);
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             break;
           }
           if (photoRes.ok) {
             // Item deleted — inFlight flag goes with it.
-            await removeFromQueue(photo.id);
+            await removeFromQueue(photo.id, currentUserId);
             queryClient.invalidateQueries({
               queryKey: ["/api/sessions", photo.sessionId.toString(), "photos"],
             });
           } else {
             // Photo record creation failed — release claim for a future retry.
-            await clearPhotoInFlight(photo.id);
+            await clearPhotoInFlight(photo.id, currentUserId);
           }
         } catch {
           // True network failure — release claim and wait for next online event.
-          await clearPhotoInFlight(photo.id);
+          await clearPhotoInFlight(photo.id, currentUserId);
           break;
         }
       }
@@ -352,6 +358,7 @@ export function useNetworkStatus(currentUserId?: string) {
 
   useEffect(() => {
     const handleOnline = () => {
+      onlineRef.current = true;
       setIsOnline(true);
       for (const [id, timer] of entryRetryTimersRef.current.entries()) {
         if (!permanentlyFailedRef.current.has(id)) {
@@ -361,26 +368,42 @@ export function useNetworkStatus(currentUserId?: string) {
       }
       syncQueue();
     };
-    const handleOffline = () => setIsOnline(false);
+    const handleOffline = () => {
+      onlineRef.current = false;
+      setIsOnline(false);
+      activeAbortControllerRef.current?.abort();
+      if (!currentUserId) return;
+      void initializeOfflineQueueIdentity(currentUserId, identityAliases)
+        .then(() => refreshPendingCount())
+        .catch(() => {});
+    };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
     const recoverExpiredClaims = () => {
-      clearStaleInFlight()
+      if (!currentUserId || !identityReadyRef.current) return;
+      clearStaleInFlight(currentUserId)
         .catch(() => {})
         .then(() => {
           refreshPendingCount();
-          if (navigator.onLine) syncQueue();
+          if (onlineRef.current) syncQueue();
         });
     };
 
-    refreshPendingCount();
     // A claim can still be fresh when a replacement page starts. Keep sweeping
     // while the app is open so an interrupted owner is retried once its claim
     // expires, without resetting active work in another tab.
     const interval = setInterval(recoverExpiredClaims, 5000);
-    const unsubQueue = onQueueChange(refreshPendingCount);
+    const unsubQueue = onQueueChange(() => {
+      if (!currentUserId) return;
+      // Queue writes may arrive while the auth/profile barrier is still
+      // settling. Chain the count refresh behind that same barrier rather than
+      // dropping the event and leaving the offline badge stale.
+      void initializeOfflineQueueIdentity(currentUserId, identityAliases)
+        .then(() => refreshPendingCount())
+        .catch(() => {});
+    });
 
     // Clear STALE inFlight flags (older than 2 min) from a previous page crash
     // BEFORE the initial drain, so stranded items are retried.  We use a
@@ -393,11 +416,42 @@ export function useNetworkStatus(currentUserId?: string) {
     // and must be surfaced to the user immediately — before the first drain —
     // so the warning panel appears right away instead of after the next retry
     // cycle exhausts its attempts again.
-    ensureLegacyQueueCleanup()
-      .catch(() => {})
-      .then(() => clearStaleInFlight())
-      .catch(() => {})
-      .then(async () => {
+    if (!currentUserId) {
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+        clearInterval(interval);
+        unsubQueue();
+      };
+    }
+    void (async () => {
+      let result;
+      try {
+        result = await initializeOfflineQueueIdentity(currentUserId, identityAliases);
+        setQueueRecoveryError(false);
+      } catch {
+        console.warn("[offline-queue] account queue reconciliation could not be completed");
+        setQueueRecoveryError(true);
+        return;
+      }
+      try {
+        if (result.reassignedPhotos > 0 || result.reassignedEntries > 0) {
+          console.info("[offline-queue] restored queued work for the current account", {
+            photos: result.reassignedPhotos,
+            entries: result.reassignedEntries,
+          });
+        }
+        if (result.ownerlessPhotos > 0 || result.ownerlessEntries > 0) {
+          console.warn("[offline-queue] skipped queued work without verified account ownership", {
+            photos: result.ownerlessPhotos,
+            entries: result.ownerlessEntries,
+          });
+        }
+        await ensureLegacyQueueCleanup();
+        await clearStaleInFlight(currentUserId);
+        if (currentUserRef.current !== currentUserId) return;
+        identityReadyRef.current = true;
+        await refreshPendingCount();
         try {
           const failed = await getFailedQueuedEntries(currentUserId);
           const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -423,7 +477,7 @@ export function useNetworkStatus(currentUserId?: string) {
           }
         } catch {}
 
-        // Purge orphaned queued photos older than 30 days.  These accumulate
+        // Purge current-account queued photos older than 30 days. These accumulate
         // when a tab is closed mid-upload before the item exhausts its retry
         // budget (it never reaches permanentlyFailed so it stays in IDB forever).
         try {
@@ -442,8 +496,12 @@ export function useNetworkStatus(currentUserId?: string) {
           }
         } catch {}
 
-        if (navigator.onLine) syncQueue();
-      });
+        if (onlineRef.current) syncQueue();
+      } catch {
+        console.warn("[offline-queue] queued work could not be prepared for recovery");
+        setQueueRecoveryError(true);
+      }
+    })();
 
     return () => {
       window.removeEventListener("online", handleOnline);
@@ -454,7 +512,7 @@ export function useNetworkStatus(currentUserId?: string) {
         clearTimeout(timer);
       }
     };
-  }, [syncQueue, refreshPendingCount]);
+  }, [syncQueue, refreshPendingCount, currentUserId, identityAliases]);
 
   // Show the browser's native "Leave site?" dialog whenever there are items
   // waiting to be synced. Registered/removed as pendingCount crosses zero so
@@ -481,6 +539,7 @@ export function useNetworkStatus(currentUserId?: string) {
     retryAllFailedEntries,
     discardFailedEntry,
     failedEntries,
+    queueRecoveryError,
   };
 }
 

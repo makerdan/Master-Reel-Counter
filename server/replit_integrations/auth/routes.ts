@@ -1,6 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import { authStorage } from "./storage";
-import { isAuthenticated } from "./replitAuth";
+import { getVerifiedIdentityAliases, isAuthenticated } from "./replitAuth";
 import type { User } from "@shared/models/auth";
 import { notifyAuthorizationChange } from "../../realtime-authorization";
 
@@ -13,6 +13,10 @@ export type IdentityAuthorizationOutcome =
 export type AuthUserLookupResult =
   | { kind: "user"; user: User }
   | { kind: "not_provisioned" };
+
+export type AuthenticatedUserResponse = User & {
+  identityAliases: string[];
+};
 
 export function classifyAuthUserLookup(
   _user: unknown,
@@ -61,7 +65,8 @@ export function registerAuthRoutes(app: Express): void {
       if (result.kind === "not_provisioned") {
         return res.status(404).json({ message: "not_provisioned" });
       }
-      return res.json(result.user);
+      const identityAliases = await getVerifiedIdentityAliases(req, result.user.id);
+      return res.json({ ...result.user, identityAliases });
     } catch (error) {
       console.error("Error fetching user:", error);
       return res.status(503).json({ message: "identity_bridge_unavailable" });

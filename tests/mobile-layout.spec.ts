@@ -122,6 +122,10 @@ test.describe("mobile layout parity @mobile", () => {
 
     await page.goto(`/session/${sess.id}`);
     await page.waitForLoadState("domcontentloaded");
+    await expect(
+      page.locator('[data-testid="text-session-name"]'),
+      "the app identity must settle before testing an identity-scoped queue",
+    ).toBeAttached({ timeout: 10_000 });
 
     const currentUserId = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", { credentials: "same-origin" });

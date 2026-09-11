@@ -24,8 +24,8 @@ export function NetworkStatusIndicator({
   wsStatus: wsProp,
   reconnectCountdown: countdownProp,
 }: NetworkStatusIndicatorProps = {}) {
-  const { identityId } = useAuth();
-  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, discardFailedEntry, failedEntries } = useNetworkStatus(identityId);
+  const { identityId, identityAliases } = useAuth();
+  const { isOnline, pendingCount, isSyncing, entryRetryAttempt, permanentlyFailedCount, retryAllFailedEntries, discardFailedEntry, failedEntries, queueRecoveryError } = useNetworkStatus(identityId, identityAliases);
   const ctx = useWsReconnect();
   // Props take priority over context (allows direct rendering with explicit values).
   const wsStatus = wsProp !== undefined ? wsProp : ctx.wsStatus;
@@ -55,7 +55,7 @@ export function NetworkStatusIndicator({
     }
   }, [failedEntries.length]);
 
-  if (isOnline && pendingCount === 0 && !isSyncing && !hasPermanentFailures && !isWsReconnecting) {
+  if (isOnline && pendingCount === 0 && !isSyncing && !hasPermanentFailures && !isWsReconnecting && !queueRecoveryError) {
     return null;
   }
 
@@ -124,7 +124,7 @@ export function NetworkStatusIndicator({
       <div
         data-testid="network-status-indicator"
         className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg transition-all ${
-          hasPermanentFailures
+          queueRecoveryError || hasPermanentFailures
             ? "bg-destructive text-destructive-foreground cursor-pointer"
             : isOnline
             ? "bg-primary text-primary-foreground"
@@ -138,7 +138,23 @@ export function NetworkStatusIndicator({
             <span data-testid="text-offline-status">Offline</span>
           </>
         )}
-        {isOnline && isWsReconnecting && (
+        {isOnline && queueRecoveryError && (
+          <>
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span data-testid="text-queue-recovery-failed">
+              Offline items could not be checked.
+            </span>
+            <button
+              type="button"
+              className="underline underline-offset-2"
+              onClick={() => window.location.reload()}
+              data-testid="button-reload-queue-recovery"
+            >
+              Reload
+            </button>
+          </>
+        )}
+        {isOnline && !queueRecoveryError && isWsReconnecting && (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span className="animate-pulse" data-testid="text-ws-reconnecting-mobile">
@@ -158,7 +174,7 @@ export function NetworkStatusIndicator({
             )}
           </>
         )}
-        {isOnline && !isWsReconnecting && hasRetryingEntries && (
+        {isOnline && !queueRecoveryError && !isWsReconnecting && hasRetryingEntries && (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span data-testid="text-retrying-entry-status">
@@ -166,13 +182,13 @@ export function NetworkStatusIndicator({
             </span>
           </>
         )}
-        {isOnline && !isWsReconnecting && isSyncing && !hasRetryingEntries && (
+        {isOnline && !queueRecoveryError && !isWsReconnecting && isSyncing && !hasRetryingEntries && (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span data-testid="text-syncing-status">Syncing...</span>
           </>
         )}
-        {isOnline && hasPermanentFailures && (
+        {isOnline && !queueRecoveryError && hasPermanentFailures && (
           <>
             <AlertTriangle className="h-3.5 w-3.5" />
             <span data-testid="text-entry-sync-failed">
@@ -184,7 +200,7 @@ export function NetworkStatusIndicator({
             }
           </>
         )}
-        {isOnline && !isWsReconnecting && !isSyncing && !hasPermanentFailures && pendingCount > 0 && (
+        {isOnline && !queueRecoveryError && !isWsReconnecting && !isSyncing && !hasPermanentFailures && pendingCount > 0 && (
           <>
             <CloudUpload className="h-3.5 w-3.5" />
             <span data-testid="text-pending-status">

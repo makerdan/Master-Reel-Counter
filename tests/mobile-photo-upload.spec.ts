@@ -163,6 +163,66 @@ async function ageQueuedPhotoClaims(
   }), ageMs);
 }
 
+type SeededQueueOwner = string | null;
+
+async function seedQueuedPhoto(
+  page: import("@playwright/test").Page,
+  input: {
+    id: string;
+    sessionId: number;
+    owner: SeededQueueOwner;
+    registrationKey: string;
+    uploadedObjectPath?: string;
+    inFlight?: boolean;
+    claimedAt?: unknown;
+  },
+): Promise<void> {
+  await page.evaluate((item) => new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open("reel-counter-offline", 2);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction("photo-queue", "readwrite");
+      transaction.objectStore("photo-queue").put({
+        id: item.id,
+        registrationKey: item.registrationKey,
+        sessionId: item.sessionId,
+        ...(item.owner === null ? {} : { userId: item.owner }),
+        blob: new Blob(["queued-photo"], { type: "image/jpeg" }),
+        originalFilename: "restored.jpg",
+        uploadFilename: "restored.jpg",
+        aisle: "A",
+        section: "1",
+        notes: "",
+        isReceiving: false,
+        isOnFloor: false,
+        createdAt: Date.now(),
+        inFlight: item.inFlight,
+        claimedAt: item.claimedAt,
+        uploadedObjectPath: item.uploadedObjectPath,
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    };
+    request.onerror = () => reject(request.error);
+  }), input);
+}
+
+async function queuedPhotoOwners(
+  page: import("@playwright/test").Page,
+): Promise<Array<{ id: string; userId: string | null }>> {
+  return page.evaluate(() => new Promise((resolve, reject) => {
+    const request = indexedDB.open("reel-counter-offline", 2);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction("photo-queue", "readonly");
+      const getAll = transaction.objectStore("photo-queue").getAll();
+      getAll.onsuccess = () => resolve(getAll.result
+        .map(item => ({ id: item.id, userId: item.userId ?? null }))
+        .sort((a, b) => a.id.localeCompare(b.id)));
+      getAll.onerror = () => reject(getAll.error);
+    };
+    request.onerror = () => reject(request.error);
+  }));
+}
+
 async function enterMobileFlow(page: import("@playwright/test").Page): Promise<void> {
   const header = page.locator('[data-testid="header-mobile-flow"]');
   if (!(await header.isVisible().catch(() => false))) {
@@ -172,6 +232,253 @@ async function enterMobileFlow(page: import("@playwright/test").Page): Promise<v
 }
 
 test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
+  test("reconciles both queue stores atomically and only recovers current-owner claims", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const state = await page.evaluate(async () => {
+      const canonical = "canonical-account";
+      const alias = "verified-previous-account";
+      const foreign = "different-account";
+      const request = indexedDB.open("reel-counter-offline", 2);
+      await new Promise<void>((resolve, reject) => {
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction(["photo-queue", "entry-queue"], "readwrite");
+          tx.objectStore("photo-queue").put({
+            id: "alias-photo",
+            registrationKey: "alias-photo-key",
+            sessionId: 1,
+            userId: alias,
+            blob: new Blob(["photo"]),
+            aisle: "A",
+            section: "1",
+            notes: "",
+            isReceiving: false,
+            isOnFloor: false,
+            createdAt: Date.now(),
+            inFlight: true,
+            claimedAt: "invalid",
+          });
+          tx.objectStore("photo-queue").put({
+            id: "foreign-photo",
+            registrationKey: "foreign-photo-key",
+            sessionId: 1,
+            userId: foreign,
+            blob: new Blob(["foreign"]),
+            aisle: "A",
+            section: "1",
+            notes: "",
+            isReceiving: false,
+            isOnFloor: false,
+            createdAt: Date.now(),
+            inFlight: true,
+            claimedAt: "invalid",
+          });
+          tx.objectStore("photo-queue").put({
+            id: "ownerless-photo",
+            registrationKey: "ownerless-photo-key",
+            sessionId: 1,
+            blob: new Blob(["ownerless"]),
+            aisle: "A",
+            section: "1",
+            notes: "",
+            isReceiving: false,
+            isOnFloor: false,
+            createdAt: Date.now(),
+          });
+          tx.objectStore("entry-queue").put({
+            id: "alias-entry",
+            sessionId: 1,
+            userId: alias,
+            data: {},
+            createdAt: Date.now(),
+            inFlight: true,
+            claimedAt: Date.now() + 10_000,
+          });
+          tx.objectStore("entry-queue").put({
+            id: "foreign-entry",
+            sessionId: 1,
+            userId: foreign,
+            data: {},
+            createdAt: Date.now(),
+            inFlight: true,
+            claimedAt: Number.NaN,
+          });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        request.onerror = () => reject(request.error);
+      });
+
+      const moduleUrl = "/src/lib/offlineQueue.ts";
+      const queue = await import(/* @vite-ignore */ moduleUrl);
+      const reconciliation = await queue.initializeOfflineQueueIdentity(canonical, [alias]);
+      await queue.clearStaleInFlight(canonical);
+
+      const db = request.result;
+      const readStore = (name: string) => new Promise<any[]>((resolve, reject) => {
+        const tx = db.transaction(name, "readonly");
+        const getAll = tx.objectStore(name).getAll();
+        getAll.onsuccess = () => resolve(getAll.result);
+        getAll.onerror = () => reject(getAll.error);
+      });
+      const [photos, entries] = await Promise.all([
+        readStore("photo-queue"),
+        readStore("entry-queue"),
+      ]);
+      return {
+        reconciliation,
+        photos: photos.map(({ id, userId, inFlight, claimedAt }) => ({
+          id, userId: userId ?? null, inFlight: inFlight ?? false, claimedAt,
+        })).sort((a, b) => a.id.localeCompare(b.id)),
+        entries: entries.map(({ id, userId, inFlight, claimedAt }) => ({
+          id, userId: userId ?? null, inFlight: inFlight ?? false, claimedAt,
+        })).sort((a, b) => a.id.localeCompare(b.id)),
+      };
+    });
+
+    expect(state.reconciliation).toEqual({
+      reassignedPhotos: 1,
+      reassignedEntries: 1,
+      ownerlessPhotos: 1,
+      ownerlessEntries: 0,
+    });
+    expect(state.photos).toEqual([
+      expect.objectContaining({
+        id: "alias-photo",
+        userId: "canonical-account",
+        inFlight: false,
+      }),
+      expect.objectContaining({
+        id: "foreign-photo",
+        userId: "different-account",
+        inFlight: true,
+        claimedAt: "invalid",
+      }),
+      expect.objectContaining({
+        id: "ownerless-photo",
+        userId: null,
+        inFlight: false,
+      }),
+    ]);
+    expect(state.entries).toEqual([
+      expect.objectContaining({
+        id: "alias-entry",
+        userId: "canonical-account",
+        inFlight: true,
+      }),
+      expect.objectContaining({
+        id: "foreign-entry",
+        userId: "different-account",
+        inFlight: true,
+      }),
+    ]);
+  });
+
+  test("reconciles a verified previous owner before recovery without adopting unrelated photos", async ({
+    page,
+    context,
+    request,
+    cleanupIds,
+  }) => {
+    const session = await createSessionViaApi(request, `Production Backlog ${Date.now()}`);
+    cleanupIds.push(session.id);
+    const authResponse = await request.get("/api/auth/user");
+    expect(authResponse.ok()).toBe(true);
+    const authenticatedUser = await authResponse.json() as {
+      id: string;
+      identityAliases?: string[];
+    };
+    const previousOwner = authenticatedUser.identityAliases?.[0];
+    expect(previousOwner, "authenticated response must provide a server-verified prior identity")
+      .toEqual(expect.any(String));
+
+    await page.goto("/");
+    await context.setOffline(true);
+    const restoredId = `restored-${Date.now()}`;
+    const futureClaimId = `future-claim-${Date.now()}`;
+    const ownerlessId = `ownerless-${Date.now()}`;
+    const foreignId = `foreign-${Date.now()}`;
+    const registrationKey = `registration-${Date.now()}`;
+    const uploadedObjectPath = `/objects/already-uploaded-${Date.now()}.jpg`;
+    await seedQueuedPhoto(page, {
+      id: restoredId,
+      sessionId: session.id,
+      owner: previousOwner!,
+      registrationKey,
+      uploadedObjectPath,
+      inFlight: true,
+      claimedAt: "malformed-production-claim",
+    });
+    await seedQueuedPhoto(page, {
+      id: futureClaimId,
+      sessionId: session.id,
+      owner: previousOwner!,
+      registrationKey: `${registrationKey}-future`,
+      uploadedObjectPath: `${uploadedObjectPath}-future`,
+      inFlight: true,
+      claimedAt: Date.now() + 10 * 60 * 1000,
+    });
+    await seedQueuedPhoto(page, {
+      id: ownerlessId,
+      sessionId: session.id,
+      owner: null,
+      registrationKey: `ownerless-registration-${Date.now()}`,
+    });
+    await seedQueuedPhoto(page, {
+      id: foreignId,
+      sessionId: session.id,
+      owner: "different-account",
+      registrationKey: `foreign-registration-${Date.now()}`,
+    });
+
+    let uploadAttempts = 0;
+    let registrationAttempts = 0;
+    const registrationPayloads: Array<Record<string, unknown>> = [];
+    context.on("request", outgoing => {
+      if (outgoing.method() === "POST" && outgoing.url().endsWith("/api/uploads/direct")) {
+        uploadAttempts++;
+      }
+      if (
+        outgoing.method() === "POST"
+        && outgoing.url().endsWith(`/api/sessions/${session.id}/photos`)
+      ) {
+        registrationAttempts++;
+        registrationPayloads.push(outgoing.postDataJSON());
+      }
+    });
+
+    await context.setOffline(false);
+    await page.reload();
+    await page.goto(`/session/${session.id}`);
+    await enterMobileFlow(page);
+
+    await expect.poll(() => queuedPhotoOwners(page), { timeout: 20_000 }).toEqual([
+      { id: foreignId, userId: "different-account" },
+      { id: ownerlessId, userId: null },
+    ]);
+    expect(registrationAttempts).toBeGreaterThanOrEqual(2);
+    expect(uploadAttempts).toBe(0);
+    expect(registrationPayloads).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        registrationKey,
+        objectStorageKey: uploadedObjectPath,
+      }),
+      expect.objectContaining({
+        registrationKey: `${registrationKey}-future`,
+        objectStorageKey: `${uploadedObjectPath}-future`,
+      }),
+    ]));
+    expect(new Set(registrationPayloads.map(payload => payload.registrationKey))).toEqual(
+      new Set([registrationKey, `${registrationKey}-future`]),
+    );
+
+    const photosResponse = await request.get(`/api/sessions/${session.id}/photos`);
+    expect(photosResponse.ok()).toBe(true);
+    expect(await photosResponse.json()).toHaveLength(2);
+  });
+
   test("converts, uploads, registers once, and clears the durable queue", async ({
     page,
     context,

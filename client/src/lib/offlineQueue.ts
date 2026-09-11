@@ -94,14 +94,19 @@ export async function ensurePhotoRegistrationKey(item: QueuedPhoto): Promise<str
   return registrationKey;
 }
 
-export async function persistPhotoUploadedObjectPath(id: string, uploadedObjectPath: string): Promise<void> {
-  return patchPhotoRecord(id, { uploadedObjectPath });
+export async function persistPhotoUploadedObjectPath(id: string, uploadedObjectPath: string, expectedOwner?: string): Promise<void> {
+  return patchPhotoRecord(id, { uploadedObjectPath }, expectedOwner);
 }
-export async function removeFromQueue(id: string): Promise<void> {
+export async function removeFromQueue(id: string, expectedOwner?: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PHOTO_STORE, "readwrite");
-    tx.objectStore(PHOTO_STORE).delete(id);
+    const store = tx.objectStore(PHOTO_STORE);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      const item = req.result as QueuedPhoto | undefined;
+      if (item && (!expectedOwner || item.userId === expectedOwner)) store.delete(id);
+    };
     tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
@@ -172,11 +177,16 @@ export async function saveEntryToQueue(item: QueuedEntry): Promise<void> {
   });
 }
 
-export async function removeEntryFromQueue(id: string): Promise<void> {
+export async function removeEntryFromQueue(id: string, expectedOwner?: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ENTRY_STORE, "readwrite");
-    tx.objectStore(ENTRY_STORE).delete(id);
+    const store = tx.objectStore(ENTRY_STORE);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      const item = req.result as QueuedEntry | undefined;
+      if (item && (!expectedOwner || item.userId === expectedOwner)) store.delete(id);
+    };
     tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
@@ -225,6 +235,89 @@ export async function getPendingCount(userId?: string): Promise<number> {
   return photos.length + entries.length;
 }
 
+export interface QueueReconciliationResult {
+  reassignedPhotos: number;
+  reassignedEntries: number;
+  ownerlessPhotos: number;
+  ownerlessEntries: number;
+}
+
+const identityInitializationPromises = new Map<string, Promise<QueueReconciliationResult>>();
+
+/**
+ * Reassign records only when their existing owner is a server-verified alias
+ * of the current account. Both stores are updated in one transaction so queue
+ * filtering and cleanup cannot observe a partially migrated identity.
+ */
+export async function reconcileQueueOwnership(
+  canonicalUserId: string,
+  verifiedAliases: readonly string[],
+): Promise<QueueReconciliationResult> {
+  const aliases = new Set(
+    verifiedAliases.filter(alias => alias.length > 0 && alias !== canonicalUserId),
+  );
+  const result: QueueReconciliationResult = {
+    reassignedPhotos: 0,
+    reassignedEntries: 0,
+    ownerlessPhotos: 0,
+    ownerlessEntries: 0,
+  };
+  if (aliases.size === 0) return result;
+
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction([PHOTO_STORE, ENTRY_STORE], "readwrite");
+    const reconcileStore = (
+      storeName: string,
+      reassignedKey: "reassignedPhotos" | "reassignedEntries",
+      ownerlessKey: "ownerlessPhotos" | "ownerlessEntries",
+    ) => {
+      const store = tx.objectStore(storeName);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        for (const item of request.result as Array<{ userId?: unknown }>) {
+          if (typeof item.userId !== "string" || item.userId.length === 0) {
+            result[ownerlessKey]++;
+          } else if (aliases.has(item.userId)) {
+            store.put({ ...item, userId: canonicalUserId });
+            result[reassignedKey]++;
+          }
+        }
+      };
+    };
+    reconcileStore(PHOTO_STORE, "reassignedPhotos", "ownerlessPhotos");
+    reconcileStore(ENTRY_STORE, "reassignedEntries", "ownerlessEntries");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  if (result.reassignedPhotos > 0 || result.reassignedEntries > 0) {
+    notifyQueueChange();
+  }
+  return result;
+}
+
+/**
+ * Shared startup barrier for every identity-scoped queue consumer.
+ * Reconciliation must finish before owner-filtered reads or claim recovery.
+ */
+export function initializeOfflineQueueIdentity(
+  canonicalUserId: string,
+  verifiedAliases: readonly string[],
+): Promise<QueueReconciliationResult> {
+  const key = JSON.stringify([
+    canonicalUserId,
+    ...Array.from(new Set(verifiedAliases)).sort(),
+  ]);
+  let pending = identityInitializationPromises.get(key);
+  if (!pending) {
+    pending = reconcileQueueOwnership(canonicalUserId, verifiedAliases);
+    identityInitializationPromises.set(key, pending);
+    pending.catch(() => identityInitializationPromises.delete(key));
+  }
+  return pending;
+}
+
 export async function clearAllQueuedPhotos(userId?: string): Promise<void> {
   if (userId !== undefined) {
     return clearQueue(undefined, userId);
@@ -255,7 +348,7 @@ export async function clearAllQueuedPhotos(userId?: string): Promise<void> {
 // readwrite transaction is effectively atomic even under concurrent drainers
 // (e.g. multiple browser tabs or rapid online/offline events).
 
-export async function claimPhotoInFlight(id: string): Promise<boolean> {
+export async function claimPhotoInFlight(id: string, expectedOwner?: string): Promise<boolean> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PHOTO_STORE, "readwrite");
@@ -264,7 +357,7 @@ export async function claimPhotoInFlight(id: string): Promise<boolean> {
     let claimed = false;
     req.onsuccess = () => {
       const item = req.result as QueuedPhoto | undefined;
-      if (!item || item.inFlight) return; // already claimed or gone
+      if (!item || item.inFlight || (expectedOwner && item.userId !== expectedOwner)) return;
       store.put({ ...item, inFlight: true, claimedAt: Date.now() });
       claimed = true;
     };
@@ -273,7 +366,7 @@ export async function claimPhotoInFlight(id: string): Promise<boolean> {
   });
 }
 
-export async function claimEntryInFlight(id: string): Promise<boolean> {
+export async function claimEntryInFlight(id: string, expectedOwner?: string): Promise<boolean> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ENTRY_STORE, "readwrite");
@@ -282,7 +375,7 @@ export async function claimEntryInFlight(id: string): Promise<boolean> {
     let claimed = false;
     req.onsuccess = () => {
       const item = req.result as QueuedEntry | undefined;
-      if (!item || item.inFlight) return; // already claimed or gone
+      if (!item || item.inFlight || (expectedOwner && item.userId !== expectedOwner)) return;
       store.put({ ...item, inFlight: true, claimedAt: Date.now() });
       claimed = true;
     };
@@ -294,40 +387,42 @@ export async function claimEntryInFlight(id: string): Promise<boolean> {
 // Non-atomic release helpers — safe to use because the caller already holds
 // the claim (and is the only one mutating it at this point).
 
-async function patchPhotoRecord(id: string, patch: Partial<QueuedPhoto>): Promise<void> {
+async function patchPhotoRecord(id: string, patch: Partial<QueuedPhoto>, expectedOwner?: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(PHOTO_STORE, "readwrite");
     const store = tx.objectStore(PHOTO_STORE);
     const req = store.get(id);
     req.onsuccess = () => {
-      if (req.result) store.put({ ...req.result, ...patch });
+      const item = req.result as QueuedPhoto | undefined;
+      if (item && (!expectedOwner || item.userId === expectedOwner)) store.put({ ...item, ...patch });
     };
     tx.oncomplete = () => { resolve(); notifyQueueChange(); };
     tx.onerror = () => reject(tx.error);
   });
 }
 
-async function patchEntryRecord(id: string, patch: Partial<QueuedEntry>): Promise<void> {
+async function patchEntryRecord(id: string, patch: Partial<QueuedEntry>, expectedOwner?: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ENTRY_STORE, "readwrite");
     const store = tx.objectStore(ENTRY_STORE);
     const req = store.get(id);
     req.onsuccess = () => {
-      if (req.result) store.put({ ...req.result, ...patch });
+      const item = req.result as QueuedEntry | undefined;
+      if (item && (!expectedOwner || item.userId === expectedOwner)) store.put({ ...item, ...patch });
     };
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-export async function clearPhotoInFlight(id: string): Promise<void> {
-  return patchPhotoRecord(id, { inFlight: false });
+export async function clearPhotoInFlight(id: string, expectedOwner?: string): Promise<void> {
+  return patchPhotoRecord(id, { inFlight: false }, expectedOwner);
 }
 
-export async function clearEntryInFlight(id: string): Promise<void> {
-  return patchEntryRecord(id, { inFlight: false });
+export async function clearEntryInFlight(id: string, expectedOwner?: string): Promise<void> {
+  return patchEntryRecord(id, { inFlight: false }, expectedOwner);
 }
 
 // How long a claim is considered "fresh" (i.e. likely still being processed).
@@ -336,12 +431,13 @@ export async function clearEntryInFlight(id: string): Promise<void> {
 // Chosen to be comfortably longer than a realistic single-item submit cycle
 // (upload + record create).  Crashed-page claims expire after this period.
 export const CLAIM_STALENESS_MS = 2 * 60 * 1000; // 2 minutes
+export const CLAIM_FUTURE_SKEW_MS = 30 * 1000;
 
 // Resets inFlight flags ONLY for claims that are demonstrably stale (older
 // than CLAIM_STALENESS_MS or missing a claimedAt timestamp).
 // Call once on app startup so items stranded by a previous page crash are
 // retried, without disturbing active claims from another tab.
-export async function clearStaleInFlight(): Promise<void> {
+export async function clearStaleInFlight(userId: string): Promise<void> {
   const db = await openDB();
   const now = Date.now();
 
@@ -353,8 +449,14 @@ export async function clearStaleInFlight(): Promise<void> {
       let resetAny = false;
       req.onsuccess = () => {
         for (const item of req.result as Array<Record<string, unknown>>) {
+          if (item.userId !== userId) continue;
           if (!item.inFlight) continue;
-          const age = typeof item.claimedAt === "number" ? now - item.claimedAt : Infinity;
+          const claimedAt = item.claimedAt;
+          const validClaimTime =
+            typeof claimedAt === "number"
+            && Number.isFinite(claimedAt)
+            && claimedAt <= now + CLAIM_FUTURE_SKEW_MS;
+          const age = validClaimTime ? now - claimedAt : Infinity;
           if (age >= CLAIM_STALENESS_MS) {
             store.put({ ...item, inFlight: false, claimedAt: undefined });
             resetAny = true;
@@ -375,12 +477,12 @@ export async function clearStaleInFlight(): Promise<void> {
 // restored immediately after a page reload, without having to exhaust retries
 // again.
 
-export async function markEntryPermanentlyFailed(id: string, reason: string): Promise<void> {
-  return patchEntryRecord(id, { permanentlyFailed: true, failureReason: reason });
+export async function markEntryPermanentlyFailed(id: string, reason: string, expectedOwner?: string): Promise<void> {
+  return patchEntryRecord(id, { permanentlyFailed: true, failureReason: reason }, expectedOwner);
 }
 
-export async function clearEntryPermanentlyFailed(id: string): Promise<void> {
-  return patchEntryRecord(id, { permanentlyFailed: false, failureReason: undefined });
+export async function clearEntryPermanentlyFailed(id: string, expectedOwner?: string): Promise<void> {
+  return patchEntryRecord(id, { permanentlyFailed: false, failureReason: undefined }, expectedOwner);
 }
 
 export async function getFailedQueuedEntries(userId?: string): Promise<QueuedEntry[]> {
@@ -389,23 +491,8 @@ export async function getFailedQueuedEntries(userId?: string): Promise<QueuedEnt
 }
 
 export async function clearLegacyQueueItems(): Promise<void> {
-  const db = await openDB();
-
-  const clearStore = (storeName: string) =>
-    new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(storeName, "readwrite");
-      const store = tx.objectStore(storeName);
-      const req = store.getAll();
-      req.onsuccess = () => {
-        for (const item of req.result as Array<{ id: IDBValidKey; userId?: unknown }>) {
-          if (!item.userId) store.delete(item.id);
-        }
-      };
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-
-  await clearStore(PHOTO_STORE);
-  await clearStore(ENTRY_STORE);
-  notifyQueueChange();
+  // Ownerless records cannot be safely attributed to the signed-in account.
+  // Keep them quarantined by strict owner filtering rather than deleting data
+  // that may be recoverable through a future, trustworthy ownership mechanism.
+  await openDB();
 }

@@ -24,7 +24,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos, claimPhotoInFlight, clearPhotoInFlight, ensurePhotoRegistrationKey, persistPhotoUploadedObjectPath, onQueueChange } from "@/lib/offlineQueue";
+import { saveToQueue, removeFromQueue, getQueuedPhotos, clearAllQueuedPhotos, claimPhotoInFlight, clearPhotoInFlight, ensurePhotoRegistrationKey, persistPhotoUploadedObjectPath, onQueueChange, initializeOfflineQueueIdentity } from "@/lib/offlineQueue";
 import { MobileImageFormatError, prepareMobileImage } from "@/lib/prepareMobileImage";
 import SingleEntryMode from "./SingleEntryMode";
 import type { Photo } from "@shared/schema";
@@ -52,7 +52,7 @@ type UploadQueueItem = {
 };
 
 function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, detailParentPhotoId, onDetailCaptured, onBackToFlagged, onClearUndoHistory }: { sessionId: number; photos: Photo[]; initialAisle?: string; initialSection?: string; detailParentPhotoId?: number | null; onDetailCaptured?: () => void; onBackToFlagged?: () => void; onClearUndoHistory?: () => void }) {
-  const { identityId } = useAuth();
+  const { identityId, identityAliases } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -98,10 +98,21 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
   const blobUrlsRef = useRef<Set<string>>(new Set());
   const retryTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const activeUploadAbortRef = useRef<AbortController | null>(null);
+  const activeIdentityRef = useRef(identityId);
   const discardedIdsRef = useRef<Set<string>>(new Set());
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const isReceiving = aisle.trim().toLowerCase() === "receiving";
+
+  useEffect(() => {
+    if (activeIdentityRef.current !== identityId) {
+      activeUploadAbortRef.current?.abort();
+      activeUploadAbortRef.current = null;
+      setUploadQueue([]);
+      processingRef.current = false;
+    }
+    activeIdentityRef.current = identityId;
+  }, [identityId]);
 
   useEffect(() => {
     const savedSize = document.documentElement.style.fontSize;
@@ -169,7 +180,10 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
 
   useEffect(() => {
     let cancelled = false;
-    getQueuedPhotos(sessionId, identityId).then(items => {
+    if (!identityId) return;
+    initializeOfflineQueueIdentity(identityId, identityAliases)
+      .then(() => getQueuedPhotos(sessionId, identityId))
+      .then(items => {
       if (cancelled || items.length === 0) return;
       const restored: UploadQueueItem[] = items.map(item => ({
         queueId: item.id,
@@ -204,7 +218,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
       toast({ title: "Could not restore queued photos", variant: "destructive" });
     });
     return () => { cancelled = true; };
-  }, [sessionId, identityId]);
+  }, [sessionId, identityId, identityAliases, toast]);
 
   useEffect(() => onQueueChange(() => {
     getQueuedPhotos(sessionId, identityId).then(items => {
@@ -251,8 +265,24 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     );
 
     (async () => {
+      const uploadIdentity = identityId;
+      const abortController = new AbortController();
+      activeUploadAbortRef.current = abortController;
+      let claimed = false;
+      const assertIdentityUnchanged = () => {
+        if (
+          !mountedRef.current
+          || abortController.signal.aborted
+          || !uploadIdentity
+          || activeIdentityRef.current !== uploadIdentity
+        ) {
+          throw new DOMException("Authenticated identity changed", "AbortError");
+        }
+      };
       try {
-        const claimed = await claimPhotoInFlight(nextItem.queueId);
+        assertIdentityUnchanged();
+        claimed = await claimPhotoInFlight(nextItem.queueId, uploadIdentity);
+        assertIdentityUnchanged();
         if (!claimed) {
           const persisted = (await getQueuedPhotos(sessionId, identityId))
             .find(item => item.id === nextItem.queueId);
@@ -264,11 +294,9 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           return;
         }
 
-        const abortController = new AbortController();
-        activeUploadAbortRef.current = abortController;
-
         const claimedPhoto = (await getQueuedPhotos(sessionId, identityId))
           .find(item => item.id === nextItem.queueId);
+        assertIdentityUnchanged();
         if (!claimedPhoto) return;
         let uploadedObjectPath = claimedPhoto.uploadedObjectPath;
         let uploadedSize: number | undefined;
@@ -283,12 +311,14 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           }
           uploadedObjectPath = uploadResult.objectPath;
           uploadedSize = uploadResult.metadata?.size;
-          await persistPhotoUploadedObjectPath(nextItem.queueId, uploadResult.objectPath);
+          assertIdentityUnchanged();
+          await persistPhotoUploadedObjectPath(nextItem.queueId, uploadResult.objectPath, uploadIdentity);
           setUploadQueue(prev => prev.map(item =>
             item.queueId === nextItem.queueId ? { ...item, uploadedObjectPath } : item
           ));
         }
         if (!uploadedObjectPath) throw new Error("Uploaded object path is unavailable");
+        assertIdentityUnchanged();
 
         if (discardedIdsRef.current.has(nextItem.queueId)) {
           processingRef.current = false;
@@ -315,6 +345,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         }
         const res = await apiRequest("POST", `/api/sessions/${sessionId}/photos`, photoPayload, { signal: abortController.signal });
         const savedPhoto = await res.json();
+        assertIdentityUnchanged();
 
         if (discardedIdsRef.current.has(nextItem.queueId)) {
           processingRef.current = false;
@@ -324,7 +355,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         if (isDetail) {
           try {
             try {
-              await removeFromQueue(nextItem.queueId);
+              await removeFromQueue(nextItem.queueId, uploadIdentity);
             } catch {
               setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? {
                 ...q,
@@ -348,7 +379,7 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         }
 
         try {
-          await removeFromQueue(nextItem.queueId);
+          await removeFromQueue(nextItem.queueId, uploadIdentity);
         } catch {
           setUploadQueue(prev => prev.map(q => q.queueId === nextItem.queueId ? {
             ...q,
@@ -372,7 +403,9 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
         setUploadQueue(prev => prev.filter(q => q.queueId !== nextItem.queueId));
         queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId.toString(), "photos"] });
       } catch (err) {
-        await clearPhotoInFlight(nextItem.queueId).catch(() => {});
+        if (claimed) {
+          await clearPhotoInFlight(nextItem.queueId, uploadIdentity).catch(() => {});
+        }
         if (err instanceof Error && err.name === "AbortError") {
           return;
         }
@@ -396,6 +429,9 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
           toast({ title: `Photo upload failed after ${MAX_AUTO_RETRIES} attempts — tap to retry`, variant: "destructive" });
         }
       } finally {
+        if (activeUploadAbortRef.current === abortController) {
+          activeUploadAbortRef.current = null;
+        }
         processingRef.current = false;
       }
     })();
@@ -554,6 +590,8 @@ function MobileCaptureView({ sessionId, photos, initialAisle, initialSection, de
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      activeUploadAbortRef.current?.abort();
+      activeUploadAbortRef.current = null;
       blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
       blobUrlsRef.current.clear();
       for (const timer of retryTimersRef.current.values()) clearTimeout(timer);

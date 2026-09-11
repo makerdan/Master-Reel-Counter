@@ -7,7 +7,7 @@ import { clearIdentityScopedBrowserState } from "@/lib/storageKeys";
 export type AuthUserState =
   | { kind: "unauthenticated"; user: null }
   | { kind: "not_provisioned"; user: null }
-  | { kind: "authenticated"; user: User };
+  | { kind: "authenticated"; user: AuthenticatedUser };
 
 class IdentityBridgeError extends Error {
   constructor() {
@@ -15,6 +15,12 @@ class IdentityBridgeError extends Error {
     this.name = "IdentityBridgeError";
   }
 }
+
+export type AuthenticatedUser = User & {
+  identityAliases?: string[];
+};
+
+const NO_IDENTITY_ALIASES: string[] = [];
 
 async function fetchUser(): Promise<AuthUserState> {
   try {
@@ -138,6 +144,7 @@ export function useAuth() {
   // Existing app data uses the local user ID. For Clerk-native users that is
   // Clerk's external ID when present, otherwise its Clerk ID.
   const identityId = localUser?.id ?? clerkUser?.externalId ?? clerkUser?.id;
+  const identityAliases = localUser?.identityAliases ?? NO_IDENTITY_ALIASES;
   const authIdentity = clerkUser?.id ?? null;
   const observedAuthState = [
     authIdentity ?? "",
@@ -165,6 +172,7 @@ export function useAuth() {
   return {
     user: localUser,
     identityId,
+    identityAliases,
     isLoading,
     isAuthenticated: !!localUser,
     isClerkSignedIn: isSignedIn,

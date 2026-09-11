@@ -74,8 +74,8 @@ interface UserSettingsResponse {
 }
 
 export default function SettingsPage() {
-  const { user, identityId, logout } = useAuth();
-  const { pendingCount } = useNetworkStatus(identityId);
+  const { user, identityId, identityAliases, logout } = useAuth();
+  const { pendingCount } = useNetworkStatus(identityId, identityAliases);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
