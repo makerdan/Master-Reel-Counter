@@ -28,7 +28,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: "html",
+  reporter: [["html", { open: "never" }]],
   globalSetup: "./tests/global-setup.ts",
   use: {
     baseURL: BASE_URL,

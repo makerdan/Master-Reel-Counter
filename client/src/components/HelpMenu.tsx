@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { HelpCircle, Camera, MapPin, Flag, Eye, EyeOff, ZoomIn, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Undo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw, HardDrive, Globe, FileSpreadsheet, Clock, Shield, Flame, Activity, Award, Layers, Target, MessageCircle, Reply, Palette, Type, Sliders, Key } from "lucide-react";
+import { HelpCircle, Camera, MapPin, Flag, Eye, EyeOff, ZoomIn, Move, RotateCw, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Download, FileText, Mail, Lock, Undo2, History, Users, Share2, AlertCircle, AlertTriangle, StickyNote, Focus, ArrowUpDown, ArrowUp, ImagePlus, Check, X, Copy, Cable, Folder, FolderPlus, FolderInput, Search, MoreVertical, Settings, LogOut, BarChart3, CheckCircle2, Hash, Ruler, ExternalLink, MessageSquare, Loader2, ScanLine, Grid3X3, ListChecks, Sparkles, SquareCheck, Send, Bot, User, RotateCcw, HardDrive, Globe, FileSpreadsheet, Clock, Shield, Flame, Activity, Award, Layers, Target, MessageCircle, Reply, Palette, Type, Sliders } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -50,7 +50,7 @@ export function HelpOnboarding() {
     setOpen(false);
   };
 
-  if (!user || user.isTestOwner) return null;
+  if (!user) return null;
   return (
     <Dialog modal={false} open={open} onOpenChange={(next) => { if (!next) dismiss(); }}>
       <DialogContent overlayClassName="pointer-events-none" className="max-w-md" data-testid="dialog-help-onboarding">
@@ -211,7 +211,7 @@ export function OverviewHelp() {
   );
 }
 
-export function DashboardSections({ isTester }: { isTester?: boolean }) {
+export function DashboardSections() {
   return (
     <>
       <AccordionItem value="dash-header-bar">
@@ -529,7 +529,7 @@ export function DashboardSections({ isTester }: { isTester?: boolean }) {
           <FeatureRow
             icon={<HelpIcon icon={Shield} />}
             label="Role-Based Metrics"
-            description="Entries, footage, reels, and photos broken down by role (Owner, Editor, Tester, Viewer). Each role has a color-coded bar. Your current roles are highlighted with a ring indicator. Useful for understanding how work is distributed across roles."
+            description="Entries, footage, reels, and photos broken down by collaboration role (Owner, Editor, Viewer). Each role has a color-coded bar. Your current roles are highlighted with a ring indicator. Useful for understanding how work is distributed across roles."
           />
         </AccordionContent>
       </AccordionItem>
@@ -623,13 +623,6 @@ export function DashboardSections({ isTester }: { isTester?: boolean }) {
 
           <Separator className="my-2" />
           <p className="text-[13px] font-semibold text-foreground uppercase tracking-wider mb-1">Security</p>
-          {!isTester && (
-            <FeatureRow
-              icon={<HelpIcon icon={Key} />}
-              label="Tester Password"
-              description="Set up a password for tester login. Testers can sign in using a special URL without needing a Replit account. They receive Editor access to your sessions but cannot lock/unlock, delete sessions, or manage collaborators."
-            />
-          )}
           <FeatureRow
             icon={<HelpIcon icon={Shield} />}
             label="Data Encoding (AES-256)"
@@ -1303,7 +1296,7 @@ export function SessionSections() {
           <FeatureRow
             icon={<span className="text-xs font-bold text-[hsl(18_70%_50%)]">R</span>}
             label="Role-Based Permissions"
-            description="Editors can add, edit, and delete entries and photos. Viewers can only view data. The owner can toggle roles and transfer ownership. Testers who log in via the tester password receive Editor access to the owner's sessions (they cannot lock/unlock, delete sessions, or manage collaborators)."
+            description="Editors can add, edit, and delete entries and photos. Viewers can only view data. Owners can lock sessions and manage collaborators."
           />
           <FeatureRow
             icon={<span className="inline-block w-2 h-2 rounded-full bg-green-500" />}
@@ -1810,8 +1803,6 @@ export function AskAIChat() {
 export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" | "dashboard" }) {
   const [open, setOpen] = useState(false);
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
-
   const title = mode === "dashboard" ? "Dashboard Help" : mode === "mobile" ? "Mobile Flow Help" : "Session Help";
   const description = mode === "dashboard"
     ? "Guide to all dashboard actions and features."
@@ -1857,7 +1848,7 @@ export default function HelpMenu({ mode = "full" }: { mode?: "full" | "mobile" |
               <div className="px-4">
                 <Accordion type="multiple" className="w-full">
                   <OverviewHelp />
-                  {mode === "dashboard" && <DashboardSections isTester={user?.isTester} />}
+                  {mode === "dashboard" && <DashboardSections />}
                   {mode === "full" && <SessionSections />}
                   {mode === "mobile" && <MobileFlowSections />}
                 </Accordion>

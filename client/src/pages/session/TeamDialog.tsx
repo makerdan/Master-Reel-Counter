@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  Users, Copy, Link, Mail, UserPlus, UserMinus, X, Loader2, Clock, ArrowRightLeft, KeyRound,
+  Users, Copy, Link, Mail, UserPlus, UserMinus, X, Loader2, Clock, ArrowRightLeft,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -22,13 +22,12 @@ import {
 } from "@/components/ui/tooltip";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { buildTesterLoginUrl } from "@/lib/testerAccess";
 import type { Collaborator, InviteLink } from "@shared/schema";
 
 type OnlineUser = { userId: string; username: string };
 
 export default function TeamDialog({
-  open, onOpenChange, sessionId, sessionName, isOwner, onlineUsers = [], hasTesterPassword = false,
+  open, onOpenChange, sessionId, sessionName, isOwner, onlineUsers = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,7 +35,6 @@ export default function TeamDialog({
   sessionName: string;
   isOwner: boolean;
   onlineUsers?: OnlineUser[];
-  hasTesterPassword?: boolean;
 }) {
   const { toast } = useToast();
   const [username, setUsername] = useState("");
@@ -232,12 +230,6 @@ export default function TeamDialog({
                 <Mail className="h-3 w-3 mr-1" />
                 Email
               </TabsTrigger>
-              {isOwner && (
-                <TabsTrigger value="testerlink" className="flex-1 border border-white/20" data-testid="tab-tester-link">
-                  <KeyRound className="h-3 w-3 mr-1" />
-                  Tester Link
-                </TabsTrigger>
-              )}
             </TabsList>
 
             <TabsContent value="username" className="space-y-3 mt-3">
@@ -355,35 +347,6 @@ export default function TeamDialog({
               </form>
             </TabsContent>
 
-            {isOwner && (
-              <TabsContent value="testerlink" className="space-y-3 mt-3">
-                <p className="text-xs text-muted-foreground">
-                  Copy this account-specific login link. Send the tester password separately.
-                </p>
-                {!hasTesterPassword ? (
-                  <p className="text-xs text-amber-600 dark:text-amber-400" data-testid="text-no-tester-password-warning">
-                    No tester password is set. Go to Settings to set one first.
-                  </p>
-                ) : (
-                  <div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="[border-color:hsl(var(--input))]"
-                      disabled={!collaboratorsData?.owner.userId}
-                      onClick={() => {
-                        const url = buildTesterLoginUrl(window.location.origin, collaboratorsData!.owner.userId);
-                        copyToClipboard(url);
-                      }}
-                      data-testid="button-copy-tester-link"
-                    >
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copy Tester Link
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
-            )}
           </Tabs>
 
           {collaborators.length > 0 && (

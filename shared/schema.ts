@@ -1,4 +1,4 @@
-export { sessions, users } from "./models/auth";
+export { users } from "./models/auth";
 import { sql } from "drizzle-orm";
 import {
   pgTable,
@@ -242,7 +242,6 @@ export const userSettings = pgTable("user_settings", {
   textSize: varchar("text_size", { length: 20 }).notNull().default("default"),
   timezone: varchar("timezone", { length: 50 }).notNull().default("America/Chicago"),
   customVendorCodes: text("custom_vendor_codes").array().notNull().default(sql`'{}'::text[]`),
-  testerPassword: text("tester_password"),
   helpGuideVersion: integer("help_guide_version").notNull().default(0),
   helpGuideCompletedAt: timestamp("help_guide_completed_at"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

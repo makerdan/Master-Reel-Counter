@@ -319,11 +319,6 @@ export default function Landing({ signInHref = `${basePath}/sign-in` }: { signIn
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </a>
-              <a href={`${basePath}/tester-login`}>
-                <Button size="lg" variant="outline" data-testid="button-tester-login" className="border-amber-500/40 text-amber-100 backdrop-blur-sm bg-white/5 h-12 px-8 text-base">
-                  Tester Login
-                </Button>
-              </a>
             </div>
 
             <div className="flex items-center justify-center gap-8 flex-wrap pt-6 text-sm text-amber-200/50">

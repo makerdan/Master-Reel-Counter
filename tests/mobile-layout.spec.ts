@@ -32,10 +32,12 @@ test.describe("mobile layout parity @mobile", () => {
     cleanupIds.push(sess.id);
 
     await page.goto(`/session/${sess.id}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
     const mobileHeader = page.locator('[data-testid="header-mobile-flow"]');
+    const mobileToggle = page.locator('[data-testid="button-toggle-mobile"]');
+    await expect(mobileToggle).toBeVisible();
     if (!(await mobileHeader.isVisible().catch(() => false))) {
-      await page.locator('[data-testid="button-toggle-mobile"]').click();
+      await mobileToggle.click();
     }
     await expect(mobileHeader).toBeVisible();
 
@@ -119,7 +121,7 @@ test.describe("mobile layout parity @mobile", () => {
     cleanupIds.push(sess.id);
 
     await page.goto(`/session/${sess.id}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     const currentUserId = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", { credentials: "same-origin" });
@@ -217,7 +219,7 @@ test.describe("mobile layout parity @mobile", () => {
     });
 
     await page.goto(`/session/${sess.id}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Wait until the app has created at least one WebSocket (tracked by PatchedWS)
     await page.waitForFunction(() => {

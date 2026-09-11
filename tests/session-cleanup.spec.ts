@@ -37,11 +37,12 @@ test.describe("session state cleanup @session-cleanup", () => {
     ];
 
     await page.goto(`/session/${sid}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Plant scanner + undo/redo keys to simulate a prior session
     await page.evaluate((keys) => {
-      const [, zoomKey, selectKey, resultsKey, undoKey, redoKey] = keys;
+      const [tabKey, zoomKey, selectKey, resultsKey, undoKey, redoKey] = keys;
+      localStorage.setItem(tabKey, "entries");
       localStorage.setItem(zoomKey, JSON.stringify({ "1": 0.12 }));
       localStorage.setItem(selectKey, JSON.stringify({ "1": true }));
       localStorage.setItem(resultsKey, JSON.stringify([{ pinId: 1, rawText: "TEST" }]));
@@ -55,7 +56,7 @@ test.describe("session state cleanup @session-cleanup", () => {
     }
 
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     const menuBtn = page.locator(`[data-testid="button-session-menu-${sid}"]`);
     await expect(menuBtn).toBeVisible({ timeout: 10_000 });
@@ -99,7 +100,7 @@ test.describe("session state cleanup @session-cleanup", () => {
     const tabKey = `session-tab-${sid}`;
 
     await page.goto(`/session/${sid}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Plant all keys
     await page.evaluate(([tk, ...rk]) => {
@@ -118,7 +119,7 @@ test.describe("session state cleanup @session-cleanup", () => {
     }
 
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     const menuBtn = page.locator(`[data-testid="button-session-menu-${sid}"]`);
     await expect(menuBtn).toBeVisible({ timeout: 10_000 });

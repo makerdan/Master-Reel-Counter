@@ -7,7 +7,7 @@ const ownerUser = {
   lastName: "Account",
   approved: true,
   rejected: false,
-  isTester: false,
+  role: "Admin",
 };
 
 async function fulfillJson(
@@ -28,7 +28,7 @@ async function mockOwnerAuth(page: import("@playwright/test").Page): Promise<voi
     const body = await response.json();
     await route.fulfill({
       response,
-      body: JSON.stringify({ ...body, isOwner: true }),
+      body: JSON.stringify({ ...body, role: "Admin" }),
     });
   });
 }
@@ -49,7 +49,7 @@ test.describe("owner account-management loading", () => {
 
     await page.goto("/settings#admin");
     await expect(page.getByTestId("tab-trigger-admin")).toBeVisible();
-    await expect(page.getByText("Loading users...")).toBeVisible();
+    await expect(page.getByTestId("admin-users-loading")).toBeVisible();
     await expect(page.getByTestId("admin-users-error")).toBeVisible();
     await expect(page.getByText("Check your connection and try again.")).toBeVisible();
 
@@ -91,7 +91,13 @@ test("keeps block-list confirmation accurate when its count request fails", asyn
     await fulfillJson(route, { count: 2 });
   });
 
+  const initialCountFailure = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/admin/rejected-users/count") &&
+      response.status() === 503,
+  );
   await page.goto("/settings#admin");
+  await initialCountFailure;
   await expect(page.getByTestId("rejected-count-error")).toBeVisible();
   await expect(page.getByTestId("button-clear-rejected")).toBeDisabled();
 

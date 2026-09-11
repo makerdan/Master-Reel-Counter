@@ -125,6 +125,5 @@ defaultBucketID = "replit-objstore-4e5979e6-bf5f-4c8c-9726-3bbe98fce901"
 
 [userenv]
 
-[userenv.shared]
-ADMIN_USER_ID = "52270193"
-VITE_ADMIN_USER_ID = "52270193"
+[userenv.development]
+VITE_CLERK_PUBLIC_HOST = "dynamic-crab-27.clerk.accounts.dev"

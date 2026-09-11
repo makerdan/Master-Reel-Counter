@@ -288,7 +288,6 @@ export interface IStorage {
   getRoleComparisonStats(userId: string): Promise<{
     Owner: { entries: number; footage: number; reels: number; photos: number };
     Editor: { entries: number; footage: number; reels: number; photos: number };
-    Tester: { entries: number; footage: number; reels: number; photos: number };
     Viewer: { entries: number; footage: number; reels: number; photos: number };
     currentUserRoles: string[];
   }>;
@@ -2348,14 +2347,12 @@ export class DatabaseStorage implements IStorage {
   async getRoleComparisonStats(userId: string): Promise<{
     Owner: { entries: number; footage: number; reels: number; photos: number };
     Editor: { entries: number; footage: number; reels: number; photos: number };
-    Tester: { entries: number; footage: number; reels: number; photos: number };
     Viewer: { entries: number; footage: number; reels: number; photos: number };
     currentUserRoles: string[];
   }> {
     const emptyResult = {
       Owner: { entries: 0, footage: 0, reels: 0, photos: 0 },
       Editor: { entries: 0, footage: 0, reels: 0, photos: 0 },
-      Tester: { entries: 0, footage: 0, reels: 0, photos: 0 },
       Viewer: { entries: 0, footage: 0, reels: 0, photos: 0 },
       currentUserRoles: [] as string[],
     };
@@ -2395,10 +2392,9 @@ export class DatabaseStorage implements IStorage {
       collabRoleMap.set(`${c.sessionId}:${c.odUserId}`, c.role);
     }
 
-    const determineRole = (contributorUserId: string, sessionId: number): "Owner" | "Editor" | "Tester" | "Viewer" => {
+    const determineRole = (contributorUserId: string, sessionId: number): "Owner" | "Editor" | "Viewer" => {
       const session = allSessionMap.get(sessionId);
       if (session && contributorUserId === session.ownerId) return "Owner";
-      if (contributorUserId.startsWith("tester-")) return "Tester";
       const collabRole = collabRoleMap.get(`${sessionId}:${contributorUserId}`);
       if (collabRole === "viewer") return "Viewer";
       return "Editor";
@@ -2412,7 +2408,6 @@ export class DatabaseStorage implements IStorage {
     const result = {
       Owner: { entries: 0, footage: 0, reels: 0, photos: 0 },
       Editor: { entries: 0, footage: 0, reels: 0, photos: 0 },
-      Tester: { entries: 0, footage: 0, reels: 0, photos: 0 },
       Viewer: { entries: 0, footage: 0, reels: 0, photos: 0 },
       currentUserRoles: Array.from(currentUserRolesSet),
     };

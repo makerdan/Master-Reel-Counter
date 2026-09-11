@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.describe("support help", () => {
   test("searchable help guide is available without hover-only controls", async ({ page }) => {

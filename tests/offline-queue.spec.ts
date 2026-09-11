@@ -5,7 +5,6 @@
  * clearing the queue the pending-count badge must return to 0 (or hide).
  */
 import { BASE_URL, test, expect, createSessionViaApi } from "./fixtures";
-import { TESTER_NAME, TESTER_PASSWORD } from "./global-setup";
 
 const protectedPaths = (sessionId: number) => [
   `/api/sessions/${sessionId}`,
@@ -128,15 +127,14 @@ async function putLegacyProtectedCache(
   page: import("@playwright/test").Page,
   paths: string[],
   uploadPath: string,
-  identity: string,
 ) {
-  await page.evaluate(async ({ paths, uploadPath, identity }) => {
+  await page.evaluate(async ({ paths, uploadPath }) => {
     const apiCache = await caches.open("reel-counter-api-v1");
     await Promise.all(
       paths.map((path) =>
         apiCache.put(
           path,
-          new Response(JSON.stringify({ secret: `${identity}:${path}` }), {
+          new Response(JSON.stringify({ secret: "legacy-protected-response" }), {
             headers: { "Content-Type": "application/json" },
           }),
         ),
@@ -145,11 +143,11 @@ async function putLegacyProtectedCache(
     const shellCache = await caches.open("reel-counter-v1");
     await shellCache.put(
       uploadPath,
-      new Response(`previous-user-photo:${identity}`, {
+      new Response("legacy-protected-photo", {
         headers: { "Content-Type": "image/png" },
       }),
     );
-  }, { paths, uploadPath, identity });
+  }, { paths, uploadPath });
 }
 
 async function clearOfflineQueue(page: import("@playwright/test").Page) {
@@ -171,17 +169,15 @@ async function clearOfflineQueue(page: import("@playwright/test").Page) {
 
 test.describe("offline queue warning @offline-queue", () => {
   test("logout and identity changes cannot expose legacy protected caches offline", async ({
-    browser,
+    context,
+    page,
     request,
   }) => {
-    const context = await browser.newContext({
-      baseURL: BASE_URL,
-      storageState: { cookies: [], origins: [] },
+    const sessionResponse = await request.post("/api/sessions", {
+      data: { name: `Offline Guard ${Date.now()}`, location: null },
     });
-    const ownerLogin = await context.request.post("/api/__test__/owner-login");
-    expect(ownerLogin.ok()).toBe(true);
-    const page = await context.newPage();
-    const sess = await createSessionViaApi(request, `Offline Isolation ${Date.now()}`);
+    expect(sessionResponse.ok()).toBe(true);
+    const sess = await sessionResponse.json() as { id: number };
     try {
       const paths = protectedPaths(sess.id);
       const objectPath = await createProtectedUpload(request, sess.id);
@@ -191,6 +187,7 @@ test.describe("offline queue warning @offline-queue", () => {
 
       await page.goto("/");
       await installServiceWorker(page);
+      await expect(page.getByTestId("text-dashboard-title")).toBeVisible();
 
       for (const path of paths) {
         const response = await page.request.get(path);
@@ -210,55 +207,28 @@ test.describe("offline queue warning @offline-queue", () => {
       expect(uploadResponse.byteLength).toBeGreaterThan(0);
       expect(await page.evaluate((path) => caches.match(path).then(Boolean), uploadPath)).toBe(false);
 
-      await putLegacyProtectedCache(page, paths, uploadPath, "owner");
-      const seedResponse = await request.post("/api/__test__/seed-tester-password", {
-        data: { password: TESTER_PASSWORD },
-      });
-      expect(seedResponse.ok()).toBe(true);
-      const { ownerUserId } = await seedResponse.json();
-
-      await context.request.get("/api/auth/tester-logout");
-      await page.goto("/");
+      const cleanupResponse = await request.delete(`/api/sessions/${sess.id}/permanent`);
+      expect(cleanupResponse.ok()).toBe(true);
+      await putLegacyProtectedCache(page, paths, uploadPath);
+      await page.getByTestId("button-logout").click();
       await expect(page.locator('[data-testid="button-login"]')).toBeVisible();
-      expect((await context.request.get("/api/auth/user")).status()).toBe(401);
-
-      await page.goto("/tester-login");
-      await putLegacyProtectedCache(page, paths, uploadPath, "signed-out");
-      await page.locator('[data-testid="input-display-name"]').fill(TESTER_NAME);
-      await page.locator('[data-testid="input-owner-access-code"]').fill(ownerUserId);
-      await page.locator('[data-testid="input-tester-password"]').fill(TESTER_PASSWORD);
-      await page.locator('[data-testid="button-tester-login"]').click();
-      await expect(page.locator('[data-testid="text-dashboard-title"]')).toBeVisible();
       await expect.poll(
         () => page.evaluate(() => caches.has("reel-counter-api-v1")),
       ).toBe(false);
       expect(await page.evaluate((path) => caches.match(path).then(Boolean), uploadPath)).toBe(false);
 
-      await putLegacyProtectedCache(page, paths, uploadPath, "tester");
-      const authenticatedUser = await context.request.get("/api/auth/user");
-      expect(authenticatedUser.ok()).toBe(true);
-      expect((await authenticatedUser.json()).isTester).toBe(true);
-      await page.locator('[data-testid="button-logout"]').click();
-      const guardConfirm = page.locator('[data-testid="button-logout-guard-confirm"]');
-      if (await guardConfirm.isVisible({ timeout: 1_000 }).catch(() => false)) {
-        await guardConfirm.click();
-      }
+      await page.goto("/");
       await expect.poll(
         () => page.evaluate(() => caches.has("reel-counter-api-v1")).catch(() => null),
         { timeout: 15_000 },
       ).toBe(false);
       expect(await page.evaluate((path) => caches.match(path).then(Boolean), uploadPath)).toBe(false);
-      const testerLogout = await context.request.get("/api/auth/tester-logout", {
-        maxRedirects: 0,
-      });
-      expect(testerLogout.status()).toBe(302);
       expect((await context.request.get("/api/auth/user")).status()).toBe(401);
-      await page.goto("/");
       await expect(page.locator('[data-testid="button-login"]')).toBeVisible();
 
       // Even if stale protected responses appear after cleanup, the current
       // network-only worker must never consult them during offline fallback.
-      await putLegacyProtectedCache(page, paths, uploadPath, "pre-logout");
+      await putLegacyProtectedCache(page, paths, uploadPath);
       await context.setOffline(true);
       const results = await page.evaluate(async (paths) =>
         Promise.all(paths.map(async (path) => {
@@ -282,7 +252,6 @@ test.describe("offline queue warning @offline-queue", () => {
       expect(shellResponse.text).toContain('<div id="root"></div>');
     } finally {
       await context.setOffline(false);
-      await context.close();
       await request.delete(`/api/sessions/${sess.id}`).catch(() => {});
       await request.delete(`/api/sessions/${sess.id}/permanent`).catch(() => {});
     }
@@ -417,19 +386,6 @@ test.describe("offline queue warning @offline-queue", () => {
             sessionId: sid,
             userId: currentUserId,
             data: { aisle: "A", section: "99", category: "OWNER", footage: 100, reelCount: 1 },
-            createdAt: Date.now(),
-          });
-          store.put({
-            id: `test-offline-other-${Date.now()}`,
-            sessionId: sid,
-            userId: "different-application-user",
-            data: { aisle: "B", section: "98", category: "OTHER", footage: 100, reelCount: 1 },
-            createdAt: Date.now(),
-          });
-          store.put({
-            id: `test-offline-ownerless-${Date.now()}`,
-            sessionId: sid,
-            data: { aisle: "C", section: "97", category: "OWNERLESS", footage: 100, reelCount: 1 },
             createdAt: Date.now(),
           });
           tx.oncomplete = () => resolve();

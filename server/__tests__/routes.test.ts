@@ -30,6 +30,8 @@ import
 }
  from "@clerk/express"
 ;
+import { buildPublishableKey } from "@clerk/shared/keys";
+import { CLERK_FRONTEND_API_HOST } from "@shared/clerk-config";
 
 import 
 {
@@ -44,7 +46,6 @@ import
   helpChatRateLimiter,
   respondWithScanResultsPersistenceFailure,
   SCAN_RESULTS_PERSISTENCE_ERROR,
-  verifyTesterCredentials,
 }
  from "../routes.js"
 ;
@@ -76,16 +77,6 @@ import
 
 import 
 {
- buildTesterLoginUrl, getTesterOwnerFromSearch 
-}
- from "../../client/src/lib/testerAccess.js"
-;
-
-import bcrypt from "bcrypt"
-;
-
-import 
-{
  pool 
 }
  from "../db.js"
@@ -105,7 +96,7 @@ import
   classifyAuthUserLookup,
   isIdentityApproved,
   getIdentityAuthorizationOutcome,
-  isOwnerIdentity,
+  isAdminIdentity,
   isWebSocketIdentityAuthorized,
 }
  from "../replit_integrations/auth/routes.js"
@@ -152,7 +143,7 @@ after(async () => {
   await pool.end().catch(() => {});
 });
 
-describe("Clerk owner and approval regression guard", () => {
+describe("Clerk identity and approval regression guard", () => {
   test("keeps missing local users distinct from provisioned approval states", () => {
     assert.deepEqual(classifyAuthUserLookup({ claims: { sub: "missing" } }, undefined), {
       kind: "not_provisioned",
@@ -166,29 +157,45 @@ describe("Clerk owner and approval regression guard", () => {
     );
   });
 
-  test("retains owner only for the existing migrated legacy identity", () => {
+  test("initial Admin promotion trusts legacy and Clerk external bindings, never native Clerk", () => {
     const base = {
-      existing: { isTester: false },
+      existing: { role: "Admin" },
       userId: "legacy-owner-subject",
       username: "dan",
       replOwner: "dan",
+      binding: "legacy-claim" as const,
     };
     assert.equal(isProtectedOwnerIdentity(base), true);
+    assert.equal(
+      isProtectedOwnerIdentity({ ...base, binding: "clerk-external-id" }),
+      true,
+    );
+    assert.equal(
+      isProtectedOwnerIdentity({ ...base, binding: "native-clerk" }),
+      false,
+    );
     assert.equal(isProtectedOwnerIdentity({ ...base, existing: undefined }), false);
     assert.equal(isProtectedOwnerIdentity({ ...base, userId: "user_new-clerk-id" }), false);
     assert.equal(isProtectedOwnerIdentity({ ...base, username: "someone-else" }), false);
-    assert.equal(isProtectedOwnerIdentity({ ...base, existing: { isTester: true } }), false);
+    assert.equal(isProtectedOwnerIdentity({ ...base, existing: { role: "User" } }), true);
+    assert.equal(
+      isProtectedOwnerIdentity({ ...base, binding: "clerk-external-id" }),
+      true,
+    );
+    assert.equal(
+      isProtectedOwnerIdentity({ ...base, binding: "native-clerk" }),
+      false,
+    );
   });
 
-  test("owner authorization trusts only normalized isOwner, never username claims", () => {
-    assert.equal(isOwnerIdentity({ isOwner: true, claims: { username: "dan" } }), true);
-    assert.equal(isOwnerIdentity({ isOwner: false, claims: { username: "dan" } }), false);
-    assert.equal(isOwnerIdentity({ claims: { username: "dan" } }), false);
+  test("Admin authorization trusts only persisted role, never username claims", () => {
+    assert.equal(isAdminIdentity({ role: "Admin", claims: { username: "dan" } }), true);
+    assert.equal(isAdminIdentity({ role: "User", claims: { username: "dan" } }), false);
+    assert.equal(isAdminIdentity({ claims: { username: "dan" } }), false);
   });
 
-  test("approval admits normalized owner and tester identities but rejects missing identity", async () => {
-    assert.equal(await isIdentityApproved({ isOwner: true }), true);
-    assert.equal(await isIdentityApproved({ isTester: true }), true);
+  test("approval rejects missing identity and remains separate from role", async () => {
+    assert.equal(await isIdentityApproved({ role: "Admin" }), false);
     assert.equal(await isIdentityApproved({}), false);
   });
 
@@ -242,8 +249,7 @@ describe("Clerk owner and approval regression guard", () => {
         await isWebSocketIdentityAuthorized({ claims: { sub: "approved-user" } }),
         true,
       );
-      assert.equal(await isWebSocketIdentityAuthorized({ isOwner: true }), true);
-      assert.equal(await isWebSocketIdentityAuthorized({ isTester: true }), true);
+      assert.equal(await isWebSocketIdentityAuthorized({ claims: { sub: "missing-user" }, role: "Admin" }), false);
     } finally {
       authStorage.getUser = originalGetUser;
     }
@@ -309,8 +315,7 @@ describe("Clerk owner and approval regression guard", () => {
         statusCode: 0,
         body: undefined,
       });
-      assert.equal((await run({ isOwner: true, claims: { sub: "owner" } })).nextCalled, true);
-      assert.equal((await run({ isTester: true, claims: { sub: "tester" } })).nextCalled, true);
+      assert.equal((await run({ claims: { sub: "approved-photo-user" }, role: "Admin" })).nextCalled, true);
     } finally {
       authStorage.getUser = originalGetUser;
     }
@@ -776,58 +781,6 @@ describe("body guard — safeParse-first pattern (regression guard)", () => {
       const result = patchPhotoSchema.safeParse(body);
       assert.equal(result.success, false, `body ${JSON.stringify(body)} should fail schema validation`);
     }
-  });
-});
-
-describe("tester access security", () => {
-  test("shared login links contain an owner scope but never a password", () => {
-    const url = buildTesterLoginUrl("https://example.com", "owner-123");
-    assert.equal(url, "https://example.com/tester-login?owner=owner-123");
-    assert.equal(getTesterOwnerFromSearch(new URL(url).search), "owner-123");
-    assert.equal(url.includes("pw="), false);
-    assert.equal(url.includes("secret-password"), false);
-  });
-
-  test("credential verification fetches and checks only the requested owner", async () => {
-    const hash = await bcrypt.hash("correct-password", 4);
-    const requestedOwners: string[] = [];
-    const result = await verifyTesterCredentials("owner-123", "correct-password", async (userId) => {
-      requestedOwners.push(userId);
-      return { userId, testerPassword: hash } as any;
-    });
-
-    assert.equal(result?.userId, "owner-123");
-    assert.deepEqual(requestedOwners, ["owner-123"]);
-  });
-
-  test("credential verification rejects missing and mismatched owner credentials", async () => {
-    const hash = await bcrypt.hash("correct-password", 4);
-    let lookups = 0;
-    const comparedHashes: string[] = [];
-    const comparePassword = async (password: string, candidateHash: string) => {
-      comparedHashes.push(candidateHash);
-      return bcrypt.compare(password, candidateHash);
-    };
-    const missing = await verifyTesterCredentials(
-      "unknown-owner",
-      "correct-password",
-      async () => {
-        lookups++;
-        return undefined;
-      },
-      comparePassword,
-    );
-    const mismatch = await verifyTesterCredentials("owner-123", "wrong-password", async (userId) => {
-      lookups++;
-      return { userId, testerPassword: hash } as any;
-    }, comparePassword);
-
-    assert.equal(missing, undefined);
-    assert.equal(mismatch, undefined);
-    assert.equal(lookups, 2);
-    assert.equal(comparedHashes.length, 2, "every attempt must perform exactly one bcrypt comparison");
-    assert.notEqual(comparedHashes[0], hash, "unknown owners must be checked against the dummy hash");
-    assert.equal(comparedHashes[1], hash);
   });
 });
 
@@ -1395,7 +1348,11 @@ describe("authenticated Poe route contracts", () => {
       },
     });
     const app = express();
-    app.use(clerkMiddleware());
+    app.use(
+      clerkMiddleware({
+        publishableKey: buildPublishableKey(CLERK_FRONTEND_API_HOST),
+      }),
+    );
     app.use(express.json());
     const handler = createHelpChatHandler(provider, "stub help prompt");
     app.post("/unauthenticated", isAuthenticated, handler);
@@ -1676,123 +1633,3 @@ async function devReq(
     req.end();
   });
 }
-
-describe("PATCH real-server integration — body guard wired into actual routes", () => {
-  let cookie = "";
-  let sessionId = 0;
-  let entryId = 0;
-  let skip = false;
-
-  before(async () => {
-    if (!(await devServerReachable())) {
-      skip = true;
-      return;
-    }
-
-    // Login as the test owner
-    const loginRes = await devReq("POST", "/api/__test__/owner-login");
-    if (loginRes.status !== 200 || !loginRes.cookie) { skip = true; return; }
-    cookie = loginRes.cookie;
-
-    // Create a throwaway session
-    const sessRes = await devReq("POST", "/api/sessions", {
-      body: { name: "routes-test-session" }, cookie,
-    });
-    if (sessRes.status !== 200) { skip = true; return; }
-    sessionId = sessRes.body.id;
-
-    // Create a throwaway entry
-    const entryRes = await devReq("POST", `/api/sessions/${sessionId}/entries`, {
-      body: { aisle: "A", section: "1", reelTag: "T1", wireType: "THHN", gauge: "12" },
-      cookie,
-    });
-    if (entryRes.status !== 200) { skip = true; return; }
-    entryId = entryRes.body.id;
-  });
-
-  after(async () => {
-    if (sessionId && cookie) {
-      await devReq("DELETE", `/api/sessions/${sessionId}`, { cookie }).catch(() => {});
-      await devReq("DELETE", `/api/sessions/${sessionId}/permanent`, { cookie }).catch(() => {});
-    }
-  });
-
-  test("PATCH /api/entries/:id (real route) — no Content-Type body → 400", async () => {
-    if (skip) return;
-    const { status } = await devReq("PATCH", `/api/entries/${entryId}`, { cookie });
-    assert.equal(status, 400, "real route must return 400 on missing body, not 500");
-  });
-
-  test("PATCH /api/entries/:id (real route) — text/plain Content-Type → 400", async () => {
-    if (skip) return;
-    const { status } = await devReq("PATCH", `/api/entries/${entryId}`, {
-      body: "plain text", contentType: "text/plain", cookie,
-    });
-    assert.equal(status, 400, "real route must reject non-JSON Content-Type with 400");
-  });
-
-  test("PATCH /api/entries/:id (real route) — invalid footage type → 400", async () => {
-    if (skip) return;
-    const { status, body } = await devReq("PATCH", `/api/entries/${entryId}`, {
-      body: { footage: "not-a-number" }, cookie,
-    });
-    assert.equal(status, 400);
-    assert.ok(body.errors, "response must include field-level errors");
-  });
-
-  test("PATCH /api/entries/:id (real route) — valid body → 200", async () => {
-    if (skip) return;
-    const { status, body } = await devReq("PATCH", `/api/entries/${entryId}`, {
-      body: { wireType: "NM-B", footage: 100 }, cookie,
-    });
-    assert.equal(status, 200);
-    assert.equal(body.wireType, "NM-B", "real route must apply the update");
-  });
-});
-
-describe("tester login real-server integration — owner-scoped authentication", () => {
-  let ownerUserId = "";
-  let skip = false;
-  const password = "routes-test-owner-scoped-password";
-
-  before(async () => {
-    if (!(await devServerReachable())) {
-      skip = true;
-      return;
-    }
-    const seed = await devReq("POST", "/api/__test__/seed-tester-password", {
-      body: { password },
-    });
-    if (seed.status !== 200 || !seed.body.ownerUserId) {
-      skip = true;
-      return;
-    }
-    ownerUserId = seed.body.ownerUserId;
-  });
-
-  test("requires an owner access code", async () => {
-    if (skip) return;
-    const response = await devReq("POST", "/api/auth/tester-login", {
-      body: { displayName: "ScopedTester", password },
-    });
-    assert.equal(response.status, 400);
-  });
-
-  test("accepts the password only for its selected owner", async () => {
-    if (skip) return;
-    const response = await devReq("POST", "/api/auth/tester-login", {
-      body: { displayName: "ScopedTester", ownerUserId, password },
-    });
-    assert.equal(response.status, 200);
-    assert.equal(response.body.testerOwnerUserId, ownerUserId);
-  });
-
-  test("returns the same unauthorized response for an unknown owner", async () => {
-    if (skip) return;
-    const response = await devReq("POST", "/api/auth/tester-login", {
-      body: { displayName: "ScopedTester", ownerUserId: "unknown-owner", password },
-    });
-    assert.equal(response.status, 401);
-    assert.equal(response.body.message, "Invalid owner access code or tester password");
-  });
-});

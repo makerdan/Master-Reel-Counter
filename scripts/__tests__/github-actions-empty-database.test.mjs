@@ -16,7 +16,6 @@ const root = resolve(import.meta.dirname, "../..");
 const EXPECTED_DATABASE = "master_reel_counter_test";
 const TEST_OWNER_ID = "github-actions-owner";
 const TEST_OWNER_EMAIL = "github-actions-owner@example.invalid";
-const TEST_PASSWORD = "github-actions-tester-password";
 
 function quoteIdentifier(identifier) {
   return `"${identifier.replaceAll('"', '""')}"`;
@@ -188,7 +187,6 @@ test("GitHub Actions boots the app against a blank disposable database", async (
       NODE_ENV: "test",
       DATABASE_URL: disposableUrl,
       SESSION_SECRET: "github-actions-test-session-secret-not-production",
-      TEST_TESTER_PASSWORD: TEST_PASSWORD,
       REPL_ID: "github-actions-validation",
       AI_INTEGRATIONS_OPENAI_API_KEY: "test-only-unavailable",
       AI_INTEGRATIONS_OPENAI_BASE_URL: "http://127.0.0.1:9",
@@ -207,10 +205,10 @@ test("GitHub Actions boots the app against a blank disposable database", async (
     const ownerPool = new Pool({ connectionString: disposableUrl, max: 1 });
     try {
       await ownerPool.query(`
-        INSERT INTO users (id, email, first_name, approved, rejected, is_tester)
-        VALUES ($1, $2, 'GitHub Actions Owner', true, false, false)
+        INSERT INTO users (id, email, first_name, approved, rejected, role)
+        VALUES ($1, $2, 'GitHub Actions Owner', true, false, 'Admin')
         ON CONFLICT (id) DO UPDATE
-          SET approved = true, rejected = false, is_tester = false;
+          SET approved = true, rejected = false, role = 'Admin';
       `, [TEST_OWNER_ID, TEST_OWNER_EMAIL]);
     } finally {
       await ownerPool.end();
@@ -230,22 +228,8 @@ test("GitHub Actions boots the app against a blank disposable database", async (
     const baseUrl = new URL(healthUrl);
     baseUrl.pathname = "/";
 
-    const seedResponse = await fetch(new URL("/api/__test__/seed-tester-password", baseUrl), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: TEST_PASSWORD }),
-    });
-    assert.equal(seedResponse.status, 200, `test-password seeding failed: ${await seedResponse.text()}`);
-    const seedBody = await seedResponse.json();
-    assert.deepEqual(seedBody, { ok: true, ownerUserId: TEST_OWNER_ID });
-
-    const loginResponse = await fetch(new URL("/api/__test__/owner-login", baseUrl), {
-      method: "POST",
-    });
-    assert.equal(loginResponse.status, 200, `test-owner login failed: ${await loginResponse.text()}`);
-    const loginBody = await loginResponse.json();
-    assert.deepEqual(loginBody, { ok: true, userId: TEST_OWNER_ID });
-    assert.match(loginResponse.headers.get("set-cookie") ?? "", /connect\.sid=/);
+    const healthResponse = await fetch(new URL("/api/healthz", baseUrl));
+    assert.equal(healthResponse.status, 200);
   } catch (error) {
     primaryError = error;
   } finally {

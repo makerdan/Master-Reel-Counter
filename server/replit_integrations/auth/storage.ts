@@ -1,6 +1,6 @@
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 import { db } from "../../db";
-import { eq, ne, count } from "drizzle-orm";
+import { eq, ne, count, sql } from "drizzle-orm";
 
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -12,6 +12,8 @@ export interface IAuthStorage {
   setUserApproved(id: string, approved: boolean): Promise<User>;
   rejectUser(id: string): Promise<User>;
   clearAllRejected(): Promise<string[]>;
+  ensureInitialAdmin(id: string): Promise<User | undefined>;
+  canRemoveAdmin(id: string): Promise<boolean>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -85,6 +87,36 @@ class AuthStorage implements IAuthStorage {
       .where(eq(users.rejected, true))
       .returning({ id: users.id });
     return updatedUsers.map((user) => user.id);
+  }
+
+  async ensureInitialAdmin(id: string): Promise<User | undefined> {
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('master-reel-counter-initial-admin'))`);
+      const [adminCount] = await tx
+        .select({ value: count() })
+        .from(users)
+        .where(eq(users.role, "Admin"));
+      if ((adminCount?.value ?? 0) > 0) {
+        const [existing] = await tx.select().from(users).where(eq(users.id, id));
+        return existing;
+      }
+      const [promoted] = await tx
+        .update(users)
+        .set({ role: "Admin", approved: true, rejected: false, updatedAt: new Date() })
+        .where(eq(users.id, id))
+        .returning();
+      return promoted;
+    });
+  }
+
+  async canRemoveAdmin(id: string): Promise<boolean> {
+    const user = await this.getUser(id);
+    if (user?.role !== "Admin") return true;
+    const [adminCount] = await db
+      .select({ value: count() })
+      .from(users)
+      .where(eq(users.role, "Admin"));
+    return (adminCount?.value ?? 0) > 1;
   }
 }
 

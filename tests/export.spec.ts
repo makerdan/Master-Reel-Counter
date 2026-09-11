@@ -31,7 +31,7 @@ test.describe("export checks @export", () => {
     await createEntryViaApi(request, sess.id);
 
     await page.goto(`/session/${sess.id}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Guard: skip if the export button is not present in this build
     const exportBtn = page.locator('[data-testid="button-export"]');
@@ -89,7 +89,7 @@ test.describe("export checks @export", () => {
     await createEntryViaApi(request, sess.id);
 
     await page.goto(`/session/${sess.id}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     // Guard: skip if the export button is not present in this build
     const exportBtn = page.locator('[data-testid="button-export"]');

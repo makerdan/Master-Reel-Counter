@@ -27,7 +27,7 @@ test.describe("folder auto-expand @folder-expand", () => {
 
     try {
       await page.goto("/");
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("domcontentloaded");
 
       // Open session context menu
       const menuBtn = page.locator(
@@ -63,7 +63,7 @@ test.describe("folder auto-expand @folder-expand", () => {
       await createMoveBtn.click();
 
       // Wait for the mutation to complete and the UI to update
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("domcontentloaded");
 
       // Find the newly created folder's header in the DOM
       const folderHeader = page
@@ -112,7 +112,7 @@ test.describe("folder auto-expand @folder-expand", () => {
 
     try {
       await page.goto("/");
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("domcontentloaded");
 
       // Collapse the folder first (it should be collapsed if empty)
       const toggleBtn = page.locator(
@@ -153,7 +153,7 @@ test.describe("folder auto-expand @folder-expand", () => {
       await expect(moveFolderItem).toBeVisible({ timeout: 5_000 });
       await moveFolderItem.click();
 
-      await page.waitForLoadState("networkidle");
+      await page.waitForLoadState("domcontentloaded");
 
       // The session must be visible inside the target folder (i.e., folder is expanded)
       const sessionCard = page.locator(

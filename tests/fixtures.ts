@@ -4,6 +4,11 @@ import {
   type APIRequestContext,
 } from "@playwright/test";
 import sharp from "sharp";
+import {
+  clerk as clerkTesting,
+  setupClerkTestingToken,
+} from "@clerk/testing/playwright";
+import { parsePublishableKey } from "@clerk/shared/keys";
 
 export const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5000";
 
@@ -167,11 +172,79 @@ export async function createOrientedJpegFixture(
 }
 
 type E2EFixtures = {
+  clerkTestingToken: void;
   cleanupIds: number[];
   sessionId: number;
 };
 
 export const test = base.extend<E2EFixtures>({
+  request: async ({ context }, use) => {
+    await use(context.request);
+  },
+  clerkTestingToken: [
+    async ({ context, page, request }, use) => {
+      const frontendApiUrl =
+        process.env.VITE_CLERK_PUBLIC_HOST ??
+        parsePublishableKey(process.env.VITE_CLERK_PUBLISHABLE_KEY)?.frontendApi;
+      if (!frontendApiUrl) {
+        throw new Error(
+          "Browser tests require a valid Clerk publishable key or frontend host for token refresh",
+        );
+      }
+      const emailAddress = process.env.E2E_CLERK_EMAIL;
+      if (!emailAddress) {
+        throw new Error(
+          "Browser tests require the disposable Clerk account from global setup",
+        );
+      }
+      await setupClerkTestingToken({
+        context,
+        options: { frontendApiUrl },
+      });
+      await page.goto("/");
+      await page.waitForFunction(
+        () => Boolean((globalThis as typeof globalThis & {
+          Clerk?: { loaded?: boolean };
+        }).Clerk?.loaded),
+        undefined,
+        { timeout: 30_000 },
+      );
+      const hasClerkSession = await page.evaluate(
+        () => Boolean((globalThis as typeof globalThis & {
+          Clerk?: { user?: unknown };
+        }).Clerk?.user),
+      );
+      let authenticatedUser = await request.get("/api/auth/user");
+      if (hasClerkSession && authenticatedUser.status() === 200) {
+        const user = await authenticatedUser.json().catch(() => null);
+        if (!user || typeof user !== "object" || !("id" in user)) {
+          throw new Error(
+            "Clerk browser setup failed: /api/auth/user returned no local identity",
+          );
+        }
+      } else {
+        // A persisted Clerk session can outlive its testing token. In that
+        // case, obtain a fresh ticket rather than trusting the stale session.
+        await page.goto("/sign-in");
+        await clerkTesting.signIn({ page, emailAddress });
+        await page.goto("/");
+        authenticatedUser = await request.get("/api/auth/user");
+      }
+      if (authenticatedUser.status() !== 200) {
+        throw new Error(
+          `Clerk browser setup failed: /api/auth/user returned ${authenticatedUser.status()}`,
+        );
+      }
+      const user = await authenticatedUser.json().catch(() => null);
+      if (!user || typeof user !== "object" || !("id" in user)) {
+        throw new Error(
+          "Clerk browser setup failed: /api/auth/user returned no local identity",
+        );
+      }
+      await use();
+    },
+    { auto: true },
+  ],
   cleanupIds: [
     async ({ request }, use) => {
       const ids: number[] = [];

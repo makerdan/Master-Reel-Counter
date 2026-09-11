@@ -1,5 +1,5 @@
 - [Global isApproved middleware](global-isapproved-middleware.md) — all /api/* routes pass through isApproved; exempt public endpoints in the skipPaths array in routes.ts.
-- [E2E test auth — run as owner](e2e-owner-auth.md) — global-setup must log in as the real owner (not tester) for full CRUD permissions; tester gets 403 on DELETE sessions.
+- [E2E test auth — run as Admin](e2e-owner-auth.md) — global setup must use a real Clerk account with persisted Admin role for full CRUD browser coverage.
 - [Undo delete-entry creates new ID](undo-entry-id.md) — undo for delete-entry POSTs a new entry with a new server-assigned ID; tests must not check for the original entry ID after undo.
 - [Typed-request migration in Express](typed-request-migration.md) — handler signatures must stay req:any; use inline cast (req as AuthenticatedRequest) for typed user access.
 - [Failure Gate validation](failure-gate-validation.md) — unchanged dependency audit failures stop the tier; preserve evidence instead of weakening audit thresholds.
@@ -22,3 +22,5 @@
 - [Auth transition cleanup](auth-transition-cleanup.md) — wait for settled local identity, then clear protected app state without removing the auth query.
 - [Durable queue claim rereads](durable-queue-claim-rereads.md) — after claiming a queued item, reread it before side effects so concurrent drainers do not act on stale snapshots.
 - [Agent build failure evidence](agent-build-failure-evidence.md) — count only explicit dated validation records; missing artifacts make historical root cause inconclusive.
+- [Clerk Playwright session lifecycle](clerk-playwright-session-lifecycle.md) — refresh each browser context and share its live cookies with API fixtures.
+- [External Clerk browser configuration](external-clerk-browser-config.md) — keep tenant hosts out of tracked config; browser validation needs a valid env-provided key or host.

@@ -35,7 +35,6 @@ interface RoleMetrics {
 interface RoleComparison {
   Owner: RoleMetrics;
   Editor: RoleMetrics;
-  Tester: RoleMetrics;
   Viewer: RoleMetrics;
   currentUserRoles: string[];
 }
@@ -537,11 +536,10 @@ export default function StatsPage() {
 const ROLE_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
   Owner: { bar: "bg-blue-500", text: "text-blue-700 dark:text-blue-400", bg: "bg-blue-500/10" },
   Editor: { bar: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-500/10" },
-  Tester: { bar: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", bg: "bg-amber-500/10" },
   Viewer: { bar: "bg-purple-500", text: "text-purple-700 dark:text-purple-400", bg: "bg-purple-500/10" },
 };
 
-const ROLE_ORDER: ("Owner" | "Editor" | "Tester" | "Viewer")[] = ["Owner", "Editor", "Tester", "Viewer"];
+const ROLE_ORDER: ("Owner" | "Editor" | "Viewer")[] = ["Owner", "Editor", "Viewer"];
 
 function RoleComparisonSection({ roleComparison }: { roleComparison: RoleComparison }) {
   const metrics: { key: keyof RoleMetrics; label: string; format: (v: number) => string }[] = [

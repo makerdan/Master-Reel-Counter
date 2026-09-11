@@ -122,7 +122,7 @@ test.describe("pin label → entry position field @pin-position", () => {
     });
 
     await page.goto(`/session/${sess.id}?tab=scanner`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
     await expect(
       page.locator('[data-testid="btn-analyze-labels"]'),

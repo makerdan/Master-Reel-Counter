@@ -9,12 +9,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { OverviewHelp, DashboardSections, SessionSections, MobileFlowSections, AskAIChat } from "@/components/HelpMenu";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useAuth } from "@/hooks/use-auth";
 import { HELP_ARTICLES } from "@shared/help-content";
 
 export default function HelpPage() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const filteredArticles = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -82,7 +80,7 @@ export default function HelpPage() {
         </div>
         <p className="text-sm text-muted-foreground mb-3">Managing sessions, folders, sorting, and search from the Sessions Dashboard.</p>
         <Accordion type="multiple" className="w-full">
-          <DashboardSections isTester={user?.isTester} />
+          <DashboardSections />
         </Accordion>
 
         <Separator className="my-6" />

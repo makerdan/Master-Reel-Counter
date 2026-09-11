@@ -316,6 +316,7 @@
 
   /* Keep the approved Mobile Flow input size stable across phone orientation changes. */
   .mobile-flow-large-input {
+    font-size: 60px !important;
     -webkit-text-size-adjust: none;
     text-size-adjust: none;
   }

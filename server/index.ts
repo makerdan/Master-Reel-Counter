@@ -11,7 +11,10 @@ import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
+import {
+  buildPublishableKey,
+  publishableKeyFromHost,
+} from "@clerk/shared/keys";
 import {
   CLERK_PROXY_PATH,
   CLERK_PROXY_READINESS_PATH,
@@ -63,12 +66,21 @@ app.get(CLERK_PROXY_READINESS_PATH, (_req, res) => {
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use(
-  clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
-      process.env.CLERK_PUBLISHABLE_KEY,
-    ),
-  })),
+  clerkMiddleware((req) => {
+    const requestHost = getClerkProxyHost(req) ?? "";
+    const configuredFrontendHost =
+      /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(requestHost)
+        ? process.env.VITE_CLERK_PUBLIC_HOST
+        : undefined;
+    return {
+      publishableKey: configuredFrontendHost
+        ? buildPublishableKey(configuredFrontendHost)
+        : publishableKeyFromHost(
+            requestHost,
+            process.env.CLERK_PUBLISHABLE_KEY,
+          ),
+    };
+  }),
 );
 
 app.use(

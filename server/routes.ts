@@ -6,9 +6,6 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
 import {
   authenticateWebSocketRequest,
-  destroyTesterSession,
-  establishTesterSession,
-  setupAuth,
   isAuthenticated,
 } from "./replit_integrations/auth";
 import {
@@ -33,7 +30,6 @@ import PDFDocument from "pdfkit";
 import { toDisplayUnit, unitLabel, type UnitType } from "./unit-conversion";
 import sharp from "sharp";
 import { randomUUID, randomBytes, createHash } from "crypto";
-import bcrypt from "bcrypt";
 import path from "path";
 import fs from "fs/promises";
 import { PassThrough } from "stream";
@@ -56,7 +52,7 @@ import {
 
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session, type UserSettings } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
 import { getPoeProvider, PoeProviderError, type PoeProvider, type PoeTextMessage } from "./providers/poe";
 const pdfJobs = new Map<string, {
   done: number;
@@ -94,7 +90,7 @@ function formatPinLabel(label: string): string {
 }
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
-const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null; testerOwnerUserId: string | null }>();
+const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null }>();
 const realtimeAuthorization = new RealtimeAuthorizationTracker();
 const encodingToggleInProgress = new Set<string>();
 
@@ -225,12 +221,11 @@ async function logActivity(sessionId: number, userId: string, username: string |
   } catch (err) { console.error("logActivity failed:", err); }
 }
 
-async function verifySessionAccess(sessionId: number, userId: string, testerOwnerUserId?: string, allowTrashed = false): Promise<{ session: any; role: "owner" | "editor" | "viewer" } | null> {
+async function verifySessionAccess(sessionId: number, userId: string, _legacyOwnerUserId?: undefined, allowTrashed = false): Promise<{ session: any; role: "owner" | "editor" | "viewer" } | null> {
   const session = await storage.getSession(sessionId);
   if (!session) return null;
   if (!allowTrashed && session.deletedAt) return null;
   if (session.userId === userId) return { session, role: "owner" };
-  if (testerOwnerUserId && session.userId === testerOwnerUserId) return { session, role: "editor" };
   const collab = await storage.getCollaborator(sessionId, userId);
   if (collab) return { session, role: collab.role as "editor" | "viewer" };
   return null;
@@ -384,18 +379,10 @@ function checkLocked(session: any, role: string): string | null {
 }
 
 function resolveUserId(req: AuthenticatedRequest | any): string {
-  const ar = req as AuthenticatedRequest;
-  if (ar.user?.isTester && ar.user?.claims?.testerOwnerUserId) {
-    return ar.user.claims.testerOwnerUserId;
-  }
-  return ar.user?.claims?.sub;
+  return (req as AuthenticatedRequest).user.claims.sub;
 }
 
-function getTesterOwner(req: AuthenticatedRequest | any): string | undefined {
-  const ar = req as AuthenticatedRequest;
-  if (ar.user?.isTester && ar.user?.claims?.testerOwnerUserId) {
-    return ar.user.claims.testerOwnerUserId;
-  }
+function getTesterOwner(_req: AuthenticatedRequest | any): undefined {
   return undefined;
 }
 
@@ -410,15 +397,6 @@ async function getEncryptionKey(userId: string): Promise<Buffer | null> {
   const kek = deriveKEK(settings.encryptionSalt);
   return unwrapKey(settings.encryptionKey, kek);
 }
-
-const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many login attempts, please try again later." },
-  skipSuccessfulRequests: false,
-});
 
 const resourceRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -471,14 +449,12 @@ const recentPageViews = new Map<string, number>();
  * using `req: any` are marked with // TODO(req-typing).
  */
 interface AuthenticatedUser {
-  isTester?: boolean;
   claims: {
     sub: string;
     email?: string;
     first_name?: string;
     last_name?: string;
     username?: string;
-    testerOwnerUserId?: string;
   };
 }
 
@@ -659,7 +635,6 @@ export async function executePhotoDeletion(
   }
 }
 
-const TESTER_LOGIN_DUMMY_HASH = "$2b$10$lAFb311fxS137sB1dRXSLO/PuLciY.N6I1qM4Hdbgv9NDozRWWLr.";
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -671,16 +646,13 @@ export async function registerRoutes(
     next();
   });
 
-  const { sessionParser } = await setupAuth(app);
   registerAuthorizationChangeHandler((userId, outcome) => {
     evictUserSockets(userId, outcome);
   });
 
   app.use("/api", (req, res, next) => {
     const skipPaths = [
-      "/api/auth/user", "/api/auth/tester-login", "/api/auth/tester-logout",
-      "/api/__test__/seed-tester-password",
-      "/api/__test__/owner-login",
+      "/api/auth/user",
       "/api/track/pageview",
       "/api/healthz",
     ];
@@ -701,67 +673,6 @@ export async function registerRoutes(
 
   registerAuthRoutes(app);
   registerObjectStorageRoutes(app);
-
-  const testerLoginSchema = z.object({
-    displayName: z.string().trim().min(1, "Display name is required").max(100),
-    ownerUserId: z.string().trim().min(1, "Owner access code is required").max(255),
-    password: z.string().trim().min(1, "Password is required").max(256),
-  });
-
-  app.post("/api/auth/tester-login", authRateLimiter, async (req: any, res) => {
-    try {
-      const parsed = testerLoginSchema.safeParse(req.body ?? {});
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Display name, owner access code, and password are required" });
-      }
-      const { displayName, ownerUserId, password } = parsed.data;
-      const ownerSettings = await verifyTesterCredentials(ownerUserId.trim(), password);
-      if (!ownerSettings) {
-        return res.status(401).json({ message: "Invalid owner access code or tester password" });
-      }
-      const testerId = `tester-${createHash("sha256").update(`${ownerSettings.userId}:${displayName.trim().toLowerCase()}`).digest("hex").slice(0, 16)}`;
-      await authStorage.upsertUser({
-        id: testerId,
-        email: null,
-        firstName: displayName.trim(),
-        lastName: null,
-        profileImageUrl: null,
-        isTester: true,
-      });
-      const testerUser = {
-        claims: {
-          sub: testerId,
-          firstName: displayName.trim(),
-          testerOwnerUserId: ownerSettings.userId,
-        },
-        expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
-        isTester: true,
-      };
-      await establishTesterSession(req, testerUser);
-      return res.json({
-        id: testerId,
-        email: null,
-        firstName: displayName.trim(),
-        lastName: null,
-        profileImageUrl: null,
-        customAvatarKey: null,
-        isTester: true,
-        testerOwnerUserId: ownerSettings.userId,
-      });
-    } catch (error) {
-      console.error("Tester login error:", error);
-      res.status(500).json({ message: "Login failed" });
-    }
-  });
-
-  app.get("/api/auth/tester-logout", async (req: any, res) => {
-    try {
-      await destroyTesterSession(req);
-      res.redirect("/");
-    } catch {
-      res.status(500).json({ message: "Logout failed" });
-    }
-  });
 
   const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
@@ -892,13 +803,12 @@ export async function registerRoutes(
       const requestingUserId = (req as AuthenticatedRequest).user.claims.sub;
       const photo = await storage.getPhotoByStorageKey(storageKey);
       if (photo) {
-        const testerOwner = getTesterOwner(req as AuthenticatedRequest);
-        const access = await verifySessionAccess(photo.sessionId, requestingUserId, testerOwner);
+        const access = await verifySessionAccess(photo.sessionId, requestingUserId);
         if (!access) {
           return res.status(403).json({ error: "Access denied" });
         }
       } else {
-        const ownerUserId = getTesterOwner(req as AuthenticatedRequest) ?? requestingUserId;
+        const ownerUserId = requestingUserId;
         const [userRecord, userSettingsRecord] = await Promise.all([
           authStorage.getUser(ownerUserId),
           storage.getUserSettings(ownerUserId),
@@ -1415,7 +1325,6 @@ export async function registerRoutes(
       const userId = resolveUserId(req as AuthenticatedRequest);
       const access = await verifySessionAccess(parseInt(req.params.id), userId, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
-      if (getTesterOwner(req as AuthenticatedRequest)) return res.status(403).json({ message: "Testers cannot duplicate sessions" });
       if (!canEdit(access.role)) return res.status(403).json({ message: "Viewers cannot duplicate sessions" });
       const { folderId, name } = req.body || {};
       const targetFolderId = folderId ?? access.session.folderId ?? null;
@@ -5960,7 +5869,7 @@ export async function registerRoutes(
       const userId = resolveUserId(req as AuthenticatedRequest);
       const settings = await storage.getUserSettings(userId);
       const response = settings
-        ? { ...settings, defaultExportFormat: settings.defaultExportFormat === "csv" ? "pdf" : settings.defaultExportFormat, testerPassword: settings.testerPassword ? "********" : null }
+        ? { ...settings, defaultExportFormat: settings.defaultExportFormat === "csv" ? "pdf" : settings.defaultExportFormat }
         : {
           userId,
           encodingEnabled: false,
@@ -5981,7 +5890,6 @@ export async function registerRoutes(
           largerTouchTargets: false,
           textSize: "default",
           customVendorCodes: [],
-          testerPassword: null,
           helpGuideVersion: 0,
           helpGuideCompletedAt: null,
         };
@@ -5993,9 +5901,6 @@ export async function registerRoutes(
 
   app.patch("/api/settings", isAuthenticated, async (req: any, res) => {
     try {
-      if ((req as AuthenticatedRequest).user?.isTester) {
-        return res.status(403).json({ message: "Testers cannot modify settings" });
-      }
       const userId = resolveUserId(req as AuthenticatedRequest);
       const allowedFields = [
         "defaultExportFormat", "companyName", "exportFooterText",
@@ -6003,7 +5908,7 @@ export async function registerRoutes(
         "useOnFloorQuality", "onFloorPhotoQuality",
         "defaultAislePrefix", "sectionAdvanceStep", "defaultUnit",
         "defaultTheme", "thumbnailSize", "largerTouchTargets", "textSize", "timezone",
-        "customVendorCodes", "testerPassword",
+        "customVendorCodes",
         "helpGuideVersion", "helpGuideCompletedAt",
       ];
       const updates: Record<string, any> = {};
@@ -6011,14 +5916,6 @@ export async function registerRoutes(
       for (const field of allowedFields) {
         if (settingsBody[field] !== undefined) {
           updates[field] = settingsBody[field];
-        }
-      }
-      if (updates.testerPassword !== undefined) {
-        if (updates.testerPassword && typeof updates.testerPassword === "string" && updates.testerPassword.trim()) {
-          const plain = updates.testerPassword.trim();
-          updates.testerPassword = await bcrypt.hash(plain, 10);
-        } else {
-          updates.testerPassword = null;
         }
       }
       if (updates.customVendorCodes) {
@@ -6583,7 +6480,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 - **AI Scanner Tab**: AI vision reads wire reel labels from photo crops. Select photos, preview crops, batch analyze (up to 20 per request), review raw text + matched catalog results, apply to entries. All Photos mode vs Single Photo mode. Receiving pooling for batch efficiency. Real-time sync via WebSocket.
 - **Table View**: All committed entries grouped by aisle/section. Clickable pin # jumps to photo. Collapsible sections. Photo viewer with pin highlight. Edit/delete entries. Validation warnings for missing data. Total footage footer.
 - **Activity Log**: Timestamped feed of all session changes with user filter dropdown and close button. Tracks entries created/edited/deleted, photos uploaded/deleted/duplicated, pins flagged/unflagged/deleted, collaborators added/removed/role changes, invite links, exports, session lock/unlock.
-- **Collaboration**: Invite by username, share link (7-day auto-expiry with join count tracking), or email. Editor/Viewer roles. Testers get Editor access (not Owner). Real-time presence with green dots. Session locking freezes all edits.
+- **Collaboration**: Invite by username, share link (7-day auto-expiry with join count tracking), or email. Editor/Viewer roles. Real-time presence with green dots. Session locking freezes all edits.
 - **Export**: CSV (spreadsheet), Excel (.xlsx with formatted metadata, grouped entries, indented pins, centered columns), PDF (full quality or standard, parallel generation), email sharing.
 
 ## Session — Mobile Flow
@@ -6640,7 +6537,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         }
         const access = await realtimeAuthorization.authorizeConsistently(
           msg.sessionId,
-          () => verifySessionAccess(msg.sessionId, info.userId!, info.testerOwnerUserId ?? undefined),
+          () => verifySessionAccess(msg.sessionId, info.userId!),
         );
         if (!access) {
           ws.send(JSON.stringify({
@@ -6671,7 +6568,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   };
 
   wss.on("connection", (ws, req: any) => {
-    wsUserMap.set(ws, { sessionId: null, userId: null, username: null, role: null, testerOwnerUserId: null });
+    wsUserMap.set(ws, { sessionId: null, userId: null, username: null, role: null });
     wsAlive.set(ws, true);
 
     let authDone = false;
@@ -6679,9 +6576,6 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     let revalidateTimer: ReturnType<typeof setInterval> | null = null;
 
     const loadSocketIdentity = async () => {
-      await new Promise<void>((resolve, reject) =>
-        sessionParser(req, {} as any, (error?: unknown) => error ? reject(error) : resolve()),
-      );
       return authenticateWebSocketRequest(req);
     };
 
@@ -6701,14 +6595,13 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         return;
       }
       const connUserId = user.claims.sub;
-      const connTesterOwnerUserId = user.isTester ? (user.claims.testerOwnerUserId ?? null) : null;
       const connUsername = user.claims.username || user.claims.firstName || connUserId;
-      wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null, testerOwnerUserId: connTesterOwnerUserId });
+      wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null });
       authDone = true;
       for (const buffered of pendingMessages) processWsMessage(ws, buffered);
       pendingMessages.length = 0;
 
-      // Re-read Clerk/tester cookies; never trust the identity captured at
+      // Re-read the signed-in identity; never trust the identity captured at
       // upgrade time after a long-lived socket has been established.
       const WS_REVALIDATE_MS = 10 * 60 * 1000;
       revalidateTimer = setInterval(() => {
@@ -7443,18 +7336,18 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     }
   });
 
-  // Admin endpoint: high-level aggregate app stats (owner-only).
+  // Admin endpoint: high-level aggregate app stats.
   app.get("/api/admin/summary", isAuthenticated, async (req: any, res) => {
     if (!isOwnerIdentity((req as AuthenticatedRequest).user)) return res.status(403).json({ message: "Forbidden" });
     try {
       const [totalUsers] = (await db.execute(
-        sql`SELECT COUNT(*)::int AS count FROM users WHERE NOT is_tester`
+        sql`SELECT COUNT(*)::int AS count FROM users`
       )).rows as [{ count: number }];
       const [newUsersWeek] = (await db.execute(
-        sql`SELECT COUNT(*)::int AS count FROM users WHERE NOT is_tester AND created_at > NOW() - INTERVAL '7 days'`
+        sql`SELECT COUNT(*)::int AS count FROM users WHERE created_at > NOW() - INTERVAL '7 days'`
       )).rows as [{ count: number }];
       const [newUsersMonth] = (await db.execute(
-        sql`SELECT COUNT(*)::int AS count FROM users WHERE NOT is_tester AND created_at > NOW() - INTERVAL '30 days'`
+        sql`SELECT COUNT(*)::int AS count FROM users WHERE created_at > NOW() - INTERVAL '30 days'`
       )).rows as [{ count: number }];
       const [totalSessions] = (await db.execute(
         sql`SELECT COUNT(*)::int AS count FROM counting_sessions WHERE deleted_at IS NULL`
@@ -7507,7 +7400,6 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         SELECT al.user_id,
           COALESCE(
             NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), ''),
-            u.username,
             al.user_id,
             'Unknown'
           ) AS display_name,
@@ -7635,82 +7527,12 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   });
 
   // ── Dev-only test seeding endpoint ──────────────────────────────────────────
-  // Sets (or overwrites) the tester password for the first non-tester owner so
-  // that the Playwright global-setup can authenticate without a real OAuth flow.
-  // Strictly unavailable in production.
-  if (process.env.NODE_ENV !== "production") {
-    app.post("/api/__test__/owner-login", async (req: any, res) => {
-      try {
-        const allUsers = await authStorage.getAllUsers();
-        const owners = allUsers.filter((u: any) => !u.isTester);
-        if (owners.length === 0) {
-          return res.status(404).json({ message: "No owner found. Sign in with Clerk once first." });
-        }
-        const owner = owners[0];
-        const ownerUser = {
-          claims: {
-            sub: owner.id,
-            firstName: owner.firstName || "TestOwner",
-            username: owner.firstName || "TestOwner",
-          },
-          expires_at: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
-          isTester: false,
-          isOwner: true,
-          isTestOwner: true,
-        };
-        // This development-only compatibility identity exercises owner-only
-        // application behavior without weakening production Clerk checks.
-        await establishTesterSession(req, ownerUser);
-        res.json({ ok: true, userId: owner.id });
-      } catch (err) {
-        console.error("[test-owner-login] error:", err);
-        res.status(500).json({ message: "Failed to create owner session" });
-      }
-    });
-
-    app.post("/api/__test__/seed-tester-password", async (req: any, res) => {
-      try {
-        authRateLimiter.resetKey(ipKeyGenerator(req.ip));
-        const { password } = req.body ?? {};
-        if (!password || typeof password !== "string") {
-          return res.status(400).json({ message: "password required" });
-        }
-        const allUsers = await authStorage.getAllUsers();
-        const owners = allUsers.filter((u: any) => !u.isTester);
-        if (owners.length === 0) {
-          return res.status(404).json({
-            message: "No owner users found. Sign in with Clerk once first.",
-          });
-        }
-        const owner = owners[0];
-        const hashed = await bcrypt.hash(password, 10);
-        await storage.upsertUserSettings(owner.id, { testerPassword: hashed });
-        return res.json({ ok: true, ownerUserId: owner.id });
-      } catch (err) {
-        console.error("[test-seed] error:", err);
-        return res.status(500).json({ message: "seed failed" });
-      }
-    });
-  }
-
   const trashPurgeTimer = setInterval(purgeExpiredTrash, TRASH_PURGE_INTERVAL_MS);
   trashPurgeTimer.unref();
   const initialTrashPurgeTimer = setTimeout(purgeExpiredTrash, 30000);
   initialTrashPurgeTimer.unref();
 
   return httpServer;
-}
-
-export async function verifyTesterCredentials(
-  ownerUserId: string,
-  password: string,
-  getUserSettings: (userId: string) => Promise<UserSettings | undefined> = (userId) => storage.getUserSettings(userId),
-  comparePassword: (password: string, hash: string) => Promise<boolean> = bcrypt.compare,
-): Promise<UserSettings | undefined> {
-  const ownerSettings = await getUserSettings(ownerUserId);
-  const testerPasswordHash = ownerSettings?.testerPassword ?? TESTER_LOGIN_DUMMY_HASH;
-  const matches = await comparePassword(password.trim(), testerPasswordHash);
-  return ownerSettings?.testerPassword && matches ? ownerSettings : undefined;
 }
 
 export function respondWithScanResultsPersistenceFailure(

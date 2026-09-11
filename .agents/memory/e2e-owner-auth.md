@@ -1,14 +1,14 @@
 ---
-name: E2E test auth — run as owner
-description: The Playwright global-setup must create storageState as the real app owner, not as a tester, to get full CRUD permissions in e2e tests.
+name: E2E test auth — run as Admin
+description: Playwright global setup needs a real Clerk account with persisted Admin role for full CRUD permissions.
 ---
 
 ## Rule
-`tests/global-setup.ts` must authenticate as the **owner** (not the tester) to create `tests/.auth/user.json`.
+Playwright global setup must authenticate a real Clerk account whose local account has persisted `Admin` role when creating shared browser storage state.
 
-**Why:** Testers have "editor" role on sessions (even their own). The `DELETE /api/sessions/:id` route requires `isOwner(role)` — testers always get 403. This breaks any test that trashes or permanently deletes a session via the browser UI. Similarly, the WS connection registers testers with `testerOwnerUserId` (owner's sub) but HTTP requests use the tester's own sub, creating a 2-user review cohort instead of 1, breaking the review-tab navigation.
+**Why:** Full browser coverage creates, trashes, and permanently deletes sessions and exercises protected account-management boundaries. An ordinary `User` account cannot cover Admin-only operations, while synthetic authentication bypasses the real Clerk identity path.
 
 **How to apply:**
-- Use `POST /api/__test__/owner-login` (dev-only endpoint) in global-setup instead of the tester login form.
-- This endpoint is registered inside `if (process.env.NODE_ENV !== "production")` in `server/routes.ts` and is exempt from the `isApproved` middleware via the `skipPaths` array.
-- Tests that specifically exercise tester flows (e.g. offline-queue) still call the tester login themselves within the test body.
+- Create or reuse a disposable Clerk user through the supported server-side test setup.
+- Seed that user's local account with persisted `Admin` role before saving browser storage state.
+- Verify the authenticated local identity endpoint before tests begin.

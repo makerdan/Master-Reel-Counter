@@ -1,20 +1,9 @@
 import { sql } from "drizzle-orm";
-import { boolean, index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { boolean, pgEnum, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 
-// Session storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)]
-);
+export const accountRoleEnum = pgEnum("account_role", ["Admin", "User"]);
 
-// User storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Local account state for Clerk identities.
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
@@ -24,14 +13,12 @@ export const users = pgTable("users", {
   customAvatarKey: varchar("custom_avatar_key"),
   approved: boolean("approved").default(false).notNull(),
   rejected: boolean("rejected").default(false).notNull(),
-  isTester: boolean("is_tester").default(false).notNull(),
+  role: accountRoleEnum("role").default("User").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect & {
-  testerOwnerUserId?: string;
-  isOwner?: boolean;
-  isTestOwner?: boolean;
-};
+export type User = typeof users.$inferSelect;
+
+export type AccountRole = (typeof accountRoleEnum.enumValues)[number];

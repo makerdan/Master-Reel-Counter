@@ -6,7 +6,7 @@ import {
   Unlock, Loader2, Cable, LogOut, Info, Pencil, Check, X, Mail,
   Download, Camera, Keyboard, Sun, Moon, Monitor, Target,
   ChevronDown, FileText, Globe, Upload, Trash2,
-  HardDrive, RefreshCw, Plus, Search, FileUp, Key, Eye, EyeOff, Copy,
+  HardDrive, RefreshCw, Plus, Search, FileUp,
   Users, UserCheck, UserX, Activity, Wrench, Brain, TrendingUp, Database,
 } from "lucide-react";
 import {
@@ -48,7 +48,6 @@ import { CATALOG, parseCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel, unitLabelFull } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import type { UserWireCatalog } from "@shared/schema";
-import { buildTesterLoginUrl } from "@/lib/testerAccess";
 
 interface UserSettingsResponse {
   userId: string;
@@ -70,7 +69,6 @@ interface UserSettingsResponse {
   largerTouchTargets: boolean;
   textSize: string;
   timezone: string;
-  testerPassword: string | null;
   helpGuideVersion: number;
   helpGuideCompletedAt: string | null;
 }
@@ -96,11 +94,6 @@ export default function SettingsPage() {
   const [localReceivingQuality, setLocalReceivingQuality] = useState<number | null>(null);
   const [localOnFloorQuality, setLocalOnFloorQuality] = useState<number | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const [testerPassword, setTesterPassword] = useState("");
-  const [testerPasswordConfirm, setTesterPasswordConfirm] = useState("");
-  const [showTesterPassword, setShowTesterPassword] = useState(false);
-  const [showTesterPasswordConfirm, setShowTesterPasswordConfirm] = useState(false);
-  const [testerPasswordLoaded, setTesterPasswordLoaded] = useState(false);
   const [encodingRetryPayload, setEncodingRetryPayload] = useState<{
     error: "verification_failed" | "mixed_key_state";
     message: string;
@@ -255,34 +248,31 @@ export default function SettingsPage() {
     retry: false,
   });
 
+  const isAdmin = user?.role === "Admin";
+  const isOwnerUser = isAdmin;
+
   const {
-    data: adminUsers,
+    data: adminUsers = [],
     isLoading: adminUsersLoading,
     error: adminUsersError,
     refetch: refetchAdminUsers,
   } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
     queryFn: () => fetchAdminResource<any[]>("/api/admin/users"),
+    enabled: isAdmin,
     retry: false,
   });
 
-  const isOwnerUser = user?.isOwner === true;
-
-  // isAdmin must be declared after adminUsers (the query result it depends on)
-  const isAdmin = !user?.isTester && !!adminUsers && Array.isArray(adminUsers);
-
-  // Guard: redirect non-admins after an intentional denial or a successful
-  // non-admin response. Preserve the tab for owner-side failures so the owner
-  // can see and retry the problem.
+  // The persisted account role is authoritative for tab access. Do not wait
+  // for the admin-users query (which is intentionally disabled for non-admins).
   useEffect(() => {
-    const denied = adminUsersError instanceof AdminRequestError && adminUsersError.status === 403;
-    if ((denied || (adminUsers !== undefined && !isAdmin)) && activeTab === "admin") {
+    if (user && user.role !== "Admin" && activeTab === "admin") {
       setActiveTab("settings");
       if (typeof window !== "undefined") {
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
     }
-  }, [adminUsers, adminUsersError, isAdmin, activeTab]);
+  }, [user, activeTab]);
 
   const {
     data: rejectedCountData,
@@ -292,7 +282,7 @@ export default function SettingsPage() {
   } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/rejected-users/count"],
     queryFn: () => fetchAdminResource<{ count: number }>("/api/admin/rejected-users/count"),
-    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    enabled: isAdmin,
     retry: false,
   });
 
@@ -319,7 +309,7 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Not authorized");
       return res.json();
     },
-    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    enabled: isAdmin,
     staleTime: 60_000,
     retry: false,
   });
@@ -347,7 +337,7 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Not authorized");
       return res.json();
     },
-    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    enabled: isAdmin,
     staleTime: 30_000,
     retry: false,
   });
@@ -366,7 +356,7 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Not authorized");
       return res.json();
     },
-    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    enabled: isAdmin,
     staleTime: 60_000,
     retry: false,
   });
@@ -385,7 +375,7 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Not authorized");
       return res.json();
     },
-    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    enabled: isAdmin,
     staleTime: 60_000,
     retry: false,
   });
@@ -402,7 +392,7 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Not authorized");
       return res.json();
     },
-    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    enabled: isAdmin,
     staleTime: 60_000,
     retry: false,
   });
@@ -421,7 +411,7 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Not authorized");
       return res.json();
     },
-    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    enabled: isAdmin,
     staleTime: 60_000,
     retry: false,
   });
@@ -439,7 +429,7 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Not authorized");
       return res.json();
     },
-    enabled: !user?.isTester && !!adminUsers && Array.isArray(adminUsers),
+    enabled: isAdmin,
     staleTime: 15_000,
     refetchInterval: 15_000,
     retry: false,
@@ -613,31 +603,6 @@ export default function SettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to clear stalled intents", variant: "destructive" });
-    },
-  });
-
-  const hasTesterPassword = settings?.testerPassword === "********";
-
-  useEffect(() => {
-    if (settings && !testerPasswordLoaded) {
-      setTesterPassword("");
-      setTesterPasswordLoaded(true);
-    }
-  }, [settings, testerPasswordLoaded]);
-
-  const saveTesterPassword = useMutation({
-    mutationFn: async (pw: string) => {
-      const res = await apiRequest("PATCH", "/api/settings", { testerPassword: pw || null });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      setTesterPassword("");
-      setTesterPasswordConfirm("");
-      toast({ title: "Tester password saved" });
-    },
-    onError: () => {
-      toast({ title: "Failed to save tester password", variant: "destructive" });
     },
   });
 
@@ -1796,110 +1761,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {!user?.isTester && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Key className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-base">Tester Access</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Set a password so testers can log in and view your sessions without a Replit account.
-                  </p>
-                  {hasTesterPassword && (
-                    <Badge variant="outline" className="text-green-600 border-green-300 w-fit">Password Set</Badge>
-                  )}
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Input
-                        data-testid="input-tester-password-settings"
-                        type={showTesterPassword ? "text" : "password"}
-                        placeholder={hasTesterPassword ? "Enter new password" : "Enter tester password"}
-                        value={testerPassword}
-                        onChange={(e) => setTesterPassword(e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                        onClick={() => setShowTesterPassword(!showTesterPassword)}
-                        data-testid="button-toggle-tester-password"
-                      >
-                        {showTesterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    <div className="relative">
-                      <Input
-                        data-testid="input-tester-password-confirm"
-                        type={showTesterPasswordConfirm ? "text" : "password"}
-                        placeholder="Confirm password"
-                        value={testerPasswordConfirm}
-                        onChange={(e) => setTesterPasswordConfirm(e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                        onClick={() => setShowTesterPasswordConfirm(!showTesterPasswordConfirm)}
-                        data-testid="button-toggle-tester-password-confirm"
-                      >
-                        {showTesterPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    {testerPassword.trim() && testerPasswordConfirm.trim() && testerPassword !== testerPasswordConfirm && (
-                      <p className="text-xs text-destructive" data-testid="text-password-mismatch">Passwords do not match</p>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={() => saveTesterPassword.mutate(testerPassword)}
-                      disabled={saveTesterPassword.isPending || !testerPassword.trim() || !testerPasswordConfirm.trim() || testerPassword !== testerPasswordConfirm}
-                      data-testid="button-save-tester-password"
-                    >
-                      {saveTesterPassword.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                    </Button>
-                  </div>
-                  {hasTesterPassword && (
-                    <>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">Tester login URL:</span>
-                        <code className="bg-muted px-2 py-0.5 rounded text-xs">/tester-login?owner=...</code>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          data-testid="button-copy-tester-url"
-                          onClick={() => {
-                            if (!identityId) return;
-                            navigator.clipboard.writeText(buildTesterLoginUrl(window.location.origin, identityId));
-                            toast({ title: "Copied to clipboard" });
-                          }}
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive hover:text-destructive w-fit"
-                        data-testid="button-remove-tester-password"
-                        onClick={() => {
-                          saveTesterPassword.mutate("");
-                          setTesterPassword("");
-                        }}
-                        disabled={saveTesterPassword.isPending}
-                      >
-                        Remove Tester Password
-                      </Button>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
@@ -2386,7 +2247,7 @@ export default function SettingsPage() {
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Users</p>
                   <p className="text-2xl font-mono font-bold leading-tight" data-testid="stat-user-count">{adminUsers.length}</p>
                   {(() => {
-                    const pending = adminUsers.filter((u: any) => !u.approved && !u.isTester).length;
+                    const pending = adminUsers.filter((u: any) => !u.approved && !u.rejected).length;
                     return pending > 0 ? (
                       <p className="text-[10px] text-amber-500 font-medium" data-testid="stat-pending-count">{pending} pending</p>
                     ) : null;
@@ -2535,6 +2396,9 @@ export default function SettingsPage() {
                                   {isOwner && (
                                     <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Owner</Badge>
                                   )}
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0" data-testid={`badge-role-${u.id}`}>
+                                    {u.role || "User"}
+                                  </Badge>
                                 </div>
                                 {u.email && (
                                   <span className="text-xs text-muted-foreground truncate block">{u.email}</span>
@@ -2542,11 +2406,7 @@ export default function SettingsPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              {u.isTester ? (
-                                <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-700" data-testid={`badge-tester-${u.id}`}>
-                                  Tester
-                                </Badge>
-                              ) : isOwner ? (
+                              {isOwner ? (
                                 <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
                               ) : u.approved ? (
                                 <>
@@ -2565,6 +2425,10 @@ export default function SettingsPage() {
                                     Reject
                                   </Button>
                                 </>
+                              ) : u.rejected ? (
+                                <Badge variant="outline" className="text-xs text-red-600 border-red-300 dark:text-red-400 dark:border-red-700" data-testid={`badge-rejected-${u.id}`}>
+                                  Rejected
+                                </Badge>
                               ) : (
                                 <>
                                   <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700" data-testid={`badge-pending-${u.id}`}>

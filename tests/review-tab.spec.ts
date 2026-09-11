@@ -32,7 +32,7 @@ test.describe("review tab persistence @review", () => {
     }
 
     await page.goto(`/session/${sess.id}`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
     await page.click('[data-testid="tab-review-mode"]');
 
     const container = page.locator('[data-testid="review-tab-container"]');

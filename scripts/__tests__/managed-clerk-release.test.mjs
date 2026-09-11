@@ -31,6 +31,20 @@ const clerkProxyMiddleware = readFileSync(
   resolve(root, "server/middlewares/clerkProxyMiddleware.ts"),
   "utf8",
 );
+const authBridge = readFileSync(
+  resolve(root, "server/replit_integrations/auth/replitAuth.ts"),
+  "utf8",
+);
+const authExports = readFileSync(
+  resolve(root, "server/replit_integrations/auth/index.ts"),
+  "utf8",
+);
+const serverRoutes = readFileSync(resolve(root, "server/routes.ts"), "utf8");
+const authModels = readFileSync(resolve(root, "shared/models/auth.ts"), "utf8");
+const testerReconciliation = readFileSync(
+  resolve(root, "migrations/0025_reconcile_legacy_tester_accounts.sql"),
+  "utf8",
+);
 const execFileAsync = promisify(execFile);
 const proxyConstructionProgram = [
   'import { clerkProxyMiddleware } from "./server/middlewares/clerkProxyMiddleware.ts";',
@@ -277,8 +291,8 @@ test("ordinary and release Playwright configurations have disjoint discovery", (
 test("smoke uses disposable managed identity and preserves local authorization state", () => {
   assert.match(smoke, /clerk\.users\.createUser/);
   assert.match(smoke, /externalId: localUserId/);
-  assert.match(smoke, /approved, rejected, is_tester/);
-  assert.match(smoke, /approved: true, rejected: false, is_tester: false/);
+  assert.match(smoke, /approved, rejected, role/);
+  assert.match(smoke, /approved: true, rejected: false, role: "Admin"/);
   assert.match(smoke, /clerk\.users\.deleteUser/);
   assert.match(smoke, /DELETE FROM users WHERE id = \$1 RETURNING id/);
   assert.match(smoke, /Managed Clerk release smoke cleanup failed/);
@@ -647,6 +661,39 @@ test("smoke proves proxy, cookie-only API, protected pages, and sign-out", () =>
   assert.match(smoke, /clerkTesting\.signIn/);
   assert.doesNotMatch(smoke, /\.fill\(password\)/);
   assert.doesNotMatch(smoke, /Authorization|__test__|owner-login|tester-login/);
+});
+
+test("Clerk-only auth leaves no tester session or password machinery", () => {
+  const packageText = JSON.stringify(packageJson);
+  assert.doesNotMatch(
+    packageText,
+    /(?:express-session|connect-pg-simple|bcrypt)/,
+  );
+  assert.doesNotMatch(authBridge, /express-session|connect-pg-simple|function getSession|function setupAuth/);
+  assert.doesNotMatch(authExports, /getSession|setupAuth/);
+  assert.doesNotMatch(serverRoutes, /sessionParser|setupAuth/);
+  assert.doesNotMatch(authModels, /pgTable\(\s*["']sessions["']/);
+});
+
+test("legacy tester accounts are removed without deleting historical inventory", () => {
+  assert.match(testerReconciliation, /WHERE id LIKE 'tester-%'/);
+  assert.match(testerReconciliation, /role = 'Admin'/);
+  assert.match(testerReconciliation, /DELETE FROM user_settings/);
+  assert.match(testerReconciliation, /DELETE FROM upload_intents/);
+  assert.match(testerReconciliation, /DELETE FROM conversations/);
+  assert.match(testerReconciliation, /DELETE FROM users/);
+  assert.match(testerReconciliation, /DROP TABLE IF EXISTS sessions/);
+  assert.doesNotMatch(
+    testerReconciliation,
+    /DELETE FROM (?:counting_sessions|folders|photos|entries|activity_logs|comments|review_responses|feedback)/,
+  );
+});
+
+test("workspace config does not pin Clerk credentials or a tenant", () => {
+  assert.doesNotMatch(
+    replitConfig,
+    /(?:CLERK_PUBLISHABLE_KEY|VITE_CLERK_PUBLISHABLE_KEY|VITE_CLERK_PUBLIC_HOST|ADMIN_USER_ID)/,
+  );
 });
 
 test("release workflow passes secrets only through the environment", () => {

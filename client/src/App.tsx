@@ -19,18 +19,22 @@ import SettingsPage from "@/pages/settings";
 import StatsPage from "@/pages/stats";
 import JoinPage from "@/pages/join";
 import HelpPage from "@/pages/help";
-import TesterLoginPage from "@/pages/tester-login";
 import PendingApproval from "@/pages/pending-approval";
 import NotFound from "@/pages/not-found";
 import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { WsReconnectProvider } from "@/hooks/use-ws-reconnect";
 import { HelpOnboarding } from "@/components/HelpMenu";
 import { buildSignInPath, getReturnPathFromSearch } from "@shared/auth-routing";
+import { buildPublishableKey } from "@clerk/shared/keys";
 
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
+const clerkPublicHost =
+  import.meta.env.VITE_CLERK_PUBLIC_HOST || window.location.hostname;
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLIC_HOST
+  ? buildPublishableKey(clerkPublicHost)
+  : publishableKeyFromHost(
+      clerkPublicHost,
+      import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+    );
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -181,7 +185,7 @@ function AuthRouter() {
     return <PendingApproval status="not-provisioned" />;
   }
 
-  const isApproved = !user || user.approved || user.isTester;
+  const isApproved = !user || user.approved;
   if (accessDenied || user?.rejected) {
     return <PendingApproval status="rejected" />;
   }
@@ -190,9 +194,6 @@ function AuthRouter() {
     <Switch>
       <Route path="/">
         {user ? (isApproved ? <Dashboard key={identityId ?? user.id} /> : <PendingApproval />) : <Landing />}
-      </Route>
-      <Route path="/tester-login">
-        <TesterLoginPage />
       </Route>
       <Route path="/session/:id">
         {user ? (isApproved ? <SessionPage /> : <PendingApproval />) : <Landing signInHref={buildSignInPath(location, basePath)} />}

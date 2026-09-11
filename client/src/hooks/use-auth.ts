@@ -96,8 +96,8 @@ async function clearIdentityTransitionState(
 /**
  * App-state compatibility layer for Clerk identity.
  *
- * Clerk owns the browser session. The one local request is retained only for
- * approval/rejection and the deliberately separate tester session.
+ * Clerk owns the browser session. The local request supplies the persisted
+ * account and its approval/admission state.
  */
 export function useAuth() {
   const queryClient = useQueryClient();
@@ -121,8 +121,7 @@ export function useAuth() {
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",
-    // Wait for Clerk before asking the app server. Tester sessions are still
-    // queried while Clerk is signed out, so they remain independent.
+    // Wait for Clerk before asking the app server.
     enabled: isLoaded,
   });
 
@@ -133,18 +132,13 @@ export function useAuth() {
   const localUser = authState?.kind === "authenticated" ? authState.user : null;
   const logout = useCallback(async () => {
     await clearClientState(queryClient);
-    if (localUser?.isTester) {
-      // Tester auth is the app's separate, password-based session.
-      window.location.assign("/api/auth/tester-logout");
-      return;
-    }
     await signOut({ redirectUrl: import.meta.env.BASE_URL });
-  }, [localUser?.isTester, queryClient, signOut]);
+  }, [queryClient, signOut]);
 
   // Existing app data uses the local user ID. For Clerk-native users that is
   // Clerk's external ID when present, otherwise its Clerk ID.
   const identityId = localUser?.id ?? clerkUser?.externalId ?? clerkUser?.id;
-  const authIdentity = clerkUser?.id ?? (localUser?.isTester ? localUser.id : null);
+  const authIdentity = clerkUser?.id ?? null;
   const observedAuthState = [
     authIdentity ?? "",
     localUser?.id ?? "",

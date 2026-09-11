@@ -1,16 +1,15 @@
-import session from "express-session";
-import connectPg from "connect-pg-simple";
 import {
   authenticateRequest,
   clerkClient,
   getAuth,
 } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
-import type { Express, Request, RequestHandler } from "express";
+import {
+  buildPublishableKey,
+  publishableKeyFromHost,
+} from "@clerk/shared/keys";
+import type { Request, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { getClerkProxyHost } from "../../middlewares/clerkProxyMiddleware";
-
-const TESTER_SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 
 type NormalizedUser = {
   claims: {
@@ -22,47 +21,10 @@ type NormalizedUser = {
     last_name?: string;
     profileImageUrl?: string;
     username?: string;
-    testerOwnerUserId?: string;
   };
   expires_at: number;
-  isTester: boolean;
-  isOwner?: boolean;
-  isTestOwner?: boolean;
+  role: "Admin" | "User";
 };
-
-declare module "express-session" {
-  interface SessionData {
-    testerIdentity?: NormalizedUser;
-  }
-}
-
-export function getSession() {
-  const pgStore = connectPg(session);
-  return session({
-    secret: process.env.SESSION_SECRET!,
-    store: new pgStore({
-      conString: process.env.DATABASE_URL,
-      createTableIfMissing: false,
-      ttl: TESTER_SESSION_TTL / 1000,
-      tableName: "sessions",
-    }),
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: TESTER_SESSION_TTL,
-    },
-  });
-}
-
-export async function setupAuth(app: Express): Promise<{ sessionParser: ReturnType<typeof getSession> }> {
-  app.set("trust proxy", 1);
-  const sessionParser = getSession();
-  app.use(sessionParser);
-  return { sessionParser };
-}
-
 function claimsValue(claims: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = claims[key];
@@ -72,79 +34,168 @@ function claimsValue(claims: Record<string, unknown>, ...keys: string[]): string
 }
 
 export function isProtectedOwnerIdentity(input: {
-  existing: { isTester?: boolean } | undefined;
+  existing: object | undefined;
   userId: string;
   username?: string;
   replOwner?: string;
+  binding: "legacy-claim" | "clerk-external-id" | "native-clerk";
 }): boolean {
   return Boolean(
     input.existing &&
-    !input.existing.isTester &&
+    input.binding !== "native-clerk" &&
     !input.userId.startsWith("user_") &&
     input.username &&
     input.replOwner === input.username,
   );
 }
 
+type ClerkProfile = {
+  id: string;
+  externalId: string | null;
+  username?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+};
+
+const CLERK_PROFILE_CACHE_LIMIT = 100;
+const clerkProfileCache = new Map<string, Promise<ClerkProfile>>();
+
+async function getClerkProfile(clerkUserId: string): Promise<ClerkProfile> {
+  const cached = clerkProfileCache.get(clerkUserId);
+  if (cached) return cached;
+  const pending = clerkClient.users.getUser(clerkUserId).then((user) => {
+    const privateUsername =
+      typeof user.privateMetadata.username === "string"
+        ? user.privateMetadata.username
+        : undefined;
+    const publicUsername =
+      typeof user.publicMetadata.username === "string"
+        ? user.publicMetadata.username
+        : undefined;
+    const externalUsername = user.externalAccounts
+      .map((account) => account.username)
+      .find((value): value is string => typeof value === "string" && value.length > 0);
+    return {
+      id: user.id,
+      externalId: user.externalId,
+      username:
+        user.username ??
+        privateUsername ??
+        publicUsername ??
+        externalUsername,
+      email: user.primaryEmailAddress?.emailAddress,
+      firstName: user.firstName ?? undefined,
+      lastName: user.lastName ?? undefined,
+      profileImageUrl: user.imageUrl,
+    };
+  });
+  clerkProfileCache.set(clerkUserId, pending);
+  try {
+    const profile = await pending;
+    if (clerkProfileCache.size > CLERK_PROFILE_CACHE_LIMIT) {
+      const oldest = clerkProfileCache.keys().next().value;
+      if (oldest) clerkProfileCache.delete(oldest);
+    }
+    return profile;
+  } catch (error) {
+    clerkProfileCache.delete(clerkUserId);
+    throw error;
+  }
+}
+
 async function clerkIdentity(req: Request): Promise<NormalizedUser | undefined> {
   const auth = getAuth(req);
   if (!auth.userId) return undefined;
   const claims = (auth.sessionClaims ?? {}) as Record<string, unknown>;
-  const userId = claimsValue(claims, "userId");
-  if (!userId) return undefined;
+  let clerkProfile: ClerkProfile | undefined;
+  const legacyUserId = claimsValue(claims, "userId");
+  const claimedExternalId = claimsValue(claims, "externalId", "external_id");
+  let userId = legacyUserId ?? claimedExternalId;
+  let identityBinding: "legacy-claim" | "clerk-external-id" | "native-clerk" =
+    legacyUserId
+      ? legacyUserId.startsWith("user_")
+        ? "native-clerk"
+        : "legacy-claim"
+      : claimedExternalId
+        ? "clerk-external-id"
+        : "native-clerk";
+  let existing = userId
+    ? await authStorage.getUser(userId)
+    : await authStorage.getUser(auth.userId);
+  if (!userId || identityBinding === "native-clerk") {
+    if (existing) {
+      userId = auth.userId;
+    } else {
+      clerkProfile = await getClerkProfile(auth.userId);
+      userId = clerkProfile.externalId ?? clerkProfile.id;
+      identityBinding = clerkProfile.externalId
+        ? "clerk-external-id"
+        : "native-clerk";
+      existing = await authStorage.getUser(userId);
+    }
+  }
 
-  // `userId` is the legacy Replit subject for migrated accounts and the local
-  // bridge value for newly-created accounts. Never use Clerk's native userId
-  // for local database records.
-  // Do not create a local row during authentication. A missing local account
-  // is a meaningful not-provisioned state that the auth-user route must
-  // communicate to the client, not a pending account with default values.
-  const existing = await authStorage.getUser(userId);
+  const email =
+    claimsValue(claims, "email") ??
+    clerkProfile?.email;
+  const firstName =
+    claimsValue(claims, "firstName", "first_name") ??
+    clerkProfile?.firstName ??
+    undefined;
+  const lastName =
+    claimsValue(claims, "lastName", "last_name") ??
+    clerkProfile?.lastName ??
+    undefined;
+  const profileImageUrl =
+    claimsValue(claims, "profileImageUrl", "profile_image_url") ??
+    clerkProfile?.profileImageUrl;
+
+  // Prefer the legacy Replit subject or Clerk externalId for migrated
+  // accounts. New external-Clerk identities safely provision under their
+  // native user_ identifier and cannot satisfy the initial-owner check.
+  if (!existing) {
+    await authStorage.createUserIfMissing({
+      id: userId,
+      email,
+      firstName,
+      lastName,
+      profileImageUrl,
+    });
+    existing = await authStorage.getUser(userId);
+  }
 
   // Owner access is only retained for the migrated local record. A new Clerk
   // identity with the same username must not become owner through JIT creation.
-  const username = claimsValue(claims, "username");
-  const isOwner = isProtectedOwnerIdentity({
+  const username = claimsValue(claims, "username") ?? clerkProfile?.username;
+  const isVerifiedExistingOwner = isProtectedOwnerIdentity({
     existing,
     userId,
     username,
     replOwner: process.env.REPL_OWNER,
+    binding: identityBinding,
   });
+  if (isVerifiedExistingOwner && existing?.role !== "Admin") {
+    existing = await authStorage.ensureInitialAdmin(userId);
+  }
   return {
     claims: {
       sub: userId,
-      email: claimsValue(claims, "email"),
-      firstName: claimsValue(claims, "firstName", "first_name"),
-      first_name: claimsValue(claims, "firstName", "first_name"),
-      lastName: claimsValue(claims, "lastName", "last_name"),
-      last_name: claimsValue(claims, "lastName", "last_name"),
-      profileImageUrl: claimsValue(claims, "profileImageUrl", "profile_image_url"),
+      email,
+      firstName,
+      first_name: firstName,
+      lastName,
+      last_name: lastName,
+      profileImageUrl,
       username,
     },
     expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
-    isTester: false,
-    isOwner,
+    role: existing?.role ?? "User",
   };
 }
-
-function testerIdentity(req: Request): NormalizedUser | undefined {
-  const tester = req.session?.testerIdentity;
-  const validDevelopmentOwner =
-    process.env.NODE_ENV !== "production" && tester?.isTestOwner === true;
-  if (
-    (!tester?.isTester && !validDevelopmentOwner) ||
-    !tester.claims?.sub ||
-    tester.expires_at < Math.floor(Date.now() / 1000)
-  ) {
-    return undefined;
-  }
-  return tester;
-}
-
 async function resolveIdentity(req: Request): Promise<NormalizedUser | undefined> {
-  // Clerk wins if both cookies are supplied. This deliberately prevents a
-  // tester session from inheriting a concurrently signed-in Clerk identity.
-  return (await clerkIdentity(req)) ?? testerIdentity(req);
+  return clerkIdentity(req);
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
@@ -161,25 +212,22 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     next(error);
   }
 };
-
-export function establishTesterSession(req: Request, identity: NormalizedUser): Promise<void> {
-  req.session.testerIdentity = identity;
-  return new Promise((resolve, reject) => req.session.save((error) => error ? reject(error) : resolve()));
-}
-
-export function destroyTesterSession(req: Request): Promise<void> {
-  return new Promise((resolve, reject) => req.session.destroy((error) => error ? reject(error) : resolve()));
-}
-
 export async function authenticateWebSocketRequest(req: Request): Promise<NormalizedUser | undefined> {
+  const requestHost = getClerkProxyHost(req) ?? "";
+  const configuredFrontendHost =
+    /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(requestHost)
+      ? process.env.VITE_CLERK_PUBLIC_HOST
+      : undefined;
   const state = await authenticateRequest({
     clerkClient,
     request: req,
     options: {
-      publishableKey: publishableKeyFromHost(
-        getClerkProxyHost(req) ?? "",
-        process.env.CLERK_PUBLISHABLE_KEY,
-      ),
+      publishableKey: configuredFrontendHost
+        ? buildPublishableKey(configuredFrontendHost)
+        : publishableKeyFromHost(
+            requestHost,
+            process.env.CLERK_PUBLISHABLE_KEY,
+          ),
     },
   });
   (req as any).auth = state.toAuth();
