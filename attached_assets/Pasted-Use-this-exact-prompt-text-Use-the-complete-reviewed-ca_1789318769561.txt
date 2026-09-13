@@ -1,0 +1,64 @@
+Use this exact prompt:
+
+```text
+Use the complete reviewed candidate at `skill-previews/poe-setup/SKILL.md` to amend every previously installed Poe Setup skill through the canonical account-managed skill workflow.
+
+Before editing, read and follow:
+- `.agents/skills/skill-mirror-sync/SKILL.md`
+- `skill-previews/poe-setup/SKILL.md`
+- `skill-previews/poe-setup/targeted-correction-contract.test.mjs`
+- Project Task #1321, “Permanently bound Poe model probing”
+
+Requirements:
+
+1. Treat `skill-previews/poe-setup/SKILL.md` as the approved content candidate. Preserve its complete frontmatter, section structure, scope, and unrelated guidance. Do not replace it with excerpts or a summarized version.
+
+2. Locate every canonical, account-managed installation of the Poe Setup skill. Update canonical sources only. Do not directly edit `.local/custom_skills`, runtime mirrors, generated projections, cached copies, or other disposable skill definitions.
+
+3. Ensure every amended installation consistently:
+   - Uses `POE_API_KEY2`, never `POE_API_KEY`.
+   - Uses Poe’s OpenAI-compatible caller API at `https://api.poe.com/v1`.
+   - Never constructs OpenAI SDK URLs from the legacy `/bot/` path.
+   - Clearly explains that `/bot/` is the legacy Poe bot-server protocol, not the OpenAI-compatible caller API.
+   - Lazily constructs and memoizes Poe clients.
+   - Performs no secret lookup, missing-secret throw, client construction, health check, catalogue request, or model completion as a module-import side effect.
+   - Keeps optional Poe integration import-safe so unrelated imports and ordinary server startup cannot fail merely because Poe is unconfigured.
+   - Reports missing configuration when a Poe operation is invoked, unless the application deliberately invokes an explicit startup preflight.
+   - Keeps an explicit startup preflight separate from module loading.
+
+4. Incorporate the related safety correction from Task #1321:
+   - Ordinary application startup, deployment startup, readiness checks, health checks, and catalogue refreshes must issue zero Poe model-completion requests.
+   - Treat catalogue discovery as metadata discovery only, not live inference verification.
+   - Do not probe every model returned by the catalogue.
+   - Live inference verification must require an explicit, protected administrator action.
+   - Any retained bulk verification must be limited to active application route-chain models and enforce fixed limits for model count, concurrency, attempts, per-request timeout, and the aggregate request/time budget.
+   - Preserve safe partial and budget-limited results instead of launching unbounded fan-out.
+   - Do not weaken existing capability filtering, privacy rules, route contracts, normalized errors, cancellation, fallback behavior, tools, vision, structured output, streaming, retries, cost controls, or context reconstruction.
+
+5. Before publishing, strengthen and run the regression contract so it rejects all forms of executable module-scope Poe client construction and secret validation—not only a specifically named export. Add mutation fixtures proving that these examples are rejected:
+   - `const client = new OpenAI(...)` at module scope.
+   - A differently named module-scope OpenAI client.
+   - Module-scope `process.env.POE_API_KEY2` lookup followed by a missing-secret throw.
+   - Import-triggered health checks, catalogue calls, or completion probes.
+   Also prove that the lazy memoized getter in the approved candidate is accepted.
+
+6. Use the account-skill synchronization and projection commands documented by the canonical skill-mirror-sync skill. After updating the canonical source, regenerate or refresh disposable mirrors through that supported workflow rather than editing them manually.
+
+7. Validate:
+   - The complete installed skill matches the approved candidate plus the Task #1321 probing clarification.
+   - No old `POE_API_KEY` references remain.
+   - No OpenAI SDK client uses `/bot/`.
+   - Importing the provider module without `POE_API_KEY2` is safe.
+   - Ordinary startup and catalogue refresh perform zero model completions.
+   - The focused contract and canonical skill projection/parity checks pass.
+   - The resulting canonical files are tracked and are not stored in ignored or runtime-mirror locations.
+
+8. Do not change application Poe integration code as part of this work unless a separate assigned task explicitly authorizes it. If an installed skill conflicts with newer approved canonical guidance, report the conflict and preserve the newer safe correction rather than blindly overwriting it.
+
+At completion, provide:
+- The canonical skill source paths amended.
+- The generated projections refreshed through the supported workflow.
+- A concise report of the secret-name, lazy-initialization, protocol, import-safety, and bounded-probing corrections.
+- The exact validation commands and results.
+- Any conflicts or installations intentionally left unchanged, with reasons.
+```
