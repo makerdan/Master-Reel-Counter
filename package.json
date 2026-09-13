@@ -15,6 +15,7 @@
     "test:unit": "node --import tsx/esm --test server/__tests__/routes.test.ts server/__tests__/photo-delete.test.ts server/__tests__/support-ops.test.ts server/__tests__/poe-provider.test.ts scripts/__tests__/dev-supervisor.test.mjs",
     "test:vite-hmr": "node --import tsx/esm --test server/__tests__/vite.test.ts",
     "test:workspace-skill": "node --test scripts/workspace-skill-sync.test.mjs",
+    "test:poe-setup-skill": "node --test .agents/skills/poe-setup/targeted-correction-contract.test.mjs",
     "workspace-skill:refresh": "node scripts/workspace-skill-sync.mjs refresh",
     "workspace-skill:validate": "node scripts/workspace-skill-sync.mjs validate",
     "workspace-skill:audit": "node scripts/workspace-skill-sync.mjs audit",
