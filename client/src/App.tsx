@@ -4,7 +4,6 @@ import { Switch, Route, useLocation, useSearch, Router as WouterRouter } from "w
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClerkProvider, SignIn, SignUp, useClerk } from "@clerk/react";
-import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,27 +24,19 @@ import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 import { WsReconnectProvider } from "@/hooks/use-ws-reconnect";
 import { HelpOnboarding } from "@/components/HelpMenu";
 import { buildSignInPath, getReturnPathFromSearch } from "@shared/auth-routing";
-import { buildPublishableKey } from "@clerk/shared/keys";
+import { resolveClerkBootstrapConfig } from "@shared/clerk-config";
 
-const clerkPublicHost =
-  import.meta.env.VITE_CLERK_PUBLIC_HOST || window.location.hostname;
-const clerkPubKey = import.meta.env.VITE_CLERK_PUBLIC_HOST
-  ? buildPublishableKey(clerkPublicHost)
-  : publishableKeyFromHost(
-      clerkPublicHost,
-      import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-    );
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const clerkBootstrap = resolveClerkBootstrapConfig({
+  publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+  proxyUrl: import.meta.env.VITE_CLERK_PROXY_URL,
+  runtimeHostname: window.location.hostname,
+});
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
     ? path.slice(basePath.length) || "/"
     : path;
-}
-
-if (!clerkPubKey) {
-  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in .env file");
 }
 
 const clerkAppearance = {
@@ -276,8 +267,8 @@ function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
   return (
     <ClerkProvider
-      publishableKey={clerkPubKey}
-      proxyUrl={clerkProxyUrl}
+      publishableKey={clerkBootstrap.publishableKey}
+      proxyUrl={clerkBootstrap.proxyUrl}
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}

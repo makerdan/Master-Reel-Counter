@@ -12,9 +12,9 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { clerkMiddleware } from "@clerk/express";
 import {
-  buildPublishableKey,
-  publishableKeyFromHost,
-} from "@clerk/shared/keys";
+  resolveClerkEnvironmentPublishableKey,
+  resolveClerkRequestPublishableKey,
+} from "@shared/clerk-config";
 import {
   CLERK_PROXY_PATH,
   CLERK_PROXY_READINESS_PATH,
@@ -42,6 +42,10 @@ try {
 
 const app = express();
 const httpServer = createServer(app);
+const clerkPublishableKey = resolveClerkEnvironmentPublishableKey({
+  serverPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+  clientPublishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
+});
 
 let shuttingDown = false;
 let drainStarted = false;
@@ -67,18 +71,12 @@ app.get(CLERK_PROXY_READINESS_PATH, (_req, res) => {
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 app.use(
   clerkMiddleware((req) => {
-    const requestHost = getClerkProxyHost(req) ?? "";
-    const configuredFrontendHost =
-      /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(requestHost)
-        ? process.env.VITE_CLERK_PUBLIC_HOST
-        : undefined;
     return {
-      publishableKey: configuredFrontendHost
-        ? buildPublishableKey(configuredFrontendHost)
-        : publishableKeyFromHost(
-            requestHost,
-            process.env.CLERK_PUBLISHABLE_KEY,
-          ),
+      publishableKey: resolveClerkRequestPublishableKey({
+        requestHost: getClerkProxyHost(req) ?? "",
+        publishableKey: clerkPublishableKey,
+        proxyEnabled: process.env.NODE_ENV === "production",
+      }),
     };
   }),
 );

@@ -4,9 +4,9 @@ import {
   getAuth,
 } from "@clerk/express";
 import {
-  buildPublishableKey,
-  publishableKeyFromHost,
-} from "@clerk/shared/keys";
+  resolveClerkEnvironmentPublishableKey,
+  resolveClerkRequestPublishableKey,
+} from "@shared/clerk-config";
 import type { Request, RequestHandler } from "express";
 import { authStorage } from "./storage";
 import { getClerkProxyHost } from "../../middlewares/clerkProxyMiddleware";
@@ -235,21 +235,19 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 };
 export async function authenticateWebSocketRequest(req: Request): Promise<NormalizedUser | undefined> {
-  const requestHost = getClerkProxyHost(req) ?? "";
-  const configuredFrontendHost =
-    /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(requestHost)
-      ? process.env.VITE_CLERK_PUBLIC_HOST
-      : undefined;
+  const clerkPublishableKey = resolveClerkEnvironmentPublishableKey({
+    serverPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+    clientPublishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
+  });
   const state = await authenticateRequest({
     clerkClient,
     request: req,
     options: {
-      publishableKey: configuredFrontendHost
-        ? buildPublishableKey(configuredFrontendHost)
-        : publishableKeyFromHost(
-            requestHost,
-            process.env.CLERK_PUBLISHABLE_KEY,
-          ),
+      publishableKey: resolveClerkRequestPublishableKey({
+        requestHost: getClerkProxyHost(req) ?? "",
+        publishableKey: clerkPublishableKey,
+        proxyEnabled: process.env.NODE_ENV === "production",
+      }),
     },
   });
   (req as any).auth = state.toAuth();

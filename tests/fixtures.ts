@@ -183,13 +183,11 @@ export const test = base.extend<E2EFixtures>({
   },
   clerkTestingToken: [
     async ({ context, page, request }, use) => {
-      const frontendApiUrl =
-        process.env.VITE_CLERK_PUBLIC_HOST ??
-        parsePublishableKey(process.env.VITE_CLERK_PUBLISHABLE_KEY)?.frontendApi;
+      const frontendApiUrl = parsePublishableKey(
+        process.env.VITE_CLERK_PUBLISHABLE_KEY,
+      )?.frontendApi;
       if (!frontendApiUrl) {
-        throw new Error(
-          "Browser tests require a valid Clerk publishable key or frontend host for token refresh",
-        );
+        throw new Error("Browser tests require a valid VITE_CLERK_PUBLISHABLE_KEY");
       }
       const emailAddress = process.env.E2E_CLERK_EMAIL;
       if (!emailAddress) {

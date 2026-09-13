@@ -8,7 +8,7 @@ import {
   clerkSetup,
   setupClerkTestingToken,
 } from "@clerk/testing/playwright";
-import { buildPublishableKey, parsePublishableKey } from "@clerk/shared/keys";
+import { resolveClerkBootstrapConfig } from "../shared/clerk-config";
 import pg from "pg";
 
 function findChromium(): string | undefined {
@@ -42,21 +42,16 @@ async function globalSetup() {
   if (process.env.CI_SMOKE_TEST === "1") return;
 
   await waitForServer(`${BASE_URL}/api/healthz`);
-  const configuredPublishableKey = process.env.VITE_CLERK_PUBLISHABLE_KEY;
-  const clerkFrontendHost =
-    process.env.VITE_CLERK_PUBLIC_HOST ??
-    parsePublishableKey(configuredPublishableKey)?.frontendApi;
-  if (
-    !process.env.CLERK_SECRET_KEY ||
-    !process.env.DATABASE_URL ||
-    !clerkFrontendHost
-  ) {
-    throw new Error(
-      "Clerk browser setup requires CLERK_SECRET_KEY, DATABASE_URL, and a valid Clerk publishable key or frontend host",
-    );
+  const missing = ["CLERK_SECRET_KEY", "DATABASE_URL"].filter(
+    (field) => !process.env[field],
+  );
+  if (missing.length > 0) {
+    throw new Error(`Clerk browser setup is missing fields: ${missing.join(", ")}`);
   }
-  const clerkPublishableKey =
-    configuredPublishableKey ?? buildPublishableKey(clerkFrontendHost);
+  const clerkConfig = resolveClerkBootstrapConfig({
+    publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
+    runtimeHostname: new URL(BASE_URL).hostname,
+  });
 
   const localUserId = `e2e-clerk-${randomUUID()}`;
   const email = `e2e-clerk+${randomUUID()}@example.com`;
@@ -88,13 +83,13 @@ async function globalSetup() {
   const context = await browser.newContext();
   const page = await context.newPage();
   await clerkSetup({
-    publishableKey: clerkPublishableKey,
+    publishableKey: clerkConfig.publishableKey,
     secretKey: process.env.CLERK_SECRET_KEY,
-    frontendApiUrl: clerkFrontendHost,
+    frontendApiUrl: clerkConfig.frontendApiHost,
   });
   await setupClerkTestingToken({
     context,
-    options: { frontendApiUrl: clerkFrontendHost },
+    options: { frontendApiUrl: clerkConfig.frontendApiHost },
   });
   await page.goto(`${BASE_URL}/sign-in`);
   await clerkTesting.signIn({ page, emailAddress: email });
