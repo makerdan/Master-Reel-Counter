@@ -130,8 +130,9 @@ inference, vision, tools, structured output, or streaming works for that model.
 Never hard-code the key, commit it, include it in a client bundle, put it in
 browser local storage, or return it in an error/log response. Do not ask a user
 to paste a secret into chat. If the app already uses a secret-management or
-provider configuration layer, follow that layer's naming and validation
-conventions instead of exposing the key to application code.
+provider configuration layer, let that layer read and validate `POE_API_KEY2`
+instead of exposing the key to application code. Preserve the `POE_API_KEY2`
+credential name exactly; do not introduce or fall back to any alternative.
 
 ## 5. Raw SDK fallback
 
