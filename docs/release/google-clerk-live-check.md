@@ -1,6 +1,7 @@
 # Google-backed Clerk live verification
 
-This checklist is the one-time live verification for Task 634. It is
+This checklist is the one-time live verification for the Google Admin/User
+release check. It is
 deliberately separate from the repeatable release spec because Google CAPTCHA,
 MFA, consent, and device-trust steps must remain human-controlled.
 
@@ -51,3 +52,25 @@ If the provider or account is unavailable, record that as a provider/account
 configuration result rather than weakening the deterministic release
 assertions. Do not record the provider response body or any credential-bearing
 URL/query string.
+
+## Verification record
+
+Recorded 2026-09-14 against the published HTTPS origin
+`https://master-reel-counter-ai.replit.app`.
+
+- Deployment metadata reported a public deployment with a successful build.
+- `GET /sign-in` returned `200`, but the page resolved to the application's
+  redacted `404 Page Not Found` view rather than the Clerk sign-in experience.
+- The unauthenticated browser check therefore found no Google provider control;
+  no Google account, OAuth callback, client-trust step, or role assertion was
+  attempted.
+- `GET /api/auth/user` returned `401` while signed out.
+- Admin live verification: unavailable because the published target does not
+  expose the expected sign-in route. The repeatable Admin role-mapping
+  assertions remain in `tests/release/google-clerk-auth.spec.ts`.
+- User live verification: unavailable for the same provider/target
+  configuration result. The repeatable User role-mapping assertions remain in
+  `tests/release/google-clerk-auth.spec.ts`.
+- The workspace also has no `PRODUCTION_BASE_URL`; the release spec correctly
+  refuses to target an implicit deployment. No credentials, OAuth codes,
+  cookies, tokens, or identity-bearing response bodies were recorded.
