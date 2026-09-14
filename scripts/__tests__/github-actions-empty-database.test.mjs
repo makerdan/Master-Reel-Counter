@@ -219,12 +219,16 @@ test("GitHub Actions boots the app against a blank disposable database", async (
     }
 
     const port = await findAvailablePort();
-    server = spawn("npx", ["tsx", "server/index.ts"], {
+    server = spawn(
+      process.execPath,
+      [resolve(root, "node_modules/tsx/dist/cli.mjs"), "server/index.ts"],
+      {
       cwd: root,
       detached: true,
       env: { ...bootstrapEnv, PORT: String(port) },
       stdio: ["ignore", "pipe", "pipe"],
-    });
+      },
+    );
     server.stdout.on("data", (chunk) => { serverOutput += chunk; });
     server.stderr.on("data", (chunk) => { serverOutput += chunk; });
 
