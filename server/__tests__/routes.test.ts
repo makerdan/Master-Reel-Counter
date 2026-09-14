@@ -42,6 +42,7 @@ import
   patchEntrySchema,
   buildScanResultsForPins,
   canEdit,
+  createAdminAiHealthHandler,
   createHelpChatHandler,
   helpChatRateLimiter,
   respondWithScanResultsPersistenceFailure,
@@ -1682,6 +1683,71 @@ describe("authenticated Poe route contracts", () => {
         { pinId: 33, pinLabel: "P033", rawText: null, readable: false },
       ],
     );
+  });
+});
+
+describe("Admin AI health route contract", () => {
+  test("returns independent API and exact supported-model health", async () => {
+    let statusCode = 0;
+    let body: unknown;
+    const response = {
+      setHeader: () => {},
+      status(code: number) {
+        statusCode = code;
+        return this;
+      },
+      json(payload: unknown) {
+        body = payload;
+        return this;
+      },
+    } as any;
+
+    await createAdminAiHealthHandler({
+      listModels: async () => [
+        { id: "Gemini-3.1-Pro", capabilities: [], privacyClass: "approved" },
+        { id: "unrelated-provider-model", capabilities: [], privacyClass: "approved" },
+      ],
+      streamText: async () => {
+        throw new Error("not used");
+      },
+      completeVision: async () => {
+        throw new Error("not used");
+      },
+    })({} as any, response, (() => {}) as any);
+
+    assert.equal(statusCode, 0);
+    assert.deepEqual(body, {
+      apiOnline: true,
+      models: [
+        { id: "Gemini-3.1-Pro", label: "Gemini 3.1 Pro", available: true },
+        { id: "Claude-Sonnet-4.5", label: "Claude Sonnet 4.5", available: false },
+      ],
+    });
+  });
+
+  test("returns both supported models unavailable when the provider fails", async () => {
+    let body: any;
+    const response = {
+      setHeader: () => {},
+      json(payload: unknown) {
+        body = payload;
+      },
+    } as any;
+
+    await createAdminAiHealthHandler({
+      listModels: async () => {
+        throw new PoeProviderError("upstream", "safe", 502);
+      },
+      streamText: async () => {
+        throw new Error("not used");
+      },
+      completeVision: async () => {
+        throw new Error("not used");
+      },
+    })({} as any, response, (() => {}) as any);
+
+    assert.equal(body.apiOnline, false);
+    assert.deepEqual(body.models.map((model: any) => model.available), [false, false]);
   });
 });
 

@@ -14,6 +14,7 @@ import {
   isApproved,
   isWebSocketIdentityAuthorized,
   isOwnerIdentity,
+  adminOnly,
   ownerOnly,
 } from "./replit_integrations/auth/routes";
 import { authStorage } from "./replit_integrations/auth/storage";
@@ -55,7 +56,13 @@ import {
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
 import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
-import { getPoeProvider, PoeProviderError, type PoeProvider, type PoeTextMessage } from "./providers/poe";
+import {
+  getPoeProvider,
+  getPoeHealthStatus,
+  PoeProviderError,
+  type PoeProvider,
+  type PoeTextMessage,
+} from "./providers/poe";
 const pdfJobs = new Map<string, {
   done: number;
   total: number;
@@ -365,6 +372,14 @@ export function createHelpChatHandler(
   };
 }
 
+export function createAdminAiHealthHandler(
+  provider: PoeProvider = getPoeProvider(),
+): RequestHandler {
+  return async (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json(await getPoeHealthStatus(provider));
+  };
+}
 function abortedOrEnded(res: any): boolean {
   return res.writableEnded === true || res.destroyed === true;
 }
@@ -668,6 +683,7 @@ export async function registerRoutes(
   // All admin operations share one deny-by-default owner boundary. Individual
   // handlers still validate their own inputs and resource scope.
   app.use("/api/admin", ownerOnly);
+  app.get("/api/admin/ai-health", isAuthenticated, adminOnly, createAdminAiHealthHandler());
   app.get(CLERK_PROXY_HEALTH_PATH, ownerOnly, (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.json({ ok: true, ...clerkProxyHealth.snapshot() });

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   normalizePoeError,
   parsePoeModelsResponse,
+  getPoeHealthStatus,
+  getPoeModelHealth,
   PoeProviderError,
   createPoeProvider,
   selectPoeModel,
@@ -17,6 +19,29 @@ afterEach(() => {
 });
 
 describe("Poe live model registry", () => {
+  test("reports only the supported models from the live catalogue", () => {
+    const models = parsePoeModelsResponse({
+      data: [
+        { id: "Gemini-3.1-Pro" },
+        { id: "unrelated-provider-model" },
+        { id: "Claude-Sonnet-4.5" },
+      ],
+    });
+
+    assert.deepEqual(getPoeModelHealth(models), [
+      { id: "Gemini-3.1-Pro", label: "Gemini 3.1 Pro", available: true },
+      { id: "Claude-Sonnet-4.5", label: "Claude Sonnet 4.5", available: true },
+    ]);
+  });
+
+  test("keeps each supported model status independent", () => {
+    const models = parsePoeModelsResponse({
+      data: [{ id: "Gemini-3.1-Pro" }, { id: "unrelated-provider-model" }],
+    });
+
+    assert.deepEqual(getPoeModelHealth(models).map((model) => model.available), [true, false]);
+  });
+
   test("rejects malformed catalogue rows and preserves only known capabilities", () => {
     process.env.POE_MODEL_CAPABILITIES_JSON = JSON.stringify({
       "live-vision-model": ["vision-json", "invented-capability"],
@@ -56,6 +81,34 @@ describe("Poe live model registry", () => {
 });
 
 describe("Poe response and error contracts", () => {
+  test("keeps API health separate from model availability", async () => {
+    const healthyApiWithMissingModels = await getPoeHealthStatus({
+      listModels: async () => [{ id: "unrelated-provider-model", capabilities: [], privacyClass: "approved" }],
+      streamText: async () => {
+        throw new Error("not used");
+      },
+      completeVision: async () => {
+        throw new Error("not used");
+      },
+    });
+    assert.equal(healthyApiWithMissingModels.apiOnline, true);
+    assert.deepEqual(healthyApiWithMissingModels.models.map((model) => model.available), [false, false]);
+
+    const providerFailure = await getPoeHealthStatus({
+      listModels: async () => {
+        throw new PoeProviderError("upstream", "Poe is temporarily unavailable.", 502);
+      },
+      streamText: async () => {
+        throw new Error("not used");
+      },
+      completeVision: async () => {
+        throw new Error("not used");
+      },
+    });
+    assert.equal(providerFailure.apiOnline, false);
+    assert.deepEqual(providerFailure.models.map((model) => model.available), [false, false]);
+  });
+
   test("fails clearly when the server-only key is missing", async () => {
     const previousKey = process.env.POE_API_KEY;
     delete process.env.POE_API_KEY;

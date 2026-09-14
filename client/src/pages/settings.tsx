@@ -380,6 +380,21 @@ export default function SettingsPage() {
     retry: false,
   });
 
+  const { data: aiHealthData } = useQuery<{
+    apiOnline: boolean;
+    models: Array<{ id: string; label: string; available: boolean }>;
+  }>({
+    queryKey: ["/api/admin/ai-health"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/ai-health", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authorized");
+      return res.json();
+    },
+    enabled: isAdmin,
+    staleTime: 30_000,
+    retry: false,
+  });
+
   const { data: pageViewData } = useQuery<{
     totalViews: number;
     uniqueVisitorsToday: number;
@@ -2693,6 +2708,52 @@ export default function SettingsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  <div data-testid="section-ai-health">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">AI Services</p>
+                      <Badge
+                        variant="outline"
+                        className={aiHealthData?.apiOnline
+                          ? "border-green-300 text-green-600 dark:border-green-700 dark:text-green-400"
+                          : "border-destructive/40 text-destructive"}
+                        data-testid="badge-ai-api-status"
+                        aria-label={`Poe API ${aiHealthData?.apiOnline ? "online" : "unavailable"}`}
+                      >
+                        {aiHealthData?.apiOnline ? "API online" : "API unavailable"}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-2" role="list" aria-label="Supported AI models">
+                      {[
+                        { id: "Gemini-3.1-Pro", label: "Gemini 3.1 Pro" },
+                        { id: "Claude-Sonnet-4.5", label: "Claude Sonnet 4.5" },
+                      ].map((model) => {
+                        const available = aiHealthData?.models.some(
+                          (liveModel) => liveModel.id === model.id && liveModel.available,
+                        ) ?? false;
+                        return (
+                          <Badge
+                            key={model.id}
+                            variant="outline"
+                            role="listitem"
+                            className={available
+                              ? "border-green-300 text-green-600 dark:border-green-700 dark:text-green-400"
+                              : "border-destructive/40 text-destructive"}
+                            data-testid={`badge-ai-model-${model.id}`}
+                            aria-label={`${model.label}: ${available ? "available" : "unavailable"}`}
+                          >
+                            <span
+                              className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${available ? "bg-green-500" : "bg-destructive"}`}
+                              aria-hidden="true"
+                            />
+                            {model.label}
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <Separator />
+
                   {/* Crash History section */}
                   <div data-testid="card-crash-history">
                     <div className="flex items-center justify-between gap-2 mb-3">

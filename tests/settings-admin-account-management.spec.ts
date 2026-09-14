@@ -109,3 +109,39 @@ test("keeps block-list confirmation accurate when its count request fails", asyn
   await expect(dialog).toContainText("This will unblock 2 rejected users");
   await expect(page.getByTestId("button-confirm-clear-rejected")).toHaveText("Clear 2 blocked users");
 });
+
+test("shows exactly the supported AI models with independent availability", async ({ page }) => {
+  await mockOwnerAuth(page);
+  await page.route("**/api/admin/users", async (route) => {
+    await fulfillJson(route, [ownerUser]);
+  });
+  await page.route("**/api/admin/rejected-users/count", async (route) => {
+    await fulfillJson(route, { count: 0 });
+  });
+  await page.route("**/api/admin/ai-health", async (route) => {
+    await fulfillJson(route, {
+      apiOnline: true,
+      models: [
+        { id: "Gemini-3.1-Pro", label: "Gemini 3.1 Pro", available: true },
+        { id: "Claude-Sonnet-4.5", label: "Claude Sonnet 4.5", available: false },
+        { id: "unrelated-provider-model", label: "Unrelated model", available: true },
+      ],
+    });
+  });
+
+  await page.goto("/settings#admin");
+  await expect(page.getByTestId("section-ai-health")).toBeVisible();
+  await expect(page.getByTestId("badge-ai-api-status")).toHaveClass(/border-green/);
+  await expect(page.getByTestId("badge-ai-model-Gemini-3.1-Pro")).toHaveAttribute(
+    "aria-label",
+    "Gemini 3.1 Pro: available",
+  );
+  await expect(page.getByTestId("badge-ai-model-Gemini-3.1-Pro")).toHaveClass(/text-green/);
+  await expect(page.getByTestId("badge-ai-model-Claude-Sonnet-4.5")).toHaveAttribute(
+    "aria-label",
+    "Claude Sonnet 4.5: unavailable",
+  );
+  await expect(page.getByTestId("badge-ai-model-Claude-Sonnet-4.5")).toHaveClass(/text-destructive/);
+  await expect(page.locator('[data-testid^="badge-ai-model-"]')).toHaveCount(2);
+  await expect(page.getByText("Unrelated model")).toHaveCount(0);
+});

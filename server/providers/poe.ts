@@ -12,6 +12,17 @@ const MAX_IN_FLIGHT = 4;
 export type PoeCapability = "text-chat-stream" | "vision-json";
 export type PoeUseCase = "help-chat" | "label-scan" | "session-scan";
 
+export const SUPPORTED_POE_HEALTH_MODELS = [
+  { id: "Gemini-3.1-Pro", label: "Gemini 3.1 Pro" },
+  { id: "Claude-Sonnet-4.5", label: "Claude Sonnet 4.5" },
+] as const;
+
+export type PoeModelHealth = {
+  id: string;
+  label: string;
+  available: boolean;
+};
+
 export interface PoeLiveModel {
   id: string;
   capabilities: PoeCapability[];
@@ -188,6 +199,14 @@ export function parsePoeModelsResponse(payload: unknown): PoeLiveModel[] {
   return models;
 }
 
+export function getPoeModelHealth(models: PoeLiveModel[]): PoeModelHealth[] {
+  const liveModelIds = new Set(models.map((model) => model.id));
+  return SUPPORTED_POE_HEALTH_MODELS.map((model) => ({
+    ...model,
+    available: liveModelIds.has(model.id),
+  }));
+}
+
 export function selectPoeModel(
   models: PoeLiveModel[],
   capability: PoeCapability,
@@ -303,6 +322,22 @@ export interface PoeProvider {
     signal?: AbortSignal;
     userId: string | null;
   }): Promise<{ model: string; retries: number; labels: string[] }>;
+}
+
+export type PoeHealthStatus = {
+  apiOnline: boolean;
+  models: PoeModelHealth[];
+};
+
+export async function getPoeHealthStatus(
+  provider: PoeProvider = getPoeProvider(),
+): Promise<PoeHealthStatus> {
+  try {
+    const models = await provider.listModels(true);
+    return { apiOnline: true, models: getPoeModelHealth(models) };
+  } catch {
+    return { apiOnline: false, models: getPoeModelHealth([]) };
+  }
 }
 
 class PoeProviderImpl implements PoeProvider {
