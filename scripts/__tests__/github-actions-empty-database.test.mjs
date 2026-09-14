@@ -192,10 +192,14 @@ test("GitHub Actions boots the app against a blank disposable database", async (
       AI_INTEGRATIONS_OPENAI_BASE_URL: "http://127.0.0.1:9",
     };
 
-    const schema = await runCommand("npx", ["drizzle-kit", "push", "--force"], {
-      cwd: root,
-      env: bootstrapEnv,
-    });
+    const schema = await runCommand(
+      process.execPath,
+      [resolve(root, "node_modules/drizzle-kit/bin.cjs"), "push", "--force"],
+      {
+        cwd: root,
+        env: bootstrapEnv,
+      },
+    );
     assert.equal(
       schema.code,
       0,
