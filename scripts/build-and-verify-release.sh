@@ -4,7 +4,7 @@ set -euo pipefail
 candidate_port="${RELEASE_SMOKE_PORT:-$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')}"
 candidate_host="${RELEASE_SMOKE_PUBLIC_HOST:-master-reel-counter-ai.replit.app}"
 candidate_url="https://${candidate_host}"
-candidate_id="$(node -e 'console.log(require("crypto").randomUUID())')"
+candidate_id="${RELEASE_CANDIDATE_ID:-$(node -e 'console.log(require("crypto").randomUUID())')}"
 server_log="${RELEASE_SERVER_LOG:-$(mktemp /tmp/managed-clerk-release-server.XXXXXX.log)}"
 proxy_log="${RELEASE_PROXY_LOG:-$(mktemp /tmp/managed-clerk-release-proxy.XXXXXX.log)}"
 tls_dir="${RELEASE_TLS_DIR:-$(mktemp -d /tmp/managed-clerk-release-tls.XXXXXX)}"

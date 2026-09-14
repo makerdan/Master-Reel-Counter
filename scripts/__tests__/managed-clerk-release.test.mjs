@@ -171,6 +171,27 @@ test("every Replit deployment build gates the exact production candidate", () =>
   assert.match(candidateBuild, /trap 'exit 143' TERM/);
 });
 
+test("manual CI release gate builds and verifies the exact checked-out candidate", () => {
+  assert.match(workflow, /name: Verify exact managed Clerk candidate/);
+  assert.match(workflow, /image: postgres:16/);
+  assert.match(workflow, /POSTGRES_DB: managed_clerk_release_smoke/);
+  assert.match(workflow, /RELEASE_SMOKE_DATABASE_URL: postgresql:\/\/postgres:postgres@localhost:5432\/managed_clerk_release_smoke/);
+  assert.match(workflow, /DATABASE_URL: postgresql:\/\/postgres:postgres@localhost:5432\/publication_guard_not_for_fixtures/);
+  assert.match(workflow, /RELEASE_CANDIDATE_ID: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /run: npm run release:build/);
+  assert.doesNotMatch(workflow, /run: npm run verify:managed-clerk-release/);
+  assert.doesNotMatch(workflow, /PRODUCTION_BASE_URL:/);
+  assert.match(candidateBuild, /candidate_id="\$\{RELEASE_CANDIDATE_ID:-/);
+});
+
+test("manual CI release gate blocks when matched production Clerk credentials are unavailable", () => {
+  assert.match(workflow, /name: Require matched production Clerk credentials/);
+  assert.match(workflow, /secrets\.CLERK_SECRET_KEY/);
+  assert.match(workflow, /secrets\.VITE_CLERK_PUBLISHABLE_KEY/);
+  assert.match(workflow, /validation is blocked: missing production credential/);
+  assert.doesNotMatch(workflow, /continue-on-error:[\s\S]*Require matched production Clerk credentials/);
+});
+
 test("production and release testing derive the proxy path from one shared source", () => {
   assert.match(sharedClerkConfig, /export const CLERK_PROXY_PATH = "\/api\/__clerk";/);
   assert.match(clerkProxyMiddleware, /CLERK_PROXY_PATH[\s\S]*from "@shared\/clerk-config"/);
@@ -741,10 +762,13 @@ test("release workflow passes secrets only through the environment", () => {
   assert.match(workflow, /require-trusted-main:/);
   assert.match(workflow, /if \[\[ "\$GITHUB_REF" != "refs\/heads\/main" \]\]/);
   assert.match(workflow, /needs:\s+- require-trusted-main/);
-  assert.match(workflow, /npm run verify:managed-clerk-release/);
-  assert.match(workflow, /PRODUCTION_BASE_URL: \$\{\{ vars\.PRODUCTION_BASE_URL \}\}/);
+  assert.match(workflow, /npm run release:build/);
   assert.match(workflow, /CLERK_SECRET_KEY: \$\{\{ secrets\.CLERK_SECRET_KEY \}\}/);
-  assert.match(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
+  assert.match(
+    workflow,
+    /VITE_CLERK_PUBLISHABLE_KEY: \$\{\{ secrets\.VITE_CLERK_PUBLISHABLE_KEY \}\}/,
+  );
+  assert.doesNotMatch(workflow, /PRODUCTION_BASE_URL:|secrets\.DATABASE_URL/);
   assert.doesNotMatch(workflow, /echo.*SECRET|set -x/);
   assert.doesNotMatch(workflow, /playwright-report/);
   const jobHeader = workflow.slice(0, workflow.indexOf("    steps:"));

@@ -82,6 +82,34 @@ lock, plan behavior, ordering, and exit status.
 | Replit-managed secrets and environment values | Not available remotely | **Intentional gap**; only non-sensitive test values are declared in the workflow. |
 | Hosted runner, service, or action outage | N/A | **Unknown until a real GitHub run**; local success cannot establish remote availability. |
 
+## Managed Clerk release-candidate coverage
+
+The manually dispatched `.github/workflows/managed-clerk-release.yml` gate is
+separate from canonical credential-free validation. It runs the canonical
+`release:build` harness against a disposable PostgreSQL service and passes the
+checked-out `github.sha` as the candidate identity. The harness builds that
+revision, starts its production server, initializes and checks the current
+Admin/User schema, verifies readiness identity through the local TLS transport,
+and executes the real Chromium Clerk flows. Those flows cover Clerk script
+loading and proxy transport, email testing-token sign-in and session state,
+local identity and persisted Admin/User roles, protected settings/stats/dashboard
+navigation, the configured Google provider, and logout.
+
+This candidate gate requires a matched production `CLERK_SECRET_KEY` and
+`VITE_CLERK_PUBLISHABLE_KEY`. Missing credentials fail in a named prerequisite
+step; they never skip or turn the browser checks green. The workflow does not
+copy credentials, access the publishing database, publish the candidate, or
+claim that a published live site was checked.
+
+Coverage classifications stay distinct:
+
+| Classification | Evidence |
+| --- | --- |
+| Deterministic contracts | `test:managed-clerk-release-contract` checks workflow routing, schema rejection, candidate identity, TLS/proxy behavior, and safe diagnostics without production credentials. |
+| Real candidate browser execution | The manual release gate runs `release:build` with production Clerk credentials and a disposable database. |
+| Live-site checks | Not part of candidate evidence. A separately invoked public-URL smoke may check an already published site, but cannot prove the checked-out revision. |
+| Production-key-dependent checks | Clerk script, provider, session, identity/role, protected navigation, and logout checks block when matched credentials are unavailable. |
+
 ## Diagnostics and artifact safety
 
 The canonical command is recorded in `ci-artifacts/canonical-validation.log`
