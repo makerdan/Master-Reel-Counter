@@ -19,6 +19,82 @@ export class RealtimeAuthorizationTracker {
   }
 }
 
+export const PRE_AUTH_WEBSOCKET_LIMITS = Object.freeze({
+  maxMessages: 32,
+  maxAggregateBytes: 64 * 1024,
+  maxPayloadBytes: 16 * 1024,
+  timeoutMs: 5_000,
+});
+
+export type PreAuthEnqueueResult =
+  | "accepted"
+  | "inactive"
+  | "message_limit"
+  | "aggregate_limit"
+  | "payload_limit";
+
+export class PreAuthWebSocketBuffer<Message> {
+  private messages: Array<{ message: Message; bytes: number }> = [];
+  private aggregateBytes = 0;
+  private accepting = true;
+
+  constructor(
+    private readonly limits: Pick<
+      typeof PRE_AUTH_WEBSOCKET_LIMITS,
+      "maxMessages" | "maxAggregateBytes" | "maxPayloadBytes"
+    > = PRE_AUTH_WEBSOCKET_LIMITS,
+  ) {}
+
+  enqueue(message: Message, bytes: number): PreAuthEnqueueResult {
+    if (!this.accepting) return "inactive";
+    if (bytes > this.limits.maxPayloadBytes) return "payload_limit";
+    if (this.messages.length >= this.limits.maxMessages) return "message_limit";
+    if (this.aggregateBytes + bytes > this.limits.maxAggregateBytes) {
+      return "aggregate_limit";
+    }
+    this.messages.push({ message, bytes });
+    this.aggregateBytes += bytes;
+    return "accepted";
+  }
+
+  release(): void {
+    this.accepting = false;
+    this.messages.length = 0;
+    this.aggregateBytes = 0;
+  }
+
+  async drain(
+    process: (message: Message) => void | Promise<void>,
+    canContinue: () => boolean,
+  ): Promise<boolean> {
+    if (!this.accepting || !canContinue()) {
+      this.release();
+      return false;
+    }
+    this.accepting = false;
+    const queued = this.messages;
+    this.messages = [];
+    this.aggregateBytes = 0;
+    for (const { message } of queued) {
+      if (!canContinue()) return false;
+      await process(message);
+    }
+    return true;
+  }
+
+  get retainedMessageCount(): number {
+    return this.messages.length;
+  }
+
+  get retainedBytes(): number {
+    return this.aggregateBytes;
+  }
+
+  get isAccepting(): boolean {
+    return this.accepting;
+  }
+}
+
 export type AuthorizationChangeOutcome =
   | "account_rejected"
   | "approval_removed"

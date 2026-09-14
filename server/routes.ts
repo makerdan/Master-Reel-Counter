@@ -1,6 +1,6 @@
 import type { Express, Request, Response as ExpressResponse, RequestHandler } from "express";
 import { type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer, WebSocket, type RawData } from "ws";
 import { attachWebSocketServerAtPath } from "./websocket-upgrade";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
@@ -42,6 +42,8 @@ import {
   evictUserSockets as evictUserSocketsFromRooms,
   registerAuthorizationChangeHandler,
   RealtimeAuthorizationTracker,
+  PRE_AUTH_WEBSOCKET_LIMITS,
+  PreAuthWebSocketBuffer,
   type AuthorizationChangeOutcome,
 } from "./realtime-authorization";
 import { HELP_SOURCE_TEXT } from "@shared/help-content";
@@ -6521,7 +6523,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     wsAlive.delete(ws);
   };
 
-  const processWsMessage = async (ws: WebSocket, raw: Buffer | string) => {
+  const processWsMessage = async (ws: WebSocket, raw: RawData) => {
     try {
       const msg = JSON.parse(raw.toString());
       if (msg.type === "ping") {
@@ -6572,15 +6574,36 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     wsAlive.set(ws, true);
 
     let authDone = false;
-    const pendingMessages: (Buffer | string)[] = [];
+    const pendingMessages = new PreAuthWebSocketBuffer<RawData>();
     let revalidateTimer: ReturnType<typeof setInterval> | null = null;
+    let authTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const releasePreAuthState = () => {
+      pendingMessages.release();
+      if (authTimer) {
+        clearTimeout(authTimer);
+        authTimer = null;
+      }
+    };
+
+    const closeBeforeAuthentication = (reason: string) => {
+      releasePreAuthState();
+      if (ws.readyState === WebSocket.OPEN) ws.close(1008, reason);
+    };
 
     const loadSocketIdentity = async () => {
       return authenticateWebSocketRequest(req);
     };
 
+    authTimer = setTimeout(() => {
+      closeBeforeAuthentication("Authentication timed out");
+    }, PRE_AUTH_WEBSOCKET_LIMITS.timeoutMs);
+    authTimer.unref();
+
     loadSocketIdentity().then(async (user) => {
+      if (!pendingMessages.isAccepting || ws.readyState !== WebSocket.OPEN) return;
       const outcome = await getIdentityAuthorizationOutcome(user);
+      if (!pendingMessages.isAccepting || ws.readyState !== WebSocket.OPEN) return;
       if (!user || outcome !== "approved") {
         ws.send(JSON.stringify({
           type: "authorization_changed",
@@ -6598,8 +6621,15 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       const connUsername = user.claims.username || user.claims.firstName || connUserId;
       wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null });
       authDone = true;
-      for (const buffered of pendingMessages) processWsMessage(ws, buffered);
-      pendingMessages.length = 0;
+      if (authTimer) {
+        clearTimeout(authTimer);
+        authTimer = null;
+      }
+      await pendingMessages.drain(
+        (buffered) => processWsMessage(ws, buffered),
+        () => ws.readyState === WebSocket.OPEN,
+      );
+      if (ws.readyState !== WebSocket.OPEN) return;
 
       // Re-read the signed-in identity; never trust the identity captured at
       // upgrade time after a long-lived socket has been established.
@@ -6633,24 +6663,32 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         });
       }, WS_REVALIDATE_MS);
     }).catch(() => {
-      ws.close(1008, "Authentication required");
+      closeBeforeAuthentication("Authentication required");
     });
 
     ws.on("pong", () => { wsAlive.set(ws, true); });
     ws.on("error", () => {
+      releasePreAuthState();
       try { ws.terminate(); } catch {}
       cleanupWs(ws);
     });
 
     ws.on("message", (raw) => {
       if (!authDone) {
-        pendingMessages.push(raw as Buffer | string);
+        const bytes = Array.isArray(raw)
+          ? raw.reduce((total, chunk) => total + chunk.byteLength, 0)
+          : raw.byteLength;
+        const result = pendingMessages.enqueue(raw, bytes);
+        if (result !== "accepted" && result !== "inactive") {
+          closeBeforeAuthentication("Pre-authentication message limit exceeded");
+        }
       } else {
-        processWsMessage(ws, raw as Buffer | string);
+        processWsMessage(ws, raw);
       }
     });
 
     ws.on("close", () => {
+      releasePreAuthState();
       if (revalidateTimer) { clearInterval(revalidateTimer); revalidateTimer = null; }
       cleanupWs(ws);
     });

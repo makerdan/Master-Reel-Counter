@@ -70,6 +70,8 @@ import
   evictAllSessionSockets,
   evictUserSockets,
   evictSessionUserSockets,
+  PRE_AUTH_WEBSOCKET_LIMITS,
+  PreAuthWebSocketBuffer,
   RealtimeAuthorizationTracker,
 }
  from "../realtime-authorization.js"
@@ -466,6 +468,111 @@ describe("Content Security Policy", () => {
     );
     assert.match(entryPage, /<script type="module" src="\/src\/main\.tsx"><\/script>/);
     assert.doesNotMatch(entryPage, /<script(?![^>]*\bsrc=)[^>]*>/);
+  });
+});
+
+describe("pre-authentication WebSocket message limits", () => {
+  test("bounds retained message count during unresolved authentication", () => {
+    const buffer = new PreAuthWebSocketBuffer<Buffer>();
+    const payload = Buffer.from('{"type":"ping"}');
+
+    for (let index = 0; index < PRE_AUTH_WEBSOCKET_LIMITS.maxMessages; index += 1) {
+      assert.equal(buffer.enqueue(payload, payload.byteLength), "accepted");
+    }
+    assert.equal(buffer.enqueue(payload, payload.byteLength), "message_limit");
+    assert.equal(buffer.retainedMessageCount, PRE_AUTH_WEBSOCKET_LIMITS.maxMessages);
+    assert.equal(
+      buffer.retainedBytes,
+      PRE_AUTH_WEBSOCKET_LIMITS.maxMessages * payload.byteLength,
+    );
+  });
+
+  test("rejects oversized frames and aggregate byte overflow without retaining them", () => {
+    const buffer = new PreAuthWebSocketBuffer<Buffer>({
+      maxMessages: 10,
+      maxAggregateBytes: 10,
+      maxPayloadBytes: 6,
+    });
+
+    assert.equal(buffer.enqueue(Buffer.alloc(7), 7), "payload_limit");
+    assert.equal(buffer.retainedMessageCount, 0);
+    assert.equal(buffer.enqueue(Buffer.alloc(6), 6), "accepted");
+    assert.equal(buffer.enqueue(Buffer.alloc(5), 5), "aggregate_limit");
+    assert.equal(buffer.retainedMessageCount, 1);
+    assert.equal(buffer.retainedBytes, 6);
+  });
+
+  test("timeout releases retained frames and late authentication cannot process them", async () => {
+    const buffer = new PreAuthWebSocketBuffer<Buffer>();
+    const processed: string[] = [];
+    buffer.enqueue(Buffer.from("queued"), 6);
+
+    await new Promise<void>((resolve) => {
+      setTimeout(() => {
+        buffer.release();
+        resolve();
+      }, 1);
+    });
+
+    assert.equal(
+      await buffer.drain((message) => processed.push(message.toString()), () => true),
+      false,
+    );
+    assert.deepEqual(processed, []);
+    assert.equal(buffer.retainedMessageCount, 0);
+    assert.equal(buffer.retainedBytes, 0);
+  });
+
+  test("disconnect during authentication releases frames and blocks late resolution", async () => {
+    const buffer = new PreAuthWebSocketBuffer<Buffer>();
+    const processed: string[] = [];
+    buffer.enqueue(Buffer.from("join"), 4);
+    buffer.release();
+
+    assert.equal(
+      await buffer.drain((message) => processed.push(message.toString()), () => false),
+      false,
+    );
+    assert.deepEqual(processed, []);
+    assert.equal(buffer.isAccepting, false);
+  });
+
+  test("authenticated sockets drain valid join and ping frames in order", async () => {
+    const buffer = new PreAuthWebSocketBuffer<Buffer>();
+    const processed: string[] = [];
+    const messages = [
+      Buffer.from('{"type":"join","sessionId":42}'),
+      Buffer.from('{"type":"ping"}'),
+    ];
+    for (const message of messages) {
+      assert.equal(buffer.enqueue(message, message.byteLength), "accepted");
+    }
+
+    assert.equal(
+      await buffer.drain((message) => processed.push(message.toString()), () => true),
+      true,
+    );
+    assert.deepEqual(processed, messages.map((message) => message.toString()));
+    assert.equal(buffer.retainedMessageCount, 0);
+    assert.equal(buffer.retainedBytes, 0);
+  });
+
+  test("stops draining queued operations after the socket closes", async () => {
+    const buffer = new PreAuthWebSocketBuffer<Buffer>();
+    const processed: string[] = [];
+    let open = true;
+    buffer.enqueue(Buffer.from("first"), 5);
+    buffer.enqueue(Buffer.from("second"), 6);
+
+    assert.equal(
+      await buffer.drain((message) => {
+        processed.push(message.toString());
+        open = false;
+      }, () => open),
+      false,
+    );
+    assert.deepEqual(processed, ["first"]);
+    assert.equal(buffer.retainedMessageCount, 0);
   });
 });
 
