@@ -27,3 +27,4 @@
 - [Offline queue identity barrier](offline-queue-identity-barrier.md) — reconcile only server-verified aliases before any owner-scoped read, claim recovery, cleanup, or drain.
 - [Drizzle enum bootstrap](drizzle-enum-bootstrap.md) — empty release databases need reviewed enum creation before exported schema SQL; push can attempt a dependent-type drop.
 - [Clerk bootstrap recovery](clerk-bootstrap-recovery.md) — use Clerk lifecycle failure state plus a fresh page reload; failed SDK singleton remounts can retain the load error.
+- [Clerk release test permissions](clerk-release-test-permissions.md) — release smoke setup needs a Clerk secret with disposable-user management and testing-token permissions.
