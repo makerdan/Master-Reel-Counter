@@ -59,7 +59,7 @@
         { "name": "port-authority-tests", "command": ["node", "scripts/port-authority-test.mjs"] },
         { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] },
         { "name": "collision-smoke", "command": ["node", "scripts/ci-collision-test.mjs"] },
-        { "name": "browser-tests", "command": ["npx", "playwright", "test"] }
+        { "name": "browser-tests", "command": ["node", "scripts/run-browser-tests.mjs"] }
       ]
     }
   }

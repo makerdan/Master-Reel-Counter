@@ -28,3 +28,4 @@
 - [Drizzle enum bootstrap](drizzle-enum-bootstrap.md) — empty release databases need reviewed enum creation before exported schema SQL; push can attempt a dependent-type drop.
 - [Clerk bootstrap recovery](clerk-bootstrap-recovery.md) — use Clerk lifecycle failure state plus a fresh page reload; failed SDK singleton remounts can retain the load error.
 - [Clerk release test permissions](clerk-release-test-permissions.md) — release smoke setup needs a Clerk secret with disposable-user management and testing-token permissions.
+- [Release schema export owns enum DDL](release-schema-export-enum.md) — Drizzle PostgreSQL export already creates account_role; do not prepend duplicate enum creation.

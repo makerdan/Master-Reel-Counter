@@ -64,12 +64,20 @@ if (bootstrap.code !== 0) {
     })\n${redact(bootstrap.stderr)}`,
   );
 }
+if (
+  !/CREATE TYPE "public"\."account_role" AS ENUM\('Admin', 'User'\)/.test(
+    bootstrap.stdout,
+  )
+) {
+  throw new Error(
+    "Dedicated release smoke schema bootstrap is missing the reviewed Admin/User account role enum",
+  );
+}
 
 const client = new Client({ connectionString: releaseDatabaseUrl });
 try {
   await client.connect();
   await client.query(`
-    CREATE TYPE account_role AS ENUM ('Admin', 'User');
     ${bootstrap.stdout}
   `);
   const schema = await assertReleaseSchema(client);

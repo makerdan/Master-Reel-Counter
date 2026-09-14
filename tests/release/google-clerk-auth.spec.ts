@@ -9,6 +9,7 @@ import {
   setupCandidateClerkTestingToken,
 } from "../support/clerk-candidate-testing";
 import { CLERK_PROXY_PATH } from "../../shared/clerk-config";
+import { assertIsolatedReleaseDatabase } from "../../scripts/release-schema-preflight.mjs";
 
 const { Client } = pg;
 const SMOKE_ID_PREFIX = "google-release-smoke-";
@@ -19,6 +20,8 @@ const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
   "CLERK_SECRET_KEY",
   "DATABASE_URL",
+  "RELEASE_SMOKE_DATABASE_URL",
+  "RELEASE_PUBLICATION_DATABASE_URL",
 ] as const;
 
 const roleCases = [
@@ -181,9 +184,13 @@ test.describe("Google-backed Clerk application boundary", () => {
       requireReleaseEnvironment();
 
       const baseURL = new URL(process.env.PRODUCTION_BASE_URL!).origin;
+      assertIsolatedReleaseDatabase({
+        releaseDatabaseUrl: process.env.RELEASE_SMOKE_DATABASE_URL,
+        publicationDatabaseUrl: process.env.RELEASE_PUBLICATION_DATABASE_URL,
+      });
       const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
       const database = new Client({
-        connectionString: process.env.DATABASE_URL,
+        connectionString: process.env.RELEASE_SMOKE_DATABASE_URL,
       });
       let account:
         | Awaited<ReturnType<typeof createDisposableAccount>>

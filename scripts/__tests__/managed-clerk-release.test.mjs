@@ -36,6 +36,11 @@ const releaseSmoke = readFileSync(resolve(root, "tests/release/managed-clerk-aut
 const sharedClerkConfig = readFileSync(resolve(root, "shared/clerk-config.ts"), "utf8");
 const serverIndex = readFileSync(resolve(root, "server/index.ts"), "utf8");
 const browserSetup = readFileSync(resolve(root, "tests/global-setup.ts"), "utf8");
+const browserRunner = readFileSync(resolve(root, "scripts/run-browser-tests.mjs"), "utf8");
+const googleReleaseSmoke = readFileSync(
+  resolve(root, "tests/release/google-clerk-auth.spec.ts"),
+  "utf8",
+);
 const clerkProxyMiddleware = readFileSync(
   resolve(root, "server/middlewares/clerkProxyMiddleware.ts"),
   "utf8",
@@ -222,7 +227,7 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.match(candidateBuild, /DATABASE_URL="\$RELEASE_SMOKE_DATABASE_URL"/);
   assert.match(releaseSchemaPreparation, /drizzle-kit/);
   assert.match(releaseSchemaPreparation, /"export"/);
-  assert.match(releaseSchemaPreparation, /CREATE TYPE account_role/);
+  assert.match(releaseSchemaPreparation, /Admin.*User.*account role enum/);
   assert.match(releaseSchemaPreparation, /assertReleaseSchema/);
   assert.match(releaseSchemaPreflight, /Release schema preflight failed before fixture provisioning/);
   assert.match(releaseSchemaPreflight, /account_role/);
@@ -240,6 +245,14 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
     browserSetup,
     /assertReleaseSchema\(database\);[\s\S]*clerk\.users\.createUser/,
   );
+  assert.match(browserRunner, /CREATE DATABASE/);
+  assert.match(browserRunner, /prepare-release-test-database\.mjs/);
+  assert.match(browserRunner, /DROP DATABASE IF EXISTS/);
+  assert.match(browserRunner, /RELEASE_SMOKE_DATABASE_URL/);
+  assert.match(browserRunner, /RELEASE_PUBLICATION_DATABASE_URL/);
+  assert.match(googleReleaseSmoke, /assertIsolatedReleaseDatabase/);
+  assert.match(googleReleaseSmoke, /RELEASE_SMOKE_DATABASE_URL/);
+  assert.match(googleReleaseSmoke, /RELEASE_PUBLICATION_DATABASE_URL/);
 });
 
 test("production Clerk proxy fails closed and exposes public readiness before auth", () => {
