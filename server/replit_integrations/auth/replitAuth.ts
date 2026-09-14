@@ -257,6 +257,7 @@ export async function authenticateWebSocketRequest(req: Request): Promise<Normal
   const clerkPublishableKey = resolveClerkEnvironmentPublishableKey({
     serverPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
     clientPublishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
+    allowClientFallback: process.env.NODE_ENV !== "production",
   });
   const state = await authenticateRequest({
     clerkClient,

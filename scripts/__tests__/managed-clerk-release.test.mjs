@@ -386,6 +386,9 @@ test("smoke uses Clerk's supported testing sign-in and keeps safe failure eviden
   assert.match(smoke, /clerkTesting\.signIn\(\{/);
   assert.match(smoke, /frontendApiUrl: new URL\(CLERK_TESTING_FRONTEND_API_ORIGIN\)\.host/);
   assert.match(smoke, /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/"\)/);
+  assert.match(smoke, /clerkScriptResponses/);
+  assert.match(smoke, /Clerk JavaScript must load once from the exact candidate proxy/);
+  assert.match(smoke, /contentType/);
   assert.match(smoke, /managed-clerk-browser-trace/);
   assert.match(smoke, /clerkRequests/);
   assert.match(

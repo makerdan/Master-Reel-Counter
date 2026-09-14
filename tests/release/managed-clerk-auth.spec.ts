@@ -158,6 +158,12 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   let clerkUserId: string | undefined;
   let localUserCreated = false;
   const proxyRequests: string[] = [];
+  const clerkScriptResponses: Array<{
+    origin: string;
+    path: string;
+    status: number;
+    contentType: string;
+  }> = [];
   const routeStates: string[] = [];
   const requestFailures: string[] = [];
   const pageErrors: string[] = [];
@@ -174,6 +180,14 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       proxyRequests.push(
         `${request.method()} ${safeDiagnosticPath(response.url())} ${response.status()}`,
       );
+    }
+    if (url.pathname.endsWith("/dist/clerk.browser.js")) {
+      clerkScriptResponses.push({
+        origin: url.origin,
+        path: url.pathname,
+        status: response.status(),
+        contentType: response.headers()["content-type"] ?? "",
+      });
     }
   });
   page.on("pageerror", (error) => {
@@ -277,6 +291,19 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     });
     await expect(page.getByTestId("text-settings-title")).toBeVisible({ timeout: 30_000 });
     expect(proxyRequests.length, "Clerk browser traffic must pass through the production proxy").toBeGreaterThan(0);
+    const loadedClerkScripts = clerkScriptResponses.filter(
+      (response) => response.status === 200,
+    );
+    expect(loadedClerkScripts, "Clerk JavaScript must load once from the exact candidate proxy").toHaveLength(1);
+    expect(loadedClerkScripts[0]).toMatchObject({
+      origin: baseURL,
+    });
+    expect(loadedClerkScripts[0].path).toMatch(
+      new RegExp(`^${CLERK_PROXY_PATH}/npm/@clerk/clerk-js@[^/]+/dist/clerk\\.browser\\.js$`),
+    );
+    expect(loadedClerkScripts[0].contentType).toMatch(
+      /^(?:application|text)\/javascript\b/i,
+    );
 
     const authorization = await database.query(
       "SELECT approved, rejected, role FROM users WHERE id = $1",
