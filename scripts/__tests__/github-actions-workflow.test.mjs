@@ -12,6 +12,7 @@ const workflowPath = resolve(root, ".github/workflows/validation.yml");
 const workflow = readFileSync(workflowPath, "utf8");
 const dependabotPath = resolve(root, ".github/dependabot.yml");
 const dependabot = readFileSync(dependabotPath, "utf8");
+const lockfile = readFileSync(resolve(root, "package-lock.json"), "utf8");
 const schema = readFileSync(resolve(root, "shared/schema.ts"), "utf8");
 const startupSmokePath = resolve(root, "scripts/startup-smoke.sh");
 const startupSmoke = readFileSync(startupSmokePath, "utf8");
@@ -103,6 +104,11 @@ test("workflow installs the declared runtime with frozen dependencies", () => {
   assert.match(workflow, /node_modules\/@clerk\/express\/package\.json/);
   assert.match(workflow, /run: node --test scripts\/__tests__\/github-actions-workflow\.test\.mjs/);
   assert.match(workflow, /npm ci --ignore-scripts --no-audit --no-fund/);
+  assert.doesNotMatch(
+    lockfile,
+    /package-firewall\.replit\.(?:local|internal)/,
+    "public GitHub Actions runs must not resolve packages through Replit-only hosts",
+  );
 });
 
 test("workflow provisions and checks the test prerequisites", () => {
