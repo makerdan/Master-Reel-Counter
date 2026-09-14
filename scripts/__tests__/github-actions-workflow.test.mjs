@@ -98,7 +98,9 @@ test("all third-party actions use immutable commit pins", () => {
 test("workflow installs the declared runtime with frozen dependencies", () => {
   assert.match(workflow, /actions\/setup-node@[0-9a-f]{40}/);
   assert.match(workflow, /node-version:\s+"20"/);
-  assert.match(workflow, /run: npm ci/);
+  assert.match(workflow, /npm ci(?:\s|$)/);
+  assert.match(workflow, /for attempt in \{1\.\.3\}/);
+  assert.match(workflow, /node_modules\/@clerk\/express\/package\.json/);
   assert.match(workflow, /run: node --test scripts\/__tests__\/github-actions-workflow\.test\.mjs/);
 });
 
