@@ -29,3 +29,4 @@
 - [Clerk bootstrap recovery](clerk-bootstrap-recovery.md) — use Clerk lifecycle failure state plus a fresh page reload; failed SDK singleton remounts can retain the load error.
 - [Clerk release test permissions](clerk-release-test-permissions.md) — release smoke setup needs a Clerk secret with disposable-user management and testing-token permissions.
 - [Release schema export owns enum DDL](release-schema-export-enum.md) — Drizzle PostgreSQL export already creates account_role; do not prepend duplicate enum creation.
+- [Auth storage integration isolation](auth-storage-integration-isolation.md) — use temporary PostgreSQL schemas for auth storage concurrency tests when dev schema may lag reviewed auth migrations.

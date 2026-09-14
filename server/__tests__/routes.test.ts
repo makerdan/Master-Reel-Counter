@@ -15,9 +15,14 @@ import
  from "node:fs"
 ;
 
+import { randomUUID } from "node:crypto";
+
 import http from "node:http"
 ;
 
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import * as databaseSchema from "@shared/schema";
 import express from "express"
 ;
 
@@ -112,6 +117,7 @@ import { buildSignInPath, getSafeReturnPath } from "../../shared/auth-routing.js
 import 
 {
   authStorage,
+  AuthStorage,
   sanitizeUserProfileWrite,
 }
  from "../replit_integrations/auth/storage.js"
@@ -204,6 +210,83 @@ describe("Clerk identity and approval regression guard", () => {
     } finally {
       await client.query("ROLLBACK").catch(() => {});
       client.release();
+    }
+  });
+
+  test("keeps concurrent bind and create operations to one immutable Clerk mapping", async () => {
+    const suffix = `${process.pid}_${randomUUID().replaceAll("-", "")}`;
+    const testSchema = `clerk_race_${suffix}`;
+    const legacyUserId = `clerk-race-legacy-${suffix}`;
+    const createdUserId = `clerk-race-created-${suffix}`;
+    const clerkUserId = `user_clerk-race-${suffix}`;
+    const migration = readFileSync(
+      new URL("../../migrations/0026_add_users_clerk_user_id.sql", import.meta.url),
+      "utf8",
+    );
+    const setupClient = await pool.connect();
+    let isolatedPool: pg.Pool | undefined;
+
+    try {
+      await setupClient.query("BEGIN");
+      await setupClient.query(`CREATE SCHEMA "${testSchema}"`);
+      await setupClient.query(`SET LOCAL search_path TO "${testSchema}"`);
+      await setupClient.query(`
+        CREATE TABLE "users" (
+          "id" varchar PRIMARY KEY,
+          "email" varchar,
+          "first_name" varchar,
+          "last_name" varchar,
+          "profile_image_url" varchar,
+          "custom_avatar_key" varchar,
+          "approved" boolean NOT NULL DEFAULT false,
+          "rejected" boolean NOT NULL DEFAULT false,
+          "role" text NOT NULL DEFAULT 'User',
+          "created_at" timestamp DEFAULT now(),
+          "updated_at" timestamp DEFAULT now()
+        )
+      `);
+      await setupClient.query(migration);
+      await setupClient.query("COMMIT");
+
+      isolatedPool = new pg.Pool({
+        connectionString: process.env.DATABASE_URL,
+        options: `-c search_path="${testSchema}"`,
+      });
+      const isolatedDb = drizzle(isolatedPool, { schema: databaseSchema });
+      const isolatedAuthStorage = new AuthStorage(isolatedDb);
+      await isolatedAuthStorage.createUserIfMissing({ id: legacyUserId });
+
+      const outcomes = await Promise.allSettled([
+        isolatedAuthStorage.bindClerkUserId(legacyUserId, clerkUserId),
+        isolatedAuthStorage.createUserForClerkIdentity({ id: createdUserId }, clerkUserId),
+      ]);
+      const fulfilled = outcomes.filter(
+        (outcome): outcome is PromiseFulfilledResult<unknown> => outcome.status === "fulfilled",
+      );
+      const rejected = outcomes.filter(
+        (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
+      );
+
+      assert.equal(fulfilled.length, 1, "exactly one competing mapping operation must win");
+      assert.equal(rejected.length, 1, "the conflicting operation must fail closed");
+
+      const mappings = await isolatedPool.query(
+        `SELECT id, clerk_user_id
+         FROM "users"
+         WHERE clerk_user_id = $1`,
+        [clerkUserId],
+      );
+      assert.equal(mappings.rowCount, 1, "the Clerk identity must have one local mapping");
+      assert.ok(
+        [legacyUserId, createdUserId].includes(mappings.rows[0].id),
+        "the winning mapping must point to one of the competing local accounts",
+      );
+      assert.equal(mappings.rows[0].clerk_user_id, clerkUserId);
+    } finally {
+      await isolatedPool?.end().catch(() => {});
+      await setupClient.query("ROLLBACK").catch(() => {});
+      await setupClient.query(`DROP SCHEMA IF EXISTS "${testSchema}" CASCADE`);
+      setupClient.release();
     }
   });
 

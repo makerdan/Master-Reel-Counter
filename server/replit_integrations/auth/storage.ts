@@ -48,20 +48,22 @@ export function sanitizeUserProfileWrite(userData: UserProfileWrite): UserProfil
   };
 }
 
-class AuthStorage implements IAuthStorage {
+export class AuthStorage implements IAuthStorage {
+  constructor(private readonly database = db) {}
+
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await this.database.select().from(users).where(eq(users.id, id));
     return user;
   }
 
   async getUserByClerkUserId(clerkUserId: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.clerkUserId, clerkUserId));
+    const [user] = await this.database.select().from(users).where(eq(users.clerkUserId, clerkUserId));
     return user;
   }
 
   async upsertUser(userData: UserProfileWrite): Promise<User> {
     const profile = sanitizeUserProfileWrite(userData);
-    const [user] = await db
+    const [user] = await this.database
       .insert(users)
       .values(profile)
       .onConflictDoUpdate({
@@ -77,7 +79,7 @@ class AuthStorage implements IAuthStorage {
 
   async createUserIfMissing(userData: UserProfileWrite): Promise<User> {
     const profile = sanitizeUserProfileWrite(userData);
-    await db.insert(users).values(profile).onConflictDoNothing({ target: users.id });
+    await this.database.insert(users).values(profile).onConflictDoNothing({ target: users.id });
     const user = await this.getUser(userData.id!);
     if (!user) throw new Error("Failed to create local user");
     return user;
@@ -88,7 +90,7 @@ class AuthStorage implements IAuthStorage {
     clerkUserId: string,
   ): Promise<User> {
     const profile = sanitizeUserProfileWrite(userData);
-    await db
+    await this.database
       .insert(users)
       .values({ ...profile, clerkUserId })
       .onConflictDoNothing({ target: users.id });
@@ -98,7 +100,7 @@ class AuthStorage implements IAuthStorage {
   }
 
   async bindClerkUserId(id: string, clerkUserId: string): Promise<User | undefined> {
-    const [user] = await db
+    const [user] = await this.database
       .update(users)
       .set({ clerkUserId, updatedAt: new Date() })
       .where(and(
@@ -110,7 +112,7 @@ class AuthStorage implements IAuthStorage {
   }
 
   async updateUserAvatar(id: string, customAvatarKey: string | null): Promise<User> {
-    const [user] = await db
+    const [user] = await this.database
       .update(users)
       .set({ customAvatarKey, updatedAt: new Date() })
       .where(eq(users.id, id))
@@ -119,16 +121,16 @@ class AuthStorage implements IAuthStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).where(ne(users.rejected, true)).orderBy(users.createdAt);
+    return await this.database.select().from(users).where(ne(users.rejected, true)).orderBy(users.createdAt);
   }
 
   async getRejectedCount(): Promise<number> {
-    const [row] = await db.select({ value: count() }).from(users).where(eq(users.rejected, true));
+    const [row] = await this.database.select({ value: count() }).from(users).where(eq(users.rejected, true));
     return row?.value ?? 0;
   }
 
   async setUserApproved(id: string, approved: boolean): Promise<User> {
-    const [user] = await db
+    const [user] = await this.database
       .update(users)
       .set({ approved, updatedAt: new Date() })
       .where(eq(users.id, id))
@@ -137,7 +139,7 @@ class AuthStorage implements IAuthStorage {
   }
 
   async rejectUser(id: string): Promise<User> {
-    const [user] = await db
+    const [user] = await this.database
       .update(users)
       .set({ approved: false, rejected: true, updatedAt: new Date() })
       .where(eq(users.id, id))
@@ -146,7 +148,7 @@ class AuthStorage implements IAuthStorage {
   }
 
   async clearAllRejected(): Promise<string[]> {
-    const updatedUsers = await db
+    const updatedUsers = await this.database
       .update(users)
       .set({ rejected: false, updatedAt: new Date() })
       .where(eq(users.rejected, true))
@@ -155,7 +157,7 @@ class AuthStorage implements IAuthStorage {
   }
 
   async ensureInitialAdmin(id: string): Promise<User | undefined> {
-    return db.transaction(async (tx) => {
+    return this.database.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('master-reel-counter-initial-admin'))`);
       const [adminCount] = await tx
         .select({ value: count() })
@@ -177,7 +179,7 @@ class AuthStorage implements IAuthStorage {
   async canRemoveAdmin(id: string): Promise<boolean> {
     const user = await this.getUser(id);
     if (user?.role !== "Admin") return true;
-    const [adminCount] = await db
+    const [adminCount] = await this.database
       .select({ value: count() })
       .from(users)
       .where(eq(users.role, "Admin"));
