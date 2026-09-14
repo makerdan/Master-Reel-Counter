@@ -25,3 +25,4 @@
 - [Clerk Playwright session lifecycle](clerk-playwright-session-lifecycle.md) — refresh each browser context and share its live cookies with API fixtures.
 - [External Clerk browser configuration](external-clerk-browser-config.md) — keep tenant hosts out of tracked config; browser validation needs a valid env-provided key or host.
 - [Offline queue identity barrier](offline-queue-identity-barrier.md) — reconcile only server-verified aliases before any owner-scoped read, claim recovery, cleanup, or drain.
+- [Drizzle enum bootstrap](drizzle-enum-bootstrap.md) — empty release databases need reviewed enum creation before exported schema SQL; push can attempt a dependent-type drop.

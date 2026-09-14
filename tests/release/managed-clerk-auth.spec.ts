@@ -9,11 +9,16 @@ import {
   setupCandidateClerkTestingToken,
 } from "../support/clerk-candidate-testing";
 import { CLERK_PROXY_PATH } from "../../shared/clerk-config";
+import {
+  assertIsolatedReleaseDatabase,
+  assertReleaseSchema,
+} from "../../scripts/release-schema-preflight.mjs";
 
 const { Client } = pg;
 const SMOKE_ID_PREFIX = "release-smoke-";
 const STALE_SMOKE_AGE_MS = 60 * 60 * 1000;
 const CLIENT_TRUST_TIMEOUT_MS = 10_000;
+const internalCandidate = process.env.RELEASE_SMOKE_INTERNAL_CANDIDATE === "1";
 
 const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
@@ -22,7 +27,12 @@ const requiredEnvironment = [
 ] as const;
 
 function requireReleaseEnvironment(): void {
-  const missing = requiredEnvironment.filter((name) => !process.env[name]);
+  const missing: string[] = requiredEnvironment.filter((name) => !process.env[name]);
+  if (internalCandidate) {
+    for (const name of ["RELEASE_SMOKE_DATABASE_URL", "RELEASE_PUBLICATION_DATABASE_URL"]) {
+      if (!process.env[name]) missing.push(name);
+    }
+  }
   if (missing.length > 0) {
     throw new Error(
       `Managed Clerk release smoke is missing required environment variables: ${missing.join(", ")}`,
@@ -129,12 +139,21 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   requireReleaseEnvironment();
 
   const baseURL = new URL(process.env.PRODUCTION_BASE_URL!).origin;
+  const smokeDatabaseUrl = internalCandidate
+    ? process.env.RELEASE_SMOKE_DATABASE_URL!
+    : process.env.DATABASE_URL!;
+  if (internalCandidate) {
+    assertIsolatedReleaseDatabase({
+      releaseDatabaseUrl: smokeDatabaseUrl,
+      publicationDatabaseUrl: process.env.RELEASE_PUBLICATION_DATABASE_URL!,
+    });
+  }
   const localUserId = `release-smoke-${randomUUID()}`;
   const email = `release-smoke+${randomUUID()}@example.com`;
   const password = `Rls-${randomBytes(18).toString("base64url")}!9`;
   const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
   const database = new Client({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: smokeDatabaseUrl,
   });
   let clerkUserId: string | undefined;
   let localUserCreated = false;
@@ -168,7 +187,10 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   });
 
   await database.connect();
+  let primaryError: unknown;
+  const cleanupErrors: Error[] = [];
   try {
+    await assertReleaseSchema(database);
     await removeStaleSmokeUsers(clerk, database);
 
     const clerkUser = await clerk.users.createUser({
@@ -311,6 +333,8 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       return response.status;
     });
     expect(signedOutStatus).toBe(401);
+  } catch (error) {
+    primaryError = error;
   } finally {
     delete process.env.CLERK_TESTING_TOKEN;
     const browserDiagnostic = {
@@ -322,19 +346,34 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       requestFailures: requestFailures.slice(-20),
       pageErrors: pageErrors.slice(-20),
     };
-    await mkdir("test-results/release-diagnostics", { recursive: true });
-    await writeFile(
-      "test-results/release-diagnostics/browser.json",
-      JSON.stringify(browserDiagnostic, null, 2),
-      { encoding: "utf8", mode: 0o600 },
-    );
+    try {
+      await mkdir("test-results/release-diagnostics", { recursive: true });
+      await writeFile(
+        "test-results/release-diagnostics/browser.json",
+        JSON.stringify(browserDiagnostic, null, 2),
+        { encoding: "utf8", mode: 0o600 },
+      );
+    } catch (error) {
+      cleanupErrors.push(
+        error instanceof Error
+          ? error
+          : new Error("Release browser diagnostic write failed"),
+      );
+    }
     // Native Playwright traces retain cookies and request payloads. This bounded
     // path-only trace is safe to upload when the workflow fails.
-    await testInfo.attach("managed-clerk-browser-trace", {
-      body: Buffer.from(JSON.stringify(browserDiagnostic, null, 2)),
-      contentType: "application/json",
-    });
-    const cleanupErrors: Error[] = [];
+    try {
+      await testInfo.attach("managed-clerk-browser-trace", {
+        body: Buffer.from(JSON.stringify(browserDiagnostic, null, 2)),
+        contentType: "application/json",
+      });
+    } catch (error) {
+      cleanupErrors.push(
+        error instanceof Error
+          ? error
+          : new Error("Release browser diagnostic attachment failed"),
+      );
+    }
     if (localUserCreated) {
       try {
         const deleted = await database.query(
@@ -366,8 +405,17 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
         error instanceof Error ? error : new Error("Smoke database connection cleanup failed"),
       );
     }
+  }
+  if (primaryError) {
     if (cleanupErrors.length > 0) {
-      throw new AggregateError(cleanupErrors, "Managed Clerk release smoke cleanup failed");
+      throw new AggregateError(
+        [primaryError, ...cleanupErrors],
+        "Managed Clerk release smoke failed and cleanup also failed",
+      );
     }
+    throw primaryError;
+  }
+  if (cleanupErrors.length > 0) {
+    throw new AggregateError(cleanupErrors, "Managed Clerk release smoke cleanup failed");
   }
 });

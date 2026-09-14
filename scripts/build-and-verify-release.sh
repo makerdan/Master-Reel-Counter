@@ -102,7 +102,21 @@ fi
 export VITE_CLERK_PROXY_URL="$clerk_proxy_path"
 npm run build
 
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "Managed Clerk release requires DATABASE_URL as the publishing database target." >&2
+  exit 1
+fi
+if [[ -z "${RELEASE_SMOKE_DATABASE_URL:-}" ]]; then
+  echo "Managed Clerk release requires RELEASE_SMOKE_DATABASE_URL as an isolated disposable target." >&2
+  exit 1
+fi
+
+RELEASE_SMOKE_DATABASE_URL="$RELEASE_SMOKE_DATABASE_URL" \
+DATABASE_URL="$DATABASE_URL" \
+node scripts/prepare-release-test-database.mjs
+
 NODE_ENV=production PORT="$candidate_port" RELEASE_CANDIDATE_ID="$candidate_id" \
+DATABASE_URL="$RELEASE_SMOKE_DATABASE_URL" \
   node dist/index.cjs >"$server_log" 2>&1 &
 server_pid="$!"
 
@@ -139,6 +153,9 @@ RELEASE_SMOKE_CANDIDATE_HOST="$candidate_host" \
 RELEASE_SMOKE_CANDIDATE_TLS_PORT="$tls_port" \
 RELEASE_SMOKE_CANDIDATE_APP_ORIGIN="http://127.0.0.1:${candidate_port}" \
 RELEASE_SMOKE_CANDIDATE_ID="$candidate_id" \
+RELEASE_SMOKE_DATABASE_URL="$RELEASE_SMOKE_DATABASE_URL" \
+RELEASE_PUBLICATION_DATABASE_URL="$DATABASE_URL" \
+DATABASE_URL="$RELEASE_SMOKE_DATABASE_URL" \
 PRODUCTION_BASE_URL="$candidate_url" \
 npm run verify:managed-clerk-release
 kill -0 "$server_pid"

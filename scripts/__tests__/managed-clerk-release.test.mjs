@@ -21,12 +21,21 @@ const config = readFileSync(resolve(root, "playwright.release.config.ts"), "utf8
 const smoke = readFileSync(resolve(root, "tests/release/managed-clerk-auth.spec.ts"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/managed-clerk-release.yml"), "utf8");
 const candidateBuild = readFileSync(resolve(root, "scripts/build-and-verify-release.sh"), "utf8");
+const releaseSchemaPreflight = readFileSync(
+  resolve(root, "scripts/release-schema-preflight.mjs"),
+  "utf8",
+);
+const releaseSchemaPreparation = readFileSync(
+  resolve(root, "scripts/prepare-release-test-database.mjs"),
+  "utf8",
+);
 const candidateProxy = readFileSync(resolve(root, "scripts/release-candidate-https-proxy.mjs"), "utf8");
 const diagnosticRedactor = readFileSync(resolve(root, "scripts/redact-release-diagnostics.mjs"), "utf8");
 const candidateTesting = readFileSync(resolve(root, "tests/support/clerk-candidate-testing.ts"), "utf8");
 const releaseSmoke = readFileSync(resolve(root, "tests/release/managed-clerk-auth.spec.ts"), "utf8");
 const sharedClerkConfig = readFileSync(resolve(root, "shared/clerk-config.ts"), "utf8");
 const serverIndex = readFileSync(resolve(root, "server/index.ts"), "utf8");
+const browserSetup = readFileSync(resolve(root, "tests/global-setup.ts"), "utf8");
 const clerkProxyMiddleware = readFileSync(
   resolve(root, "server/middlewares/clerkProxyMiddleware.ts"),
   "utf8",
@@ -179,6 +188,36 @@ test("standard validation runs the deterministic release proxy contract before l
   assert.match(
     readFileSync(resolve(root, "docs/validation/manifest.json"), "utf8"),
     /"name": "clerk-release-contract"[\s\S]*"npm", "run", "test:managed-clerk-release-contract"/,
+  );
+  assert.match(
+    packageJson.scripts["test:managed-clerk-release-contract"],
+    /release-schema-preflight\.test\.mjs/,
+  );
+});
+
+test("release candidate schema setup is isolated, migration-aware, and read-only before fixtures", () => {
+  assert.match(candidateBuild, /RELEASE_SMOKE_DATABASE_URL/);
+  assert.match(candidateBuild, /prepare-release-test-database\.mjs/);
+  assert.match(candidateBuild, /DATABASE_URL="\$RELEASE_SMOKE_DATABASE_URL"/);
+  assert.match(releaseSchemaPreparation, /drizzle-kit/);
+  assert.match(releaseSchemaPreparation, /"export"/);
+  assert.match(releaseSchemaPreparation, /CREATE TYPE account_role/);
+  assert.match(releaseSchemaPreparation, /assertReleaseSchema/);
+  assert.match(releaseSchemaPreflight, /Release schema preflight failed before fixture provisioning/);
+  assert.match(releaseSchemaPreflight, /account_role/);
+  assert.match(releaseSchemaPreflight, /is_tester/);
+  assert.match(releaseSchemaPreflight, /tester_password/);
+  assert.match(releaseSchemaPreflight, /table_name = 'sessions'/);
+  assert.match(releaseSmoke, /assertReleaseSchema\(database\)/);
+  assert.match(releaseSmoke, /assertIsolatedReleaseDatabase/);
+  assert.match(releaseSmoke, /RELEASE_PUBLICATION_DATABASE_URL/);
+  assert.match(
+    releaseSmoke,
+    /assertReleaseSchema\(database\);[\s\S]*removeStaleSmokeUsers/,
+  );
+  assert.match(
+    browserSetup,
+    /assertReleaseSchema\(database\);[\s\S]*clerk\.users\.createUser/,
   );
 });
 

@@ -10,6 +10,7 @@ import {
 } from "@clerk/testing/playwright";
 import { resolveClerkBootstrapConfig } from "../shared/clerk-config";
 import pg from "pg";
+import { assertReleaseSchema } from "../scripts/release-schema-preflight.mjs";
 
 function findChromium(): string | undefined {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
@@ -60,21 +61,28 @@ async function globalSetup() {
   const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
   const database = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await database.connect();
-  const clerkUser = await clerk.users.createUser({
-    externalId: localUserId,
-    emailAddress: [email],
-    password,
-    firstName: "Playwright",
-    lastName: "Owner",
-    skipLegalChecks: true,
-  });
-  await database.query(
-    `INSERT INTO users (id, email, first_name, last_name, approved, rejected, role)
-     VALUES ($1, $2, 'Playwright', 'Owner', true, false, 'Admin')
-     ON CONFLICT (id) DO UPDATE SET approved = true, rejected = false, role = 'Admin'`,
-    [clerkUser.id, email],
-  );
-  await database.end();
+  try {
+    // Read-only schema validation must precede both provider and database
+    // fixture writes. In particular, do not create a Clerk user and then
+    // discover that an unmigrated database cannot persist its role.
+    await assertReleaseSchema(database);
+    const clerkUser = await clerk.users.createUser({
+      externalId: localUserId,
+      emailAddress: [email],
+      password,
+      firstName: "Playwright",
+      lastName: "Owner",
+      skipLegalChecks: true,
+    });
+    await database.query(
+      `INSERT INTO users (id, email, first_name, last_name, approved, rejected, role)
+       VALUES ($1, $2, 'Playwright', 'Owner', true, false, 'Admin')
+       ON CONFLICT (id) DO UPDATE SET approved = true, rejected = false, role = 'Admin'`,
+      [clerkUser.id, email],
+    );
+  } finally {
+    await database.end();
+  }
 
   const chromiumExecutable = findChromium();
   const browser = await chromium.launch(
