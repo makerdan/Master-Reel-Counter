@@ -74,3 +74,6 @@ Recorded 2026-09-14 against the published HTTPS origin
 - The workspace also has no `PRODUCTION_BASE_URL`; the release spec correctly
   refuses to target an implicit deployment. No credentials, OAuth codes,
   cookies, tokens, or identity-bearing response bodies were recorded.
+
+The published target must be republished with the current build before this
+checklist is rerun. The checklist and its safety contract are unchanged.

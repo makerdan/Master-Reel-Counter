@@ -403,8 +403,10 @@ function ClerkProviderWithRoutes() {
         <QueryClientProvider client={queryClient}>
           <ClerkQueryClientCacheInvalidator />
           <Switch>
-            <Route path="/sign-in/*?" component={SignInPage} />
-            <Route path="/sign-up/*?" component={SignUpPage} />
+            <Route path="/sign-in" component={SignInPage} />
+            <Route path="/sign-in/*" component={SignInPage} />
+            <Route path="/sign-up" component={SignUpPage} />
+            <Route path="/sign-up/*" component={SignUpPage} />
             <Route component={Application} />
           </Switch>
         </QueryClientProvider>

@@ -102,6 +102,7 @@ test("real preview loads Clerk JavaScript over valid HTTPS with bounded CSP", as
   expect(sessionState).toEqual({ loaded: true, hasSession: false });
   expect(failures).toEqual([]);
   expect(pageErrors).toEqual([]);
+  await expect(page.getByRole("button", { name: /google/i })).toBeVisible();
 
   await context.close();
 });
