@@ -44,6 +44,7 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/master_reel_counter_test
       SESSION_SECRET: github-actions-test-session-secret-not-production
+      CLERK_SECRET_KEY: sk_test_github_actions_validation_not_production
       REPL_ID: github-actions-validation
       # These are intentionally test-only values. The suite mocks AI calls and
       # does not access Replit object storage or production credentials.

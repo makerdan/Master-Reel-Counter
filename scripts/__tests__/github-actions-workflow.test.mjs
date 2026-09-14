@@ -144,6 +144,11 @@ test("workflow provisions and checks the test prerequisites", () => {
     "removed tester-account columns and credentials must not return to CI",
   );
   assert.match(workflow, /REPL_ID:\s+github-actions-validation/);
+  assert.match(
+    workflow,
+    /CLERK_SECRET_KEY:\s+sk_test_github_actions_validation_not_production/,
+    "isolated CI startup must provide only a synthetic Clerk secret",
+  );
   const browserCache = sectionBetween(
     "      - name: Cache Playwright browser engines",
     "      - name: Check workflow contract",

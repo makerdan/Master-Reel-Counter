@@ -187,6 +187,7 @@ test("GitHub Actions boots the app against a blank disposable database", async (
       NODE_ENV: "test",
       DATABASE_URL: disposableUrl,
       SESSION_SECRET: "github-actions-test-session-secret-not-production",
+      CLERK_SECRET_KEY: "sk_test_github_actions_validation_not_production",
       REPL_ID: "github-actions-validation",
       AI_INTEGRATIONS_OPENAI_API_KEY: "test-only-unavailable",
       AI_INTEGRATIONS_OPENAI_BASE_URL: "http://127.0.0.1:9",
