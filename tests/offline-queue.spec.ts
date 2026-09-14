@@ -69,6 +69,30 @@ async function installServiceWorker(page: import("@playwright/test").Page) {
   ).toBe(true);
 }
 
+async function seedOfflineQueueRecord(page: import("@playwright/test").Page) {
+  await page.evaluate(() => new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open("reel-counter-offline", 2);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains("entry-queue")) {
+        request.result.createObjectStore("entry-queue", { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => {
+      const transaction = request.result.transaction("entry-queue", "readwrite");
+      transaction.objectStore("entry-queue").put({
+        id: "worker-upgrade-preservation",
+        sessionId: 1,
+        userId: "worker-test",
+        data: {},
+        createdAt: Date.now(),
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    };
+    request.onerror = () => reject(request.error);
+  }));
+}
+
 async function installServiceWorkerWithCacheFailure(
   page: import("@playwright/test").Page,
   request: import("@playwright/test").APIRequestContext,
@@ -168,6 +192,96 @@ async function clearOfflineQueue(page: import("@playwright/test").Page) {
 }
 
 test.describe("offline queue warning @offline-queue", () => {
+  test("script cache admits only valid application assets and cleans legacy errors", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      baseURL: BASE_URL,
+      storageState: { cookies: [], origins: [] },
+    });
+    const page = await context.newPage();
+
+    try {
+      await page.goto("/");
+      await seedOfflineQueueRecord(page);
+      await page.evaluate(async () => {
+        const cache = await caches.open("reel-counter-v1");
+        await cache.put(
+          "/assets/legacy-error.js",
+          new Response("<!doctype html><title>error</title>", {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          }),
+        );
+        await cache.put(
+          "/auth/clerk.js",
+          new Response("legacy auth transport", {
+            status: 200,
+            headers: { "Content-Type": "application/javascript" },
+          }),
+        );
+      });
+
+      await installServiceWorker(page);
+      await expect.poll(
+        () => page.evaluate(() => caches.match("/assets/legacy-error.js").then(Boolean)),
+      ).toBe(false);
+      expect(
+        await page.evaluate(() => caches.match("/auth/clerk.js").then(Boolean)),
+      ).toBe(false);
+
+      const assetPath = await page.evaluate(async () => {
+        const html = await (await fetch("/")).text();
+        return html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1] ?? null;
+      });
+      expect(assetPath).not.toBeNull();
+      const validAsset = await page.evaluate(async (path) => {
+        const cache = await caches.open("reel-counter-v1");
+        await cache.delete(path!);
+        const response = await fetch(path!);
+        return {
+          status: response.status,
+          contentType: response.headers.get("content-type"),
+        };
+      }, assetPath);
+      expect(validAsset.status).toBe(200);
+      expect(validAsset.contentType).toContain("javascript");
+      await expect.poll(
+        () => page.evaluate((path) => caches.match(path!).then(Boolean), assetPath),
+      ).toBe(true);
+
+      const rejected = await page.evaluate(async () => {
+        const htmlResponse = await fetch("/assets/missing-script.js");
+        const authResponse = await fetch("/api/__clerk/missing.js");
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return {
+          htmlStatus: htmlResponse.status,
+          htmlType: htmlResponse.headers.get("content-type"),
+          htmlCached: Boolean(await caches.match("/assets/missing-script.js")),
+          authCached: Boolean(await caches.match("/api/__clerk/missing.js")),
+        };
+      });
+      expect(
+        rejected.htmlStatus >= 400 || rejected.htmlType?.includes("text/html"),
+      ).toBe(true);
+      expect(rejected.htmlCached).toBe(false);
+      expect(rejected.authCached).toBe(false);
+
+      expect(await page.evaluate(() => new Promise<boolean>((resolve, reject) => {
+        const request = indexedDB.open("reel-counter-offline", 2);
+        request.onsuccess = () => {
+          const transaction = request.result.transaction("entry-queue", "readonly");
+          const getRequest = transaction.objectStore("entry-queue").get("worker-upgrade-preservation");
+          getRequest.onsuccess = () => resolve(Boolean(getRequest.result));
+          getRequest.onerror = () => reject(getRequest.error);
+        };
+        request.onerror = () => reject(request.error);
+      }))).toBe(true);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("logout and identity changes cannot expose legacy protected caches offline", async ({
     context,
     page,

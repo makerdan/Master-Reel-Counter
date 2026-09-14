@@ -18,6 +18,65 @@ function isProtectedRead(url) {
   );
 }
 
+function isOwnedStaticAsset(url) {
+  const u = new URL(url);
+  return (
+    u.origin === self.location.origin &&
+    (u.pathname.startsWith("/assets/") ||
+      STATIC_ASSETS.includes(u.pathname))
+  );
+}
+
+function hasExpectedAssetContentType(request, response) {
+  const pathname = new URL(request.url).pathname;
+  const contentType = response.headers.get("content-type")?.toLowerCase() || "";
+
+  if (pathname.endsWith(".js")) {
+    return (
+      contentType.includes("javascript") ||
+      contentType.includes("ecmascript")
+    );
+  }
+  if (pathname.endsWith(".css")) return contentType.includes("text/css");
+  if (pathname.endsWith(".json")) return contentType.includes("json");
+  if (pathname.endsWith(".svg")) return contentType.includes("image/svg+xml");
+  if (pathname.match(/\.(png|jpg|jpeg|ico)$/)) {
+    return contentType.startsWith("image/");
+  }
+  if (pathname.match(/\.(woff2?|ttf|eot)$/)) {
+    return (
+      contentType.startsWith("font/") ||
+      contentType.includes("application/font") ||
+      contentType.includes("application/vnd.ms-fontobject")
+    );
+  }
+  return pathname === "/" && contentType.includes("text/html");
+}
+
+function canCacheAsset(request, response) {
+  return (
+    response.ok &&
+    !isProtectedRead(request.url) &&
+    isOwnedStaticAsset(request.url) &&
+    hasExpectedAssetContentType(request, response)
+  );
+}
+
+async function clearInvalidLegacyScripts() {
+  const shellCache = await caches.open(CACHE_NAME);
+  const requests = await shellCache.keys();
+  await Promise.all(
+    requests
+      .filter((request) => new URL(request.url).pathname.endsWith(".js"))
+      .map(async (request) => {
+        const response = await shellCache.match(request);
+        if (!response || !canCacheAsset(request, response)) {
+          await shellCache.delete(request);
+        }
+      })
+  );
+}
+
 async function clearProtectedCaches() {
   const keys = await caches.keys();
   await Promise.all(
@@ -51,6 +110,7 @@ self.addEventListener("activate", (event) => {
           .map((k) => caches.delete(k))
       );
       await clearProtectedCaches();
+      await clearInvalidLegacyScripts();
       await self.clients.claim();
     })
   );
@@ -76,18 +136,8 @@ function isNavigationRequest(request) {
   );
 }
 
-function isStaticAsset(url) {
-  const u = new URL(url);
-  const path = u.pathname;
-  return (
-    path.match(/\.(js|css|png|jpg|jpeg|svg|ico|woff2?|ttf|eot)$/) ||
-    path.startsWith("/assets/") ||
-    u.hostname === "fonts.googleapis.com" ||
-    u.hostname === "fonts.gstatic.com"
-  );
-}
-
 function cachePublicResponse(request, response) {
+  if (!canCacheAsset(request, response)) return Promise.resolve();
   return caches
     .open(CACHE_NAME)
     .then((cache) => cache.put(request, response))
@@ -134,7 +184,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isStaticAsset(request.url)) {
+  if (isOwnedStaticAsset(request.url)) {
     const responsePromise = caches.match(request).then((cached) => {
       if (cached) return { response: cached, cacheResponse: null };
       return fetch(request).then((response) => ({
