@@ -1,11 +1,14 @@
-import { users, type User, type UpsertUser } from "@shared/models/auth";
+import { users, type User, type UserProfileWrite } from "@shared/models/auth";
 import { db } from "../../db";
-import { eq, ne, count, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, count, or, sql } from "drizzle-orm";
 
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
-  createUserIfMissing(user: UpsertUser): Promise<User>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  getUserByClerkUserId(clerkUserId: string): Promise<User | undefined>;
+  createUserIfMissing(user: UserProfileWrite): Promise<User>;
+  createUserForClerkIdentity(user: UserProfileWrite, clerkUserId: string): Promise<User>;
+  bindClerkUserId(id: string, clerkUserId: string): Promise<User | undefined>;
+  upsertUser(user: UserProfileWrite): Promise<User>;
   updateUserAvatar(id: string, customAvatarKey: string | null): Promise<User>;
   getAllUsers(): Promise<User[]>;
   getRejectedCount(): Promise<number>;
@@ -16,20 +19,55 @@ export interface IAuthStorage {
   canRemoveAdmin(id: string): Promise<boolean>;
 }
 
+export function sanitizeUserProfileWrite(userData: UserProfileWrite): UserProfileWrite {
+  const {
+    id,
+    email,
+    firstName,
+    lastName,
+    profileImageUrl,
+    customAvatarKey,
+    approved,
+    rejected,
+    role,
+    createdAt,
+    updatedAt,
+  } = userData;
+  return {
+    id,
+    email,
+    firstName,
+    lastName,
+    profileImageUrl,
+    customAvatarKey,
+    approved,
+    rejected,
+    role,
+    createdAt,
+    updatedAt,
+  };
+}
+
 class AuthStorage implements IAuthStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
+  async getUserByClerkUserId(clerkUserId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.clerkUserId, clerkUserId));
+    return user;
+  }
+
+  async upsertUser(userData: UserProfileWrite): Promise<User> {
+    const profile = sanitizeUserProfileWrite(userData);
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values(profile)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          ...profile,
           updatedAt: new Date(),
         },
       })
@@ -37,10 +75,37 @@ class AuthStorage implements IAuthStorage {
     return user;
   }
 
-  async createUserIfMissing(userData: UpsertUser): Promise<User> {
-    await db.insert(users).values(userData).onConflictDoNothing({ target: users.id });
+  async createUserIfMissing(userData: UserProfileWrite): Promise<User> {
+    const profile = sanitizeUserProfileWrite(userData);
+    await db.insert(users).values(profile).onConflictDoNothing({ target: users.id });
     const user = await this.getUser(userData.id!);
     if (!user) throw new Error("Failed to create local user");
+    return user;
+  }
+
+  async createUserForClerkIdentity(
+    userData: UserProfileWrite,
+    clerkUserId: string,
+  ): Promise<User> {
+    const profile = sanitizeUserProfileWrite(userData);
+    await db
+      .insert(users)
+      .values({ ...profile, clerkUserId })
+      .onConflictDoNothing({ target: users.id });
+    const user = await this.getUserByClerkUserId(clerkUserId);
+    if (!user) throw new Error("Failed to create linked local user");
+    return user;
+  }
+
+  async bindClerkUserId(id: string, clerkUserId: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ clerkUserId, updatedAt: new Date() })
+      .where(and(
+        eq(users.id, id),
+        or(isNull(users.clerkUserId), eq(users.clerkUserId, clerkUserId)),
+      ))
+      .returning();
     return user;
   }
 

@@ -60,6 +60,13 @@ type ClerkProfile = {
   profileImageUrl?: string;
 };
 
+type ResolvedClerkAccount = {
+  userId: string;
+  existing: Awaited<ReturnType<typeof authStorage.getUser>>;
+  clerkProfile?: ClerkProfile;
+  identityBinding: "clerk-external-id" | "native-clerk";
+};
+
 const CLERK_PROFILE_CACHE_LIMIT = 100;
 const CLERK_PROFILE_CACHE_TTL_MS = 60_000;
 const clerkProfileCache = new Map<string, {
@@ -116,49 +123,62 @@ async function getClerkProfile(clerkUserId: string): Promise<ClerkProfile> {
   }
 }
 
+export async function resolveClerkAccount(
+  clerkUserId: string,
+  loadProfile: (id: string) => Promise<ClerkProfile> = getClerkProfile,
+): Promise<ResolvedClerkAccount> {
+  let existing = await authStorage.getUserByClerkUserId(clerkUserId);
+  if (existing) {
+    return {
+      userId: existing.id,
+      existing,
+      identityBinding: existing.id === clerkUserId
+        ? "native-clerk"
+        : "clerk-external-id",
+    };
+  }
+
+  const clerkProfile = await loadProfile(clerkUserId);
+  const userId = clerkProfile.externalId ?? clerkProfile.id;
+  const identityBinding = clerkProfile.externalId
+    ? "clerk-external-id" as const
+    : "native-clerk" as const;
+  existing = await authStorage.getUser(userId);
+  if (existing) {
+    existing = await authStorage.bindClerkUserId(existing.id, clerkProfile.id);
+    if (!existing) {
+      throw new Error("Local account is already linked to another Clerk identity");
+    }
+  }
+  return { userId, existing, clerkProfile, identityBinding };
+}
+
+export async function getPersistedIdentityAliases(
+  clerkUserId: string,
+  canonicalUserId: string,
+): Promise<string[]> {
+  const linkedUser = await authStorage.getUserByClerkUserId(clerkUserId);
+  if (linkedUser?.id !== canonicalUserId) return [];
+  return clerkUserId === canonicalUserId ? [] : [clerkUserId];
+}
+
 export async function getVerifiedIdentityAliases(req: Request, canonicalUserId: string): Promise<string[]> {
   const auth = getAuth(req);
   if (!auth.userId) return [];
-  const aliases = [auth.userId];
-  try {
-    aliases.push((await getClerkProfile(auth.userId)).externalId ?? "");
-  } catch {
-    // Alias recovery fails closed without taking down ordinary authenticated API access.
-  }
-  return Array.from(new Set(aliases.filter(value => value && value !== canonicalUserId)));
+  return getPersistedIdentityAliases(auth.userId, canonicalUserId);
 }
 
 async function clerkIdentity(req: Request): Promise<NormalizedUser | undefined> {
   const auth = getAuth(req);
   if (!auth.userId) return undefined;
   const claims = (auth.sessionClaims ?? {}) as Record<string, unknown>;
-  let clerkProfile: ClerkProfile | undefined;
-  const legacyUserId = claimsValue(claims, "userId");
-  const claimedExternalId = claimsValue(claims, "externalId", "external_id");
-  let userId = legacyUserId ?? claimedExternalId;
-  let identityBinding: "legacy-claim" | "clerk-external-id" | "native-clerk" =
-    legacyUserId
-      ? legacyUserId.startsWith("user_")
-        ? "native-clerk"
-        : "legacy-claim"
-      : claimedExternalId
-        ? "clerk-external-id"
-        : "native-clerk";
-  let existing = userId
-    ? await authStorage.getUser(userId)
-    : await authStorage.getUser(auth.userId);
-  if (!userId || identityBinding === "native-clerk") {
-    if (existing) {
-      userId = auth.userId;
-    } else {
-      clerkProfile = await getClerkProfile(auth.userId);
-      userId = clerkProfile.externalId ?? clerkProfile.id;
-      identityBinding = clerkProfile.externalId
-        ? "clerk-external-id"
-        : "native-clerk";
-      existing = await authStorage.getUser(userId);
-    }
-  }
+  const resolved = await resolveClerkAccount(auth.userId);
+  let {
+    clerkProfile,
+    existing,
+    identityBinding,
+    userId,
+  } = resolved;
   const email =
     claimsValue(claims, "email") ??
     clerkProfile?.email;
@@ -178,14 +198,13 @@ async function clerkIdentity(req: Request): Promise<NormalizedUser | undefined> 
   // accounts. New external-Clerk identities safely provision under their
   // native user_ identifier and cannot satisfy the initial-owner check.
   if (!existing) {
-    await authStorage.createUserIfMissing({
+    existing = await authStorage.createUserForClerkIdentity({
       id: userId,
       email,
       firstName,
       lastName,
       profileImageUrl,
-    });
-    existing = await authStorage.getUser(userId);
+    }, auth.userId);
   }
 
   // Owner access is only retained for the migrated local record. A new Clerk

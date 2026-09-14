@@ -60,7 +60,9 @@ import
 
 import 
 {
- isAuthenticated 
+  isAuthenticated,
+  getPersistedIdentityAliases,
+  resolveClerkAccount,
 }
  from "../replit_integrations/auth/replitAuth.js"
 ;
@@ -109,7 +111,8 @@ import { buildSignInPath, getSafeReturnPath } from "../../shared/auth-routing.js
 
 import 
 {
- authStorage 
+  authStorage,
+  sanitizeUserProfileWrite,
 }
  from "../replit_integrations/auth/storage.js"
 ;
@@ -147,6 +150,177 @@ after(async () => {
 });
 
 describe("Clerk identity and approval regression guard", () => {
+  test("identity-link migration applies and rolls back against PostgreSQL", async () => {
+    const migration = readFileSync(
+      new URL("../../migrations/0026_add_users_clerk_user_id.sql", import.meta.url),
+      "utf8",
+    );
+    const rollback = readFileSync(
+      new URL("../../migrations/rollback/0026_add_users_clerk_user_id.sql", import.meta.url),
+      "utf8",
+    );
+    const client = await pool.connect();
+    const schema = `clerk_mapping_test_${process.pid}`;
+    try {
+      await client.query("BEGIN");
+      await client.query(`CREATE SCHEMA "${schema}"`);
+      await client.query(`SET LOCAL search_path TO "${schema}"`);
+      await client.query('CREATE TABLE "users" ("id" varchar PRIMARY KEY)');
+      await client.query(migration);
+      await client.query(
+        `INSERT INTO "users" ("id", "clerk_user_id") VALUES ('one', 'user_same')`,
+      );
+      await client.query("SAVEPOINT duplicate_mapping");
+      await assert.rejects(
+        client.query(
+          `INSERT INTO "users" ("id", "clerk_user_id") VALUES ('two', 'user_same')`,
+        ),
+        /unique/i,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT duplicate_mapping");
+      await client.query(rollback);
+      const columns = await client.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = $1 AND table_name = 'users'`,
+        [schema],
+      );
+      assert.deepEqual(columns.rows.map(({ column_name }) => column_name), ["id"]);
+
+      await client.query(
+        `ALTER TABLE "users"
+         ADD COLUMN "clerk_user_id" varchar
+         CONSTRAINT "users_clerk_user_id_unique" UNIQUE`,
+      );
+      await client.query(rollback);
+      const constraintColumns = await client.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = $1 AND table_name = 'users'`,
+        [schema],
+      );
+      assert.deepEqual(
+        constraintColumns.rows.map(({ column_name }) => column_name),
+        ["id"],
+      );
+    } finally {
+      await client.query("ROLLBACK").catch(() => {});
+      client.release();
+    }
+  });
+
+  test("ordinary account writes discard hostile Clerk identity linkage", () => {
+    const sanitized = sanitizeUserProfileWrite({
+      id: "local-id",
+      firstName: "Pat",
+      clerkUserId: "user_hostile",
+    } as any);
+    assert.deepEqual(sanitized, {
+      id: "local-id",
+      email: undefined,
+      firstName: "Pat",
+      lastName: undefined,
+      profileImageUrl: undefined,
+      customAvatarKey: undefined,
+      approved: undefined,
+      rejected: undefined,
+      role: undefined,
+      createdAt: undefined,
+      updatedAt: undefined,
+    });
+    assert.equal("clerkUserId" in sanitized, false);
+  });
+
+  test("resolves a persisted native Clerk mapping without loading the Clerk profile", async () => {
+    const originalGetByClerkId = authStorage.getUserByClerkUserId;
+    let profileLoads = 0;
+    authStorage.getUserByClerkUserId = async () => ({
+      id: "legacy-local-id",
+      clerkUserId: "user_native-id",
+    } as any);
+
+    try {
+      const resolved = await resolveClerkAccount("user_native-id", async () => {
+        profileLoads++;
+        throw new Error("Clerk Users API must not be called");
+      });
+      assert.equal(resolved.userId, "legacy-local-id");
+      assert.equal(resolved.identityBinding, "clerk-external-id");
+      assert.equal(profileLoads, 0);
+    } finally {
+      authStorage.getUserByClerkUserId = originalGetByClerkId;
+    }
+  });
+
+  test("verified alias recovery uses the persisted mapping without Clerk profile access", async () => {
+    const originalGetByClerkId = authStorage.getUserByClerkUserId;
+    authStorage.getUserByClerkUserId = async () => ({
+      id: "legacy-local-id",
+      clerkUserId: "user_native-id",
+    } as any);
+    try {
+      assert.deepEqual(
+        await getPersistedIdentityAliases("user_native-id", "legacy-local-id"),
+        ["user_native-id"],
+      );
+      assert.deepEqual(
+        await getPersistedIdentityAliases("user_native-id", "different-local-id"),
+        [],
+      );
+    } finally {
+      authStorage.getUserByClerkUserId = originalGetByClerkId;
+    }
+  });
+
+  test("persists a legacy mapping only from Clerk's verified external ID", async () => {
+    const originalGetByClerkId = authStorage.getUserByClerkUserId;
+    const originalGetUser = authStorage.getUser;
+    const originalBind = authStorage.bindClerkUserId;
+    const bindings: Array<[string, string]> = [];
+    authStorage.getUserByClerkUserId = async () => undefined;
+    authStorage.getUser = async (id) => id === "verified-legacy-id"
+      ? { id, clerkUserId: null } as any
+      : undefined;
+    authStorage.bindClerkUserId = async (id, clerkUserId) => {
+      bindings.push([id, clerkUserId]);
+      return { id, clerkUserId } as any;
+    };
+
+    try {
+      const resolved = await resolveClerkAccount("user_native-id", async () => ({
+        id: "user_native-id",
+        externalId: "verified-legacy-id",
+      }));
+      assert.equal(resolved.userId, "verified-legacy-id");
+      assert.deepEqual(bindings, [["verified-legacy-id", "user_native-id"]]);
+    } finally {
+      authStorage.getUserByClerkUserId = originalGetByClerkId;
+      authStorage.getUser = originalGetUser;
+      authStorage.bindClerkUserId = originalBind;
+    }
+  });
+
+  test("rejects a conflicting immutable Clerk mapping", async () => {
+    const originalGetByClerkId = authStorage.getUserByClerkUserId;
+    const originalGetUser = authStorage.getUser;
+    const originalBind = authStorage.bindClerkUserId;
+    authStorage.getUserByClerkUserId = async () => undefined;
+    authStorage.getUser = async () => ({ id: "legacy-id", clerkUserId: "user_other" } as any);
+    authStorage.bindClerkUserId = async () => undefined;
+
+    try {
+      await assert.rejects(
+        resolveClerkAccount("user_native-id", async () => ({
+          id: "user_native-id",
+          externalId: "legacy-id",
+        })),
+        /already linked/,
+      );
+    } finally {
+      authStorage.getUserByClerkUserId = originalGetByClerkId;
+      authStorage.getUser = originalGetUser;
+      authStorage.bindClerkUserId = originalBind;
+    }
+  });
+
   test("keeps missing local users distinct from provisioned approval states", () => {
     assert.deepEqual(classifyAuthUserLookup({ claims: { sub: "missing" } }, undefined), {
       kind: "not_provisioned",

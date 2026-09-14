@@ -6,6 +6,7 @@ export const accountRoleEnum = pgEnum("account_role", ["Admin", "User"]);
 // Local account state for Clerk identities.
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clerkUserId: varchar("clerk_user_id").unique(),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
@@ -20,5 +21,6 @@ export const users = pgTable("users", {
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type UserProfileWrite = Omit<UpsertUser, "clerkUserId">;
 
 export type AccountRole = (typeof accountRoleEnum.enumValues)[number];

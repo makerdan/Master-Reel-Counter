@@ -5,6 +5,7 @@ const root = resolve(import.meta.dirname, "..");
 
 export const REQUIRED_AUTH_COLUMNS = new Set([
   "id",
+  "clerk_user_id",
   "email",
   "first_name",
   "last_name",
@@ -68,6 +69,10 @@ async function verifyReviewedMigrations() {
     resolve(root, "migrations/0025_reconcile_legacy_tester_accounts.sql"),
     "utf8",
   );
+  const migration26 = await readFile(
+    resolve(root, "migrations/0026_add_users_clerk_user_id.sql"),
+    "utf8",
+  );
 
   if (
     !/CREATE TYPE account_role/.test(migration23) ||
@@ -83,6 +88,14 @@ async function verifyReviewedMigrations() {
   ) {
     throw new Error(
       "Reviewed auth migration 0025 is missing its safe legacy-account reconciliation guard",
+    );
+  }
+  if (
+    !/ADD COLUMN IF NOT EXISTS "clerk_user_id"/.test(migration26) ||
+    !/CREATE UNIQUE INDEX IF NOT EXISTS "users_clerk_user_id_unique"/.test(migration26)
+  ) {
+    throw new Error(
+      "Reviewed auth migration 0026 is missing the durable Clerk identity mapping",
     );
   }
 }

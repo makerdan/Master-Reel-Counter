@@ -30,7 +30,16 @@ function fakeClient({ columns, roleValues = ["Admin", "User"], legacyColumns = [
   };
 }
 
-const currentColumns = ["id", "email", "first_name", "last_name", "approved", "rejected", "role"];
+const currentColumns = [
+  "id",
+  "clerk_user_id",
+  "email",
+  "first_name",
+  "last_name",
+  "approved",
+  "rejected",
+  "role",
+];
 
 test("release target must be explicit and distinct from the publishing database", () => {
   assert.throws(
@@ -60,6 +69,15 @@ test("schema preflight fails before release fixtures when users.role is absent",
   await assert.rejects(
     assertReleaseSchema(fakeClient({ columns: currentColumns.filter((column) => column !== "role") })),
     /missing users\.role/,
+  );
+});
+
+test("schema preflight fails before release fixtures when durable Clerk identity mapping is absent", async () => {
+  await assert.rejects(
+    assertReleaseSchema(
+      fakeClient({ columns: currentColumns.filter((column) => column !== "clerk_user_id") }),
+    ),
+    /missing users\.clerk_user_id/,
   );
 });
 
