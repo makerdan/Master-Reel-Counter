@@ -44,7 +44,6 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/master_reel_counter_test
       SESSION_SECRET: github-actions-test-session-secret-not-production
-      TEST_TESTER_PASSWORD: github-actions-tester-password
       REPL_ID: github-actions-validation
       # These are intentionally test-only values. The suite mocks AI calls and
       # does not access Replit object storage or production credentials.
@@ -102,17 +101,17 @@ jobs:
         run: |
           set -euo pipefail
           psql "$DATABASE_URL" --command="
-            INSERT INTO users (id, email, first_name, approved, rejected, is_tester)
+            INSERT INTO users (id, email, first_name, approved, rejected, role)
             VALUES (
               'github-actions-owner',
               'github-actions-owner@example.invalid',
               'GitHub Actions Owner',
               true,
               false,
-              false
+              'Admin'
             )
             ON CONFLICT (id) DO UPDATE
-              SET approved = true, rejected = false, is_tester = false;
+              SET approved = true, rejected = false, role = 'Admin';
           "
 
       - name: Install Playwright browser engines on cache miss

@@ -117,6 +117,17 @@ test("workflow provisions and checks the test prerequisites", () => {
   assert.match(workflow, /psql "\$DATABASE_URL"/);
   assert.match(workflow, /drizzle-kit push --force/);
   assert.match(workflow, /github-actions-owner/);
+  assert.match(
+    workflow,
+    /INSERT INTO users \(id, email, first_name, approved, rejected, role\)/,
+    "synthetic owner seeding must use the current persisted account-role schema",
+  );
+  assert.match(workflow, /'Admin'/);
+  assert.doesNotMatch(
+    workflow,
+    /\bis_tester\b|TEST_TESTER_PASSWORD/,
+    "removed tester-account columns and credentials must not return to CI",
+  );
   assert.match(workflow, /REPL_ID:\s+github-actions-validation/);
   const browserCache = sectionBetween(
     "      - name: Cache Playwright browser engines",
