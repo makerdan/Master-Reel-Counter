@@ -1,10 +1,10 @@
 # GitHub Actions validation contract
 
 This repository contains a GitHub Actions workflow at
-`.github/workflows/validation.yml`. It is a repository configuration artifact,
-not evidence that GitHub has run it or that any branch policy requires it.
-Activation, first-run verification, and branch-policy changes remain manual
-GitHub administration steps.
+`.github/workflows/validation.yml`. The workflow file is configuration, not
+evidence that a particular revision ran or that any branch policy requires it.
+Revision-aware run and policy evidence is recorded below; configuration claims
+remain local observations until GitHub reports them.
 
 ## Events and result contract
 
@@ -30,7 +30,9 @@ environment values in the workflow are test-only values: AI requests are
 mocked by the browser tests and object storage is not authenticated in GitHub
 Actions. Current application startup does perform public Replit OIDC metadata
 discovery. The workflow supplies a non-secret test client identifier for that
-discovery, not a Replit credential.
+discovery, not a Replit credential. The synthetic database account uses the
+current persisted `Admin` role; it does not use the removed tester-account
+columns or password flow.
 
 
 ## PostgreSQL compatibility contract
@@ -70,10 +72,10 @@ lock, plan behavior, ordering, and exit status.
 | `port-authority-tests` | `npm run ci` → `test-heavy` | **Indirect**; owns only ephemeral runner ports. |
 | `manifest-parity` | `npm run ci` → `test-heavy` | **Indirect**; verifies the tracked validation manifest. |
 | `collision-smoke` | `npm run ci` → `test-heavy` | **Indirect**; nested commands use isolated temporary lock paths. |
-| `empty-database-startup` | `node --test scripts/__tests__/github-actions-empty-database.test.mjs` | **Direct** preflight; creates a local disposable PostgreSQL database, applies the same forced Drizzle schema push, inserts the synthetic owner, starts the app with the workflow's non-secret test values, verifies health/password seeding/owner login, and terminates connections before dropping the database. |
-| `browser-tests` | `npm run ci` → `test-heavy` | **Indirect**; the isolated service receives a schema push and a synthetic non-tester owner, then Chromium is installed with Playwright and launched before the suite as a readiness check. |
+| `empty-database-startup` | `node --test scripts/__tests__/github-actions-empty-database.test.mjs` | **Direct** preflight; creates a local disposable PostgreSQL database, applies the same forced Drizzle schema push, inserts a synthetic Admin account, starts the app with the workflow's non-secret test values, verifies health, and terminates connections before dropping the database. |
+| `browser-tests` | `npm run ci` → `test-heavy` | **Indirect**; the isolated service receives a schema push and a synthetic Admin account, then Chromium and WebKit are installed with Playwright and launched before the suite as readiness checks. Browser authentication still requires the separate Clerk setup values described below. |
 | GitHub workflow contract | `node --test scripts/__tests__/github-actions-workflow.test.mjs` | **Direct** preflight; it inspects triggers, permissions, pins, routing, prerequisites, aggregation, and artifact safety before the canonical run. |
-| Replit Auth owner session | Synthetic test owner row | **Intentional test substitute**; the isolated database receives a non-production owner row so the existing test-only owner-login endpoint can create a full-permission test session without Replit Auth. |
+| Clerk owner session | Synthetic persisted Admin row | **Intentional test substitute**; the isolated database receives a non-production Admin row for schema and startup coverage. Full browser authentication remains a separate external-Clerk prerequisite and is not claimed unless its required credentials are available. |
 | Replit OIDC metadata discovery | Public metadata endpoint | **External prerequisite**; current startup discovers public provider metadata with a non-secret test client ID. Availability on GitHub runners is unknown until a revision-aware run succeeds. |
 | Replit object storage | Not authenticated remotely | **Intentional gap**; tests that need photo storage must skip or mock according to their existing test contract. No production bucket is used. |
 | OpenAI/Replit AI integrations | Not authenticated remotely | **Intentional gap**; browser AI calls are mocked. Real provider reachability is not a CI requirement. |
@@ -90,11 +92,11 @@ and therefore cannot replace the validation result. Hidden files are excluded,
 and no environment dump, `.env` file, auth-state file, or secret-bearing path
 is included in the artifact list.
 
-## Private repository and fork behavior
+## Public repository and fork behavior
 
-This repository is private. Pull-request workflow behavior, merge queues,
+This repository is public. Pull-request workflow behavior, merge queues,
 artifact availability, and hosted-runner minutes still depend on the
-repository's GitHub plan and settings; this file does not change them. Fork
+repository's GitHub settings; this file does not change them. Fork
 pull requests must not receive repository secrets, and this workflow does not
 request any. A fork can run the read-only source validation only if GitHub
 permits the workflow for that fork/event; that event behavior is not claimed
@@ -172,6 +174,31 @@ latest revision-aware run failed. No branch protection or ruleset policy was
 changed. A future administrator should repeat the merge-queue verification
 after a successful run and artifact upload, then require the exact check name
 `Validation result` only if that evidence remains stable.
+
+## Task 624 completion decision
+
+The latest revision-aware run reached the canonical command after the blank
+database repair:
+
+| Evidence item | Result |
+| --- | --- |
+| Workflow run | **Observed**: [`34835784882`](https://github.com/makerdan/Master-Reel-Counter/actions/runs/34835784882) used `workflow_dispatch` at exact revision `1ac67ebc363fd8ac7755491eee44192f9146e1a4`. |
+| Required jobs | **Observed**: `Validate canonical contract` failed in `Run canonical validation`; `Validation result` also failed because its required job result was `failure`. |
+| Preflight and browser prerequisites | **Observed successful**: dependency installation, Clerk package verification, workflow contract checks, PostgreSQL readiness, blank-database startup, schema creation, synthetic Admin seeding, Playwright installation, and Chromium/WebKit launch checks all completed successfully. |
+| Canonical command | **Observed reached**: the workflow executed `npm run ci`; Playwright global setup then stopped the command because no valid `VITE_CLERK_PUBLISHABLE_KEY` or `VITE_CLERK_PUBLIC_HOST` was available to create the external Clerk test user. |
+| Diagnostic artifact | **Observed successful**: artifact `canonical-validation-diagnostics-34835784882` was uploaded and remains available with seven-day retention. |
+| GitHub Actions secrets | **Observed absent**: the repository secret listing returned no secrets. No production credential was added, and no credential was requested in chat. |
+| Dependabot policy on `main` | **Not observed**: `.github/dependabot.yml` is present on the task branch but is not present in the remote `main` tree while pull request [#5](https://github.com/makerdan/Master-Reel-Counter/pull/5) remains open. |
+| Browser validation decision | **Intentional local-only gap**: the user chose not to authorize a GitHub test Clerk tenant. Browser authentication remains required by the canonical local suite and was not skipped or weakened in the workflow. |
+| Branch policy | **Not enabled**: successful complete validation evidence does not exist, so `main` remains unprotected and `Validation result` remains non-required. |
+
+This run proves that workflow execution can pass the previous blank-database
+and dependency-install barriers and reach the canonical command. It does not
+prove a successful complete `test-heavy` run, remote browser authentication,
+the presence of Dependabot policy on `main`, or a merge-blocking branch rule.
+Those claims must remain separate from local configuration until an
+administrator authorizes a non-production Clerk test tenant and merges the
+reviewed branch through the normal pull-request path.
 
 ## Task 570 automatic security-update verification
 

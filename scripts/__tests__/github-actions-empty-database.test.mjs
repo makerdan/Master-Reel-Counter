@@ -187,15 +187,20 @@ test("GitHub Actions boots the app against a blank disposable database", async (
       NODE_ENV: "test",
       DATABASE_URL: disposableUrl,
       SESSION_SECRET: "github-actions-test-session-secret-not-production",
+      CLERK_SECRET_KEY: "sk_test_github_actions_validation_not_production",
       REPL_ID: "github-actions-validation",
       AI_INTEGRATIONS_OPENAI_API_KEY: "test-only-unavailable",
       AI_INTEGRATIONS_OPENAI_BASE_URL: "http://127.0.0.1:9",
     };
 
-    const schema = await runCommand("npx", ["drizzle-kit", "push", "--force"], {
-      cwd: root,
-      env: bootstrapEnv,
-    });
+    const schema = await runCommand(
+      process.execPath,
+      [resolve(root, "node_modules/drizzle-kit/bin.cjs"), "push", "--force"],
+      {
+        cwd: root,
+        env: bootstrapEnv,
+      },
+    );
     assert.equal(
       schema.code,
       0,
@@ -215,12 +220,16 @@ test("GitHub Actions boots the app against a blank disposable database", async (
     }
 
     const port = await findAvailablePort();
-    server = spawn("npx", ["tsx", "server/index.ts"], {
-      cwd: root,
-      detached: true,
-      env: { ...bootstrapEnv, PORT: String(port) },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    server = spawn(
+      process.execPath,
+      [resolve(root, "node_modules/tsx/dist/cli.mjs"), "server/index.ts"],
+      {
+        cwd: root,
+        detached: true,
+        env: { ...bootstrapEnv, PORT: String(port) },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     server.stdout.on("data", (chunk) => { serverOutput += chunk; });
     server.stderr.on("data", (chunk) => { serverOutput += chunk; });
 

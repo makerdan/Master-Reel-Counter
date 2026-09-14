@@ -1,4 +1,4 @@
-export { users } from "./models/auth";
+export { accountRoleEnum, users } from "./models/auth";
 import { sql } from "drizzle-orm";
 import {
   pgTable,

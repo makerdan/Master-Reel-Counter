@@ -12,6 +12,8 @@ const workflowPath = resolve(root, ".github/workflows/validation.yml");
 const workflow = readFileSync(workflowPath, "utf8");
 const dependabotPath = resolve(root, ".github/dependabot.yml");
 const dependabot = readFileSync(dependabotPath, "utf8");
+const lockfile = readFileSync(resolve(root, "package-lock.json"), "utf8");
+const schema = readFileSync(resolve(root, "shared/schema.ts"), "utf8");
 const startupSmokePath = resolve(root, "scripts/startup-smoke.sh");
 const startupSmoke = readFileSync(startupSmokePath, "utf8");
 
@@ -97,11 +99,24 @@ test("all third-party actions use immutable commit pins", () => {
 test("workflow installs the declared runtime with frozen dependencies", () => {
   assert.match(workflow, /actions\/setup-node@[0-9a-f]{40}/);
   assert.match(workflow, /node-version:\s+"20"/);
-  assert.match(workflow, /run: npm ci/);
+  assert.match(workflow, /npm ci(?:\s|$)/);
+  assert.match(workflow, /for attempt in \{1\.\.3\}/);
+  assert.match(workflow, /node_modules\/@clerk\/express\/package\.json/);
   assert.match(workflow, /run: node --test scripts\/__tests__\/github-actions-workflow\.test\.mjs/);
+  assert.match(workflow, /npm ci --ignore-scripts --no-audit --no-fund/);
+  assert.doesNotMatch(
+    lockfile,
+    /package-firewall\.replit\.(?:local|internal)/,
+    "public GitHub Actions runs must not resolve packages through Replit-only hosts",
+  );
 });
 
 test("workflow provisions and checks the test prerequisites", () => {
+  assert.match(
+    schema,
+    /export \{\s*accountRoleEnum,\s*users\s*\} from "\.\/models\/auth";/,
+    "Drizzle schema entrypoint must expose the account role enum used by users.role",
+  );
   assert.match(
     workflow,
     new RegExp(`image:\\s+${SUPPORTED_POSTGRES_IMAGE.replace(":", "\\:")}\\b`),
@@ -117,7 +132,23 @@ test("workflow provisions and checks the test prerequisites", () => {
   assert.match(workflow, /psql "\$DATABASE_URL"/);
   assert.match(workflow, /drizzle-kit push --force/);
   assert.match(workflow, /github-actions-owner/);
+  assert.match(
+    workflow,
+    /INSERT INTO users \(id, email, first_name, approved, rejected, role\)/,
+    "synthetic owner seeding must use the current persisted account-role schema",
+  );
+  assert.match(workflow, /'Admin'/);
+  assert.doesNotMatch(
+    workflow,
+    /\bis_tester\b|TEST_TESTER_PASSWORD/,
+    "removed tester-account columns and credentials must not return to CI",
+  );
   assert.match(workflow, /REPL_ID:\s+github-actions-validation/);
+  assert.match(
+    workflow,
+    /CLERK_SECRET_KEY:\s+sk_test_github_actions_validation_not_production/,
+    "isolated CI startup must provide only a synthetic Clerk secret",
+  );
   const browserCache = sectionBetween(
     "      - name: Cache Playwright browser engines",
     "      - name: Check workflow contract",
