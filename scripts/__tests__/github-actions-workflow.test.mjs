@@ -102,6 +102,7 @@ test("workflow installs the declared runtime with frozen dependencies", () => {
   assert.match(workflow, /for attempt in \{1\.\.3\}/);
   assert.match(workflow, /node_modules\/@clerk\/express\/package\.json/);
   assert.match(workflow, /run: node --test scripts\/__tests__\/github-actions-workflow\.test\.mjs/);
+  assert.match(workflow, /npm ci --ignore-scripts --no-audit --no-fund/);
 });
 
 test("workflow provisions and checks the test prerequisites", () => {
