@@ -12,6 +12,7 @@ const workflowPath = resolve(root, ".github/workflows/validation.yml");
 const workflow = readFileSync(workflowPath, "utf8");
 const dependabotPath = resolve(root, ".github/dependabot.yml");
 const dependabot = readFileSync(dependabotPath, "utf8");
+const schema = readFileSync(resolve(root, "shared/schema.ts"), "utf8");
 const startupSmokePath = resolve(root, "scripts/startup-smoke.sh");
 const startupSmoke = readFileSync(startupSmokePath, "utf8");
 
@@ -102,6 +103,11 @@ test("workflow installs the declared runtime with frozen dependencies", () => {
 });
 
 test("workflow provisions and checks the test prerequisites", () => {
+  assert.match(
+    schema,
+    /export \{\s*accountRoleEnum,\s*users\s*\} from "\.\/models\/auth";/,
+    "Drizzle schema entrypoint must expose the account role enum used by users.role",
+  );
   assert.match(
     workflow,
     new RegExp(`image:\\s+${SUPPORTED_POSTGRES_IMAGE.replace(":", "\\:")}\\b`),
