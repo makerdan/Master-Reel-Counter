@@ -192,9 +192,47 @@ test("manual CI release gate builds and verifies the exact checked-out candidate
 test("manual CI release gate blocks when matched production Clerk credentials are unavailable", () => {
   assert.match(workflow, /name: Require matched production Clerk credentials/);
   assert.match(workflow, /secrets\.CLERK_SECRET_KEY/);
+  assert.equal(
+    workflow.match(/CLERK_PUBLISHABLE_KEY: \$\{\{ secrets\.CLERK_PUBLISHABLE_KEY \}\}/g)?.length,
+    2,
+  );
+  assert.equal(
+    workflow.match(
+      /VITE_CLERK_PUBLISHABLE_KEY: \$\{\{ secrets\.VITE_CLERK_PUBLISHABLE_KEY \}\}/g,
+    )?.length,
+    2,
+  );
+  assert.match(workflow, /\[\[ -n "\$CLERK_PUBLISHABLE_KEY" \]\] \|\| missing\+=\("CLERK_PUBLISHABLE_KEY"\)/);
+  assert.match(
+    workflow,
+    /\[\[ -n "\$VITE_CLERK_PUBLISHABLE_KEY" \]\] \|\| missing\+=\("VITE_CLERK_PUBLISHABLE_KEY"\)/,
+  );
   assert.match(workflow, /secrets\.VITE_CLERK_PUBLISHABLE_KEY/);
   assert.match(workflow, /validation is blocked: missing production credential/);
   assert.doesNotMatch(workflow, /continue-on-error:[\s\S]*Require matched production Clerk credentials/);
+});
+
+test("release workflow and production startup share the two-key tenant contract", () => {
+  assert.match(
+    serverIndex,
+    /resolveClerkEnvironmentPublishableKey\(\{\s*serverPublishableKey: process\.env\.CLERK_PUBLISHABLE_KEY,\s*clientPublishableKey: process\.env\.VITE_CLERK_PUBLISHABLE_KEY,\s*allowClientFallback: process\.env\.NODE_ENV !== "production",\s*\}\)/,
+  );
+  assert.match(
+    sharedClerkConfig,
+    /requirePublishableKey\(\s*serverPublishableKey,\s*"CLERK_PUBLISHABLE_KEY",\s*\)/,
+  );
+  assert.match(
+    sharedClerkConfig,
+    /requirePublishableKey\(\s*input\.clientPublishableKey,\s*"VITE_CLERK_PUBLISHABLE_KEY",\s*\)/,
+  );
+  assert.match(
+    sharedClerkConfig,
+    /CLERK_PUBLISHABLE_KEY and VITE_CLERK_PUBLISHABLE_KEY select different tenants/,
+  );
+  assert.doesNotMatch(
+    sharedClerkConfig,
+    /allowClientFallback:\s*true/,
+  );
 });
 
 test("production and release testing derive the proxy path from one shared source", () => {
