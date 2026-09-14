@@ -19,7 +19,7 @@ const chromiumExecutable = findChromium();
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "clerk-preview-bootstrap.spec.ts",
+  testMatch: "clerk-*.spec.ts",
   workers: 1,
   retries: 0,
   reporter: "line",

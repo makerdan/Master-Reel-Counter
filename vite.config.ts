@@ -3,10 +3,22 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+function isClerkBootstrapLoadError(error: Error): boolean {
+  return /failed_to_load_clerk_js|Failed to load Clerk JS/i.test(
+    `${error.name}: ${error.message}`,
+  );
+}
+
 export default defineConfig({
   plugins: [
     react(),
-    runtimeErrorOverlay(),
+    // ClerkFailed renders the user-facing recovery state for this expected
+    // provider lifecycle failure. Do not cover it with the dev overlay, which
+    // would block the retry control and turn a recoverable outage into a
+    // runtime error screen.
+    runtimeErrorOverlay({
+      filter: (error) => !isClerkBootstrapLoadError(error),
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [

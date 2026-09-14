@@ -26,3 +26,4 @@
 - [External Clerk browser configuration](external-clerk-browser-config.md) — keep tenant hosts out of tracked config; browser validation needs a valid env-provided key or host.
 - [Offline queue identity barrier](offline-queue-identity-barrier.md) — reconcile only server-verified aliases before any owner-scoped read, claim recovery, cleanup, or drain.
 - [Drizzle enum bootstrap](drizzle-enum-bootstrap.md) — empty release databases need reviewed enum creation before exported schema SQL; push can attempt a dependent-type drop.
+- [Clerk bootstrap recovery](clerk-bootstrap-recovery.md) — use Clerk lifecycle failure state plus a fresh page reload; failed SDK singleton remounts can retain the load error.

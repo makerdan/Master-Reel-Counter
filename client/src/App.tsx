@@ -1,16 +1,24 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { THEME_MODE_KEY, PAGEVIEW_LAST_KEY, readSessionKey, writeSessionKey } from "@/lib/storageKeys";
 import { Switch, Route, useLocation, useSearch, Router as WouterRouter } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClerkProvider, SignIn, SignUp, useClerk } from "@clerk/react";
+import {
+  ClerkFailed,
+  ClerkLoaded,
+  ClerkLoading,
+  ClerkProvider,
+  SignIn,
+  SignUp,
+  useClerk,
+} from "@clerk/react";
 import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider, useTheme } from "@/lib/theme-provider";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import SessionPage from "@/pages/session";
@@ -26,11 +34,35 @@ import { HelpOnboarding } from "@/components/HelpMenu";
 import { buildSignInPath, getReturnPathFromSearch } from "@shared/auth-routing";
 import { resolveClerkBootstrapConfig } from "@shared/clerk-config";
 
-const clerkBootstrap = resolveClerkBootstrapConfig({
-  publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-  proxyUrl: import.meta.env.VITE_CLERK_PROXY_URL,
-  runtimeHostname: window.location.hostname,
-});
+type ClerkBootstrapState =
+  | {
+      config: ReturnType<typeof resolveClerkBootstrapConfig>;
+      error: null;
+    }
+  | {
+      config: null;
+      error: "configuration";
+    };
+
+function readClerkBootstrapState(): ClerkBootstrapState {
+  try {
+    return {
+      config: resolveClerkBootstrapConfig({
+        publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+        proxyUrl: import.meta.env.VITE_CLERK_PROXY_URL,
+        runtimeHostname: window.location.hostname,
+      }),
+      error: null,
+    };
+  } catch {
+    // Do not expose configuration values or throw before React can render a
+    // recovery screen. A malformed or missing key is terminal until the page
+    // is rebuilt with corrected environment configuration.
+    return { config: null, error: "configuration" };
+  }
+}
+
+const clerkBootstrap = readClerkBootstrapState();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function stripBase(path: string): string {
@@ -229,6 +261,78 @@ function SignUpPage() {
   );
 }
 
+function ClerkBootstrapRecovery({
+  failure,
+  onRetry,
+}: {
+  failure: "configuration" | "provider";
+  onRetry: () => void;
+}) {
+  const isConfigurationFailure = failure === "configuration";
+
+  return (
+    <div
+      className="min-h-[100dvh] flex items-center justify-center bg-background p-4"
+      data-testid="clerk-bootstrap-recovery"
+    >
+      <div className="w-full max-w-md rounded-2xl border border-amber-700/20 bg-amber-50 p-8 text-center shadow-xl dark:bg-stone-900">
+        <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-amber-700 dark:text-amber-400" />
+        <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
+          {isConfigurationFailure
+            ? "Authentication setup is unavailable"
+            : "Authentication service is unavailable"}
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-stone-600 dark:text-stone-300">
+          {isConfigurationFailure
+            ? "This app cannot start sign-in because its authentication configuration is missing or invalid. Please contact the app owner."
+            : "We couldn't start the authentication service. Check your connection and try again."}
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-6 inline-flex items-center justify-center gap-2 rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-700 focus:ring-offset-2"
+          data-testid={
+            isConfigurationFailure
+              ? "button-reload-clerk"
+              : "button-retry-clerk"
+          }
+        >
+          <RefreshCw className="h-4 w-4" />
+          {isConfigurationFailure ? "Reload page" : "Try again"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ClerkLoadingScreen() {
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setTimedOut(true), 15_000);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  if (timedOut) {
+    return (
+      <ClerkBootstrapRecovery
+        failure="provider"
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center bg-background"
+      data-testid="clerk-loading-screen"
+    >
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <span className="sr-only">Starting authentication</span>
+    </div>
+  );
+}
+
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
   const client = useQueryClient();
@@ -265,10 +369,20 @@ function Application() {
 
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
+
+  if (clerkBootstrap.error) {
+    return (
+      <ClerkBootstrapRecovery
+        failure="configuration"
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
     <ClerkProvider
-      publishableKey={clerkBootstrap.publishableKey}
-      proxyUrl={clerkBootstrap.proxyUrl}
+      publishableKey={clerkBootstrap.config.publishableKey}
+      proxyUrl={clerkBootstrap.config.proxyUrl}
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
@@ -276,18 +390,42 @@ function ClerkProviderWithRoutes() {
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
-      <QueryClientProvider client={queryClient}>
-        <ClerkQueryClientCacheInvalidator />
-        <Switch>
-          <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpPage} />
-          <Route component={Application} />
-        </Switch>
-      </QueryClientProvider>
+      <ClerkFailed>
+        <ClerkBootstrapRecovery
+          failure="provider"
+          onRetry={() => window.location.reload()}
+        />
+      </ClerkFailed>
+      <ClerkLoading>
+        <ClerkLoadingScreen />
+      </ClerkLoading>
+      <ClerkLoaded>
+        <QueryClientProvider client={queryClient}>
+          <ClerkQueryClientCacheInvalidator />
+          <Switch>
+            <Route path="/sign-in/*?" component={SignInPage} />
+            <Route path="/sign-up/*?" component={SignUpPage} />
+            <Route component={Application} />
+          </Switch>
+        </QueryClientProvider>
+      </ClerkLoaded>
     </ClerkProvider>
   );
 }
 
 export default function App() {
-  return <WouterRouter base={basePath}><ClerkProviderWithRoutes /></WouterRouter>;
+  return (
+    <ErrorBoundary
+      fallback={
+        <ClerkBootstrapRecovery
+          failure="provider"
+          onRetry={() => window.location.reload()}
+        />
+      }
+    >
+      <WouterRouter base={basePath}>
+        <ClerkProviderWithRoutes />
+      </WouterRouter>
+    </ErrorBoundary>
+  );
 }
