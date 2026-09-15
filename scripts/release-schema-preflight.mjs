@@ -12,6 +12,7 @@ export const REQUIRED_AUTH_COLUMNS = new Set([
   "approved",
   "rejected",
   "role",
+  "capabilities",
 ]);
 
 const REQUIRED_ROLE_VALUES = new Set(["Admin", "User"]);
@@ -73,6 +74,10 @@ async function verifyReviewedMigrations() {
     resolve(root, "migrations/0026_add_users_clerk_user_id.sql"),
     "utf8",
   );
+  const migration27 = await readFile(
+    resolve(root, "migrations/0027_add_user_capabilities.sql"),
+    "utf8",
+  );
 
   if (
     !/CREATE TYPE account_role/.test(migration23) ||
@@ -84,7 +89,8 @@ async function verifyReviewedMigrations() {
   }
   if (
     !/DROP TABLE IF EXISTS sessions/.test(migration25) ||
-    !/Refusing to remove a legacy tester account with the Admin role/.test(migration25)
+    !/requires exactly one retained Admin/.test(migration25) ||
+    !/DELETE FROM counting_sessions/.test(migration25)
   ) {
     throw new Error(
       "Reviewed auth migration 0025 is missing its safe legacy-account reconciliation guard",
@@ -96,6 +102,14 @@ async function verifyReviewedMigrations() {
   ) {
     throw new Error(
       "Reviewed auth migration 0026 is missing the durable Clerk identity mapping",
+    );
+  }
+  if (
+    !/ADD COLUMN IF NOT EXISTS "capabilities" jsonb/.test(migration27) ||
+    !/users_capabilities_object_check/.test(migration27)
+  ) {
+    throw new Error(
+      "Reviewed auth migration 0027 is missing persisted User capabilities",
     );
   }
 }

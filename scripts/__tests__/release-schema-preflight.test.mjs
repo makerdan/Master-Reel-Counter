@@ -39,6 +39,7 @@ const currentColumns = [
   "approved",
   "rejected",
   "role",
+  "capabilities",
 ];
 
 test("release target must be explicit and distinct from the publishing database", () => {

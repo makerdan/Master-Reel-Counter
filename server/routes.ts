@@ -16,7 +16,9 @@ import {
   isOwnerIdentity,
   adminOnly,
   ownerOnly,
+  requireUserCapability,
 } from "./replit_integrations/auth/routes";
+import type { UserCapability } from "./replit_integrations/auth/capabilities";
 import { authStorage } from "./replit_integrations/auth/storage";
 import {
   objectStorageClient,
@@ -399,6 +401,14 @@ function resolveUserId(req: AuthenticatedRequest | any): string {
   return (req as AuthenticatedRequest).user.claims.sub;
 }
 
+async function requireCapability(
+  req: AuthenticatedRequest | any,
+  res: ExpressResponse,
+  capability: UserCapability,
+): Promise<boolean> {
+  return requireUserCapability(req, res, capability);
+}
+
 function getTesterOwner(_req: AuthenticatedRequest | any): undefined {
   return undefined;
 }
@@ -680,6 +690,54 @@ export async function registerRoutes(
       isApproved(req, res, next);
     });
   });
+
+  // Account capabilities are a second, server-authoritative boundary after
+  // authentication and approval. The client may hide controls, but it cannot
+  // grant access by replaying a request with a hidden feature enabled.
+  app.use("/api", async (req, res, next) => {
+    const path = req.originalUrl.split("?")[0];
+    let capability: UserCapability | undefined;
+    if (
+      req.method === "POST" &&
+      (path === "/api/sessions" || path.endsWith("/duplicate"))
+    ) capability = "session_create";
+    else if (
+      (req.method === "DELETE" && /^\/api\/sessions\/[^/]+(?:\/(?:permanent))?$/.test(path)) ||
+      (req.method === "POST" && (
+        path === "/api/sessions/bulk/delete" ||
+        /^\/api\/sessions\/[^/]+\/restore$/.test(path)
+      ))
+    ) capability = "session_delete";
+    else if (path.includes("/export")) capability = "exports";
+    else if (path === "/api/stats") capability = "statistics";
+    else if (
+      path === "/api/settings" ||
+      path.startsWith("/api/settings/")
+    ) capability = "account_settings";
+    else if (
+      path === "/api/uploads/direct" ||
+      path.includes("/photos") ||
+      path.includes("/pins") ||
+      path.includes("/dismissed-duplicates")
+    ) {
+      if (req.method !== "GET" && req.method !== "HEAD") capability = "photo_management";
+    } else if (
+      path.includes("/collaborators") ||
+      path.includes("/invite-links") ||
+      path === "/api/invite-links" ||
+      path.endsWith("/transfer-ownership")
+    ) {
+      capability = "collaborator_management";
+    } else if (
+      path.includes("analyze-labels") ||
+      path.includes("/scan")
+    ) {
+      capability = "ai_scanning";
+    }
+    if (!capability) return next();
+    if (await requireCapability(req, res, capability)) return next();
+  });
+
   // All admin operations share one deny-by-default owner boundary. Individual
   // handlers still validate their own inputs and resource scope.
   app.use("/api/admin", ownerOnly);

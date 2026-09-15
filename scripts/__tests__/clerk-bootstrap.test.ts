@@ -110,12 +110,12 @@ test("server direct and proxy modes use the same environment contract", () => {
     }),
     configuredKey,
   );
-  assert.equal(
-    resolveClerkEnvironmentPublishableKey({
-      clientPublishableKey: configuredKey,
-      allowClientFallback: true,
-    }),
-    configuredKey,
+  assert.throws(
+    () =>
+      resolveClerkEnvironmentPublishableKey({
+        clientPublishableKey: configuredKey,
+      }),
+    /CLERK_PUBLISHABLE_KEY is missing/,
   );
   assert.throws(
     () =>

@@ -1,4 +1,10 @@
-import { users, type User, type UserProfileWrite } from "@shared/models/auth";
+import {
+  users,
+  RESTRICTED_USER_CAPABILITIES,
+  type User,
+  type UserCapabilities,
+  type UserProfileWrite,
+} from "@shared/models/auth";
 import { db } from "../../db";
 import { and, eq, isNull, ne, count, or, sql } from "drizzle-orm";
 
@@ -13,6 +19,7 @@ export interface IAuthStorage {
   getAllUsers(): Promise<User[]>;
   getRejectedCount(): Promise<number>;
   setUserApproved(id: string, approved: boolean): Promise<User>;
+  setUserCapabilities(id: string, capabilities: UserCapabilities): Promise<User | undefined>;
   rejectUser(id: string): Promise<User>;
   clearAllRejected(): Promise<string[]>;
   ensureInitialAdmin(id: string): Promise<User | undefined>;
@@ -30,6 +37,7 @@ export function sanitizeUserProfileWrite(userData: UserProfileWrite): UserProfil
     approved,
     rejected,
     role,
+    capabilities,
     createdAt,
     updatedAt,
   } = userData;
@@ -43,6 +51,7 @@ export function sanitizeUserProfileWrite(userData: UserProfileWrite): UserProfil
     approved,
     rejected,
     role,
+    capabilities,
     createdAt,
     updatedAt,
   };
@@ -132,7 +141,20 @@ export class AuthStorage implements IAuthStorage {
   async setUserApproved(id: string, approved: boolean): Promise<User> {
     const [user] = await this.database
       .update(users)
-      .set({ approved, updatedAt: new Date() })
+      .set({
+        approved,
+        capabilities: approved ? { ...RESTRICTED_USER_CAPABILITIES } : RESTRICTED_USER_CAPABILITIES,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async setUserCapabilities(id: string, capabilities: UserCapabilities): Promise<User | undefined> {
+    const [user] = await this.database
+      .update(users)
+      .set({ capabilities, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;

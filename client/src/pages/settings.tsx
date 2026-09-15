@@ -48,6 +48,18 @@ import { CATALOG, parseCatalogEntry } from "@/lib/wireReference";
 import { toDisplayUnit, toBaseFeet, unitLabel, unitLabelFull } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import type { UserWireCatalog } from "@shared/schema";
+import { USER_CAPABILITIES, type UserCapability } from "@shared/models/auth";
+
+const USER_CAPABILITY_LABELS: Record<UserCapability, string> = {
+  session_create: "Create sessions",
+  session_delete: "Delete sessions",
+  exports: "Export reports",
+  photo_management: "Manage photos",
+  ai_scanning: "Use AI scanning",
+  collaborator_management: "Manage collaborators",
+  statistics: "View statistics",
+  account_settings: "Manage account settings",
+};
 
 interface UserSettingsResponse {
   userId: string;
@@ -512,6 +524,26 @@ export default function SettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to update approval", variant: "destructive" });
+    },
+  });
+
+  const updateCapabilities = useMutation({
+    mutationFn: async ({
+      userId,
+      capability,
+      enabled,
+    }: { userId: string; capability: UserCapability; enabled: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/capabilities`, {
+        [capability]: enabled,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "User permissions updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update user permissions", variant: "destructive" });
     },
   });
 
@@ -2391,89 +2423,120 @@ export default function SettingsPage() {
                         return (
                           <div
                             key={u.id}
-                            className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card"
+                            className="flex flex-col gap-3 p-3 rounded-lg border bg-card"
                             data-testid={`row-user-${u.id}`}
                           >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <Avatar className="h-8 w-8">
-                                {u.profileImageUrl ? (
-                                  <AvatarImage src={u.profileImageUrl} alt={u.firstName || u.id} />
-                                ) : null}
-                                <AvatarFallback className="text-xs">
-                                  {(u.firstName || u.id).charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium truncate" data-testid={`text-username-${u.id}`}>
-                                    {u.firstName || u.id}{u.lastName ? ` ${u.lastName}` : ""}
-                                  </span>
-                                  {isOwner && (
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Owner</Badge>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <Avatar className="h-8 w-8">
+                                  {u.profileImageUrl ? (
+                                    <AvatarImage src={u.profileImageUrl} alt={u.firstName || u.id} />
+                                  ) : null}
+                                  <AvatarFallback className="text-xs">
+                                    {(u.firstName || u.id).charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium truncate" data-testid={`text-username-${u.id}`}>
+                                      {u.firstName || u.id}{u.lastName ? ` ${u.lastName}` : ""}
+                                    </span>
+                                    {isOwner && (
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Owner</Badge>
+                                    )}
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0" data-testid={`badge-role-${u.id}`}>
+                                      {u.role || "User"}
+                                    </Badge>
+                                  </div>
+                                  {u.email && (
+                                    <span className="text-xs text-muted-foreground truncate block">{u.email}</span>
                                   )}
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0" data-testid={`badge-role-${u.id}`}>
-                                    {u.role || "User"}
-                                  </Badge>
                                 </div>
-                                {u.email && (
-                                  <span className="text-xs text-muted-foreground truncate block">{u.email}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {isOwner ? (
+                                  <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
+                                ) : u.approved ? (
+                                  <>
+                                    <Badge className="bg-green-600 text-white text-xs" data-testid={`badge-approved-${u.id}`}>
+                                      Approved
+                                    </Badge>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                                      onClick={() => rejectUser.mutate(u.id)}
+                                      disabled={rejectUser.isPending}
+                                      data-testid={`button-reject-${u.id}`}
+                                    >
+                                      <UserX className="h-3 w-3 mr-1" />
+                                      Reject
+                                    </Button>
+                                  </>
+                                ) : u.rejected ? (
+                                  <Badge variant="outline" className="text-xs text-red-600 border-red-300 dark:text-red-400 dark:border-red-700" data-testid={`badge-rejected-${u.id}`}>
+                                    Rejected
+                                  </Badge>
+                                ) : (
+                                  <>
+                                    <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700" data-testid={`badge-pending-${u.id}`}>
+                                      Pending
+                                    </Badge>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
+                                      onClick={() => toggleApproval.mutate({ userId: u.id, approved: true })}
+                                      disabled={toggleApproval.isPending}
+                                      data-testid={`button-approve-${u.id}`}
+                                    >
+                                      <UserCheck className="h-3 w-3 mr-1" />
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                                      onClick={() => rejectUser.mutate(u.id)}
+                                      disabled={rejectUser.isPending}
+                                      data-testid={`button-reject-pending-${u.id}`}
+                                    >
+                                      <UserX className="h-3 w-3 mr-1" />
+                                      Reject
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {isOwner ? (
-                                <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
-                              ) : u.approved ? (
-                                <>
-                                  <Badge className="bg-green-600 text-white text-xs" data-testid={`badge-approved-${u.id}`}>
-                                    Approved
-                                  </Badge>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                                    onClick={() => rejectUser.mutate(u.id)}
-                                    disabled={rejectUser.isPending}
-                                    data-testid={`button-reject-${u.id}`}
-                                  >
-                                    <UserX className="h-3 w-3 mr-1" />
-                                    Reject
-                                  </Button>
-                                </>
-                              ) : u.rejected ? (
-                                <Badge variant="outline" className="text-xs text-red-600 border-red-300 dark:text-red-400 dark:border-red-700" data-testid={`badge-rejected-${u.id}`}>
-                                  Rejected
-                                </Badge>
-                              ) : (
-                                <>
-                                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700" data-testid={`badge-pending-${u.id}`}>
-                                    Pending
-                                  </Badge>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50 dark:border-green-800 dark:hover:bg-green-950"
-                                    onClick={() => toggleApproval.mutate({ userId: u.id, approved: true })}
-                                    disabled={toggleApproval.isPending}
-                                    data-testid={`button-approve-${u.id}`}
-                                  >
-                                    <UserCheck className="h-3 w-3 mr-1" />
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                                    onClick={() => rejectUser.mutate(u.id)}
-                                    disabled={rejectUser.isPending}
-                                    data-testid={`button-reject-pending-${u.id}`}
-                                  >
-                                    <UserX className="h-3 w-3 mr-1" />
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
-                            </div>
+                            {u.role === "Admin" ? (
+                              <p className="text-xs text-muted-foreground border-t pt-2">
+                                Admins always have full administration access.
+                              </p>
+                            ) : (
+                              <div className="border-t pt-3">
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  Approved Users can view and edit assigned sessions, upload photos, and enter inventory. Enable additional access as needed.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2">
+                                  {USER_CAPABILITIES.map((capability) => (
+                                    <label key={capability} className="flex items-center justify-between gap-3 text-xs">
+                                      <span>{USER_CAPABILITY_LABELS[capability]}</span>
+                                      <Switch
+                                        checked={u.capabilities?.[capability] === true}
+                                        onCheckedChange={(enabled) => updateCapabilities.mutate({
+                                          userId: u.id,
+                                          capability,
+                                          enabled,
+                                        })}
+                                        disabled={updateCapabilities.isPending}
+                                        aria-label={`${USER_CAPABILITY_LABELS[capability]} for ${u.firstName || u.id}`}
+                                        data-testid={`switch-capability-${capability}-${u.id}`}
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

@@ -46,13 +46,9 @@ function normalizeProxyUrl(value: string | undefined): string | undefined {
 export function resolveClerkEnvironmentPublishableKey(input: {
   serverPublishableKey?: string;
   clientPublishableKey?: string;
-  allowClientFallback?: boolean;
 }): string {
-  const serverPublishableKey =
-    input.serverPublishableKey ??
-    (input.allowClientFallback ? input.clientPublishableKey : undefined);
   const server = requirePublishableKey(
-    serverPublishableKey,
+    input.serverPublishableKey,
     "CLERK_PUBLISHABLE_KEY",
   );
   const client = requirePublishableKey(

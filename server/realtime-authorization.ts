@@ -104,6 +104,7 @@ export type AuthorizationChangeOutcome =
   | "ownership_changed"
   | "denied_join"
   | "identity_changed"
+  | "capabilities_changed"
   | "pending"
   | "rejected";
 
@@ -138,6 +139,8 @@ export function authorizationChangeMessage(
       return "Your account access was rejected.";
     case "identity_changed":
       return "Your signed-in identity changed.";
+    case "capabilities_changed":
+      return "Your account permissions changed. Updating access.";
   }
 }
 

@@ -10,7 +10,7 @@ Master Reel Counter is a full-stack warehouse wire reel counting application des
 - Orange accent color (#ea580c)
 
 ## System Architecture
-The application is built with a React frontend, an Express.js backend, and PostgreSQL as the database. Normal user authentication is handled by Replit-managed Clerk, while the owner-scoped tester login remains an application-managed session.
+The application is built with a React frontend, an Express.js backend, and PostgreSQL as the database. Authentication is handled exclusively by Replit-managed Clerk. PostgreSQL stores approval state, roles, and per-User capabilities.
 
 **UI/UX Decisions:**
 - **Theme:** Copper/industrial warm tones with dark mode support, using shadcn/ui components.
@@ -33,8 +33,8 @@ The application is built with a React frontend, an Express.js backend, and Postg
 - **Flagged Reels Workflow:** Pins can be flagged for re-shoot/review with notes, and a dedicated tab allows viewing and resolving flagged pins.
 - **Review Tab:** A "Review" tab on the session page assigns entries round-robin to online users for accuracy review. Each entry shows a 60-second sync spinner before revealing its image. AI Scanner entries display a cropped thumbnail at the pin location; other entries display the full section photo. Users can approve or flag entries (with optional reason). Responses are persisted in the `review_responses` table and support upsert (users can change verdicts). A progress indicator shows review completion.
 - **Duplicate Detection:** Identifies potential duplicate pins based on label matching (same label in same aisle/section) and same-reel detection (multiple pins on the same photo for the same physical reel). Dismissed duplicates are persisted to the `dismissed_duplicates` DB table (per session), shared across all users. Undo/Redo supports dismiss/undismiss actions. Old localStorage dismissals are auto-migrated to DB on first load.
-- **Tester Password Login:** Account owners can set a tester password in Settings to allow testers to log in without a Clerk account via `/tester-login`. Passwords are bcrypt-hashed. Testers see the owner's sessions as editors but cannot modify settings. Logout clears the isolated tester session through `/api/auth/tester-logout`.
-- **User Settings:** Comprehensive settings for display (theme, thumbnail size), accessibility, data entry (aisle prefix, section advance), photo capture quality, export defaults, data encryption, tester access password, and storage usage dashboard.
+- **Account Access:** Anyone may sign up through managed Clerk. New identities remain pending until an Admin approves them. Approved Users start with assigned-session editing, photo upload, and normal inventory-entry access; Admins can grant additional capabilities.
+- **User Settings:** Comprehensive settings for display (theme, thumbnail size), accessibility, data entry (aisle prefix, section advance), photo capture quality, export defaults, data encryption, and storage usage dashboard.
 - **Storage Usage Dashboard:** Settings page shows per-user cloud storage consumption with a visual progress bar (10 GB limit), photo/session counts, and a collapsible all-users breakdown table. Photo file sizes are stored in the `photos.fileSize` DB column and populated on upload. A backfill endpoint (`POST /api/storage/backfill-sizes`) fetches GCS metadata for existing photos missing sizes.
 - **User Profile Avatar:** Users can upload custom profile photos stored in Replit Object Storage.
 

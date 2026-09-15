@@ -110,12 +110,10 @@ The application focuses on practical warehouse usage: mobile capture, industrial
   - Undo/redo supports dismiss/undismiss.
   - Old `localStorage` dismissals automatically migrated to DB on first load.
 
-- **Tester Password Login**
-  - Account owners can set a **tester password** in Settings.
-  - Testers can log in via `/tester-login` without a Replit account.
-  - Passwords are bcrypt-hashed.
-  - Testers see the owner’s sessions as editors but cannot modify settings.
-  - Logout via `/api/auth/tester-logout`.
+- **Managed Clerk account access**
+  - Anyone may sign up through managed Clerk, but new identities stay pending until an Admin approves them.
+  - Approved Users start with assigned-session editing, photo upload, and normal inventory-entry access.
+  - Admins can independently grant or revoke session creation/deletion, exports, photo management, AI scanning, collaborator management, statistics, and account settings.
 
 - **User Settings**
   - Display: theme (dark mode), thumbnail size.

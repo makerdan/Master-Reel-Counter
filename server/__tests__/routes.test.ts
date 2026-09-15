@@ -223,6 +223,10 @@ describe("Clerk identity and approval regression guard", () => {
       new URL("../../migrations/0026_add_users_clerk_user_id.sql", import.meta.url),
       "utf8",
     );
+    const capabilitiesMigration = readFileSync(
+      new URL("../../migrations/0027_add_user_capabilities.sql", import.meta.url),
+      "utf8",
+    );
     const setupClient = await pool.connect();
     let isolatedPool: pg.Pool | undefined;
 
@@ -246,6 +250,7 @@ describe("Clerk identity and approval regression guard", () => {
         )
       `);
       await setupClient.query(migration);
+      await setupClient.query(capabilitiesMigration);
       await setupClient.query("COMMIT");
 
       isolatedPool = new pg.Pool({
@@ -306,6 +311,7 @@ describe("Clerk identity and approval regression guard", () => {
       approved: undefined,
       rejected: undefined,
       role: undefined,
+      capabilities: undefined,
       createdAt: undefined,
       updatedAt: undefined,
     });

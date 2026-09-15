@@ -220,11 +220,11 @@ test("manual CI release gate blocks when matched production Clerk credentials ar
 test("release workflow and production startup share the two-key tenant contract", () => {
   assert.match(
     serverIndex,
-    /resolveClerkEnvironmentPublishableKey\(\{\s*serverPublishableKey: process\.env\.CLERK_PUBLISHABLE_KEY,\s*clientPublishableKey: process\.env\.VITE_CLERK_PUBLISHABLE_KEY,\s*allowClientFallback: process\.env\.NODE_ENV !== "production",\s*\}\)/,
+    /resolveClerkEnvironmentPublishableKey\(\{\s*serverPublishableKey: process\.env\.CLERK_PUBLISHABLE_KEY,\s*clientPublishableKey: process\.env\.VITE_CLERK_PUBLISHABLE_KEY,\s*\}\)/,
   );
   assert.match(
     sharedClerkConfig,
-    /requirePublishableKey\(\s*serverPublishableKey,\s*"CLERK_PUBLISHABLE_KEY",\s*\)/,
+    /requirePublishableKey\(\s*input\.serverPublishableKey,\s*"CLERK_PUBLISHABLE_KEY",\s*\)/,
   );
   assert.match(
     sharedClerkConfig,
@@ -821,18 +821,17 @@ test("Clerk-only auth leaves no tester session or password machinery", () => {
   assert.doesNotMatch(authModels, /pgTable\(\s*["']sessions["']/);
 });
 
-test("legacy tester accounts are removed without deleting historical inventory", () => {
-  assert.match(testerReconciliation, /WHERE id LIKE 'tester-%'/);
+test("managed Clerk cutover retains one Admin and removes non-Admin-owned data", () => {
+  assert.match(testerReconciliation, /requires exactly one retained Admin/);
   assert.match(testerReconciliation, /role = 'Admin'/);
   assert.match(testerReconciliation, /DELETE FROM user_settings/);
   assert.match(testerReconciliation, /DELETE FROM upload_intents/);
   assert.match(testerReconciliation, /DELETE FROM conversations/);
+  assert.match(testerReconciliation, /DELETE FROM counting_sessions/);
+  assert.match(testerReconciliation, /DELETE FROM folders/);
+  assert.match(testerReconciliation, /DELETE FROM session_collaborators/);
   assert.match(testerReconciliation, /DELETE FROM users/);
   assert.match(testerReconciliation, /DROP TABLE IF EXISTS sessions/);
-  assert.doesNotMatch(
-    testerReconciliation,
-    /DELETE FROM (?:counting_sessions|folders|photos|entries|activity_logs|comments|review_responses|feedback)/,
-  );
 });
 
 test("workspace config does not pin Clerk credentials or a tenant", () => {

@@ -72,9 +72,7 @@ npx playwright show-report
 
 ## Authentication Setup
 
-Tests seed the tester password for the first owner account, then authenticate as the real owner through the dev-only `/api/__test__/owner-login` endpoint. This keeps CRUD and trash cleanup permissions available to the full suite. The global setup script (`tests/global-setup.ts`) saves that session cookie to `tests/.auth/user.json`.
-
-**Important:** you must log in to the app at least once via Replit Auth before running tests, so the seed endpoint has an owner user to configure.
+Browser tests authenticate through the configured managed Clerk test account. The global setup script (`tests/global-setup.ts`) saves the resulting browser state to `tests/.auth/user.json`; no tester password or application-managed login exists.
 
 ### Custom credentials
 
@@ -107,8 +105,7 @@ The `test` fixture provides:
 All interactive elements in the app carry `data-testid` attributes. Prefer them over text-based selectors for stability:
 
 ```typescript
-await page.click('[data-testid="button-tester-login"]');
-await expect(page.locator('[data-testid="dialog-logout-guard"]')).toBeVisible();
+await expect(page.getByTestId("dialog-logout-guard")).toBeVisible();
 ```
 
 ### 4. Skip gracefully when preconditions aren't met
@@ -156,7 +153,7 @@ tests/
   .auth/
     user.json          # Saved session cookie (git-ignored)
   fixtures.ts          # Shared test utilities and base `test` fixture
-  global-setup.ts      # Seeds tester password + logs in once before all tests
+  global-setup.ts      # Logs in through managed Clerk once before all tests
   undo-redo.spec.ts
   scan-parity.spec.ts
   session-cleanup.spec.ts

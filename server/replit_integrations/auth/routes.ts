@@ -3,6 +3,12 @@ import { authStorage } from "./storage";
 import { getVerifiedIdentityAliases, isAuthenticated } from "./replitAuth";
 import type { User } from "@shared/models/auth";
 import { notifyAuthorizationChange } from "../../realtime-authorization";
+import {
+  USER_CAPABILITIES,
+  hasUserCapability,
+  normalizeUserCapabilities,
+  type UserCapability,
+} from "./capabilities";
 
 export type IdentityAuthorizationOutcome =
   | "approved"
@@ -48,6 +54,20 @@ export const isApproved: RequestHandler = async (req: any, res, next) => {
   }
   return next();
 };
+
+export async function requireUserCapability(
+  req: any,
+  res: any,
+  capability: UserCapability,
+): Promise<boolean> {
+  const userId = req.user?.claims?.sub;
+  const user = userId ? await authStorage.getUser(userId) : undefined;
+  if (!hasUserCapability(user, capability)) {
+    res.status(403).json({ message: "capability_denied", capability });
+    return false;
+  }
+  return true;
+}
 
 /** Shared server-authoritative Admin boundary for support/admin operations. */
 export const adminOnly: RequestHandler = (req: any, res, next) => {
@@ -170,6 +190,45 @@ export function registerAuthRoutes(app: Express): void {
       } catch (error) {
         console.error("Error updating user approval:", error);
         return res.status(500).json({ message: "Failed to update user approval" });
+      }
+    },
+  );
+
+  app.patch(
+    "/api/admin/users/:id/capabilities",
+    isAuthenticated,
+    isApproved,
+    adminOnly,
+    async (req: any, res) => {
+      try {
+        const targetId = req.params.id;
+        const target = await authStorage.getUser(targetId);
+        if (!target) return res.status(404).json({ message: "User not found" });
+        if (target.role === "Admin") {
+          return res.status(409).json({ message: "Admin capabilities are always complete" });
+        }
+        const body = req.body && typeof req.body === "object" ? req.body : {};
+        const unknownKeys = Object.keys(body).filter(
+          (key) => !USER_CAPABILITIES.includes(key as (typeof USER_CAPABILITIES)[number]),
+        );
+        if (unknownKeys.length > 0) {
+          return res.status(400).json({ message: "Unknown capability" });
+        }
+        if (Object.values(body).some((value) => typeof value !== "boolean")) {
+          return res.status(400).json({ message: "Capabilities must be boolean values" });
+        }
+        const current = normalizeUserCapabilities(target.capabilities);
+        const capabilities = {
+          ...current,
+          ...body,
+        };
+        const updatedUser = await authStorage.setUserCapabilities(targetId, capabilities);
+        if (!updatedUser) return res.status(404).json({ message: "User not found" });
+        notifyAuthorizationChange(targetId, "capabilities_changed");
+        return res.json(updatedUser);
+      } catch (error) {
+        console.error("Error updating user capabilities:", error);
+        return res.status(500).json({ message: "Failed to update user capabilities" });
       }
     },
   );

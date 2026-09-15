@@ -211,7 +211,6 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   resolveClerkEnvironmentPublishableKey({
     serverPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
     clientPublishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
-    allowClientFallback: false,
   });
   const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
   const database = new Client({
