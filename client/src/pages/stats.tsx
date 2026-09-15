@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { formatDateOnly, getDateKeyInTimezone, shiftDateKey } from "@/lib/timezone";
+import { toDisplayUnit, unitLabel, type UnitType } from "@/lib/unit-conversion";
 
 interface SharedContributor {
   userId: string;
@@ -86,9 +88,21 @@ interface UserStats {
 
 export default function StatsPage() {
   const [, setLocation] = useLocation();
-  const { data: stats, isLoading, isError } = useQuery<UserStats>({
+  const { data: settings } = useQuery<{ defaultUnit?: string; timezone?: string }>({
+    queryKey: ["/api/settings"],
+  });
+  const {
+    data: stats,
+    isLoading,
+    isError,
+    isFetching,
+    refetch,
+  } = useQuery<UserStats>({
     queryKey: ["/api/stats"],
   });
+  const currentUnit: UnitType = settings?.defaultUnit === "meters" ? "meters" : "feet";
+  const timezone = settings?.timezone || "America/Chicago";
+  const formatFootage = (value: number) => `${toDisplayUnit(value, currentUnit).toLocaleString()} ${unitLabel(currentUnit)}`;
 
   if (isLoading) {
     return (
@@ -120,9 +134,20 @@ export default function StatsPage() {
               <BarChart3 className="h-10 w-10 mx-auto mb-3 text-destructive" />
               <p className="text-sm font-medium mb-1">Unable to load stats</p>
               <p className="text-xs text-muted-foreground mb-4">There was a problem fetching your statistics.</p>
-              <Button variant="outline" size="sm" onClick={() => setLocation("/")} data-testid="button-back-to-dashboard">
-                <ArrowLeft className="h-3 w-3 mr-1" /> Back to Dashboard
-              </Button>
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void refetch()}
+                  disabled={isFetching}
+                  data-testid="button-retry-stats"
+                >
+                  {isFetching ? "Retrying…" : "Retry"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setLocation("/")} data-testid="button-back-to-dashboard">
+                  <ArrowLeft className="h-3 w-3 mr-1" /> Back to Dashboard
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -183,7 +208,7 @@ export default function StatsPage() {
                     <StatCard icon={<CheckCircle className="h-4 w-4" />} label="Completed:" value={stats.completedSessions} testId="stat-completed" />
                     <StatCard icon={<Clock className="h-4 w-4" />} label="Active Sessions:" value={stats.activeSessions} testId="stat-active" />
                     <StatCard icon={<Package className="h-4 w-4" />} label="Total Reels:" value={stats.totalReels.toLocaleString()} testId="stat-total-reels" />
-                    <StatCard icon={<Ruler className="h-4 w-4" />} label="Total Footage:" value={`${stats.totalFootage.toLocaleString()} ft`} testId="stat-total-footage" />
+                    <StatCard icon={<Ruler className="h-4 w-4" />} label={`Total Footage (${unitLabel(currentUnit)}):`} value={formatFootage(stats.totalFootage)} testId="stat-total-footage" />
                     <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Total Entries:" value={stats.totalEntries.toLocaleString()} testId="stat-total-entries" />
                     <StatCard icon={<Camera className="h-4 w-4" />} label="Total Photos:" value={stats.totalPhotos.toLocaleString()} testId="stat-total-photos" />
                   </div>
@@ -220,12 +245,12 @@ export default function StatsPage() {
                     <StatCard
                       icon={<Ruler className="h-4 w-4" />}
                       label="Avg Footage/Session:"
-                      value={stats.totalSessions > 0 ? `${Math.round(stats.totalFootage / stats.totalSessions).toLocaleString()} ft` : "0 ft"}
+                      value={stats.totalSessions > 0 ? formatFootage(Math.round(stats.totalFootage / stats.totalSessions)) : formatFootage(0)}
                       testId="stat-avg-footage"
                     />
                     <StatCard icon={<Target className="h-4 w-4" />} label="Avg Entries/Session:" value={avgEntriesPerSession} testId="stat-avg-entries" />
                     <StatCard icon={<Package className="h-4 w-4" />} label="Avg Reels/Entry:" value={avgReelsPerEntry} testId="stat-avg-reels" />
-                    <StatCard icon={<Trophy className="h-4 w-4" />} label="Best Session:" value={`${stats.bestSessionFootage.toLocaleString()} ft`} testId="stat-best-session" />
+                    <StatCard icon={<Trophy className="h-4 w-4" />} label="Best Session:" value={formatFootage(stats.bestSessionFootage)} testId="stat-best-session" />
                   </div>
                 </section>
 
@@ -245,8 +270,7 @@ export default function StatsPage() {
                       <CardContent className="pt-4">
                         <div className="space-y-1">
                           {stats.weeklyStats.map((w) => {
-                            const weekDate = new Date(w.week);
-                            const label = weekDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                            const label = formatDateOnly(w.week, timezone);
                             return (
                               <div key={w.week} className="flex items-center gap-2 text-xs" data-testid={`stat-week-${w.week}`}>
                                 <span className="w-16 text-muted-foreground mono shrink-0">{label}</span>
@@ -257,7 +281,7 @@ export default function StatsPage() {
                                   />
                                   <span className="mono text-muted-foreground shrink-0">{w.entries}<span className="hidden sm:inline"> entries</span></span>
                                 </div>
-                                <span className="mono text-muted-foreground shrink-0 w-16 sm:w-20 text-right">{w.footage.toLocaleString()} ft</span>
+                                <span className="mono text-muted-foreground shrink-0 w-16 sm:w-20 text-right">{formatFootage(w.footage)}</span>
                               </div>
                             );
                           })}
@@ -283,7 +307,7 @@ export default function StatsPage() {
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-0.5">
                                       <span className="text-xs mono truncate">{c.catalog}</span>
-                                      <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{c.count} ({c.footage.toLocaleString()} ft)</span>
+                                        <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{c.count} ({formatFootage(c.footage)})</span>
                                     </div>
                                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                                       <div className="h-full bg-primary/70 rounded-full" style={{ width: `${(c.count / maxCatCount) * 100}%` }} />
@@ -351,7 +375,7 @@ export default function StatsPage() {
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between mb-0.5">
                                         <span className="text-xs mono truncate">{w.wireType}</span>
-                                        <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{w.count} ({w.footage.toLocaleString()} ft)</span>
+                                        <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{w.count} ({formatFootage(w.footage)})</span>
                                       </div>
                                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                                         <div className="h-full bg-yellow-500/70 rounded-full" style={{ width: `${(w.count / maxWt) * 100}%` }} />
@@ -378,7 +402,7 @@ export default function StatsPage() {
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between mb-0.5">
                                         <span className="text-xs mono truncate">{g.gauge}</span>
-                                        <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{g.count} ({g.footage.toLocaleString()} ft)</span>
+                                        <span className="text-xs text-muted-foreground mono shrink-0 ml-2">{g.count} ({formatFootage(g.footage)})</span>
                                       </div>
                                       <div className="h-2 bg-muted rounded-full overflow-hidden">
                                         <div className="h-full bg-cyan-500/70 rounded-full" style={{ width: `${(g.count / maxG) * 100}%` }} />
@@ -400,7 +424,7 @@ export default function StatsPage() {
                     <SectionHeading icon={<Grid3X3 className="h-4 w-4" />} title="Daily Activity (Last 30 Days)" testId="heading-daily-heatmap" />
                     <Card>
                       <CardContent className="pt-4">
-                        <DailyHeatmap dailyActivity={stats.dailyActivity} />
+                        <DailyHeatmap dailyActivity={stats.dailyActivity} timezone={timezone} />
                       </CardContent>
                     </Card>
                   </section>
@@ -499,7 +523,7 @@ export default function StatsPage() {
                                       {c.username}{isCurrentUser ? " (you)" : ""}
                                     </span>
                                     <span className="text-xs text-muted-foreground mono shrink-0 ml-2">
-                                      {c.footage.toLocaleString()} ft
+                                      {formatFootage(c.footage)}
                                     </span>
                                   </div>
                                   <div className="h-2 bg-muted rounded-full overflow-hidden mb-1.5">
@@ -527,7 +551,7 @@ export default function StatsPage() {
           </>
         )}
 
-        {stats.roleComparison && <RoleComparisonSection roleComparison={stats.roleComparison} />}
+        {stats.roleComparison && <RoleComparisonSection roleComparison={stats.roleComparison} unit={currentUnit} />}
       </div>
     </div>
   );
@@ -541,10 +565,10 @@ const ROLE_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
 
 const ROLE_ORDER: ("Owner" | "Editor" | "Viewer")[] = ["Owner", "Editor", "Viewer"];
 
-function RoleComparisonSection({ roleComparison }: { roleComparison: RoleComparison }) {
+function RoleComparisonSection({ roleComparison, unit }: { roleComparison: RoleComparison; unit: UnitType }) {
   const metrics: { key: keyof RoleMetrics; label: string; format: (v: number) => string }[] = [
     { key: "entries", label: "Entries", format: (v) => v.toLocaleString() },
-    { key: "footage", label: "Footage (ft)", format: (v) => v.toLocaleString() },
+    { key: "footage", label: `Footage (${unitLabel(unit)})`, format: (v) => toDisplayUnit(v, unit).toLocaleString() },
     { key: "reels", label: "Reels", format: (v) => v.toLocaleString() },
     { key: "photos", label: "Photos", format: (v) => v.toLocaleString() },
   ];
@@ -619,23 +643,18 @@ function RoleComparisonSection({ roleComparison }: { roleComparison: RoleCompari
   );
 }
 
-function DailyHeatmap({ dailyActivity }: { dailyActivity: { date: string; count: number }[] }) {
+function DailyHeatmap({ dailyActivity, timezone }: { dailyActivity: { date: string; count: number }[]; timezone: string }) {
   const activityMap = new Map(dailyActivity.map(d => [d.date, d.count]));
   const maxCount = Math.max(...dailyActivity.map(d => d.count), 1);
 
   const days: { date: string; count: number; label: string }[] = [];
-  const today = new Date();
+  const today = getDateKeyInTimezone(new Date(), timezone);
   for (let i = 29; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const dateStr = `${year}-${month}-${day}`;
+    const dateStr = shiftDateKey(today, -i);
     days.push({
       date: dateStr,
       count: activityMap.get(dateStr) || 0,
-      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      label: formatDateOnly(dateStr, timezone),
     });
   }
 

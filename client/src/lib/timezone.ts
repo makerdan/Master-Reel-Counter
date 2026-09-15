@@ -27,8 +27,31 @@ export function formatTimestamp(date: string | Date, tz: string, options?: Intl.
 }
 
 export function formatDateOnly(date: string | Date, tz: string): string {
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split("-").map(Number);
+    return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" })
+      .format(new Date(Date.UTC(year, month - 1, day)));
+  }
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleString("en-US", { timeZone: tz, month: "short", day: "numeric" });
+}
+
+export function getDateKeyInTimezone(date: string | Date, tz: string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function shiftDateKey(dateKey: string, days: number): string {
+  const d = new Date(`${dateKey}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 function formatDateShort(date: string | Date, tz: string): string {
