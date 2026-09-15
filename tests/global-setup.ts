@@ -11,6 +11,7 @@ import {
 import { resolveClerkBootstrapConfig } from "../shared/clerk-config";
 import pg from "pg";
 import { assertReleaseSchema } from "../scripts/release-schema-preflight.mjs";
+import { assertClerkTestPermissions } from "./support/clerk-test-permissions";
 
 function findChromium(): string | undefined {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
@@ -54,11 +55,13 @@ async function globalSetup() {
     runtimeHostname: new URL(BASE_URL).hostname,
   });
 
+  const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+  await assertClerkTestPermissions(clerk);
+
   const localUserId = `e2e-clerk-${randomUUID()}`;
   const email = `e2e-clerk+${randomUUID()}@example.com`;
   const password = `E2e-${randomUUID()}!9`;
   process.env.E2E_CLERK_EMAIL = email;
-  const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
   const database = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await database.connect();
   try {

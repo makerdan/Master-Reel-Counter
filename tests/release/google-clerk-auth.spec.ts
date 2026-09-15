@@ -10,6 +10,7 @@ import {
 } from "../support/clerk-candidate-testing";
 import { CLERK_PROXY_PATH } from "../../shared/clerk-config";
 import { assertIsolatedReleaseDatabase } from "../../scripts/release-schema-preflight.mjs";
+import { assertClerkTestPermissions } from "../support/clerk-test-permissions";
 
 const { Client } = pg;
 const SMOKE_ID_PREFIX = "google-release-smoke-";
@@ -177,6 +178,12 @@ async function removeStaleSmokeUsers(
 }
 
 test.describe("Google-backed Clerk application boundary", () => {
+  test.beforeAll(async () => {
+    requireReleaseEnvironment();
+    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
+    await assertClerkTestPermissions(clerk);
+  });
+
   for (const roleCase of roleCases) {
     test(`preserves the ${roleCase.label} mapping after sign-in`, async ({
       page,

@@ -41,6 +41,10 @@ const googleReleaseSmoke = readFileSync(
   resolve(root, "tests/release/google-clerk-auth.spec.ts"),
   "utf8",
 );
+const clerkTestPermissions = readFileSync(
+  resolve(root, "tests/support/clerk-test-permissions.ts"),
+  "utf8",
+);
 const clerkProxyMiddleware = readFileSync(
   resolve(root, "server/middlewares/clerkProxyMiddleware.ts"),
   "utf8",
@@ -426,6 +430,20 @@ test("smoke uses disposable managed identity and preserves local authorization s
   assert.match(smoke, /CLERK_PUBLISHABLE_KEY/);
   assert.match(smoke, /VITE_CLERK_PUBLISHABLE_KEY/);
   assert.doesNotMatch(config, /storageState/);
+});
+
+test("browser setup reports missing Clerk test permissions before fixtures", () => {
+  assert.match(browserSetup, /assertClerkTestPermissions\(clerk\)/);
+  assert.match(googleReleaseSmoke, /test\.beforeAll\(async \(\) => \{/);
+  assert.match(googleReleaseSmoke, /assertClerkTestPermissions\(clerk\)/);
+  assert.match(clerkTestPermissions, /createUser\(\{\} as never\)/);
+  assert.match(clerkTestPermissions, /createTestingToken\(\)/);
+  assert.match(clerkTestPermissions, /form_data_missing/);
+  assert.match(clerkTestPermissions, /permissionPreflightError/);
+  assert.match(clerkTestPermissions, /Browser validation did not start/);
+  assert.match(clerkTestPermissions, /deleteUser\(probeUserId\)/);
+  assert.doesNotMatch(clerkTestPermissions, /error\.message/);
+  assert.doesNotMatch(clerkTestPermissions, /JSON\.stringify\(error/);
 });
 
 test("smoke uses Clerk's supported testing sign-in and keeps safe failure evidence", () => {
