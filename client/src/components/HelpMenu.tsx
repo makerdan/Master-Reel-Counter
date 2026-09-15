@@ -26,7 +26,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { HELP_ARTICLES, HELP_CONTENT_VERSION } from "@shared/help-content";
-import { helpGuideStateKey, readKey, writeKey } from "@/lib/storageKeys";
+import {
+  helpChatStateKey,
+  helpGuideStateKey,
+  readKey,
+  readSessionKey,
+  writeKey,
+  writeSessionKey,
+} from "@/lib/storageKeys";
 
 /** Concise first-run guidance shared across dashboard and session surfaces. */
 export function HelpOnboarding() {
@@ -1566,17 +1573,34 @@ interface ChatMessage {
   content: string;
 }
 
-const helpChatState: { messages: ChatMessage[] } = {
-  messages: [],
-};
+function readHelpChatMessages(identityId: string | null | undefined): ChatMessage[] {
+  if (!identityId) return [];
+
+  const stored = readSessionKey(helpChatStateKey(identityId));
+  if (!stored) return [];
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((message): message is ChatMessage =>
+      message
+      && (message.role === "user" || message.role === "assistant")
+      && typeof message.content === "string",
+    );
+  } catch {
+    return [];
+  }
+}
 
 export function AskAIChat() {
-  const [messages, setMessagesRaw] = useState<ChatMessage[]>(helpChatState.messages);
+  const { identityId } = useAuth();
+  const [messages, setMessagesRaw] = useState<ChatMessage[]>(() => readHelpChatMessages(identityId));
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const activeIdentityRef = useRef(identityId);
 
   useEffect(() => {
     return () => {
@@ -1584,13 +1608,25 @@ export function AskAIChat() {
     };
   }, []);
 
+  useEffect(() => {
+    if (activeIdentityRef.current === identityId) return;
+
+    activeIdentityRef.current = identityId;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsStreaming(false);
+    setInput("");
+    setMessagesRaw(readHelpChatMessages(identityId));
+  }, [identityId]);
+
   const setMessages = useCallback((updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
     setMessagesRaw(prev => {
+      if (!identityId || activeIdentityRef.current !== identityId) return prev;
       const next = typeof updater === "function" ? updater(prev) : updater;
-      helpChatState.messages = next;
+      writeSessionKey(helpChatStateKey(identityId), JSON.stringify(next));
       return next;
     });
-  }, []);
+  }, [identityId]);
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -1602,9 +1638,13 @@ export function AskAIChat() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // During the render between identities, hide the previous state before the
+  // transition effect loads the new identity's transcript.
+  const visibleMessages = activeIdentityRef.current === identityId ? messages : [];
+
   const sendMessage = useCallback(async () => {
     const trimmed = input.trim();
-    if (!trimmed || isStreaming) return;
+    if (!identityId || !trimmed || isStreaming) return;
 
     const userMsg: ChatMessage = { role: "user", content: trimmed };
     const updatedMessages = [...messages, userMsg];
@@ -1711,7 +1751,7 @@ export function AskAIChat() {
   return (
     <div className="flex flex-col h-full">
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
-        {messages.length === 0 && (
+        {visibleMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center py-8">
             <Bot className="h-8 w-8 text-muted-foreground/40 mb-3" />
             <p className="text-sm font-medium text-muted-foreground">Ask me anything about the app</p>
@@ -1730,7 +1770,7 @@ export function AskAIChat() {
             </div>
           </div>
         )}
-        {messages.map((msg, i) => (
+        {visibleMessages.map((msg, i) => (
           <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`} data-testid={`chat-message-${msg.role}-${i}`}>
             {msg.role === "assistant" && (
               <div className="shrink-0 mt-0.5">
@@ -1745,7 +1785,7 @@ export function AskAIChat() {
                 : "bg-muted text-foreground"
             }`}>
               {msg.role === "assistant" ? renderMarkdown(msg.content) : msg.content}
-              {msg.role === "assistant" && isStreaming && i === messages.length - 1 && (
+              {msg.role === "assistant" && isStreaming && i === visibleMessages.length - 1 && (
                 <span className="inline-block w-1.5 h-3 bg-foreground/50 animate-pulse ml-0.5 align-middle" />
               )}
             </div>
@@ -1760,7 +1800,7 @@ export function AskAIChat() {
         ))}
       </div>
       <div className="shrink-0 border-t p-3 space-y-2">
-        {messages.length > 0 && (
+        {visibleMessages.length > 0 && (
           <Button
             variant="ghost"
             size="sm"

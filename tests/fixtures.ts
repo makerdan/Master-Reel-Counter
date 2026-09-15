@@ -4,11 +4,14 @@ import {
   type APIRequestContext,
 } from "@playwright/test";
 import sharp from "sharp";
+import { createClerkClient } from "@clerk/backend";
 import {
   clerk as clerkTesting,
   setupClerkTestingToken,
 } from "@clerk/testing/playwright";
 import { parsePublishableKey } from "@clerk/shared/keys";
+import { randomUUID } from "node:crypto";
+import pg from "pg";
 
 export const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5000";
 
@@ -175,6 +178,9 @@ type E2EFixtures = {
   clerkTestingToken: void;
   cleanupIds: number[];
   sessionId: number;
+  secondApprovedIdentity: {
+    email: string;
+  };
 };
 
 export const test = base.extend<E2EFixtures>({
@@ -269,6 +275,43 @@ export const test = base.extend<E2EFixtures>({
     },
     { auto: true },
   ],
+  secondApprovedIdentity: async ({ clerkTestingToken }, use) => {
+    void clerkTestingToken;
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!secretKey || !databaseUrl) {
+      throw new Error(
+        "The second approved identity fixture requires CLERK_SECRET_KEY and DATABASE_URL",
+      );
+    }
+
+    const email = `e2e-clerk-second+${randomUUID()}@example.com`;
+    const password = `E2e-${randomUUID()}!9`;
+    const clerk = createClerkClient({ secretKey });
+    const database = new pg.Client({ connectionString: databaseUrl });
+    await database.connect();
+    const clerkUser = await clerk.users.createUser({
+      externalId: `e2e-clerk-second-${randomUUID()}`,
+      emailAddress: [email],
+      password,
+      firstName: "Second",
+      lastName: "Playwright",
+      skipLegalChecks: true,
+    });
+
+    try {
+      await database.query(
+        `INSERT INTO users (id, email, first_name, last_name, approved, rejected, role)
+         VALUES ($1, $2, 'Second', 'Playwright', true, false, 'Admin')`,
+        [clerkUser.id, email],
+      );
+      await use({ email });
+    } finally {
+      await database.query("DELETE FROM users WHERE id = $1", [clerkUser.id]);
+      await database.end();
+      await clerk.users.deleteUser(clerkUser.id);
+    }
+  },
   sessionId: async ({ request }, use) => {
     const sess = await createSessionViaApi(request);
     await use(sess.id);

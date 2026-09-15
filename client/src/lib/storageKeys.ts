@@ -44,6 +44,7 @@
  * theme                             LS     global   legacy theme key; one-time migration to themeMode
  * sweepMinAgeDays                   LS     global   admin preference (never auto-cleared)
  * help-guide-state-{uid}             LS     user     user dismiss/revisit preference
+ * help-chat-state-{uid}              SS     user     logout / identity change
  * pageview-last-{path}               SS     global   duplicate suppression (session)
  * disregarded-dups-{sid}            LS     session  clearSessionKeys; legacy key — cleared once migrated to DB
  * ────────────────────────────────────────────────────────────────────────────
@@ -154,6 +155,10 @@ export const SWEEP_MIN_AGE_DAYS_KEY = "sweepMinAgeDays";
 /** First-run help state is scoped by user so accounts never share dismissal state. */
 export const helpGuideStateKey = (userId: string) => `help-guide-state-${userId}`;
 
+/** Ask AI transcript for one application identity. */
+export const helpChatStateKey = (userId: string) =>
+  `help-chat-state-${identityStorageSuffix(userId)}`;
+
 /** Last tracked route and timestamp; prevents reload/rerender duplicates. */
 export const PAGEVIEW_LAST_KEY = "pageview-last";
 
@@ -228,7 +233,7 @@ export function clearIdentityScopedBrowserState(): void {
     `${LAST_SESSION_KEY}:`,
     `${RECENT_SEARCHES_KEY}:`,
   ];
-  const sessionPrefixes = ["dash:"];
+  const sessionPrefixes = ["dash:", "help-chat-state-"];
 
   try {
     localStorage.removeItem(LAST_SESSION_KEY);
