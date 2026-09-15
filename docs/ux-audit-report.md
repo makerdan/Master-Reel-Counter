@@ -436,3 +436,305 @@ These are not counted as confirmed product findings:
 ## Report-only stop
 
 This approval/route audit intentionally stops before fixes. No findings were fixed, no approval state was changed, no product route or API behavior was modified, and no new automated regression test was added. Recommended priority is F-003 first because revocation needs a single consistent client boundary, followed by F-002 for missing-account clarity, F-004 for timely approval transitions, F-006 for retryable auth-service failures, and F-005 for protected deep-link completion.
+
+---
+
+# Remaining Application-Surface UX Audit
+
+**Mode:** Report-only
+**Scope:** Dashboard, session organization, settings/preferences, owner panels, statistics, help/Ask AI, invitation joining, and logout/offline cross-context behavior
+**Audit date:** 2026-09-15
+**Validation ceiling:** `test-heavy`
+**Product behavior changed:** No
+**Finding ID continuity:** F-001 belongs to the core-session audit; F-002 through F-006 belong to the Clerk approval audit. This section continues with F-007.
+
+## Summary
+
+| Severity | Count |
+|---|---:|
+| Critical | 0 |
+| High | 1 |
+| Medium | 5 |
+| Low | 2 |
+
+The remaining application surfaces have working primary routes, loading states, and several live browser journeys. The audit found one high-impact cross-context privacy failure, five medium-severity failures, and two low-severity failures in search, statistics, invitations, and settings recovery. Existing core-session and Clerk findings were used as seed context and were not reported again.
+
+The report remains report-only. The consolidation groups below are recommendations only; no implementation task was created, no product behavior was changed, and no fix loop was entered.
+
+## Phase 0 — Discovery, scope, and app map
+
+### Detected stack and gates
+
+- **Frontend:** React + TypeScript with Vite.
+- **Routing:** Wouter routes for `/`, `/settings`, `/stats`, `/help`, `/join/:token`, and `/session/:id`.
+- **Client state/data:** TanStack Query, React state, identity-scoped local/session storage, IndexedDB offline queues, and module state for the help chat.
+- **Backend:** Express with PostgreSQL-backed session, settings, statistics, invitation, feedback, catalog, and support endpoints.
+- **Authentication/admission:** Clerk plus the local approved-user boundary. Clerk widget internals, admission provisioning, approval transitions, and protected-route internals are seed context from the preceding section and are not re-audited here.
+- **Interactions:** Dialogs, dropdowns, tabs, accordion help content, streaming Ask AI, file uploads, bulk actions, pagination, offline logout guard, and responsive layouts.
+
+### Route and control inventory
+
+| Surface | Relevant controls and state |
+|---|---|
+| Dashboard | New/rename/duplicate/reset session, folders and nested folders, move/reorder, trash restore/permanent delete, bulk actions, search-inside, filters, recent searches, sort, load-more, export, help, stats, settings, logout |
+| Settings | Profile/photo, theme, text size, larger touch targets, timezone, units, encoding, photo/export preferences, feedback, help replay, wire catalogs, storage, owner/admin panels |
+| Statistics | Overview, averages, streaks, weekly activity, catalog/vendor/wire breakdowns, quality, scanner, photo insights, shared performance, back navigation |
+| Help | Search, accordion sections, feedback, Ask AI streaming, clear chat, suggested prompts |
+| Invitation | Loading, invalid/expired/already-member/success branches, dashboard/session navigation |
+| Cross-context | Identity-scoped dashboard storage, help-chat module state, offline queue count, logout guard, reload/deep navigation |
+
+### Selected journeys
+
+1. **Dashboard and session organization:** Load the dashboard, create and rename a session, duplicate it, reset or mark it complete, move it between root/nested folders, reorder folders, and navigate to the session.
+2. **Search/filter/sort persistence:** Search by name/location and entry fields, apply status/collaborator/wire/date/footage filters, select recent searches, change sort field/direction, load more results, navigate away, and reload.
+3. **Folders and trash:** Create/rename/nest a folder, move a session, open Trash, restore a session, permanently delete a session, and verify empty/list states.
+4. **Settings and preferences:** Change theme, text size, touch targets, timezone, units, photo/export preferences, profile photo/name, encoding, feedback, catalog entries, and storage display; reload and compare visible behavior.
+5. **Owner panels:** Open the owner tab, inspect account management, approval counts, storage, integrity, crash, AI, page-view, PDF-job, and feedback panels; distinguish loading, denial, retryable failure, and empty states.
+6. **Statistics:** Open populated and no-data statistics, inspect summaries/breakdowns/heatmap/shared performance, change display preferences, reload, use back navigation, and inspect error recovery.
+7. **Help and Ask AI:** Open the full guide, search an article, expand/navigate accordion sections, submit feedback, send a streamed Ask AI prompt, handle an error, clear the chat, and revisit help after account-context changes.
+8. **Invitation joining:** Open a valid invite, already-member invite, invalid/expired invite, and transient-failure branch; inspect loading, success/error copy, retry, back navigation, and session/dashboard actions.
+9. **Logout/offline cross-context:** Create pending offline work, invoke logout, inspect the guard and cancel/confirm paths, reload or switch application identity, and verify protected hints and help state are not carried across contexts.
+
+### Persistent state inventoried
+
+- Identity-scoped dashboard search, filter, sort, folder-open, last-session, and recent-search state.
+- Global theme and PDF quality preferences.
+- Server-backed settings including units, timezone, accessibility, photo/export, encoding, and help-guide completion.
+- Server-backed sessions, folders, trash state, wire catalogs, feedback, invitations, and statistics.
+- IndexedDB offline photo/entry queues and pending-count indicators.
+- `AskAIChat` module-level message state.
+
+### Seed reconciliation
+
+- F-001 was not re-audited; entry editing inside `/session/:id` remains core-session scope.
+- F-002 through F-006 were not re-reported; those findings own missing admission records, revocation, pending transitions, protected deep links, and auth-service lookup failures.
+- Existing task coverage for Clerk release access, persisted roles, tester paths, and owner account-management policy was treated as out of scope. This section reports only remaining application behavior not represented by those seeds.
+
+## Evidence and validation baseline
+
+### Browser evidence
+
+The available authenticated Playwright environment and existing suite were used where fixtures support the journey:
+
+- `tests/help-guide.spec.ts` supplied live browser evidence for help search, streamed Ask AI success, and Ask AI route-error recovery.
+- `tests/folder-expand.spec.ts` supplied live dashboard folder/create-and-move evidence.
+- `tests/settings-admin-account-management.spec.ts` supplied live owner loading, retry, and non-owner denial evidence.
+- `tests/mobile-layout.spec.ts` and `tests/offline-queue.spec.ts` supplied live responsive, reconnect, pending-count, and logout-guard evidence.
+
+The newly confirmed findings below are primarily supported by current route/component inspection because the existing fixtures do not safely seed every required combination of 50+ sessions, saved non-default unit/timezone preferences, a transient invitation failure, or two distinct authenticated identities in one browser context. Those limitations are recorded as manual-QA or code-inspection boundaries rather than claimed browser passes.
+
+### Required validation result
+
+The mandated command was invoked exactly as specified:
+
+```text
+npm run test-heavy
+```
+
+The run waited for the shared `validation` serial lock, then completed the non-browser steps successfully through collision smoke. The browser step failed before the application journeys ran because the authenticated Playwright setup could not create its disposable Clerk user:
+
+```text
+ClerkAPIResponseError: Unprocessable Entity
+tests/global-setup.ts:69 — clerk.users.createUser(...)
+[validation] FAIL: browser-tests exited 1 after 9294ms.
+```
+
+This is recorded as an environment-limited validation result, not a passing application UX result and not an authorized pre-existing failure: the task-local baseline was empty, the task changed only this report, and the separate release-access work was blocked waiting for input. The tier was not escalated, weakened, or retried with a different command.
+
+The task-local `docs/validation/failure-baseline.json` contained no active records before the run, so no failure was authorized to be ignored at plan time.
+
+### Code and route evidence
+
+- `client/src/pages/dashboard.tsx` loads owned sessions in pages of 50, filters only the accumulated client list against the all-match ID set returned by `/api/search/sessions`, and shows a no-results state before the user can load another page.
+- `client/src/pages/dashboard.tsx` returns `emptySearch` for every non-OK search response, so a 500/network/auth failure is represented as a successful zero-match result.
+- `client/src/pages/stats.tsx` renders every footage value with a literal `ft` suffix and formats weekly dates with the browser's `toLocaleDateString`, without reading the saved `defaultUnit` or `timezone` settings.
+- `client/src/pages/stats.tsx` renders a Back to Dashboard action for `isError` but no retry/refetch action.
+- `client/src/pages/join.tsx` maps all mutation errors to one error card with a Dashboard escape; it has no retry action and does not distinguish transient 5xx/network failures from invalid or expired tokens.
+- `client/src/pages/settings.tsx` has a storage refresh button but no `isError` branch for `/api/storage/usage`; after loading ends with no data, the storage card has no user-visible failure explanation.
+- `client/src/components/HelpMenu.tsx` stores `AskAIChat` messages in the module-level `helpChatState` object. The state is not keyed by `identityId` and is not cleared by logout or an identity transition.
+
+## Phase results
+
+### Phase 1 — Happy-path application sweep
+
+**Completed.** Existing browser coverage verified dashboard folder organization, searchable help, Ask AI success/error rendering, owner account-management loading/retry, mobile layout, pending offline indicators, and logout guard behavior. The remaining dashboard, settings, statistics, and invite routes have explicit primary success/error branches. F-007 through F-014 describe defects in those branches or their cross-context state.
+
+### Phase 2 — State and persistence
+
+**Completed.** Identity-scoped dashboard keys, settings query hydration, help-guide dismissal, offline queue state, and route-local tab state were traced. The search pagination boundary and statistics preference mismatch were confirmed by code. The module-global help chat state is not identity-scoped and is F-007.
+
+### Phase 3 — Silent failure hunt
+
+**Completed; backend checks applicable.** Dashboard mutations generally have success/error toasts, and the help chat has a visible generic recovery message. The search query deliberately converts non-OK responses to an empty result, storage usage has no failed-query branch, and stats/invite failure cards omit retry. These are F-011 through F-014, not duplicates of the Clerk auth-service findings.
+
+### Phase 4 — Error and edge cases
+
+**Completed by code inspection and existing browser error fixtures.** Invalid/expired/already-member invite outcomes, empty/no-data stats, help no-match, Ask AI error, owner denial, dashboard empty states, offline logout guarding, and pagination controls were inspected. Transient invite/network failures, large-session search beyond the first page, and storage-query failure require dedicated seeded browser coverage and are reported with the current code evidence.
+
+### Phase 5 — Navigation and dead ends
+
+**Completed.** Dashboard, settings, stats, help, invite success, invite error, and logout escape routes all have navigation controls. The invitation error branch dead-ends at Dashboard instead of offering a retry, and the stats error branch also exits to Dashboard without retry; see F-012 and F-014.
+
+### Phase 6 — Keyboard, shortcuts, and interaction
+
+**Completed for applicable controls; manual visual gates remain open.** Search Enter behavior, dropdowns, tabs, accordions, dialog controls, Ask AI Enter/send behavior, and disabled mutation states were inspected. Physical rapid clicks, screen-reader focus/announcement, clipboard behavior outside existing session coverage, and drag behavior are not claimed as verified.
+
+### Phase 7 — Tool and mode switching
+
+**Gated out for this scope.** The core session's five tool modes are owned by the preceding core-session report. Remaining surfaces use pages, tabs, accordions, and dashboard controls rather than a second session tool-switch audit.
+
+### Phase 8 — Settings and preferences
+
+**Completed.** Preference controls and save mutations were traced through `/api/settings`; theme, text size, touch target, timezone, and unit controls are present. The statistics page does not consume unit/timezone preferences (F-009 and F-010). Storage usage has no visible failed-query state (F-013). Owner/admin health-panel failures were not duplicated from the existing owner-health task coverage.
+
+### Phase 9 — Auth and session
+
+**Gated to application boundaries only.** Approved protected navigation and admission semantics belong to F-002 through F-006. This phase checked only logout guard and application state cleanup at the boundary. Clerk widget behavior, token expiry, identity provisioning, approval transitions, and protected-route internals remain excluded.
+
+### Phase 10 — UI feedback and polish
+
+**Completed.** Loading, success, empty, toast, error, disabled, and retry affordances were inspected. Missing retry or misleading empty/blank states are counted as F-011 through F-014. Zoom, screen-reader output, focus return, and physical clipping remain manual QA.
+
+### Phase 11 — Data lifecycle
+
+**Completed for selected application data.** Session/folder/trash mutations, settings saves, wire catalogs, feedback, invite joining, stats reads, and offline queue boundaries were traced. The core session entry/photo lifecycle and export/import round trip were not re-audited. No data-loss finding was confirmed in the remaining surfaces.
+
+### Phase 12 — Cross-context
+
+**Completed with manual visual and provider boundaries.** Dashboard browser state cleanup and offline logout guard are covered by existing evidence. The help chat's module-level state is not identity-scoped and is F-007. Two-user same-browser confirmation, browser restart persistence, DevTools offline transitions, zoom, screen-reader semantics, and physical multi-device behavior are **[MANUAL QA NEEDED]**.
+
+### Phase 13 — Triage and stop point
+
+**Completed; report-only.** Findings were de-duplicated against F-001 through F-006 and the known task coverage, assigned sequential IDs, and grouped only where a shared remediation boundary is plausible. No fix loop, product-code edit, test edit, migration, configuration change, secret access, or follow-up task creation was performed during the audit.
+
+## Findings
+
+### F-007
+
+- **ID:** F-007
+- **Journey:** 9 — Logout/offline cross-context; 7 — Help and Ask AI
+- **Phase:** Phase 2 — State and persistence; Phase 12 — Cross-context
+- **Severity:** High
+- **Failure:** Ask AI conversation messages are kept in a module-level `helpChatState` object rather than being scoped to the authenticated identity. When one user leaves Help and another user later uses the same loaded application, `AskAIChat` initializes from the previous messages. The second user can see the previous user's questions and answers until the chat is cleared or the page bundle is replaced. This is an application-state isolation failure, not a Clerk or protected-route finding.
+- **Fix:** Scope help-chat state by `identityId` or clear it as part of the existing identity-transition/logout cleanup. Do not use one process-wide message array for all authenticated identities. Add a two-identity browser journey that logs out, signs in as another approved user, opens Help, and asserts that no prior chat messages appear.
+- **Evidence:** `client/src/components/HelpMenu.tsx` declares `const helpChatState: { messages: ChatMessage[] } = { messages: [] }` at module scope. `AskAIChat` initializes from `helpChatState.messages` and writes every conversation update back to the same object. The component does not read `identityId`, subscribe to identity changes, or clear this state on unmount/logout. Existing logout cleanup clears identity-scoped browser keys and protected offline caches, but it cannot clear this module object.
+
+### F-008
+
+- **ID:** F-008
+- **Journey:** 2 — Search/filter/sort persistence
+- **Phase:** Phase 1 — Happy-path application sweep; Phase 4 — Error and edge cases
+- **Severity:** Medium
+- **Failure:** Search can report no sessions even when a matching owned session exists beyond the first 50 dashboard rows. The server search endpoint returns all matching IDs, but the dashboard filters only `allLoadedSessions`; it does not fetch the matching session records or automatically advance pagination when the match set is outside the loaded page. A user with a large session list can therefore search for a known session and receive the no-results card.
+- **Fix:** Make search and structured filters server-paginated over matching session records, or automatically load/merge all matching owned rows before rendering. Keep the result count and load-more control consistent with the filtered result set; do not show “No sessions found” while `ownedIds` contains unloaded matches.
+- **Evidence:** `client/src/pages/dashboard.tsx` requests `/api/sessions` with `limit=50` and `offset`, stores pages in `allLoadedSessions`, then computes `filteredSessions` by checking each loaded row against `ownedMatchSet`. `server/routes.ts` and `server/storage.ts` return an unpaginated `ownedIds` array from `/api/search/sessions`. The no-results branch runs when `filteredSessions` is empty, regardless of whether `searchResults.ownedIds` contains IDs that were not loaded.
+
+### F-009
+
+- **ID:** F-009
+- **Journey:** 4 — Settings and preferences; 6 — Statistics
+- **Phase:** Phase 8 — Settings and preferences; Phase 10 — UI feedback and polish
+- **Severity:** Medium
+- **Failure:** The saved default-unit preference is not honored on Summary Stats. After a user selects meters in Settings, the statistics page continues to label total, average, weekly, catalog, wire, gauge, and shared-performance footage values as `ft`, with no indication that the displayed unit differs from the preference used elsewhere in the application.
+- **Fix:** Load the user's settings in `client/src/pages/stats.tsx`, convert base-foot values with the shared unit-conversion helpers, and derive labels from the saved unit. Cover populated and no-data stats plus reload after changing the unit.
+- **Evidence:** `client/src/pages/settings.tsx` saves `defaultUnit` and the dashboard reads it for display. `client/src/pages/stats.tsx` contains literal `ft` suffixes for every footage value and imports neither `useQuery` for settings nor the shared conversion helpers. The stats API returns numeric footage values without a display-unit contract.
+
+### F-010
+
+- **ID:** F-010
+- **Journey:** 4 — Settings and preferences; 6 — Statistics
+- **Phase:** Phase 8 — Settings and preferences; Phase 12 — Cross-context
+- **Severity:** Low
+- **Failure:** Statistics date labels use the browser's locale/timezone rather than the saved application timezone. Weekly activity constructs a JavaScript `Date` from a date-only API value and calls `toLocaleDateString("en-US")`; daily activity is rendered from API dates without an application-timezone formatter. Users who configure a non-browser timezone can see an activity day or week label shifted or formatted differently from dashboard timestamps.
+- **Fix:** Treat API date-only values as calendar dates in the saved timezone, use the existing timezone utilities, and make the stats date-label contract explicit. Verify a timezone west/east of the browser timezone and a date near UTC midnight.
+- **Evidence:** `client/src/pages/stats.tsx` formats `weeklyStats` with `new Date(w.week).toLocaleDateString("en-US", ...)` and does not import `useTimezone` or `formatTimestamp`. `client/src/pages/settings.tsx` persists a `timezone` preference, while dashboard timestamp rendering already uses shared timezone utilities.
+
+### F-011
+
+- **ID:** F-011
+- **Journey:** 2 — Search/filter/sort persistence
+- **Phase:** Phase 3 — Silent failure hunt; Phase 10 — UI feedback and polish
+- **Severity:** Medium
+- **Failure:** A failed dashboard search is presented as a legitimate empty result. The search query function returns `emptySearch` for every non-OK response, including server errors, network failures, and protected-response failures. The dashboard then renders “No sessions found” or “No sessions match the active filters” with no error or retry affordance, leading the user to believe their data does not match.
+- **Fix:** Throw a typed query error for non-OK search responses, render a search-specific failure state with Retry and Clear controls, and keep genuine zero-match responses separate from failed requests. Preserve the existing encryption/filter notices.
+- **Evidence:** In `client/src/pages/dashboard.tsx`, the `/api/search/sessions` query function executes `if (!res.ok) return emptySearch;`. The component does not expose `searchResults` query error state and routes the empty result into the normal no-search-results card.
+
+### F-012
+
+- **ID:** F-012
+- **Journey:** 8 — Invitation joining
+- **Phase:** Phase 3 — Silent failure hunt; Phase 5 — Navigation and dead ends
+- **Severity:** Medium
+- **Failure:** A transient invite-join failure gives the user only a generic error and a one-way Dashboard escape. The client does not distinguish a network/5xx failure from an invalid or expired token and offers no Retry action. A temporary outage therefore looks like a bad invite and forces the user to reopen the link manually or abandon the join flow.
+- **Fix:** Preserve the response status/error category in the join mutation, keep invalid/expired/already-member outcomes distinct, and render Retry for network/5xx failures while retaining Dashboard for permanent token failures. Ensure retry does not double-submit after a successful response.
+- **Evidence:** `client/src/pages/join.tsx` catches all mutation errors, defaults to “This invite link may be invalid or expired,” and renders only `button-back-dashboard`. The server has distinct 404, 410, and 500 responses in `server/routes.ts`, but the client does not expose a retryable branch for the 500/network cases.
+
+### F-013
+
+- **ID:** F-013
+- **Journey:** 4 — Settings and preferences; 5 — Owner panels
+- **Phase:** Phase 3 — Silent failure hunt; Phase 10 — UI feedback and polish
+- **Severity:** Low
+- **Failure:** If `/api/storage/usage` fails after the initial loading state, the Storage Usage card renders neither an error message nor a retry explanation. The header refresh icon remains available, but the blank card content does not tell the user why their usage data is missing or that refresh is the recovery action.
+- **Fix:** Add an `isError` state with concise copy and a labeled Retry/Refresh action, while preserving the existing loading, populated, and zero-usage states. Do not merge this into the owner-health panel failure task; this is the regular user's storage panel.
+- **Evidence:** `client/src/pages/settings.tsx` reads `storageUsage` and `storageLoading` but not a storage-query `isError`. Its conditional content covers loading and truthy data only; an undefined result after failure leaves `CardContent` without a status message.
+
+### F-014
+
+- **ID:** F-014
+- **Journey:** 6 — Statistics
+- **Phase:** Phase 3 — Silent failure hunt; Phase 5 — Navigation and dead ends
+- **Severity:** Medium
+- **Failure:** A transient `/api/stats` failure ends on an error card with only “Back to Dashboard.” There is no Retry/refetch action, so the user must leave and re-enter the page to attempt recovery, and the page provides no path to tell a temporary outage from a persistent data problem.
+- **Fix:** Expose the query refetch action in the error branch, provide a disabled/loading state while retrying, and retain Back to Dashboard as a separate escape. Verify retry after a single injected 5xx/network failure.
+- **Evidence:** `client/src/pages/stats.tsx` destructures `isLoading` and `isError` from the stats query but not `refetch`; the `isError` branch renders only `button-back-stats-error` and `button-back-to-dashboard`.
+
+## Proposed consolidation groups
+
+These are recommendations only. No follow-up implementation tasks are created until the user reviews and chooses which groups, if any, to promote.
+
+### Group A — Dashboard search correctness and failure recovery
+
+- **Shared problem:** Search owns a server-wide match set but renders only loaded page rows, and it masks failed requests as zero matches.
+- **Member findings:** F-008, F-011.
+- **Recommended single task:** “Make dashboard search paginated and failure-aware.”
+- **Suggested nested subtasks:** (1) define a server-paginated search/filter response and merge it with dashboard rows; (2) separate zero-match from failed-query UI; (3) cover unloaded matches, retry, filters, recent searches, and reload persistence.
+- **Why they may remain separate:** F-008 is a data/pagination correctness defect; F-011 is an error-state contract defect. They share the dashboard search response/remediation boundary but should remain separately verifiable.
+
+### Group B — Preference-aware statistics display
+
+- **Shared problem:** Summary Stats does not consume the same display preferences used by the rest of the application.
+- **Member findings:** F-009, F-010.
+- **Recommended parent task with nested subtasks:** “Make Summary Stats honor saved display preferences.” Subtasks: (1) unit conversion and labels; (2) timezone-safe calendar labels; (3) populated, empty, reload, and cross-timezone browser coverage.
+- **Why they may remain separate:** Units change numeric meaning; timezone changes calendar interpretation. A task can coordinate them, but each needs an independent acceptance check.
+
+### Group C — Retryable read failures on remaining application pages
+
+- **Shared problem:** Read failures on invitation, storage, and statistics surfaces are not consistently distinguished from permanent/empty states or given an in-place retry.
+- **Member findings:** F-012, F-013, F-014.
+- **Recommended parent task with nested subtasks:** “Standardize retryable recovery for application read flows.” Subtasks: (1) invite status classification and retry; (2) storage usage error/retry state; (3) stats refetch state; (4) verify no duplicate submissions and preserve permanent-error copy.
+- **Why they may remain separate:** Invite joining is a mutation with token semantics; storage and stats are independent reads with different ownership and data lifecycles.
+
+### Group D — Identity-scoped help conversation state
+
+- **Shared problem:** Help chat state survives component/account transitions without an identity boundary.
+- **Member finding:** F-007.
+- **Recommended single task:** “Scope Ask AI help history to the active identity.”
+- **Suggested nested subtasks:** (1) key or clear chat state on identity transition; (2) verify logout/login with two approved identities; (3) preserve same-user navigation behavior.
+- **Why it remains separate:** F-007 is high severity and a cross-context privacy boundary; it should not be bundled into generic retry or settings work.
+
+## Blocked and manual-QA checks
+
+These are not counted as additional confirmed findings:
+
+- **[MANUAL QA NEEDED]** Use two real approved identities in one browser context, log out/in, open Help, and verify the previous Ask AI transcript is absent; code evidence already confirms the unscoped state risk.
+- **[MANUAL QA NEEDED]** Seed more than 50 owned sessions with a match beyond the first page, then search, filter, sort, navigate away, reload, and compare displayed rows with the result count.
+- **[MANUAL QA NEEDED]** Inject a 500/network failure into dashboard search and storage usage, and verify that the proposed failure states do not look like empty data. Current code evidence confirms the present masking/blank behavior.
+- **[MANUAL QA NEEDED]** Change the unit and timezone preferences, reload, and compare populated stats against dashboard/session values across browser timezones.
+- **[MANUAL QA NEEDED]** Exercise a valid invite during a transient network/5xx failure, then retry without reopening the link; provider/network timing is not established by current fixtures.
+- **[MANUAL QA NEEDED]** Verify dialog focus return, keyboard-only operation, screen-reader announcements, 75%/150% zoom, 375px/768px/1280px clipping, long strings, high-volume list performance, physical rapid taps, and clipboard/drag gates where applicable.
+- **Gated out:** Clerk widget/provider internals, approval/provisioning/revocation mechanics, token expiry, core session modes, and unsupported session export/import round trips remain owned by the preceding audits or other task plans.
+
+## Report-only stop
+
+This remaining-surface audit stops at the report-only boundary. No application code, tests, migrations, configuration, secrets, deployments, external services, or artifact content were changed. No finding was fixed and no regression-test loop was entered. The recommended next actions are to review the consolidation groups, promote only the groups the user selects, and separately verify the high-severity identity-scoped help state before release.
