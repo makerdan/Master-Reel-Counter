@@ -143,6 +143,7 @@ test("release command uses an isolated production-only Playwright configuration"
   assert.match(config, /public HTTPS deployment/);
   assert.match(config, /timeout: 120_000/);
   assert.match(config, /trace: "off"/);
+  assert.match(config, /screenshot: "off"/);
   assert.match(config, /reporter: "line"/);
   assert.doesNotMatch(config, /html/);
   assert.doesNotMatch(config, /globalSetup|webServer|tests\/\.auth/);
@@ -406,6 +407,14 @@ test("smoke uses disposable managed identity and preserves local authorization s
   assert.match(smoke, /approved: true, rejected: false, role: "Admin"/);
   assert.match(smoke, /clerk\.users\.deleteUser/);
   assert.match(smoke, /DELETE FROM users WHERE id = \$1 RETURNING id/);
+  assert.match(smoke, /assertProviderUserAbsent/);
+  assert.match(smoke, /assertLocalUserAbsent/);
+  assert.match(smoke, /externalId: \[localUserId\]/);
+  assert.match(smoke, /SELECT id FROM users WHERE id = \$1/);
+  assert.match(smoke, /cleanupBrowserSession/);
+  assert.match(smoke, /context\.clearCookies\(\)/);
+  assert.match(smoke, /context\.close\(\)/);
+  assert.match(smoke, /delete process\.env\.CLERK_TESTING_TOKEN/);
   assert.match(smoke, /Managed Clerk release smoke cleanup failed/);
   assert.match(smoke, /removeStaleSmokeUsers/);
   assert.match(smoke, /createdAtBefore: cutoff/);
@@ -413,6 +422,10 @@ test("smoke uses disposable managed identity and preserves local authorization s
   assert.match(smoke, /clerkTesting\.signIn\(\{/);
   assert.doesNotMatch(smoke, /name: \/continue\/i/);
   assert.doesNotMatch(smoke, /rejectUnauthorized: false/);
+  assert.match(smoke, /resolveClerkEnvironmentPublishableKey/);
+  assert.match(smoke, /CLERK_PUBLISHABLE_KEY/);
+  assert.match(smoke, /VITE_CLERK_PUBLISHABLE_KEY/);
+  assert.doesNotMatch(config, /storageState/);
 });
 
 test("smoke uses Clerk's supported testing sign-in and keeps safe failure evidence", () => {

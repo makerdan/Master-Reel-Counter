@@ -53,7 +53,8 @@ export default defineConfig({
     // Native traces include cookies and request payloads. The smoke attaches a
     // bounded path-only browser trace instead.
     trace: "off",
-    screenshot: "only-on-failure",
+    // Authenticated release pages must never be retained as screenshots.
+    screenshot: "off",
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
   },

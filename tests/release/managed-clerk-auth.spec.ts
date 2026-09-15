@@ -13,6 +13,7 @@ import {
   assertIsolatedReleaseDatabase,
   assertReleaseSchema,
 } from "../../scripts/release-schema-preflight.mjs";
+import { resolveClerkEnvironmentPublishableKey } from "../../shared/clerk-config";
 
 const { Client } = pg;
 const SMOKE_ID_PREFIX = "release-smoke-";
@@ -23,6 +24,8 @@ const internalCandidate = process.env.RELEASE_SMOKE_INTERNAL_CANDIDATE === "1";
 const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
   "CLERK_SECRET_KEY",
+  "CLERK_PUBLISHABLE_KEY",
+  "VITE_CLERK_PUBLISHABLE_KEY",
   "DATABASE_URL",
 ] as const;
 
@@ -98,6 +101,60 @@ async function waitForCompletedSignIn(
   );
 }
 
+async function assertProviderUserAbsent(
+  clerk: ReturnType<typeof createClerkClient>,
+  localUserId: string,
+): Promise<void> {
+  const users = await clerk.users.getUserList({
+    externalId: [localUserId],
+    limit: 10,
+  });
+  if (users.data.some((user) => user.externalId === localUserId)) {
+    throw new Error("Disposable Clerk smoke user remains after cleanup");
+  }
+}
+
+async function assertLocalUserAbsent(
+  database: InstanceType<typeof Client>,
+  localUserId: string,
+): Promise<void> {
+  const result = await database.query("SELECT id FROM users WHERE id = $1", [localUserId]);
+  if (result.rowCount !== 0) {
+    throw new Error("Disposable local smoke user remains after cleanup");
+  }
+}
+
+async function cleanupBrowserSession(page: import("@playwright/test").Page): Promise<void> {
+  await page.evaluate(async () => {
+    const clerk = (
+      window as typeof window & {
+        Clerk?: {
+          session?: { id?: string } | null;
+          signOut?: () => Promise<void>;
+        };
+      }
+    ).Clerk;
+    if (clerk?.session?.id) await clerk.signOut?.();
+  });
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  const signedOutStatus = await page.evaluate(async () => {
+    const response = await fetch("/api/auth/user", {
+      credentials: "same-origin",
+      headers: { accept: "application/json" },
+    });
+    return response.status;
+  });
+  if (signedOutStatus !== 401) {
+    throw new Error("Managed Clerk browser session remains authenticated during cleanup");
+  }
+  const context = page.context();
+  await context.clearCookies();
+  await context.close();
+}
+
 async function removeStaleSmokeUsers(
   clerk: ReturnType<typeof createClerkClient>,
   database: InstanceType<typeof Client>,
@@ -151,6 +208,11 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   const localUserId = `release-smoke-${randomUUID()}`;
   const email = `release-smoke+${randomUUID()}@example.com`;
   const password = `Rls-${randomBytes(18).toString("base64url")}!9`;
+  resolveClerkEnvironmentPublishableKey({
+    serverPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+    clientPublishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
+    allowClientFallback: false,
+  });
   const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
   const database = new Client({
     connectionString: smokeDatabaseUrl,
@@ -167,6 +229,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   const routeStates: string[] = [];
   const requestFailures: string[] = [];
   const pageErrors: string[] = [];
+  let databaseConnected = false;
 
   page.on("requestfailed", (request) => {
     requestFailures.push(
@@ -201,6 +264,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   });
 
   await database.connect();
+  databaseConnected = true;
   let primaryError: unknown;
   const cleanupErrors: Error[] = [];
   try {
@@ -363,6 +427,18 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   } catch (error) {
     primaryError = error;
   } finally {
+    const cleanupBrowser = async () => {
+      try {
+        await cleanupBrowserSession(page);
+      } catch (error) {
+        cleanupErrors.push(
+          error instanceof Error
+            ? error
+            : new Error("Managed Clerk browser session cleanup failed"),
+        );
+      }
+    };
+
     delete process.env.CLERK_TESTING_TOKEN;
     const browserDiagnostic = {
       finalPath: safeDiagnosticPath(page.url()),
@@ -401,7 +477,8 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
           : new Error("Release browser diagnostic attachment failed"),
       );
     }
-    if (localUserCreated) {
+    await cleanupBrowser();
+    if (localUserCreated && databaseConnected) {
       try {
         const deleted = await database.query(
           "DELETE FROM users WHERE id = $1 RETURNING id",
@@ -422,6 +499,28 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
       } catch (error) {
         cleanupErrors.push(
           error instanceof Error ? error : new Error("Disposable Clerk user cleanup failed"),
+        );
+      }
+    }
+    if (clerkUserId) {
+      try {
+        await assertProviderUserAbsent(clerk, localUserId);
+      } catch (error) {
+        cleanupErrors.push(
+          error instanceof Error
+            ? error
+            : new Error("Disposable Clerk smoke user absence check failed"),
+        );
+      }
+    }
+    if (localUserCreated && databaseConnected) {
+      try {
+        await assertLocalUserAbsent(database, localUserId);
+      } catch (error) {
+        cleanupErrors.push(
+          error instanceof Error
+            ? error
+            : new Error("Disposable local smoke user absence check failed"),
         );
       }
     }
