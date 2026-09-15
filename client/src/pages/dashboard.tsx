@@ -264,7 +264,7 @@ export default function Dashboard() {
 
   type SessionsResponse = { sessions: SessionWithStats[]; total: number; limit: number; offset: number };
 
-  const { data: sessionsData, isLoading, isError: sessionsError } = useQuery<SessionsResponse>({
+  const { data: sessionsData, isLoading, isFetching: isFetchingSessions, isError: sessionsError } = useQuery<SessionsResponse>({
     queryKey: ["/api/sessions", showTrash, sessionsOffset],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -342,7 +342,13 @@ export default function Dashboard() {
   };
   const hasActiveFilters = !!(activeFilters.status || activeFilters.collaborator || activeFilters.wireType || activeFilters.minFootage || activeFilters.dateMonth || activeFilters.dateYear);
 
-  const { data: searchResults } = useQuery<SearchResult>({
+  const {
+    data: searchResults,
+    isLoading: isSearchLoading,
+    isFetching: isSearchFetching,
+    isError: searchError,
+    refetch: retrySearch,
+  } = useQuery<SearchResult>({
     queryKey: ["/api/search/sessions", searchQuery, searchInside, activeFilters],
     queryFn: async () => {
       if (!searchQuery.trim() && !hasActiveFilters) return emptySearch;
@@ -354,11 +360,12 @@ export default function Dashboard() {
       if (activeFilters.dateMonth) params.set("dateMonth", String(activeFilters.dateMonth));
       if (activeFilters.dateYear) params.set("dateYear", String(activeFilters.dateYear));
       const res = await fetch(`/api/search/sessions?${params}`);
-      if (!res.ok) return emptySearch;
+      if (!res.ok) throw new Error("Failed to search sessions");
       return res.json();
     },
     enabled: !!user && (searchQuery.trim().length > 0 || hasActiveFilters),
     placeholderData: emptySearch,
+    retry: false,
   });
 
   useEffect(() => {
@@ -372,6 +379,36 @@ export default function Dashboard() {
   const sharedMatchSet = useMemo(() => new Set(searchResults?.sharedIds || []), [searchResults]);
   const matchReasons = searchResults?.reasons || {};
   const entrySnippets = searchResults?.entrySnippets || {};
+  const hasUnloadedSearchMatches = useMemo(() => {
+    if (!isSearching || searchError || !searchResults || !hasMoreSessions) return false;
+    const loadedIds = new Set(sessions.map(session => session.id));
+    return searchResults.ownedIds.some(id => !loadedIds.has(id));
+  }, [isSearching, searchError, searchResults, hasMoreSessions, sessions]);
+
+  // Search returns IDs for the complete owned-session set, while the dashboard
+  // list is paginated for normal browsing. Keep loading pages until every
+  // matching owned session is available to render; otherwise a match beyond
+  // the first page would look like a false empty result.
+  useEffect(() => {
+    if (
+      !isSearching ||
+      showTrash ||
+      searchError ||
+      isSearchLoading ||
+      isSearchFetching ||
+      isFetchingSessions ||
+      !hasUnloadedSearchMatches
+    ) return;
+    setSessionsOffset(prev => prev + PAGE_SIZE);
+  }, [
+    isSearching,
+    showTrash,
+    searchError,
+    isSearchLoading,
+    isSearchFetching,
+    isFetchingSessions,
+    hasUnloadedSearchMatches,
+  ]);
 
   const filteredSessions = useMemo(() => {
     if (!sessions) return [];
@@ -2430,6 +2467,25 @@ export default function Dashboard() {
               </Button>
             </CardContent>
           </Card>
+        ) : isSearching && searchError ? (
+          <Card className="border border-destructive/30">
+            <CardContent className="py-10 text-center">
+              <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-destructive" />
+              <p className="text-sm font-medium mb-1">Search failed</p>
+              <p className="text-xs text-muted-foreground mb-4">There was a problem connecting to the server. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => retrySearch()} data-testid="button-retry-search">
+                <RotateCcw className="h-3 w-3 mr-1" /> Retry search
+              </Button>
+            </CardContent>
+          </Card>
+        ) : isSearching && (isSearchLoading || isSearchFetching || hasUnloadedSearchMatches || isFetchingSessions) && !filteredSessions.length && !filteredSharedSessions.length ? (
+          <Card className="border border-border">
+            <CardContent className="py-10 text-center">
+              <Loader2 className="h-10 w-10 mx-auto mb-3 animate-spin text-muted-foreground" />
+              <p className="text-sm font-medium">Searching sessions…</p>
+              <p className="text-xs text-muted-foreground">Loading all matching sessions</p>
+            </CardContent>
+          </Card>
         ) : !filteredSessions.length && !isSearching && !(userFolders || []).length ? (
           <Card className="border border-border">
             <CardContent className="py-12 text-center">
@@ -2508,10 +2564,10 @@ export default function Dashboard() {
               variant="outline"
               size="sm"
               onClick={() => setSessionsOffset(prev => prev + PAGE_SIZE)}
-              disabled={isLoading}
+              disabled={isFetchingSessions}
               data-testid="button-load-more-sessions"
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              {isFetchingSessions ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
               Load more ({sessions.length} of {sessionsTotal})
             </Button>
           </div>
