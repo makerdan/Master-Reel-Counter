@@ -9,6 +9,9 @@ if (!planPath) {
 }
 try {
   const { command } = assertRequestedTier(planPath);
+  // Keep this as the single task-validation entrypoint. run-tier owns plan
+  // guards and serial-lock owns reentrancy; neither responsibility should be
+  // duplicated here or bypassed by a nested package-script invocation.
   const result = spawnSync(process.execPath, ["scripts/run-tier.mjs", command], {
     stdio: "inherit",
     env: { ...process.env, TASK_PLAN_FILE: planPath },

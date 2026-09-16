@@ -34,3 +34,4 @@
 - [Drizzle push EOF prompts](drizzle-push-eof-prompts.md) — a schema ambiguity prompt can exit 0 on closed stdin without applying changes; verify schema state, not only process success.
 - [Destructive SQL needs execution tests](destructive-sql-execution-tests.md) — static source checks miss PostgreSQL planning errors and driver type coercion at safety-critical invariants.
 - [Object-key ownership comparisons](object-key-ownership-comparisons.md) — normalize legacy object-path aliases before deciding whether a blob is exclusively owned.
+- [Nested validation reentrancy](nested-validation-reentrancy.md) — preserve only the active resource's lock marker; independent collision harnesses must clear inherited markers.

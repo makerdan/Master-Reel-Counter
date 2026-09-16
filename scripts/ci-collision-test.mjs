@@ -26,15 +26,87 @@
  * Run:  node scripts/ci-collision-test.mjs
  */
 
-import { spawn } from "child_process";
-import { readFileSync, unlinkSync, existsSync } from "fs";
+import { spawn, spawnSync } from "child_process";
+import { mkdtempSync, readFileSync, rmSync, unlinkSync, existsSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, resolve } from "path";
+import { dirname, join, resolve } from "path";
 import { randomBytes } from "crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const PKG_PATH = resolve(ROOT, "package.json");
+
+async function runNonSmokeReentrancyRegression() {
+  console.log("[ci-collision-test] Non-smoke mode: reaching a manifest step through a nested tier…");
+
+  const fixtureDir = mkdtempSync("/tmp/repl-validation-reentrancy-");
+  const manifestPath = join(fixtureDir, "manifest.json");
+  const probeCommand = [
+    process.execPath,
+    "-e",
+    "console.log('[validation-regression] nested manifest probe reached');",
+  ];
+  writeFileSync(manifestPath, JSON.stringify({
+    version: 1,
+    tiers: {
+      "test-fast": {
+        packageScript: "npm run test-fast",
+        resource: "validation",
+        priority: 1,
+        timeoutMs: 30_000,
+        steps: [{ name: "nested-manifest-probe", command: probeCommand }],
+      },
+      "test-heavy": {
+        packageScript: "npm run test-heavy",
+        resource: "validation",
+        priority: 3,
+        timeoutMs: 30_000,
+        steps: [{ name: "nested-tier", command: ["npm", "run", "test-fast"] }],
+      },
+    },
+  }, null, 2));
+
+  const result = spawnSync(
+    process.execPath,
+    [resolve(ROOT, "scripts/run-tier.mjs"), "test-heavy", "--allow-no-plan"],
+    {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        VALIDATION_MANIFEST_PATH: manifestPath,
+        CI_SMOKE_TEST: "",
+        SERIAL_LOCK_WAIT_INTERVAL_MS: "100",
+        SERIAL_LOCK_MAX_WAIT_MS: "5_000",
+      },
+    },
+  );
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  const checks = [
+    [result.status === 0, `nested validation exited 0 (got ${result.status})`],
+    [output.includes("[validation] Step: nested-tier"), "outer run reached its manifest step"],
+    [output.includes("[validation] Step: nested-manifest-probe"), "nested tier reached its manifest step"],
+    [output.includes("[serial-lock] reentrant resource 'validation'"), "nested tier used the owned reentrancy path"],
+    [!output.includes("[serial-lock] waiting"), "nested tier did not wait behind its owning lock"],
+    [output.match(/\[validation\] Step: nested-manifest-probe/g)?.length === 1, "nested manifest step ran exactly once"],
+  ];
+  for (const [passed, message] of checks) {
+    if (!passed) {
+      console.error(`  FAIL: ${message}`);
+      console.error(output);
+      rmSync(fixtureDir, { recursive: true, force: true });
+      process.exit(1);
+    }
+    console.log(`  PASS: ${message}`);
+  }
+  rmSync(fixtureDir, { recursive: true, force: true });
+  console.log("[ci-collision-test] Non-smoke reentrancy regression passed.");
+}
+
+if (process.argv.includes("--non-smoke")) {
+  await runNonSmokeReentrancyRegression();
+  process.exit(0);
+}
 
 // ── Part 1: Integration check ─────────────────────────────────────────────────
 
@@ -89,6 +161,14 @@ const testEnv = {
   // ci.sh checks this and exits 0 immediately — keeps the test fast.
   CI_SMOKE_TEST: "1",
 };
+// Smoke mode deliberately tests two independent contenders. Do not let the
+// enclosing heavy manifest's ownership marker turn either contender into a
+// reentrant child of that unrelated lock.
+for (const key of Object.keys(testEnv)) {
+  if (key === "SERIAL_LOCK_HOLDER_PID" || key.startsWith("VALIDATION_LOCK_HELD_PID_")) {
+    delete testEnv[key];
+  }
+}
 
 if (existsSync(LOCK_PATH)) {
   try { unlinkSync(LOCK_PATH); } catch { /* ignore */ }

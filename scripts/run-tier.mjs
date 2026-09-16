@@ -16,7 +16,9 @@ import { loadTiers } from "./lib/tiers.mjs";
 import { assertRequestedTier } from "./lib/tier-lock-check.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const manifest = JSON.parse(readFileSync(resolve(root, "docs/validation/manifest.json"), "utf8"));
+const manifestPath = process.env.VALIDATION_MANIFEST_PATH ??
+  resolve(root, "docs/validation/manifest.json");
+const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const localTiers = loadTiers();
 const executeOnly = process.argv.includes("--execute");
 const executeIndex = process.argv.indexOf("--execute");
@@ -99,9 +101,22 @@ if (process.env.CI_SMOKE_TEST === "1") {
   process.exit(0);
 }
 
+// A manifest step may intentionally invoke another registered tier (for
+// example, the CI alias). The outer serial-lock process owns the resource and
+// places a resource-specific holder PID in the environment. Keep only that
+// marker for child steps: serial-lock.mjs verifies that the PID is an actual
+// ancestor before taking the reentrant path. Markers for other resources must
+// not cross the manifest boundary.
 const stepEnv = { ...process.env };
+const resource = String(entry.resource ?? "validation").toUpperCase().replace(/[^A-Z0-9]/g, "_");
+const ownedMarker = `VALIDATION_LOCK_HELD_PID_${resource}`;
 for (const key of Object.keys(stepEnv)) {
-  if (key === "SERIAL_LOCK_HOLDER_PID" || key.startsWith("VALIDATION_LOCK_HELD_PID_")) delete stepEnv[key];
+  if (
+    key === "SERIAL_LOCK_HOLDER_PID" && resource !== "GLOBAL" ||
+    key.startsWith("VALIDATION_LOCK_HELD_PID_") && key !== ownedMarker
+  ) {
+    delete stepEnv[key];
+  }
 }
 
 for (const step of entry.steps) {

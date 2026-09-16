@@ -59,6 +59,7 @@
         { "name": "serial-lock-tests", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
         { "name": "port-authority-tests", "command": ["node", "scripts/port-authority-test.mjs"] },
         { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] },
+        { "name": "nested-tier-regression", "command": ["npm", "run", "test:validation-reentrancy"] },
         { "name": "collision-smoke", "command": ["node", "scripts/ci-collision-test.mjs"] },
         { "name": "browser-tests", "command": ["node", "scripts/run-browser-tests.mjs"] }
       ]
