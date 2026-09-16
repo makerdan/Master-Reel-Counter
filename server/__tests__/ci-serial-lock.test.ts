@@ -82,10 +82,21 @@ function runLocked(
   extraEnv: Record<string, string> = {}
   , resource = "global"
   , priority = 5
+  , timeoutMs = 0
 ): { proc: ReturnType<typeof spawn>; done: Promise<{ code: number; stdout: string; stderr: string }> } {
+  const lockArgs = [
+    LOCK_SCRIPT,
+    "--resource",
+    resource,
+    "--priority",
+    String(priority),
+    ...(timeoutMs > 0 ? ["--timeout-ms", String(timeoutMs)] : []),
+    "--",
+    ...innerCmd,
+  ];
   const proc = spawn(
     process.execPath,
-    [LOCK_SCRIPT, "--resource", resource, "--priority", String(priority), "--", ...innerCmd],
+    lockArgs,
     {
       env: testEnv(lockPath, extraEnv),
       stdio: ["ignore", "pipe", "pipe"],
@@ -115,6 +126,20 @@ function readLockFile(path: string): { pid: number; acquiredAt: number; lastHear
     const lastHeartbeat = hbStr ? parseInt(hbStr, 10) : acquiredAt;
     return { pid, acquiredAt, lastHeartbeat: isNaN(lastHeartbeat) ? acquiredAt : lastHeartbeat };
   } catch { return null; }
+}
+
+function processIsRunning(pid: number): boolean {
+  try {
+    const status = readFileSync(`/proc/${pid}/status`, "utf8");
+    return status.match(/^State:\s+([A-Z])/m)?.[1] !== "Z";
+  } catch {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 /** Poll until fn() returns truthy or deadline is exceeded. */
@@ -530,6 +555,74 @@ await test("SIGTERM releases the lock and terminates the child", async () => {
     assert.ok(!existsSync(lockPath), "signal cleanup should remove lock");
   } finally {
     holder.proc.kill("SIGKILL");
+    cleanup(lockPath);
+  }
+});
+
+await test("SIGTERM escalates when the child ignores the signal", async () => {
+  const lockPath = tempLockPath();
+  const overrides = {
+    SERIAL_LOCK_CLEANUP_GRACE_MS: "150",
+    SERIAL_LOCK_CLEANUP_POLL_INTERVAL_MS: "20",
+  };
+  const holder = runLocked(
+    lockPath,
+    [process.execPath, "-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"],
+    overrides,
+  );
+  try {
+    assert.ok(await waitFor(() => readLockFile(lockPath) !== null, 4_000));
+    const startedAt = Date.now();
+    holder.proc.kill("SIGTERM");
+    const result = await holder.done;
+    assert.notEqual(result.code, 0, "interrupted check must exit non-zero");
+    assert.ok(Date.now() - startedAt < 3_000, "cleanup should use a bounded escalation path");
+    assert.ok(!existsSync(lockPath), "lock should be released after SIGKILL cleanup");
+  } finally {
+    holder.proc.kill("SIGKILL");
+    cleanup(lockPath);
+  }
+});
+
+await test("timeout cleans up a detached descendant before releasing the lock", async () => {
+  const lockPath = tempLockPath();
+  const markerPath = join(tmpdir(), `repl-lock-detached-${randomBytes(4).toString("hex")}.pid`);
+  const overrides = {
+    SERIAL_LOCK_CLEANUP_GRACE_MS: "150",
+    SERIAL_LOCK_CLEANUP_POLL_INTERVAL_MS: "20",
+  };
+  const childCode = [
+    "const fs=require('fs');",
+    "const {spawn}=require('child_process');",
+    `const p=spawn(process.execPath,['-e',${JSON.stringify("process.on('SIGTERM',()=>{});setInterval(()=>{},1000);")}],{detached:true,stdio:'ignore'});`,
+    `fs.writeFileSync(${JSON.stringify(markerPath)},String(p.pid));`,
+    "setInterval(()=>{},1000);",
+  ].join("");
+  const holder = runLocked(
+    lockPath,
+    [process.execPath, "-e", childCode],
+    { ...overrides, SERIAL_LOCK_CLEANUP_POLL_INTERVAL_MS: "20" },
+    "global",
+    5,
+    200,
+  );
+  let detachedPid = 0;
+  try {
+    assert.ok(await waitFor(() => existsSync(markerPath), 4_000), "detached child should start");
+    detachedPid = Number(readFileSync(markerPath, "utf8"));
+    assert.ok(detachedPid > 0, "detached child PID should be recorded");
+    const result = await holder.done;
+    assert.notEqual(result.code, 0, "timed-out check must exit non-zero");
+    assert.ok(
+      await waitFor(() => !processIsRunning(detachedPid), 4_000),
+      "detached descendant should be terminated",
+    );
+    assert.ok(!existsSync(lockPath), "lock should be released after descendant cleanup");
+  } finally {
+    if (detachedPid && processIsRunning(detachedPid)) {
+      try { process.kill(detachedPid, "SIGKILL"); } catch { /* already gone */ }
+    }
+    cleanup(markerPath);
     cleanup(lockPath);
   }
 });

@@ -41,6 +41,11 @@ const HEARTBEAT_STALE_MS = parseEnvInt(
   2 * HEARTBEAT_INTERVAL_MS,
 );
 const PRIORITY_GRACE_MS = parseEnvInt("SERIAL_LOCK_PRIORITY_GRACE_MS", 2_000);
+const CLEANUP_GRACE_MS = parseEnvInt("SERIAL_LOCK_CLEANUP_GRACE_MS", 2_000);
+const CLEANUP_POLL_INTERVAL_MS = parseEnvInt(
+  "SERIAL_LOCK_CLEANUP_POLL_INTERVAL_MS",
+  50,
+);
 
 function parseEnvInt(name, fallback) {
   const value = process.env[name];
@@ -122,6 +127,61 @@ function getParentPid(pid) {
   } catch {
     return 0;
   }
+}
+
+function getProcessParents() {
+  const parents = new Map();
+  try {
+    for (const pid of readdirSync("/proc").filter((entry) => /^\d+$/.test(entry))) {
+      const parent = getParentPid(pid);
+      if (parent > 0) parents.set(pid, String(parent));
+    }
+  } catch {
+    // Best effort; process-group cleanup remains authoritative where available.
+  }
+  return parents;
+}
+
+function getDescendants(pid, parents) {
+  const descendants = new Set();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [candidate, parent] of parents) {
+      if ((parent === String(pid) || descendants.has(parent)) && !descendants.has(candidate)) {
+        descendants.add(candidate);
+        changed = true;
+      }
+    }
+  }
+  return descendants;
+}
+
+function isRunning(pid) {
+  if (!isAlive(pid)) return false;
+  try {
+    const status = readFileSync(`/proc/${pid}/status`, "utf8");
+    const state = status.match(/^State:\s+([A-Z])/m)?.[1];
+    return state !== "Z";
+  } catch {
+    return isAlive(pid);
+  }
+}
+
+function signalPid(pid, signal) {
+  try {
+    process.kill(pid, signal);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    console.error(`[serial-lock] WARNING: unable to send ${signal} to PID ${pid}: ${error.message}`);
+    return false;
+  }
+}
+
+function signalProcessGroup(pid, signal) {
+  if (process.platform === "win32") return false;
+  return signalPid(-pid, signal);
 }
 
 function getAncestors() {
@@ -479,18 +539,91 @@ const child = spawn(command, commandArgs, {
   stdio: "inherit",
   shell: false,
   env: process.env,
+  detached: process.platform !== "win32",
 });
 let timeoutTimer;
+let timedOut = false;
+let interruptedSignal = null;
+let cleanupPromise = null;
+const observedChildPids = new Set(child.pid ? [child.pid] : []);
+
+function observeChildTree() {
+  if (!child.pid) return;
+  const parents = getProcessParents();
+  for (const pid of getDescendants(String(child.pid), parents)) {
+    observedChildPids.add(Number(pid));
+  }
+}
+
+function remainingChildPids() {
+  return [...observedChildPids].filter((pid) => isRunning(pid));
+}
+
+async function waitForChildCleanup() {
+  const deadline = Date.now() + CLEANUP_GRACE_MS;
+  while (true) {
+    observeChildTree();
+    if (remainingChildPids().length === 0) return true;
+    if (Date.now() >= deadline) return false;
+    await sleep(Math.min(CLEANUP_POLL_INTERVAL_MS, Math.max(1, deadline - Date.now())));
+  }
+}
+
+async function terminateChild(reason, initialSignal = "SIGTERM") {
+  if (cleanupPromise) return cleanupPromise;
+  cleanupPromise = (async () => {
+    observeChildTree();
+    console.error(
+      `[serial-lock] INCIDENT: terminating resource '${RESOURCE}' command after ${reason}.`,
+    );
+    signalProcessGroup(child.pid, initialSignal);
+    for (const pid of observedChildPids) signalPid(pid, initialSignal);
+
+    let cleaned = await waitForChildCleanup();
+    if (!cleaned) {
+      observeChildTree();
+      const survivors = remainingChildPids();
+      console.error(
+        `[serial-lock] INCIDENT: ${survivors.length} child process(es) survived ` +
+        `${initialSignal}; escalating to SIGKILL.`,
+      );
+      signalProcessGroup(child.pid, "SIGKILL");
+      for (const pid of survivors) signalPid(pid, "SIGKILL");
+      cleaned = await waitForChildCleanup();
+    }
+    if (!cleaned) {
+      console.error(
+        `[serial-lock] ERROR: child process cleanup could not be verified; ` +
+        `resource '${RESOURCE}' lock will remain for stale-holder recovery.`,
+      );
+    }
+    return cleaned;
+  })();
+  return cleanupPromise;
+}
+
+async function finish(code, signal) {
+  if (timeoutTimer) clearTimeout(timeoutTimer);
+  const cleanupVerified = interruptedSignal || timedOut
+    ? await terminateChild(
+      timedOut ? `timeout (${args.timeoutMs}ms)` : `signal ${interruptedSignal}`,
+      interruptedSignal ?? "SIGTERM",
+    )
+    : true;
+  const exitCode = timedOut
+    ? 124
+    : interruptedSignal
+      ? 128 + ({ SIGINT: 2, SIGTERM: 15 }[interruptedSignal] ?? 1)
+      : code ?? (signal ? 1 : 0);
+  if (cleanupVerified) release();
+  process.exit(cleanupVerified ? exitCode : 1);
+}
+
 if (args.timeoutMs > 0) {
   timeoutTimer = setTimeout(() => {
-    console.error(
-      `[serial-lock] INCIDENT: resource '${RESOURCE}' command exceeded post-acquisition ` +
-      `budget of ${args.timeoutMs}ms; terminating child.`,
-    );
-    child.kill("SIGTERM");
-    setTimeout(() => {
-      if (child.exitCode === null) child.kill("SIGKILL");
-    }, 2_000).unref();
+    if (timedOut || interruptedSignal) return;
+    timedOut = true;
+    void terminateChild(`timeout (${args.timeoutMs}ms)`);
   }, args.timeoutMs);
   timeoutTimer.unref();
 }
@@ -502,9 +635,14 @@ child.on("error", (error) => {
   process.exit(1);
 });
 child.on("close", (code, signal) => {
-  if (timeoutTimer) clearTimeout(timeoutTimer);
-  release();
-  process.exit(code ?? (signal ? 1 : 0));
+  void finish(code, signal);
 });
-process.on("SIGINT", () => child.kill("SIGINT"));
-process.on("SIGTERM", () => child.kill("SIGTERM"));
+
+function handleInterruption(signal) {
+  if (interruptedSignal || timedOut) return;
+  interruptedSignal = signal;
+  void terminateChild(`signal ${signal}`, signal);
+}
+
+process.on("SIGINT", () => handleInterruption("SIGINT"));
+process.on("SIGTERM", () => handleInterruption("SIGTERM"));
