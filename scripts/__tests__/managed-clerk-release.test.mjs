@@ -7,17 +7,23 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import pg from "pg";
 import { redactReleaseDiagnostics } from "../redact-release-diagnostics.mjs";
 import {
   formatReleaseDiagnostics,
   MAX_DIAGNOSTIC_BYTES,
   MAX_DIAGNOSTIC_LINES,
 } from "../print-release-diagnostics.mjs";
+import {
+  COUNT_REMAINING_REMOVED_ACCOUNT_DATA_SQL,
+  FILTER_REMOVED_REVIEW_COHORT_SQL,
+} from "../lib/managed-clerk-reset-queries.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const replitConfig = readFileSync(resolve(root, ".replit"), "utf8");
 const config = readFileSync(resolve(root, "playwright.release.config.ts"), "utf8");
+const ordinaryConfig = readFileSync(resolve(root, "playwright.config.ts"), "utf8");
 const smoke = readFileSync(resolve(root, "tests/release/managed-clerk-auth.spec.ts"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/managed-clerk-release.yml"), "utf8");
 const candidateBuild = readFileSync(resolve(root, "scripts/build-and-verify-release.sh"), "utf8");
@@ -61,6 +67,18 @@ const serverRoutes = readFileSync(resolve(root, "server/routes.ts"), "utf8");
 const authModels = readFileSync(resolve(root, "shared/models/auth.ts"), "utf8");
 const testerReconciliation = readFileSync(
   resolve(root, "migrations/0025_reconcile_legacy_tester_accounts.sql"),
+  "utf8",
+);
+const managedClerkReset = readFileSync(
+  resolve(root, "scripts/reset-managed-clerk.mjs"),
+  "utf8",
+);
+const managedClerkResetQueries = readFileSync(
+  resolve(root, "scripts/lib/managed-clerk-reset-queries.mjs"),
+  "utf8",
+);
+const browserFixtureCleanup = readFileSync(
+  resolve(root, "tests/clerk-fixture-cleanup.ts"),
   "utf8",
 );
 const execFileAsync = promisify(execFile);
@@ -430,6 +448,26 @@ test("smoke uses disposable managed identity and preserves local authorization s
   assert.match(smoke, /CLERK_PUBLISHABLE_KEY/);
   assert.match(smoke, /VITE_CLERK_PUBLISHABLE_KEY/);
   assert.doesNotMatch(config, /storageState/);
+});
+
+test("ordinary browser fixtures persist Clerk external IDs as local account IDs", () => {
+  assert.match(browserSetup, /externalId: localUserId/);
+  assert.match(browserSetup, /id, clerk_user_id, email/);
+  assert.match(browserSetup, /\[localUserId, clerkUser\.id, email\]/);
+  assert.doesNotMatch(
+    browserSetup,
+    /INSERT INTO users \(id, email[\s\S]*\[clerkUser\.id, email\]/,
+  );
+});
+
+test("ordinary browser fixtures clean disposable provider identities on every run", () => {
+  assert.match(ordinaryConfig, /globalTeardown: "\.\/tests\/global-teardown\.ts"/);
+  assert.match(browserSetup, /cleanupClerkBrowserFixture\(clerk, database, previousFixture\)/);
+  assert.match(browserSetup, /writeClerkBrowserFixture\(\{/);
+  assert.match(browserFixtureCleanup, /requires a Clerk development tenant/);
+  assert.match(browserFixtureCleanup, /clerk\.users\.deleteUser\(fixture\.clerkUserId\)/);
+  assert.match(browserFixtureCleanup, /DELETE FROM users WHERE id = \$1/);
+  assert.doesNotMatch(browserFixtureCleanup, /getUserList|WHERE id LIKE/);
 });
 
 test("browser setup reports missing Clerk test permissions before fixtures", () => {
@@ -821,7 +859,7 @@ test("Clerk-only auth leaves no tester session or password machinery", () => {
   assert.doesNotMatch(authModels, /pgTable\(\s*["']sessions["']/);
 });
 
-test("managed Clerk cutover retains one Admin and removes non-Admin-owned data", () => {
+test("legacy reconciliation retains one Admin and removes non-Admin-owned data", () => {
   assert.match(testerReconciliation, /requires exactly one retained Admin/);
   assert.match(testerReconciliation, /role = 'Admin'/);
   assert.match(testerReconciliation, /DELETE FROM user_settings/);
@@ -832,6 +870,131 @@ test("managed Clerk cutover retains one Admin and removes non-Admin-owned data",
   assert.match(testerReconciliation, /DELETE FROM session_collaborators/);
   assert.match(testerReconciliation, /DELETE FROM users/);
   assert.match(testerReconciliation, /DROP TABLE IF EXISTS sessions/);
+});
+
+test("managed Clerk reset retains the selected Admin and removes every other account", () => {
+  assert.match(managedClerkReset, /users\.getUser\(managedClerkUserId\)/);
+  assert.match(
+    managedClerkReset,
+    /managedIdentity\.externalId !== null[\s\S]*managedIdentity\.externalId !== retainedAdminId/,
+  );
+  assert.match(managedClerkReset, /LOCK TABLE users, counting_sessions/);
+  assert.match(
+    managedClerkReset,
+    /WHERE id = \$1 AND approved = true AND rejected = false[\s\S]*\[retainedAdminId\]/,
+  );
+  assert.match(
+    managedClerkReset,
+    /SELECT id, clerk_user_id FROM users WHERE id <> \$1[\s\S]*\[retainedAdminId\]/,
+  );
+  assert.doesNotMatch(managedClerkReset, /WHERE role <> 'Admin'/);
+  assert.match(managedClerkReset, /WHERE clerk_user_id = \$1 AND id <> \$2/);
+  assert.match(
+    managedClerkReset,
+    /SET clerk_user_id = \$1,[\s\S]*role = 'Admin'[\s\S]*WHERE id = \$2 AND approved = true AND rejected = false/,
+  );
+  assert.match(
+    managedClerkReset,
+    /DELETE FROM scan_results[\s\S]*cutover_removed_identities/,
+  );
+  assert.match(managedClerkReset, /DELETE FROM entries[\s\S]*WHERE user_id/);
+  assert.match(managedClerkReset, /DELETE FROM photos[\s\S]*WHERE user_id/);
+  assert.match(
+    managedClerkResetQueries,
+    /jsonb_array_elements\(session\.review_cohort::jsonb\)/,
+  );
+  for (const table of [
+    "user_settings",
+    "upload_intents",
+    "conversations",
+    "user_wire_categories",
+    "ai_usage_logs",
+    "feedback",
+    "comments",
+    "review_responses",
+    "activity_logs",
+  ]) {
+    assert.match(managedClerkReset, new RegExp(`\"${table}\"`));
+  }
+  assert.match(
+    managedClerkReset,
+    /finalState\.rowCount !== 1[\s\S]*approved !== true[\s\S]*rejected !== false/,
+  );
+  assert.match(managedClerkReset, /remainingOwnedData\.rows\[0\]\?\.count !== 0/);
+});
+
+test("managed Clerk reset SQL filters both local and Clerk identity references", async () => {
+  assert(process.env.DATABASE_URL, "DATABASE_URL is required for reset SQL verification");
+  const database = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await database.connect();
+  try {
+    await database.query("BEGIN");
+    await database.query(`
+      CREATE TEMP TABLE counting_sessions (
+        id integer PRIMARY KEY,
+        user_id varchar NOT NULL,
+        review_cohort text
+      );
+      CREATE TEMP TABLE cutover_removed_accounts (
+        id varchar PRIMARY KEY,
+        clerk_user_id varchar
+      );
+      CREATE TEMP TABLE cutover_removed_identities (id varchar PRIMARY KEY);
+      CREATE TEMP TABLE scan_results (scanned_by varchar);
+      CREATE TEMP TABLE folders (user_id varchar);
+      CREATE TEMP TABLE session_collaborators (user_id varchar);
+      CREATE TEMP TABLE session_invite_links (created_by varchar);
+      CREATE TEMP TABLE photos (user_id varchar);
+      CREATE TEMP TABLE entries (user_id varchar);
+      CREATE TEMP TABLE user_settings (user_id varchar);
+      CREATE TEMP TABLE upload_intents (user_id varchar);
+      CREATE TEMP TABLE conversations (user_id varchar);
+      CREATE TEMP TABLE user_wire_categories (user_id varchar);
+      CREATE TEMP TABLE ai_usage_logs (user_id varchar);
+      CREATE TEMP TABLE feedback (user_id varchar);
+      CREATE TEMP TABLE comments (user_id varchar);
+      CREATE TEMP TABLE review_responses (user_id varchar);
+      CREATE TEMP TABLE activity_logs (user_id varchar);
+    `);
+    await database.query(
+      `INSERT INTO cutover_removed_accounts (id, clerk_user_id)
+       VALUES ('removed-local', 'user_removedClerk')`,
+    );
+    await database.query(
+      `INSERT INTO cutover_removed_identities (id)
+       VALUES ('removed-local'), ('user_removedClerk')`,
+    );
+    await database.query(
+      `INSERT INTO counting_sessions (id, user_id, review_cohort)
+       VALUES (
+         1,
+         'retained-owner',
+         '[{"userId":"removed-local"},{"userId":"user_removedClerk"},{"userId":"retained-owner"}]'
+       )`,
+    );
+
+    await database.query(FILTER_REMOVED_REVIEW_COHORT_SQL);
+    const cohort = await database.query(
+      "SELECT review_cohort FROM counting_sessions WHERE id = 1",
+    );
+    assert.deepEqual(JSON.parse(cohort.rows[0].review_cohort), [
+      { userId: "retained-owner" },
+    ]);
+
+    await database.query(
+      "INSERT INTO scan_results (scanned_by) VALUES ('user_removedClerk')",
+    );
+    const remaining = await database.query(
+      COUNT_REMAINING_REMOVED_ACCOUNT_DATA_SQL,
+    );
+    assert.equal(remaining.rows[0].count, 1);
+    await database.query("DELETE FROM scan_results");
+    const clean = await database.query(COUNT_REMAINING_REMOVED_ACCOUNT_DATA_SQL);
+    assert.equal(clean.rows[0].count, 0);
+  } finally {
+    await database.query("ROLLBACK").catch(() => {});
+    await database.end();
+  }
 });
 
 test("workspace config does not pin Clerk credentials or a tenant", () => {

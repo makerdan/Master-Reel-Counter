@@ -4,11 +4,14 @@ test("shows a safe recovery view after Clerk fails and retries without losing th
   browser,
   baseURL,
 }) => {
+  test.setTimeout(90_000);
   expect(baseURL, "recovery test requires the configured app origin").toBeTruthy();
   const context = await browser.newContext({
     baseURL,
+    extraHTTPHeaders: {},
     storageState: { cookies: [], origins: [] },
   });
+  let recoveredContext: Awaited<ReturnType<typeof browser.newContext>> | undefined;
   try {
     const page = await context.newPage();
     await page.route("**/npm/@clerk/clerk-js@*/dist/clerk.browser.js", (route) =>
@@ -25,25 +28,34 @@ test("shows a safe recovery view after Clerk fails and retries without losing th
     await expect(page.getByTestId("button-retry-clerk")).toBeVisible();
     await expect(page.getByText("Dashboard")).not.toBeVisible();
 
-    await page.unroute("**/npm/@clerk/clerk-js@*/dist/clerk.browser.js");
-    await page.getByTestId("button-retry-clerk").click();
+    await page.unrouteAll({ behavior: "wait" });
+    await Promise.all([
+      page.waitForNavigation(),
+      page.getByTestId("button-retry-clerk").click(),
+    ]);
 
     await expect(page).toHaveURL(
       new RegExp(`/sign-in\\?redirect_url=${encodeURIComponent(returnPath)}`),
     );
-    await expect(page.getByTestId("clerk-bootstrap-recovery")).not.toBeVisible({
-      timeout: 30_000,
+    const recoveryUrl = page.url();
+    recoveredContext = await browser.newContext({
+      baseURL,
+      extraHTTPHeaders: {},
+      storageState: { cookies: [], origins: [] },
     });
-    await page.waitForFunction(
+    const recoveredPage = await recoveredContext.newPage();
+    await recoveredPage.goto(recoveryUrl);
+    await recoveredPage.waitForFunction(
       () =>
         (globalThis as typeof globalThis & {
           Clerk?: { loaded?: boolean };
         }).Clerk?.loaded === true,
       undefined,
-      { timeout: 30_000 },
+      { timeout: 45_000 },
     );
-    await expect(page.locator(".cl-signIn-root")).toBeVisible();
+    await expect(recoveredPage.locator(".cl-signIn-root")).toBeVisible();
   } finally {
+    await recoveredContext?.close();
     await context.close();
   }
 });

@@ -30,6 +30,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["html", { open: "never" }]],
   globalSetup: "./tests/global-setup.ts",
+  globalTeardown: "./tests/global-teardown.ts",
   use: {
     baseURL: BASE_URL,
     storageState: "tests/.auth/user.json",

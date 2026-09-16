@@ -30,7 +30,7 @@ test.describe("dashboard search", () => {
     await expect(page.getByTestId("dropdown-recent-searches")).toBeVisible();
     await expect(page.getByTestId(`item-recent-search-${token}`)).toBeVisible();
 
-    await page.getByTestId(`item-recent-search-${token}`).getByRole("button").click();
+    await page.getByTestId(`button-select-recent-${token}`).click();
     await expect(search).toHaveValue(token);
     await expect(page.getByTestId(`card-session-${match.id}`)).toBeVisible();
   });
@@ -42,11 +42,13 @@ test.describe("dashboard search", () => {
     const suffix = Date.now();
     const active = await createSessionViaApi(request, `Filter Active ${suffix}`);
     const completed = await createSessionViaApi(request, `Filter Completed ${suffix}`);
-    const completedAt = new Date().toISOString();
-    const statusResponse = await request.patch(`/api/sessions/${completed.id}`, {
-      data: { status: "completed", completedAt },
+    const statusResponse = await request.post("/api/sessions/bulk/status", {
+      data: { ids: [completed.id], status: "completed" },
     });
-    expect(statusResponse.ok()).toBeTruthy();
+    expect(
+      statusResponse.ok(),
+      `status update failed: HTTP ${statusResponse.status()} ${await statusResponse.text()}`,
+    ).toBeTruthy();
 
     await page.goto("/");
     await page.getByTestId("button-toggle-filter-bar").click();

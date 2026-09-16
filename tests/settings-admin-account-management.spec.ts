@@ -24,12 +24,7 @@ async function fulfillJson(
 
 async function mockOwnerAuth(page: import("@playwright/test").Page): Promise<void> {
   await page.route("**/api/auth/user", async (route) => {
-    const response = await route.fetch();
-    const body = await response.json();
-    await route.fulfill({
-      response,
-      body: JSON.stringify({ ...body, role: "Admin" }),
-    });
+    await fulfillJson(route, ownerUser);
   });
 }
 
@@ -59,11 +54,10 @@ test.describe("owner account-management loading", () => {
 
   test("does not show a non-owner denial as an owner error", async ({ page }) => {
     await page.route("**/api/auth/user", async (route) => {
-      const response = await route.fetch();
-      const body = await response.json();
-      await route.fulfill({
-        response,
-        body: JSON.stringify({ ...body, isOwner: false }),
+      await fulfillJson(route, {
+        ...ownerUser,
+        id: "non-owner-account-management",
+        role: "User",
       });
     });
     await page.route("**/api/admin/users", async (route) => {

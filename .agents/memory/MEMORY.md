@@ -31,3 +31,4 @@
 - [Release schema export owns enum DDL](release-schema-export-enum.md) — Drizzle PostgreSQL export already creates account_role; do not prepend duplicate enum creation.
 - [Auth storage integration isolation](auth-storage-integration-isolation.md) — use temporary PostgreSQL schemas for auth storage concurrency tests when dev schema may lag reviewed auth migrations.
 - [Drizzle push EOF prompts](drizzle-push-eof-prompts.md) — a schema ambiguity prompt can exit 0 on closed stdin without applying changes; verify schema state, not only process success.
+- [Destructive SQL needs execution tests](destructive-sql-execution-tests.md) — static source checks miss PostgreSQL planning errors and driver type coercion at safety-critical invariants.

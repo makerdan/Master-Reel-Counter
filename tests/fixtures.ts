@@ -290,8 +290,9 @@ export const test = base.extend<E2EFixtures>({
     const clerk = createClerkClient({ secretKey });
     const database = new pg.Client({ connectionString: databaseUrl });
     await database.connect();
+    const localUserId = `e2e-clerk-second-${randomUUID()}`;
     const clerkUser = await clerk.users.createUser({
-      externalId: `e2e-clerk-second-${randomUUID()}`,
+      externalId: localUserId,
       emailAddress: [email],
       password,
       firstName: "Second",
@@ -301,15 +302,20 @@ export const test = base.extend<E2EFixtures>({
 
     try {
       await database.query(
-        `INSERT INTO users (id, email, first_name, last_name, approved, rejected, role)
-         VALUES ($1, $2, 'Second', 'Playwright', true, false, 'Admin')`,
-        [clerkUser.id, email],
+        `INSERT INTO users (
+           id, clerk_user_id, email, first_name, last_name, approved, rejected, role
+         )
+         VALUES ($1, $2, $3, 'Second', 'Playwright', true, false, 'Admin')`,
+        [localUserId, clerkUser.id, email],
       );
       await use({ email });
     } finally {
-      await database.query("DELETE FROM users WHERE id = $1", [clerkUser.id]);
-      await database.end();
-      await clerk.users.deleteUser(clerkUser.id);
+      try {
+        await database.query("DELETE FROM users WHERE id = $1", [localUserId]);
+      } finally {
+        await database.end();
+        await clerk.users.deleteUser(clerkUser.id);
+      }
     }
   },
   sessionId: async ({ request }, use) => {

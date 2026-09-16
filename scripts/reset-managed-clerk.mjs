@@ -1,4 +1,9 @@
 import pg from "pg";
+import { createClerkClient } from "@clerk/backend";
+import {
+  COUNT_REMAINING_REMOVED_ACCOUNT_DATA_SQL,
+  FILTER_REMOVED_REVIEW_COHORT_SQL,
+} from "./lib/managed-clerk-reset-queries.mjs";
 
 const { Client } = pg;
 
@@ -22,22 +27,52 @@ if (confirmation !== "RESET_MANAGED_CLERK") {
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is required");
 }
+if (!process.env.CLERK_SECRET_KEY) {
+  throw new Error("CLERK_SECRET_KEY is required");
+}
+
+let managedIdentity;
+try {
+  managedIdentity = await createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY,
+  }).users.getUser(managedClerkUserId);
+} catch {
+  throw new Error(
+    "The retained managed Clerk identity could not be verified in the configured tenant",
+  );
+}
+if (
+  managedIdentity.externalId !== null &&
+  managedIdentity.externalId !== retainedAdminId
+) {
+  throw new Error(
+    "The retained managed Clerk identity is linked to a different local account",
+  );
+}
 
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 
 try {
   await client.connect();
   await client.query("BEGIN");
+  await client.query(
+    `LOCK TABLE users, counting_sessions, folders, session_collaborators,
+       session_invite_links, photos, entries, scan_results, user_settings,
+       upload_intents, conversations, user_wire_categories, ai_usage_logs,
+       feedback, comments, review_responses, activity_logs
+     IN SHARE ROW EXCLUSIVE MODE`,
+  );
 
-  const adminResult = await client.query(
+  const retainedAdminResult = await client.query(
     `SELECT id, clerk_user_id
      FROM users
-     WHERE role = 'Admin'
+     WHERE id = $1 AND approved = true AND rejected = false
      FOR UPDATE`,
+    [retainedAdminId],
   );
-  if (adminResult.rowCount !== 1 || adminResult.rows[0].id !== retainedAdminId) {
+  if (retainedAdminResult.rowCount !== 1) {
     throw new Error(
-      `Managed Clerk cutover requires exactly the requested retained Admin (${retainedAdminId})`,
+      `Managed Clerk cutover requires the requested retained account (${retainedAdminId}) to be approved`,
     );
   }
 
@@ -53,60 +88,96 @@ try {
   }
 
   await client.query(
-    `CREATE TEMP TABLE cutover_non_admin_accounts (
+    `CREATE TEMP TABLE cutover_removed_accounts (
+       id varchar PRIMARY KEY,
+       clerk_user_id varchar
+     ) ON COMMIT DROP`,
+  );
+  await client.query(
+    `INSERT INTO cutover_removed_accounts (id, clerk_user_id)
+     SELECT id, clerk_user_id FROM users WHERE id <> $1`,
+    [retainedAdminId],
+  );
+  await client.query(
+    `CREATE TEMP TABLE cutover_removed_identities (
        id varchar PRIMARY KEY
      ) ON COMMIT DROP`,
   );
   await client.query(
-    `INSERT INTO cutover_non_admin_accounts (id)
-     SELECT id FROM users WHERE role <> 'Admin'`,
+    `INSERT INTO cutover_removed_identities (id)
+     SELECT id FROM cutover_removed_accounts
+     UNION
+     SELECT clerk_user_id
+     FROM cutover_removed_accounts
+     WHERE clerk_user_id IS NOT NULL`,
   );
 
   // Delete account-owned session graphs first so their foreign-key cascades
   // remove session-scoped records atomically.
   await client.query(
     `DELETE FROM counting_sessions
-     WHERE user_id IN (SELECT id FROM cutover_non_admin_accounts)`,
+     WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
   );
   await client.query(
     `DELETE FROM folders
-     WHERE user_id IN (SELECT id FROM cutover_non_admin_accounts)`,
+     WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
   );
   await client.query(
     `DELETE FROM session_collaborators
-     WHERE user_id IN (SELECT id FROM cutover_non_admin_accounts)`,
+     WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
   );
   await client.query(
     `DELETE FROM session_invite_links
-     WHERE created_by IN (SELECT id FROM cutover_non_admin_accounts)`,
+     WHERE created_by IN (SELECT id FROM cutover_removed_accounts)`,
   );
+  await client.query(
+    `DELETE FROM scan_results
+     WHERE scanned_by IN (SELECT id FROM cutover_removed_identities)`,
+  );
+  await client.query(
+    `DELETE FROM entries
+     WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
+  );
+  await client.query(
+    `DELETE FROM photos
+     WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
+  );
+  await client.query(FILTER_REMOVED_REVIEW_COHORT_SQL);
 
   for (const table of [
     "user_settings",
     "upload_intents",
     "conversations",
-    "user_wire_catalogs",
+    "user_wire_categories",
     "ai_usage_logs",
+    "feedback",
+    "comments",
+    "review_responses",
+    "activity_logs",
   ]) {
     await client.query(
       `DELETE FROM "${table}"
-       WHERE user_id IN (SELECT id FROM cutover_non_admin_accounts)`,
+       WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
     );
   }
 
   await client.query(
     `UPDATE users
-     SET clerk_user_id = $1, approved = true, rejected = false, updated_at = now()
-     WHERE id = $2 AND role = 'Admin'`,
+     SET clerk_user_id = $1,
+         approved = true,
+         rejected = false,
+         role = 'Admin',
+         updated_at = now()
+     WHERE id = $2 AND approved = true AND rejected = false`,
     [managedClerkUserId, retainedAdminId],
   );
   await client.query(
     `DELETE FROM users
-     WHERE id IN (SELECT id FROM cutover_non_admin_accounts)`,
+     WHERE id IN (SELECT id FROM cutover_removed_accounts)`,
   );
 
   const finalState = await client.query(
-    `SELECT id, role, clerk_user_id
+    `SELECT id, role, approved, rejected, clerk_user_id
      FROM users
      ORDER BY id`,
   );
@@ -114,9 +185,20 @@ try {
     finalState.rowCount !== 1 ||
     finalState.rows[0].id !== retainedAdminId ||
     finalState.rows[0].role !== "Admin" ||
+    finalState.rows[0].approved !== true ||
+    finalState.rows[0].rejected !== false ||
     finalState.rows[0].clerk_user_id !== managedClerkUserId
   ) {
     throw new Error("Managed Clerk cutover verification failed; rolling back");
+  }
+
+  const remainingOwnedData = await client.query(
+    COUNT_REMAINING_REMOVED_ACCOUNT_DATA_SQL,
+  );
+  if (remainingOwnedData.rows[0]?.count !== 0) {
+    throw new Error(
+      "Managed Clerk cutover left removed-account data; rolling back",
+    );
   }
 
   await client.query("COMMIT");

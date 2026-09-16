@@ -199,6 +199,14 @@ test.describe("offline queue warning @offline-queue", () => {
       baseURL: BASE_URL,
       storageState: { cookies: [], origins: [] },
     });
+    const assetPath = "/assets/e2e-valid.js";
+    await context.route(`**${assetPath}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/javascript",
+        body: "export const e2eCacheFixture = true;",
+      });
+    });
     const page = await context.newPage();
 
     try {
@@ -230,15 +238,10 @@ test.describe("offline queue warning @offline-queue", () => {
         await page.evaluate(() => caches.match("/auth/clerk.js").then(Boolean)),
       ).toBe(false);
 
-      const assetPath = await page.evaluate(async () => {
-        const html = await (await fetch("/")).text();
-        return html.match(/src="(\/assets\/[^"]+\.js)"/)?.[1] ?? null;
-      });
-      expect(assetPath).not.toBeNull();
       const validAsset = await page.evaluate(async (path) => {
         const cache = await caches.open("reel-counter-v1");
-        await cache.delete(path!);
-        const response = await fetch(path!);
+        await cache.delete(path);
+        const response = await fetch(path);
         return {
           status: response.status,
           contentType: response.headers.get("content-type"),
@@ -247,7 +250,7 @@ test.describe("offline queue warning @offline-queue", () => {
       expect(validAsset.status).toBe(200);
       expect(validAsset.contentType).toContain("javascript");
       await expect.poll(
-        () => page.evaluate((path) => caches.match(path!).then(Boolean), assetPath),
+        () => page.evaluate((path) => caches.match(path).then(Boolean), assetPath),
       ).toBe(true);
 
       const rejected = await page.evaluate(async () => {

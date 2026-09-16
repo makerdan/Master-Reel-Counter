@@ -12,6 +12,13 @@ import { resolveClerkBootstrapConfig } from "../shared/clerk-config";
 import pg from "pg";
 import { assertReleaseSchema } from "../scripts/release-schema-preflight.mjs";
 import { assertClerkTestPermissions } from "./support/clerk-test-permissions";
+import {
+  assertDisposableClerkTenant,
+  cleanupClerkBrowserFixture,
+  readClerkBrowserFixture,
+  removeClerkBrowserFixtureMarker,
+  writeClerkBrowserFixture,
+} from "./clerk-fixture-cleanup";
 
 function findChromium(): string | undefined {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
@@ -50,25 +57,34 @@ async function globalSetup() {
   if (missing.length > 0) {
     throw new Error(`Clerk browser setup is missing fields: ${missing.join(", ")}`);
   }
+  const secretKey = process.env.CLERK_SECRET_KEY!;
+  const databaseUrl = process.env.DATABASE_URL!;
   const clerkConfig = resolveClerkBootstrapConfig({
     publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
     runtimeHostname: new URL(BASE_URL).hostname,
   });
 
-  const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+  assertDisposableClerkTenant(secretKey);
+  const clerk = createClerkClient({ secretKey });
   await assertClerkTestPermissions(clerk);
 
   const localUserId = `e2e-clerk-${randomUUID()}`;
   const email = `e2e-clerk+${randomUUID()}@example.com`;
   const password = `E2e-${randomUUID()}!9`;
   process.env.E2E_CLERK_EMAIL = email;
-  const database = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  const database = new pg.Client({ connectionString: databaseUrl });
   await database.connect();
   try {
     // Read-only schema validation must precede both provider and database
     // fixture writes. In particular, do not create a Clerk user and then
     // discover that an unmigrated database cannot persist its role.
     await assertReleaseSchema(database);
+    await mkdir("tests/.auth", { recursive: true });
+    const previousFixture = await readClerkBrowserFixture();
+    if (previousFixture) {
+      await cleanupClerkBrowserFixture(clerk, database, previousFixture);
+      await removeClerkBrowserFixtureMarker();
+    }
     const clerkUser = await clerk.users.createUser({
       externalId: localUserId,
       emailAddress: [email],
@@ -77,11 +93,21 @@ async function globalSetup() {
       lastName: "Owner",
       skipLegalChecks: true,
     });
+    await writeClerkBrowserFixture({
+      clerkUserId: clerkUser.id,
+      localUserId,
+    });
     await database.query(
-      `INSERT INTO users (id, email, first_name, last_name, approved, rejected, role)
-       VALUES ($1, $2, 'Playwright', 'Owner', true, false, 'Admin')
-       ON CONFLICT (id) DO UPDATE SET approved = true, rejected = false, role = 'Admin'`,
-      [clerkUser.id, email],
+      `INSERT INTO users (
+         id, clerk_user_id, email, first_name, last_name, approved, rejected, role
+       )
+       VALUES ($1, $2, $3, 'Playwright', 'Owner', true, false, 'Admin')
+       ON CONFLICT (id) DO UPDATE
+       SET clerk_user_id = EXCLUDED.clerk_user_id,
+           approved = true,
+           rejected = false,
+           role = 'Admin'`,
+      [localUserId, clerkUser.id, email],
     );
   } finally {
     await database.end();
@@ -95,7 +121,7 @@ async function globalSetup() {
   const page = await context.newPage();
   await clerkSetup({
     publishableKey: clerkConfig.publishableKey,
-    secretKey: process.env.CLERK_SECRET_KEY,
+    secretKey,
     frontendApiUrl: clerkConfig.frontendApiHost,
   });
   await setupClerkTestingToken({
@@ -112,7 +138,6 @@ async function globalSetup() {
   await page.goto(`${BASE_URL}/`);
   await authenticatedUser;
 
-  await mkdir("tests/.auth", { recursive: true });
   await context.storageState({ path: "tests/.auth/user.json" });
   await browser.close();
 }
