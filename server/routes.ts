@@ -40,6 +40,10 @@ import { cropPhoto } from "./lib/cropPhoto";
 import ExcelJS from "exceljs";
 import { taskTracker } from "./lib/taskTracker";
 import {
+  DELETE_STALE_UNCOMMITTED_PINS_QUERY,
+  STALE_UNCOMMITTED_PINS_QUERY,
+} from "./admin-integrity";
+import {
   evictAllSessionSockets as evictAllSessionSocketsFromRoom,
   evictSessionUserSockets as evictSessionUserSocketsFromRoom,
   evictUserSockets as evictUserSocketsFromRooms,
@@ -7245,12 +7249,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       )).rows as [{ count: number }];
 
       const [stalePins] = (await db.execute(
-        sql`SELECT COUNT(*)::int AS count FROM pins p
-            JOIN photos ph ON p.photo_id = ph.id
-            JOIN counting_sessions cs ON ph.session_id = cs.id
-            WHERE p.entry_id IS NULL
-              AND cs.created_at < NOW() - INTERVAL '7 days'
-              AND cs.deleted_at IS NULL`
+        sql.raw(STALE_UNCOMMITTED_PINS_QUERY)
       )).rows as [{ count: number }];
 
       const [staleIntents] = (await db.execute(
@@ -7343,14 +7342,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         );
       } else if (checkId === "uncommitted_pins_stale") {
         result = await db.execute(
-          sql`DELETE FROM pins
-              WHERE entry_id IS NULL
-                AND photo_id IN (
-                  SELECT ph.id FROM photos ph
-                  JOIN counting_sessions cs ON ph.session_id = cs.id
-                  WHERE cs.created_at < NOW() - INTERVAL '7 days'
-                    AND cs.deleted_at IS NULL
-                )`
+          sql.raw(DELETE_STALE_UNCOMMITTED_PINS_QUERY)
         );
       } else if (checkId === "stale_upload_intents") {
         result = await db.execute(
