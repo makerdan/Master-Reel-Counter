@@ -97,6 +97,61 @@ const proxyConstructionProgram = [
   "clerkProxyMiddleware();",
 ].join("\n");
 
+function clerkPermissionProbeProgram(capability) {
+  const providerMessage = `raw-provider-message-${capability}`;
+  const secret = `raw-clerk-secret-${capability}`;
+  const requestBody = `raw-request-body-${capability}`;
+  const token = `raw-testing-token-${capability}`;
+  const source = [
+    'import assert from "node:assert/strict";',
+    'import { ClerkAPIResponseError } from "@clerk/shared/error";',
+    'import { assertClerkTestPermissions } from "./tests/support/clerk-test-permissions.ts";',
+    `const providerMessage = ${JSON.stringify(providerMessage)};`,
+    `const secret = ${JSON.stringify(secret)};`,
+    `const requestBody = ${JSON.stringify(requestBody)};`,
+    `const token = ${JSON.stringify(token)};`,
+    "const providerResponse = [providerMessage, secret, requestBody, token].join(\" | \");",
+    "let capturedRequestBody;",
+    "const clerk = {",
+    "  users: {",
+    "    createUser: async (params) => {",
+    "      capturedRequestBody = JSON.stringify(params);",
+    capability === "user"
+      ? "      throw new ClerkAPIResponseError(providerResponse, { status: 403, data: [{ code: \"forbidden\", message: providerResponse }] });"
+      : "      throw new ClerkAPIResponseError(requestBody, { status: 422, data: [{ code: \"form_data_missing\", message: providerResponse }] });",
+    "    },",
+    "    deleteUser: async () => undefined,",
+    "  },",
+    "  testingTokens: {",
+    "    createTestingToken: async () => {",
+    capability === "user"
+      ? `      return { token: ${JSON.stringify(token)} };`
+      : "      throw new ClerkAPIResponseError(providerResponse, { status: 403, data: [{ code: \"forbidden\", message: providerResponse }] });",
+    "    },",
+    "  },",
+    "};",
+    "let failure;",
+    "try {",
+    "  await assertClerkTestPermissions(clerk);",
+    "} catch (error) {",
+    "  failure = error;",
+    "}",
+    "assert.ok(failure instanceof Error, \"permission preflight should reject\");",
+    capability === "user"
+      ? 'assert.match(failure.message, /disposable-user creation/);'
+      : 'assert.match(failure.message, /testing-token creation/);',
+    capability === "user"
+      ? 'assert.match(failure.message, /manage users/);'
+      : 'assert.match(failure.message, /create testing tokens/);',
+    'assert.match(failure.message, /Browser validation did not start/);',
+    "for (const leakedValue of [providerMessage, secret, requestBody, token, capturedRequestBody]) {",
+    "  if (leakedValue) assert.equal(failure.message.includes(leakedValue), false);",
+    "}",
+    "console.log(failure.message);",
+  ].join("\n");
+  return { source, providerMessage, secret, requestBody, token };
+}
+
 function seededGenerator(seed) {
   let state = seed >>> 0;
   return () => {
@@ -512,6 +567,37 @@ test("browser setup reports missing Clerk test permissions before fixtures", () 
   assert.match(clerkTestPermissions, /deleteUser\(probeUserId\)/);
   assert.doesNotMatch(clerkTestPermissions, /error\.message/);
   assert.doesNotMatch(clerkTestPermissions, /JSON\.stringify\(error/);
+});
+
+test("permission preflight redacts forbidden Clerk responses for both capabilities", async () => {
+  for (const capability of ["user", "testing-token"]) {
+    const probe = clerkPermissionProbeProgram(capability);
+    const result = await execFileAsync(
+      process.execPath,
+      ["--import", "tsx/esm", "--input-type=module", "--eval", probe.source],
+      { cwd: root, maxBuffer: 1024 * 1024 },
+    );
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.match(
+      output,
+      capability === "user"
+        ? /disposable-user creation[\s\S]*manage users/
+        : /testing-token creation[\s\S]*create testing tokens/,
+    );
+    for (const secret of [
+      probe.providerMessage,
+      probe.secret,
+      probe.requestBody,
+      probe.token,
+      '{"',
+    ]) {
+      assert.equal(
+        output.includes(secret),
+        false,
+        `${capability} permission failure leaked ${secret}`,
+      );
+    }
+  }
 });
 
 test("smoke uses Clerk's supported testing sign-in and keeps safe failure evidence", () => {
