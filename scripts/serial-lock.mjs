@@ -15,12 +15,15 @@
 import {
   closeSync,
   existsSync,
+  fsyncSync,
+  linkSync,
   mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
   renameSync,
   unlinkSync,
+  writeSync,
   writeFileSync,
 } from "fs";
 import { spawn, spawnSync } from "child_process";
@@ -153,64 +156,129 @@ function atomicWrite(path, content) {
   renameSync(temporaryPath, path);
 }
 
+const LOCK_TOKEN = randomBytes(16).toString("hex");
+let holderLockFd = null;
+
+function lockContent(acquiredAt, lastHeartbeat = acquiredAt) {
+  return `${String(process.pid).padStart(12, "0")}\n` +
+    `${String(acquiredAt).padStart(16, "0")}\n` +
+    `${String(lastHeartbeat).padStart(16, "0")}\n` +
+    `${LOCK_TOKEN}\n`;
+}
+
+function writeLockToFd(fd, content) {
+  writeSync(fd, content, 0, "utf8");
+  fsyncSync(fd);
+}
+
 function readLock() {
+  let raw = "";
   try {
-    const raw = readFileSync(LOCK_PATH, "utf8").trim();
-    if (raw.startsWith("{")) {
-      const parsed = JSON.parse(raw);
-      if (!Number.isInteger(parsed.pid) || !Number.isInteger(parsed.acquiredAt)) return null;
+    raw = readFileSync(LOCK_PATH, "utf8");
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return { kind: "malformed", raw, reason: "lock file is empty" };
+    }
+    if (trimmed.startsWith("{")) {
+      const parsed = JSON.parse(trimmed);
+      if (!Number.isInteger(parsed.pid) || !Number.isInteger(parsed.acquiredAt)) {
+        return { kind: "malformed", raw, reason: "lock JSON is missing pid or acquiredAt" };
+      }
       return {
+        kind: "valid",
+        raw,
         pid: parsed.pid,
         acquiredAt: parsed.acquiredAt,
         lastHeartbeat: Number.isInteger(parsed.lastHeartbeat)
           ? parsed.lastHeartbeat
           : parsed.acquiredAt,
         resource: parsed.resource ?? RESOURCE,
+        token: typeof parsed.token === "string" ? parsed.token : null,
       };
     }
-    const [pid, acquiredAt, lastHeartbeat] = raw.split("\n").map(Number);
-    if (!Number.isInteger(pid) || !Number.isInteger(acquiredAt)) return null;
+    const [pid, acquiredAt, lastHeartbeat, token] = trimmed.split("\n");
+    const numericPid = Number(pid);
+    const numericAcquiredAt = Number(acquiredAt);
+    const numericLastHeartbeat = Number(lastHeartbeat);
+    if (!Number.isInteger(numericPid) || !Number.isInteger(numericAcquiredAt)) {
+      return { kind: "malformed", raw, reason: "lock file is missing numeric pid or acquiredAt" };
+    }
     return {
-      pid,
-      acquiredAt,
-      lastHeartbeat: Number.isInteger(lastHeartbeat) ? lastHeartbeat : acquiredAt,
+      kind: "valid",
+      raw,
+      pid: numericPid,
+      acquiredAt: numericAcquiredAt,
+      lastHeartbeat: Number.isInteger(numericLastHeartbeat)
+        ? numericLastHeartbeat
+        : numericAcquiredAt,
       resource: RESOURCE,
+      token: token || null,
     };
-  } catch {
-    return null;
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    return {
+      kind: "malformed",
+      raw,
+      reason: `unable to read lock file: ${error?.message ?? "unknown error"}`,
+    };
   }
 }
 
-function writeLock() {
-  const now = Date.now();
-  atomicWrite(LOCK_PATH, `${process.pid}\n${now}\n${now}\n`);
+function sameLock(left, right) {
+  if (!left || !right || left.kind !== right.kind) return false;
+  if (left.kind === "malformed") return left.raw === right.raw;
+  if (left.token && right.token) return left.token === right.token;
+  return (
+    left.pid === right.pid &&
+    left.acquiredAt === right.acquiredAt &&
+    left.raw === right.raw
+  );
+}
+
+function clearLock(expected) {
+  const current = readLock();
+  if (!sameLock(current, expected)) return false;
+  try {
+    unlinkSync(LOCK_PATH);
+    return true;
+  } catch {
+    // Another contender may already have reclaimed it.
+    return false;
+  }
 }
 
 function tryCreateLock() {
+  const now = Date.now();
+  const temporaryPath = `${LOCK_PATH}.${LOCK_TOKEN}.tmp`;
+  let descriptor = null;
   try {
-    const descriptor = openSync(LOCK_PATH, "wx");
-    closeSync(descriptor);
-    writeLock();
-    return readLock()?.pid === process.pid;
+    descriptor = openSync(temporaryPath, "wx");
+    writeLockToFd(descriptor, lockContent(now));
+    linkSync(temporaryPath, LOCK_PATH);
+    unlinkSync(temporaryPath);
+    holderLockFd = descriptor;
+    descriptor = null;
+    const lock = readLock();
+    return lock?.kind === "valid" && lock.pid === process.pid && lock.token === LOCK_TOKEN;
   } catch (error) {
-    if (error?.code === "EEXIST") return false;
+    if (error?.code === "EEXIST" || error?.code === "EISDIR") return false;
     throw error;
-  }
-}
-
-function clearLock() {
-  try {
-    unlinkSync(LOCK_PATH);
-  } catch {
-    // Another contender may already have reclaimed it.
+  } finally {
+    if (descriptor !== null) closeSync(descriptor);
+    try { unlinkSync(temporaryPath); } catch { /* already gone */ }
   }
 }
 
 function writeHeartbeat() {
   try {
     const lock = readLock();
-    if (lock?.pid === process.pid) {
-      atomicWrite(LOCK_PATH, `${process.pid}\n${lock.acquiredAt}\n${Date.now()}\n`);
+    if (
+      holderLockFd !== null &&
+      lock?.kind === "valid" &&
+      lock.pid === process.pid &&
+      lock.token === LOCK_TOKEN
+    ) {
+      writeLockToFd(holderLockFd, lockContent(lock.acquiredAt, Date.now()));
     }
   } catch {
     // A transient heartbeat write failure is handled by the stale recovery path.
@@ -297,11 +365,26 @@ if (inheritedHolder && getAncestors().has(String(Number(inheritedHolder)))) {
 let waiterWritten = false;
 const waitStartedAt = Date.now();
 
+function waitElapsed() {
+  return Date.now() - waitStartedAt;
+}
+
+function failWait(waitedMs) {
+  console.error(
+    `[serial-lock] ERROR: waited ${Math.round(waitedMs / 1000)}s for resource '${RESOURCE}' ` +
+    `(MAX_WAIT_MS=${Math.round(MAX_WAIT_MS / 1000)}s).`,
+  );
+  clearWaiter();
+  process.exit(1);
+}
+
 async function acquireLock() {
   while (true) {
     const lock = readLock();
     if (!lock) {
       if (higherPriorityWaiterIsDue()) {
+        const waitedMs = waitElapsed();
+        if (waitedMs >= MAX_WAIT_MS) failWait(waitedMs);
         if (!waiterWritten) {
           writeWaiter();
           waiterWritten = true;
@@ -310,6 +393,24 @@ async function acquireLock() {
         continue;
       }
       if (tryCreateLock()) return;
+    } else if (lock.kind === "malformed") {
+      const waitedMs = waitElapsed();
+      if (waitedMs >= MAX_WAIT_MS) failWait(waitedMs);
+      if (clearLock(lock)) {
+        console.error(
+          `[serial-lock] INCIDENT: reclaimed malformed lock for resource '${RESOURCE}' ` +
+          `(${lock.reason}).`,
+        );
+        continue;
+      }
+      if (!waiterWritten) {
+        writeWaiter();
+        waiterWritten = true;
+      }
+      console.log(
+        `[serial-lock] waiting for resource '${RESOURCE}' because its lock file is malformed` +
+        ` (elapsed ${Math.round(waitedMs / 1000)}s)`,
+      );
     } else {
       const heldMs = Date.now() - lock.acquiredAt;
       const heartbeatAgeMs = Date.now() - lock.lastHeartbeat;
@@ -323,17 +424,11 @@ async function acquireLock() {
           `\n[serial-lock] INCIDENT: reclaiming resource '${RESOURCE}' from PID ${lock.pid}; ` +
           `${takeoverReason} (held ${Math.round(heldMs / 1000)}s).\n`,
         );
-        clearLock();
-        if (tryCreateLock()) return;
+        if (clearLock(lock) && tryCreateLock()) return;
       } else {
-        const waitedMs = Date.now() - waitStartedAt;
+        const waitedMs = waitElapsed();
         if (waitedMs >= MAX_WAIT_MS) {
-          console.error(
-            `[serial-lock] ERROR: waited ${Math.round(waitedMs / 1000)}s for resource '${RESOURCE}' ` +
-            `(MAX_WAIT_MS=${Math.round(MAX_WAIT_MS / 1000)}s).`,
-          );
-          clearWaiter();
-          process.exit(1);
+          failWait(waitedMs);
         }
         if (!waiterWritten) {
           writeWaiter();
@@ -367,9 +462,14 @@ function release() {
   released = true;
   clearInterval(heartbeatTimer);
   const lock = readLock();
-  if (lock?.pid === process.pid) {
-    clearLock();
-    console.log(`[serial-lock] PID ${process.pid} released lock for resource '${RESOURCE}'.`);
+  if (lock?.kind === "valid" && lock.pid === process.pid && lock.token === LOCK_TOKEN) {
+    if (clearLock(lock)) {
+      console.log(`[serial-lock] PID ${process.pid} released lock for resource '${RESOURCE}'.`);
+    }
+  }
+  if (holderLockFd !== null) {
+    closeSync(holderLockFd);
+    holderLockFd = null;
   }
   clearWaiter();
 }

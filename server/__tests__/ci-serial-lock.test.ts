@@ -17,7 +17,7 @@
 
 import assert from "assert/strict";
 import { spawn } from "child_process";
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from "fs";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, rmdirSync } from "fs";
 import { randomBytes } from "crypto";
 import { tmpdir } from "os";
 import { join, resolve, dirname } from "path";
@@ -369,6 +369,93 @@ await test("dead holder is reclaimed loudly", async () => {
     assert.ok((result.stdout + result.stderr).includes("holder PID is dead"));
   } finally {
     cleanup(lockPath);
+  }
+});
+
+await test("partially-created lock files are reclaimed safely", async () => {
+  const lockPath = tempLockPath();
+  writeFileSync(lockPath, "", "utf8");
+  try {
+    const { done } = runLocked(
+      lockPath,
+      [process.execPath, "-e", "process.exit(0)"],
+      { SERIAL_LOCK_MAX_WAIT_MS: "1200" },
+    );
+    const result = await done;
+    assert.equal(result.code, 0, `waiter should recover the empty lock (got ${result.code})`);
+    assert.ok(
+      (result.stdout + result.stderr).includes("malformed lock"),
+      "recovery should identify the malformed lock",
+    );
+  } finally {
+    cleanup(lockPath);
+  }
+});
+
+await test("unrecoverable malformed lock fails within MAX_WAIT_MS", async () => {
+  const lockPath = tempLockPath();
+  mkdirSync(lockPath);
+  const startedAt = Date.now();
+  try {
+    const { done } = runLocked(
+      lockPath,
+      [process.execPath, "-e", "process.exit(0)"],
+      { SERIAL_LOCK_MAX_WAIT_MS: "550" },
+    );
+    const result = await done;
+    const elapsedMs = Date.now() - startedAt;
+    assert.equal(result.code, 1, `waiter should fail clearly (got ${result.code})`);
+    assert.ok(
+      (result.stdout + result.stderr).includes("MAX_WAIT_MS"),
+      "timeout should identify MAX_WAIT_MS",
+    );
+    assert.ok(elapsedMs < 2_000, `timeout should be bounded (elapsed ${elapsedMs}ms)`);
+  } finally {
+    try { rmdirSync(lockPath); } catch { /* already removed */ }
+    cleanup(lockPath);
+  }
+});
+
+await test("concurrent stale reclaimers do not remove a replacement holder", async () => {
+  const lockPath = tempLockPath();
+  const activePath = `${lockPath}.active`;
+  const now = Date.now();
+  writeFileSync(
+    lockPath,
+    `${process.pid}\n${now - 30_000}\n${now - 30_000}\nstale-owner\n`,
+    "utf8",
+  );
+  const command = [
+    "const {openSync,unlinkSync}=require('fs');",
+    `const active=${JSON.stringify(activePath)};`,
+    "let fd;",
+    "try { fd=openSync(active,'wx'); } catch { process.exit(73); }",
+    "setTimeout(() => { unlinkSync(active); process.exit(0); }, 250);",
+  ].join("");
+  const contenders = Array.from({ length: 8 }, () =>
+    runLocked(
+      lockPath,
+      [process.execPath, "-e", command],
+      {
+        SERIAL_LOCK_HEARTBEAT_INTERVAL_MS: "25",
+        SERIAL_LOCK_HEARTBEAT_STALE_MS: "100",
+        SERIAL_LOCK_MAX_WAIT_MS: "5000",
+      },
+    ),
+  );
+  try {
+    const results = await Promise.all(contenders.map(({ done }) => done));
+    for (const result of results) {
+      assert.equal(
+        result.code,
+        0,
+        `every contender should run serially (got ${result.code}; ${result.stderr})`,
+      );
+    }
+  } finally {
+    for (const contender of contenders) contender.proc.kill("SIGTERM");
+    cleanup(lockPath);
+    cleanup(activePath);
   }
 });
 
