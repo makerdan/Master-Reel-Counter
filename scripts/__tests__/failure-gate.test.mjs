@@ -1,13 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import { spawnSync } from "child_process";
 import { loadTiers } from "../lib/tiers.mjs";
 import { findExactRecord, isReferenceable, loadCatalog, maintenanceFindings } from "../lib/baseline.mjs";
 
 const ROOT = process.cwd();
+const PACKAGE_FILES = [
+  ["SKILL.md", ".agents/skills/failure-gate/SKILL.md"],
+  ["validation-tiers.md", ".agents/skills/validation-tiers/SKILL.md"],
+  ["tiers.json", ".agents/skills/validation-tiers/tiers.json"],
+];
 const run = (script, args, env = {}) => spawnSync(process.execPath, [script, ...args], {
   cwd: ROOT,
   env: { ...process.env, ...env },
@@ -81,6 +86,41 @@ test("published archive drift fails with regeneration guidance", () => {
     assert.match(result.stderr, /npm run publish:failure-gate/);
   } finally {
     writeFileSync(sourcePath, original);
+  }
+});
+
+test("Failure Gate package reproduces byte-for-byte from a clean checkout", () => {
+  const checkout = mkdtempSync(join(tmpdir(), "failure-gate-clean-checkout-"));
+  const publisher = join(checkout, "scripts/publish-failure-gate.mjs");
+  const expectedPackage = join(ROOT, "artifacts/bathyscan/public/failure-gate-skill.zip");
+
+  try {
+    mkdirSync(dirname(publisher), { recursive: true });
+    copyFileSync(join(ROOT, "scripts/publish-failure-gate.mjs"), publisher);
+    for (const [, source] of PACKAGE_FILES) {
+      const target = join(checkout, source);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(join(ROOT, source), target);
+    }
+
+    const published = spawnSync(process.execPath, ["scripts/publish-failure-gate.mjs"], {
+      cwd: checkout,
+      env: { ...process.env },
+      encoding: "utf8",
+    });
+    assert.equal(published.status, 0, published.stderr);
+
+    const cleanPackage = join(checkout, "artifacts/bathyscan/public/failure-gate-skill.zip");
+    assert.deepEqual(readFileSync(cleanPackage), readFileSync(expectedPackage));
+
+    const entries = spawnSync("unzip", ["-Z1", cleanPackage], {
+      cwd: checkout,
+      encoding: "utf8",
+    });
+    assert.equal(entries.status, 0, entries.stderr);
+    assert.deepEqual(entries.stdout.trim().split("\n"), PACKAGE_FILES.map(([name]) => name));
+  } finally {
+    rmSync(checkout, { recursive: true, force: true });
   }
 });
 
