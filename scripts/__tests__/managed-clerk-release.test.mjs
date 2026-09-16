@@ -17,7 +17,9 @@ import {
 import {
   COUNT_REMAINING_REMOVED_ACCOUNT_DATA_SQL,
   FILTER_REMOVED_REVIEW_COHORT_SQL,
+  SELECT_REMOVED_ACCOUNT_OBJECT_KEYS_SQL,
 } from "../lib/managed-clerk-reset-queries.mjs";
+import { deletePrivateObjectsAndVerify } from "../../server/replit_integrations/object_storage/objectStorageClient.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
@@ -921,6 +923,71 @@ test("managed Clerk reset retains the selected Admin and removes every other acc
     /finalState\.rowCount !== 1[\s\S]*approved !== true[\s\S]*rejected !== false/,
   );
   assert.match(managedClerkReset, /remainingOwnedData\.rows\[0\]\?\.count !== 0/);
+  assert.match(managedClerkReset, /SELECT_REMOVED_ACCOUNT_OBJECT_KEYS_SQL/);
+  assert.match(managedClerkReset, /deletePrivateObjectsAndVerify/);
+  assert.doesNotMatch(managedClerkReset, /object_storage_key.*console|console.*object_storage_key/);
+});
+
+test("managed Clerk object cleanup is retryable, verified, and path-safe", async () => {
+  const operations = [];
+  const files = new Map([
+    ["private/uploads/removed-a.jpg", { exists: true, failDelete: false }],
+    ["private/uploads/removed-b.jpg", { exists: true, failDelete: true }],
+  ]);
+  const client = {
+    bucket(bucketName) {
+      assert.equal(bucketName, "bucket");
+      return {
+        file(objectName) {
+          const state = files.get(objectName);
+          assert(state);
+          return {
+            async delete() {
+              operations.push(["delete", objectName]);
+              if (state.failDelete) throw new Error(`sensitive:${objectName}`);
+              state.exists = false;
+            },
+            async exists() {
+              operations.push(["exists", objectName]);
+              return [state.exists];
+            },
+          };
+        },
+      };
+    },
+  };
+  const paths = ["/uploads/removed-a.jpg", "/objects/uploads/removed-b.jpg"];
+
+  await assert.rejects(
+    deletePrivateObjectsAndVerify({
+      client,
+      privateObjectDir: "/bucket/private",
+      objectPaths: paths,
+    }),
+    (error) => {
+      assert.match(error.message, /1 of 2 object\(s\) require retry/);
+      assert.deepEqual(error.failureIndexes, [1]);
+      assert.match(error.batchId, /^[a-f0-9]{12}$/);
+      assert.doesNotMatch(error.message, /removed-|uploads|private|bucket/);
+      return true;
+    },
+  );
+
+  files.get("private/uploads/removed-b.jpg").failDelete = false;
+  const retried = await deletePrivateObjectsAndVerify({
+    client,
+    privateObjectDir: "/bucket/private",
+    objectPaths: paths,
+  });
+  assert.equal(retried.attempted, 2);
+  assert.equal(retried.removed, 2);
+  assert.match(retried.batchId, /^[a-f0-9]{12}$/);
+  assert.deepEqual(operations.slice(-4), [
+    ["delete", "private/uploads/removed-a.jpg"],
+    ["exists", "private/uploads/removed-a.jpg"],
+    ["delete", "private/uploads/removed-b.jpg"],
+    ["exists", "private/uploads/removed-b.jpg"],
+  ]);
 });
 
 test("managed Clerk reset SQL filters both local and Clerk identity references", async () => {
@@ -944,10 +1011,18 @@ test("managed Clerk reset SQL filters both local and Clerk identity references",
       CREATE TEMP TABLE folders (user_id varchar);
       CREATE TEMP TABLE session_collaborators (user_id varchar);
       CREATE TEMP TABLE session_invite_links (created_by varchar);
-      CREATE TEMP TABLE photos (user_id varchar);
+      CREATE TEMP TABLE users (
+        id varchar PRIMARY KEY,
+        custom_avatar_key varchar
+      );
+      CREATE TEMP TABLE photos (
+        session_id integer,
+        user_id varchar,
+        object_storage_key text
+      );
       CREATE TEMP TABLE entries (user_id varchar);
-      CREATE TEMP TABLE user_settings (user_id varchar);
-      CREATE TEMP TABLE upload_intents (user_id varchar);
+      CREATE TEMP TABLE user_settings (user_id varchar, company_logo_key text);
+      CREATE TEMP TABLE upload_intents (user_id varchar, object_path text);
       CREATE TEMP TABLE conversations (user_id varchar);
       CREATE TEMP TABLE user_wire_categories (user_id varchar);
       CREATE TEMP TABLE ai_usage_logs (user_id varchar);
@@ -961,18 +1036,56 @@ test("managed Clerk reset SQL filters both local and Clerk identity references",
        VALUES ('removed-local', 'user_removedClerk')`,
     );
     await database.query(
+      `INSERT INTO users (id, custom_avatar_key)
+       VALUES
+         ('removed-local', '/objects/uploads/removed-avatar.jpg'),
+         ('retained-owner', '/uploads/shared-avatar.jpg')`,
+    );
+    await database.query(
       `INSERT INTO cutover_removed_identities (id)
        VALUES ('removed-local'), ('user_removedClerk')`,
     );
     await database.query(
       `INSERT INTO counting_sessions (id, user_id, review_cohort)
-       VALUES (
-         1,
-         'retained-owner',
-         '[{"userId":"removed-local"},{"userId":"user_removedClerk"},{"userId":"retained-owner"}]'
-       )`,
+       VALUES
+         (
+           1,
+           'retained-owner',
+           '[{"userId":"removed-local"},{"userId":"user_removedClerk"},{"userId":"retained-owner"}]'
+         ),
+         (2, 'removed-local', NULL)`,
     );
-
+    await database.query(
+      `INSERT INTO photos (session_id, user_id, object_storage_key)
+       VALUES
+         (1, 'removed-local', '/uploads/removed-only.jpg'),
+         (1, 'removed-local', '/objects/uploads/shared.jpg'),
+         (1, 'retained-owner', '/uploads/shared.jpg'),
+         (1, 'retained-owner', '/uploads/retained-only.jpg'),
+         (2, 'retained-owner', '/uploads/removed-session.jpg'),
+         (2, 'retained-owner', '/objects/uploads/cross-session-shared.jpg'),
+         (1, 'retained-owner', '/uploads/cross-session-shared.jpg')`,
+    );
+    await database.query(
+      `INSERT INTO user_settings (user_id, company_logo_key)
+       VALUES
+         ('removed-local', '/uploads/removed-logo.jpg'),
+         ('removed-local', '/objects/uploads/shared-avatar.jpg')`,
+    );
+    await database.query(
+      `INSERT INTO upload_intents (user_id, object_path)
+       VALUES ('removed-local', '/uploads/removed-pending.jpg')`,
+    );
+    const removedObjectKeys = await database.query(
+      SELECT_REMOVED_ACCOUNT_OBJECT_KEYS_SQL,
+    );
+    assert.deepEqual(removedObjectKeys.rows, [
+      { object_storage_key: "/uploads/removed-avatar.jpg" },
+      { object_storage_key: "/uploads/removed-logo.jpg" },
+      { object_storage_key: "/uploads/removed-only.jpg" },
+      { object_storage_key: "/uploads/removed-pending.jpg" },
+      { object_storage_key: "/uploads/removed-session.jpg" },
+    ]);
     await database.query(FILTER_REMOVED_REVIEW_COHORT_SQL);
     const cohort = await database.query(
       "SELECT review_cohort FROM counting_sessions WHERE id = 1",
@@ -983,6 +1096,27 @@ test("managed Clerk reset SQL filters both local and Clerk identity references",
 
     await database.query(
       "INSERT INTO scan_results (scanned_by) VALUES ('user_removedClerk')",
+    );
+    await database.query(
+      `DELETE FROM photos
+       WHERE user_id IN (SELECT id FROM cutover_removed_accounts)
+          OR session_id IN (
+            SELECT session.id
+            FROM counting_sessions session
+            JOIN cutover_removed_accounts removed ON removed.id = session.user_id
+          )`,
+    );
+    await database.query(
+      `DELETE FROM user_settings
+       WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
+    );
+    await database.query(
+      `DELETE FROM upload_intents
+       WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
+    );
+    await database.query(
+      `DELETE FROM counting_sessions
+       WHERE user_id IN (SELECT id FROM cutover_removed_accounts)`,
     );
     const remaining = await database.query(
       COUNT_REMAINING_REMOVED_ACCOUNT_DATA_SQL,

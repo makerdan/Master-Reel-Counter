@@ -3,7 +3,9 @@ import { createClerkClient } from "@clerk/backend";
 import {
   COUNT_REMAINING_REMOVED_ACCOUNT_DATA_SQL,
   FILTER_REMOVED_REVIEW_COHORT_SQL,
+  SELECT_REMOVED_ACCOUNT_OBJECT_KEYS_SQL,
 } from "./lib/managed-clerk-reset-queries.mjs";
+import { deletePrivateObjectsAndVerify } from "../server/replit_integrations/object_storage/objectStorageClient.mjs";
 
 const { Client } = pg;
 
@@ -110,6 +112,16 @@ try {
      SELECT clerk_user_id
      FROM cutover_removed_accounts
      WHERE clerk_user_id IS NOT NULL`,
+  );
+
+  const removedObjectKeys = await client.query(
+    SELECT_REMOVED_ACCOUNT_OBJECT_KEYS_SQL,
+  );
+  const objectCleanup = await deletePrivateObjectsAndVerify({
+    objectPaths: removedObjectKeys.rows.map((row) => row.object_storage_key),
+  });
+  console.log(
+    `Managed Clerk object cleanup verified for batch ${objectCleanup.batchId}: ${objectCleanup.removed} object(s) absent.`,
   );
 
   // Delete account-owned session graphs first so their foreign-key cascades
