@@ -3,6 +3,7 @@
 - [Undo delete-entry creates new ID](undo-entry-id.md) — undo for delete-entry POSTs a new entry with a new server-assigned ID; tests must not check for the original entry ID after undo.
 - [Typed-request migration in Express](typed-request-migration.md) — handler signatures must stay req:any; use inline cast (req as AuthenticatedRequest) for typed user access.
 - [Failure Gate validation](failure-gate-validation.md) — unchanged dependency audit failures stop the tier; preserve evidence instead of weakening audit thresholds.
+- [Failure Gate runtime manifest](failure-gate-runtime-manifest.md) — routine parity checks belong in the runtime validation manifest, while the published tier registry remains contract data.
 - [Validation lock waiter isolation](validation-lock-waiters.md) — parallel tiers need isolated waiter manifests so nested collision smoke tests do not stall behind unrelated queues.
 - [Support operations schema](support-ops-schema.md) — schema validation checks files, not the live dev DB; apply support migrations before authenticated runtime validation.
 - [GitHub Actions verification access](github-actions-verification-access.md) — an installed GitHub connection can authenticate while lacking repository-scoped access to a private repo.

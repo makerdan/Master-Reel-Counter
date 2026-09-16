@@ -23,6 +23,7 @@
         { "name": "unit-tests", "command": ["npm", "run", "test:unit"] },
         { "name": "clerk-release-contract", "command": ["npm", "run", "test:managed-clerk-release-contract"] },
         { "name": "vite-hmr-tests", "command": ["npm", "run", "test:vite-hmr"] },
+        { "name": "failure-gate-parity", "command": ["node", "scripts/check-failure-gate-parity.mjs"] },
         { "name": "manifest-parity", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
       ]
     },

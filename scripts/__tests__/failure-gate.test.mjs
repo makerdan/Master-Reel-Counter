@@ -62,6 +62,28 @@ test("Failure Gate package regeneration is byte-for-byte stable", () => {
   ]);
 });
 
+test("registered standard validation checks Failure Gate archive parity", () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, "docs/validation/manifest.json"), "utf8"));
+  assert.ok(manifest.tiers["test-standard"].steps.some(
+    (step) => step.name === "failure-gate-parity"
+      && step.command.join(" ") === "node scripts/check-failure-gate-parity.mjs",
+  ));
+});
+
+test("published archive drift fails with regeneration guidance", () => {
+  const sourcePath = join(ROOT, ".agents/skills/validation-tiers/tiers.json");
+  const original = readFileSync(sourcePath);
+  writeFileSync(sourcePath, Buffer.concat([original, Buffer.from("\n// deliberate mismatch\n")]));
+  try {
+    const result = run("scripts/check-failure-gate-parity.mjs", []);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /published tiers\.json differs from its canonical source/);
+    assert.match(result.stderr, /npm run publish:failure-gate/);
+  } finally {
+    writeFileSync(sourcePath, original);
+  }
+});
+
 test("plan scaffold rejects unknown tiers and creates exact baseline markers", () => {
   const invalid = run("scripts/new-plan.mjs", ["--name", "fixture-invalid", "--why", "test", "--tier", "not-registered"]);
   assert.equal(invalid.status, 1);

@@ -47,7 +47,9 @@ for (const { archiveName, sourcePath } of publishedEntries) {
     execFileSync("unzip", ["-p", published, archiveName], { encoding: "utf8" }),
   );
   if (publishedText.trim() !== sourceText.trim()) {
-    console.error(`Failure Gate parity: published ${archiveName} differs from its canonical source.`);
+    console.error(
+      `Failure Gate parity: published ${archiveName} differs from its canonical source; run npm run publish:failure-gate.`,
+    );
     process.exit(1);
   }
 }
