@@ -1,15 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 import { execSync } from "node:child_process";
+import { validateProductionBaseUrl } from "./scripts/validate-production-base-url.mjs";
 
-const baseURL = process.env.PRODUCTION_BASE_URL;
-
-if (!baseURL) {
-  throw new Error(
-    "PRODUCTION_BASE_URL is required. Refusing to run the managed Clerk release smoke against an implicit target.",
-  );
-}
-
-const target = new URL(baseURL);
+const target = validateProductionBaseUrl();
 const candidateHost = process.env.RELEASE_SMOKE_CANDIDATE_HOST;
 const candidateTlsPort = Number(process.env.RELEASE_SMOKE_CANDIDATE_TLS_PORT);
 const isInternalCandidate =

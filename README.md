@@ -276,7 +276,7 @@ For production deployment:
 
 Every Replit production deployment runs `npm run release:build`. That command embeds the canonical production Clerk host, builds the exact candidate, starts the compiled artifact in production mode with a unique build identity, and blocks promotion unless the managed Clerk smoke passes against that artifact. The gate creates and removes a disposable Clerk/local user, verifies the production Clerk proxy, cookie-only authentication, protected Settings and Stats pages, and sign-out. It fails closed when any required managed setting is absent and does not print secret values.
 
-The **Managed Clerk production release gate** GitHub workflow remains available for an additional check against the currently published URL. Configure `PRODUCTION_BASE_URL` as a protected-environment variable and provide `CLERK_SECRET_KEY` and `DATABASE_URL` as protected-environment secrets.
+The **Managed Clerk production release gate** GitHub workflow is a separate manual check against the currently published URL. It runs only from trusted `main`, validates the protected `PRODUCTION_BASE_URL` environment variable as a public HTTPS deployment, and invokes `npm run verify:managed-clerk-published` without rebuilding or replacing that URL with a local candidate. Configure `PRODUCTION_BASE_URL` as a protected-environment variable and provide `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`, and the published deployment's `DATABASE_URL` as protected-environment secrets. The check uses disposable Clerk/local smoke identities, verifies the live proxy and protected pages, removes its identities and browser state, and retains only bounded redacted diagnostics on failure.
 
 
 ## Contributing / Conventions

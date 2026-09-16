@@ -25,26 +25,12 @@ jobs:
           fi
 
   verify-managed-clerk:
-    name: Verify exact managed Clerk candidate
+    name: Verify published managed Clerk deployment
     needs:
       - require-trusted-main
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: production
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: managed_clerk_release_smoke
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d managed_clerk_release_smoke"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -54,6 +40,11 @@ jobs:
         with:
           node-version: "20"
           cache: npm
+
+      - name: Require safe published production URL
+        env:
+          PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+        run: node scripts/validate-production-base-url.mjs
 
       - name: Install frozen dependencies
         run: npm ci
@@ -73,19 +64,18 @@ jobs:
           [[ -n "$CLERK_PUBLISHABLE_KEY" ]] || missing+=("CLERK_PUBLISHABLE_KEY")
           [[ -n "$VITE_CLERK_PUBLISHABLE_KEY" ]] || missing+=("VITE_CLERK_PUBLISHABLE_KEY")
           if (( ${#missing[@]} > 0 )); then
-            printf 'Managed Clerk candidate validation is blocked: missing production credential %s.\n' "${missing[@]}" >&2
+            printf 'Published managed Clerk validation is blocked: missing production credential %s.\n' "${missing[@]}" >&2
             exit 1
           fi
 
-      - name: Verify exact managed Clerk production candidate
+      - name: Verify currently published managed Clerk deployment
         env:
+          PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/publication_guard_not_for_fixtures
-          RELEASE_SMOKE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/managed_clerk_release_smoke
-          RELEASE_CANDIDATE_ID: ${{ github.sha }}
-        run: npm run release:build
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:managed-clerk-published
 
       - name: Upload failure diagnostics
         if: ${{ failure() }}

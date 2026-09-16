@@ -29,6 +29,14 @@ const ordinaryConfig = readFileSync(resolve(root, "playwright.config.ts"), "utf8
 const smoke = readFileSync(resolve(root, "tests/release/managed-clerk-auth.spec.ts"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/managed-clerk-release.yml"), "utf8");
 const candidateBuild = readFileSync(resolve(root, "scripts/build-and-verify-release.sh"), "utf8");
+const publishedRelease = readFileSync(
+  resolve(root, "scripts/verify-published-release.mjs"),
+  "utf8",
+);
+const productionUrlValidation = readFileSync(
+  resolve(root, "scripts/validate-production-base-url.mjs"),
+  "utf8",
+);
 const releaseSchemaPreflight = readFileSync(
   resolve(root, "scripts/release-schema-preflight.mjs"),
   "utf8",
@@ -163,8 +171,9 @@ test("release command uses an isolated production-only Playwright configuration"
     packageJson.scripts["verify:managed-clerk-release"],
     /playwright test --config playwright\.release\.config\.ts/,
   );
-  assert.match(config, /PRODUCTION_BASE_URL is required/);
-  assert.match(config, /public HTTPS deployment/);
+  assert.match(config, /validateProductionBaseUrl/);
+  assert.match(productionUrlValidation, /PRODUCTION_BASE_URL is required/);
+  assert.match(productionUrlValidation, /public HTTPS deployment/);
   assert.match(config, /timeout: 120_000/);
   assert.match(config, /trace: "off"/);
   assert.match(config, /screenshot: "off"/);
@@ -201,20 +210,26 @@ test("every Replit deployment build gates the exact production candidate", () =>
   assert.match(candidateBuild, /trap 'exit 143' TERM/);
 });
 
-test("manual CI release gate builds and verifies the exact checked-out candidate", () => {
-  assert.match(workflow, /name: Verify exact managed Clerk candidate/);
-  assert.match(workflow, /image: postgres:16/);
-  assert.match(workflow, /POSTGRES_DB: managed_clerk_release_smoke/);
-  assert.match(workflow, /RELEASE_SMOKE_DATABASE_URL: postgresql:\/\/postgres:postgres@localhost:5432\/managed_clerk_release_smoke/);
-  assert.match(workflow, /DATABASE_URL: postgresql:\/\/postgres:postgres@localhost:5432\/publication_guard_not_for_fixtures/);
-  assert.match(workflow, /RELEASE_CANDIDATE_ID: \$\{\{ github\.sha \}\}/);
-  assert.match(workflow, /run: npm run release:build/);
-  assert.doesNotMatch(workflow, /run: npm run verify:managed-clerk-release/);
-  assert.doesNotMatch(workflow, /PRODUCTION_BASE_URL:/);
+test("manual CI release gate verifies the currently published deployment", () => {
+  assert.match(workflow, /name: Verify published managed Clerk deployment/);
+  assert.match(workflow, /name: Require safe published production URL/);
+  assert.match(workflow, /PRODUCTION_BASE_URL: \$\{\{ vars\.PRODUCTION_BASE_URL \}\}/);
+  assert.match(workflow, /run: node scripts\/validate-production-base-url\.mjs/);
+  assert.match(workflow, /run: npm run verify:managed-clerk-published/);
+  assert.match(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
+  assert.doesNotMatch(workflow, /image: postgres:16/);
+  assert.doesNotMatch(workflow, /run: npm run release:build/);
+  assert.doesNotMatch(workflow, /RELEASE_SMOKE_DATABASE_URL:/);
+  assert.doesNotMatch(workflow, /RELEASE_CANDIDATE_ID:/);
+  assert.match(packageJson.scripts["verify:managed-clerk-published"], /verify-published-release\.mjs/);
+  assert.match(publishedRelease, /validateProductionBaseUrl/);
+  assert.match(publishedRelease, /playwright\.release\.config\.ts/);
+  assert.match(publishedRelease, /process\.env/);
+  assert.doesNotMatch(publishedRelease, /release:build|build-and-verify-release/);
   assert.match(candidateBuild, /candidate_id="\$\{RELEASE_CANDIDATE_ID:-/);
 });
 
-test("manual CI release gate blocks when matched production Clerk credentials are unavailable", () => {
+test("manual CI published deployment check blocks when matched production Clerk credentials are unavailable", () => {
   assert.match(workflow, /name: Require matched production Clerk credentials/);
   assert.match(workflow, /secrets\.CLERK_SECRET_KEY/);
   assert.equal(
@@ -235,6 +250,17 @@ test("manual CI release gate blocks when matched production Clerk credentials ar
   assert.match(workflow, /secrets\.VITE_CLERK_PUBLISHABLE_KEY/);
   assert.match(workflow, /validation is blocked: missing production credential/);
   assert.doesNotMatch(workflow, /continue-on-error:[\s\S]*Require matched production Clerk credentials/);
+});
+
+test("published deployment target validation fails closed for missing or unsafe URLs", () => {
+  assert.match(productionUrlValidation, /PRODUCTION_BASE_URL is required/);
+  assert.match(productionUrlValidation, /must be a valid public HTTPS deployment URL/);
+  assert.match(productionUrlValidation, /target\.protocol !== "https:"/);
+  assert.match(productionUrlValidation, /target\.username/);
+  assert.match(productionUrlValidation, /target\.password/);
+  assert.match(productionUrlValidation, /target\.search/);
+  assert.match(productionUrlValidation, /target\.hash/);
+  assert.match(productionUrlValidation, /localhost/);
 });
 
 test("release workflow and production startup share the two-key tenant contract", () => {
@@ -316,6 +342,8 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.match(googleReleaseSmoke, /assertIsolatedReleaseDatabase/);
   assert.match(googleReleaseSmoke, /RELEASE_SMOKE_DATABASE_URL/);
   assert.match(googleReleaseSmoke, /RELEASE_PUBLICATION_DATABASE_URL/);
+  assert.match(googleReleaseSmoke, /internalCandidate/);
+  assert.match(googleReleaseSmoke, /connectionString: internalCandidate/);
 });
 
 test("production Clerk proxy fails closed and exposes public readiness before auth", () => {
@@ -1138,20 +1166,22 @@ test("workspace config does not pin Clerk credentials or a tenant", () => {
   );
 });
 
-test("release workflow passes secrets only through the environment", () => {
+test("published release workflow passes protected inputs only through the environment", () => {
   assert.match(workflow, /environment: production/);
   assert.match(workflow, /require-trusted-main:/);
   assert.match(workflow, /if \[\[ "\$GITHUB_REF" != "refs\/heads\/main" \]\]/);
   assert.match(workflow, /needs:\s+- require-trusted-main/);
-  assert.match(workflow, /npm run release:build/);
+  assert.match(workflow, /npm run verify:managed-clerk-published/);
+  assert.match(workflow, /PRODUCTION_BASE_URL: \$\{\{ vars\.PRODUCTION_BASE_URL \}\}/);
   assert.match(workflow, /CLERK_SECRET_KEY: \$\{\{ secrets\.CLERK_SECRET_KEY \}\}/);
+  assert.match(workflow, /CLERK_PUBLISHABLE_KEY: \$\{\{ secrets\.CLERK_PUBLISHABLE_KEY \}\}/);
   assert.match(
     workflow,
     /VITE_CLERK_PUBLISHABLE_KEY: \$\{\{ secrets\.VITE_CLERK_PUBLISHABLE_KEY \}\}/,
   );
-  assert.doesNotMatch(workflow, /PRODUCTION_BASE_URL:|secrets\.DATABASE_URL/);
+  assert.match(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
   assert.doesNotMatch(workflow, /echo.*SECRET|set -x/);
   assert.doesNotMatch(workflow, /playwright-report/);
   const jobHeader = workflow.slice(0, workflow.indexOf("    steps:"));
-  assert.doesNotMatch(jobHeader, /CLERK_SECRET_KEY|DATABASE_URL/);
+  assert.doesNotMatch(jobHeader, /CLERK_SECRET_KEY|DATABASE_URL|PRODUCTION_BASE_URL/);
 });
