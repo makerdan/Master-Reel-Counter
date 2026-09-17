@@ -1,6 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["tests/**/*", "playwright.release.config.ts"],
+  "include": [
+    "tests/**/*",
+    "playwright.config.ts",
+    "playwright.clerk-preview.config.ts",
+    "playwright.release.config.ts"
+  ],
   "compilerOptions": {
     "noUnusedLocals": false,
     "noUnusedParameters": false,
