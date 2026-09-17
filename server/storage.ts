@@ -343,9 +343,9 @@ export interface IStorage {
    *                    scan_results rows exist for the given sessions)
    *   - photoInsights: detail-shot count, avg photos/session, linked-pin rate
    *   - wireBreakdown: top wire types and gauges by entry count and footage
-   *   - dailyActivity: entry counts grouped by calendar date (last 90 days)
+   *   - dailyActivity: entry counts grouped by calendar date (last 30 days)
    */
-  getEnhancedStats(userId: string, sessionIds: number[]): Promise<{
+  getEnhancedStats(userId: string, sessionIds: number[], timezone?: string): Promise<{
     dataQuality: {
       totalFlaggedPins: number;
       totalPins: number;
@@ -2031,7 +2031,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getEnhancedStats(_userId: string, sessionIds: number[]): Promise<{
+  async getEnhancedStats(_userId: string, sessionIds: number[], timezone = "UTC"): Promise<{
     dataQuality: {
       totalFlaggedPins: number;
       totalPins: number;
@@ -2136,18 +2136,20 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(count()))
       .limit(10);
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Entry timestamps are stored as UTC values in timestamp-without-time-zone
+    // columns. Convert them to the user's local calendar before grouping so the
+    // API dates use the same definition as the stats page heatmap.
+    const activityDay = sql`((${entries.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE ${timezone})::date`;
     const dailyActivityRaw = await db.select({
-      date: sql<string>`to_char(${entries.createdAt}::date, 'YYYY-MM-DD')`,
+      date: sql<string>`to_char(${activityDay}, 'YYYY-MM-DD')`,
       count: count(),
     }).from(entries)
       .where(and(
         inArray(entries.sessionId, sessionIds),
-        sql`${entries.createdAt} >= ${thirtyDaysAgo.toISOString()}`,
+        sql`${activityDay} >= ((CURRENT_TIMESTAMP AT TIME ZONE ${timezone})::date - INTERVAL '29 days')`,
       ))
-      .groupBy(sql`${entries.createdAt}::date`)
-      .orderBy(sql`${entries.createdAt}::date`);
+      .groupBy(activityDay)
+      .orderBy(activityDay);
 
     return {
       dataQuality: {

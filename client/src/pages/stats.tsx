@@ -101,7 +101,7 @@ export default function StatsPage() {
     queryKey: ["/api/stats"],
   });
   const currentUnit: UnitType = settings?.defaultUnit === "meters" ? "meters" : "feet";
-  const timezone = settings?.timezone || "America/Chicago";
+  const timezone = settings?.timezone || "UTC";
   const formatFootage = (value: number) => `${toDisplayUnit(value, currentUnit).toLocaleString()} ${unitLabel(currentUnit)}`;
 
   if (isLoading) {

@@ -6290,7 +6290,9 @@ export async function registerRoutes(
         .where(eq(countingSessions.userId, userId));
       const sessionIds = userSessions.map(s => s.id);
 
-      const enhancedStats = await storage.getEnhancedStats(userId, sessionIds);
+      const userSettings = await storage.getUserSettings(userId);
+      const timezone = userSettings?.timezone || "UTC";
+      const enhancedStats = await storage.getEnhancedStats(userId, sessionIds, timezone);
 
       res.json({ ...stats, sharedPerformance, roleComparison, currentUserId: userId, ...enhancedStats });
     } catch (error) {
