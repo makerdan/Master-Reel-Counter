@@ -6,8 +6,8 @@
 export function findHardcodedPortReferences(source) {
   const findings = [];
   const patterns = [
-    /\blisten\s*\(\s*[1-9]\d{0,4}\b/g,
-    /\b(?:localhost|127\.0\.0\.1):[1-9]\d{0,4}\b/g,
+    /\blisten\s*\(\s*(?:(?:["'])([1-9]\d{0,4})(?:["'])|[1-9]\d{0,4})(?=\s*[,)]|\s|$)/g,
+    /\b(?:localhost|127\.0\.0\.1|0\.0\.0\.0):[1-9]\d{0,4}\b/g,
   ];
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) findings.push(match[0]);

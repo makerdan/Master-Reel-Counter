@@ -15,11 +15,15 @@ const cleanupScript = resolve(root, "scripts/free-ports.mjs");
 // Scanner fixtures: a fixed service bind/URL fails closed, while an
 // environment-driven bind and an ephemeral test listener remain valid.
 assert.deepEqual(
-  findHardcodedPortReferences("server.listen(5000); fetch('http://localhost:5000/api/healthz')"),
-  ["listen(5000", "localhost:5000"],
+  findHardcodedPortReferences(
+    "server.listen(5000); server.listen('5001'); fetch('http://0.0.0.0:5002/api/healthz')",
+  ),
+  ["listen(5000", "listen('5001'", "0.0.0.0:5002"],
 );
 assert.deepEqual(
-  findHardcodedPortReferences("server.listen(Number(process.env.PORT || 5000)); server.listen(0)"),
+  findHardcodedPortReferences(
+    "server.listen(Number(process.env.PORT || 5000)); server.listen(0); fetch(`http://localhost:${port}`)",
+  ),
   [],
 );
 
@@ -77,4 +81,87 @@ assert.ok(
   listener.exitCode !== null || listener.signalCode !== null,
   "listener should be terminated",
 );
-console.log("[port-authority-test] PASS: invalid, no-op, and real ephemeral-port cleanup verified.");
+
+const replacementCode = [
+  "const net=require('net');",
+  "const s=net.createServer();",
+  "s.listen(0,'127.0.0.1',()=>{",
+  "  const port=s.address().port; console.log(port);",
+  "  setTimeout(()=>s.close(()=>{",
+  "    const replacement=net.createServer();",
+  "    replacement.listen(port,'127.0.0.1',()=>console.log('replacement'));",
+  "  }),500);",
+  "});",
+].join("");
+const replacement = spawn(process.execPath, ["-e", replacementCode], {
+  cwd: root,
+  stdio: ["ignore", "pipe", "pipe"],
+});
+let replacementOutput = "";
+replacement.stdout.on("data", (data) => { replacementOutput += data; });
+const replacementPort = await new Promise((resolvePromise, reject) => {
+  const timer = setTimeout(() => reject(new Error("replacement listener did not bind")), 5000);
+  replacement.stdout.on("data", () => {
+    const match = replacementOutput.match(/^\d+/m);
+    if (match) {
+      clearTimeout(timer);
+      resolvePromise(Number(match[0]));
+    }
+  });
+});
+const replacementCleanupPromise = run(process.execPath, [cleanupScript, String(replacementPort)], {
+  FREE_PORTS_BEFORE_SIGNAL_MS: "800",
+  FREE_PORTS_GRACE_MS: "50",
+});
+if (!replacementOutput.includes("replacement")) {
+  await new Promise((resolvePromise, reject) => {
+    const timer = setTimeout(() => reject(new Error("replacement listener did not become observable")), 5000);
+    replacement.stdout.on("data", () => {
+      if (replacementOutput.includes("replacement")) {
+        clearTimeout(timer);
+        resolvePromise();
+      }
+    });
+  });
+}
+const replacementCleanup = await replacementCleanupPromise;
+assert.equal(replacementCleanup.code, 1, "changed socket ownership must fail closed");
+assert.match(replacementCleanup.output, /ownership changed/);
+assert.equal(replacement.exitCode, null, "replacement listener must not be terminated");
+replacement.kill("SIGTERM");
+await new Promise((resolvePromise) => replacement.once("close", resolvePromise));
+
+const sharedCode = [
+  "const net=require('net');",
+  "const first=net.createServer(); const second=net.createServer();",
+  "first.listen(0,'127.0.0.1',()=>{",
+  "  const firstPort=first.address().port;",
+  "  second.listen(0,'127.0.0.1',()=>console.log(firstPort+' '+second.address().port));",
+  "});",
+].join("");
+const shared = spawn(process.execPath, ["-e", sharedCode], {
+  cwd: root,
+  stdio: ["ignore", "pipe", "pipe"],
+});
+let sharedOutput = "";
+shared.stdout.on("data", (data) => { sharedOutput += data; });
+const sharedPorts = await new Promise((resolvePromise, reject) => {
+  const timer = setTimeout(() => reject(new Error("shared listeners did not bind")), 5000);
+  shared.stdout.on("data", () => {
+    const match = sharedOutput.match(/(\d+)\s+(\d+)/);
+    if (match) {
+      clearTimeout(timer);
+      resolvePromise([Number(match[1]), Number(match[2])]);
+    }
+  });
+});
+const sharedCleanup = await run(process.execPath, [cleanupScript, String(sharedPorts[0])], {
+  FREE_PORTS_GRACE_MS: "50",
+});
+assert.equal(sharedCleanup.code, 1, "shared process cleanup must fail closed");
+assert.match(sharedCleanup.output, /shared/);
+assert.equal(shared.exitCode, null, "shared process must not be terminated");
+shared.kill("SIGTERM");
+await new Promise((resolvePromise) => shared.once("close", resolvePromise));
+
+console.log("[port-authority-test] PASS: isolated cleanup, socket replacement, shared-process, and scanner guards verified.");

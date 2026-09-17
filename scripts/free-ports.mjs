@@ -51,6 +51,11 @@ if (!Number.isInteger(graceMs) || graceMs < 0) {
   console.error("[free-ports] ERROR: FREE_PORTS_GRACE_MS must be a non-negative integer.");
   process.exit(2);
 }
+const beforeSignalMs = Number.parseInt(process.env.FREE_PORTS_BEFORE_SIGNAL_MS ?? "0", 10);
+if (!Number.isInteger(beforeSignalMs) || beforeSignalMs < 0) {
+  console.error("[free-ports] ERROR: FREE_PORTS_BEFORE_SIGNAL_MS must be a non-negative integer.");
+  process.exit(2);
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -84,20 +89,25 @@ function getCommandLine(pid) {
   }
 }
 
-function getPortInodes(port) {
-  const hexPort = port.toString(16).toUpperCase().padStart(4, "0");
-  const inodes = new Set();
+function getListeningPortInodes() {
+  const portInodes = new Map();
   for (const file of ["/proc/net/tcp", "/proc/net/tcp6"]) {
     if (!existsSync(file)) continue;
     for (const line of readFileSync(file, "utf8").split("\n").slice(1)) {
       const columns = line.trim().split(/\s+/);
       if (columns.length < 10 || columns[3] !== "0A") continue;
-      if (columns[1].split(":")[1]?.toUpperCase() === hexPort) {
-        inodes.add(columns[9]);
-      }
+      const port = Number.parseInt(columns[1].split(":")[1], 16);
+      if (!Number.isInteger(port)) continue;
+      const inodes = portInodes.get(port) ?? new Set();
+      inodes.add(columns[9]);
+      portInodes.set(port, inodes);
     }
   }
-  return inodes;
+  return portInodes;
+}
+
+function getPortInodes(port, listeningPortInodes = getListeningPortInodes()) {
+  return listeningPortInodes.get(port) ?? new Set();
 }
 
 function pidHoldsInode(pid, inodes) {
@@ -130,6 +140,42 @@ function findHolders(inodes, selfTree) {
     // Best effort; final port verification remains authoritative.
   }
   return holders;
+}
+
+function getListeningPortsForPid(pid, listeningPortInodes) {
+  return [...listeningPortInodes.entries()]
+    .filter(([, inodes]) => pidHoldsInode(pid, inodes))
+    .map(([port]) => port);
+}
+
+function getProcessIdentity(pid) {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const commandEnd = stat.lastIndexOf(")");
+    if (commandEnd < 0) return null;
+    const fields = stat.slice(commandEnd + 2).trim().split(/\s+/);
+    // The starttime field is field 22 in procfs, and field 3 is the first
+    // value after the command name.
+    const startTime = fields[19];
+    if (!startTime) return null;
+    return {
+      pid: Number(pid),
+      startTime,
+      command: getCommandLine(pid),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sameProcessIdentity(expected, actual) {
+  return Boolean(
+    expected &&
+    actual &&
+    expected.pid === actual.pid &&
+    expected.startTime === actual.startTime &&
+    expected.command === actual.command,
+  );
 }
 
 function getProcessParents() {
@@ -178,16 +224,23 @@ function getSafeSupervisors(pid, selfTree) {
 
 function findKillTargets(holders, selfTree) {
   const parents = getProcessParents();
-  const targets = new Set();
+  const targets = new Map();
   for (const holder of holders) {
     if (selfTree.has(String(holder))) continue;
-    targets.add(holder);
+    targets.set(holder, { pid: holder, holder });
     for (const child of getDescendants(holder, parents)) {
-      if (!selfTree.has(child)) targets.add(Number(child));
+      if (!selfTree.has(child)) {
+        const pid = Number(child);
+        targets.set(pid, { pid, holder });
+      }
     }
-    for (const supervisor of getSafeSupervisors(holder, selfTree)) targets.add(supervisor);
+    for (const supervisor of getSafeSupervisors(holder, selfTree)) {
+      targets.set(supervisor, { pid: supervisor, holder });
+    }
   }
-  return [...targets].filter((pid) => pid > 1 && !selfTree.has(String(pid)));
+  return [...targets.values()].filter(
+    (target) => target.pid > 1 && !selfTree.has(String(target.pid)),
+  );
 }
 
 function signalPid(pid, signal) {
@@ -201,9 +254,11 @@ function signalPid(pid, signal) {
 }
 
 const selfTree = getSelfTree();
+const requestedPorts = new Set(ports);
 for (const port of ports) {
   console.log(`[free-ports] Clearing port ${port}…`);
-  const inodes = getPortInodes(port);
+  const listeningPortInodes = getListeningPortInodes();
+  const inodes = getPortInodes(port, listeningPortInodes);
   if (inodes.size === 0) {
     console.log(`[free-ports] Port ${port} is already free.`);
     continue;
@@ -216,17 +271,73 @@ for (const port of ports) {
     continue;
   }
 
+  const sharedHolders = holders.filter((pid) =>
+    getListeningPortsForPid(pid, listeningPortInodes)
+      .some((heldPort) => !requestedPorts.has(heldPort)),
+  );
+  if (holders.length > 1 || sharedHolders.length > 0) {
+    const reason = holders.length > 1
+      ? "multiple holder processes share the requested port"
+      : `holder(s) also own listener(s) outside the requested set: ${sharedHolders.join(", ")}`;
+    console.error(
+      `[free-ports] WARNING: Port ${port} is shared; refusing to terminate holder process(es) (${reason}).`,
+    );
+    process.exitCode = 1;
+    continue;
+  }
+
   const targets = findKillTargets(holders, selfTree);
-  console.error(`[free-ports] INCIDENT: Port ${port} held by ${holders.join(", ")}; terminating process tree ${targets.join(", ")}.`);
-  for (const pid of targets) signalPid(pid, "SIGTERM");
+  const holderIdentities = new Map(
+    holders.map((pid) => [pid, getProcessIdentity(pid)]),
+  );
+  const targetIdentities = targets.map((target) => ({
+    ...target,
+    holderIdentity: holderIdentities.get(target.holder),
+    identity: getProcessIdentity(target.pid),
+    inodes,
+  }));
+  const validTargets = targetIdentities.filter(
+    (target) => target.holderIdentity && target.identity,
+  );
+  if (validTargets.length === 0) {
+    console.error(`[free-ports] WARNING: Port ${port} ownership changed before cleanup; refusing to terminate any process.`);
+    process.exitCode = 1;
+    continue;
+  }
+
+  function targetStillOwned(target) {
+    const holderIdentity = getProcessIdentity(target.holder);
+    const identity = getProcessIdentity(target.pid);
+    return (
+      sameProcessIdentity(target.holderIdentity, holderIdentity) &&
+      sameProcessIdentity(target.identity, identity) &&
+      pidHoldsInode(target.holder, target.inodes)
+    );
+  }
+
+  function signalOwnedTarget(target, signal) {
+    if (!targetStillOwned(target)) {
+      console.error(
+        `[free-ports] WARNING: Port ${port} ownership changed for PID ${target.pid}; skipping ${signal}.`,
+      );
+      return false;
+    }
+    return signalPid(target.pid, signal);
+  }
+
+  console.error(
+    `[free-ports] INCIDENT: Port ${port} held by ${holders.join(", ")}; terminating process tree ${validTargets.map((target) => target.pid).join(", ")}.`,
+  );
+  if (beforeSignalMs > 0) await sleep(beforeSignalMs);
+  for (const target of validTargets) signalOwnedTarget(target, "SIGTERM");
   await sleep(graceMs);
 
-  const remainingHolders = findHolders(getPortInodes(port), selfTree);
-  const survivors = findKillTargets(remainingHolders, selfTree)
-    .filter((pid) => signalPid(pid, 0));
+  const survivors = validTargets.filter(
+    (target) => targetStillOwned(target) && signalPid(target.pid, 0),
+  );
   if (survivors.length > 0) {
     console.error(`[free-ports] INCIDENT: Port ${port} has ${survivors.length} survivor(s) after SIGTERM; sending SIGKILL.`);
-    for (const pid of survivors) signalPid(pid, "SIGKILL");
+    for (const target of survivors) signalOwnedTarget(target, "SIGKILL");
     await sleep(500);
   }
 

@@ -20,8 +20,11 @@ route `/api/healthz`.
 
 - `scripts/free-ports.mjs` is the only port cleanup command. It requires
   explicit ports, rejects production execution, excludes its caller tree,
-  terminates supervised descendants, escalates from SIGTERM to SIGKILL, and
-  verifies release. Forced cleanup is logged as an `INCIDENT`.
+  terminates supervised descendants only after revalidating their `/proc`
+  process identity and original socket inode, escalates from SIGTERM to
+  SIGKILL using the same snapshots, and verifies release. It fails closed for
+  shared holders or a process that also owns an unrequested listener. Forced
+  cleanup is logged as an `INCIDENT`.
 - `scripts/serial-lock.mjs` is the only validation lock. Resources are striped
   by name, waiter manifests are written while queued, priorities are 1–9, and
   dead, stale, or overlong holders are reclaimed loudly.
@@ -31,9 +34,9 @@ route `/api/healthz`.
   created; `globalSetup` only waits for and exercises the already healthy
   backend.
 - `scripts/port-reference-scan.mjs` is the focused scanner contract for
-  executable service references. Its synthetic fixtures reject fixed bind ports
-  and fixed localhost URLs while accepting `process.env.PORT` and ephemeral
-  port `0`.
+  executable service references. Its synthetic fixtures reject fixed bind
+  ports, fixed loopback or wildcard-host URLs, and quoted fixed ports while
+  accepting `process.env.PORT`, interpolated URLs, and ephemeral port `0`.
 
 ## Capability checklist
 

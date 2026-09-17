@@ -32,6 +32,16 @@ test("owner boundary denies missing and non-owner identities without disclosure"
 });
 
 test("port scanner rejects fixed service fixtures but allows canonical allocation", () => {
-  assert.equal(findHardcodedPortReferences("app.listen(5000)")[0], "listen(5000");
-  assert.deepEqual(findHardcodedPortReferences("app.listen(Number(process.env.PORT || 5000)); app.listen(0)"), []);
+  assert.deepEqual(
+    findHardcodedPortReferences(
+      "app.listen(5000); app.listen('5001'); fetch('http://0.0.0.0:5002/api/healthz')",
+    ),
+    ["listen(5000", "listen('5001'", "0.0.0.0:5002"],
+  );
+  assert.deepEqual(
+    findHardcodedPortReferences(
+      "app.listen(Number(process.env.PORT || 5000)); app.listen(0); fetch(`http://localhost:${port}`)",
+    ),
+    [],
+  );
 });
