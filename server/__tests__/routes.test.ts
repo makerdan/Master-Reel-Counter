@@ -37,6 +37,7 @@ import
 ;
 import { buildPublishableKey } from "@clerk/shared/keys";
 import { CLERK_FRONTEND_API_HOST } from "@shared/clerk-config";
+import type { User } from "@shared/models/auth";
 
 import 
 {
@@ -328,7 +329,7 @@ describe("Clerk identity and approval regression guard", () => {
         isolatedAuthStorage.createUserForClerkIdentity({ id: createdUserId }, clerkUserId),
       ]);
       const fulfilled = outcomes.filter(
-        (outcome): outcome is PromiseFulfilledResult<unknown> => outcome.status === "fulfilled",
+        (outcome): outcome is PromiseFulfilledResult<User | undefined> => outcome.status === "fulfilled",
       );
       const rejected = outcomes.filter(
         (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
@@ -586,7 +587,11 @@ describe("Clerk identity and approval regression guard", () => {
   test("fails WebSocket revalidation after a connected collaborator is rejected", async () => {
     const originalGetUser = authStorage.getUser;
     let rejected = false;
-    authStorage.getUser = async () => ({ approved: !rejected, rejected });
+    authStorage.getUser = async () => ({
+      id: "collaborator-user",
+      approved: !rejected,
+      rejected,
+    } as User);
 
     try {
       const connectedUser = { claims: { sub: "collaborator-user" } };
@@ -841,7 +846,7 @@ describe("pre-authentication WebSocket message limits", () => {
     });
 
     assert.equal(
-      await buffer.drain((message) => processed.push(message.toString()), () => true),
+      await buffer.drain((message) => { processed.push(message.toString()); }, () => true),
       false,
     );
     assert.deepEqual(processed, []);
@@ -856,7 +861,7 @@ describe("pre-authentication WebSocket message limits", () => {
     buffer.release();
 
     assert.equal(
-      await buffer.drain((message) => processed.push(message.toString()), () => false),
+      await buffer.drain((message) => { processed.push(message.toString()); }, () => false),
       false,
     );
     assert.deepEqual(processed, []);
@@ -875,7 +880,7 @@ describe("pre-authentication WebSocket message limits", () => {
     }
 
     assert.equal(
-      await buffer.drain((message) => processed.push(message.toString()), () => true),
+      await buffer.drain((message) => { processed.push(message.toString()); }, () => true),
       true,
     );
     assert.deepEqual(processed, messages.map((message) => message.toString()));
@@ -1750,7 +1755,7 @@ describe("authenticated Poe route contracts", () => {
     app.post(
       "/api/help-chat",
       (req, _res, next) => {
-        req.user = { claims: { sub: userId } };
+        (req as typeof req & { user: { claims: { sub: string } } }).user = { claims: { sub: userId } };
         next();
       },
       helpChatRateLimiter,
@@ -1792,7 +1797,9 @@ describe("authenticated Poe route contracts", () => {
     app.post(
       "/pending",
       (req, _res, next) => {
-        req.user = { claims: { sub: "pending-poe-user" } };
+        (req as typeof req & { user: { claims: { sub: string } } }).user = {
+          claims: { sub: "pending-poe-user" },
+        };
         next();
       },
       isApproved,

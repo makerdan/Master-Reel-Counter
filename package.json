@@ -11,7 +11,7 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "check:playwright-configs": "node scripts/check-playwright-config-coverage.mjs",
-    "typecheck": "npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.playwright.json --noEmit",
+    "typecheck": "npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit",
     "db:push": "drizzle-kit push",
     "lint:storage": "node scripts/lint-storage.mjs --strict",
     "test:storage-lint-contract": "node --test scripts/__tests__/lint-storage.test.mjs",

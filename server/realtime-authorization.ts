@@ -19,7 +19,14 @@ export class RealtimeAuthorizationTracker {
   }
 }
 
-export const PRE_AUTH_WEBSOCKET_LIMITS = Object.freeze({
+export interface PreAuthWebSocketLimits {
+  maxMessages: number;
+  maxAggregateBytes: number;
+  maxPayloadBytes: number;
+  timeoutMs: number;
+}
+
+export const PRE_AUTH_WEBSOCKET_LIMITS: Readonly<PreAuthWebSocketLimits> = Object.freeze({
   maxMessages: 32,
   maxAggregateBytes: 64 * 1024,
   maxPayloadBytes: 16 * 1024,
@@ -40,7 +47,7 @@ export class PreAuthWebSocketBuffer<Message> {
 
   constructor(
     private readonly limits: Pick<
-      typeof PRE_AUTH_WEBSOCKET_LIMITS,
+      PreAuthWebSocketLimits,
       "maxMessages" | "maxAggregateBytes" | "maxPayloadBytes"
     > = PRE_AUTH_WEBSOCKET_LIMITS,
   ) {}

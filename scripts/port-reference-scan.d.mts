@@ -1,0 +1,1 @@
+export function findHardcodedPortReferences(source: string): string[];
