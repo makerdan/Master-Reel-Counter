@@ -63,7 +63,7 @@ jobs:
           [[ -n "$CLERK_PUBLISHABLE_KEY" ]] || missing+=("CLERK_PUBLISHABLE_KEY")
           [[ -n "$VITE_CLERK_PUBLISHABLE_KEY" ]] || missing+=("VITE_CLERK_PUBLISHABLE_KEY")
           if (( ${#missing[@]} > 0 )); then
-            printf 'Published managed Clerk validation is blocked: missing production publishable key %s.\n' "${missing[@]}" >&2
+            printf 'Published managed Clerk validation is blocked: missing production publishable key %s.\n' "${missing[*]}" >&2
             exit 1
           fi
 
@@ -71,6 +71,8 @@ jobs:
         env:
           PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
           PRODUCTION_DEPLOYMENT_ID: ${{ vars.PRODUCTION_DEPLOYMENT_ID }}
+          RELEASE_PUBLISHED_SMOKE_TARGET: ${{ vars.PRODUCTION_BASE_URL }}
+          RELEASE_PUBLISHED_SMOKE_MODE: read-only
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
         run: npm run verify:managed-clerk-published

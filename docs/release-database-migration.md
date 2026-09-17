@@ -31,10 +31,17 @@ same PostgreSQL endpoint.
 This isolated smoke proves that the candidate and smoke test agree on the
 reviewed schema. It does **not** prove that the publishing database is current.
 
-Currently published verification is separate and read-only. It receives no
-database URL or Clerk secret, creates no identities, performs no stale-fixture
-cleanup or schema preparation, and proves only anonymous authorization, live
-Clerk proxy availability, and Google provider visibility.
+Currently published verification is separate and read-only. The workflow pairs
+`PRODUCTION_BASE_URL` with the identical
+`RELEASE_PUBLISHED_SMOKE_TARGET` and requires
+`RELEASE_PUBLISHED_SMOKE_MODE=read-only` before the browser starts. It receives
+no database URL or Clerk secret; the verifier fails closed if any publication,
+smoke, or Clerk secret input is supplied. This published boundary therefore
+creates no identities, performs no stale-fixture cleanup or schema preparation,
+and proves only anonymous authorization, live Clerk proxy availability, and
+Google provider visibility. Mutation-based identity coverage remains paired with
+the isolated candidate target above, never with customer data behind the
+published URL.
 
 Before publishing a release that depends on the account-role migration:
 

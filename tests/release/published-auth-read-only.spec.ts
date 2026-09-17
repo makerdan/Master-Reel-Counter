@@ -5,6 +5,8 @@ import { resolveClerkEnvironmentPublishableKey } from "../../shared/clerk-config
 const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
   "PRODUCTION_DEPLOYMENT_ID",
+  "RELEASE_PUBLISHED_SMOKE_TARGET",
+  "RELEASE_PUBLISHED_SMOKE_MODE",
   "CLERK_PUBLISHABLE_KEY",
   "VITE_CLERK_PUBLISHABLE_KEY",
 ] as const;
@@ -22,7 +24,22 @@ function requirePublishedEnvironment(): void {
   if (process.env.RELEASE_SMOKE_PUBLISHED_READ_ONLY !== "1") {
     throw new Error("Published Clerk verification requires the read-only release wrapper");
   }
-  for (const name of ["DATABASE_URL", "RELEASE_SMOKE_DATABASE_URL", "RELEASE_PUBLICATION_DATABASE_URL", "CLERK_SECRET_KEY"]) {
+  if (process.env.RELEASE_PUBLISHED_SMOKE_MODE !== "read-only") {
+    throw new Error("Published Clerk verification requires an explicit read-only smoke mode");
+  }
+  const publishedTarget = new URL(process.env.PRODUCTION_BASE_URL!).origin;
+  if (process.env.RELEASE_PUBLISHED_SMOKE_TARGET !== publishedTarget) {
+    throw new Error(
+      "Published Clerk verification requires the smoke target to match the published deployment",
+    );
+  }
+  for (const name of [
+    "DATABASE_URL",
+    "RELEASE_SMOKE_DATABASE_URL",
+    "RELEASE_PUBLICATION_DATABASE_URL",
+    "RELEASE_PUBLISHED_SMOKE_DATABASE_URL",
+    "CLERK_SECRET_KEY",
+  ]) {
     if (process.env[name]) {
       throw new Error(`Published read-only Clerk verification refuses privileged ${name}`);
     }

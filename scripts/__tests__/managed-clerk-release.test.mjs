@@ -337,6 +337,11 @@ test("manual CI release gate verifies the currently published deployment", () =>
   assert.match(workflow, /name: Require safe published production URL/);
   assert.match(workflow, /PRODUCTION_BASE_URL: \$\{\{ vars\.PRODUCTION_BASE_URL \}\}/);
   assert.match(workflow, /PRODUCTION_DEPLOYMENT_ID: \$\{\{ vars\.PRODUCTION_DEPLOYMENT_ID \}\}/);
+  assert.match(
+    workflow,
+    /RELEASE_PUBLISHED_SMOKE_TARGET: \$\{\{ vars\.PRODUCTION_BASE_URL \}\}/,
+  );
+  assert.match(workflow, /RELEASE_PUBLISHED_SMOKE_MODE: read-only/);
   assert.match(workflow, /run: node scripts\/validate-production-base-url\.mjs/);
   assert.match(workflow, /run: npm run verify:managed-clerk-published/);
   assert.doesNotMatch(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
@@ -356,6 +361,10 @@ test("manual CI release gate verifies the currently published deployment", () =>
   assert.match(publishedRelease, /RELEASE_SMOKE_PUBLISHED_READ_ONLY = "1"/);
   assert.match(publishedRelease, /"DATABASE_URL"/);
   assert.match(publishedRelease, /"CLERK_SECRET_KEY"/);
+  assert.match(publishedRelease, /RELEASE_PUBLISHED_SMOKE_TARGET/);
+  assert.match(publishedRelease, /RELEASE_PUBLISHED_SMOKE_MODE/);
+  assert.match(publishedRelease, /refusing an ambiguous published smoke pairing/);
+  assert.match(publishedRelease, /refuses database or Clerk-secret inputs/);
   assert.match(publishedRelease, /"RELEASE_SMOKE_INTERNAL_CANDIDATE"/);
   assert.match(config, /!isPublishedReadOnly &&/);
   assert.doesNotMatch(publishedRelease, /release:build|build-and-verify-release/);
@@ -516,6 +525,8 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.match(config, /published-auth-read-only\.spec\.ts/);
   assert.match(publishedReadOnlySmoke, /page\.request\.get\("\/api\/auth\/user"\)/);
   assert.match(publishedReadOnlySmoke, /RELEASE_SMOKE_PUBLISHED_READ_ONLY/);
+  assert.match(publishedReadOnlySmoke, /RELEASE_PUBLISHED_SMOKE_TARGET/);
+  assert.match(publishedReadOnlySmoke, /RELEASE_PUBLISHED_SMOKE_MODE/);
   assert.match(publishedReadOnlySmoke, /refuses privileged/);
   assert.doesNotMatch(
     publishedReadOnlySmoke,

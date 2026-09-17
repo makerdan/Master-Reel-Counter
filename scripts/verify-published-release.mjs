@@ -8,11 +8,29 @@ import {
 } from "./validate-production-base-url.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const target = validateProductionBaseUrl();
+const publishedTarget = validateProductionBaseUrl();
 const expectedDeploymentId = validateProductionDeploymentId();
 
+const publishedSmokeTarget = process.env.RELEASE_PUBLISHED_SMOKE_TARGET?.trim();
+if (!publishedSmokeTarget) {
+  throw new Error(
+    "RELEASE_PUBLISHED_SMOKE_TARGET is required and must pair the published URL with the read-only smoke boundary.",
+  );
+}
+const normalizedSmokeTarget = validateProductionBaseUrl(publishedSmokeTarget);
+if (normalizedSmokeTarget.origin !== publishedTarget.origin) {
+  throw new Error(
+    "RELEASE_PUBLISHED_SMOKE_TARGET must match PRODUCTION_BASE_URL exactly; refusing an ambiguous published smoke pairing.",
+  );
+}
+if (process.env.RELEASE_PUBLISHED_SMOKE_MODE !== "read-only") {
+  throw new Error(
+    "RELEASE_PUBLISHED_SMOKE_MODE must be read-only; published verification cannot use a fixture-writing smoke mode.",
+  );
+}
+
 async function verifyPublishedDeploymentIdentity() {
-  const healthUrl = new URL("/api/healthz", target.origin);
+  const healthUrl = new URL("/api/healthz", publishedTarget.origin);
   let response;
   try {
     response = await fetch(healthUrl, {
@@ -53,20 +71,32 @@ async function verifyPublishedDeploymentIdentity() {
 await verifyPublishedDeploymentIdentity();
 
 const publishedReadOnlyEnvironment = { ...process.env };
-for (const name of [
+const forbiddenPublishedInputs = [
   "DATABASE_URL",
   "RELEASE_SMOKE_DATABASE_URL",
   "RELEASE_PUBLICATION_DATABASE_URL",
+  "RELEASE_PUBLISHED_SMOKE_DATABASE_URL",
   "RELEASE_SMOKE_INTERNAL_CANDIDATE",
   "RELEASE_SMOKE_CANDIDATE_HOST",
   "RELEASE_SMOKE_CANDIDATE_TLS_PORT",
   "RELEASE_SMOKE_CANDIDATE_APP_ORIGIN",
   "RELEASE_SMOKE_CANDIDATE_ID",
   "CLERK_SECRET_KEY",
-]) {
+];
+const suppliedForbiddenInputs = forbiddenPublishedInputs.filter(
+  (name) => process.env[name],
+);
+if (suppliedForbiddenInputs.length > 0) {
+  throw new Error(
+    `Published read-only verification refuses database or Clerk-secret inputs: ${suppliedForbiddenInputs.join(", ")}`,
+  );
+}
+for (const name of forbiddenPublishedInputs) {
   delete publishedReadOnlyEnvironment[name];
 }
 publishedReadOnlyEnvironment.RELEASE_SMOKE_PUBLISHED_READ_ONLY = "1";
+publishedReadOnlyEnvironment.RELEASE_PUBLISHED_SMOKE_MODE = "read-only";
+publishedReadOnlyEnvironment.RELEASE_PUBLISHED_SMOKE_TARGET = publishedTarget.origin;
 
 const result = spawnSync(
   process.execPath,
