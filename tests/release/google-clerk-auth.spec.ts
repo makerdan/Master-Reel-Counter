@@ -9,7 +9,10 @@ import {
   setupCandidateClerkTestingToken,
 } from "../support/clerk-candidate-testing";
 import { CLERK_PROXY_PATH } from "../../shared/clerk-config";
-import { assertIsolatedReleaseDatabase } from "../../scripts/release-schema-preflight.mjs";
+import {
+  assertIsolatedReleaseDatabase,
+  assertReleaseSchema,
+} from "../../scripts/release-schema-preflight.mjs";
 import { assertClerkTestPermissions } from "../support/clerk-test-permissions";
 
 const { Client } = pg;
@@ -187,6 +190,15 @@ test.describe("Google-backed Clerk application boundary", () => {
       releaseDatabaseUrl: process.env.RELEASE_SMOKE_DATABASE_URL,
       publicationDatabaseUrl: process.env.RELEASE_PUBLICATION_DATABASE_URL,
     });
+    const database = new Client({
+      connectionString: process.env.RELEASE_SMOKE_DATABASE_URL,
+    });
+    await database.connect();
+    try {
+      await assertReleaseSchema(database);
+    } finally {
+      await database.end();
+    }
     const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
     await assertClerkTestPermissions(clerk);
   });

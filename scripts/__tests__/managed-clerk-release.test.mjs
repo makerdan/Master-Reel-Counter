@@ -496,6 +496,7 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.match(browserRunner, /RELEASE_SMOKE_DATABASE_URL/);
   assert.match(browserRunner, /RELEASE_PUBLICATION_DATABASE_URL/);
   assert.match(googleReleaseSmoke, /assertIsolatedReleaseDatabase/);
+  assert.match(googleReleaseSmoke, /assertReleaseSchema\(database\)/);
   assert.match(googleReleaseSmoke, /RELEASE_SMOKE_DATABASE_URL/);
   assert.match(googleReleaseSmoke, /RELEASE_PUBLICATION_DATABASE_URL/);
   assert.match(googleReleaseSmoke, /internalCandidate/);
@@ -516,6 +517,22 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
     googleReleaseSmoke.indexOf("assertIsolatedReleaseDatabase({") <
       googleReleaseSmoke.indexOf("createClerkClient({"),
     "Google candidate isolation must be established before provider access",
+  );
+  const googleBeforeAll = googleReleaseSmoke.indexOf("test.beforeAll(async () => {");
+  const googleSchemaPreflight = googleReleaseSmoke.indexOf(
+    "await assertReleaseSchema(database)",
+    googleBeforeAll,
+  );
+  const googlePermissionPreflight = googleReleaseSmoke.indexOf(
+    "await assertClerkTestPermissions(clerk)",
+    googleBeforeAll,
+  );
+  assert(googleBeforeAll >= 0);
+  assert(googleSchemaPreflight >= 0);
+  assert(googlePermissionPreflight >= 0);
+  assert(
+    googleSchemaPreflight < googlePermissionPreflight,
+    "Google schema preflight must pass before Clerk permission probes",
   );
   assert(
     googleReleaseSmoke.indexOf("assertIsolatedReleaseDatabase({") <
