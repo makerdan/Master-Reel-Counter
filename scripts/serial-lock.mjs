@@ -16,6 +16,7 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
+  ftruncateSync,
   fstatSync,
   linkSync,
   mkdirSync,
@@ -147,12 +148,13 @@ function getProcessParents() {
 }
 
 function getDescendants(pid, parents) {
+  const root = String(pid);
   const descendants = new Set();
   let changed = true;
   while (changed) {
     changed = false;
     for (const [candidate, parent] of parents) {
-      if ((parent === String(pid) || descendants.has(parent)) && !descendants.has(candidate)) {
+      if ((parent === root || descendants.has(parent)) && !descendants.has(candidate)) {
         descendants.add(candidate);
         changed = true;
       }
@@ -170,6 +172,25 @@ function isRunning(pid) {
   } catch {
     return isAlive(pid);
   }
+}
+
+function isProcessGroupRunning(processGroupId) {
+  if (process.platform === "win32" || !Number.isInteger(processGroupId) || processGroupId <= 0) {
+    return false;
+  }
+  try {
+    process.kill(-processGroupId, 0);
+    return true;
+  } catch (error) {
+    return error?.code !== "ESRCH";
+  }
+}
+
+function hasSurvivingOwnership(lock) {
+  const ownership = lock?.ownership;
+  if (!ownership) return false;
+  if (isProcessGroupRunning(ownership.processGroupId)) return true;
+  return ownership.observedChildPids.some((pid) => isRunning(pid));
 }
 
 function signalPid(pid, signal) {
@@ -225,15 +246,40 @@ function atomicWrite(path, content) {
 const LOCK_TOKEN = randomBytes(16).toString("hex");
 let holderLockFd = null;
 
-function lockContent(acquiredAt, lastHeartbeat = acquiredAt) {
+function emptyOwnership() {
+  return {
+    childPid: null,
+    processGroupId: null,
+    observedChildPids: [],
+    cleanupPending: false,
+  };
+}
+
+function normalizeOwnership(value) {
+  if (!value || typeof value !== "object") return emptyOwnership();
+  const positiveInteger = (candidate) =>
+    Number.isInteger(candidate) && candidate > 0 ? candidate : null;
+  return {
+    childPid: positiveInteger(value.childPid),
+    processGroupId: positiveInteger(value.processGroupId),
+    observedChildPids: Array.isArray(value.observedChildPids)
+      ? [...new Set(value.observedChildPids.map(positiveInteger).filter(Boolean))]
+      : [],
+    cleanupPending: value.cleanupPending === true,
+  };
+}
+
+function lockContent(acquiredAt, lastHeartbeat = acquiredAt, ownership = emptyOwnership()) {
   return `${String(process.pid).padStart(12, "0")}\n` +
     `${String(acquiredAt).padStart(16, "0")}\n` +
     `${String(lastHeartbeat).padStart(16, "0")}\n` +
-    `${LOCK_TOKEN}\n`;
+    `${LOCK_TOKEN}\n` +
+    `${JSON.stringify(normalizeOwnership(ownership))}\n`;
 }
 
 function writeLockToFd(fd, content) {
   writeSync(fd, content, 0, "utf8");
+  ftruncateSync(fd, Buffer.byteLength(content));
   fsyncSync(fd);
 }
 
@@ -260,9 +306,10 @@ function readLock() {
           : parsed.acquiredAt,
         resource: parsed.resource ?? RESOURCE,
         token: typeof parsed.token === "string" ? parsed.token : null,
+        ownership: normalizeOwnership(parsed.ownership),
       };
     }
-    const [pid, acquiredAt, lastHeartbeat, token] = trimmed.split("\n");
+    const [pid, acquiredAt, lastHeartbeat, token, ownershipRaw] = trimmed.split("\n");
     const numericPid = Number(pid);
     const numericAcquiredAt = Number(acquiredAt);
     const numericLastHeartbeat = Number(lastHeartbeat);
@@ -279,6 +326,13 @@ function readLock() {
         : numericAcquiredAt,
       resource: RESOURCE,
       token: token || null,
+      ownership: (() => {
+        try {
+          return normalizeOwnership(ownershipRaw ? JSON.parse(ownershipRaw) : null);
+        } catch {
+          return emptyOwnership();
+        }
+      })(),
     };
   } catch (error) {
     if (error?.code === "ENOENT") return null;
@@ -344,10 +398,29 @@ function writeHeartbeat() {
       lock.pid === process.pid &&
       lock.token === LOCK_TOKEN
     ) {
-      writeLockToFd(holderLockFd, lockContent(lock.acquiredAt, Date.now()));
+       writeLockToFd(holderLockFd, lockContent(lock.acquiredAt, Date.now(), lock.ownership));
     }
   } catch {
     // A transient heartbeat write failure is handled by the stale recovery path.
+  }
+}
+
+function updateOwnership(ownership) {
+  try {
+    const lock = readLock();
+    if (
+      holderLockFd !== null &&
+      lock?.kind === "valid" &&
+      lock.pid === process.pid &&
+      lock.token === LOCK_TOKEN
+    ) {
+      writeLockToFd(
+        holderLockFd,
+        lockContent(lock.acquiredAt, Date.now(), normalizeOwnership(ownership)),
+      );
+    }
+  } catch {
+    // A failed ownership update leaves the lock recoverable through its last known metadata.
   }
 }
 
@@ -539,7 +612,23 @@ async function acquireLock() {
       else if (heartbeatAgeMs > HEARTBEAT_STALE_MS) takeoverReason = "heartbeat is stale";
       else if (heldMs > MAX_HOLD_MS) takeoverReason = "maximum hold duration exceeded";
 
-      if (takeoverReason) {
+      const survivingOwnership = hasSurvivingOwnership(lock);
+      const mustPreserveSurvivor =
+        survivingOwnership && (!isAlive(lock.pid) || lock.ownership.cleanupPending);
+      if (takeoverReason && mustPreserveSurvivor) {
+        const waitedMs = waitElapsed();
+        if (waitedMs >= MAX_WAIT_MS) {
+          failWait(waitedMs);
+        }
+        if (!waiterWritten) {
+          writeWaiter();
+          waiterWritten = true;
+        }
+        console.log(
+          `[serial-lock] waiting for resource '${RESOURCE}' because stale holder PID ${lock.pid} ` +
+          `still has surviving child process-group/tree work (elapsed ${Math.round(waitedMs / 1000)}s)`,
+        );
+      } else if (takeoverReason) {
         console.error(
           `\n[serial-lock] INCIDENT: reclaiming resource '${RESOURCE}' from PID ${lock.pid}; ` +
           `${takeoverReason} (held ${Math.round(heldMs / 1000)}s).\n`,
@@ -628,6 +717,18 @@ function observeChildTree() {
   }
 }
 
+function persistChildOwnership(cleanupPending = false) {
+  updateOwnership({
+    childPid: child.pid ?? null,
+    processGroupId: process.platform === "win32" ? null : child.pid ?? null,
+    observedChildPids: [...observedChildPids],
+    cleanupPending,
+  });
+}
+
+observeChildTree();
+persistChildOwnership();
+
 function remainingChildPids() {
   return [...observedChildPids].filter((pid) => isRunning(pid));
 }
@@ -646,6 +747,7 @@ async function terminateChild(reason, initialSignal = "SIGTERM") {
   if (cleanupPromise) return cleanupPromise;
   cleanupPromise = (async () => {
     observeChildTree();
+    persistChildOwnership(true);
     console.error(
       `[serial-lock] INCIDENT: terminating resource '${RESOURCE}' command after ${reason}.`,
     );
@@ -655,6 +757,7 @@ async function terminateChild(reason, initialSignal = "SIGTERM") {
     let cleaned = await waitForChildCleanup();
     if (!cleaned) {
       observeChildTree();
+      persistChildOwnership(true);
       const survivors = remainingChildPids();
       console.error(
         `[serial-lock] INCIDENT: ${survivors.length} child process(es) survived ` +

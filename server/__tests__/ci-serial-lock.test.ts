@@ -116,15 +116,31 @@ function runLocked(
 }
 
 /** Read the lock file written by serial-lock.mjs. */
-function readLockFile(path: string): { pid: number; acquiredAt: number; lastHeartbeat: number } | null {
+function readLockFile(path: string): {
+  pid: number;
+  acquiredAt: number;
+  lastHeartbeat: number;
+  ownership: {
+    childPid: number | null;
+    processGroupId: number | null;
+    observedChildPids: number[];
+    cleanupPending: boolean;
+  };
+} | null {
   try {
     const raw = readFileSync(path, "utf8").trim();
-    const [pidStr, tsStr, hbStr] = raw.split("\n");
+    const [pidStr, tsStr, hbStr, , ownershipRaw] = raw.split("\n");
     const pid = parseInt(pidStr, 10);
     const acquiredAt = parseInt(tsStr, 10);
     if (isNaN(pid) || isNaN(acquiredAt)) return null;
     const lastHeartbeat = hbStr ? parseInt(hbStr, 10) : acquiredAt;
-    return { pid, acquiredAt, lastHeartbeat: isNaN(lastHeartbeat) ? acquiredAt : lastHeartbeat };
+    const ownership = ownershipRaw ? JSON.parse(ownershipRaw) : {};
+    return {
+      pid,
+      acquiredAt,
+      lastHeartbeat: isNaN(lastHeartbeat) ? acquiredAt : lastHeartbeat,
+      ownership,
+    };
   } catch { return null; }
 }
 
@@ -169,18 +185,39 @@ await test("acquires and releases lock, exits 0 for successful command", async (
   }
 });
 
-await test("lock file has three lines: pid, acquiredAt, lastHeartbeat", async () => {
+await test("lock file records holder timing and child ownership metadata", async () => {
   const lockPath = tempLockPath();
   const { proc } = runLocked(lockPath, ["sleep", "5"]);
 
   try {
     // Poll until the lock file appears.
-    const appeared = await waitFor(() => readLockFile(lockPath) !== null, 4_000);
-    assert.ok(appeared, "lock file should appear once holder acquires");
+    let recordedLock: ReturnType<typeof readLockFile> = null;
+    const ownershipRecorded = await waitFor(
+      () => {
+        const candidate = readLockFile(lockPath);
+        if (candidate && Number.isInteger(candidate.ownership.childPid) && candidate.ownership.childPid > 0) {
+          recordedLock = candidate;
+          return true;
+        }
+        return false;
+      },
+      4_000,
+    );
+    assert.ok(ownershipRecorded, "lock file should record child ownership once holder acquires");
 
-    const lock = readLockFile(lockPath);
+    const lock = recordedLock;
     assert.ok(lock !== null, "lock file must be readable");
     assert.ok(lock!.pid > 0, `pid should be positive (got ${lock!.pid})`);
+    assert.ok(lock!.ownership.childPid > 0, "lock should record the child PID");
+    assert.equal(
+      lock!.ownership.processGroupId,
+      lock!.ownership.childPid,
+      "lock should record the detached child process group",
+    );
+    assert.ok(
+      lock!.ownership.observedChildPids.includes(lock!.ownership.childPid),
+      "lock should record the child in its observed ownership tree",
+    );
     assert.ok(lock!.acquiredAt > 0, "acquiredAt should be a positive timestamp");
     assert.ok(lock!.lastHeartbeat > 0, "lastHeartbeat should be written on acquisition");
     assert.ok(
@@ -622,6 +659,79 @@ await test("timeout cleans up a detached descendant before releasing the lock", 
     if (detachedPid && processIsRunning(detachedPid)) {
       try { process.kill(detachedPid, "SIGKILL"); } catch { /* already gone */ }
     }
+    cleanup(markerPath);
+    cleanup(lockPath);
+  }
+});
+
+await test("stale recovery preserves a lock while cleanup survivors still own the process group", async () => {
+  const lockPath = tempLockPath();
+  const markerPath = join(tmpdir(), `repl-lock-survivor-${randomBytes(4).toString("hex")}.marker`);
+  const survivor = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000);"],
+    { detached: true, stdio: "ignore" },
+  );
+  const survivorPid = survivor.pid ?? 0;
+  const now = Date.now();
+  const ownership = {
+    childPid: survivorPid,
+    processGroupId: survivorPid,
+    observedChildPids: [survivorPid],
+    cleanupPending: true,
+  };
+  writeFileSync(
+    lockPath,
+    `${999999}\n${now - 30_000}\n${now - 30_000}\nstale-owner\n${JSON.stringify(ownership)}\n`,
+    "utf8",
+  );
+  const command = [
+    "const fs=require('fs');",
+    `fs.writeFileSync(${JSON.stringify(markerPath)},'acquired');`,
+    "process.exit(0);",
+  ];
+  const contenders = Array.from({ length: 2 }, () =>
+    runLocked(
+      lockPath,
+      [process.execPath, "-e", command.join("")],
+      {
+        SERIAL_LOCK_MAX_WAIT_MS: "550",
+        SERIAL_LOCK_WAIT_INTERVAL_MS: "100",
+      },
+    ),
+  );
+
+  try {
+    assert.ok(survivorPid > 0, "surviving process group should have a PID");
+    assert.ok(processIsRunning(survivorPid), "surviving process should be running");
+    const results = await Promise.all(contenders.map(({ done }) => done));
+    for (const result of results) {
+      assert.equal(result.code, 1, "later checks must refuse takeover while cleanup work survives");
+      assert.match(
+        result.stdout + result.stderr,
+        /surviving child process-group\/tree work/,
+        "recovery should explain why the stale lock remains held",
+      );
+    }
+    assert.ok(existsSync(lockPath), "stale lock must remain while the survivor owns the group");
+    assert.ok(!existsSync(markerPath), "no later check may run concurrently with the survivor");
+
+    process.kill(-survivorPid, "SIGKILL");
+    assert.ok(
+      await waitFor(() => !processIsRunning(survivorPid), 4_000),
+      "surviving process group should terminate before takeover",
+    );
+    const recovered = runLocked(
+      lockPath,
+      [process.execPath, "-e", command.join("")],
+      { SERIAL_LOCK_MAX_WAIT_MS: "2_000" },
+    );
+    const recoveredResult = await recovered.done;
+    assert.equal(recoveredResult.code, 0, "lock should be reclaimable after cleanup is verified");
+    assert.ok(existsSync(markerPath), "the post-cleanup check should run only after takeover is safe");
+  } finally {
+    try { process.kill(-survivorPid, "SIGKILL"); } catch { /* already gone */ }
+    survivor.kill("SIGKILL");
     cleanup(markerPath);
     cleanup(lockPath);
   }
