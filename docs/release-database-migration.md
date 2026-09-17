@@ -20,8 +20,21 @@ termination all stop child processes before removing an automatically created
 database. Creation or cleanup failure blocks release with a bounded,
 credential-free diagnostic; the harness never falls back to publication data.
 
+The isolation guard defines the writable physical target as normalized host,
+effective PostgreSQL port (default `5432`), and decoded database name. Usernames,
+passwords, URL protocol spelling, query ordering, and schema/search-path
+parameters cannot make one physical database appear distinct. Different host
+spellings are ambiguous without provider-specific identity data, so the guard
+fails closed; candidate smoke must use an explicit different database on the
+same PostgreSQL endpoint.
+
 This isolated smoke proves that the candidate and smoke test agree on the
 reviewed schema. It does **not** prove that the publishing database is current.
+
+Currently published verification is separate and read-only. It receives no
+database URL or Clerk secret, creates no identities, performs no stale-fixture
+cleanup or schema preparation, and proves only anonymous authorization, live
+Clerk proxy availability, and Google provider visibility.
 
 Before publishing a release that depends on the account-role migration:
 

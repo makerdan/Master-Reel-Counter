@@ -3,9 +3,12 @@ import { execSync } from "node:child_process";
 import { validateProductionBaseUrl } from "./scripts/validate-production-base-url.mjs";
 
 const target = validateProductionBaseUrl();
+const isPublishedReadOnly =
+  process.env.RELEASE_SMOKE_PUBLISHED_READ_ONLY === "1";
 const candidateHost = process.env.RELEASE_SMOKE_CANDIDATE_HOST;
 const candidateTlsPort = Number(process.env.RELEASE_SMOKE_CANDIDATE_TLS_PORT);
 const isInternalCandidate =
+  !isPublishedReadOnly &&
   process.env.RELEASE_SMOKE_INTERNAL_CANDIDATE === "1" &&
   target.protocol === "https:" &&
   Boolean(candidateHost) &&
@@ -34,6 +37,9 @@ const chromiumExecutable = findChromium();
 
 export default defineConfig({
   testDir: "./tests/release",
+  testMatch: isInternalCandidate
+    ? ["managed-clerk-auth.spec.ts", "google-clerk-auth.spec.ts"]
+    : ["published-auth-read-only.spec.ts"],
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,

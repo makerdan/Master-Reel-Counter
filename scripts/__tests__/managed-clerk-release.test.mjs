@@ -61,6 +61,10 @@ const googleReleaseSmoke = readFileSync(
   resolve(root, "tests/release/google-clerk-auth.spec.ts"),
   "utf8",
 );
+const publishedReadOnlySmoke = readFileSync(
+  resolve(root, "tests/release/published-auth-read-only.spec.ts"),
+  "utf8",
+);
 const clerkTestPermissions = readFileSync(
   resolve(root, "tests/support/clerk-test-permissions.ts"),
   "utf8",
@@ -275,7 +279,8 @@ test("manual CI release gate verifies the currently published deployment", () =>
   assert.match(workflow, /PRODUCTION_BASE_URL: \$\{\{ vars\.PRODUCTION_BASE_URL \}\}/);
   assert.match(workflow, /run: node scripts\/validate-production-base-url\.mjs/);
   assert.match(workflow, /run: npm run verify:managed-clerk-published/);
-  assert.match(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
+  assert.doesNotMatch(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
+  assert.doesNotMatch(workflow, /CLERK_SECRET_KEY: \$\{\{ secrets\.CLERK_SECRET_KEY \}\}/);
   assert.doesNotMatch(workflow, /image: postgres:16/);
   assert.doesNotMatch(workflow, /run: npm run release:build/);
   assert.doesNotMatch(workflow, /RELEASE_SMOKE_DATABASE_URL:/);
@@ -283,14 +288,20 @@ test("manual CI release gate verifies the currently published deployment", () =>
   assert.match(packageJson.scripts["verify:managed-clerk-published"], /verify-published-release\.mjs/);
   assert.match(publishedRelease, /validateProductionBaseUrl/);
   assert.match(publishedRelease, /playwright\.release\.config\.ts/);
-  assert.match(publishedRelease, /process\.env/);
+  assert.match(publishedRelease, /publishedReadOnlyEnvironment/);
+  assert.match(publishedRelease, /delete publishedReadOnlyEnvironment\[name\]/);
+  assert.match(publishedRelease, /RELEASE_SMOKE_PUBLISHED_READ_ONLY = "1"/);
+  assert.match(publishedRelease, /"DATABASE_URL"/);
+  assert.match(publishedRelease, /"CLERK_SECRET_KEY"/);
+  assert.match(publishedRelease, /"RELEASE_SMOKE_INTERNAL_CANDIDATE"/);
+  assert.match(config, /!isPublishedReadOnly &&/);
   assert.doesNotMatch(publishedRelease, /release:build|build-and-verify-release/);
   assert.match(candidateBuild, /candidate_id="\$\{RELEASE_CANDIDATE_ID:-/);
 });
 
-test("manual CI published deployment check blocks when matched production Clerk credentials are unavailable", () => {
-  assert.match(workflow, /name: Require matched production Clerk credentials/);
-  assert.match(workflow, /secrets\.CLERK_SECRET_KEY/);
+test("manual CI published deployment check requires only matched publishable keys", () => {
+  assert.match(workflow, /name: Require matched production Clerk publishable keys/);
+  assert.doesNotMatch(workflow, /secrets\.CLERK_SECRET_KEY/);
   assert.equal(
     workflow.match(/CLERK_PUBLISHABLE_KEY: \$\{\{ secrets\.CLERK_PUBLISHABLE_KEY \}\}/g)?.length,
     2,
@@ -307,8 +318,8 @@ test("manual CI published deployment check blocks when matched production Clerk 
     /\[\[ -n "\$VITE_CLERK_PUBLISHABLE_KEY" \]\] \|\| missing\+=\("VITE_CLERK_PUBLISHABLE_KEY"\)/,
   );
   assert.match(workflow, /secrets\.VITE_CLERK_PUBLISHABLE_KEY/);
-  assert.match(workflow, /validation is blocked: missing production credential/);
-  assert.doesNotMatch(workflow, /continue-on-error:[\s\S]*Require matched production Clerk credentials/);
+  assert.match(workflow, /validation is blocked: missing production publishable key/);
+  assert.doesNotMatch(workflow, /continue-on-error:[\s\S]*Require matched production Clerk publishable keys/);
 });
 
 test("published deployment target validation fails closed for missing or unsafe URLs", () => {
@@ -402,6 +413,11 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
     /assertReleaseSchema\(database\);[\s\S]*clerk\.users\.createUser/,
   );
   assert.match(browserRunner, /CREATE DATABASE/);
+  assert(
+    browserRunner.indexOf("assertIsolatedReleaseDatabase({", browserRunner.indexOf("else {")) <
+      browserRunner.indexOf("createTemporaryDatabase(databaseName, browserDatabaseUrl)"),
+    "automatic browser database isolation must be established before CREATE DATABASE",
+  );
   assert.match(browserRunner, /prepare-release-test-database\.mjs/);
   assert.match(browserRunner, /DROP DATABASE IF EXISTS/);
   assert.match(browserRunner, /RELEASE_SMOKE_DATABASE_URL/);
@@ -410,7 +426,37 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.match(googleReleaseSmoke, /RELEASE_SMOKE_DATABASE_URL/);
   assert.match(googleReleaseSmoke, /RELEASE_PUBLICATION_DATABASE_URL/);
   assert.match(googleReleaseSmoke, /internalCandidate/);
-  assert.match(googleReleaseSmoke, /connectionString: internalCandidate/);
+  assert.match(googleReleaseSmoke, /connectionString: process\.env\.RELEASE_SMOKE_DATABASE_URL/);
+  assert.doesNotMatch(releaseSmoke, /process\.env\.DATABASE_URL/);
+  assert.doesNotMatch(googleReleaseSmoke, /process\.env\.DATABASE_URL/);
+  assert(
+    releaseSmoke.indexOf("assertIsolatedReleaseDatabase({") <
+      releaseSmoke.indexOf("createClerkClient({"),
+    "managed candidate isolation must be established before provider access",
+  );
+  assert(
+    releaseSmoke.indexOf("assertIsolatedReleaseDatabase({") <
+      releaseSmoke.indexOf("new Client({"),
+    "managed candidate isolation must be established before SQL access",
+  );
+  assert(
+    googleReleaseSmoke.indexOf("assertIsolatedReleaseDatabase({") <
+      googleReleaseSmoke.indexOf("createClerkClient({"),
+    "Google candidate isolation must be established before provider access",
+  );
+  assert(
+    googleReleaseSmoke.indexOf("assertIsolatedReleaseDatabase({") <
+      googleReleaseSmoke.indexOf("new Client({"),
+    "Google candidate isolation must be established before SQL access",
+  );
+  assert.match(config, /published-auth-read-only\.spec\.ts/);
+  assert.match(publishedReadOnlySmoke, /page\.request\.get\("\/api\/auth\/user"\)/);
+  assert.match(publishedReadOnlySmoke, /RELEASE_SMOKE_PUBLISHED_READ_ONLY/);
+  assert.match(publishedReadOnlySmoke, /refuses privileged/);
+  assert.doesNotMatch(
+    publishedReadOnlySmoke,
+    /createClerkClient|new Client|database\.query|createUser|deleteUser|INSERT INTO|DELETE FROM/,
+  );
 });
 
 async function runReleaseDatabaseHarness({ directory, lifecycleBody, exitStatus = "0", extraEnv = {} }) {
@@ -815,8 +861,21 @@ test("ordinary and release Playwright configurations have disjoint discovery", (
     PRODUCTION_BASE_URL: "https://example.com",
   });
   assert.doesNotMatch(ordinary, /managed Clerk sign-in preserves/);
-  assert.match(release, /managed Clerk sign-in preserves/);
+  assert.match(release, /published managed Clerk and Google boundaries are reachable without fixture writes/);
+  assert.doesNotMatch(release, /managed Clerk sign-in preserves/);
   assert.doesNotMatch(release, /dashboard\.spec|settings\.spec|session\.spec/);
+  const pollutedPublished = listTests("playwright.release.config.ts", {
+    PRODUCTION_BASE_URL: "https://example.com",
+    RELEASE_SMOKE_PUBLISHED_READ_ONLY: "1",
+    RELEASE_SMOKE_INTERNAL_CANDIDATE: "1",
+    RELEASE_SMOKE_CANDIDATE_HOST: "example.com",
+    RELEASE_SMOKE_CANDIDATE_TLS_PORT: "443",
+  });
+  assert.match(
+    pollutedPublished,
+    /published managed Clerk and Google boundaries are reachable without fixture writes/,
+  );
+  assert.doesNotMatch(pollutedPublished, /managed Clerk sign-in preserves/);
 });
 
 test("smoke uses disposable managed identity and preserves local authorization state", () => {
@@ -1571,13 +1630,13 @@ test("published release workflow passes protected inputs only through the enviro
   assert.match(workflow, /needs:\s+- require-trusted-main/);
   assert.match(workflow, /npm run verify:managed-clerk-published/);
   assert.match(workflow, /PRODUCTION_BASE_URL: \$\{\{ vars\.PRODUCTION_BASE_URL \}\}/);
-  assert.match(workflow, /CLERK_SECRET_KEY: \$\{\{ secrets\.CLERK_SECRET_KEY \}\}/);
+  assert.doesNotMatch(workflow, /CLERK_SECRET_KEY: \$\{\{ secrets\.CLERK_SECRET_KEY \}\}/);
   assert.match(workflow, /CLERK_PUBLISHABLE_KEY: \$\{\{ secrets\.CLERK_PUBLISHABLE_KEY \}\}/);
   assert.match(
     workflow,
     /VITE_CLERK_PUBLISHABLE_KEY: \$\{\{ secrets\.VITE_CLERK_PUBLISHABLE_KEY \}\}/,
   );
-  assert.match(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
+  assert.doesNotMatch(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
   assert.doesNotMatch(workflow, /echo.*SECRET|set -x/);
   assert.doesNotMatch(workflow, /playwright-report/);
   const jobHeader = workflow.slice(0, workflow.indexOf("    steps:"));

@@ -33,8 +33,7 @@ function run(command, args, env) {
   return result.status ?? 1;
 }
 
-async function createTemporaryDatabase() {
-  const databaseName = `browser_test_${process.pid}_${randomUUID().replaceAll("-", "")}`;
+async function createTemporaryDatabase(databaseName, databaseUrl) {
   const adminUrl = databaseUrlWithName(sourceDatabaseUrl, "postgres");
   const admin = new Client({ connectionString: adminUrl });
   await admin.connect();
@@ -45,7 +44,7 @@ async function createTemporaryDatabase() {
   }
   return {
     databaseName,
-    databaseUrl: databaseUrlWithName(sourceDatabaseUrl, databaseName),
+    databaseUrl,
     adminUrl,
   };
 }
@@ -77,7 +76,13 @@ try {
       publicationDatabaseUrl: sourceDatabaseUrl,
     });
   } else {
-    temporaryDatabase = await createTemporaryDatabase();
+    const databaseName = `browser_test_${process.pid}_${randomUUID().replaceAll("-", "")}`;
+    browserDatabaseUrl = databaseUrlWithName(sourceDatabaseUrl, databaseName);
+    assertIsolatedReleaseDatabase({
+      releaseDatabaseUrl: browserDatabaseUrl,
+      publicationDatabaseUrl: sourceDatabaseUrl,
+    });
+    temporaryDatabase = await createTemporaryDatabase(databaseName, browserDatabaseUrl);
     browserDatabaseUrl = temporaryDatabase.databaseUrl;
   }
 

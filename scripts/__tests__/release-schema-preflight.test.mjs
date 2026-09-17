@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 import {
   assertIsolatedReleaseDatabase,
   assertReleaseSchema,
 } from "../release-schema-preflight.mjs";
+
+const execFileAsync = promisify(execFile);
+const root = resolve(import.meta.dirname, "../..");
 
 function fakeClient({ columns, roleValues = ["Admin", "User"], legacyColumns = [], sessions = [] }) {
   return {
@@ -42,14 +50,47 @@ const currentColumns = [
   "capabilities",
 ];
 
-test("release target must be explicit and distinct from the publishing database", () => {
+test("release target identity ignores credentials and equivalent URL spelling", () => {
+  for (const releaseDatabaseUrl of [
+    "postgresql://alice:one@DB/release",
+    "postgres://bob:two@db:5432/release",
+    "postgresql://carol:three@db./release?sslmode=require",
+    "postgresql://dave:four@db/release?schema=release_smoke",
+    "postgresql://erin:five@db/release?options=-csearch_path%3Drelease_smoke",
+  ]) {
+    assert.throws(
+      () => assertIsolatedReleaseDatabase({
+        releaseDatabaseUrl,
+        publicationDatabaseUrl: "postgresql://publisher:secret@db:5432/release?schema=public",
+      }),
+      /dedicated target distinct/,
+    );
+  }
+});
+
+test("release target fails closed when endpoint aliases cannot be proven distinct", () => {
+  for (const releaseDatabaseUrl of [
+    "postgresql://smoke:secret@db-alias/release_smoke",
+    "postgresql://smoke:secret@db:6543/release_smoke",
+  ]) {
+    assert.throws(
+      () => assertIsolatedReleaseDatabase({
+        releaseDatabaseUrl,
+        publicationDatabaseUrl: "postgresql://publisher:secret@db/release",
+      }),
+      /endpoint aliases cannot be proven distinct/,
+    );
+  }
   assert.throws(
     () => assertIsolatedReleaseDatabase({
-      releaseDatabaseUrl: "postgresql://postgres:secret@db/release",
-      publicationDatabaseUrl: "postgresql://postgres:secret@db/release",
+      releaseDatabaseUrl: "postgresql://smoke@db/release_smoke?host=db-alias",
+      publicationDatabaseUrl: "postgresql://publisher@db/release",
     }),
-    /dedicated target distinct/,
+    /cannot prove effective identity when host is supplied/,
   );
+});
+
+test("release target must be explicit, valid, and a different database", () => {
   assert.throws(
     () => assertIsolatedReleaseDatabase({
       releaseDatabaseUrl: "",
@@ -57,12 +98,26 @@ test("release target must be explicit and distinct from the publishing database"
     }),
     /RELEASE_SMOKE_DATABASE_URL is required/,
   );
+  assert.throws(
+    () => assertIsolatedReleaseDatabase({
+      releaseDatabaseUrl: "postgresql://smoke@db",
+      publicationDatabaseUrl: "postgresql://publisher@db/public",
+    }),
+    /explicit host and database name/,
+  );
+  assert.throws(
+    () => assertIsolatedReleaseDatabase({
+      releaseDatabaseUrl: "postgresql://smoke@db/release",
+      publicationDatabaseUrl: "",
+    }),
+    /DATABASE_URL is required/,
+  );
   assert.equal(
     assertIsolatedReleaseDatabase({
       releaseDatabaseUrl: "postgresql://postgres:secret@db/release",
       publicationDatabaseUrl: "postgresql://postgres:secret@db/public",
     }),
-    "postgresql://postgres@db/release",
+    "db:5432/release",
   );
   for (const releaseDatabaseUrl of [
     "postgresql://other:changed@db/public?sslmode=require",
@@ -77,6 +132,38 @@ test("release target must be explicit and distinct from the publishing database"
       }),
       /dedicated target distinct/,
     );
+  }
+});
+
+test("unsafe release target stops schema preparation before the first DDL command", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-boundary-"));
+  const marker = resolve(directory, "npx-invoked");
+  const fakeNpx = resolve(directory, "npx");
+  await writeFile(fakeNpx, `#!/bin/sh\n: > "${marker}"\nexit 99\n`);
+  await chmod(fakeNpx, 0o755);
+
+  try {
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        ["scripts/prepare-release-test-database.mjs"],
+        {
+          cwd: root,
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH ?? ""}`,
+            RELEASE_SMOKE_DATABASE_URL:
+              "postgresql://smoke:one@db:5432/application?schema=smoke",
+            DATABASE_URL:
+              "postgresql://publisher:two@DB/application?options=-csearch_path%3Dpublic",
+          },
+        },
+      ),
+      /dedicated target distinct/,
+    );
+    await assert.rejects(readFile(marker), { code: "ENOENT" });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });
 

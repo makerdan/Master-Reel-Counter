@@ -29,19 +29,53 @@ function databaseTarget(urlString) {
     throw new Error("Release smoke database target must use the PostgreSQL protocol");
   }
 
-  const normalized = new URL(url);
-  normalized.password = "";
-  normalized.searchParams.sort();
-  return normalized.toString();
-}
+  if (!url.hostname || !url.pathname || url.pathname === "/") {
+    throw new Error(
+      "Release smoke database target must include an explicit host and database name",
+    );
+  }
+  if (url.hostname.includes(",")) {
+    throw new Error(
+      "Release smoke database target cannot use a multi-host connection value",
+    );
+  }
+  const endpointOverride = [
+    "host",
+    "hostaddr",
+    "port",
+    "dbname",
+    "database",
+    "service",
+    "servicefile",
+  ].find((name) => url.searchParams.has(name));
+  if (endpointOverride) {
+    throw new Error(
+      `Release smoke database target cannot prove effective identity when ${endpointOverride} is supplied as connection metadata`,
+    );
+  }
 
-function databaseIdentity(urlString) {
-  const url = new URL(databaseTarget(urlString));
-  return JSON.stringify({
-    hostname: url.hostname.toLowerCase(),
-    port: url.port || "5432",
-    databaseName: decodeURIComponent(url.pathname.replace(/^\/+/, "")),
-  });
+  let databaseName;
+  try {
+    databaseName = decodeURIComponent(url.pathname.slice(1));
+  } catch {
+    throw new Error(
+      "Release smoke database target contains an invalid encoded database name",
+    );
+  }
+  if (!databaseName || databaseName.includes("/")) {
+    throw new Error(
+      "Release smoke database target must include exactly one database name",
+    );
+  }
+
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  const port = url.port || "5432";
+  return {
+    host,
+    port,
+    databaseName,
+    identity: `${host}:${port}/${databaseName}`,
+  };
 }
 
 export function assertIsolatedReleaseDatabase({
@@ -62,15 +96,20 @@ export function assertIsolatedReleaseDatabase({
   const releaseTarget = databaseTarget(releaseDatabaseUrl);
   const publicationTarget = databaseTarget(publicationDatabaseUrl);
   if (
-    releaseTarget === publicationTarget ||
-    databaseIdentity(releaseDatabaseUrl) === databaseIdentity(publicationDatabaseUrl)
+    releaseTarget.host !== publicationTarget.host ||
+    releaseTarget.port !== publicationTarget.port
   ) {
+    throw new Error(
+      "Release smoke database endpoint aliases cannot be proven distinct safely; use explicit targets on the same PostgreSQL host and port with different database names",
+    );
+  }
+  if (releaseTarget.databaseName === publicationTarget.databaseName) {
     throw new Error(
       "RELEASE_SMOKE_DATABASE_URL must be a dedicated target distinct from DATABASE_URL; refusing to mutate the publishing database",
     );
   }
 
-  return releaseTarget;
+  return releaseTarget.identity;
 }
 
 async function verifyReviewedMigrations() {

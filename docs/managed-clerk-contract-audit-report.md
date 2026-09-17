@@ -86,6 +86,10 @@ the registered validation tier; no separate dependency-audit command was run.
 
 ### Finding F-002 — Published smoke mutates the publishing database
 
+**Status:** Resolved. Published verification now runs a dedicated read-only
+browser spec without database or Clerk secret credentials. Disposable identity,
+role, navigation, and logout mutation coverage remains candidate-only.
+
 - **File and line:** `tests/release/managed-clerk-auth.spec.ts:198-205`,
   `tests/release/managed-clerk-auth.spec.ts:273-287`,
   `tests/release/managed-clerk-auth.spec.ts:480-517`,
@@ -114,6 +118,10 @@ the registered validation tier; no separate dependency-audit command was run.
   only in the isolated candidate environment.
 
 ### Finding F-003 — Database isolation can accept the same physical target
+
+**Status:** Resolved. Isolation now compares credential-free normalized host,
+effective port, and database name, ignores schema/search-path differences for
+physical-database safety, and fails closed for unprovable host aliases.
 
 - **File and line:** `scripts/release-schema-preflight.mjs:20-35,38-61`,
   `scripts/prepare-release-test-database.mjs:77-84`

@@ -26,16 +26,12 @@ const requiredEnvironment = [
   "CLERK_SECRET_KEY",
   "CLERK_PUBLISHABLE_KEY",
   "VITE_CLERK_PUBLISHABLE_KEY",
-  "DATABASE_URL",
+  "RELEASE_SMOKE_DATABASE_URL",
+  "RELEASE_PUBLICATION_DATABASE_URL",
 ] as const;
 
 function requireReleaseEnvironment(): void {
   const missing: string[] = requiredEnvironment.filter((name) => !process.env[name]);
-  if (internalCandidate) {
-    for (const name of ["RELEASE_SMOKE_DATABASE_URL", "RELEASE_PUBLICATION_DATABASE_URL"]) {
-      if (!process.env[name]) missing.push(name);
-    }
-  }
   if (missing.length > 0) {
     throw new Error(
       `Managed Clerk release smoke is missing required environment variables: ${missing.join(", ")}`,
@@ -193,18 +189,17 @@ async function removeStaleSmokeUsers(
 }
 
 test("managed Clerk sign-in preserves local authorization and protected navigation", async ({ page }, testInfo) => {
+  if (!internalCandidate) {
+    throw new Error("Fixture-writing managed Clerk smoke may run only against an internal candidate");
+  }
   requireReleaseEnvironment();
 
   const baseURL = new URL(process.env.PRODUCTION_BASE_URL!).origin;
-  const smokeDatabaseUrl = internalCandidate
-    ? process.env.RELEASE_SMOKE_DATABASE_URL!
-    : process.env.DATABASE_URL!;
-  if (internalCandidate) {
-    assertIsolatedReleaseDatabase({
-      releaseDatabaseUrl: smokeDatabaseUrl,
-      publicationDatabaseUrl: process.env.RELEASE_PUBLICATION_DATABASE_URL!,
-    });
-  }
+  const smokeDatabaseUrl = process.env.RELEASE_SMOKE_DATABASE_URL!;
+  assertIsolatedReleaseDatabase({
+    releaseDatabaseUrl: smokeDatabaseUrl,
+    publicationDatabaseUrl: process.env.RELEASE_PUBLICATION_DATABASE_URL!,
+  });
   const localUserId = `release-smoke-${randomUUID()}`;
   const email = `release-smoke+${randomUUID()}@example.com`;
   const password = `Rls-${randomBytes(18).toString("base64url")}!9`;

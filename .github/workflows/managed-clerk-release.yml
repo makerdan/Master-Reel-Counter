@@ -52,29 +52,25 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Require matched production Clerk credentials
+      - name: Require matched production Clerk publishable keys
         env:
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
         run: |
           set -euo pipefail
           missing=()
-          [[ -n "$CLERK_SECRET_KEY" ]] || missing+=("CLERK_SECRET_KEY")
           [[ -n "$CLERK_PUBLISHABLE_KEY" ]] || missing+=("CLERK_PUBLISHABLE_KEY")
           [[ -n "$VITE_CLERK_PUBLISHABLE_KEY" ]] || missing+=("VITE_CLERK_PUBLISHABLE_KEY")
           if (( ${#missing[@]} > 0 )); then
-            printf 'Published managed Clerk validation is blocked: missing production credential %s.\n' "${missing[@]}" >&2
+            printf 'Published managed Clerk validation is blocked: missing production publishable key %s.\n' "${missing[@]}" >&2
             exit 1
           fi
 
       - name: Verify currently published managed Clerk deployment
         env:
           PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run verify:managed-clerk-published
 
       - name: Upload failure diagnostics

@@ -21,7 +21,8 @@ const internalCandidate = process.env.RELEASE_SMOKE_INTERNAL_CANDIDATE === "1";
 const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
   "CLERK_SECRET_KEY",
-  "DATABASE_URL",
+  "RELEASE_SMOKE_DATABASE_URL",
+  "RELEASE_PUBLICATION_DATABASE_URL",
 ] as const;
 
 const roleCases = [
@@ -31,11 +32,6 @@ const roleCases = [
 
 function requireReleaseEnvironment(): void {
   const missing: string[] = requiredEnvironment.filter((name) => !process.env[name]);
-  if (internalCandidate) {
-    for (const name of ["RELEASE_SMOKE_DATABASE_URL", "RELEASE_PUBLICATION_DATABASE_URL"]) {
-      if (!process.env[name]) missing.push(name);
-    }
-  }
   if (missing.length > 0) {
     throw new Error(
       `Google Clerk release smoke is missing required environment variables: ${missing.join(", ")}`,
@@ -183,7 +179,14 @@ async function removeStaleSmokeUsers(
 
 test.describe("Google-backed Clerk application boundary", () => {
   test.beforeAll(async () => {
+    if (!internalCandidate) {
+      throw new Error("Fixture-writing Google Clerk smoke may run only against an internal candidate");
+    }
     requireReleaseEnvironment();
+    assertIsolatedReleaseDatabase({
+      releaseDatabaseUrl: process.env.RELEASE_SMOKE_DATABASE_URL,
+      publicationDatabaseUrl: process.env.RELEASE_PUBLICATION_DATABASE_URL,
+    });
     const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
     await assertClerkTestPermissions(clerk);
   });
@@ -195,17 +198,13 @@ test.describe("Google-backed Clerk application boundary", () => {
       requireReleaseEnvironment();
 
       const baseURL = new URL(process.env.PRODUCTION_BASE_URL!).origin;
-      if (internalCandidate) {
-        assertIsolatedReleaseDatabase({
-          releaseDatabaseUrl: process.env.RELEASE_SMOKE_DATABASE_URL,
-          publicationDatabaseUrl: process.env.RELEASE_PUBLICATION_DATABASE_URL,
-        });
-      }
+      assertIsolatedReleaseDatabase({
+        releaseDatabaseUrl: process.env.RELEASE_SMOKE_DATABASE_URL,
+        publicationDatabaseUrl: process.env.RELEASE_PUBLICATION_DATABASE_URL,
+      });
       const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
       const database = new Client({
-        connectionString: internalCandidate
-          ? process.env.RELEASE_SMOKE_DATABASE_URL
-          : process.env.DATABASE_URL,
+        connectionString: process.env.RELEASE_SMOKE_DATABASE_URL,
       });
       let account:
         | Awaited<ReturnType<typeof createDisposableAccount>>
