@@ -234,8 +234,13 @@ const WAITERS_DIR = resolve(
   process.env.VALIDATION_LOCK_WAITERS_DIR ??
     `.local/validation-waiters-${RESOURCE}`,
 );
-mkdirSync(dirname(LOCK_PATH), { recursive: true });
-mkdirSync(WAITERS_DIR, { recursive: true });
+let storageInitializationError = null;
+try {
+  mkdirSync(dirname(LOCK_PATH), { recursive: true });
+  mkdirSync(WAITERS_DIR, { recursive: true });
+} catch (error) {
+  storageInitializationError = `unable to initialize lock storage: ${error?.message ?? "unknown error"}`;
+}
 
 function atomicWrite(path, content) {
   const temporaryPath = `${path}.${randomBytes(4).toString("hex")}.tmp`;
@@ -337,7 +342,7 @@ function readLock() {
   } catch (error) {
     if (error?.code === "ENOENT") return null;
     return {
-      kind: "malformed",
+      kind: "unusable",
       raw,
       reason: `unable to read lock file: ${error?.message ?? "unknown error"}`,
     };
@@ -382,7 +387,7 @@ function tryCreateLock() {
     return lock?.kind === "valid" && lock.pid === process.pid && lock.token === LOCK_TOKEN;
   } catch (error) {
     if (error?.code === "EEXIST" || error?.code === "EISDIR") return false;
-    throw error;
+    failStorage(`unable to create lock file: ${error?.message ?? "unknown error"}`);
   } finally {
     if (descriptor !== null) closeSync(descriptor);
     try { unlinkSync(temporaryPath); } catch { /* already gone */ }
@@ -429,16 +434,20 @@ function waiterPath(pid = process.pid) {
 }
 
 function writeWaiter() {
-  atomicWrite(
-    waiterPath(),
-    `${JSON.stringify({
-      pid: process.pid,
-      resource: RESOURCE,
-      priority: args.priority,
-      queuedAt: Date.now(),
-      command: args.command,
-    })}\n`,
-  );
+  try {
+    atomicWrite(
+      waiterPath(),
+      `${JSON.stringify({
+        pid: process.pid,
+        resource: RESOURCE,
+        priority: args.priority,
+        queuedAt: Date.now(),
+        command: args.command,
+      })}\n`,
+    );
+  } catch (error) {
+    failStorage(`unable to write waiter manifest: ${error?.message ?? "unknown error"}`);
+  }
 }
 
 function clearWaiter() {
@@ -447,6 +456,14 @@ function clearWaiter() {
   } catch {
     // Already gone.
   }
+}
+
+function failStorage(reason) {
+  console.error(
+    `[serial-lock] ERROR: lock storage is unusable for resource '${RESOURCE}': ${reason}`,
+  );
+  clearWaiter();
+  process.exit(1);
 }
 
 function readWaiters() {
@@ -572,6 +589,7 @@ function failWait(waitedMs) {
 }
 
 async function acquireLock() {
+  if (storageInitializationError) failStorage(storageInitializationError);
   while (true) {
     const lock = readLock();
     if (!lock) {
@@ -586,6 +604,8 @@ async function acquireLock() {
         continue;
       }
       if (tryCreateLock()) return;
+    } else if (lock.kind === "unusable") {
+      failStorage(lock.reason);
     } else if (lock.kind === "malformed") {
       const waitedMs = waitElapsed();
       if (waitedMs >= MAX_WAIT_MS) failWait(waitedMs);

@@ -454,9 +454,10 @@ await test("partially-created lock files are reclaimed safely", async () => {
   }
 });
 
-await test("unrecoverable malformed lock fails within MAX_WAIT_MS", async () => {
-  const lockPath = tempLockPath();
-  mkdirSync(lockPath);
+await test("unusable lock parent fails clearly during storage initialization", async () => {
+  const parentPath = tempLockPath();
+  const lockPath = join(parentPath, "lock");
+  writeFileSync(parentPath, "not a directory", "utf8");
   const startedAt = Date.now();
   try {
     const { done } = runLocked(
@@ -468,12 +469,69 @@ await test("unrecoverable malformed lock fails within MAX_WAIT_MS", async () => 
     const elapsedMs = Date.now() - startedAt;
     assert.equal(result.code, 1, `waiter should fail clearly (got ${result.code})`);
     assert.ok(
-      (result.stdout + result.stderr).includes("MAX_WAIT_MS"),
-      "timeout should identify MAX_WAIT_MS",
+      (result.stdout + result.stderr).includes("lock storage is unusable"),
+      "failure should identify unusable lock storage",
     );
     assert.ok(elapsedMs < 2_000, `timeout should be bounded (elapsed ${elapsedMs}ms)`);
   } finally {
+    cleanup(parentPath);
+    cleanup(lockPath);
+  }
+});
+
+await test("unusable lock storage fails fast and removes its waiter manifest", async () => {
+  const lockPath = tempLockPath();
+  const waitersDir = `${lockPath}.waiters`;
+  mkdirSync(waitersDir);
+  const holder = runLocked(lockPath, ["sleep", "2"], {
+    VALIDATION_LOCK_WAITERS_DIR: waitersDir,
+  });
+  let waiter: ReturnType<typeof runLocked> | null = null;
+
+  try {
+    assert.ok(
+      await waitFor(() => readLockFile(lockPath) !== null, 4_000),
+      "holder should create a lock before the waiter starts",
+    );
+
+    waiter = runLocked(
+      lockPath,
+      [process.execPath, "-e", "process.exit(0)"],
+      {
+        VALIDATION_LOCK_WAITERS_DIR: waitersDir,
+        SERIAL_LOCK_MAX_WAIT_MS: "10_000",
+      },
+    );
+    const waiterManifest = join(waitersDir, `${waiter.proc.pid}.json`);
+    assert.ok(
+      await waitFor(() => existsSync(waiterManifest), 4_000),
+      "waiter should create its manifest while the lock is held",
+    );
+
+    unlinkSync(lockPath);
+    mkdirSync(lockPath);
+
+    const startedAt = Date.now();
+    const result = await waiter.done;
+    const elapsedMs = Date.now() - startedAt;
+    const output = result.stdout + result.stderr;
+
+    assert.equal(result.code, 1, `waiter should fail clearly (got ${result.code})`);
+    assert.ok(
+      output.includes("lock storage is unusable"),
+      `failure should identify unusable lock storage (got: ${output})`,
+    );
+    assert.ok(elapsedMs < 2_000, `storage failure should be immediate (elapsed ${elapsedMs}ms)`);
+    assert.ok(!existsSync(waiterManifest), "storage failure should remove the waiter manifest");
+  } finally {
+    if (waiter && !waiter.proc.killed) waiter.proc.kill("SIGTERM");
+    holder.proc.kill("SIGTERM");
+    await Promise.all([
+      holder.done,
+      waiter?.done ?? Promise.resolve(),
+    ]);
     try { rmdirSync(lockPath); } catch { /* already removed */ }
+    try { rmdirSync(waitersDir); } catch { /* already removed */ }
     cleanup(lockPath);
   }
 });
