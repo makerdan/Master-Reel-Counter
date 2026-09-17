@@ -10,8 +10,11 @@ ancestor process.
 
 **Why:** Removing the marker makes a nested tier wait behind the lock held by
 its parent, while forwarding every marker can incorrectly make an unrelated
-resource appear reentrant.
+resource appear reentrant. An intentionally independent collision harness must
+also clear inherited task-plan metadata, because a nested tier can otherwise
+fail closed against the outer tier's command before testing lock reentrancy.
 
 **How to apply:** Keep a non-smoke regression that reaches a manifest step and
-asserts the nested step runs once without a waiting message. Clear inherited
-markers when a harness intentionally creates independent lock contenders.
+asserts the nested step runs once without a waiting message or inherited task
+plan. Clear inherited markers and task-plan metadata when a harness
+intentionally creates independent lock contenders.

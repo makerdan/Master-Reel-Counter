@@ -61,10 +61,37 @@ async function runNonSmokeReentrancyRegression() {
         resource: "validation",
         priority: 3,
         timeoutMs: 30_000,
-        steps: [{ name: "nested-tier", command: ["npm", "run", "test-fast"] }],
+        // This tier is intentionally nested under the outer test-heavy lock,
+        // but it is not a second task-plan execution. Keep the lock marker so
+        // serial-lock can take its reentrant path while clearing the inherited
+        // plan so the nested test-fast request cannot mismatch the outer tier.
+        steps: [{
+          name: "nested-tier",
+          command: ["env", "-u", "TASK_PLAN_FILE", "npm", "run", "test-fast"],
+        }],
       },
     },
   }, null, 2));
+
+  const fixtureEnv = {
+    ...process.env,
+    VALIDATION_MANIFEST_PATH: manifestPath,
+    VALIDATION_LOCK_FILE: join(fixtureDir, "validation.lock"),
+    VALIDATION_LOCK_WAITERS_DIR: join(fixtureDir, "waiters"),
+    CI_SMOKE_TEST: "",
+    SERIAL_LOCK_WAIT_INTERVAL_MS: "100",
+    SERIAL_LOCK_MAX_WAIT_MS: "5_000",
+  };
+  // The regression creates its own outer lock. Do not let a task workflow or
+  // another validation run make the fixture appear reentrant before it starts.
+  for (const key of Object.keys(fixtureEnv)) {
+    if (
+      key === "SERIAL_LOCK_HOLDER_PID" ||
+      key.startsWith("VALIDATION_LOCK_HELD_PID_")
+    ) {
+      delete fixtureEnv[key];
+    }
+  }
 
   const result = spawnSync(
     process.execPath,
@@ -72,13 +99,7 @@ async function runNonSmokeReentrancyRegression() {
     {
       cwd: ROOT,
       encoding: "utf8",
-      env: {
-        ...process.env,
-        VALIDATION_MANIFEST_PATH: manifestPath,
-        CI_SMOKE_TEST: "",
-        SERIAL_LOCK_WAIT_INTERVAL_MS: "100",
-        SERIAL_LOCK_MAX_WAIT_MS: "5_000",
-      },
+      env: fixtureEnv,
     },
   );
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
@@ -86,6 +107,7 @@ async function runNonSmokeReentrancyRegression() {
     [result.status === 0, `nested validation exited 0 (got ${result.status})`],
     [output.includes("[validation] Step: nested-tier"), "outer run reached its manifest step"],
     [output.includes("[validation] Step: nested-manifest-probe"), "nested tier reached its manifest step"],
+    [output.includes("no task plan is in force"), "nested tier did not inherit the outer task plan"],
     [output.includes("[serial-lock] reentrant resource 'validation'"), "nested tier used the owned reentrancy path"],
     [!output.includes("[serial-lock] waiting"), "nested tier did not wait behind its owning lock"],
     [output.match(/\[validation\] Step: nested-manifest-probe/g)?.length === 1, "nested manifest step ran exactly once"],
@@ -162,10 +184,14 @@ const testEnv = {
   CI_SMOKE_TEST: "1",
 };
 // Smoke mode deliberately tests two independent contenders. Do not let the
-// enclosing heavy manifest's ownership marker turn either contender into a
-// reentrant child of that unrelated lock.
+// enclosing heavy manifest's task plan or ownership marker turn either
+// contender into a reentrant child of that unrelated lock.
 for (const key of Object.keys(testEnv)) {
-  if (key === "SERIAL_LOCK_HOLDER_PID" || key.startsWith("VALIDATION_LOCK_HELD_PID_")) {
+  if (
+    key === "TASK_PLAN_FILE" ||
+    key === "SERIAL_LOCK_HOLDER_PID" ||
+    key.startsWith("VALIDATION_LOCK_HELD_PID_")
+  ) {
     delete testEnv[key];
   }
 }
