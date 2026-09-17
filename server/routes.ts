@@ -81,6 +81,15 @@ const pdfJobs = new Map<string, {
   userId: string;
   sessionId: number;
 }>();
+
+function invalidatePdfJobs(sessionId: number, userId?: string): void {
+  for (const [jobId, job] of pdfJobs) {
+    if (job.sessionId === sessionId && (!userId || job.userId === userId)) {
+      pdfJobs.delete(jobId);
+    }
+  }
+}
+
 const pdfCleanupTimer = setInterval(() => {
   const now = Date.now();
   const staleCutoff = now - 15 * 60 * 1000;      // 15 min for in-progress jobs
@@ -244,6 +253,16 @@ async function verifySessionAccess(sessionId: number, userId: string, _legacyOwn
   const collab = await storage.getCollaborator(sessionId, userId);
   if (collab) return { session, role: collab.role as "editor" | "viewer" };
   return null;
+}
+
+export async function getCurrentPdfJobAccess<T>(
+  job: { userId: string; sessionId: number },
+  routeSessionId: number,
+  userId: string,
+  accessChecker: (sessionId: number, userId: string) => Promise<T | null>,
+): Promise<T | null> {
+  if (job.userId !== userId || job.sessionId !== routeSessionId) return null;
+  return accessChecker(routeSessionId, userId);
 }
 
 export function canEdit(role: string): boolean {
@@ -1116,6 +1135,7 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can delete sessions" });
       await storage.softDeleteSession(access.session.id);
+      invalidatePdfJobs(access.session.id);
       evictAllSessionSockets(access.session.id, "Session deleted");
       res.json({ success: true });
     } catch (error) {
@@ -1156,6 +1176,7 @@ export async function registerRoutes(
         }
       }
       await storage.deleteSession(access.session.id);
+      invalidatePdfJobs(access.session.id);
       evictAllSessionSockets(access.session.id, "Session deleted");
       res.json({ success: true });
     } catch (error) {
@@ -3110,6 +3131,7 @@ export async function registerRoutes(
       const collabId = parseInt(req.params.collabId);
       const removed = await storage.removeCollaborator(collabId, access.session.id);
       if (!removed) return res.status(404).json({ message: "Collaborator not found" });
+      invalidatePdfJobs(access.session.id, removed.userId);
       evictSessionUserSockets(access.session.id, removed.userId, "Session access revoked");
       logActivity(access.session.id, (req as AuthenticatedRequest).user.claims.sub, (req as AuthenticatedRequest).user.claims.username, "collaborator_removed", "collaborator", collabId);
       res.json({ success: true });
@@ -3173,6 +3195,7 @@ export async function registerRoutes(
       const collab = await storage.getCollaborator(sessionId, userId);
       if (!collab) return res.status(404).json({ message: "Not a collaborator of this session" });
       await storage.removeCollaboratorBySessionAndUser(sessionId, userId);
+      invalidatePdfJobs(sessionId, userId);
       evictSessionUserSockets(sessionId, collab.userId, "Session access revoked");
       logActivity(sessionId, userId, (req as AuthenticatedRequest).user?.claims?.username, "collaborator_left", "session", sessionId);
       res.json({ success: true });
@@ -3293,20 +3316,42 @@ export async function registerRoutes(
   });
 
   // GET /api/sessions/:id/export/pdf/progress/:jobId — poll generation progress
-  app.get("/api/sessions/:id/export/pdf/progress/:jobId", isAuthenticated, (req: any, res) => {
+  app.get("/api/sessions/:id/export/pdf/progress/:jobId", isAuthenticated, async (req: any, res) => {
     const userId = resolveUserId(req as AuthenticatedRequest);
     const routeSessionId = parseInt(req.params.id);
     const job = pdfJobs.get(req.params.jobId);
-    if (!job || job.userId !== userId || job.sessionId !== routeSessionId) return res.status(404).json({ error: "Job not found" });
+    const access = job && await getCurrentPdfJobAccess(
+      job,
+      routeSessionId,
+      userId,
+      (sessionId, candidateUserId) => verifySessionAccess(sessionId, candidateUserId, getTesterOwner(req as AuthenticatedRequest)),
+    );
+    if (!access) {
+      if (job?.userId === userId && job.sessionId === routeSessionId) {
+        invalidatePdfJobs(routeSessionId, userId);
+      }
+      return res.status(404).json({ error: "Job not found" });
+    }
     res.json({ done: job.done, total: job.total, complete: job.complete, error: job.error });
   });
 
   // GET /api/sessions/:id/export/pdf/download/:jobId — retrieve completed PDF buffer
-  app.get("/api/sessions/:id/export/pdf/download/:jobId", isAuthenticated, (req: any, res) => {
+  app.get("/api/sessions/:id/export/pdf/download/:jobId", isAuthenticated, async (req: any, res) => {
     const userId = resolveUserId(req as AuthenticatedRequest);
     const routeSessionId = parseInt(req.params.id);
     const job = pdfJobs.get(req.params.jobId);
-    if (!job || job.userId !== userId || job.sessionId !== routeSessionId) return res.status(404).json({ error: "Job not found" });
+    const access = job && await getCurrentPdfJobAccess(
+      job,
+      routeSessionId,
+      userId,
+      (sessionId, candidateUserId) => verifySessionAccess(sessionId, candidateUserId, getTesterOwner(req as AuthenticatedRequest)),
+    );
+    if (!access) {
+      if (job?.userId === userId && job.sessionId === routeSessionId) {
+        invalidatePdfJobs(routeSessionId, userId);
+      }
+      return res.status(404).json({ error: "Job not found" });
+    }
     if (!job.complete) return res.status(202).json({ message: "Not ready" });
     if (job.error) return res.status(500).json({ error: job.error });
     if (!job.buffer) return res.status(500).json({ error: "No buffer" });
