@@ -3,17 +3,35 @@ import { execFile } from "node:child_process";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { Client } from "pg";
 import test from "node:test";
 import { promisify } from "node:util";
 import {
   assertIsolatedReleaseDatabase,
   assertReleaseSchema,
+  compareReleaseSchema,
+  executeReviewedMigrations,
 } from "../release-schema-preflight.mjs";
+import { createOwnedDatabase, dropOwnedDatabase } from "../release-smoke-database.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(import.meta.dirname, "../..");
 
-function fakeClient({ columns, roleValues = ["Admin", "User"], legacyColumns = [], sessions = [] }) {
+function fakeClient({
+  columns,
+  roleValues = ["Admin", "User"],
+  legacyColumns = [],
+  sessions = [],
+  schemaColumns = columns.map((column_name) => ({
+    table_name: "users",
+    column_name,
+    data_type: "character varying",
+    udt_name: "varchar",
+    is_nullable: "YES",
+    column_default: null,
+  })),
+  indexes = [],
+}) {
   return {
     query: async (query) => {
       if (query.includes("current_database")) {
@@ -32,6 +50,10 @@ function fakeClient({ columns, roleValues = ["Admin", "User"], legacyColumns = [
       }
       if (query.includes("information_schema.columns") && query.includes("table_name = 'users'")) {
         return { rows: columns.map((column_name) => ({ column_name })) };
+      }
+      if (query.includes("pg_indexes")) return { rows: indexes };
+      if (query.includes("ORDER BY table_name, ordinal_position")) {
+        return { rows: schemaColumns };
       }
       return { rows: sessions.map((table_name) => ({ table_name })) };
     },
@@ -200,4 +222,74 @@ test("schema preflight rejects legacy tester objects and sessions", async () => 
     ),
     /legacy auth objects remain/,
   );
+});
+
+test("publishing schema comparison reports structural drift", async () => {
+  const expected = await assertReleaseSchema(fakeClient({ columns: currentColumns }));
+  await assert.rejects(
+    assertReleaseSchema(
+      fakeClient({ columns: currentColumns.filter((column) => column !== "capabilities") }),
+      { expectedSchema: expected, target: "publishing" },
+    ),
+    (error) => {
+      assert.equal(error.classification, "target-drift");
+      return true;
+    },
+  );
+  assert.deepEqual(compareReleaseSchema(expected, {
+    ...expected,
+    schemaState: {
+      ...expected.schemaState,
+      columns: expected.schemaState.columns.slice(0, -1),
+    },
+  }), ["columns or indexes differ from the reviewed schema"]);
+});
+
+test("release-critical migration SQL executes against an isolated PostgreSQL target", {
+  skip: !process.env.DATABASE_URL,
+}, async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-migration-execution-"));
+  const statePath = resolve(directory, "state.json");
+  let owned;
+  try {
+    owned = await createOwnedDatabase(process.env.DATABASE_URL, statePath);
+    const releaseDatabaseUrl = new URL(
+      `/${owned.databaseName}`,
+      process.env.DATABASE_URL,
+    ).toString();
+    const bootstrap = await execFileAsync(
+      "npx",
+      [
+        "drizzle-kit",
+        "export",
+        "--sql",
+        "--dialect",
+        "postgresql",
+        "--schema",
+        "./shared/schema.ts",
+      ],
+      {
+        cwd: root,
+        env: { ...process.env, DATABASE_URL: releaseDatabaseUrl },
+      },
+    );
+    const client = new Client({ connectionString: releaseDatabaseUrl });
+    try {
+      await client.connect();
+      await client.query(bootstrap.stdout);
+      await executeReviewedMigrations(client);
+      const schema = await assertReleaseSchema(client);
+      assert.deepEqual(schema.missingColumns, []);
+      assert.deepEqual(schema.missingRoleValues, []);
+    } finally {
+      await client.end();
+    }
+  } finally {
+    if (owned) {
+      await dropOwnedDatabase(owned, {
+        publicationDatabaseUrl: process.env.DATABASE_URL,
+      });
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
 });

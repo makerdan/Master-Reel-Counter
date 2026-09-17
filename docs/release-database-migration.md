@@ -28,8 +28,17 @@ spellings are ambiguous without provider-specific identity data, so the guard
 fails closed; candidate smoke must use an explicit different database on the
 same PostgreSQL endpoint.
 
-This isolated smoke proves that the candidate and smoke test agree on the
-reviewed schema. It does **not** prove that the publishing database is current.
+The isolated setup executes the release-critical reviewed migrations in
+rollback-only fixtures, then compares its read-only structural schema snapshot
+with the publishing database before the candidate starts. A mismatch fails as
+`target-drift` with the differing schema category; the release flow never
+applies migrations or repairs the publishing target.
+
+Ordinary browser validation intentionally sets
+`RELEASE_PUBLICATION_SCHEMA_PREFLIGHT=0` because it creates its own disposable
+candidate database and must remain usable while a development publishing
+database is being migrated. The release build explicitly sets the preflight to
+`1`; this opt-out is not used by release approval.
 
 Currently published verification is separate and read-only. The workflow pairs
 `PRODUCTION_BASE_URL` with the identical

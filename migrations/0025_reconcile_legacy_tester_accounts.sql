@@ -47,7 +47,7 @@ WHERE user_id IN (SELECT id FROM cutover_non_admin_accounts);
 DELETE FROM conversations
 WHERE user_id IN (SELECT id FROM cutover_non_admin_accounts);
 
-DELETE FROM user_wire_catalogs
+DELETE FROM user_wire_categories
 WHERE user_id IN (SELECT id FROM cutover_non_admin_accounts);
 
 DELETE FROM ai_usage_logs

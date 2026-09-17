@@ -163,6 +163,7 @@ fi
 export VITE_CLERK_PROXY_URL="$clerk_proxy_path"
 env -u RELEASE_SMOKE_DATABASE_URL npm run build
 
+RELEASE_PUBLICATION_SCHEMA_PREFLIGHT=1 \
 RELEASE_SMOKE_DATABASE_URL="$selected_smoke_database_url" \
 DATABASE_URL="$DATABASE_URL" \
 node scripts/prepare-release-test-database.mjs

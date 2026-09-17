@@ -5,10 +5,13 @@ import { Client } from "pg";
 import {
   assertIsolatedReleaseDatabase,
   assertReleaseSchema,
+  executeReviewedMigrations,
+  ReleaseSchemaPreflightError,
 } from "./release-schema-preflight.mjs";
 
 const releaseDatabaseUrl = process.env.RELEASE_SMOKE_DATABASE_URL;
 const publicationDatabaseUrl = process.env.DATABASE_URL;
+const verifyPublicationSchema = process.env.RELEASE_PUBLICATION_SCHEMA_PREFLIGHT !== "0";
 
 assertIsolatedReleaseDatabase({
   releaseDatabaseUrl,
@@ -58,7 +61,8 @@ function exportSchema() {
 
 const bootstrap = await exportSchema();
 if (bootstrap.code !== 0) {
-  throw new Error(
+  throw new ReleaseSchemaPreflightError(
+    "execution-failure",
     `Dedicated release smoke schema bootstrap failed (signal ${
       bootstrap.signal ?? "none"
     })\n${redact(bootstrap.stderr)}`,
@@ -69,7 +73,8 @@ if (
     bootstrap.stdout,
   )
 ) {
-  throw new Error(
+  throw new ReleaseSchemaPreflightError(
+    "invalid-migration",
     "Dedicated release smoke schema bootstrap is missing the reviewed Admin/User account role enum",
   );
 }
@@ -77,12 +82,50 @@ if (
 const client = new Client({ connectionString: releaseDatabaseUrl });
 try {
   await client.connect();
-  await client.query(`
-    ${bootstrap.stdout}
-  `);
-  const schema = await assertReleaseSchema(client);
+  let schema;
+  try {
+    await client.query(`
+      ${bootstrap.stdout}
+    `);
+    await executeReviewedMigrations(client);
+    schema = await assertReleaseSchema(client);
+  } catch (error) {
+    if (error instanceof ReleaseSchemaPreflightError) throw error;
+    throw new ReleaseSchemaPreflightError(
+      "execution-failure",
+      `isolated release schema execution failed: ${
+        error instanceof Error ? error.message : "unknown PostgreSQL error"
+      }`,
+      { cause: error },
+    );
+  }
+
+  if (verifyPublicationSchema) {
+    const publication = new Client({ connectionString: publicationDatabaseUrl });
+    try {
+      await publication.connect();
+      await assertReleaseSchema(publication, {
+        expectedSchema: schema,
+        target: "publishing",
+      });
+    } catch (error) {
+      if (error?.classification === "target-drift") throw error;
+      throw new ReleaseSchemaPreflightError(
+        "target-drift",
+        `publishing schema could not be verified without mutation: ${
+          error instanceof Error ? error.message : "unknown PostgreSQL error"
+        }`,
+        { cause: error },
+      );
+    } finally {
+      await publication.end();
+    }
+  }
+
   console.log(
-    `[release-schema] PASS — ${schema.databaseName}.${schema.schemaName} is initialized for release smoke`,
+    verifyPublicationSchema
+      ? `[release-schema] PASS — ${schema.databaseName}.${schema.schemaName} is initialized and matches the publishing schema`
+      : `[release-schema] PASS — ${schema.databaseName}.${schema.schemaName} is initialized for isolated browser validation`,
   );
 } finally {
   await client.end();

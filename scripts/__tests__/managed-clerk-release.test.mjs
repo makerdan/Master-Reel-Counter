@@ -469,6 +469,8 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.match(releaseSchemaPreparation, /"export"/);
   assert.match(releaseSchemaPreparation, /Admin.*User.*account role enum/);
   assert.match(releaseSchemaPreparation, /assertReleaseSchema/);
+  assert.match(releaseSchemaPreparation, /RELEASE_PUBLICATION_SCHEMA_PREFLIGHT/);
+  assert.match(candidateBuild, /RELEASE_PUBLICATION_SCHEMA_PREFLIGHT=1/);
   assert.match(releaseSchemaPreflight, /Release schema preflight failed before fixture provisioning/);
   assert.match(releaseSchemaPreflight, /account_role/);
   assert.match(releaseSchemaPreflight, /is_tester/);
@@ -495,6 +497,7 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.match(browserRunner, /DROP DATABASE IF EXISTS/);
   assert.match(browserRunner, /RELEASE_SMOKE_DATABASE_URL/);
   assert.match(browserRunner, /RELEASE_PUBLICATION_DATABASE_URL/);
+  assert.match(browserRunner, /RELEASE_PUBLICATION_SCHEMA_PREFLIGHT: "0"/);
   assert.match(googleReleaseSmoke, /assertIsolatedReleaseDatabase/);
   assert.match(googleReleaseSmoke, /assertReleaseSchema\(database\)/);
   assert.match(googleReleaseSmoke, /RELEASE_SMOKE_DATABASE_URL/);

@@ -16,6 +16,20 @@ export const REQUIRED_AUTH_COLUMNS = new Set([
 ]);
 
 const REQUIRED_ROLE_VALUES = new Set(["Admin", "User"]);
+const REVIEWED_MIGRATION_NAMES = [
+  "0023_remove_tester_auth_add_account_roles.sql",
+  "0025_reconcile_legacy_tester_accounts.sql",
+  "0026_add_users_clerk_user_id.sql",
+  "0027_add_user_capabilities.sql",
+];
+
+export class ReleaseSchemaPreflightError extends Error {
+  constructor(classification, message, options = {}) {
+    super(`${message} [classification: ${classification}]`, options);
+    this.name = "ReleaseSchemaPreflightError";
+    this.classification = classification;
+  }
+}
 
 function databaseTarget(urlString) {
   let url;
@@ -112,23 +126,20 @@ export function assertIsolatedReleaseDatabase({
   return releaseTarget.identity;
 }
 
-async function verifyReviewedMigrations() {
-  const migration23 = await readFile(
-    resolve(root, "migrations/0023_remove_tester_auth_add_account_roles.sql"),
-    "utf8",
+export async function readReviewedMigrations() {
+  const migrations = Object.fromEntries(
+    await Promise.all(
+      REVIEWED_MIGRATION_NAMES.map(async (name) => [
+        name,
+        await readFile(resolve(root, "migrations", name), "utf8"),
+      ]),
+    ),
   );
-  const migration25 = await readFile(
-    resolve(root, "migrations/0025_reconcile_legacy_tester_accounts.sql"),
-    "utf8",
-  );
-  const migration26 = await readFile(
-    resolve(root, "migrations/0026_add_users_clerk_user_id.sql"),
-    "utf8",
-  );
-  const migration27 = await readFile(
-    resolve(root, "migrations/0027_add_user_capabilities.sql"),
-    "utf8",
-  );
+
+  const migration23 = migrations["0023_remove_tester_auth_add_account_roles.sql"];
+  const migration25 = migrations["0025_reconcile_legacy_tester_accounts.sql"];
+  const migration26 = migrations["0026_add_users_clerk_user_id.sql"];
+  const migration27 = migrations["0027_add_user_capabilities.sql"];
 
   if (
     !/CREATE TYPE account_role/.test(migration23) ||
@@ -163,10 +174,33 @@ async function verifyReviewedMigrations() {
       "Reviewed auth migration 0027 is missing persisted User capabilities",
     );
   }
+
+  return migrations;
+}
+
+async function verifyReviewedMigrations() {
+  try {
+    return await readReviewedMigrations();
+  } catch (error) {
+    if (error instanceof ReleaseSchemaPreflightError) throw error;
+    throw new ReleaseSchemaPreflightError(
+      "invalid-migration",
+      error instanceof Error ? error.message : "reviewed migration content could not be read",
+      { cause: error },
+    );
+  }
 }
 
 export async function readReleaseSchema(client) {
-  const [identity, columns, roleValues, legacyColumns, legacySessions] =
+  const [
+    identity,
+    columns,
+    roleValues,
+    legacyColumns,
+    legacySessions,
+    schemaColumns,
+    indexes,
+  ] =
     await Promise.all([
       client.query(
         "SELECT current_database() AS database_name, current_schema() AS schema_name",
@@ -201,9 +235,23 @@ export async function readReleaseSchema(client) {
          WHERE table_schema = current_schema()
            AND table_name = 'sessions'`,
       ),
+      client.query(
+        `SELECT table_name, column_name, data_type, udt_name, is_nullable, column_default
+         FROM information_schema.columns
+         WHERE table_schema = current_schema()
+         ORDER BY table_name, ordinal_position`,
+      ),
+      client.query(
+        `SELECT indexname, indexdef
+         FROM pg_indexes
+         WHERE schemaname = current_schema()
+         ORDER BY indexname`,
+      ),
     ]);
 
-  const actualColumns = new Set(columns.rows.map(({ column_name }) => column_name));
+  const actualColumns = new Set(
+    columns.rows.map(({ column_name }) => column_name),
+  );
   const missingColumns = [...REQUIRED_AUTH_COLUMNS].filter(
     (column) => !actualColumns.has(column),
   );
@@ -224,10 +272,116 @@ export async function readReleaseSchema(client) {
     missingColumns,
     missingRoleValues,
     legacyObjects,
+    schemaState: {
+      columns: schemaColumns.rows.map(
+        ({
+          table_name,
+          column_name,
+          data_type,
+          udt_name,
+          is_nullable,
+          column_default,
+        }) => ({
+          table_name,
+          column_name,
+          data_type,
+          udt_name,
+          is_nullable,
+          column_default,
+        }),
+      ),
+      indexes: indexes.rows.map(({ indexname, indexdef }) => ({
+        indexname,
+        indexdef,
+      })),
+    },
+    roleValues: [...actualRoleValues].sort(),
   };
 }
 
-export async function assertReleaseSchema(client) {
+function schemaDifferences(expected, actual) {
+  const differences = [];
+  if (JSON.stringify(expected.schemaState) !== JSON.stringify(actual.schemaState)) {
+    differences.push("columns or indexes differ from the reviewed schema");
+  }
+  if (JSON.stringify(expected.roleValues) !== JSON.stringify(actual.roleValues)) {
+    differences.push(
+      `account_role values differ (expected ${[...REQUIRED_ROLE_VALUES].join(", ")})`,
+    );
+  }
+  if (JSON.stringify(expected.legacyObjects) !== JSON.stringify(actual.legacyObjects)) {
+    differences.push("legacy auth objects differ");
+  }
+  return differences;
+}
+
+export function compareReleaseSchema(expected, actual) {
+  return schemaDifferences(expected, actual);
+}
+
+function migrationBody(sql) {
+  return sql
+    .replace(/^\s*BEGIN;\s*/i, "")
+    .replace(/\s*COMMIT;\s*$/i, "");
+}
+
+async function executeInRollback(client, sql, setupSql = []) {
+  await client.query("BEGIN");
+  try {
+    for (const statement of setupSql) await client.query(statement);
+    await client.query(migrationBody(sql));
+  } finally {
+    await client.query("ROLLBACK");
+  }
+}
+
+export async function executeReviewedMigrations(client) {
+  const migrations = await verifyReviewedMigrations();
+  try {
+    await executeInRollback(
+      client,
+      migrations["0023_remove_tester_auth_add_account_roles.sql"],
+      [
+        'ALTER TABLE "users" DROP COLUMN IF EXISTS "role"',
+        'DROP TYPE IF EXISTS "account_role"',
+        'ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_tester" boolean DEFAULT false NOT NULL',
+        'ALTER TABLE "user_settings" ADD COLUMN IF NOT EXISTS "tester_password" text',
+      ],
+    );
+    await executeInRollback(
+      client,
+      migrations["0026_add_users_clerk_user_id.sql"],
+      ['ALTER TABLE "users" DROP COLUMN IF EXISTS "clerk_user_id"'],
+    );
+    await executeInRollback(
+      client,
+      migrations["0027_add_user_capabilities.sql"],
+      [
+        'ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "users_capabilities_object_check"',
+        'ALTER TABLE "users" DROP COLUMN IF EXISTS "capabilities"',
+      ],
+    );
+
+    const adminId = `release-schema-admin-${process.pid}`;
+    const userId = `release-schema-user-${process.pid}`;
+    await executeInRollback(
+      client,
+      migrations["0025_reconcile_legacy_tester_accounts.sql"],
+      [
+        `INSERT INTO "users" ("id", "email", "approved", "rejected", "role") VALUES ('${adminId}', '${adminId}@invalid.test', true, false, 'Admin'), ('${userId}', '${userId}@invalid.test', true, false, 'User')`,
+      ],
+    );
+  } catch (error) {
+    if (error instanceof ReleaseSchemaPreflightError) throw error;
+    throw new ReleaseSchemaPreflightError(
+      "execution-failure",
+      `reviewed migration execution failed: ${error instanceof Error ? error.message : "unknown PostgreSQL error"}`,
+      { cause: error },
+    );
+  }
+}
+
+export async function assertReleaseSchema(client, { expectedSchema, target = "release" } = {}) {
   await verifyReviewedMigrations();
   const schema = await readReleaseSchema(client);
   if (schema.missingColumns.length > 0 || schema.missingRoleValues.length > 0) {
@@ -235,14 +389,25 @@ export async function assertReleaseSchema(client) {
       ...schema.missingColumns.map((column) => `users.${column}`),
       ...schema.missingRoleValues.map((value) => `account_role=${value}`),
     ];
-    throw new Error(
+    throw new ReleaseSchemaPreflightError(
+      target === "publishing" ? "target-drift" : "execution-failure",
       `Release schema preflight failed before fixture provisioning: missing ${missing.join(", ")} in ${schema.databaseName}.${schema.schemaName}`,
     );
   }
   if (schema.legacyObjects.length > 0) {
-    throw new Error(
+    throw new ReleaseSchemaPreflightError(
+      target === "publishing" ? "target-drift" : "execution-failure",
       `Release schema preflight failed before fixture provisioning: legacy auth objects remain (${schema.legacyObjects.join(", ")})`,
     );
+  }
+  if (expectedSchema) {
+    const differences = compareReleaseSchema(expectedSchema, schema);
+    if (differences.length > 0) {
+      throw new ReleaseSchemaPreflightError(
+        "target-drift",
+        `publishing schema differs from the reviewed isolated schema (${differences.join("; ")})`,
+      );
+    }
   }
   return schema;
 }

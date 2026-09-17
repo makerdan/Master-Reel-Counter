@@ -93,6 +93,7 @@ try {
       ...process.env,
       DATABASE_URL: sourceDatabaseUrl,
       RELEASE_SMOKE_DATABASE_URL: browserDatabaseUrl,
+      RELEASE_PUBLICATION_SCHEMA_PREFLIGHT: "0",
     },
   );
   if (setupStatus !== 0) process.exitCode = setupStatus;
