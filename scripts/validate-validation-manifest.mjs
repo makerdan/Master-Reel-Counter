@@ -40,9 +40,14 @@ for (const tier of expectedTiers) {
   }
 }
 
-const securityAudit = manifest.tiers["test-heavy"].steps.find((step) => step.name === "security-audit");
+const securityAudits = manifest.tiers["test-heavy"].steps.filter((step) => step.name === "security-audit");
+if (securityAudits.length !== 1) {
+  fail("test-heavy must contain exactly one security-audit step");
+}
+
+const [securityAudit] = securityAudits;
 if (
-  securityAudit?.kind !== "audit" ||
+  securityAudit.kind !== "audit" ||
   JSON.stringify(securityAudit.command) !== JSON.stringify(["npm", "audit", "--audit-level=high"])
 ) {
   fail("test-heavy security-audit must retain kind audit and the high-severity threshold");

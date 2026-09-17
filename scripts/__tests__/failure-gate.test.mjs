@@ -18,11 +18,28 @@ const run = (script, args, env = {}) => spawnSync(process.execPath, [script, ...
   env: { ...process.env, ...env },
   encoding: "utf8",
 });
+const runIn = (cwd, script, args, env = {}) => spawnSync(process.execPath, [script, ...args], {
+  cwd,
+  env: { ...process.env, ...env },
+  encoding: "utf8",
+});
 const fixturePlan = (body) => {
   const dir = mkdtempSync(join(tmpdir(), "failure-gate-"));
   const path = join(dir, "plan.md");
   writeFileSync(path, body);
   return path;
+};
+const manifestValidatorFixture = (mutate) => {
+  const dir = mkdtempSync(join(tmpdir(), "validation-manifest-"));
+  mkdirSync(join(dir, "scripts"), { recursive: true });
+  mkdirSync(join(dir, "docs", "validation"), { recursive: true });
+  copyFileSync(join(ROOT, "scripts/validate-validation-manifest.mjs"), join(dir, "scripts/validate-validation-manifest.mjs"));
+  copyFileSync(join(ROOT, "package.json"), join(dir, "package.json"));
+  const manifestPath = join(dir, "docs", "validation", "manifest.json");
+  const manifest = JSON.parse(readFileSync(join(ROOT, "docs/validation/manifest.json"), "utf8"));
+  mutate(manifest);
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  return runIn(dir, "scripts/validate-validation-manifest.mjs", []);
 };
 const validPlan = `# Fixture
 
@@ -156,6 +173,29 @@ test("registered standard validation runs the contract and archive parity checks
     (step) => step.name === "failure-gate-parity"
       && step.command.join(" ") === "node scripts/check-failure-gate-parity.mjs",
   ));
+});
+
+test("manifest parity requires exactly one high-severity security audit", () => {
+  const missing = manifestValidatorFixture((manifest) => {
+    manifest.tiers["test-heavy"].steps = manifest.tiers["test-heavy"].steps
+      .filter((step) => step.name !== "security-audit");
+  });
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /exactly one security-audit step/);
+
+  const weakened = manifestValidatorFixture((manifest) => {
+    const audit = manifest.tiers["test-heavy"].steps.find((step) => step.name === "security-audit");
+    audit.command = ["npm", "audit", "--audit-level=moderate"];
+  });
+  assert.equal(weakened.status, 1);
+  assert.match(weakened.stderr, /high-severity threshold/);
+
+  const duplicated = manifestValidatorFixture((manifest) => {
+    const audit = manifest.tiers["test-heavy"].steps.find((step) => step.name === "security-audit");
+    manifest.tiers["test-heavy"].steps.push({ ...audit });
+  });
+  assert.equal(duplicated.status, 1);
+  assert.match(duplicated.stderr, /exactly one security-audit step/);
 });
 
 test("published archive drift fails with regeneration guidance", () => {
