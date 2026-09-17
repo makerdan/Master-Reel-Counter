@@ -6,11 +6,12 @@
 
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
+import { loadTiers } from "./lib/tiers.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const manifestPath = resolve(root, "docs/validation/manifest.json");
 const packagePath = resolve(root, "package.json");
-const expectedTiers = ["test-fast", "test-standard", "test-standard-plus", "test-heavy"];
+const registryPath = resolve(root, ".agents/skills/validation-tiers/tiers.json");
 const stepKinds = new Set(["typecheck", "test", "lint", "audit", "smoke", "harness"]);
 
 function fail(message) {
@@ -19,13 +20,46 @@ function fail(message) {
 }
 
 if (!existsSync(manifestPath)) fail(`missing ${manifestPath}`);
-const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
-if (manifest.version !== 1 || !manifest.tiers) fail("manifest must declare version 1 and tiers");
+let manifest;
+let packageJson;
+try {
+  manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+} catch (error) {
+  fail(`invalid JSON: ${error.message}`);
+}
+if (
+  manifest.version !== 1 ||
+  !manifest.tiers ||
+  typeof manifest.tiers !== "object" ||
+  Array.isArray(manifest.tiers) ||
+  Object.keys(manifest.tiers).length === 0
+) {
+  fail("manifest must declare version 1 and tiers");
+}
+
+let registeredTiers;
+try {
+  registeredTiers = loadTiers(registryPath);
+} catch (error) {
+  fail(`invalid tier registry: ${error.message}`);
+}
+
+const expectedTiers = Object.keys(registeredTiers);
+const manifestTiers = Object.keys(manifest.tiers);
+const missingTiers = expectedTiers.filter((tier) => !manifestTiers.includes(tier));
+const unexpectedTiers = manifestTiers.filter((tier) => !expectedTiers.includes(tier));
+if (missingTiers.length || unexpectedTiers.length) {
+  const details = [
+    missingTiers.length ? `missing ${missingTiers.join(", ")}` : "",
+    unexpectedTiers.length ? `unexpected ${unexpectedTiers.join(", ")}` : "",
+  ].filter(Boolean).join("; ");
+  fail(`manifest tier parity mismatch: ${details}`);
+}
 
 for (const tier of expectedTiers) {
   const entry = manifest.tiers[tier];
-  if (!entry) fail(`missing tier '${tier}'`);
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) fail(`${tier} must be an object`);
   if (entry.packageScript !== `npm run ${tier}`) fail(`${tier} has incorrect packageScript`);
   if (!Number.isInteger(entry.timeoutMs) || entry.timeoutMs <= 0) fail(`${tier} needs a positive timeoutMs`);
   if (!Number.isInteger(entry.priority) || entry.priority < 1 || entry.priority > 9) fail(`${tier} needs priority 1-9`);
@@ -34,7 +68,16 @@ for (const tier of expectedTiers) {
     fail(`package.json script '${tier}' must use the canonical runner with the explicit ad-hoc escape hatch`);
   }
   for (const step of entry.steps) {
-    if (!step.name || !stepKinds.has(step.kind) || !Array.isArray(step.command) || step.command.length === 0) {
+    if (
+      !step ||
+      typeof step !== "object" ||
+      typeof step.name !== "string" ||
+      !step.name.trim() ||
+      !stepKinds.has(step.kind) ||
+      !Array.isArray(step.command) ||
+      step.command.length === 0 ||
+      step.command.some((part) => typeof part !== "string" || !part.trim())
+    ) {
       fail(`${tier} contains an invalid step`);
     }
   }

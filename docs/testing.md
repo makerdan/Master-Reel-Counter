@@ -198,7 +198,8 @@ Run the tier locked by the plan:
 TASK_PLAN_FILE=.local/tasks/<name>.md node scripts/run-locked-tier.mjs
 ```
 
-The registered tiers are `test-light`, `test-standard`, and `test-heavy`.
+The registered tiers are `test-fast`, `test-standard`, `test-standard-plus`, and
+`test-heavy`.
 Task validation cannot be escalated above the plan. Completion validation is a
 separate platform check. Missing, malformed, unreadable, or mismatched plans
 fail before any suite starts. An ad-hoc caller must opt in explicitly with

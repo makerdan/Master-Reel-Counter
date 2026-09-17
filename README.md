@@ -298,8 +298,9 @@ This project employs a **task plan and validation** contract, along with workspa
   - No-plan escape hatch:
     - `node scripts/run-tier.mjs <tier> --allow-no-plan` for ad-hoc work.
   - Declarative tiers:
-    - `test-light`
+    - `test-fast`
     - `test-standard`
+    - `test-standard-plus`
     - `test-heavy`
   - Heavy validation includes:
     - `serial-lock.mjs`

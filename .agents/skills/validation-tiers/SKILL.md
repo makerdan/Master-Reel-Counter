@@ -11,13 +11,14 @@ tier registry, but they do not need these tier names, commands, paths, or suite
 composition.
 
 In this repository tiers are registered in `tiers.json`, not in runner
-conditionals. Each step has a stable name, command, kind, and optional serial
-requirement. `test-light`, `test-standard`, and `test-heavy` are this
-repository's package tiers; future suites are added as registry entries and
-tests, then included in a tier by data.
+conditionals. Each step has a stable name, command array, kind, and optional
+serial requirement. `test-fast`, `test-standard`, `test-standard-plus`, and
+`test-heavy` are this repository's package tiers; future suites are added as
+registry entries and tests, then included in a tier by data.
 
-- **light**: typecheck and storage lint.
+- **fast**: typecheck and storage lint.
 - **standard**: light checks plus backend unit tests.
+- **standard-plus**: standard checks plus lock, cleanup, and resource-isolation tests.
 - **heavy**: startup smoke, dependency audit, light checks, backend tests,
   serial-lock collision smoke, and Playwright e2e. The heavy group is wrapped
   by the existing serial lock and port cleanup controls.

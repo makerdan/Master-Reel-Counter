@@ -61,11 +61,11 @@ for task validation. Missing or malformed plans, unregistered tiers, and tier
 mismatches fail closed. The only no-plan escape hatch is an explicit
 `node scripts/run-tier.mjs <tier> --allow-no-plan` for ad-hoc work.
 
-`test-light`, `test-standard`, and `test-heavy` are declarative registered
-tiers. Heavy validation retains the existing `serial-lock.mjs`, `free-ports.mjs`,
-startup smoke, CI collision, and Playwright controls. Task validation and
-platform completion validation are separate: completion checks may be broader
-and are not a reason to escalate the task tier.
+`test-fast`, `test-standard`, `test-standard-plus`, and `test-heavy` are
+declarative registered tiers. Heavy validation retains the existing
+`serial-lock.mjs`, `free-ports.mjs`, startup smoke, CI collision, and Playwright
+controls. Task validation and platform completion validation are separate:
+completion checks may be broader and are not a reason to escalate the task tier.
 
 Failure classification requires exact baseline matching, and a passing retry
 establishes intermittency only. An unlisted failure needs two of three

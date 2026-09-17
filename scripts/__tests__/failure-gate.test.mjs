@@ -32,8 +32,15 @@ const fixturePlan = (body) => {
 const manifestValidatorFixture = (mutate) => {
   const dir = mkdtempSync(join(tmpdir(), "validation-manifest-"));
   mkdirSync(join(dir, "scripts"), { recursive: true });
+  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
   mkdirSync(join(dir, "docs", "validation"), { recursive: true });
+  mkdirSync(join(dir, ".agents", "skills", "validation-tiers"), { recursive: true });
   copyFileSync(join(ROOT, "scripts/validate-validation-manifest.mjs"), join(dir, "scripts/validate-validation-manifest.mjs"));
+  copyFileSync(join(ROOT, "scripts/lib/tiers.mjs"), join(dir, "scripts/lib/tiers.mjs"));
+  copyFileSync(
+    join(ROOT, ".agents/skills/validation-tiers/tiers.json"),
+    join(dir, ".agents/skills/validation-tiers/tiers.json"),
+  );
   copyFileSync(join(ROOT, "package.json"), join(dir, "package.json"));
   const manifestPath = join(dir, "docs", "validation", "manifest.json");
   const manifest = JSON.parse(readFileSync(join(ROOT, "docs/validation/manifest.json"), "utf8"));
@@ -47,7 +54,7 @@ const validPlan = `# Fixture
 None known at plan time.
 
 ## Validation
-**Command:** \`test-light\`
+**Command:** \`test-fast\`
 **Why:** Static checks cover this documentation-only fixture.
 **Do not escalate:** Run exactly this command.
 
@@ -55,10 +62,16 @@ None known at plan time.
 **Self-satisfying** — this fixture tests the guard.
 `;
 
-test("registry exposes extensible light, standard, and heavy tiers", () => {
+test("registry exposes every canonical validation tier with executable commands", () => {
   const tiers = loadTiers();
-  assert.deepEqual(Object.keys(tiers), ["test-light", "test-standard", "test-heavy"]);
-  assert.ok(tiers["test-heavy"].steps.some((step) => step.command.includes("npm run ci")));
+  assert.deepEqual(Object.keys(tiers), ["test-fast", "test-standard", "test-standard-plus", "test-heavy"]);
+  for (const tier of Object.values(tiers)) {
+    for (const step of tier.steps) {
+      assert.ok(Array.isArray(step.command));
+      assert.ok(step.command.every((part) => typeof part === "string" && part.length > 0));
+    }
+  }
+  assert.ok(tiers["test-heavy"].steps.some((step) => step.command.join(" ") === "npm audit --audit-level=high"));
   assert.equal(tiers["test-heavy"].serial, true);
 });
 
@@ -204,6 +217,29 @@ test("manifest parity requires exactly one high-severity security audit", () => 
   assert.match(duplicated.stderr, /exactly one security-audit step/);
 });
 
+test("manifest parity rejects missing, extra, and malformed tiers", () => {
+  const valid = manifestValidatorFixture(() => {});
+  assert.equal(valid.status, 0, valid.stderr);
+
+  const missing = manifestValidatorFixture((manifest) => {
+    delete manifest.tiers["test-standard-plus"];
+  });
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /tier parity mismatch: missing test-standard-plus/);
+
+  const extra = manifestValidatorFixture((manifest) => {
+    manifest.tiers["test-hidden"] = {};
+  });
+  assert.equal(extra.status, 1);
+  assert.match(extra.stderr, /tier parity mismatch: unexpected test-hidden/);
+
+  const malformed = manifestValidatorFixture((manifest) => {
+    manifest.tiers["test-fast"].steps[0].command = ["npm", 42];
+  });
+  assert.equal(malformed.status, 1);
+  assert.match(malformed.stderr, /test-fast contains an invalid step/);
+});
+
 test("published archive drift fails with regeneration guidance", () => {
   const sourcePath = join(ROOT, ".agents/skills/validation-tiers/tiers.json");
   const original = readFileSync(sourcePath);
@@ -299,7 +335,7 @@ test("plan scaffold rejects unknown tiers and creates exact baseline markers", (
   }] }, null, 2));
   try {
     const result = run("scripts/new-plan.mjs", [
-      "--name", "fixture-plan", "--why", "exercise plan creation", "--tier", "test-light",
+      "--name", "fixture-plan", "--why", "exercise plan creation", "--tier", "test-fast",
       "--baseline-id", "BASE-FIXTURE",
     ]);
     assert.equal(result.status, 0, result.stderr);
@@ -309,6 +345,24 @@ test("plan scaffold rejects unknown tiers and creates exact baseline markers", (
     rmSync(planPath, { force: true });
   } finally {
     writeFileSync(catalogPath, original);
+  }
+});
+
+test("plan scaffold accepts every canonical validation tier", () => {
+  const created = [];
+  try {
+    for (const tier of Object.keys(loadTiers())) {
+      const name = `fixture-tier-${tier}`;
+      const result = run("scripts/new-plan.mjs", [
+        "--name", name,
+        "--why", "exercise canonical tier registration",
+        "--tier", tier,
+      ]);
+      assert.equal(result.status, 0, `${tier}: ${result.stderr}`);
+      created.push(join(ROOT, ".local/tasks", `${name}.md`));
+    }
+  } finally {
+    for (const path of created) rmSync(path, { force: true });
   }
 });
 
@@ -358,13 +412,13 @@ test("unauthorized baseline IDs fail closed and archive inspection is explicit",
 });
 
 test("tier lock fails before validation when plan is missing or mismatched", () => {
-  const noPlan = run("scripts/run-tier.mjs", ["test-light"], { TASK_PLAN_FILE: "" });
+  const noPlan = run("scripts/run-tier.mjs", ["test-fast"], { TASK_PLAN_FILE: "" });
   assert.equal(noPlan.status, 2);
   assert.match(noPlan.stderr, /TASK_PLAN_FILE is required/);
   const path = fixturePlan(validPlan);
   const mismatch = run("scripts/run-tier.mjs", ["test-standard"], { TASK_PLAN_FILE: path });
   assert.equal(mismatch.status, 2);
-  assert.match(mismatch.stderr, /requested test-standard but plan locks test-light/);
+  assert.match(mismatch.stderr, /requested test-standard but plan locks test-fast/);
 });
 
 test("ad-hoc validation requires an explicit no-plan escape hatch", () => {
@@ -392,9 +446,9 @@ test("ad-hoc validation requires an explicit no-plan escape hatch", () => {
 });
 
 test("package lifecycle metadata cannot bypass the task tier lock", () => {
-  const result = run("scripts/run-tier.mjs", ["test-light"], {
+  const result = run("scripts/run-tier.mjs", ["test-fast"], {
     TASK_PLAN_FILE: "",
-    npm_lifecycle_event: "test-light",
+    npm_lifecycle_event: "test-fast",
   });
   assert.equal(result.status, 2);
   assert.match(result.stderr, /TASK_PLAN_FILE is required/);
@@ -417,7 +471,7 @@ test("direct execute mode rejects spoofed guard metadata without a verified ance
     resource: "validation",
     lockPath,
   }));
-  const result = spawnSync(process.execPath, ["scripts/run-tier.mjs", "--execute", "test-light"], {
+  const result = spawnSync(process.execPath, ["scripts/run-tier.mjs", "--execute", "test-fast"], {
     cwd: ROOT,
     env: {
       ...process.env,

@@ -9,7 +9,7 @@ claim.
 | Portable requirements separated from host adaptation | canonical skill and validation-tier adapter | portability contract test |
 | Plan-time baseline discovery and required announcement | `SKILL.md`, `new-plan.mjs` | plan scaffold tests |
 | Required baseline and validation sections | `check-failure-gate.mjs` | missing/malformed plan tests |
-| Host-specific light, standard, and heavy tiers | `validation-tiers/tiers.json` | tier registry tests |
+| Host-specific fast, standard, standard-plus, and heavy tiers | `validation-tiers/tiers.json` | tier registry tests |
 | Fail-closed missing, unreadable, malformed, or mismatched plans | `tier-lock-check.mjs`, `run-tier.mjs` | tier-lock tests |
 | Explicit ad-hoc no-plan escape hatch | `run-tier.mjs --allow-no-plan` | ad-hoc test |
 | Exact suite/test/signature resolution | `lib/baseline.mjs`, failure lint | mismatch/stale tests |

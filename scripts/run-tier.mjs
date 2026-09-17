@@ -34,7 +34,7 @@ const entry = manifestEntry ?? (localEntry ? {
   steps: localEntry.steps.map((step) => ({
     name: step.name,
     kind: step.kind,
-    command: ["bash", "-lc", step.command],
+    command: step.command,
   })),
 } : undefined);
 

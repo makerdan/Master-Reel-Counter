@@ -35,7 +35,6 @@
     "test-standard-plus": "node scripts/run-tier.mjs test-standard-plus --allow-no-plan",
     "test-heavy": "node scripts/run-tier.mjs test-heavy --allow-no-plan",
     "ci": "npm run test-heavy",
-    "test-light": "node scripts/run-tier.mjs test-light --allow-no-plan",
     "new-plan": "node scripts/new-plan.mjs",
     "check-failure-gate": "node scripts/check-failure-gate.mjs",
     "check-regression-guard": "node scripts/check-regression-guard.mjs",
