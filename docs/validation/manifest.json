@@ -9,7 +9,8 @@
       "timeoutMs": 180000,
       "steps": [
         { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
-        { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] }
+        { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] }
       ]
     },
     "test-standard": {
@@ -20,6 +21,7 @@
       "steps": [
         { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
         { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
         { "name": "clerk-release-contract", "kind": "test", "command": ["npm", "run", "test:managed-clerk-release-contract"] },
         { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
@@ -36,6 +38,7 @@
       "steps": [
         { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
         { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
         { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
         { "name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
@@ -56,6 +59,7 @@
         { "name": "workspace-skill-contract", "kind": "test", "command": ["npm", "run", "test:workspace-skill"] },
         { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
         { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
         { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
         { "name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },

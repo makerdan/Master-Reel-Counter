@@ -3,7 +3,15 @@ import { apiRequest, queryClient, parseApiErrorPayload } from "@/lib/queryClient
 import { useToast } from "@/hooks/use-toast";
 import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { useAuth } from "@/hooks/use-auth";
-import { undoStackKey, redoStackKey, UNDO_STACK_KEY_PREFIX, REDO_STACK_KEY_PREFIX } from "@/lib/storageKeys";
+import {
+  undoStackKey,
+  redoStackKey,
+  UNDO_STACK_KEY_PREFIX,
+  REDO_STACK_KEY_PREFIX,
+  readKey,
+  writeKey,
+  clearKey,
+} from "@/lib/storageKeys";
 
 export type ActionType = "create-entry" | "update-entry" | "delete-entry" | "create-pin" | "update-pin" | "delete-pin" | "restore-draft-pins" | "dismiss-duplicate" | "undismiss-duplicate" | "flag-pin" | "unflag-pin" | "flag-pin-group" | "unflag-pin-group" | "delete-photo" | "duplicate-photo" | "update-photo" | "update-session" | "lock-session" | "create-comment" | "update-comment" | "delete-comment";
 
@@ -27,12 +35,12 @@ interface PersistedStack {
 
 function loadStack(key: string): UndoAction[] {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = readKey(key);
     if (!raw) return [];
     const parsed: PersistedStack = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.stack)) return [];
     if (typeof parsed.storedAt !== "number" || isNaN(parsed.storedAt) || Date.now() - parsed.storedAt > TTL_MS) {
-      localStorage.removeItem(key);
+      clearKey(key);
       return [];
     }
     return parsed.stack;
@@ -44,7 +52,7 @@ function loadStack(key: string): UndoAction[] {
 function saveStack(key: string, stack: UndoAction[]) {
   try {
     const payload: PersistedStack = { storedAt: Date.now(), stack };
-    localStorage.setItem(key, JSON.stringify(payload));
+    writeKey(key, JSON.stringify(payload));
   } catch {
     // Ignore quota or access errors gracefully
   }
@@ -61,7 +69,7 @@ function pruneStaleSessionKeys(currentSessionId: number) {
       const id = parseInt(idStr, 10);
       if (id === currentSessionId) continue;
       try {
-        const raw = localStorage.getItem(key);
+        const raw = readKey(key);
         if (!raw) { toRemove.push(key); continue; }
         const parsed: PersistedStack = JSON.parse(raw);
         if (!parsed || typeof parsed.storedAt !== "number" || isNaN(parsed.storedAt) || Date.now() - parsed.storedAt > TTL_MS) toRemove.push(key);
@@ -69,7 +77,7 @@ function pruneStaleSessionKeys(currentSessionId: number) {
         toRemove.push(key);
       }
     }
-    for (const key of toRemove) localStorage.removeItem(key);
+    for (const key of toRemove) clearKey(key);
   } catch {
     // Ignore errors
   }
