@@ -61,7 +61,7 @@
         { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
         { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
         { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
-        { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
+        { "name": "vite-hmr-recovery-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr-recovery"] },
         { "name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
         { "name": "port-authority-tests", "kind": "harness", "command": ["node", "scripts/port-authority-test.mjs"] },
         { "name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"] },
