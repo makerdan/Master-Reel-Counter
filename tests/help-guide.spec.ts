@@ -63,6 +63,60 @@ test.describe("support help", () => {
     );
   });
 
+  test("help chat trims oversized transcripts while restoring and streaming", async ({ page }) => {
+    await page.route("**/api/help-chat", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: [
+          'data: {"content":"The newest answer is retained."}',
+          "",
+          'data: {"done":true}',
+          "",
+        ].join("\n"),
+      }),
+    );
+
+    await page.goto("/help");
+    await page.getByTestId("input-help-chat").fill("Create a storage key");
+    await page.getByTestId("button-send-help-chat").click();
+    await expect(page.getByTestId("chat-message-assistant-1")).toContainText(
+      "The newest answer is retained.",
+    );
+
+    const storageKey = await page.evaluate(() =>
+      Object.keys(sessionStorage).find((key) => key.startsWith("help-chat-state-")),
+    );
+    expect(storageKey).toBeTruthy();
+
+    const oversizedTranscript = Array.from({ length: 60 }, (_, index) => ({
+      role: index % 2 === 0 ? "user" : "assistant",
+      content: index % 2 === 0 ? `Older question ${index}` : `Older answer ${index}`,
+    }));
+    await page.evaluate(
+      ({ key, transcript }) => sessionStorage.setItem(key!, JSON.stringify(transcript)),
+      { key: storageKey, transcript: oversizedTranscript },
+    );
+    await page.reload();
+
+    await expect(page.getByText("Older question 0")).not.toBeVisible();
+    await expect(page.getByText("Older question 10")).toBeVisible();
+    await expect(page.getByText("Older answer 59")).toBeVisible();
+    await expect(page.locator('[data-testid^="chat-message-"]')).toHaveCount(50);
+
+    await page.getByTestId("input-help-chat").fill("What is newest?");
+    await page.getByTestId("button-send-help-chat").click();
+    await expect(page.getByText("The newest answer is retained.")).toBeVisible();
+    await expect(page.getByText("Older question 0")).not.toBeVisible();
+    await expect(page.locator('[data-testid^="chat-message-"]')).toHaveCount(50);
+
+    const persistedCount = await page.evaluate((key) => {
+      const stored = sessionStorage.getItem(key!);
+      return stored ? JSON.parse(stored).length : 0;
+    }, storageKey);
+    expect(persistedCount).toBe(50);
+  });
+
   test("help chat does not expose one approved identity transcript to another", async ({
     page,
     secondApprovedIdentity,

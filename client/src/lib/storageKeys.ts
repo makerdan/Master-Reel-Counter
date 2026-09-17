@@ -159,6 +159,13 @@ export const helpGuideStateKey = (userId: string) => `help-guide-state-${userId}
 export const helpChatStateKey = (userId: string) =>
   `help-chat-state-${identityStorageSuffix(userId)}`;
 
+/**
+ * Keep the latest 25 Ask AI exchanges (50 messages) in session storage.
+ * This bounds parsing, rendering, and storage costs without truncating a
+ * normal support conversation.
+ */
+export const HELP_CHAT_MAX_MESSAGES = 50;
+
 /** Last tracked route and timestamp; prevents reload/rerender duplicates. */
 export const PAGEVIEW_LAST_KEY = "pageview-last";
 

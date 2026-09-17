@@ -27,6 +27,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { HELP_ARTICLES, HELP_CONTENT_VERSION } from "@shared/help-content";
 import {
+  HELP_CHAT_MAX_MESSAGES,
   helpChatStateKey,
   helpGuideStateKey,
   readKey,
@@ -1573,20 +1574,31 @@ interface ChatMessage {
   content: string;
 }
 
+function limitHelpChatMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.length > HELP_CHAT_MAX_MESSAGES
+    ? messages.slice(-HELP_CHAT_MAX_MESSAGES)
+    : messages;
+}
+
 function readHelpChatMessages(identityId: string | null | undefined): ChatMessage[] {
   if (!identityId) return [];
 
-  const stored = readSessionKey(helpChatStateKey(identityId));
+  const storageKey = helpChatStateKey(identityId);
+  const stored = readSessionKey(storageKey);
   if (!stored) return [];
 
   try {
     const parsed = JSON.parse(stored);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((message): message is ChatMessage =>
+    const messages = limitHelpChatMessages(parsed.filter((message): message is ChatMessage =>
       message
       && (message.role === "user" || message.role === "assistant")
       && typeof message.content === "string",
-    );
+    ));
+    if (messages.length !== parsed.length) {
+      writeSessionKey(storageKey, JSON.stringify(messages));
+    }
+    return messages;
   } catch {
     return [];
   }
@@ -1622,7 +1634,7 @@ export function AskAIChat() {
   const setMessages = useCallback((updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
     setMessagesRaw(prev => {
       if (!identityId || activeIdentityRef.current !== identityId) return prev;
-      const next = typeof updater === "function" ? updater(prev) : updater;
+      const next = limitHelpChatMessages(typeof updater === "function" ? updater(prev) : updater);
       writeSessionKey(helpChatStateKey(identityId), JSON.stringify(next));
       return next;
     });
@@ -1647,7 +1659,7 @@ export function AskAIChat() {
     if (!identityId || !trimmed || isStreaming) return;
 
     const userMsg: ChatMessage = { role: "user", content: trimmed };
-    const updatedMessages = [...messages, userMsg];
+    const updatedMessages = limitHelpChatMessages([...messages, userMsg]);
     setMessages(updatedMessages);
     setInput("");
     setIsStreaming(true);
