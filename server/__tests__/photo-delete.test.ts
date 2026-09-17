@@ -20,11 +20,16 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 
-import { executePhotoDeletion, type PhotoDeletionDeps } from "../routes.js";
-import { storage } from "../storage.js";
+import {
+  executePhotoDeletion,
+  executeSessionPhotoFileCleanup,
+  type PhotoDeletionDeps,
+} from "../routes.js";
+import { physicalObjectKeyAliases, storage } from "../storage.js";
 import { db, pool } from "../db.js";
-import { countingSessions, photos } from "@shared/schema";
+import { countingSessions, photos, uploadIntents } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { canonicalPhysicalObjectKey } from "../replit_integrations/object_storage/index.js";
 
 // ---------------------------------------------------------------------------
 // Scenario 1: DB failure — storage must NOT be called
@@ -80,6 +85,21 @@ describe("executePhotoDeletion — DB cascade failure", () => {
   });
 });
 
+describe("canonical physical object identity", () => {
+  test("maps direct and legacy upload paths to the same key", () => {
+    assert.equal(canonicalPhysicalObjectKey("/uploads/shared.jpg"), "/uploads/shared.jpg");
+    assert.equal(canonicalPhysicalObjectKey("/objects/uploads/shared.jpg"), "/uploads/shared.jpg");
+    assert.equal(canonicalPhysicalObjectKey("uploads/shared.jpg"), "/uploads/shared.jpg");
+  });
+
+  test("produces only the two indexed database lookup aliases", () => {
+    assert.deepEqual(
+      physicalObjectKeyAliases("/objects/uploads/shared.jpg"),
+      ["/uploads/shared.jpg", "/objects/uploads/shared.jpg"],
+    );
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Scenario 2: Storage failure after successful DB cascade — must return 200
 //
@@ -114,6 +134,10 @@ describe("executePhotoDeletion — storage failure after successful DB delete", 
   });
 
   after(async () => {
+    await db
+      .delete(uploadIntents)
+      .where(eq(uploadIntents.userId, TEST_USER_ID))
+      .catch(() => {});
     // Cascade-delete any remaining fixture data (photos will cascade).
     if (testSessionId) {
       await db
@@ -160,6 +184,88 @@ describe("executePhotoDeletion — storage failure after successful DB delete", 
       undefined,
       "photo row must be absent from the DB after executePhotoDeletion returns — " +
       "the UI must not be able to serve a broken reference"
+    );
+  });
+
+  test("session cleanup preserves a file referenced through a legacy alias", async () => {
+    const [retainedSession] = await db
+      .insert(countingSessions)
+      .values({ userId: TEST_USER_ID, name: "__photo-delete-retained-session__" })
+      .returning();
+    const [direct, legacy] = await db
+      .insert(photos)
+      .values([
+        {
+          sessionId: testSessionId,
+          userId: TEST_USER_ID,
+          objectStorageKey: "/uploads/shared-alias.jpg",
+        },
+        {
+          sessionId: retainedSession.id,
+          userId: TEST_USER_ID,
+          objectStorageKey: "/objects/uploads/shared-alias.jpg",
+        },
+      ])
+      .returning();
+    let storageDeleteAttempted = false;
+
+    await executePhotoDeletion(direct, {
+      deletePhotoFromDb: (id) => storage.deletePhoto(id),
+      isObjectKeyShared: (key, excludeId) => storage.isObjectKeyShared(key, excludeId),
+      deleteStorageFile: async () => {
+        storageDeleteAttempted = true;
+      },
+    });
+
+    assert.equal(storageDeleteAttempted, false);
+    assert.ok(await storage.getPhoto(legacy.id));
+    await db.delete(countingSessions).where(eq(countingSessions.id, retainedSession.id));
+  });
+
+  test("whole-session cleanup deletes direct and legacy candidates exactly once", async () => {
+    const candidates = [
+      { id: 901, objectStorageKey: "/uploads/session-alias.jpg" },
+      { id: 902, objectStorageKey: "/objects/uploads/session-alias.jpg" },
+    ];
+    const sharedChecks: Array<{ key: string; excludedIds: number[] }> = [];
+    const deletedKeys: string[] = [];
+
+    await executeSessionPhotoFileCleanup(candidates, {
+      isObjectKeyShared: async (key, excludedIds) => {
+        sharedChecks.push({ key, excludedIds });
+        return false;
+      },
+      deleteStorageFile: async (key) => {
+        deletedKeys.push(key);
+      },
+    });
+
+    assert.deepEqual(sharedChecks, [{
+      key: "/uploads/session-alias.jpg",
+      excludedIds: [901, 902],
+    }]);
+    assert.deepEqual(deletedKeys, ["/uploads/session-alias.jpg"]);
+  });
+
+  test("orphan cleanup does not return a legacy intent whose direct key is referenced", async () => {
+    const objectPath = "/objects/uploads/referenced-intent-alias.jpg";
+    await db.insert(photos).values({
+      sessionId: testSessionId,
+      userId: TEST_USER_ID,
+      objectStorageKey: "/uploads/referenced-intent-alias.jpg",
+    });
+    await db.insert(uploadIntents).values({
+      objectPath,
+      userId: TEST_USER_ID,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    });
+
+    const expired = await storage.getExpiredUploadIntents(60 * 60 * 1000);
+
+    assert.equal(
+      expired.some((intent) => intent.objectPath === objectPath),
+      false,
+      "a referenced legacy alias must not be purged as an orphan",
     );
   });
 });

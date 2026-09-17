@@ -1,6 +1,7 @@
 export {
   ObjectStorageService,
   ObjectNotFoundError,
+  canonicalPhysicalObjectKey,
   objectStorageClient,
 } from "./objectStorage";
 

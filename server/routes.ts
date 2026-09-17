@@ -21,6 +21,7 @@ import {
 import type { UserCapability } from "./replit_integrations/auth/capabilities";
 import { authStorage } from "./replit_integrations/auth/storage";
 import {
+  canonicalPhysicalObjectKey,
   objectStorageClient,
   registerObjectStorageRoutes,
 } from "./replit_integrations/object_storage";
@@ -685,6 +686,30 @@ export async function executePhotoDeletion(
   }
 }
 
+export interface SessionPhotoFileCleanupDeps {
+  isObjectKeyShared: (key: string, excludePhotoIds: number[]) => Promise<boolean>;
+  deleteStorageFile: (key: string) => Promise<void>;
+}
+
+export async function executeSessionPhotoFileCleanup(
+  sessionPhotos: Array<{ id: number; objectStorageKey: string }>,
+  deps: SessionPhotoFileCleanupDeps,
+): Promise<void> {
+  const excludedPhotoIds = sessionPhotos.map((photo) => photo.id);
+  const uniquePhysicalKeys = new Set(
+    sessionPhotos.map((photo) => canonicalPhysicalObjectKey(photo.objectStorageKey)),
+  );
+
+  for (const key of uniquePhysicalKeys) {
+    try {
+      const shared = await deps.isObjectKeyShared(key, excludedPhotoIds);
+      if (!shared) await deps.deleteStorageFile(key);
+    } catch (err) {
+      console.warn("Could not delete session photo file:", err);
+    }
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -778,12 +803,19 @@ export async function registerRoutes(
   const privateDir = process.env.PRIVATE_OBJECT_DIR ?? "";
   const BUCKET_NAME = privateDir.split("/").filter(Boolean)[0] ?? "";
   const toStorageObjectName = (key: string): string => {
-    const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key;
+    const physicalKey = canonicalPhysicalObjectKey(key);
+    const filename = physicalKey.startsWith("/uploads/") ? physicalKey.slice("/uploads/".length) : physicalKey.replace(/^\/+/, "");
     const dirPart = privateDir.replace(/^\/[^/]+\/?/, "");
     return `${dirPart}/uploads/${filename}`;
   };
   const toAvatarObjectName = (filename: string): string => {
     return toStorageObjectName(`/uploads/${filename}`);
+  };
+  const deleteStorageFile = async (key: string): Promise<void> => {
+    const physicalKey = canonicalPhysicalObjectKey(key);
+    const filename = physicalKey.startsWith("/uploads/") ? physicalKey.slice("/uploads/".length) : physicalKey.replace(/^\/+/, "");
+    await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(physicalKey)).delete({ ignoreNotFound: true }).catch(() => {});
+    await fs.unlink(path.join(UPLOADS_DIR, filename)).catch(() => {});
   };
 
   const SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
@@ -1161,20 +1193,10 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Session not found" });
       if (!isOwner(access.role)) return res.status(403).json({ message: "Only the session owner can permanently delete sessions" });
       const sessionPhotos = await storage.getSessionPhotos(access.session.id);
-      for (const photo of sessionPhotos) {
-        try {
-          const shared = await storage.isObjectKeyShared(photo.objectStorageKey, photo.id);
-          if (!shared) {
-            const key = photo.objectStorageKey;
-            const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
-            const filePath = path.join(UPLOADS_DIR, filename);
-            await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
-            await fs.unlink(filePath).catch(() => {});
-          }
-        } catch (err) {
-          console.warn("Could not delete photo file on session delete:", err);
-        }
-      }
+      await executeSessionPhotoFileCleanup(sessionPhotos, {
+        isObjectKeyShared: (key, excludeIds) => storage.isObjectKeyShared(key, excludeIds),
+        deleteStorageFile,
+      });
       await storage.deleteSession(access.session.id);
       invalidatePdfJobs(access.session.id);
       evictAllSessionSockets(access.session.id, "Session deleted");
@@ -1247,20 +1269,10 @@ export async function registerRoutes(
         const access = await verifySessionAccess(id, userId, getTesterOwner(req as AuthenticatedRequest));
         if (access && isOwner(access.role)) {
           const sessionPhotos = await storage.getSessionPhotos(id);
-          for (const photo of sessionPhotos) {
-            try {
-              const shared = await storage.isObjectKeyShared(photo.objectStorageKey, photo.id);
-              if (!shared) {
-                const key = photo.objectStorageKey;
-                const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
-                const filePath = path.join(UPLOADS_DIR, filename);
-                await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
-                await fs.unlink(filePath).catch(() => {});
-              }
-            } catch (err) {
-              console.warn("Could not delete photo file on bulk session delete:", err);
-            }
-          }
+          await executeSessionPhotoFileCleanup(sessionPhotos, {
+            isObjectKeyShared: (key, excludeIds) => storage.isObjectKeyShared(key, excludeIds),
+            deleteStorageFile,
+          });
           await storage.deleteSession(id);
           evictAllSessionSockets(id, "Session deleted");
           results.push(id);
@@ -1751,9 +1763,10 @@ export async function registerRoutes(
         deletePhotoFromDb: (id) => storage.deletePhoto(id),
         isObjectKeyShared: (key, excludeId) => storage.isObjectKeyShared(key, excludeId),
         deleteStorageFile: async (key) => {
-          const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+          const physicalKey = canonicalPhysicalObjectKey(key);
+          const filename = physicalKey.startsWith("/uploads/") ? physicalKey.slice("/uploads/".length) : physicalKey.replace(/^\/+/, "");
           const filePath = path.join(UPLOADS_DIR, filename);
-          await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
+          await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(physicalKey)).delete({ ignoreNotFound: true }).catch(() => {});
           await fs.unlink(filePath).catch(() => {});
         },
       }, keepFile);
@@ -2389,7 +2402,8 @@ export async function registerRoutes(
   const labelResultsCache = new Map<number, { results: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> }>();
 
   async function loadPhotoBuffer(photoKey: string): Promise<Buffer> {
-    const photoFilename = photoKey.startsWith("/uploads/") ? photoKey.slice("/uploads/".length) : photoKey.replace(/^\/objects\/uploads\//, "");
+    const physicalPhotoKey = canonicalPhysicalObjectKey(photoKey);
+    const photoFilename = physicalPhotoKey.startsWith("/uploads/") ? physicalPhotoKey.slice("/uploads/".length) : physicalPhotoKey.replace(/^\/+/, "");
     try {
       const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(photoKey));
       const [existsInGcs] = await Promise.race([
@@ -6876,8 +6890,8 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       if (expired.length === 0) return;
       const purged: number[] = [];
       for (const intent of expired) {
-        const key = intent.objectPath;
-        const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
+        const key = canonicalPhysicalObjectKey(intent.objectPath);
+        const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/+/, "");
         let gcsOk = false;
         try {
           await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true });
@@ -6905,20 +6919,10 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       for (const session of expiredSessions) {
         try {
           const sessionPhotos = await storage.getSessionPhotos(session.id);
-          for (const photo of sessionPhotos) {
-            try {
-              const shared = await storage.isObjectKeyShared(photo.objectStorageKey, photo.id);
-              if (!shared) {
-                const key = photo.objectStorageKey;
-                const filename = key.startsWith("/uploads/") ? key.slice("/uploads/".length) : key.replace(/^\/objects\/uploads\//, "");
-                const filePath = path.join(UPLOADS_DIR, filename);
-                await objectStorageClient.bucket(BUCKET_NAME).file(toStorageObjectName(key)).delete({ ignoreNotFound: true }).catch(() => {});
-                await fs.unlink(filePath).catch(() => {});
-              }
-            } catch (err) {
-              console.warn("Could not delete photo file during trash purge:", err);
-            }
-          }
+          await executeSessionPhotoFileCleanup(sessionPhotos, {
+            isObjectKeyShared: (key, excludeIds) => storage.isObjectKeyShared(key, excludeIds),
+            deleteStorageFile,
+          });
           await storage.deleteSession(session.id);
           evictAllSessionSockets(session.id, "Session deleted");
           console.log(`Purged expired trashed session ${session.id} (${session.name})`);
@@ -6989,18 +6993,13 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     const cutoff = new Date(Date.now() - minAgeDays * 24 * 60 * 60 * 1000);
     const pageToken: string | undefined = req.body?.pageToken || undefined;
 
-    // Normalize any key to canonical "/uploads/<filename>" form so that legacy
-    // "/objects/uploads/<filename>" DB values match the GCS-derived key.
-    const normalizeKey = (key: string) =>
-      key.startsWith("/objects/uploads/") ? key.slice("/objects".length) : key;
-
     try {
       // Build set of all DB-referenced storage keys (photos + logos, already normalized)
       const knownKeys = await storage.getAllKnownStorageKeys();
       // Augment with user avatar keys (stored in the auth users table)
       const allUsers = await authStorage.getAllUsers();
       for (const u of allUsers) {
-        if (u.customAvatarKey) knownKeys.add(normalizeKey(u.customAvatarKey));
+        if (u.customAvatarKey) knownKeys.add(canonicalPhysicalObjectKey(u.customAvatarKey));
       }
 
       // Compute the GCS prefix for the uploads directory
@@ -7031,7 +7030,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         // Convert GCS name → canonical DB key
         // e.g. "mydir/uploads/foo.jpg" → "/uploads/foo.jpg"
         const rawKey = "/" + file.name.slice(dirPart ? dirPart.length + 1 : 0);
-        const dbKey = normalizeKey(rawKey);
+        const dbKey = canonicalPhysicalObjectKey(rawKey);
 
         if (knownKeys.has(dbKey)) { skipped++; continue; }
 
@@ -7078,12 +7077,6 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
     const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt((req.query as any).limit) || 100));
     const offset = Math.max(0, parseInt((req.query as any).offset) || 0);
 
-    // Normalize legacy "/objects/uploads/<file>" keys → "/uploads/<file>"
-    // so that toStorageObjectName produces the correct GCS path regardless
-    // of which format was stored when the photo was originally uploaded.
-    const normalizeKey = (key: string) =>
-      key.startsWith("/objects/uploads/") ? key.slice("/objects".length) : key;
-
     try {
       const { photos: batch, total } = await storage.getAllPhotosPaginated(limit, offset);
 
@@ -7095,7 +7088,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       for (let i = 0; i < batch.length; i += CONCURRENCY) {
         const chunk = batch.slice(i, i + CONCURRENCY);
         await Promise.all(chunk.map(async (photo) => {
-          const objectName = toStorageObjectName(normalizeKey(photo.objectStorageKey));
+          const objectName = toStorageObjectName(photo.objectStorageKey);
           try {
             const [exists] = await objectStorageClient.bucket(BUCKET_NAME).file(objectName).exists();
             if (!exists) {
@@ -7154,11 +7147,6 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
       return res.status(400).json({ message: "photoIds must be positive integers" });
     }
 
-    // Normalize legacy "/objects/uploads/<file>" keys → "/uploads/<file>"
-    // so toStorageObjectName derives the correct GCS path.
-    const normalizeKey = (key: string) =>
-      key.startsWith("/objects/uploads/") ? key.slice("/objects".length) : key;
-
     let deleted = 0;
     let notFound = 0;
     let errors = 0;
@@ -7169,7 +7157,7 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
 
       // Double-check the storage object is still missing before removing the row.
       try {
-        const objectName = toStorageObjectName(normalizeKey(photo.objectStorageKey));
+        const objectName = toStorageObjectName(photo.objectStorageKey);
         const [exists] = await objectStorageClient.bucket(BUCKET_NAME).file(objectName).exists();
         if (exists) {
           // File was restored or this photo is not actually orphaned; skip it.

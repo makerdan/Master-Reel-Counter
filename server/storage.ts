@@ -1,5 +1,6 @@
 import { db } from "./db";
-import { eq, and, desc, asc, inArray, sql, count, sum, min, max, ilike, or, isNull, isNotNull, lt } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, notInArray, sql, count, sum, min, max, ilike, or, isNull, isNotNull, lt } from "drizzle-orm";
+import { canonicalPhysicalObjectKey } from "./replit_integrations/object_storage/objectStorageClient.mjs";
 import { users } from "@shared/models/auth";
 import {
   countingSessions,
@@ -49,6 +50,11 @@ import {
   type UploadIntent,
 } from "@shared/schema";
 
+export function physicalObjectKeyAliases(objectPath: string): [string, string] {
+  const physicalKey = canonicalPhysicalObjectKey(objectPath);
+  return [physicalKey, `/objects${physicalKey}`];
+}
+
 export interface IStorage {
   createSession(session: InsertSession): Promise<Session>;
   getSession(id: number): Promise<Session | undefined>;
@@ -94,7 +100,7 @@ export interface IStorage {
    * responsibility and happens outside this method.
    */
   deletePhoto(id: number): Promise<void>;
-  isObjectKeyShared(key: string, excludePhotoId: number): Promise<boolean>;
+  isObjectKeyShared(key: string, excludePhotoIds: number | number[]): Promise<boolean>;
   /**
    * Returns a paginated slice of ALL photo rows across all sessions, ordered by
    * ascending ID. Used by the admin orphaned-photo-rows scan to walk every row
@@ -521,7 +527,9 @@ export class DatabaseStorage implements IStorage {
         .returning();
       // Resolve the upload intent so the orphan-cleanup job won't delete this file.
       if (photo.objectStorageKey) {
-        await tx.delete(uploadIntents).where(eq(uploadIntents.objectPath, photo.objectStorageKey));
+        await tx.delete(uploadIntents).where(
+          inArray(uploadIntents.objectPath, physicalObjectKeyAliases(photo.objectStorageKey)),
+        );
       }
       return updated;
     });
@@ -577,9 +585,13 @@ export class DatabaseStorage implements IStorage {
     return { photos: rows, total };
   }
 
-  async isObjectKeyShared(key: string, excludePhotoId: number): Promise<boolean> {
+  async isObjectKeyShared(key: string, excludePhotoIds: number | number[]): Promise<boolean> {
+    const excludedIds = Array.isArray(excludePhotoIds) ? excludePhotoIds : [excludePhotoIds];
     const rows = await db.select({ id: photos.id }).from(photos)
-      .where(and(eq(photos.objectStorageKey, key), sql`${photos.id} != ${excludePhotoId}`));
+      .where(and(
+        inArray(photos.objectStorageKey, physicalObjectKeyAliases(key)),
+        notInArray(photos.id, excludedIds),
+      ));
     return rows.length > 0;
   }
 
@@ -2776,50 +2788,47 @@ export class DatabaseStorage implements IStorage {
 
   async createUploadIntent(objectPath: string, userId: string): Promise<void> {
     await db.insert(uploadIntents)
-      .values({ objectPath, userId })
+      .values({ objectPath: canonicalPhysicalObjectKey(objectPath), userId })
       .onConflictDoNothing();
   }
 
   async resolveUploadIntent(objectPath: string): Promise<void> {
-    await db.delete(uploadIntents).where(eq(uploadIntents.objectPath, objectPath));
+    await db.delete(uploadIntents).where(
+      inArray(uploadIntents.objectPath, physicalObjectKeyAliases(objectPath)),
+    );
   }
 
   async getAllKnownStorageKeys(): Promise<Set<string>> {
-    // Normalize to canonical "/uploads/<filename>" form so legacy
-    // "/objects/uploads/<filename>" keys compare equal.
-    const normalize = (key: string) =>
-      key.startsWith("/objects/uploads/") ? key.slice("/objects".length) : key;
     const keys = new Set<string>();
     const photoRows = await db
       .select({ key: photos.objectStorageKey })
       .from(photos)
       .where(isNotNull(photos.objectStorageKey));
-    for (const row of photoRows) if (row.key) keys.add(normalize(row.key));
+    for (const row of photoRows) if (row.key) keys.add(canonicalPhysicalObjectKey(row.key));
     const logoRows = await db
       .select({ key: userSettings.companyLogoKey })
       .from(userSettings)
       .where(isNotNull(userSettings.companyLogoKey));
-    for (const row of logoRows) if (row.key) keys.add(normalize(row.key));
+    for (const row of logoRows) if (row.key) keys.add(canonicalPhysicalObjectKey(row.key));
     return keys;
   }
 
   async getExpiredUploadIntents(olderThanMs: number): Promise<UploadIntent[]> {
     const cutoff = new Date(Date.now() - olderThanMs);
-    // Only return rows that are both old enough AND have no matching photos row.
-    // The anti-join guards against deleting a file that was registered via a
-    // code path that skipped intent resolution (e.g. manual inserts or future
-    // non-atomicCreatePhoto paths).
     return db.select({ id: uploadIntents.id, objectPath: uploadIntents.objectPath, userId: uploadIntents.userId, createdAt: uploadIntents.createdAt })
       .from(uploadIntents)
-      .where(
-        and(
-          lt(uploadIntents.createdAt, cutoff),
-          sql`NOT EXISTS (
-            SELECT 1 FROM ${photos}
-            WHERE ${photos.objectStorageKey} = ${uploadIntents.objectPath}
-          )`,
-        )
-      );
+      .where(and(
+        lt(uploadIntents.createdAt, cutoff),
+        sql`NOT EXISTS (
+          SELECT 1 FROM ${photos}
+          WHERE ${photos.objectStorageKey} = ${uploadIntents.objectPath}
+             OR ${photos.objectStorageKey} = CASE
+               WHEN ${uploadIntents.objectPath} LIKE '/objects/%'
+                 THEN substring(${uploadIntents.objectPath} FROM 9)
+               ELSE '/objects' || ${uploadIntents.objectPath}
+             END
+        )`,
+      ));
   }
 
   async deleteUploadIntents(ids: number[]): Promise<void> {

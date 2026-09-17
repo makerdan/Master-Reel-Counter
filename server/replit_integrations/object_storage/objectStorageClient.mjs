@@ -21,6 +21,13 @@ export const objectStorageClient = new Storage({
   projectId: "",
 });
 
+export function canonicalPhysicalObjectKey(objectPath) {
+  const normalized = objectPath.startsWith("/") ? objectPath : `/${objectPath}`;
+  return normalized.startsWith("/objects/")
+    ? normalized.slice("/objects".length)
+    : normalized;
+}
+
 function parseObjectPath(path) {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const pathParts = normalized.split("/");
@@ -37,9 +44,7 @@ export function resolvePrivateObjectFile(client, privateObjectDir, objectPath) {
   if (!privateObjectDir) {
     throw new Error("PRIVATE_OBJECT_DIR is required for object cleanup");
   }
-  const entityId = objectPath.startsWith("/objects/")
-    ? objectPath.slice("/objects/".length)
-    : objectPath.replace(/^\/+/, "");
+  const entityId = canonicalPhysicalObjectKey(objectPath).replace(/^\/+/, "");
   const fullPath = `${privateObjectDir.replace(/\/+$/, "")}/${entityId}`;
   const { bucketName, objectName } = parseObjectPath(fullPath);
   return client.bucket(bucketName).file(objectName);

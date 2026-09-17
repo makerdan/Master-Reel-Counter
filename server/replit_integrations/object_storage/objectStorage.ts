@@ -2,6 +2,7 @@ import { File } from "@google-cloud/storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
 import {
+  canonicalPhysicalObjectKey,
   deletePrivateObjectsAndVerify,
   objectStorageClient,
 } from "./objectStorageClient.mjs";
@@ -15,7 +16,7 @@ import {
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 
-export { deletePrivateObjectsAndVerify, objectStorageClient };
+export { canonicalPhysicalObjectKey, deletePrivateObjectsAndVerify, objectStorageClient };
 
 export class ObjectNotFoundError extends Error {
   constructor() {
