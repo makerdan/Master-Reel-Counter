@@ -1,9 +1,9 @@
-# Storage-Key Lint Bug Audit Report
+# Storage-Key Lint Bug Remediation Report
 
 **Scope:** `scripts/lint-storage.mjs`, its strict npm command, the browser
 storage-key registry and lifecycle annotations, and validation-tier integration.
-**Mode:** Report-only
-**Date:** 2026-09-16
+**Mode:** Remediated
+**Date:** 2026-09-17
 **Stack:** Node.js ESM validation script; TypeScript/TSX React client; Vite;
 JSON-backed validation tiers. TypeScript and client-specific checks applied.
 Backend, React lifecycle, authentication, database, payment, and browser-UI
@@ -17,8 +17,17 @@ categories were not relevant to the static scanner itself.
 |---|---:|
 | Critical | 0 |
 | High | 0 |
-| Medium | 3 |
-| Low | 1 |
+| Medium | 0 |
+| Low | 0 |
+
+## Remediation
+
+The scanner now parses TypeScript/TSX ASTs and analyzes complete storage call
+expressions. It follows same-file storage-object aliases and registry constant
+or factory aliases, rejects unresolved key expressions, removes the broad
+`dash:` exemption, and ignores comments and string contents safely. Focused
+contract tests cover accepted and rejected syntax plus report-only and strict
+CLI exit behavior.
 
 | # | Severity | Category | File:Line | One-line description |
 |---|---|---|---|---|
@@ -43,10 +52,9 @@ current raw-key violation.
 ### Scanner
 
 The linter recursively scans only `.ts` and `.tsx` files below `client/src`.
-It excludes only `client/src/lib/storageKeys.ts`. Its primary regex looks for
-`localStorage` or `sessionStorage` followed by one of the three supported
-methods and a quote on the same source line. Its secondary regex looks for a
-key-named variable assigned a multi-segment hyphenated template literal.
+It excludes only `client/src/lib/storageKeys.ts`. TypeScript AST traversal
+identifies complete storage call expressions, follows supported same-file
+storage and registry aliases, and reports the call's starting line.
 
 ### Command and tier wiring
 
@@ -61,10 +69,10 @@ key-named variable assigned a multi-segment hyphenated template literal.
 
 ## Tooling signals
 
-The required command was run exactly with the assigned plan:
+The remediation validation commands were run with the assigned plan:
 
 ```text
-TASK_PLAN_FILE=.local/tasks/task-707.md npm run test-standard
+TASK_PLAN_FILE=.local/tasks/task-771.md npm run test-standard
 ```
 
 It passed all registered steps:
@@ -78,9 +86,8 @@ It passed all registered steps:
 - Validation-manifest parity: passed.
 
 The serial-lock harness reclaimed a dead stale holder before executing the
-tier. It did not prevent the tier from running and no test failure occurred.
-No linter, registry, application, CI, test, configuration, dependency, or
-secret file was changed for this report.
+standard tier. It did not prevent that tier from running, and no test failure
+occurred there.
 
 ## Verification probes
 
@@ -214,17 +221,16 @@ on the broad exemption.
   unit, contract, Vite, and manifest checks were used as surrounding
   confidence only.
 
-## Recommended remediation order
+## Remediation checklist
 
-1. Replace line-based matching with token-aware or AST-based call analysis
-   (F-001, F-002, and F-004).
-2. Remove or narrow the `dash:` exemption and make its registry shape
-   enforceable (F-003).
-3. Add focused linter contract tests covering strict exit status, multiline
-   calls, aliases/indirection, comments, exemptions, and malformed input.
+1. AST-based call analysis: complete.
+2. Narrowed registry boundary: complete; arbitrary `dash:` literals are no
+   longer exempt.
+3. Focused contract coverage: complete for strict exit status, multiline
+   calls, aliases/indirection, comments, and registry acceptance.
 
-## Report-only stop
+## Completion
 
-This audit stops at the report phase. All four findings are deferred; no
-linter, registry, application, CI, test, configuration, dependency, secret,
-or external-service data was changed. Fixes require a separate approved task.
+All four findings are remediated within the assigned scope. The typed storage
+key registry remains the source of truth; no broad client storage migration was
+performed.

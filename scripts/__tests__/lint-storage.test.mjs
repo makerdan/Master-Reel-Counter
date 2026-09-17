@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { analyzeSource } from "../lint-storage.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const LINTER = resolve(ROOT, "scripts/lint-storage.mjs");
@@ -104,4 +105,68 @@ test("malformed source fails closed without crashing the linter", () => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /malformed TypeScript source/);
   assert.match(result.stdout, /violation/);
+});
+
+test("accepts multiline registry constants, factories, and local aliases", () => {
+  const violations = analyzeSource(`
+    import { THEME_MODE_KEY, scannerResultsKey as resultKey } from "@/lib/storageKeys";
+    const aliasedConstant = THEME_MODE_KEY;
+    const aliasedFactory = resultKey;
+    localStorage.getItem(
+      aliasedConstant,
+    );
+    sessionStorage.setItem(
+      aliasedFactory(sessionId),
+      value,
+    );
+  `);
+  assert.deepEqual(violations, []);
+});
+
+test("accepts namespace imports and window storage aliases for registry keys", () => {
+  const violations = analyzeSource(`
+    import * as registry from "@/lib/storageKeys";
+    const browserStorage = window.localStorage;
+    browserStorage.setItem(
+      registry.scannerResultsKey(sessionId),
+      value,
+    );
+  `);
+  assert.deepEqual(violations, []);
+});
+
+test("does not let a shadowed unsafe alias inherit a registered outer key", () => {
+  const violations = analyzeSource(`
+    import { THEME_MODE_KEY } from "@/lib/storageKeys";
+    const key = THEME_MODE_KEY;
+    localStorage.getItem(key);
+    function writeUnsafe() {
+      const key = "unsafe-shadowed-key";
+      localStorage.setItem(key, value);
+    }
+  `);
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0].line, 7);
+});
+
+test("rejects multiline literals, indirect literals, and aliased storage objects", () => {
+  const violations = analyzeSource(`
+    const rawConstant = "unsafe-constant";
+    const rawTemplate = \`unsafe-\${sessionId}\`;
+    const browserStorage = localStorage;
+    browserStorage.setItem(
+      rawConstant,
+      value,
+    );
+    localStorage.removeItem(rawTemplate);
+    sessionStorage.getItem(
+      "unsafe-direct",
+    );
+    sessionStorage.setItem("dash:unregistered", value);
+  `);
+  assert.equal(violations.length, 4);
+  assert.deepEqual(
+    violations.map(({ line }) => line),
+    [5, 9, 10, 13],
+  );
 });

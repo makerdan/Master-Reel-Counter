@@ -203,8 +203,8 @@ export function useUndoRedo(sessionId: number) {
   const clearHistory = useCallback(() => {
     setUndoStack([]);
     setRedoStack([]);
-    try { localStorage.removeItem(undoStackKey(sessionId)); } catch {}
-    try { localStorage.removeItem(redoStackKey(sessionId)); } catch {}
+    try { clearKey(undoStackKey(sessionId)); } catch {}
+    try { clearKey(redoStackKey(sessionId)); } catch {}
     pruneStaleSessionKeys(sessionId);
   }, [sessionId]);
 
