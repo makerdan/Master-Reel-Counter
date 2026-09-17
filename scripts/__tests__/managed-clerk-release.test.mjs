@@ -160,6 +160,65 @@ function clerkPermissionProbeProgram(capability) {
   return { source, providerMessage, secret, requestBody, token };
 }
 
+function clerkUnexpectedProbeProgram(capability, failureKind) {
+  const providerMessage = `raw-unexpected-provider-message-${capability}-${failureKind}`;
+  const secret = `raw-unexpected-clerk-secret-${capability}-${failureKind}`;
+  const requestBody = `raw-unexpected-request-body-${capability}-${failureKind}`;
+  const token = `raw-unexpected-testing-token-${capability}-${failureKind}`;
+  const providerResponse = [providerMessage, secret, requestBody, token].join(" | ");
+  const throwUnexpectedFailure =
+    failureKind === "provider"
+      ? `      throw new ClerkAPIResponseError(providerResponse, { status: 422, data: [{ code: "form_data_invalid", message: providerResponse }] });`
+      : "      throw new Error(providerResponse);";
+  const source = [
+    'import assert from "node:assert/strict";',
+    'import { ClerkAPIResponseError } from "@clerk/shared/error";',
+    'import { assertClerkTestPermissions } from "./tests/support/clerk-test-permissions.ts";',
+    `const providerMessage = ${JSON.stringify(providerMessage)};`,
+    `const secret = ${JSON.stringify(secret)};`,
+    `const requestBody = ${JSON.stringify(requestBody)};`,
+    `const token = ${JSON.stringify(token)};`,
+    `const providerResponse = ${JSON.stringify(providerResponse)};`,
+    "let capturedRequestBody;",
+    "const clerk = {",
+    "  users: {",
+    "    createUser: async (params) => {",
+    "      capturedRequestBody = JSON.stringify(params);",
+    capability === "user"
+      ? throwUnexpectedFailure
+      : '      throw new ClerkAPIResponseError(requestBody, { status: 422, data: [{ code: "form_data_missing", message: providerMessage }] });',
+    "    },",
+    "    deleteUser: async () => undefined,",
+    "  },",
+    "  testingTokens: {",
+    "    createTestingToken: async () => {",
+    capability === "user"
+      ? `      return { token: ${JSON.stringify(token)} };`
+      : throwUnexpectedFailure,
+    "    },",
+    "  },",
+    "};",
+    "let failure;",
+    "try {",
+    "  await assertClerkTestPermissions(clerk);",
+    "} catch (error) {",
+    "  failure = error;",
+    "}",
+    "assert.ok(failure instanceof Error, \"unexpected preflight failure should reject\");",
+    capability === "user"
+      ? 'assert.match(failure.message, /failed during disposable-user creation/);'
+      : 'assert.match(failure.message, /failed during testing-token creation/);',
+    'assert.match(failure.message, /Browser validation did not start/);',
+    'assert.match(failure.message, /Check (the Clerk tenant configuration|Clerk connectivity)/);',
+    "for (const leakedValue of [providerMessage, secret, requestBody, token, capturedRequestBody]) {",
+    "  if (leakedValue) assert.equal(failure.message.includes(leakedValue), false);",
+    "}",
+    "assert.equal(failure.message.includes('{\"'), false);",
+    "console.log(failure.message);",
+  ].join("\n");
+  return { source, providerMessage, secret, requestBody, token };
+}
+
 function seededGenerator(seed) {
   let state = seed >>> 0;
   return () => {
@@ -967,6 +1026,40 @@ test("permission preflight redacts forbidden Clerk responses for both capabiliti
         false,
         `${capability} permission failure leaked ${secret}`,
       );
+    }
+  }
+});
+
+test("permission preflight redacts unexpected Clerk and network failures", async () => {
+  for (const capability of ["user", "testing-token"]) {
+    for (const failureKind of ["provider", "network"]) {
+      const probe = clerkUnexpectedProbeProgram(capability, failureKind);
+      const result = await execFileAsync(
+        process.execPath,
+        ["--import", "tsx/esm", "--input-type=module", "--eval", probe.source],
+        { cwd: root, maxBuffer: 1024 * 1024 },
+      );
+      const output = `${result.stdout}\n${result.stderr}`;
+      assert.match(
+        output,
+        capability === "user"
+          ? /failed during disposable-user creation/
+          : /failed during testing-token creation/,
+      );
+      assert.match(output, /Browser validation did not start/);
+      for (const secret of [
+        probe.providerMessage,
+        probe.secret,
+        probe.requestBody,
+        probe.token,
+        '{"',
+      ]) {
+        assert.equal(
+          output.includes(secret),
+          false,
+          `${capability} ${failureKind} failure leaked ${secret}`,
+        );
+      }
     }
   }
 });

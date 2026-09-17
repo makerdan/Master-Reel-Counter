@@ -35,6 +35,20 @@ function permissionPreflightError(
   );
 }
 
+function unexpectedPreflightError(
+  capability: "disposable-user creation" | "testing-token creation",
+  status: number | undefined,
+): Error {
+  const statusLabel = status === undefined ? "unknown status" : `HTTP ${status}`;
+  const guidance =
+    status === undefined
+      ? "Check Clerk connectivity and the configured test credentials."
+      : "Check the Clerk tenant configuration, API request contract, and configured test credentials.";
+  return new Error(
+    `Clerk test permission preflight failed during ${capability} (${statusLabel}). ${guidance} Browser validation did not start.`,
+  );
+}
+
 export async function assertClerkTestPermissions(
   clerk: ClerkTestPermissionClient,
 ): Promise<void> {
@@ -71,7 +85,7 @@ export async function assertClerkTestPermissions(
       // Clerk accepted the authenticated request and rejected only the
       // intentionally incomplete fixture payload.
     } else {
-      throw permissionPreflightError("disposable-user creation", status);
+      throw unexpectedPreflightError("disposable-user creation", status);
     }
   }
 
@@ -81,9 +95,9 @@ export async function assertClerkTestPermissions(
       throw new Error("missing testing token");
     }
   } catch (error) {
-    throw permissionPreflightError(
-      "testing-token creation",
-      clerkErrorStatus(error),
-    );
+    const status = clerkErrorStatus(error);
+    throw status === 403
+      ? permissionPreflightError("testing-token creation", status)
+      : unexpectedPreflightError("testing-token creation", status);
   }
 }
