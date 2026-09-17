@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+node scripts/check-failure-gate-parity.mjs
+
 candidate_port="${RELEASE_SMOKE_PORT:-$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')}"
 candidate_host="${RELEASE_SMOKE_PUBLIC_HOST:-master-reel-counter-ai.replit.app}"
 candidate_url="https://${candidate_host}"

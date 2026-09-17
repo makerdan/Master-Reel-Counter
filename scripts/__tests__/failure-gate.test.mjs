@@ -163,7 +163,7 @@ test("Failure Gate package regeneration is byte-for-byte stable", () => {
   ]);
 });
 
-test("registered standard validation runs the contract and archive parity checks", () => {
+test("registered validation tiers run the Failure Gate contract and archive parity checks", () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, "docs/validation/manifest.json"), "utf8"));
   assert.ok(manifest.tiers["test-standard"].steps.some(
     (step) => step.name === "failure-gate-contract"
@@ -173,6 +173,12 @@ test("registered standard validation runs the contract and archive parity checks
     (step) => step.name === "failure-gate-parity"
       && step.command.join(" ") === "node scripts/check-failure-gate-parity.mjs",
   ));
+  for (const tier of ["test-standard-plus", "test-heavy"]) {
+    assert.ok(manifest.tiers[tier].steps.some(
+      (step) => step.name === "failure-gate-parity"
+        && step.command.join(" ") === "node scripts/check-failure-gate-parity.mjs",
+    ), `${tier} must check Failure Gate archive parity`);
+  }
 });
 
 test("manifest parity requires exactly one high-severity security audit", () => {
@@ -204,6 +210,41 @@ test("published archive drift fails with regeneration guidance", () => {
   writeFileSync(sourcePath, Buffer.concat([original, Buffer.from("\n// deliberate mismatch\n")]));
   try {
     const result = run("scripts/check-failure-gate-parity.mjs", []);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /published tiers\.json differs from its canonical source/);
+    assert.match(result.stderr, /npm run publish:failure-gate/);
+  } finally {
+    writeFileSync(sourcePath, original);
+  }
+});
+
+test("current Failure Gate archive passes the release packaging preflight", () => {
+  const result = spawnSync("bash", [join(ROOT, "scripts/build-and-verify-release.sh")], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      RELEASE_CLEANUP_HARNESS: "1",
+      RELEASE_CLEANUP_EXIT_STATUS: "0",
+    },
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("stale Failure Gate archive blocks release packaging with regeneration guidance", () => {
+  const sourcePath = join(ROOT, ".agents/skills/validation-tiers/tiers.json");
+  const original = readFileSync(sourcePath);
+  writeFileSync(sourcePath, Buffer.concat([original, Buffer.from("\n// deliberate release mismatch\n")]));
+  try {
+    const result = spawnSync("bash", [join(ROOT, "scripts/build-and-verify-release.sh")], {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        RELEASE_CLEANUP_HARNESS: "1",
+        RELEASE_CLEANUP_EXIT_STATUS: "0",
+      },
+      encoding: "utf8",
+    });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /published tiers\.json differs from its canonical source/);
     assert.match(result.stderr, /npm run publish:failure-gate/);
