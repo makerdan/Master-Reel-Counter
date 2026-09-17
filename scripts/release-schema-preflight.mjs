@@ -35,6 +35,15 @@ function databaseTarget(urlString) {
   return normalized.toString();
 }
 
+function databaseIdentity(urlString) {
+  const url = new URL(databaseTarget(urlString));
+  return JSON.stringify({
+    hostname: url.hostname.toLowerCase(),
+    port: url.port || "5432",
+    databaseName: decodeURIComponent(url.pathname.replace(/^\/+/, "")),
+  });
+}
+
 export function assertIsolatedReleaseDatabase({
   releaseDatabaseUrl,
   publicationDatabaseUrl,
@@ -52,7 +61,10 @@ export function assertIsolatedReleaseDatabase({
 
   const releaseTarget = databaseTarget(releaseDatabaseUrl);
   const publicationTarget = databaseTarget(publicationDatabaseUrl);
-  if (releaseTarget === publicationTarget) {
+  if (
+    releaseTarget === publicationTarget ||
+    databaseIdentity(releaseDatabaseUrl) === databaseIdentity(publicationDatabaseUrl)
+  ) {
     throw new Error(
       "RELEASE_SMOKE_DATABASE_URL must be a dedicated target distinct from DATABASE_URL; refusing to mutate the publishing database",
     );

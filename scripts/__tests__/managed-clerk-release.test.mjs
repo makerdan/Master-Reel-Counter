@@ -19,6 +19,10 @@ import {
   FILTER_REMOVED_REVIEW_COHORT_SQL,
   SELECT_REMOVED_ACCOUNT_OBJECT_KEYS_SQL,
 } from "../lib/managed-clerk-reset-queries.mjs";
+import {
+  createOwnedDatabase,
+  dropOwnedDatabase,
+} from "../release-smoke-database.mjs";
 import { deletePrivateObjectsAndVerify } from "../../server/replit_integrations/object_storage/objectStorageClient.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -366,9 +370,17 @@ test("standard validation runs the deterministic release proxy contract before l
 });
 
 test("release candidate schema setup is isolated, migration-aware, and read-only before fixtures", () => {
+  assert.match(candidateBuild, /release-smoke-database\.mjs/);
+  assert.match(candidateBuild, /select_release_database[\s\S]*npm run build/);
+  assert.match(candidateBuild, /env -u RELEASE_SMOKE_DATABASE_URL npm run build/);
+  assert.doesNotMatch(candidateBuild, /export RELEASE_SMOKE_DATABASE_URL/);
+  assert.match(candidateBuild, /selected_smoke_database_url="\$\([\s\S]*unset RELEASE_SMOKE_DATABASE_URL/);
+  assert.match(candidateBuild, /stop_release_process "\$proxy_pid"[\s\S]*cleanup_release_database/);
+  assert.doesNotMatch(candidateBuild, /source "\$database_env"/);
+  assert.match(candidateBuild, /timeout --kill-after=1s[\s\S]*release-smoke-database\.mjs cleanup/);
   assert.match(candidateBuild, /RELEASE_SMOKE_DATABASE_URL/);
   assert.match(candidateBuild, /prepare-release-test-database\.mjs/);
-  assert.match(candidateBuild, /DATABASE_URL="\$RELEASE_SMOKE_DATABASE_URL"/);
+  assert.match(candidateBuild, /DATABASE_URL="\$selected_smoke_database_url"/);
   assert.match(releaseSchemaPreparation, /drizzle-kit/);
   assert.match(releaseSchemaPreparation, /"export"/);
   assert.match(releaseSchemaPreparation, /Admin.*User.*account role enum/);
@@ -399,6 +411,306 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.match(googleReleaseSmoke, /RELEASE_PUBLICATION_DATABASE_URL/);
   assert.match(googleReleaseSmoke, /internalCandidate/);
   assert.match(googleReleaseSmoke, /connectionString: internalCandidate/);
+});
+
+async function runReleaseDatabaseHarness({ directory, lifecycleBody, exitStatus = "0", extraEnv = {} }) {
+  const lifecyclePath = resolve(directory, "database-lifecycle.sh");
+  const markerPath = resolve(directory, "database-lifecycle.log");
+  await writeFile(
+    lifecyclePath,
+    ["#!/usr/bin/env bash", "set -euo pipefail", lifecycleBody, ""].join("\n"),
+  );
+  await chmod(lifecyclePath, 0o755);
+  const result = await execFileAsync(
+    "bash",
+    [resolve(root, "scripts/build-and-verify-release.sh")],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        DATABASE_URL: "postgresql://publisher:secret@db.example/publication",
+        RELEASE_DATABASE_LIFECYCLE_COMMAND: lifecyclePath,
+        RELEASE_DATABASE_HARNESS_EXIT_STATUS: exitStatus,
+        RELEASE_DATABASE_MARKER: markerPath,
+        RELEASE_CLEANUP_TIMEOUT_SECONDS: "1",
+        ...extraEnv,
+      },
+    },
+  ).then(
+    ({ stdout, stderr }) => ({ code: 0, stdout, stderr }),
+    (error) => ({ code: error.code, stdout: error.stdout, stderr: error.stderr }),
+  );
+  return { ...result, markerPath };
+}
+
+test("missing release smoke target is provisioned before build and cleaned on success", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-database-harness-"));
+  try {
+    const result = await runReleaseDatabaseHarness({
+      directory,
+      lifecycleBody: `
+case "$1" in
+  select)
+    printf '{"owned":true}' > "$2"
+    printf 'select:%s\\n' "\${RELEASE_SMOKE_DATABASE_URL:-missing}" >> "$RELEASE_DATABASE_MARKER"
+    ;;
+  url) printf 'postgresql://smoke:secret@db.example/owned' ;;
+  cleanup) printf 'cleanup\\n' >> "$RELEASE_DATABASE_MARKER" ;;
+esac`,
+    });
+    assert.equal(result.code, 0);
+    assert.equal(await readFile(result.markerPath, "utf8"), "select:missing\ncleanup\n");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("explicit release smoke target is preserved and cleanup runs after candidate failure", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-database-harness-"));
+  try {
+    const explicit = "postgresql://smoke:secret@db.example/explicit";
+    const result = await runReleaseDatabaseHarness({
+      directory,
+      exitStatus: "37",
+      extraEnv: { RELEASE_SMOKE_DATABASE_URL: explicit },
+      lifecycleBody: `
+case "$1" in
+  select)
+    printf '{"owned":false}' > "$2"
+    printf 'select:%s\\n' "$RELEASE_SMOKE_DATABASE_URL" >> "$RELEASE_DATABASE_MARKER"
+    ;;
+  url) printf '%s' "$RELEASE_SMOKE_DATABASE_URL" ;;
+  cleanup) printf 'cleanup\\n' >> "$RELEASE_DATABASE_MARKER" ;;
+esac`,
+    });
+    assert.equal(result.code, 37);
+    assert.equal(await readFile(result.markerPath, "utf8"), `select:${explicit}\ncleanup\n`);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("database creation and cleanup failures block release without leaking credentials", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-database-harness-"));
+  try {
+    const creation = await runReleaseDatabaseHarness({
+      directory,
+      lifecycleBody: `echo "creation denied" >&2; exit 1`,
+    });
+    assert.equal(creation.code, 1);
+    assert.match(creation.stderr, /creation denied/);
+    assert.equal(creation.stderr.includes("publisher:secret"), false);
+
+    const cleanup = await runReleaseDatabaseHarness({
+      directory,
+      lifecycleBody: `
+if [[ "$1" == select ]]; then
+  printf '{"owned":true}' > "$2"
+elif [[ "$1" == url ]]; then
+  printf 'postgresql://smoke:secret@db.example/owned'
+else
+  echo "drop denied" >&2
+  exit 1
+fi`,
+    });
+    assert.equal(cleanup.code, 1);
+    assert.match(cleanup.stderr, /temporary database cleanup failed/);
+    assert.equal(cleanup.stderr.includes("smoke:secret"), false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("selection timeout still invokes state-based cleanup", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-database-harness-"));
+  try {
+    const result = await runReleaseDatabaseHarness({
+      directory,
+      extraEnv: { RELEASE_DATABASE_SELECTION_TIMEOUT_SECONDS: "1" },
+      lifecycleBody: `
+if [[ "$1" == select ]]; then
+  printf '{"owned":true}' > "$2"
+  sleep 60
+elif [[ "$1" == cleanup ]]; then
+  printf 'cleanup\\n' >> "$RELEASE_DATABASE_MARKER"
+fi`,
+    });
+    assert.equal(result.code, 124);
+    assert.equal(await readFile(result.markerPath, "utf8"), "cleanup\n");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  test(`${signal} after database selection cleans the owned target`, async () => {
+    const directory = await mkdtemp(resolve(tmpdir(), "release-database-signal-"));
+    const lifecyclePath = resolve(directory, "database-lifecycle.sh");
+    const markerPath = resolve(directory, "database-lifecycle.log");
+    await writeFile(
+      lifecyclePath,
+      `#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+  select) printf '{"owned":true}' > "$2"; printf 'selected\\n' >> "$RELEASE_DATABASE_MARKER" ;;
+  url) printf 'postgresql://smoke:secret@db.example/owned' ;;
+  cleanup) printf 'cleanup\\n' >> "$RELEASE_DATABASE_MARKER" ;;
+esac
+`,
+    );
+    await chmod(lifecyclePath, 0o755);
+    const child = spawn("bash", [resolve(root, "scripts/build-and-verify-release.sh")], {
+      cwd: root,
+      detached: true,
+      env: {
+        ...process.env,
+        DATABASE_URL: "postgresql://publisher:secret@db.example/publication",
+        RELEASE_DATABASE_LIFECYCLE_COMMAND: lifecyclePath,
+        RELEASE_DATABASE_HARNESS_WAIT: "1",
+        RELEASE_DATABASE_MARKER: markerPath,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    try {
+      let selected = false;
+      for (let attempt = 0; attempt < 500; attempt += 1) {
+        if ((await readFile(markerPath, "utf8").catch(() => "")).includes("selected")) break;
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+      }
+      selected = (await readFile(markerPath, "utf8").catch(() => "")).includes("selected");
+      assert.equal(selected, true, "release harness did not finish database selection");
+      process.kill(-child.pid, signal);
+      const outcome = await new Promise((resolvePromise) => {
+        child.once("exit", (code, childSignal) => resolvePromise({ code, signal: childSignal }));
+      });
+      assert.ok(outcome.code !== 0 || outcome.signal);
+      assert.match(await readFile(markerPath, "utf8"), /selected\ncleanup\n/);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch (error) {
+          if (error?.code !== "ESRCH") throw error;
+        }
+      }
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+test("real lifecycle helper persists ownership, rolls back ambiguous create, and drops idempotently", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-database-helper-"));
+  const statePath = resolve(directory, "state.json");
+  const queries = [];
+  class SuccessfulClient {
+    async connect() {}
+    async query(sql) {
+      queries.push(sql);
+    }
+    async end() {}
+  }
+  try {
+    const state = await createOwnedDatabase(
+      "postgresql://publisher:secret@db.example/publication",
+      statePath,
+      { ClientClass: SuccessfulClient, uuid: () => "00000000-0000-0000-0000-000000000001" },
+    );
+    const persisted = JSON.parse(await readFile(statePath, "utf8"));
+    assert.equal(persisted.databaseName, state.databaseName);
+    assert.deepEqual(Object.keys(persisted).sort(), ["databaseName", "owned"]);
+    const publicationDatabaseUrl = "postgresql://publisher:secret@db.example/publication";
+    await dropOwnedDatabase(state, { ClientClass: SuccessfulClient, publicationDatabaseUrl });
+    await dropOwnedDatabase(state, { ClientClass: SuccessfulClient, publicationDatabaseUrl });
+    assert.equal(queries.filter((sql) => /^CREATE DATABASE/.test(sql)).length, 1);
+    assert.equal(queries.filter((sql) => /^DROP DATABASE IF EXISTS/.test(sql)).length, 2);
+
+    class AmbiguousFailureClient extends SuccessfulClient {
+      async query(sql) {
+        queries.push(sql);
+        if (/^CREATE DATABASE/.test(sql)) {
+          const error = new Error("credential-bearing provider detail");
+          error.code = "42501";
+          throw error;
+        }
+      }
+    }
+    await assert.rejects(
+      createOwnedDatabase(
+        "postgresql://publisher:secret@db.example/publication",
+        statePath,
+        { ClientClass: AmbiguousFailureClient, uuid: () => "00000000-0000-0000-0000-000000000002" },
+      ),
+      (error) =>
+        /permission to create and drop temporary databases/.test(error.message) &&
+        !error.message.includes("publisher:secret") &&
+        !error.message.includes("credential-bearing"),
+    );
+    assert.ok(queries.some((sql) => /^DROP DATABASE IF EXISTS.*000000000002/.test(sql)));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("real release lifecycle CLI creates and removes a PostgreSQL database", async (context) => {
+  if (!process.env.DATABASE_URL) {
+    context.skip("DATABASE_URL is unavailable");
+    return;
+  }
+  const directory = await mkdtemp(resolve(tmpdir(), "release-database-live-"));
+  const statePath = resolve(directory, "state.json");
+  const helperPath = resolve(root, "scripts/release-smoke-database.mjs");
+  try {
+    await execFileAsync(process.execPath, [helperPath, "select", statePath], {
+      cwd: root,
+      env: { ...process.env, RELEASE_SMOKE_DATABASE_URL: "" },
+    });
+    const state = JSON.parse(await readFile(statePath, "utf8"));
+    assert.match(state.databaseName, /^release_smoke_/);
+    const selectedUrl = await execFileAsync(process.execPath, [helperPath, "url", statePath], {
+      cwd: root,
+    });
+    assert.equal(new URL(selectedUrl.stdout).pathname, `/${state.databaseName}`);
+    await execFileAsync(process.execPath, [helperPath, "cleanup", statePath], { cwd: root });
+    const adminUrl = new URL(process.env.DATABASE_URL);
+    adminUrl.pathname = "/postgres";
+    const admin = new pg.Client({ connectionString: adminUrl.toString() });
+    await admin.connect();
+    try {
+      const result = await admin.query(
+        "SELECT 1 FROM pg_database WHERE datname = $1",
+        [state.databaseName],
+      );
+      assert.equal(result.rowCount, 0);
+    } finally {
+      await admin.end();
+    }
+  } finally {
+    const state = await readFile(statePath, "utf8").then(JSON.parse, () => null);
+    if (state?.owned) await dropOwnedDatabase(state).catch(() => undefined);
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("consecutive automatic release runs each clean their owned database", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-database-harness-"));
+  try {
+    const lifecycleBody = `
+case "$1" in
+  select)
+    printf '{"owned":true}' > "$2"
+    printf 'select\\n' >> "$RELEASE_DATABASE_MARKER"
+    ;;
+  url) printf 'postgresql://smoke:secret@db.example/owned' ;;
+  cleanup) printf 'cleanup\\n' >> "$RELEASE_DATABASE_MARKER" ;;
+esac`;
+    const first = await runReleaseDatabaseHarness({ directory, lifecycleBody });
+    const second = await runReleaseDatabaseHarness({ directory, lifecycleBody });
+    assert.equal(first.code, 0);
+    assert.equal(second.code, 0);
+    assert.equal(await readFile(first.markerPath, "utf8"), "select\ncleanup\nselect\ncleanup\n");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("production Clerk proxy fails closed and exposes public readiness before auth", () => {

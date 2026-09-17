@@ -64,6 +64,20 @@ test("release target must be explicit and distinct from the publishing database"
     }),
     "postgresql://postgres@db/release",
   );
+  for (const releaseDatabaseUrl of [
+    "postgresql://other:changed@db/public?sslmode=require",
+    "postgres://other:changed@db/public?sslmode=require",
+    "postgresql://postgres:other@DB:5432/public?application_name=smoke",
+    "postgresql://postgres@db/%70ublic",
+  ]) {
+    assert.throws(
+      () => assertIsolatedReleaseDatabase({
+        releaseDatabaseUrl,
+        publicationDatabaseUrl: "postgresql://postgres:secret@db/public?sslmode=disable",
+      }),
+      /dedicated target distinct/,
+    );
+  }
 });
 
 test("schema preflight fails before release fixtures when users.role is absent", async () => {

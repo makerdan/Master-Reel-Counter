@@ -1,10 +1,24 @@
 # Release database migration prerequisite
 
-The managed Clerk release candidate is verified against the dedicated
-`RELEASE_SMOKE_DATABASE_URL` target. The release build refuses to use the
-publishing `DATABASE_URL` for candidate fixtures, prepares only the dedicated
-target from the reviewed Drizzle schema, and runs a read-only auth-schema
-preflight before any Clerk or database fixture write.
+The managed Clerk release candidate uses an isolated PostgreSQL database. By
+default, the release build connects through the publishing `DATABASE_URL`,
+creates a uniquely named, run-owned database, and removes it after all candidate
+processes stop. The publishing credential must therefore be able to connect to
+the `postgres` administrative database and create, terminate connections to,
+and drop databases.
+
+Operators may instead provide `RELEASE_SMOKE_DATABASE_URL` as an explicit,
+already-isolated target. An explicit target is validated and is never replaced,
+inherited from `DATABASE_URL`, or dropped by the release harness.
+
+Target selection and automatic-database capability checks happen before
+compilation or Clerk activity. The selected target is passed only to schema
+preparation, candidate startup, and smoke fixtures. `DATABASE_URL` remains the
+protected publication target used for isolation comparison and administration.
+Success, setup failures, candidate failures, browser failures, and handled
+termination all stop child processes before removing an automatically created
+database. Creation or cleanup failure blocks release with a bounded,
+credential-free diagnostic; the harness never falls back to publication data.
 
 This isolated smoke proves that the candidate and smoke test agree on the
 reviewed schema. It does **not** prove that the publishing database is current.

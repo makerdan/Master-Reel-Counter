@@ -13,7 +13,38 @@ server_pid="${RELEASE_SERVER_PID:-}"
 proxy_pid="${RELEASE_PROXY_PID:-}"
 release_status=0
 cleanup_timeout_seconds="${RELEASE_CLEANUP_TIMEOUT_SECONDS:-10}"
+selection_timeout_seconds="${RELEASE_DATABASE_SELECTION_TIMEOUT_SECONDS:-30}"
 diagnostics_dir="${RELEASE_DIAGNOSTICS_DIR:-test-results/release-diagnostics}"
+database_state="${RELEASE_DATABASE_STATE:-$(mktemp /tmp/managed-clerk-release-database.XXXXXX.json)}"
+database_selected=0
+
+release_database_lifecycle() {
+  if [[ -n "${RELEASE_DATABASE_LIFECYCLE_COMMAND:-}" ]]; then
+    "$RELEASE_DATABASE_LIFECYCLE_COMMAND" "$@"
+  else
+    node scripts/release-smoke-database.mjs "$@"
+  fi
+}
+
+cleanup_release_database() {
+  if [[ -n "${RELEASE_DATABASE_LIFECYCLE_COMMAND:-}" ]]; then
+    timeout --kill-after=1s "${cleanup_timeout_seconds}s" \
+      "$RELEASE_DATABASE_LIFECYCLE_COMMAND" cleanup "$database_state"
+  else
+    timeout --kill-after=1s "${cleanup_timeout_seconds}s" \
+      node scripts/release-smoke-database.mjs cleanup "$database_state"
+  fi
+}
+
+select_release_database() {
+  if [[ -n "${RELEASE_DATABASE_LIFECYCLE_COMMAND:-}" ]]; then
+    timeout --kill-after=1s "${selection_timeout_seconds}s" \
+      "$RELEASE_DATABASE_LIFECYCLE_COMMAND" select "$database_state"
+  else
+    timeout --kill-after=1s "${selection_timeout_seconds}s" \
+      node scripts/release-smoke-database.mjs select "$database_state"
+  fi
+}
 
 redact_log() {
   if [[ -n "${RELEASE_REDACT_COMMAND:-}" ]]; then
@@ -70,6 +101,7 @@ stop_release_process() {
 
 cleanup() (
   set +e
+  local cleanup_status=0
   if [[ "$release_status" -ne 0 ]]; then
     retain_failure_diagnostics || \
       echo "Managed Clerk release diagnostic artifact retention failed." >&2
@@ -78,17 +110,30 @@ cleanup() (
   fi
   stop_release_process "$server_pid"
   stop_release_process "$proxy_pid"
+  if [[ "$database_selected" == "1" ]]; then
+    cleanup_release_database || {
+      echo "Managed Clerk release temporary database cleanup failed; release is blocked." >&2
+      cleanup_status=1
+    }
+  fi
   rm -f "$server_log" "$proxy_log" || \
     echo "Managed Clerk release temporary log cleanup failed." >&2
   rm -rf "$tls_dir" || \
     echo "Managed Clerk release temporary TLS cleanup failed." >&2
-  exit 0
+  rm -f "$database_state" "$database_state".*.tmp || {
+    echo "Managed Clerk release database-state cleanup failed; release is blocked." >&2
+    cleanup_status=1
+  }
+  exit "$cleanup_status"
 )
 
 on_exit() {
   release_status=$?
   trap - EXIT
-  cleanup || echo "Managed Clerk release cleanup failed." >&2
+  if ! cleanup; then
+    echo "Managed Clerk release cleanup failed." >&2
+    release_status=1
+  fi
   exit "$release_status"
 }
 trap on_exit EXIT
@@ -99,24 +144,29 @@ if [[ "${RELEASE_CLEANUP_HARNESS:-0}" == "1" ]]; then
   exit "${RELEASE_CLEANUP_EXIT_STATUS:-1}"
 fi
 
+database_selected=1
+select_release_database
+selected_smoke_database_url="$(
+  release_database_lifecycle url "$database_state"
+)"
+unset RELEASE_SMOKE_DATABASE_URL
+
+if [[ -n "${RELEASE_DATABASE_HARNESS_EXIT_STATUS:-}" ]]; then
+  exit "$RELEASE_DATABASE_HARNESS_EXIT_STATUS"
+fi
+if [[ "${RELEASE_DATABASE_HARNESS_WAIT:-0}" == "1" ]]; then
+  sleep 60
+fi
+
 export VITE_CLERK_PROXY_URL="$clerk_proxy_path"
-npm run build
+env -u RELEASE_SMOKE_DATABASE_URL npm run build
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "Managed Clerk release requires DATABASE_URL as the publishing database target." >&2
-  exit 1
-fi
-if [[ -z "${RELEASE_SMOKE_DATABASE_URL:-}" ]]; then
-  echo "Managed Clerk release requires RELEASE_SMOKE_DATABASE_URL as an isolated disposable target." >&2
-  exit 1
-fi
-
-RELEASE_SMOKE_DATABASE_URL="$RELEASE_SMOKE_DATABASE_URL" \
+RELEASE_SMOKE_DATABASE_URL="$selected_smoke_database_url" \
 DATABASE_URL="$DATABASE_URL" \
 node scripts/prepare-release-test-database.mjs
 
 NODE_ENV=production PORT="$candidate_port" RELEASE_CANDIDATE_ID="$candidate_id" \
-DATABASE_URL="$RELEASE_SMOKE_DATABASE_URL" \
+DATABASE_URL="$selected_smoke_database_url" \
   node dist/index.cjs >"$server_log" 2>&1 &
 server_pid="$!"
 
@@ -153,9 +203,9 @@ RELEASE_SMOKE_CANDIDATE_HOST="$candidate_host" \
 RELEASE_SMOKE_CANDIDATE_TLS_PORT="$tls_port" \
 RELEASE_SMOKE_CANDIDATE_APP_ORIGIN="http://127.0.0.1:${candidate_port}" \
 RELEASE_SMOKE_CANDIDATE_ID="$candidate_id" \
-RELEASE_SMOKE_DATABASE_URL="$RELEASE_SMOKE_DATABASE_URL" \
+RELEASE_SMOKE_DATABASE_URL="$selected_smoke_database_url" \
 RELEASE_PUBLICATION_DATABASE_URL="$DATABASE_URL" \
-DATABASE_URL="$RELEASE_SMOKE_DATABASE_URL" \
+DATABASE_URL="$selected_smoke_database_url" \
 PRODUCTION_BASE_URL="$candidate_url" \
 npm run verify:managed-clerk-release
 kill -0 "$server_pid"
