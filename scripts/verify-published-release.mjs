@@ -2,10 +2,55 @@
 
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { validateProductionBaseUrl } from "./validate-production-base-url.mjs";
+import {
+  validateProductionBaseUrl,
+  validateProductionDeploymentId,
+} from "./validate-production-base-url.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-validateProductionBaseUrl();
+const target = validateProductionBaseUrl();
+const expectedDeploymentId = validateProductionDeploymentId();
+
+async function verifyPublishedDeploymentIdentity() {
+  const healthUrl = new URL("/api/healthz", target.origin);
+  let response;
+  try {
+    response = await fetch(healthUrl, {
+      headers: { accept: "application/json" },
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    throw new Error(
+      `Published deployment health check failed before browser verification: ${
+        error instanceof Error ? error.message : "request failed"
+      }`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Published deployment health check returned HTTP ${response.status}; refusing to verify an unknown deployment.`,
+    );
+  }
+
+  let body;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error(
+      "Published deployment health check returned invalid JSON; refusing to verify an unknown deployment.",
+    );
+  }
+
+  if (body?.ok !== true || body?.deploymentId !== expectedDeploymentId) {
+    throw new Error(
+      "Published deployment identity is absent or does not match the intended deployment.",
+    );
+  }
+}
+
+await verifyPublishedDeploymentIdentity();
 
 const publishedReadOnlyEnvironment = { ...process.env };
 for (const name of [

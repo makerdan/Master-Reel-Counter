@@ -30,7 +30,23 @@ export function validateProductionBaseUrl(rawValue = process.env.PRODUCTION_BASE
   return target;
 }
 
+export function validateProductionDeploymentId(
+  rawValue = process.env.PRODUCTION_DEPLOYMENT_ID,
+) {
+  const deploymentId = rawValue?.trim();
+  if (!deploymentId) {
+    throw new Error(
+      "PRODUCTION_DEPLOYMENT_ID is required. Refusing to verify an unpublished or ambiguous deployment.",
+    );
+  }
+  if (deploymentId.length > 256 || /[\r\n]/.test(deploymentId)) {
+    throw new Error("PRODUCTION_DEPLOYMENT_ID must be a bounded single-line value.");
+  }
+  return deploymentId;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   validateProductionBaseUrl();
-  console.log("PRODUCTION_BASE_URL is a safe public HTTPS deployment URL.");
+  validateProductionDeploymentId();
+  console.log("Published production URL and deployment identity are configured.");
 }

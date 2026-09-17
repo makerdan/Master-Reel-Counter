@@ -4,6 +4,7 @@ import { resolveClerkEnvironmentPublishableKey } from "../../shared/clerk-config
 
 const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
+  "PRODUCTION_DEPLOYMENT_ID",
   "CLERK_PUBLISHABLE_KEY",
   "VITE_CLERK_PUBLISHABLE_KEY",
 ] as const;
@@ -44,6 +45,14 @@ test("published managed Clerk and Google boundaries are reachable without fixtur
     if (url.origin === baseURL && url.pathname.startsWith(CLERK_PROXY_PATH)) {
       proxyResponses.push(response.status());
     }
+  });
+
+  const healthResponse = await page.request.get("/api/healthz");
+  expect(healthResponse.ok(), "Published deployment health must be reachable").toBe(true);
+  const health = await healthResponse.json();
+  expect(health).toMatchObject({
+    ok: true,
+    deploymentId: process.env.PRODUCTION_DEPLOYMENT_ID,
   });
 
   const anonymousAuth = await page.request.get("/api/auth/user");

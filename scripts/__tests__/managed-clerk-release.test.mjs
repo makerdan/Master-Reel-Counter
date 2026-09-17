@@ -336,6 +336,7 @@ test("manual CI release gate verifies the currently published deployment", () =>
   assert.match(workflow, /name: Verify published managed Clerk deployment/);
   assert.match(workflow, /name: Require safe published production URL/);
   assert.match(workflow, /PRODUCTION_BASE_URL: \$\{\{ vars\.PRODUCTION_BASE_URL \}\}/);
+  assert.match(workflow, /PRODUCTION_DEPLOYMENT_ID: \$\{\{ vars\.PRODUCTION_DEPLOYMENT_ID \}\}/);
   assert.match(workflow, /run: node scripts\/validate-production-base-url\.mjs/);
   assert.match(workflow, /run: npm run verify:managed-clerk-published/);
   assert.doesNotMatch(workflow, /DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}/);
@@ -346,6 +347,9 @@ test("manual CI release gate verifies the currently published deployment", () =>
   assert.doesNotMatch(workflow, /RELEASE_CANDIDATE_ID:/);
   assert.match(packageJson.scripts["verify:managed-clerk-published"], /verify-published-release\.mjs/);
   assert.match(publishedRelease, /validateProductionBaseUrl/);
+  assert.match(publishedRelease, /validateProductionDeploymentId/);
+  assert.match(publishedRelease, /\/api\/healthz/);
+  assert.match(publishedRelease, /deploymentId !== expectedDeploymentId/);
   assert.match(publishedRelease, /playwright\.release\.config\.ts/);
   assert.match(publishedRelease, /publishedReadOnlyEnvironment/);
   assert.match(publishedRelease, /delete publishedReadOnlyEnvironment\[name\]/);
@@ -390,6 +394,7 @@ test("published deployment target validation fails closed for missing or unsafe 
   assert.match(productionUrlValidation, /target\.search/);
   assert.match(productionUrlValidation, /target\.hash/);
   assert.match(productionUrlValidation, /localhost/);
+  assert.match(productionUrlValidation, /PRODUCTION_DEPLOYMENT_ID is required/);
 });
 
 test("release workflow and production startup share the two-key tenant contract", () => {
@@ -835,6 +840,15 @@ test("production Clerk proxy fails closed and exposes public readiness before au
   assert(proxyMount < clerkAuth);
   assert(readinessRoute < routeRegistration);
   assert.match(serverIndex, /candidateId: process\.env\.RELEASE_CANDIDATE_ID/);
+  assert.match(serverIndex, /deploymentId: productionDeploymentId/);
+});
+
+test("published verification requires and checks the immutable deployment identity", () => {
+  assert.match(publishedReadOnlySmoke, /PRODUCTION_DEPLOYMENT_ID/);
+  assert.match(publishedReadOnlySmoke, /\/api\/healthz/);
+  assert.match(publishedReadOnlySmoke, /deploymentId: process\.env\.PRODUCTION_DEPLOYMENT_ID/);
+  assert.match(publishedRelease, /redirect: "manual"/);
+  assert.match(publishedRelease, /refusing to verify an unknown deployment/);
 });
 
 test("development retains its proxy-free Clerk path", () => {

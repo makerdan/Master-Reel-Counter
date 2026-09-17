@@ -44,6 +44,7 @@ jobs:
       - name: Require safe published production URL
         env:
           PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+          PRODUCTION_DEPLOYMENT_ID: ${{ vars.PRODUCTION_DEPLOYMENT_ID }}
         run: node scripts/validate-production-base-url.mjs
 
       - name: Install frozen dependencies
@@ -69,6 +70,7 @@ jobs:
       - name: Verify currently published managed Clerk deployment
         env:
           PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+          PRODUCTION_DEPLOYMENT_ID: ${{ vars.PRODUCTION_DEPLOYMENT_ID }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
         run: npm run verify:managed-clerk-published
