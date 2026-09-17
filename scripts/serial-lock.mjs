@@ -16,15 +16,19 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
+  fstatSync,
   linkSync,
   mkdirSync,
   openSync,
   readFileSync,
+  readSync,
   readdirSync,
   renameSync,
+  realpathSync,
   unlinkSync,
   writeSync,
   writeFileSync,
+  statSync,
 } from "fs";
 import { spawn, spawnSync } from "child_process";
 import { randomBytes } from "crypto";
@@ -198,6 +202,8 @@ const args = parseArgs();
 const RESOURCE = args.resource;
 const RESOURCE_ENV = RESOURCE.toUpperCase().replace(/[^A-Z0-9]/g, "_");
 const HELD_PID_ENV = `VALIDATION_LOCK_HELD_PID_${RESOURCE_ENV}`;
+const HELD_FD_ENV = `VALIDATION_LOCK_ATTESTATION_HOLDER_FD_${RESOURCE_ENV}`;
+const ATTESTATION_FD_ENV = "VALIDATION_LOCK_ATTESTATION_FD";
 const LOCK_PATH = resolve(
   process.env.VALIDATION_LOCK_FILE ??
     process.env.SERIAL_LOCK_PATH ??
@@ -407,8 +413,11 @@ function higherPriorityWaiterIsDue() {
 
 function runDirect() {
   const [command, ...commandArgs] = args.command;
+  const stdio = Number.isInteger(inheritedCapabilityFd) && inheritedCapabilityFd >= 3
+    ? ["inherit", "inherit", "inherit", inheritedCapabilityFd]
+    : "inherit";
   const result = spawnSync(command, commandArgs, {
-    stdio: "inherit",
+    stdio,
     shell: false,
     env: process.env,
   });
@@ -417,7 +426,58 @@ function runDirect() {
 
 const inheritedHolder = process.env[HELD_PID_ENV] ??
   (RESOURCE === DEFAULT_RESOURCE ? process.env[LEGACY_HOLDER_ENV] : undefined);
-if (inheritedHolder && getAncestors().has(String(Number(inheritedHolder)))) {
+const inheritedLock = readLock();
+let inheritedAttestation = null;
+let inheritedCapabilityMatchesHolder = false;
+let inheritedCapabilityFd = null;
+function inspectInheritedCapability(fd) {
+  const buffer = Buffer.alloc(4096);
+  const bytes = readSync(fd, buffer, 0, buffer.length, 0);
+  const attestation = JSON.parse(buffer.subarray(0, bytes).toString("utf8"));
+  const localStat = fstatSync(fd);
+  const holderStat = statSync(`/proc/${attestation.holderPid}/fd/${attestation.holderFd}`);
+  const holderCommand = readFileSync(`/proc/${attestation.holderPid}/cmdline`, "utf8").split("\0");
+  return {
+    attestation,
+    matches:
+      localStat.dev === holderStat.dev &&
+      localStat.ino === holderStat.ino &&
+      realpathSync(`/proc/${attestation.holderPid}/exe`) === realpathSync(process.execPath) &&
+      resolve(holderCommand[1] ?? "") === resolve(import.meta.dirname, "serial-lock.mjs"),
+  };
+}
+try {
+  let fd = Number(process.env[ATTESTATION_FD_ENV]);
+  let inspected;
+  if (Number.isInteger(fd) && fd >= 3) {
+    try {
+      inspected = inspectInheritedCapability(fd);
+    } catch {
+      inspected = null;
+    }
+  }
+  if (!inspected) {
+    const holderFd = Number(process.env[HELD_FD_ENV]);
+    fd = openSync(`/proc/${Number(inheritedHolder)}/fd/${holderFd}`, "r");
+    inspected = inspectInheritedCapability(fd);
+  }
+  inheritedCapabilityFd = fd;
+  inheritedAttestation = inspected.attestation;
+  inheritedCapabilityMatchesHolder = inspected.matches;
+} catch {
+  // Missing or malformed inherited capability disables reentrant execution.
+}
+if (
+  inheritedHolder &&
+  getAncestors().has(String(Number(inheritedHolder))) &&
+  inheritedLock?.kind === "valid" &&
+  inheritedLock.pid === Number(inheritedHolder) &&
+  inheritedLock.token === inheritedAttestation?.token &&
+  inheritedCapabilityMatchesHolder &&
+  inheritedAttestation?.holderPid === Number(inheritedHolder) &&
+  inheritedAttestation?.resource === RESOURCE &&
+  inheritedAttestation?.lockPath === LOCK_PATH
+) {
   console.log(`[serial-lock] reentrant resource '${RESOURCE}'; running without reacquiring.`);
   runDirect();
 }
@@ -513,6 +573,18 @@ console.log(
 );
 process.env[LEGACY_HOLDER_ENV] = String(process.pid);
 process.env[HELD_PID_ENV] = String(process.pid);
+const attestationPath = `${LOCK_PATH}.${LOCK_TOKEN}.attestation`;
+const attestationFd = openSync(attestationPath, "w+", 0o600);
+writeFileSync(attestationFd, JSON.stringify({
+  holderPid: process.pid,
+  holderFd: attestationFd,
+  token: LOCK_TOKEN,
+  resource: RESOURCE,
+  lockPath: LOCK_PATH,
+}), { mode: 0o600 });
+unlinkSync(attestationPath);
+process.env[ATTESTATION_FD_ENV] = "3";
+process.env[HELD_FD_ENV] = String(attestationFd);
 
 let heartbeatTimer = setInterval(writeHeartbeat, HEARTBEAT_INTERVAL_MS);
 heartbeatTimer.unref();
@@ -531,12 +603,13 @@ function release() {
     closeSync(holderLockFd);
     holderLockFd = null;
   }
+  closeSync(attestationFd);
   clearWaiter();
 }
 
 const [command, ...commandArgs] = args.command;
 const child = spawn(command, commandArgs, {
-  stdio: "inherit",
+  stdio: ["inherit", "inherit", "inherit", attestationFd],
   shell: false,
   env: process.env,
   detached: process.platform !== "win32",

@@ -11,6 +11,7 @@ const root = resolve(import.meta.dirname, "..");
 const manifestPath = resolve(root, "docs/validation/manifest.json");
 const packagePath = resolve(root, "package.json");
 const expectedTiers = ["test-fast", "test-standard", "test-standard-plus", "test-heavy"];
+const stepKinds = new Set(["typecheck", "test", "lint", "audit", "smoke", "harness"]);
 
 function fail(message) {
   console.error(`[validation-manifest] FAIL: ${message}`);
@@ -29,14 +30,22 @@ for (const tier of expectedTiers) {
   if (!Number.isInteger(entry.timeoutMs) || entry.timeoutMs <= 0) fail(`${tier} needs a positive timeoutMs`);
   if (!Number.isInteger(entry.priority) || entry.priority < 1 || entry.priority > 9) fail(`${tier} needs priority 1-9`);
   if (!Array.isArray(entry.steps) || entry.steps.length === 0) fail(`${tier} needs executable steps`);
-  if (packageJson.scripts?.[tier] !== `node scripts/run-tier.mjs ${tier}`) {
-    fail(`package.json script '${tier}' must route through the canonical tier runner`);
+  if (packageJson.scripts?.[tier] !== `node scripts/run-tier.mjs ${tier} --allow-no-plan`) {
+    fail(`package.json script '${tier}' must use the canonical runner with the explicit ad-hoc escape hatch`);
   }
   for (const step of entry.steps) {
-    if (!step.name || !Array.isArray(step.command) || step.command.length === 0) {
+    if (!step.name || !stepKinds.has(step.kind) || !Array.isArray(step.command) || step.command.length === 0) {
       fail(`${tier} contains an invalid step`);
     }
   }
+}
+
+const securityAudit = manifest.tiers["test-heavy"].steps.find((step) => step.name === "security-audit");
+if (
+  securityAudit?.kind !== "audit" ||
+  JSON.stringify(securityAudit.command) !== JSON.stringify(["npm", "audit", "--audit-level=high"])
+) {
+  fail("test-heavy security-audit must retain kind audit and the high-severity threshold");
 }
 
 console.log(`[validation-manifest] PASS: ${expectedTiers.length} tiers and package-script parity verified.`);

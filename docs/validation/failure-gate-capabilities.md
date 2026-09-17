@@ -6,9 +6,10 @@ claim.
 
 | Capability | Implementation | Verified by |
 |---|---|---|
+| Portable requirements separated from host adaptation | canonical skill and validation-tier adapter | portability contract test |
 | Plan-time baseline discovery and required announcement | `SKILL.md`, `new-plan.mjs` | plan scaffold tests |
 | Required baseline and validation sections | `check-failure-gate.mjs` | missing/malformed plan tests |
-| Registered light, standard, and heavy tiers | `validation-tiers/tiers.json` | tier registry tests |
+| Host-specific light, standard, and heavy tiers | `validation-tiers/tiers.json` | tier registry tests |
 | Fail-closed missing, unreadable, malformed, or mismatched plans | `tier-lock-check.mjs`, `run-tier.mjs` | tier-lock tests |
 | Explicit ad-hoc no-plan escape hatch | `run-tier.mjs --allow-no-plan` | ad-hoc test |
 | Exact suite/test/signature resolution | `lib/baseline.mjs`, failure lint | mismatch/stale tests |
@@ -17,6 +18,8 @@ claim.
 | Scoped fix-stub behavior and archive inspection | both lint guards | scoped/archive tests |
 | Regression Guard strict, stub, N/A, and self-satisfying modes | `check-regression-guard.mjs` | regression guard tests |
 | Task versus completion validation distinction | canonical skill | contract text test |
+| Incomplete runs and named not-reached steps fail the run | canonical skill, `run-tier.mjs` | runner outcome test |
+| Audit commands, thresholds, and failures retain integrity | canonical skill, tier adapter | portability contract test |
 | Serial heavy execution and existing port controls | tier registry, `serial-lock.mjs`, `ci.sh` | heavy registry and CI collision tests |
 | Baseline review deadlines and stale-verification report | maintenance script and guide | maintenance tests |
 | Catalog promotion boundary and fail-closed reference resolution | baseline library | promotion/status tests |

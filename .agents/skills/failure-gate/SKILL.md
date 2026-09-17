@@ -8,23 +8,66 @@ description: >-
 
 # Failure Gate
 
-Failure Gate has one purpose: make test ownership explicit before work is
-declared complete. It applies at two points:
+Failure Gate is a portable validation-ownership contract. It has one purpose:
+make validation ownership explicit before work is declared complete. It applies
+at two points:
 
 1. **Plan time:** discover and document the baseline before writing the plan.
 2. **Execute time:** classify new failures without treating a convenient retry
    as evidence of provenance.
 
-This gate covers test-suite failures. Typecheck failures remain task failures
-and are handled by the project's typecheck/audit process.
+The contract distinguishes test failures, which may be matched to authoritative
+baseline evidence, from non-test failures. Typecheck, lint, audit, smoke, and
+harness results never become ignorable test baselines merely because a host
+project registers them in the same tier.
+
+## Portability boundary
+
+### Portable requirements
+
+Every adopting project must provide:
+
+- a task plan with baseline and validation-ceiling sections;
+- a registry of valid validation commands or tiers;
+- a fail-closed lock that binds task validation to the plan's command;
+- an authoritative baseline mechanism with exact failure matching, lifecycle
+  status, ownership, and expiry;
+- execution reporting that distinguishes passed, failed, incomplete, and not
+  reached work;
+- evidence-based ownership and retry rules;
+- immutable audit semantics: an audit step's configured command, threshold, and
+  exit result cannot be weakened, ignored, or reclassified to make a run pass;
+- a final completion-validation handoff for code-changing tasks.
+
+The headings and semantic fields shown below are the portable interchange
+contract. A host may implement them with different scripts or storage paths,
+but must preserve their meaning and fail-closed behavior.
+
+### Required host adaptation
+
+Before use, each host project must map:
+
+- its plan location and plan-creation workflow;
+- its registered tier names, commands, step kinds, resource locks, and timeouts;
+- its authoritative baseline catalog location and lifecycle maintenance;
+- its local memory or historical-evidence sources, if any;
+- its completion-validation interface and polling limit;
+- its package/publishing path and any generated mirrors;
+- application-specific suites, paths, startup checks, ports, databases,
+  browsers, and external-service assumptions.
+
+The concrete paths and commands in **Host-project adapter: this repository**
+are examples for this repository, not universal requirements. Baseline records,
+project memory, tier composition, and application paths must never be copied as
+portable defaults.
 
 ## Non-negotiable contract
 
 - Every plan has `## Pre-existing failures to ignore` and `## Validation`.
 - `## Validation` has a real registered tier in `**Command:**`, a filled
   `**Why:**`, and `**Do not escalate:**`.
-- `docs/validation/failure-baseline.json` is the durable baseline source. A
-  plan may reference only an authoritative, unexpired `active` record.
+- The host-designated baseline catalog is the durable baseline source. A plan
+  may reference only an authoritative, unexpired `active` record.
 - `unknown`, `needs-review`, `intermittent`, `environment-limited`, and
   `resolved` records never authorize an ignore.
 - A referenced baseline must declare exactly one plan ownership:
@@ -35,15 +78,31 @@ and are handled by the project's typecheck/audit process.
 - A retry that passes proves **intermittency only**. It does not prove that the
   failure pre-dates the task.
 - A task-driven tier-lock problem fails closed. Only an explicit
-  `--allow-no-plan` on an ad-hoc/non-task run may bypass a missing plan.
-- `.local/tasks/` is gitignored environment-local archive state. Bulk archive
-  repairs are not tracked deliverables and must not be included in a commit.
-  Keep enforcement changes in tracked source, tests, session guidance, or
-  published assets.
+  host-defined ad-hoc/non-task escape hatch may bypass a missing plan.
+- A run is successful only if every required step passes. A step that starts but
+  cannot produce a valid result is **incomplete**. Every later required step is
+  **not reached**. Neither status is a pass or an ignorable baseline failure.
+- Audit steps preserve their registered command, threshold, and result. Audit
+  failures are task failures and cannot be baselined, waived by retries, or
+  converted to harness limitations.
 
 The session mandate, lint guard, tier runner, and this skill are one contract.
 When changing the contract, update all relevant tracked surfaces together.
 Do not edit generated `.local/custom_skills/` mirrors directly.
+
+## Host-project adapter: this repository
+
+This repository maps the portable contract to `.local/tasks/` plans,
+`.agents/skills/validation-tiers/tiers.json` plus
+`docs/validation/manifest.json`, and
+`docs/validation/failure-baseline.json`. It uses `scripts/new-plan.mjs`,
+`scripts/check-failure-gate.mjs`, `scripts/run-locked-tier.mjs`, and
+`scripts/run-tier.mjs` as its enforcement commands.
+
+`.local/tasks/` is gitignored environment-local archive state here. Bulk
+archive repairs are not tracked deliverables. Keep this repository's
+enforcement changes in tracked source, tests, session guidance, or published
+assets. Other adopters must choose and document their own locations.
 
 ## Plan time — Planner checklist
 
@@ -153,9 +212,10 @@ The plan's `**Command:**` is the validation ceiling.
   validation-skip reason; a generic "no changes" statement or an omitted check
   is not success.
 - If completion validation remains **RUNNING** through its polling limit,
-  classify that result as a validation-harness limitation, not a product
-  failure. Do not start or retry another completion validation while the
-  original run remains active.
+  classify that completion attempt as **incomplete** due to a
+  validation-harness limitation, not a product failure or a pass. Report any
+  checks it did not execute as **not reached**. Do not start or retry another
+  completion validation while the original run remains active.
 
 ### 1. Establish the tier lock
 
@@ -193,8 +253,8 @@ node scripts/run-tier.mjs test-standard --allow-no-plan
 The plan tier is the task-validation ceiling. Completion validation is a
 separate platform-managed check and may run registered commands beyond that
 ceiling; it must not be skipped for code-changing tasks. A completion check
-that remains running through its polling limit is a harness limitation, not a
-product failure.
+that remains running through its polling limit is incomplete because of a
+harness limitation, not a product failure or a successful result.
 
 ### 2. Classify each failure
 
@@ -223,6 +283,12 @@ Apply these rules in order:
 Unknown, stale, resolved, intermittent, environment-limited, or mismatched
 records follow steps 3–5; they are never auto-ignored.
 
+Only failures from steps registered with the host's test kind may follow the
+baseline ownership path. Typecheck, lint, audit, smoke, and harness failures
+remain task failures. In particular, do not alter an audit command, threshold,
+lockfile, or dependency graph merely to obtain a passing result; any intentional
+change needs task scope and review on its own merits.
+
 For each self-classification emit:
 
 ```text
@@ -248,6 +314,23 @@ Complete only when every remaining failure is either:
 
 Do not escalate above the plan tier because of a baseline, intermittent retry,
 or self-classification.
+
+### 4. Report incomplete and not-reached work
+
+For every required step, report exactly one terminal classification:
+
+- **passed** — the step completed and met its registered contract;
+- **failed** — the step completed with a valid failing result;
+- **incomplete** — the step started but no valid result was produced, including
+  timeout, signal termination, runner failure, or exhausted completion polling;
+- **not reached** — the step was required but never started because an earlier
+  failure or incomplete result stopped the run.
+
+Fail and incomplete both make the run unsuccessful. List every not-reached step
+by name; do not omit it, describe it as skipped, or imply it passed. Retry only
+under the failure-classification rules, and retain the original attempt in the
+evidence. A passing retry establishes intermittency, never provenance and never
+erases an incomplete attempt.
 
 ## Regression Guard composition
 
