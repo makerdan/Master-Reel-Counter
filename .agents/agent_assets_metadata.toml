@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "0DR6TzU5lFHp_sEH7PBUe"
+uri = "file://skill-previews/failure-gate/candidate-2026-09-16-a/failure-gate-compression-preview.zip"
+type = "unspecified"
+title = "Failure Gate compression preview"
+description = "Downloadable preview package with the immutable B0 baseline, complete P3 candidate, and full review record. The canonical Failure Gate source was not modified."
+logical_id = "bc22082c-51cb-4c12-8f52-8e2483e266b6"
+content_hash = "sha256:431290e46ca1bf8c330f637fad697366ed38b35493a09cc2da41ec99eccfcdac"
+size = 19534
+mtime_ms = 1789611823627
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/bc22082c-51cb-4c12-8f52-8e2483e266b6/4662ce80-6eed-46b1-9285-291c8c993614"
+storage_version_token = "1789611835701205"
+content_type = "application/octet-stream"
