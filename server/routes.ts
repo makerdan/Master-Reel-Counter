@@ -270,6 +270,25 @@ export function canEdit(role: string): boolean {
   return role === "owner" || role === "editor";
 }
 
+export type CommentUpdateAuthorization =
+  | { allowed: true; access: { role: string } }
+  | { allowed: false; status: 403 | 404; message: string };
+
+export async function authorizeCommentUpdate(
+  comment: { sessionId: number; userId: string },
+  userId: string,
+  accessChecker: (
+    sessionId: number,
+    userId: string,
+  ) => Promise<{ role: string } | null>,
+): Promise<CommentUpdateAuthorization> {
+  const access = await accessChecker(comment.sessionId, userId);
+  if (!access) return { allowed: false, status: 404, message: "Session not found" };
+  if (!canEdit(access.role)) return { allowed: false, status: 403, message: "View-only access" };
+  if (comment.userId !== userId) return { allowed: false, status: 403, message: "Not authorized" };
+  return { allowed: true, access };
+}
+
 export type ScanResult = {
   pinId: number;
   pinLabel: string;
@@ -6476,7 +6495,17 @@ export async function registerRoutes(
       const commentId = parseInt(req.params.id);
       const comment = await storage.getComment(commentId);
       if (!comment) return res.status(404).json({ message: "Comment not found" });
-      if (comment.userId !== userId) return res.status(403).json({ message: "Not authorized" });
+      const authorization = await authorizeCommentUpdate(
+        comment,
+        userId,
+        (sessionId, requestingUserId) =>
+          verifySessionAccess(
+            sessionId,
+            requestingUserId,
+            getTesterOwner(req as AuthenticatedRequest),
+          ),
+      );
+      if (!authorization.allowed) return res.status(authorization.status).json({ message: authorization.message });
       const { text } = (req.body ?? {}) as any;
       if (!text || !text.trim()) return res.status(400).json({ message: "Comment text required" });
       const updated = await storage.updateComment(commentId, { text: text.trim() });

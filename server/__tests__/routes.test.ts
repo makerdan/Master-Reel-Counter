@@ -48,6 +48,7 @@ import
   patchEntrySchema,
   buildScanResultsForPins,
   canEdit,
+  authorizeCommentUpdate,
   createAdminAiHealthHandler,
   createHelpChatHandler,
   helpChatRateLimiter,
@@ -715,6 +716,74 @@ describe("scan result persistence contract", () => {
     assert.equal((body as any).code, "scan_results_persistence");
   });
 });
+
+describe("comment update authorization", () => {
+  test("denies a revoked collaborator before persistence or broadcast", async () => {
+    const collaborator = "comment-collaborator";
+    const comment = {
+      id: 42,
+      sessionId: 7,
+      userId: collaborator,
+      text: "before revocation",
+    };
+    let access: { role: string } | null = { role: "editor" };
+    const broadcasts: string[] = [];
+
+    const createComment = await authorizeCommentUpdate(
+      comment,
+      collaborator,
+      async () => access,
+    );
+    assert.equal(createComment.allowed, true, "an editor can create the original comment");
+
+    access = null;
+    const updateComment = async (text: string) => {
+      const authorization = await authorizeCommentUpdate(
+        comment,
+        collaborator,
+        async () => access,
+      );
+      if (!authorization.allowed) return authorization;
+      comment.text = text;
+      broadcasts.push(text);
+      return authorization;
+    };
+
+    const denied = await updateComment("after revocation");
+    assert.deepEqual(denied, { allowed: false, status: 404, message: "Session not found" });
+    assert.equal(comment.text, "before revocation");
+    assert.deepEqual(broadcasts, []);
+  });
+
+  test("retains author and editable-role checks for an authorized update", async () => {
+    const accessChecker = async () => ({ role: "editor" });
+    assert.deepEqual(
+      await authorizeCommentUpdate(
+        { sessionId: 7, userId: "author" },
+        "author",
+        accessChecker,
+      ),
+      { allowed: true, access: { role: "editor" } },
+    );
+    assert.deepEqual(
+      await authorizeCommentUpdate(
+        { sessionId: 7, userId: "author" },
+        "other-user",
+        accessChecker,
+      ),
+      { allowed: false, status: 403, message: "Not authorized" },
+    );
+    assert.deepEqual(
+      await authorizeCommentUpdate(
+        { sessionId: 7, userId: "author" },
+        "author",
+        async () => ({ role: "viewer" }),
+      ),
+      { allowed: false, status: 403, message: "View-only access" },
+    );
+  });
+});
+
 function getDirective(header: string, directive: string): string {
   const value = header
     .split(";")
