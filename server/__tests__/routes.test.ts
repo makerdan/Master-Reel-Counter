@@ -54,6 +54,7 @@ import
   respondWithScanResultsPersistenceFailure,
   SCAN_RESULTS_PERSISTENCE_ERROR,
   getCurrentPdfJobAccess,
+  createSessionHandler,
 }
  from "../routes.js"
 ;
@@ -115,6 +116,7 @@ import
 ;
 
 import { buildSignInPath, getSafeReturnPath } from "../../shared/auth-routing.js";
+import { SESSION_VALIDATION_ERROR_CODE } from "@shared/schema";
 
 import 
 {
@@ -1266,6 +1268,117 @@ function buildTestApp() {
 
   return app;
 }
+
+function sessionRequest(body: unknown): any {
+  return {
+    body,
+    user: { claims: { sub: "session-owner" } },
+  };
+}
+
+function sessionResponse() {
+  let statusCode = 200;
+  let payload: unknown;
+  const response: any = {
+    status(code: number) {
+      statusCode = code;
+      return response;
+    },
+    json(body: unknown) {
+      payload = body;
+      return response;
+    },
+  };
+  return {
+    response,
+    get statusCode() {
+      return statusCode;
+    },
+    get payload() {
+      return payload;
+    },
+  };
+}
+
+describe("session creation route error contract", () => {
+  test("returns actionable validation errors without inserting a session", async () => {
+    let insertCalls = 0;
+    const handler = createSessionHandler({
+      getFolder: async () => undefined,
+      createSession: async () => {
+        insertCalls++;
+        throw new Error("must not insert invalid input");
+      },
+    });
+    const response = sessionResponse();
+
+    await handler(sessionRequest({ name: "   " }), response.response, (() => {}) as any);
+
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(response.payload, {
+      code: SESSION_VALIDATION_ERROR_CODE,
+      message: "Please correct the highlighted session fields.",
+      errors: { name: ["Session name is required"] },
+      formErrors: [],
+    });
+    assert.equal(insertCalls, 0);
+  });
+
+  test("returns the same safe validation contract for a malformed body", async () => {
+    const handler = createSessionHandler({
+      getFolder: async () => undefined,
+      createSession: async () => {
+        throw new Error("must not insert malformed input");
+      },
+    });
+    const response = sessionResponse();
+
+    await handler(sessionRequest({ name: 42 }), response.response, (() => {}) as any);
+
+    assert.equal(response.statusCode, 400);
+    const payload = response.payload as any;
+    assert.equal(payload.code, SESSION_VALIDATION_ERROR_CODE);
+    assert.ok(Array.isArray(payload.errors.name));
+    assert.equal(typeof payload.errors.name[0], "string");
+  });
+
+  test("keeps unexpected insert failures generic and non-disclosing", async () => {
+    const handler = createSessionHandler({
+      getFolder: async () => undefined,
+      createSession: async () => {
+        throw new Error("database connection details must not reach the client");
+      },
+    });
+    const response = sessionResponse();
+
+    await handler(sessionRequest({ name: "Valid session" }), response.response, (() => {}) as any);
+
+    assert.equal(response.statusCode, 500);
+    assert.deepEqual(response.payload, { message: "Failed to create session" });
+    assert.doesNotMatch(JSON.stringify(response.payload), /database connection details/);
+  });
+
+  test("inserts valid input and returns the created session", async () => {
+    let inserted: any;
+    const created = { id: 42, userId: "session-owner", name: "Valid session" };
+    const handler = createSessionHandler({
+      getFolder: async () => undefined,
+      createSession: async (session) => {
+        inserted = session;
+        return created as any;
+      },
+    });
+    const response = sessionResponse();
+
+    await handler(sessionRequest({ name: "  Valid session  ", location: "Warehouse" }), response.response, (() => {}) as any);
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.payload, created);
+    assert.equal(inserted.userId, "session-owner");
+    assert.equal(inserted.name, "Valid session");
+    assert.equal(inserted.location, "Warehouse");
+  });
+});
 
 async function httpReq(
   baseUrl: string,

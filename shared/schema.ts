@@ -294,7 +294,14 @@ export const insertSessionSchema = createInsertSchema(countingSessions).omit({
   lastUpdatedAt: true,
   completedAt: true,
   deletedAt: true,
+}).extend({
+  name: z.string()
+    .trim()
+    .min(1, "Session name is required")
+    .max(500, "Session name must be 500 characters or fewer"),
 });
+
+export const SESSION_VALIDATION_ERROR_CODE = "SESSION_VALIDATION_ERROR";
 
 export const insertPhotoSchema = createInsertSchema(photos).omit({
   id: true,

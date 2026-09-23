@@ -62,7 +62,7 @@ import {
 
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
-import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, type Session } from "@shared/schema";
+import { insertSessionSchema, insertEntrySchema, insertPinSchema, insertPhotoBodySchema, photos, pins, entries, userSettings, insertFeedbackSchema, insertUserWireCatalogSchema, countingSessions, SESSION_VALIDATION_ERROR_CODE, type InsertSession, type Session } from "@shared/schema";
 import {
   getPoeProvider,
   getPoeHealthStatus,
@@ -710,6 +710,54 @@ export async function executeSessionPhotoFileCleanup(
   }
 }
 
+export interface SessionCreationDeps {
+  getFolder: (folderId: number) => Promise<{ userId: string } | undefined>;
+  createSession: (session: InsertSession) => Promise<Session>;
+}
+
+function sessionValidationPayload(error: z.ZodError) {
+  const flattened = error.flatten();
+  return {
+    code: SESSION_VALIDATION_ERROR_CODE,
+    message: "Please correct the highlighted session fields.",
+    errors: flattened.fieldErrors,
+    formErrors: flattened.formErrors,
+  };
+}
+
+export function createSessionHandler(
+  deps: SessionCreationDeps = {
+    getFolder: (folderId) => storage.getFolder(folderId),
+    createSession: (session) => storage.createSession(session),
+  },
+): RequestHandler {
+  return async (req: any, res) => {
+    const userId = resolveUserId(req as AuthenticatedRequest);
+    const parsed = insertSessionSchema.safeParse({
+      ...(req.body ?? {}),
+      userId,
+    });
+    if (!parsed.success) {
+      return res.status(400).json(sessionValidationPayload(parsed.error));
+    }
+
+    try {
+      const data = parsed.data;
+      if (data.folderId) {
+        const folder = await deps.getFolder(data.folderId);
+        if (!folder || folder.userId !== userId) {
+          return res.status(400).json({ message: "Invalid folder" });
+        }
+      }
+      const session = await deps.createSession(data);
+      return res.json(session);
+    } catch (error) {
+      console.error("Error creating session:", error);
+      return res.status(500).json({ message: "Failed to create session" });
+    }
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1023,21 +1071,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sessions", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = resolveUserId(req as AuthenticatedRequest);
-      const data = insertSessionSchema.parse({ ...req.body, userId });
-      if (data.folderId) {
-        const folder = await storage.getFolder(data.folderId);
-        if (!folder || folder.userId !== userId) return res.status(400).json({ message: "Invalid folder" });
-      }
-      const session = await storage.createSession(data);
-      res.json(session);
-    } catch (error) {
-      console.error("Error creating session:", error);
-      res.status(500).json({ message: "Failed to create session" });
-    }
-  });
+  app.post("/api/sessions", isAuthenticated, createSessionHandler());
 
   app.get("/api/sessions/shared", isAuthenticated, async (req: any, res) => {
     try {

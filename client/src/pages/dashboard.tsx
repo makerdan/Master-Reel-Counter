@@ -56,7 +56,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useTimezone } from "@/hooks/use-timezone";
 import { formatTimestamp } from "@/lib/timezone";
-import type { Session, Folder as FolderType } from "@shared/schema";
+import { SESSION_VALIDATION_ERROR_CODE, type Session, type Folder as FolderType } from "@shared/schema";
 import { toDisplayUnit, unitLabel } from "@/lib/unit-conversion";
 import type { UnitType } from "@/lib/unit-conversion";
 import { findFolderConflict, getNextAutoNumberedName } from "@/lib/folder-conflicts";
@@ -482,7 +482,22 @@ export default function Dashboard() {
       setSessionLocation("");
       setLocation(`/session/${session.id}`);
     },
-    onError: () => {
+    onError: (error: unknown) => {
+      const parsed = parseApiErrorPayload(error);
+      if (parsed?.code === SESSION_VALIDATION_ERROR_CODE) {
+        const fieldErrors = parsed.errors;
+        const messages = fieldErrors && typeof fieldErrors === "object"
+          ? Object.values(fieldErrors as Record<string, unknown>)
+            .flatMap((value) => Array.isArray(value) ? value : [])
+            .filter((value): value is string => typeof value === "string")
+          : [];
+        toast({
+          title: "Check session details",
+          description: messages[0] || "Enter a valid session name and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
       toast({ title: "Failed to create session", variant: "destructive" });
     },
   });
