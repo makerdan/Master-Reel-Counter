@@ -39,3 +39,4 @@
 - [CI collision smoke contract](ci-collision-smoke-contract.md) — collision checks must prove both acquisitions, bound teardown, and isolate lock/waiter state.
 - [Validation lock survivor ownership](validation-lock-survivor-ownership.md) — stale recovery must inspect recorded process-group/tree ownership when wrapper cleanup cannot be verified.
 - [Live Vite HMR validation](live-vite-hmr-validation.md) — use a real browser, supervised fixture PID, socket lifecycle, and post-restart update rather than option-only checks.
+- [Collision fixture cleanup](collision-fixture-cleanup.md) — collision smoke fixtures must group lock and waiters and install signal cleanup before child startup.

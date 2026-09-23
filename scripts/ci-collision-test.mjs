@@ -27,10 +27,9 @@
  */
 
 import { spawn, spawnSync } from "child_process";
-import { mkdtempSync, readFileSync, rmSync, unlinkSync, existsSync, writeFileSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join, resolve } from "path";
-import { randomBytes } from "crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -167,8 +166,60 @@ console.log(
   "\n[ci-collision-test] Part 2: Spawning npm run ci + npm run test:e2e concurrently…"
 );
 
-// Isolated lock path so we don't stomp on a real CI run.
-const LOCK_PATH = `/tmp/repl-collision-test-${randomBytes(4).toString("hex")}.lock`;
+// Isolated fixture so we don't stomp on a real CI run. Keep the lock and
+// waiter directory together so an interrupted harness can remove both.
+let FIXTURE_DIR = null;
+const children = [];
+let interruptedSignal = null;
+let resolveInterruption;
+const interruption = new Promise((resolvePromise) => {
+  resolveInterruption = resolvePromise;
+});
+
+function cleanupFixture() {
+  if (!FIXTURE_DIR) return;
+  try {
+    rmSync(FIXTURE_DIR, { recursive: true, force: true });
+  } catch (error) {
+    // Cleanup must never replace the collision result or signal status.
+    console.error(
+      `[ci-collision-test] WARNING: unable to remove temporary fixture: ${error.message}`,
+    );
+  }
+}
+
+function signalExitCode(signal) {
+  return 128 + ({ SIGINT: 2, SIGTERM: 15 }[signal] ?? 1);
+}
+
+function signalChild(proc, signal) {
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return;
+  try {
+    if (process.platform !== "win32" && proc.pid) {
+      process.kill(-proc.pid, signal);
+    } else {
+      proc.kill(signal);
+    }
+  } catch {
+    // The child may have exited between the state check and the signal.
+  }
+}
+
+const handleInterruption = (signal) => {
+  if (interruptedSignal) return;
+  interruptedSignal = signal;
+  resolveInterruption(signal);
+  for (const child of children) signalChild(child, signal);
+};
+const handleSigint = () => handleInterruption("SIGINT");
+const handleSigterm = () => handleInterruption("SIGTERM");
+process.once("SIGINT", handleSigint);
+process.once("SIGTERM", handleSigterm);
+
+FIXTURE_DIR = mkdtempSync("/tmp/repl-collision-test-");
+const LOCK_PATH = join(FIXTURE_DIR, "validation.lock");
+const WAITERS_DIR = join(FIXTURE_DIR, "waiters");
+console.log(`[ci-collision-test] Temporary fixture: ${FIXTURE_DIR}`);
 
 // Shared env for the smoke invocations.
 const testEnv = {
@@ -178,6 +229,7 @@ const testEnv = {
   // SERIAL_LOCK_PATH. Override both so the nested smoke invocations cannot
   // wait on the validation harness's own lock.
   VALIDATION_LOCK_FILE: LOCK_PATH,
+  VALIDATION_LOCK_WAITERS_DIR: WAITERS_DIR,
   // Short poll interval so queuing is visible quickly.
   SERIAL_LOCK_WAIT_INTERVAL_MS: "500",
   // ci.sh checks this and exits 0 immediately — keeps the test fast.
@@ -196,27 +248,30 @@ for (const key of Object.keys(testEnv)) {
   }
 }
 
-if (existsSync(LOCK_PATH)) {
-  try { unlinkSync(LOCK_PATH); } catch { /* ignore */ }
-}
-
 function capture(proc) {
   let out = "";
   proc.stdout?.on("data", (d) => { out += d.toString(); });
   proc.stderr?.on("data", (d) => { out += d.toString(); });
   const done = new Promise((res) =>
-    proc.on("close", (code) => res({ code: code ?? 1, out }))
+    proc.on("close", (code, signal) =>
+      res({ code: code ?? signalExitCode(signal), signal, out })
+    )
   );
   return done;
 }
+
+const holdMs = Number.parseInt(process.env.CI_COLLISION_TEST_HOLD_MS ?? "0", 10);
 
 // Process A: npm run ci — exits 0 immediately because CI_SMOKE_TEST=1.
 const procA = spawn("npm", ["run", "ci"], {
   cwd: ROOT,
   env: testEnv,
   stdio: ["ignore", "pipe", "pipe"],
+  detached: process.platform !== "win32",
 });
+children.push(procA);
 const doneA = capture(procA);
+if (interruptedSignal) signalChild(procA, interruptedSignal);
 
 // Process B: npm run test:e2e with --pass-with-no-tests so playwright exits 0
 // without running the full suite. The extra args are forwarded by npm's `--`.
@@ -227,68 +282,90 @@ const procB = spawn(
     cwd: ROOT,
     env: testEnv,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
   }
 );
+children.push(procB);
 const doneB = capture(procB);
+if (interruptedSignal) signalChild(procB, interruptedSignal);
 
 console.log(
   "[ci-collision-test] Both npm run commands spawned. Waiting for both to complete…"
 );
 
-// Both run to completion — no forced kills.
-const [resultA, resultB] = await Promise.all([doneA, doneB]);
-
-// Cleanup
-if (existsSync(LOCK_PATH)) {
-  try { unlinkSync(LOCK_PATH); } catch { /* ignore */ }
-}
-
-// ── Assertions ────────────────────────────────────────────────────────────────
-
-let allPassed = true;
-
-function check(condition, message) {
-  if (!condition) {
-    allPassed = false;
-    console.error(`  FAIL: ${message}`);
-  } else {
-    console.log(`  PASS: ${message}`);
+let resultA;
+let resultB;
+let exitCode = 0;
+try {
+  if (holdMs > 0 && !interruptedSignal) {
+    await Promise.race([
+      new Promise((resolvePromise) => setTimeout(resolvePromise, holdMs)),
+      interruption,
+    ]);
   }
+
+  // Both run to completion unless the harness receives a termination signal.
+  [resultA, resultB] = await Promise.all([doneA, doneB]);
+
+  if (!interruptedSignal) {
+    // ── Assertions ──────────────────────────────────────────────────────────
+
+    let allPassed = true;
+
+    function check(condition, message) {
+      if (!condition) {
+        allPassed = false;
+        console.error(`  FAIL: ${message}`);
+      } else {
+        console.log(`  PASS: ${message}`);
+      }
+    }
+
+    // At least one process printed "waiting" — proof of serialization.
+    const someoneWaited =
+      resultA.out.includes("[serial-lock] waiting") ||
+      resultB.out.includes("[serial-lock] waiting");
+
+    check(
+      resultA.code === 0,
+      `npm run ci exited with code 0 (got ${resultA.code})`
+    );
+
+    check(
+      resultB.code === 0,
+      `npm run test:e2e exited with code 0 (got ${resultB.code})`
+    );
+
+    check(
+      someoneWaited,
+      `At least one process printed "[serial-lock] waiting" — serialized rather than colliding`
+    );
+
+    check(
+      resultA.out.includes("acquired lock") || resultB.out.includes("acquired lock"),
+      "At least one process confirms it acquired the lock"
+    );
+
+    if (!allPassed) {
+      console.error("\n[ci-collision-test] FAILED. Captured output:");
+      console.error("\n--- npm run ci output ---");
+      console.error(resultA.out || "(empty)");
+      console.error("\n--- npm run test:e2e output ---");
+      console.error(resultB.out || "(empty)");
+      exitCode = 1;
+    }
+  }
+} finally {
+  cleanupFixture();
+  process.removeListener("SIGINT", handleSigint);
+  process.removeListener("SIGTERM", handleSigterm);
 }
 
-// At least one process printed "waiting" — proof of serialization.
-const someoneWaited =
-  resultA.out.includes("[serial-lock] waiting") ||
-  resultB.out.includes("[serial-lock] waiting");
-
-check(
-  resultA.code === 0,
-  `npm run ci exited with code 0 (got ${resultA.code})`
-);
-
-check(
-  resultB.code === 0,
-  `npm run test:e2e exited with code 0 (got ${resultB.code})`
-);
-
-check(
-  someoneWaited,
-  `At least one process printed "[serial-lock] waiting" — serialized rather than colliding`
-);
-
-check(
-  resultA.out.includes("acquired lock") || resultB.out.includes("acquired lock"),
-  "At least one process confirms it acquired the lock"
-);
-
-if (!allPassed) {
-  console.error("\n[ci-collision-test] FAILED. Captured output:");
-  console.error("\n--- npm run ci output ---");
-  console.error(resultA.out || "(empty)");
-  console.error("\n--- npm run test:e2e output ---");
-  console.error(resultB.out || "(empty)");
-  process.exit(1);
+if (interruptedSignal) {
+  console.error(`[ci-collision-test] Interrupted by ${interruptedSignal}.`);
+  process.exit(signalExitCode(interruptedSignal));
 }
+if (exitCode !== 0) process.exit(exitCode);
 
 console.log(
   "\n[ci-collision-test] All assertions passed. Serial lock collision prevention is working correctly."

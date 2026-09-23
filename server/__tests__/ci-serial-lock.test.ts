@@ -25,6 +25,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LOCK_SCRIPT = resolve(__dirname, "../../scripts/serial-lock.mjs");
+const COLLISION_SCRIPT = resolve(__dirname, "../../scripts/ci-collision-test.mjs");
 
 // Short timing overrides for tests (ms):
 const HB_INTERVAL = 400;   // heartbeat fires every 400 ms
@@ -804,6 +805,57 @@ await test("serial-lock forwards child exit code correctly", async () => {
   } finally {
     cleanup(lockPath);
   }
+});
+
+await test("collision harness removes its isolated fixture after SIGTERM", async () => {
+  const proc = spawn(process.execPath, [COLLISION_SCRIPT], {
+    cwd: resolve(__dirname, "../.."),
+    env: {
+      ...process.env,
+      TASK_PLAN_FILE: "",
+      CI_COLLISION_TEST_HOLD_MS: "10_000",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  proc.stderr!.on("data", (data: Buffer) => { output += data.toString(); });
+
+  const fixturePath = await new Promise<string>((resolveFixture, rejectFixture) => {
+    const timer = setTimeout(() => {
+      rejectFixture(new Error(`collision harness did not reach its interruptible phase:\n${output}`));
+    }, 5_000);
+    let announcedFixture: string | null = null;
+    const onData = (data: Buffer) => {
+      output += data.toString();
+      const match = output.match(/\[ci-collision-test\] Temporary fixture: (.+)/);
+      if (match) announcedFixture = match[1].trim();
+      if (
+        announcedFixture &&
+        output.includes("[ci-collision-test] Both npm run commands spawned.")
+      ) {
+        clearTimeout(timer);
+        proc.stdout!.off("data", onData);
+        resolveFixture(announcedFixture);
+      }
+    };
+    proc.stdout!.on("data", onData);
+    proc.once("close", (code, signal) => {
+      clearTimeout(timer);
+      rejectFixture(new Error(
+        `collision harness exited before interruption (code ${code}, signal ${signal}):\n${output}`,
+      ));
+    });
+  });
+
+  const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolveResult) => {
+    proc.once("close", (code, signal) => resolveResult({ code, signal }));
+    proc.kill("SIGTERM");
+  });
+
+  assert.equal(result.code, 143, `SIGTERM should preserve the harness status (output:\n${output})`);
+  assert.equal(result.signal, null, "the harness should translate SIGTERM into an exit code");
+  assert.match(output, /Interrupted by SIGTERM/);
+  assert.ok(!existsSync(fixturePath), "interrupted cleanup should remove the lock and waiter fixture");
 });
 
 // ── Summary ───────────────────────────────────────────────────────────────────
