@@ -17,8 +17,9 @@
  *     real DB after the call.
  */
 
-import { test, describe, before, after } from "node:test";
+import { test, describe, after } from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 
 import {
   executePhotoDeletion,
@@ -109,117 +110,147 @@ describe("canonical physical object identity", () => {
 // ---------------------------------------------------------------------------
 
 describe("executePhotoDeletion — storage failure after successful DB delete", () => {
-  const TEST_USER_ID = "test-user-photo-delete-integration";
-  let testSessionId = 0;
-  let testPhotoId = 0;
+  type PhotoFixture = {
+    userId: string;
+    sessionId: number;
+    photo: { id: number; objectStorageKey: string };
+  };
 
-  before(async () => {
-    // Create a minimal counting session to satisfy the FK constraint on photos.
-    const [session] = await db
-      .insert(countingSessions)
-      .values({ userId: TEST_USER_ID, name: "__photo-delete-test-session__" })
-      .returning();
-    testSessionId = session.id;
+  async function createPhotoFixture(label: string): Promise<PhotoFixture> {
+    const userId = `photo-delete-${randomUUID()}`;
+    let sessionId = 0;
+    try {
+      const [session] = await db
+        .insert(countingSessions)
+        .values({ userId, name: `__photo-delete-${label}-${userId}__` })
+        .returning();
+      sessionId = session.id;
 
-    // Create the photo row that will be deleted by the test.
-    const [photo] = await db
-      .insert(photos)
-      .values({
-        sessionId: testSessionId,
-        userId: TEST_USER_ID,
-        objectStorageKey: "/uploads/photo-delete-test-fixture.jpg",
-      })
-      .returning();
-    testPhotoId = photo.id;
-  });
+      const [photo] = await db
+        .insert(photos)
+        .values({
+          sessionId,
+          userId,
+          objectStorageKey: `/uploads/${userId}.jpg`,
+        })
+        .returning();
+      return { userId, sessionId, photo };
+    } catch (error) {
+      if (sessionId) {
+        await db.delete(countingSessions).where(eq(countingSessions.id, sessionId)).catch(() => {});
+      }
+      throw error;
+    }
+  }
 
-  after(async () => {
+  async function cleanupPhotoFixture(fixture: PhotoFixture): Promise<void> {
     await db
       .delete(uploadIntents)
-      .where(eq(uploadIntents.userId, TEST_USER_ID))
+      .where(eq(uploadIntents.userId, fixture.userId))
       .catch(() => {});
-    // Cascade-delete any remaining fixture data (photos will cascade).
-    if (testSessionId) {
-      await db
-        .delete(countingSessions)
-        .where(eq(countingSessions.id, testSessionId))
-        .catch(() => {});
+    await db
+      .delete(countingSessions)
+      .where(eq(countingSessions.id, fixture.sessionId))
+      .catch(() => {});
+  }
+
+  async function withPhotoFixture<T>(
+    label: string,
+    callback: (fixture: PhotoFixture) => Promise<T>,
+  ): Promise<T> {
+    const fixture = await createPhotoFixture(label);
+    try {
+      return await callback(fixture);
+    } finally {
+      await cleanupPhotoFixture(fixture);
     }
-    // Close the pool so the test runner exits cleanly.
+  }
+
+  after(async () => {
     await pool.end().catch(() => {});
   });
 
   test("resolves without throwing even when deleteStorageFile throws", async () => {
-    let storageDeleteAttempted = false;
+    await withPhotoFixture("storage-failure", async ({ photo }) => {
+      let storageDeleteAttempted = false;
 
-    const deps: PhotoDeletionDeps = {
-      // Use the real storage.deletePhoto so the DB row is actually removed.
-      deletePhotoFromDb: (id) => storage.deletePhoto(id),
-      isObjectKeyShared: (key, excludeId) => storage.isObjectKeyShared(key, excludeId),
-      deleteStorageFile: async () => {
-        storageDeleteAttempted = true;
-        throw new Error("Simulated GCS / object-storage outage");
-      },
-    };
+      const deps: PhotoDeletionDeps = {
+        // Use the real storage.deletePhoto so the DB row is actually removed.
+        deletePhotoFromDb: (id) => storage.deletePhoto(id),
+        isObjectKeyShared: (key, excludeId) => storage.isObjectKeyShared(key, excludeId),
+        deleteStorageFile: async () => {
+          storageDeleteAttempted = true;
+          throw new Error("Simulated GCS / object-storage outage");
+        },
+      };
 
-    // Must NOT throw — the storage failure must be swallowed.
-    await executePhotoDeletion(
-      { id: testPhotoId, objectStorageKey: "/uploads/photo-delete-test-fixture.jpg" },
-      deps
-    );
+      // Must NOT throw — the storage failure must be swallowed.
+      await executePhotoDeletion(photo, deps);
 
-    assert.equal(
-      storageDeleteAttempted,
-      true,
-      "deleteStorageFile must have been attempted even though it fails"
-    );
+      assert.equal(
+        storageDeleteAttempted,
+        true,
+        "deleteStorageFile must have been attempted even though it fails"
+      );
+    });
   });
 
   test("photo row no longer exists in the DB after executePhotoDeletion resolves", async () => {
-    // The previous test already ran executePhotoDeletion for this photo,
-    // which should have deleted it from the DB via the real storage.deletePhoto.
-    const row = await storage.getPhoto(testPhotoId);
-    assert.equal(
-      row,
-      undefined,
-      "photo row must be absent from the DB after executePhotoDeletion returns — " +
-      "the UI must not be able to serve a broken reference"
-    );
+    await withPhotoFixture("row-absence", async ({ photo }) => {
+      await executePhotoDeletion(photo, {
+        deletePhotoFromDb: (id) => storage.deletePhoto(id),
+        isObjectKeyShared: (key, excludeId) => storage.isObjectKeyShared(key, excludeId),
+        deleteStorageFile: async () => {},
+      });
+
+      const row = await storage.getPhoto(photo.id);
+      assert.equal(
+        row,
+        undefined,
+        "photo row must be absent from the DB after executePhotoDeletion returns — " +
+        "the UI must not be able to serve a broken reference"
+      );
+    });
   });
 
   test("session cleanup preserves a file referenced through a legacy alias", async () => {
-    const [retainedSession] = await db
-      .insert(countingSessions)
-      .values({ userId: TEST_USER_ID, name: "__photo-delete-retained-session__" })
-      .returning();
-    const [direct, legacy] = await db
-      .insert(photos)
-      .values([
-        {
-          sessionId: testSessionId,
-          userId: TEST_USER_ID,
-          objectStorageKey: "/uploads/shared-alias.jpg",
-        },
-        {
-          sessionId: retainedSession.id,
-          userId: TEST_USER_ID,
-          objectStorageKey: "/objects/uploads/shared-alias.jpg",
-        },
-      ])
-      .returning();
-    let storageDeleteAttempted = false;
+    await withPhotoFixture("legacy-alias", async ({ userId, sessionId }) => {
+      const [retainedSession] = await db
+        .insert(countingSessions)
+        .values({ userId, name: `__photo-delete-retained-${userId}__` })
+        .returning();
+      try {
+        const [direct, legacy] = await db
+          .insert(photos)
+          .values([
+            {
+              sessionId,
+              userId,
+              objectStorageKey: "/uploads/shared-alias.jpg",
+            },
+            {
+              sessionId: retainedSession.id,
+              userId,
+              objectStorageKey: "/objects/uploads/shared-alias.jpg",
+            },
+          ])
+          .returning();
+        let storageDeleteAttempted = false;
 
-    await executePhotoDeletion(direct, {
-      deletePhotoFromDb: (id) => storage.deletePhoto(id),
-      isObjectKeyShared: (key, excludeId) => storage.isObjectKeyShared(key, excludeId),
-      deleteStorageFile: async () => {
-        storageDeleteAttempted = true;
-      },
+        await executePhotoDeletion(direct, {
+          deletePhotoFromDb: (id) => storage.deletePhoto(id),
+          isObjectKeyShared: (key, excludeId) => storage.isObjectKeyShared(key, excludeId),
+          deleteStorageFile: async () => {
+            storageDeleteAttempted = true;
+          },
+        });
+
+        assert.equal(storageDeleteAttempted, false);
+        assert.ok(await storage.getPhoto(legacy.id));
+      } finally {
+        await db.delete(countingSessions).where(eq(countingSessions.id, retainedSession.id)).catch(() => {});
+      }
     });
-
-    assert.equal(storageDeleteAttempted, false);
-    assert.ok(await storage.getPhoto(legacy.id));
-    await db.delete(countingSessions).where(eq(countingSessions.id, retainedSession.id));
   });
 
   test("whole-session cleanup deletes direct and legacy candidates exactly once", async () => {
@@ -248,24 +279,26 @@ describe("executePhotoDeletion — storage failure after successful DB delete", 
   });
 
   test("orphan cleanup does not return a legacy intent whose direct key is referenced", async () => {
-    const objectPath = "/objects/uploads/referenced-intent-alias.jpg";
-    await db.insert(photos).values({
-      sessionId: testSessionId,
-      userId: TEST_USER_ID,
-      objectStorageKey: "/uploads/referenced-intent-alias.jpg",
-    });
-    await db.insert(uploadIntents).values({
-      objectPath,
-      userId: TEST_USER_ID,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    });
+    await withPhotoFixture("orphan-intent", async ({ userId, sessionId }) => {
+      const objectPath = "/objects/uploads/referenced-intent-alias.jpg";
+      await db.insert(photos).values({
+        sessionId,
+        userId,
+        objectStorageKey: "/uploads/referenced-intent-alias.jpg",
+      });
+      await db.insert(uploadIntents).values({
+        objectPath,
+        userId,
+        createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      });
 
-    const expired = await storage.getExpiredUploadIntents(60 * 60 * 1000);
+      const expired = await storage.getExpiredUploadIntents(60 * 60 * 1000);
 
-    assert.equal(
-      expired.some((intent) => intent.objectPath === objectPath),
-      false,
-      "a referenced legacy alias must not be purged as an orphan",
-    );
+      assert.equal(
+        expired.some((intent) => intent.objectPath === objectPath),
+        false,
+        "a referenced legacy alias must not be purged as an orphan",
+      );
+    });
   });
 });

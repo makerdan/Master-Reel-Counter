@@ -56,6 +56,7 @@ import
   SCAN_RESULTS_PERSISTENCE_ERROR,
   getCurrentPdfJobAccess,
   createSessionHandler,
+  registerRoutes,
 }
  from "../routes.js"
 ;
@@ -91,10 +92,13 @@ import
 
 import 
 {
- pool 
+  db,
+  pool
 }
  from "../db.js"
 ;
+import { eq } from "drizzle-orm";
+import { storage } from "../storage.js";
 
 import 
 {
@@ -1293,51 +1297,6 @@ describe("body guard — safeParse-first pattern (regression guard)", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Synthetic HTTP integration tests — minimal Express app exercises the same
-// safeParse-first pattern used in the real routes.  Catches regressions where
-// the schema itself breaks, but does not require DB or auth infrastructure.
-// ---------------------------------------------------------------------------
-
-function buildTestApp() {
-  const app = express();
-  app.use(express.json());
-
-  app.patch("/api/photos/:id", (req, res) => {
-    const parsed = patchPhotoSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return void res.status(400).json({ message: "Invalid photo update data", errors: parsed.error.flatten().fieldErrors });
-    }
-    res.json({ ok: true, data: parsed.data });
-  });
-
-  app.patch("/api/pins/:id", (req, res) => {
-    const parsed = patchPinSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return void res.status(400).json({ message: "Invalid pin update data", errors: parsed.error.flatten().fieldErrors });
-    }
-    res.json({ ok: true, data: parsed.data });
-  });
-
-  app.patch("/api/pins/:pinId/flag", (req, res) => {
-    const parsed = patchPinFlagSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return void res.status(400).json({ message: "Invalid pin flag data", errors: parsed.error.flatten().fieldErrors });
-    }
-    res.json({ ok: true, data: parsed.data });
-  });
-
-  app.patch("/api/entries/:id", (req, res) => {
-    const parsed = patchEntrySchema.safeParse(req.body);
-    if (!parsed.success) {
-      return void res.status(400).json({ message: "Invalid entry update data", errors: parsed.error.flatten().fieldErrors });
-    }
-    res.json({ ok: true, data: parsed.data });
-  });
-
-  return app;
-}
-
 function sessionRequest(body: unknown): any {
   return {
     body,
@@ -1808,106 +1767,260 @@ describe("production Clerk proxy lifecycle guards", () => {
   });
 });
 
-describe("PATCH synthetic integration — body validation returns 400, not 500", () => {
+// ---------------------------------------------------------------------------
+// Production route integration tests. Requests pass through the real
+// registerRoutes() middleware and handlers. The request auth object is the
+// branded shape Clerk's middleware installs, so production authentication,
+// approval, capability, resource lookup, and safeParse paths all execute.
+// ---------------------------------------------------------------------------
+
+type PatchRouteTestContext = {
+  baseUrl: string;
+  server: http.Server;
+  photoId: number;
+  pinId: number;
+  entryId: number;
+  cleanup: () => Promise<void>;
+};
+
+async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext> {
+  const app = express();
+  app.use(express.json());
+
+  const userId = `routes-test-${randomUUID()}`;
+  let sessionId = 0;
+  let server: http.Server | undefined;
+  const testUser = {
+    id: userId,
+    approved: true,
+    rejected: false,
+    role: "User" as const,
+    capabilities: {
+      session_create: true,
+      session_delete: true,
+      exports: true,
+      photo_management: true,
+      ai_scanning: true,
+      collaborator_management: true,
+      statistics: true,
+      account_settings: true,
+    },
+  };
+  const originalGetUserByClerkId = authStorage.getUserByClerkUserId;
+  const originalGetUser = authStorage.getUser;
+  const originalCreateActivityLog = storage.createActivityLog;
+  const pendingActivityLogs = new Set<Promise<unknown>>();
+  let authStoragePatched = false;
+  let storagePatched = false;
+
+  const cleanup = async () => {
+    if (server?.listening) await closeHttpServer(server);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    while (pendingActivityLogs.size > 0) {
+      await Promise.allSettled([...pendingActivityLogs]);
+    }
+    if (sessionId) {
+      await db
+        .delete(databaseSchema.countingSessions)
+        .where(eq(databaseSchema.countingSessions.id, sessionId))
+        .catch(() => {});
+    }
+    if (authStoragePatched) {
+      authStorage.getUserByClerkUserId = originalGetUserByClerkId;
+      authStorage.getUser = originalGetUser;
+      authStoragePatched = false;
+    }
+    if (storagePatched) {
+      storage.createActivityLog = originalCreateActivityLog;
+      storagePatched = false;
+    }
+  };
+
+  try {
+    authStorage.getUserByClerkUserId = async (clerkUserId: string) =>
+      clerkUserId === userId
+        ? testUser as any
+        : originalGetUserByClerkId.call(authStorage, clerkUserId);
+    authStorage.getUser = async (lookupUserId: string) =>
+      lookupUserId === userId
+        ? testUser as any
+        : originalGetUser.call(authStorage, lookupUserId);
+    authStoragePatched = true;
+    storage.createActivityLog = (log) => {
+      const pending = originalCreateActivityLog.call(storage, log);
+      pendingActivityLogs.add(pending);
+      pending.then(
+        () => pendingActivityLogs.delete(pending),
+        () => pendingActivityLogs.delete(pending),
+      );
+      return pending;
+    };
+    storagePatched = true;
+
+    const [session] = await db
+      .insert(databaseSchema.countingSessions)
+      .values({ userId, name: `__routes-test-${userId}__` })
+      .returning();
+    sessionId = session.id;
+
+    const [photo] = await db
+      .insert(databaseSchema.photos)
+      .values({
+        sessionId,
+        userId,
+        objectStorageKey: `/uploads/${userId}-photo.jpg`,
+      })
+      .returning();
+    const [pin] = await db
+      .insert(databaseSchema.pins)
+      .values({
+        photoId: photo.id,
+        xPercent: 10,
+        yPercent: 20,
+      })
+      .returning();
+    const [entry] = await db
+      .insert(databaseSchema.entries)
+      .values({
+        sessionId,
+        userId,
+        photoId: photo.id,
+        aisle: "A",
+        section: "1",
+      })
+      .returning();
+
+    const testAuth = Object.assign(
+      () => ({
+        userId,
+        sessionClaims: { sub: userId },
+        tokenType: "session_token",
+      }),
+      { [Symbol.for("@clerk/express.auth")]: true },
+    );
+    app.use((req, _res, next) => {
+      (req as any).auth = testAuth;
+      next();
+    });
+
+    server = http.createServer(app);
+    await registerRoutes(server, app);
+    const baseUrl = await listenOnLoopback(server);
+
+    return {
+      baseUrl,
+      server,
+      photoId: photo.id,
+      pinId: pin.id,
+      entryId: entry.id,
+      cleanup,
+    };
+  } catch (error) {
+    await cleanup();
+    throw error;
+  }
+}
+
+describe("PATCH production routes — body validation returns 400, not 500", () => {
   let server: http.Server;
   let baseUrl: string;
+  let photoId: number;
+  let pinId: number;
+  let entryId: number;
+  let cleanup: () => Promise<void>;
 
   before(async () => {
-    const app = buildTestApp();
-    server = http.createServer(app);
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-    const addr = server.address() as { port: number };
-    baseUrl = `http://127.0.0.1:${addr.port}`;
+    const context = await buildProductionPatchRouteContext();
+    ({ baseUrl, server, photoId, pinId, entryId, cleanup } = context);
   });
 
   after(async () => {
-    await new Promise<void>((resolve, reject) =>
-      server.close((err) => (err ? reject(err) : resolve()))
-    );
+    await cleanup();
   });
 
   test("PATCH /api/photos/:id — no body → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/photos/1");
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/photos/${photoId}`);
     assert.equal(status, 400, "missing body must yield 400");
   });
 
   test("PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/photos/1", {
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/photos/${photoId}`, {
       body: "plain text", contentType: "text/plain",
     });
     assert.equal(status, 400, "non-JSON Content-Type leaves body unparsed → 400");
   });
 
   test("PATCH /api/photos/:id — invalid field type → 400", async () => {
-    const { status, body } = await httpReq(baseUrl, "PATCH", "/api/photos/1", { body: { rotation: "bad" } });
+    const { status, body } = await httpReq(baseUrl, "PATCH", `/api/photos/${photoId}`, { body: { rotation: "bad" } });
     assert.equal(status, 400);
     assert.ok(body.errors, "response should include field errors");
   });
 
   test("PATCH /api/photos/:id — valid partial body → 200", async () => {
-    const { status, body } = await httpReq(baseUrl, "PATCH", "/api/photos/1", { body: { rotation: 90, notes: "OK" } });
+    const { status, body } = await httpReq(baseUrl, "PATCH", `/api/photos/${photoId}`, { body: { rotation: 90, notes: "OK" } });
     assert.equal(status, 200);
-    assert.equal(body.ok, true);
+    assert.equal(body.notes, "OK");
   });
 
   test("PATCH /api/pins/:id — no body → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/pins/1");
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/pins/${pinId}`);
     assert.equal(status, 400);
   });
 
   test("PATCH /api/pins/:id — wrong Content-Type → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/pins/1", { body: "plain text", contentType: "text/plain" });
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/pins/${pinId}`, { body: "plain text", contentType: "text/plain" });
     assert.equal(status, 400);
   });
 
   test("PATCH /api/pins/:id — invalid field type → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/pins/1", { body: { xPercent: "not-a-number" } });
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/pins/${pinId}`, { body: { xPercent: "not-a-number" } });
     assert.equal(status, 400);
   });
 
   test("PATCH /api/pins/:id — valid partial body → 200", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/pins/1", { body: { xPercent: 50.0, yPercent: 25.0 } });
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/pins/${pinId}`, { body: { xPercent: 50.0, yPercent: 25.0 } });
     assert.equal(status, 200);
   });
 
   test("PATCH /api/pins/:pinId/flag — no body → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/pins/1/flag");
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/pins/${pinId}/flag`);
     assert.equal(status, 400);
   });
 
   test("PATCH /api/pins/:pinId/flag — wrong Content-Type → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/pins/1/flag", { body: "plain text", contentType: "text/plain" });
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/pins/${pinId}/flag`, { body: "plain text", contentType: "text/plain" });
     assert.equal(status, 400);
   });
 
   test("PATCH /api/pins/:pinId/flag — invalid flagged type → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/pins/1/flag", { body: { flagged: "yes" } });
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/pins/${pinId}/flag`, { body: { flagged: "yes" } });
     assert.equal(status, 400);
   });
 
   test("PATCH /api/pins/:pinId/flag — valid flag body → 200", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/pins/1/flag", { body: { flagged: true, flagReason: "blurry image" } });
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/pins/${pinId}/flag`, { body: { flagged: true, flagReason: "blurry image" } });
     assert.equal(status, 200);
   });
 
   test("PATCH /api/entries/:id — no body → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/entries/1");
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/entries/${entryId}`);
     assert.equal(status, 400);
   });
 
   test("PATCH /api/entries/:id — wrong Content-Type → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/entries/1", { body: "plain text", contentType: "text/plain" });
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/entries/${entryId}`, { body: "plain text", contentType: "text/plain" });
     assert.equal(status, 400);
   });
 
   test("PATCH /api/entries/:id — invalid footage type → 400", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/entries/1", { body: { footage: "five-hundred" } });
+    const { status } = await httpReq(baseUrl, "PATCH", `/api/entries/${entryId}`, { body: { footage: "five-hundred" } });
     assert.equal(status, 400);
   });
 
   test("PATCH /api/entries/:id — valid partial body → 200", async () => {
-    const { status } = await httpReq(baseUrl, "PATCH", "/api/entries/1", { body: { wireType: "THHN", footage: 250 } });
+    const { status, body } = await httpReq(baseUrl, "PATCH", `/api/entries/${entryId}`, { body: { wireType: "THHN", footage: 250 } });
     assert.equal(status, 200);
+    assert.equal(body.wireType, "THHN");
   });
 });
 
