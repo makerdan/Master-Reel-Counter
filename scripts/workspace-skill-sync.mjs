@@ -132,6 +132,19 @@ function hashEntries(entries) {
   return hash.digest("hex");
 }
 
+function snapshotGeneration(snapshot) {
+  const hash = createHash("sha256");
+  hash.update(snapshot.sourceRevision, "utf8");
+  hash.update(Buffer.from([0]));
+  for (const skill of snapshot.skills) {
+    hash.update(skill.skillId, "utf8");
+    hash.update(Buffer.from([0]));
+    hash.update(skill.fingerprint, "utf8");
+    hash.update(Buffer.from([0]));
+  }
+  return hash.digest("hex");
+}
+
 function walkSkill(skillPath, skillId) {
   const entries = [];
   const walk = (directory, prefix) => {
@@ -224,6 +237,7 @@ function manifestFor(snapshot) {
   return {
     format: MANIFEST_FORMAT,
     sourceRevision: snapshot.sourceRevision,
+    generation: snapshotGeneration(snapshot),
     skills: snapshot.skills.map((skill) => ({
       skillId: skill.skillId,
       fingerprint: skill.fingerprint,
@@ -250,6 +264,7 @@ function readManifest(directory) {
     manifest.format !== MANIFEST_FORMAT ||
     typeof manifest.sourceRevision !== "string" ||
     !REVISION_RE.test(manifest.sourceRevision) ||
+    !/^[a-f0-9]{64}$/.test(manifest.generation) ||
     !Array.isArray(manifest.skills)
   ) {
     fail("invalid-manifest");
@@ -323,16 +338,33 @@ function projectionEntries(directory, skillId) {
   return entries;
 }
 
+function sameFileIdentity(left, right) {
+  return left?.dev === right?.dev && left?.ino === right?.ino;
+}
+
+function assertStableDirectory(path, identity, code) {
+  let current;
+  try {
+    current = lstatSync(path);
+  } catch {
+    fail(code);
+  }
+  if (!current.isDirectory() || current.isSymbolicLink() || !sameFileIdentity(current, identity)) {
+    fail(code);
+  }
+}
+
 function skillMap(skills) {
   return new Map(skills.map((skill) => [skill.skillId, skill]));
 }
 
 function validateProjectionContents(directory, snapshot) {
-  assertDirectory(directory, "missing-projection");
+  const directoryIdentity = assertDirectory(directory, "missing-projection");
   const manifest = readManifest(directory);
   if (manifest.sourceRevision !== snapshot.sourceRevision) fail("revision-mismatch");
   const expected = skillMap(snapshot.skills);
   const actual = new Map();
+  const validatedFiles = new Map();
   let names;
   try {
     names = readdirSync(directory).sort((a, b) => a.localeCompare(b));
@@ -389,9 +421,17 @@ function validateProjectionContents(directory, snapshot) {
         fail("file-mismatch");
       }
     }
+    validatedFiles.set(manifestSkill.skillId, actualEntries);
   }
   if (manifestIds.size !== expected.size) fail("skill-set-mismatch");
-  return { manifest, skills: [...expected.keys()] };
+  if (manifest.generation !== snapshotGeneration(snapshot)) fail("generation-mismatch");
+  assertStableDirectory(directory, directoryIdentity, "projection-changed");
+  return {
+    manifest,
+    generation: manifest.generation,
+    skills: [...expected.keys()],
+    files: validatedFiles,
+  };
 }
 
 export function validateProjection(snapshot = readSourceSnapshot(), directory = projectionRoot()) {
@@ -413,9 +453,13 @@ function lockOwner(raw) {
     const parsed = JSON.parse(raw);
     if (
       parsed &&
-      Number.isInteger(parsed.pid) &&
+      parsed.format === "workspace-skill-lock/v1" &&
+      Number.isSafeInteger(parsed.pid) &&
+      parsed.pid > 0 &&
       typeof parsed.token === "string" &&
-      Number.isInteger(parsed.acquiredAt)
+      parsed.token.length > 0 &&
+      Number.isSafeInteger(parsed.acquiredAt) &&
+      parsed.acquiredAt > 0
     ) {
       return parsed;
     }
@@ -434,7 +478,27 @@ function pidAlive(pid) {
   }
 }
 
-function tryReclaim(lock, now) {
+function lockIdentity(stat, raw) {
+  return {
+    dev: stat.dev,
+    ino: stat.ino,
+    size: stat.size,
+    mtimeMs: stat.mtimeMs,
+    raw,
+  };
+}
+
+function sameLockIdentity(left, right) {
+  return (
+    left?.dev === right?.dev &&
+    left?.ino === right?.ino &&
+    left?.size === right?.size &&
+    left?.mtimeMs === right?.mtimeMs &&
+    left?.raw === right?.raw
+  );
+}
+
+function tryReclaim(lock, now, beforeRename) {
   let stat;
   try {
     stat = lstatSync(lock);
@@ -448,14 +512,33 @@ function tryReclaim(lock, now) {
       return "";
     }
   })();
+  const observedIdentity = lockIdentity(stat, raw);
   const owner = lockOwner(raw);
   if (owner && pidAlive(owner.pid)) return false;
   if (!owner && now - stat.mtimeMs < Number(process.env.WORKSPACE_SKILLS_LOCK_STALE_MS || LOCK_STALE_MS)) {
     return false;
   }
+  if (beforeRename) beforeRename({ lock, owner, identity: observedIdentity });
   const reclaimed = `${lock}.reclaim-${createToken()}`;
   try {
     renameSync(lock, reclaimed);
+    let reclaimedStat;
+    let reclaimedRaw;
+    try {
+      reclaimedStat = lstatSync(reclaimed);
+      reclaimedRaw = readFileSync(reclaimed, "utf8");
+    } catch {
+      try {
+        if (!existsSync(lock)) renameSync(reclaimed, lock);
+      } catch { /* another contender won */ }
+      return false;
+    }
+    if (!sameLockIdentity(lockIdentity(reclaimedStat, reclaimedRaw), observedIdentity)) {
+      try {
+        if (!existsSync(lock)) renameSync(reclaimed, lock);
+      } catch { /* another contender won */ }
+      return false;
+    }
     rmSync(reclaimed, { force: true });
     return true;
   } catch {
@@ -464,7 +547,7 @@ function tryReclaim(lock, now) {
   }
 }
 
-function acquireLock() {
+function acquireLock({ beforeReclaim } = {}) {
   const lock = lockPath();
   mkdirSync(dirname(lock), { recursive: true });
   const started = Date.now();
@@ -483,7 +566,7 @@ function acquireLock() {
       };
     } catch (error) {
       if (error?.code !== "EEXIST") fail("lock-error");
-      if (!tryReclaim(lock, Date.now())) {
+      if (!tryReclaim(lock, Date.now(), beforeReclaim)) {
         const delay = Number(process.env.WORKSPACE_SKILLS_LOCK_POLL_MS || 50);
         const end = Date.now() + Math.max(1, delay);
         while (Date.now() < end) { /* bounded synchronous wait */ }
@@ -531,8 +614,8 @@ function sameSnapshot(left, right) {
   return snapshotComparable(left) === snapshotComparable(right);
 }
 
-export function refreshProjection({ maxAttempts = 2, afterStage, afterInstall } = {}) {
-  const release = acquireLock();
+export function refreshProjection({ maxAttempts = 2, afterStage, afterInstall, beforeReclaim } = {}) {
+  const release = acquireLock({ beforeReclaim });
   const destination = projectionRoot();
   const parent = dirname(destination);
   let staging;
@@ -565,9 +648,15 @@ export function refreshProjection({ maxAttempts = 2, afterStage, afterInstall } 
         staging = undefined;
         if (afterInstall) afterInstall({ destination, backup: movedExisting ? backup : undefined });
         validateProjectionContents(destination, snapshot);
+        const afterInstallSnapshot = readSourceSnapshot();
+        if (!sameSnapshot(snapshot, afterInstallSnapshot)) fail("source-changed");
         if (movedExisting) removeOwnDirectory(backup);
         backup = undefined;
-        return { skills: snapshot.skills.map((skill) => skill.skillId), sourceRevision: snapshot.sourceRevision };
+        return {
+          skills: snapshot.skills.map((skill) => skill.skillId),
+          sourceRevision: snapshot.sourceRevision,
+          generation: snapshotGeneration(snapshot),
+        };
       } catch (error) {
         try {
           if (existsSync(destination)) removeOwnDirectory(destination);
@@ -578,7 +667,10 @@ export function refreshProjection({ maxAttempts = 2, afterStage, afterInstall } 
         } catch {
           fail("rollback-failed");
         }
-        if (error instanceof WorkspaceSkillSyncError) throw error;
+        if (error instanceof WorkspaceSkillSyncError) {
+          if (error.code === "source-changed" && attempt + 1 < maxAttempts) continue;
+          throw error;
+        }
         fail("install-failed");
       } finally {
         if (staging) removeOwnDirectory(staging);
@@ -594,18 +686,20 @@ export function refreshProjection({ maxAttempts = 2, afterStage, afterInstall } 
   }
 }
 
-export function loadSkills(skillIds = []) {
+export function loadSkills(skillIds = [], { afterValidation } = {}) {
   const snapshot = readSourceSnapshot();
-  validateProjectionContents(projectionRoot(), snapshot);
+  const validated = validateProjectionContents(projectionRoot(), snapshot);
   const requested = skillIds.length ? skillIds.map(assertSlug) : snapshot.skills.map((skill) => skill.skillId);
   const available = skillMap(snapshot.skills);
+  if (afterValidation) afterValidation({ generation: validated.generation });
   const result = [];
   for (const skillId of requested) {
     const sourceSkill = available.get(skillId);
     if (!sourceSkill) fail("missing-skill");
     const files = {};
-    for (const file of sourceSkill.files) {
-      files[file.path] = readFileSync(join(projectionRoot(), skillId, ...file.path.split("/")), "utf8");
+    const validatedFiles = validated.files.get(skillId);
+    for (const file of validatedFiles) {
+      files[file.path] = file.bytes.toString("utf8");
     }
     result.push({ skillId, files });
   }
@@ -624,6 +718,24 @@ function sourceSkillMetadata(snapshot, skillId) {
   };
 }
 
+function assertPathWithoutSymlinks(path, code) {
+  const absolute = resolve(path);
+  let current = "/";
+  for (const part of absolute.split("/").filter(Boolean)) {
+    current = join(current, part);
+    let stat;
+    try {
+      stat = lstatSync(current);
+    } catch (error) {
+      if (error?.code === "ENOENT") return false;
+      fail(code);
+    }
+    if (stat.isSymbolicLink()) fail(code);
+    if (!stat.isDirectory() && current !== absolute) fail(code);
+  }
+  return true;
+}
+
 export function mirrorStatus(skillId) {
   let snapshot;
   try {
@@ -640,11 +752,21 @@ export function mirrorStatus(skillId) {
   } catch {
     return { outcome: "mismatch", code: STATUS_EXIT_CODES.mismatch };
   }
-  const sidecar = join(mirrorRoot(), skillId, ".workspace-skill-metadata.json");
-  if (!existsSync(sidecar)) {
-    return { outcome: "missing-mirror", code: STATUS_EXIT_CODES["missing-mirror"] };
-  }
   try {
+    const root = mirrorRoot();
+    if (!assertPathWithoutSymlinks(root, "mismatch")) {
+      return { outcome: "missing-mirror", code: STATUS_EXIT_CODES["missing-mirror"] };
+    }
+    assertDirectory(root, "mismatch");
+    const skillPath = join(root, skillId);
+    if (!assertPathWithoutSymlinks(skillPath, "mismatch")) {
+      return { outcome: "missing-mirror", code: STATUS_EXIT_CODES["missing-mirror"] };
+    }
+    assertDirectory(skillPath, "mismatch");
+    const sidecar = join(skillPath, ".workspace-skill-metadata.json");
+    if (!assertPathWithoutSymlinks(sidecar, "mismatch")) {
+      return { outcome: "missing-mirror", code: STATUS_EXIT_CODES["missing-mirror"] };
+    }
     assertRegular(sidecar, "mismatch");
     const actual = JSON.parse(readFileSync(sidecar, "utf8"));
     const exact =

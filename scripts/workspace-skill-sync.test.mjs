@@ -285,6 +285,46 @@ test("recovers only abandoned locks and leaves live work busy", (t) => {
   const old = new Date(Date.now() - 1000);
   utimesSync(fixturePaths.lock, old, old);
   refreshProjection();
+
+  writeFileSync(fixturePaths.lock, JSON.stringify({
+    format: "workspace-skill-lock/v1",
+    pid: 0,
+    token: "invalid-pid",
+    acquiredAt: Date.now(),
+  }));
+  utimesSync(fixturePaths.lock, old, old);
+  refreshProjection();
+});
+
+test("does not reclaim a replacement lock observed during stale recovery", (t) => {
+  const fixturePaths = fixture(t);
+  addSkill(fixturePaths.source, "replacement-lock-skill");
+  const replacement = {
+    format: "workspace-skill-lock/v1",
+    pid: process.pid,
+    token: "replacement-owner",
+    acquiredAt: Date.now(),
+  };
+  writeFileSync(fixturePaths.lock, JSON.stringify({
+    format: "workspace-skill-lock/v1",
+    pid: 999999999,
+    token: "stale-owner",
+    acquiredAt: Date.now(),
+  }));
+  const old = new Date(Date.now() - 1000);
+  utimesSync(fixturePaths.lock, old, old);
+
+  let replaced = false;
+  assert.equal(errorCode(() => refreshProjection({
+    maxAttempts: 1,
+    beforeReclaim: ({ lock }) => {
+      if (replaced) return;
+      replaced = true;
+      rmSync(lock);
+      writeFileSync(lock, JSON.stringify(replacement));
+    },
+  })), "busy");
+  assert.deepEqual(JSON.parse(readFileSync(fixturePaths.lock, "utf8")), replacement);
 });
 
 test("keeps source-change and stale projection failures fail-closed", (t) => {
@@ -294,6 +334,41 @@ test("keeps source-change and stale projection failures fail-closed", (t) => {
   writeFileSync(join(fixturePaths.source, "changing-skill", "SKILL.md"), "after\n");
   assert.equal(errorCode(() => loadSkills(["changing-skill"])), "fingerprint-mismatch");
   assert.equal(errorCode(validateProjection), "fingerprint-mismatch");
+});
+
+test("rolls back when the source changes after projection installation", (t) => {
+  const fixturePaths = fixture(t);
+  addSkill(fixturePaths.source, "post-install-skill", { "SKILL.md": "before\n" });
+  refreshProjection();
+
+  assert.equal(errorCode(() => refreshProjection({
+    maxAttempts: 1,
+    afterInstall: () => writeFileSync(
+      join(fixturePaths.source, "post-install-skill", "SKILL.md"),
+      "changed after install\n",
+    ),
+  })), "source-changed");
+  assert.equal(
+    readFileSync(join(fixturePaths.projection, "post-install-skill", "SKILL.md"), "utf8"),
+    "before\n",
+  );
+});
+
+test("loads the validated projection generation even if its path is swapped afterward", (t) => {
+  const fixturePaths = fixture(t);
+  addSkill(fixturePaths.source, "immutable-generation-skill", { "SKILL.md": "validated\n" });
+  refreshProjection();
+  const outside = join(fixturePaths.root, "outside.md");
+  writeFileSync(outside, "outside\n");
+
+  const loaded = loadSkills(["immutable-generation-skill"], {
+    afterValidation: () => {
+      rmSync(fixturePaths.projection, { recursive: true, force: true });
+      mkdirSync(join(fixturePaths.projection, "immutable-generation-skill"), { recursive: true });
+      symlinkSync(outside, join(fixturePaths.projection, "immutable-generation-skill", "SKILL.md"));
+    },
+  });
+  assert.equal(loaded[0].files["SKILL.md"], "validated\n");
 });
 
 test("status has exact parity outcomes and does not mutate source, projection, or mirror", (t) => {
@@ -321,6 +396,35 @@ test("status has exact parity outcomes and does not mutate source, projection, o
   assert.deepEqual(mirrorStatus("status-skill"), { outcome: "unavailable-source", code: 2 });
   process.env.WORKSPACE_SKILLS_SOURCE = fixturePaths.source;
   assert.equal(readFileSync(join(fixturePaths.source, ".workspace-revision"), "utf8"), before);
+});
+
+test("status rejects symlinked mirror roots, ancestors, and skill directories", (t) => {
+  const fixturePaths = fixture(t);
+  addSkill(fixturePaths.source, "boundary-skill");
+  const snapshot = readSourceSnapshot();
+  const metadata = JSON.stringify({
+    format: "workspace-skill-metadata/v1",
+    skillId: "boundary-skill",
+    sourceRevision: snapshot.sourceRevision,
+    fingerprint: snapshot.skills[0].fingerprint,
+  });
+  const outside = join(fixturePaths.root, "outside-mirror");
+  mkdirSync(outside);
+  mkdirSync(join(outside, "boundary-skill"));
+  writeFileSync(join(outside, "boundary-skill", ".workspace-skill-metadata.json"), metadata);
+  mkdirSync(fixturePaths.mirror);
+  symlinkSync(join(outside, "boundary-skill"), join(fixturePaths.mirror, "boundary-skill"));
+  assert.deepEqual(mirrorStatus("boundary-skill"), { outcome: "mismatch", code: 1 });
+
+  rmSync(fixturePaths.mirror, { recursive: true, force: true });
+  symlinkSync(outside, fixturePaths.mirror);
+  assert.deepEqual(mirrorStatus("boundary-skill"), { outcome: "mismatch", code: 1 });
+
+  rmSync(fixturePaths.mirror, { force: true });
+  const redirectedParent = join(fixturePaths.root, "redirected-parent");
+  symlinkSync(outside, redirectedParent);
+  process.env.WORKSPACE_SKILLS_MIRROR_DIR = join(redirectedParent, "mirror");
+  assert.deepEqual(mirrorStatus("boundary-skill"), { outcome: "mismatch", code: 1 });
 });
 
 test("status CLI returns documented codes and redacts private values", (t) => {

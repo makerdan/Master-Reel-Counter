@@ -63,21 +63,27 @@ Refresh only through the supported projection helper:
    busy and do not remove active work.
 2. Recover an abandoned lock only when its structured owner is provably dead,
    or an unstructured lock is provably stale under the helper's timeout.
-   Recovery must be atomic and race-safe.
+   Invalid owner records, including non-positive PIDs, follow the bounded
+   unstructured-lock timeout. Recovery must quarantine and recheck the exact
+   stale lock identity before removal, so it cannot remove a replacement
+   worker's lock.
 3. Under the lock, remove only helper-owned staging and backup directories
    whose names have the expected format and valid identifier. Never delete a
    similarly named or active directory.
 4. Build the complete projection in a new staging directory. Validate its
    recursive manifest and all bytes before installation, then re-read the
    source revision. If the source changed, discard staging and retry or report
-   the change; do not install a mixed snapshot.
+   the change; do not install a mixed snapshot. The manifest carries a
+   deterministic generation derived from that source snapshot.
 5. Install with guarded directory renames: move an existing projection to an
    owned backup, rename staging into place, and restore the backup if the
    install fails. Clean staging and backup artifacts in a `finally` path.
    Never replace the destination by an unguarded delete-and-copy operation.
-6. Validate the installed projection again immediately before loading. If the
-   requested skill is absent or validation fails, fail closed. Return only
-   supported content from the validated projection.
+6. Validate the installed projection again immediately before loading and
+   verify the source still has the same generation after installation. If the
+   requested skill is absent or validation fails, fail closed. Load returns
+   bytes captured during that validation, so a later path swap cannot redirect
+   consumption to a symlink or a different generation.
 
 An interrupted refresh is handled by the same ownership-safe cleanup on the
 next supported refresh. Do not manually rescue partial files, merge staging
@@ -93,6 +99,8 @@ npm run workspace-skill:status -- --skill <skill-id>
 
 It reads the workspace source and the platform-owned
 `.local/custom_skills/<skill-id>/.workspace-skill-metadata.json` sidecar. The
+mirror root and all ancestors, the selected skill directory, and the sidecar
+must be real non-symlinked paths inside the configured mirror boundary. The
 sidecar's format, skill ID, source revision, and fingerprint must exactly match
 the canonical workspace metadata. Interpret outcomes as:
 

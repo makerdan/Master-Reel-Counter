@@ -39,20 +39,29 @@ npm run workspace-skill:status -- --skill example-skill
 ```
 
 Refresh discovers every source skill, computes a deterministic SHA-256
-manifest, validates a complete staging tree, checks that the source did not
-change, and atomically installs the projection. It uses an ownership-aware
-lock and cleans only its own staging/backup names. A live lock is reported as
-busy; a structured dead owner or an unstructured lock older than the bounded
-stale timeout may be reclaimed atomically.
+manifest and generation, validates a complete staging tree, checks that the
+source did not change before and after installation, and atomically installs
+the projection. It uses an ownership-aware lock and cleans only its own
+staging/backup names. A live lock is reported as busy; a structured dead
+owner or an unstructured lock older than the bounded stale timeout may be
+reclaimed atomically. Reclamation quarantines and rechecks the exact observed
+lock identity, so a replacement worker's lock is never removed.
 
 Validate and audit are read-only projection checks. Load validates both the
-current source and projection before returning supported projection content;
-it never falls back to an older projection when the source is unavailable.
+current source and projection before returning supported projection content.
+The manifest generation binds that source snapshot to the projection, and load
+returns the bytes captured during that validation rather than reopening
+projection paths after validation. It never falls back to an older projection
+when the source is unavailable.
 Use `--skill` more than once to load or validate a selected set, or omit it
 for all currently discovered skills.
 
 Status reads the canonical source and the platform-owned
-`.workspace-skill-metadata.json` sidecar without writing anything. Exit codes:
+`.workspace-skill-metadata.json` sidecar without writing anything. The mirror
+root, every ancestor, the selected skill directory, and the sidecar must be
+non-symlinked paths inside the configured mirror boundary. A missing path is
+`missing-mirror`; a symlink or other unsafe redirection is `mismatch`. Exit
+codes:
 
 | Code | Outcome | Meaning |
 | ---: | --- | --- |
