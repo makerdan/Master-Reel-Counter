@@ -228,6 +228,51 @@ Those claims must remain separate from local configuration until an
 administrator authorizes a non-production Clerk test tenant and merges the
 reviewed branch through the normal pull-request path.
 
+## Local post-remediation full-tier evidence (September 23, 2026)
+
+This is **local task-locked validation**, not a GitHub Actions run or evidence
+for a published build. At revision
+`07fd1cad233abb981768ffa9a4273fd82a1824df` (working tree clean before
+the documentation update), `npm audit --audit-level=high` exited 0 with
+`found 0 vulnerabilities`. The unchanged canonical `security-audit` step
+also passed in the full run. The command
+`TASK_PLAN_FILE=.local/tasks/task-630.md node scripts/run-locked-tier.mjs .local/tasks/task-630.md`
+exited 0. The runner reported:
+
+| Registered heavy step | Result | Duration |
+| --- | --- | ---: |
+| `startup-smoke` | Passed | 14,300 ms |
+| `security-audit` | Passed | 767 ms |
+| `schema-check` | Passed | 62 ms |
+| `workspace-skill-contract` | Passed | 4,208 ms |
+| `typecheck` | Passed | 19,044 ms |
+| `storage-lint` | Passed | 2,524 ms |
+| `storage-lint-contract` | Passed | 9,315 ms |
+| `unit-tests` | Passed | 6,432 ms |
+| `vite-hmr-recovery-tests` | Passed | 18,293 ms |
+| `serial-lock-tests` | Passed | 19,249 ms |
+| `port-authority-tests` | Passed | 1,564 ms |
+| `failure-gate-parity` | Passed | 140 ms |
+| `manifest-parity` | Passed | 59 ms |
+| `nested-tier-regression` | Passed | 1,021 ms |
+| `collision-smoke` | Passed | 10,651 ms |
+| `browser-tests` | Passed | 306,488 ms |
+
+Retained diagnostic summary from the run: Playwright reported **52 passed,
+8 skipped** across 60 Chromium/mobile-Chromium cases. It emitted a PostCSS
+`from`-option warning, Node color-setting warnings, and several object-storage
+`exists()` timeout warnings that were treated as not found; none failed the
+registered step. The runner reported `PASS: test-heavy completed` and released
+its validation lock. No registered steps were incomplete or not reached.
+
+This resolves the *observed local validation blocker* from the earlier
+high-severity `multer`/`sharp` audit signature: the audit no longer stops this
+revision and all downstream steps were reached. The warning messages and the
+eight browser skips are distinct from that earlier audit failure; they are not
+classified as passing browser cases or as a new audit failure. This local result
+does **not** change the remote GitHub run conclusions, the credential-dependent
+browser limitation on GitHub, or branch-policy evidence above.
+
 ## Task 570 automatic security-update verification
 
 The repository-authorized GitHub CLI session was used on September 10, 2026
