@@ -1,4 +1,5 @@
 - [Global isApproved middleware](global-isapproved-middleware.md) — all /api/* routes pass through isApproved; exempt public endpoints in the skipPaths array in routes.ts.
+- [Storage lint registry trust](storage-lint-registry-trust.md) — storage lint must trust only verified key exports and shape-checked identity factories, never every import from the registry module.
 - [E2E test auth — run as Admin](e2e-owner-auth.md) — global setup must use a real Clerk account with persisted Admin role for full CRUD browser coverage.
 - [Undo delete-entry creates new ID](undo-entry-id.md) — undo for delete-entry POSTs a new entry with a new server-assigned ID; tests must not check for the original entry ID after undo.
 - [Typed-request migration in Express](typed-request-migration.md) — handler signatures must stay req:any; use inline cast (req as AuthenticatedRequest) for typed user access.

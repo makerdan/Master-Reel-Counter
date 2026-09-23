@@ -107,6 +107,13 @@ test("malformed source fails closed without crashing the linter", () => {
   assert.match(result.stdout, /violation/);
 });
 
+test("malformed source fails strict mode", () => {
+  const result = runLint(`sessionStorage.getItem("malformed-key",`, ["--strict"]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /malformed TypeScript source/);
+});
+
 test("accepts multiline registry constants, factories, and local aliases", () => {
   const violations = analyzeSource(`
     import { THEME_MODE_KEY, scannerResultsKey as resultKey } from "@/lib/storageKeys";
@@ -121,6 +128,66 @@ test("accepts multiline registry constants, factories, and local aliases", () =>
     );
   `);
   assert.deepEqual(violations, []);
+});
+
+test("rejects unknown registry exports and expression-built keys", () => {
+  const violations = analyzeSource(`
+    import {
+      DASHBOARD_STATE_FIELDS,
+      HELP_CHAT_MAX_MESSAGES,
+      THEME_MODE_KEY,
+    } from "@/lib/storageKeys";
+    const unknownExport = DASHBOARD_STATE_FIELDS;
+    const numericExport = HELP_CHAT_MAX_MESSAGES;
+    const concatenated = THEME_MODE_KEY + "-suffix";
+    const templated = \`\${THEME_MODE_KEY}-suffix\`;
+    localStorage.getItem(unknownExport);
+    localStorage.getItem(numericExport);
+    localStorage.getItem(concatenated);
+    localStorage.getItem(templated);
+  `);
+  assert.equal(violations.length, 4);
+});
+
+test("accepts only the documented identity-scoped dashboard factory shape", () => {
+  const violations = analyzeSource(`
+    import { dashboardStateKey } from "@/lib/storageKeys";
+    const field = "searchQuery";
+    const valid = dashboardStateKey(field, userId);
+    sessionStorage.getItem(valid);
+    sessionStorage.getItem(dashboardStateKey("filterStatus", currentUser.id));
+    sessionStorage.getItem(dashboardStateKey("debugPanel", userId));
+    sessionStorage.getItem(dashboardStateKey("searchQuery"));
+    sessionStorage.getItem(dashboardStateKey("searchQuery", "fixed-user"));
+  `);
+  assert.equal(violations.length, 3);
+  assert.deepEqual(
+    violations.map(({ line }) => line),
+    [7, 8, 9],
+  );
+});
+
+test("does not treat shadowed storage globals as browser storage", () => {
+  const violations = analyzeSource(`
+    function unsafe(localStorage) {
+      localStorage.setItem("shadowed-key", value);
+    }
+    function alsoUnsafe(sessionStorage) {
+      sessionStorage.removeItem("shadowed-key");
+    }
+  `);
+  assert.deepEqual(violations, []);
+});
+
+test("rejects shadowed registry factories and namespace aliases", () => {
+  const violations = analyzeSource(`
+    import * as registry from "@/lib/storageKeys";
+    function unsafe(dashboardStateKey, registry) {
+      localStorage.getItem(dashboardStateKey("searchQuery", userId));
+      localStorage.getItem(registry.THEME_MODE_KEY);
+    }
+  `);
+  assert.equal(violations.length, 2);
 });
 
 test("accepts namespace imports and window storage aliases for registry keys", () => {
