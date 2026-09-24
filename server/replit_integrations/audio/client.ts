@@ -5,11 +5,69 @@ import { writeFile, unlink, readFile } from "fs/promises";
 import { randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
+import { REPLIT_AI_MODELS } from "../../providers/approved-models";
 
 export const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  // Retry waits must be owned here so caller cancellation can interrupt them.
+  maxRetries: 0,
 });
+
+function cancellationError(): Error {
+  const error = new Error("The audio request was cancelled.");
+  error.name = "AbortError";
+  return error;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  throw cancellationError();
+}
+
+function isRetryableAudioError(error: unknown): boolean {
+  const status = typeof (error as { status?: unknown })?.status === "number"
+    ? (error as { status: number }).status
+    : undefined;
+  if (status !== undefined) return status === 408 || status === 409 || status === 429 || status >= 500;
+  const name = (error as { name?: unknown })?.name;
+  return name === "APIConnectionError" || name === "APIConnectionTimeoutError";
+}
+
+function waitForAudioRetry(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(cancellationError());
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(finish, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      reject(cancellationError());
+    };
+    function finish() {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+export async function withAudioProviderRetry<T>(
+  signal: AbortSignal | undefined,
+  operation: (signal: AbortSignal | undefined) => Promise<T>,
+): Promise<T> {
+  let retries = 0;
+  while (true) {
+    throwIfAborted(signal);
+    try {
+      return await operation(signal);
+    } catch (error) {
+      if (signal?.aborted) throw cancellationError();
+      if (!isRetryableAudioError(error) || retries >= 2) throw error;
+      retries++;
+      await waitForAudioRetry(100 * 2 ** retries, signal);
+    }
+  }
+}
 
 export type AudioFormat = "wav" | "mp3" | "webm" | "mp4" | "ogg" | "unknown";
 
@@ -51,13 +109,15 @@ export function detectAudioFormat(buffer: Buffer): AudioFormat {
  * Uses temp files instead of pipes because video containers (MP4/MOV)
  * require seeking to find the audio track.
  */
-export async function convertToWav(audioBuffer: Buffer): Promise<Buffer> {
+export async function convertToWav(audioBuffer: Buffer, signal?: AbortSignal): Promise<Buffer> {
   const inputPath = join(tmpdir(), `input-${randomUUID()}`);
   const outputPath = join(tmpdir(), `output-${randomUUID()}.wav`);
 
   try {
+    throwIfAborted(signal);
     // Write input to temp file (required for video containers that need seeking)
     await writeFile(inputPath, audioBuffer);
+    throwIfAborted(signal);
 
     // Run ffmpeg with file paths
     await new Promise<void>((resolve, reject) => {
@@ -70,7 +130,7 @@ export async function convertToWav(audioBuffer: Buffer): Promise<Buffer> {
         "-acodec", "pcm_s16le",
         "-y",               // Overwrite output
         outputPath,
-      ]);
+      ], signal ? { signal } : {});
 
       ffmpeg.stderr.on("data", () => {}); // Suppress logs
       ffmpeg.on("close", (code) => {
@@ -95,13 +155,15 @@ export async function convertToWav(audioBuffer: Buffer): Promise<Buffer> {
  * - WebM/MP4/OGG: Convert to WAV via ffmpeg
  */
 export async function ensureCompatibleFormat(
-  audioBuffer: Buffer
+  audioBuffer: Buffer,
+  signal?: AbortSignal,
 ): Promise<{ buffer: Buffer; format: "wav" | "mp3" }> {
+  throwIfAborted(signal);
   const detected = detectAudioFormat(audioBuffer);
   if (detected === "wav") return { buffer: audioBuffer, format: "wav" };
   if (detected === "mp3") return { buffer: audioBuffer, format: "mp3" };
   // Convert WebM, MP4, OGG, or unknown to WAV
-  const wavBuffer = await convertToWav(audioBuffer);
+  const wavBuffer = await convertToWav(audioBuffer, signal);
   return { buffer: wavBuffer, format: "wav" };
 }
 
@@ -114,20 +176,23 @@ export async function voiceChat(
   audioBuffer: Buffer,
   voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy",
   inputFormat: "wav" | "mp3" = "wav",
-  outputFormat: "wav" | "mp3" = "mp3"
+  outputFormat: "wav" | "mp3" = "mp3",
+  signal?: AbortSignal,
 ): Promise<{ transcript: string; audioResponse: Buffer }> {
+  throwIfAborted(signal);
   const audioBase64 = audioBuffer.toString("base64");
-  const response = await openai.chat.completions.create({
-    model: "gpt-audio",
-    modalities: ["text", "audio"],
-    audio: { voice, format: outputFormat },
-    messages: [{
-      role: "user",
-      content: [
-        { type: "input_audio", input_audio: { data: audioBase64, format: inputFormat } },
-      ],
-    }],
-  });
+  const response = await withAudioProviderRetry(signal, (requestSignal) =>
+    openai.chat.completions.create({
+      model: REPLIT_AI_MODELS.audioResponse,
+      modalities: ["text", "audio"],
+      audio: { voice, format: outputFormat },
+      messages: [{
+        role: "user",
+        content: [
+          { type: "input_audio", input_audio: { data: audioBase64, format: inputFormat } },
+        ],
+      }],
+    }, { signal: requestSignal, maxRetries: 0 }));
   const message = response.choices[0]?.message as any;
   const transcript = message?.audio?.transcript || message?.content || "";
   const audioData = message?.audio?.data ?? "";
@@ -150,21 +215,24 @@ export async function voiceChat(
 export async function voiceChatStream(
   audioBuffer: Buffer,
   voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy",
-  inputFormat: "wav" | "mp3" = "wav"
+  inputFormat: "wav" | "mp3" = "wav",
+  signal?: AbortSignal,
 ): Promise<AsyncIterable<{ type: "transcript" | "audio"; data: string }>> {
+  throwIfAborted(signal);
   const audioBase64 = audioBuffer.toString("base64");
-  const stream = await openai.chat.completions.create({
-    model: "gpt-audio",
-    modalities: ["text", "audio"],
-    audio: { voice, format: "pcm16" },
-    messages: [{
-      role: "user",
-      content: [
-        { type: "input_audio", input_audio: { data: audioBase64, format: inputFormat } },
-      ],
-    }],
-    stream: true,
-  });
+  const stream = await withAudioProviderRetry(signal, (requestSignal) =>
+    openai.chat.completions.create({
+      model: REPLIT_AI_MODELS.audioResponse,
+      modalities: ["text", "audio"],
+      audio: { voice, format: "pcm16" },
+      messages: [{
+        role: "user",
+        content: [
+          { type: "input_audio", input_audio: { data: audioBase64, format: inputFormat } },
+        ],
+      }],
+      stream: true,
+    }, { signal: requestSignal, maxRetries: 0 }));
 
   return (async function* () {
     for await (const chunk of stream) {
@@ -187,17 +255,20 @@ export async function voiceChatStream(
 export async function textToSpeech(
   text: string,
   voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy",
-  format: "wav" | "mp3" | "flac" | "opus" | "pcm16" = "wav"
+  format: "wav" | "mp3" | "flac" | "opus" | "pcm16" = "wav",
+  signal?: AbortSignal,
 ): Promise<Buffer> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-audio",
-    modalities: ["text", "audio"],
-    audio: { voice, format },
-    messages: [
-      { role: "system", content: "You are an assistant that performs text-to-speech." },
-      { role: "user", content: `Repeat the following text verbatim: ${text}` },
-    ],
-  });
+  throwIfAborted(signal);
+  const response = await withAudioProviderRetry(signal, (requestSignal) =>
+    openai.chat.completions.create({
+      model: REPLIT_AI_MODELS.audioResponse,
+      modalities: ["text", "audio"],
+      audio: { voice, format },
+      messages: [
+        { role: "system", content: "You are an assistant that performs text-to-speech." },
+        { role: "user", content: `Repeat the following text verbatim: ${text}` },
+      ],
+    }, { signal: requestSignal, maxRetries: 0 }));
   const audioData = (response.choices[0]?.message as any)?.audio?.data ?? "";
   return Buffer.from(audioData, "base64");
 }
@@ -209,18 +280,21 @@ export async function textToSpeech(
  */
 export async function textToSpeechStream(
   text: string,
-  voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy"
+  voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer" = "alloy",
+  signal?: AbortSignal,
 ): Promise<AsyncIterable<string>> {
-  const stream = await openai.chat.completions.create({
-    model: "gpt-audio",
-    modalities: ["text", "audio"],
-    audio: { voice, format: "pcm16" },
-    messages: [
-      { role: "system", content: "You are an assistant that performs text-to-speech." },
-      { role: "user", content: `Repeat the following text verbatim: ${text}` },
-    ],
-    stream: true,
-  });
+  throwIfAborted(signal);
+  const stream = await withAudioProviderRetry(signal, (requestSignal) =>
+    openai.chat.completions.create({
+      model: REPLIT_AI_MODELS.audioResponse,
+      modalities: ["text", "audio"],
+      audio: { voice, format: "pcm16" },
+      messages: [
+        { role: "system", content: "You are an assistant that performs text-to-speech." },
+        { role: "user", content: `Repeat the following text verbatim: ${text}` },
+      ],
+      stream: true,
+    }, { signal: requestSignal, maxRetries: 0 }));
 
   return (async function* () {
     for await (const chunk of stream) {
@@ -239,13 +313,17 @@ export async function textToSpeechStream(
  */
 export async function speechToText(
   audioBuffer: Buffer,
-  format: "wav" | "mp3" | "webm" = "wav"
+  format: "wav" | "mp3" | "webm" = "wav",
+  signal?: AbortSignal,
 ): Promise<string> {
+  throwIfAborted(signal);
   const file = await toFile(audioBuffer, `audio.${format}`);
-  const response = await openai.audio.transcriptions.create({
-    file,
-    model: "gpt-4o-mini-transcribe",
-  });
+  throwIfAborted(signal);
+  const response = await withAudioProviderRetry(signal, (requestSignal) =>
+    openai.audio.transcriptions.create({
+      file,
+      model: REPLIT_AI_MODELS.audioTranscription,
+    }, { signal: requestSignal, maxRetries: 0 }));
   return response.text;
 }
 
@@ -255,14 +333,18 @@ export async function speechToText(
  */
 export async function speechToTextStream(
   audioBuffer: Buffer,
-  format: "wav" | "mp3" | "webm" = "wav"
+  format: "wav" | "mp3" | "webm" = "wav",
+  signal?: AbortSignal,
 ): Promise<AsyncIterable<string>> {
+  throwIfAborted(signal);
   const file = await toFile(audioBuffer, `audio.${format}`);
-  const stream = await openai.audio.transcriptions.create({
-    file,
-    model: "gpt-4o-mini-transcribe",
-    stream: true,
-  });
+  throwIfAborted(signal);
+  const stream = await withAudioProviderRetry(signal, (requestSignal) =>
+    openai.audio.transcriptions.create({
+      file,
+      model: REPLIT_AI_MODELS.audioTranscription,
+      stream: true,
+    }, { signal: requestSignal, maxRetries: 0 }));
 
   return (async function* () {
     for await (const event of stream) {

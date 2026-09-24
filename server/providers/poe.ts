@@ -2,6 +2,10 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import {
+  APPROVED_POE_MODELS,
+  isApprovedPoeModelId,
+} from "./approved-models";
 
 export const POE_ENDPOINT = "https://api.poe.com/v1";
 const MODEL_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -12,10 +16,7 @@ const MAX_IN_FLIGHT = 4;
 export type PoeCapability = "text-chat-stream" | "vision-json";
 export type PoeUseCase = "help-chat" | "label-scan" | "session-scan";
 
-export const SUPPORTED_POE_HEALTH_MODELS = [
-  { id: "Gemini-3.1-Pro", label: "Gemini 3.1 Pro" },
-  { id: "Claude-Sonnet-4.5", label: "Claude Sonnet 4.5" },
-] as const;
+export const SUPPORTED_POE_HEALTH_MODELS = APPROVED_POE_MODELS;
 
 export type PoeModelHealth = {
   id: string;
@@ -102,7 +103,7 @@ export class PoeProviderError extends Error {
 
 const capabilitySchema = z.enum(["text-chat-stream", "vision-json"]);
 const modelSchema = z.object({
-  id: z.string().trim().min(1),
+  id: z.string().min(1),
   capabilities: z.array(z.string()).optional(),
   input_modalities: z.array(z.string()).optional(),
   output_modalities: z.array(z.string()).optional(),
@@ -179,6 +180,7 @@ export function parsePoeModelsResponse(payload: unknown): PoeLiveModel[] {
   for (const candidate of parsed.data.data) {
     const model = modelSchema.safeParse(candidate);
     if (!model.success) continue;
+    if (!isApprovedPoeModelId(model.data.id)) continue;
     const metadataCapabilities = model.data.metadata?.capabilities ?? [];
     const declaredCapabilities = [...(model.data.capabilities ?? []), ...metadataCapabilities];
     const capabilities = [...new Set(
@@ -210,14 +212,29 @@ export function getPoeModelHealth(models: PoeLiveModel[]): PoeModelHealth[] {
 export function selectPoeModel(
   models: PoeLiveModel[],
   capability: PoeCapability,
+  requestedModelId?: string,
 ): PoeLiveModel {
-  const match = [...models]
-    .filter((model) => model.privacyClass === "approved" && model.capabilities.includes(capability))
-    .sort((a, b) => a.id.localeCompare(b.id))[0];
+  if (requestedModelId !== undefined && !isApprovedPoeModelId(requestedModelId)) {
+    throw new PoeProviderError("model", "The selected Poe model is not approved.", 400);
+  }
+  const eligible = [...models]
+    .filter((model) =>
+      isApprovedPoeModelId(model.id) &&
+      model.privacyClass === "approved" &&
+      model.capabilities.includes(capability),
+    );
+  const match = requestedModelId
+    ? eligible.find((model) => model.id === requestedModelId)
+    : eligible.sort((a, b) => a.id.localeCompare(b.id))[0];
   if (!match) {
+    const requestedModelMissing = Boolean(
+      requestedModelId && !models.some((model) => model.id === requestedModelId),
+    );
     throw new PoeProviderError(
-      "capability",
-      "No live Poe model satisfies the requested capability.",
+      requestedModelMissing ? "model" : "capability",
+      requestedModelId
+        ? "The selected Poe model is unavailable for this use case."
+        : "No live Poe model satisfies the requested capability.",
       503,
     );
   }
@@ -271,7 +288,8 @@ function combineSignals(signal: AbortSignal | undefined, timeoutMs: number): {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const abort = () => controller.abort();
-  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
+  else signal?.addEventListener("abort", abort, { once: true });
   return {
     signal: controller.signal,
     cleanup: () => {
@@ -280,6 +298,27 @@ function combineSignals(signal: AbortSignal | undefined, timeoutMs: number): {
     },
     controller,
   };
+}
+
+function cancelledProviderError(retries = 0): PoeProviderError {
+  return new PoeProviderError("cancelled", "Poe request was cancelled.", 499, false, retries);
+}
+
+function retryDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(cancelledProviderError());
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(finish, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      reject(cancelledProviderError());
+    };
+    function finish() {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 async function recordUsage(event: PoeTelemetryEvent): Promise<void> {
@@ -304,6 +343,7 @@ export interface PoeProvider {
   streamText(args: {
     messages: PoeTextMessage[];
     useCase: "help-chat";
+    modelId?: string;
     maxTokens: number;
     signal?: AbortSignal;
     userId: string | null;
@@ -392,10 +432,11 @@ class PoeProviderImpl implements PoeProvider {
           const value = await operation(combined.signal);
           return { value, retries };
         } catch (error) {
+          if (callerSignal?.aborted) throw cancelledProviderError(retries);
           const normalized = normalizePoeError(error, retries);
-          if (!normalized.retryable || retries >= MAX_RETRIES || callerSignal?.aborted) throw normalized;
+          if (!normalized.retryable || retries >= MAX_RETRIES) throw normalized;
           retries++;
-          await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** retries));
+          await retryDelay(100 * 2 ** retries, callerSignal);
         } finally {
           combined.cleanup();
         }
@@ -408,6 +449,7 @@ class PoeProviderImpl implements PoeProvider {
   async streamText(args: {
     messages: PoeTextMessage[];
     useCase: "help-chat";
+    modelId?: string;
     maxTokens: number;
     signal?: AbortSignal;
     userId: string | null;
@@ -422,8 +464,11 @@ class PoeProviderImpl implements PoeProvider {
     const cacheState = modelCacheState();
     let model: PoeLiveModel;
     try {
+      if (args.modelId !== undefined && !isApprovedPoeModelId(args.modelId)) {
+        throw new PoeProviderError("model", "The selected Poe model is not approved.", 400);
+      }
       const models = await this.listModels();
-      model = selectPoeModel(models, "text-chat-stream");
+      model = selectPoeModel(models, "text-chat-stream", args.modelId);
     } catch (error) {
       const normalized = normalizePoeError(error);
       await recordUsage({

@@ -22,8 +22,8 @@ describe("Poe live model registry", () => {
   test("reports only the supported models from the live catalogue", () => {
     const models = parsePoeModelsResponse({
       data: [
-        { id: "Gemini-3.1-Pro" },
-        { id: "unrelated-provider-model" },
+        { id: "Gemini-3.1-Pro", capabilities: ["text-chat-stream"] },
+        { id: "unrelated-provider-model", capabilities: ["text-chat-stream", "vision-json"] },
         { id: "Claude-Sonnet-4.5" },
       ],
     });
@@ -42,13 +42,14 @@ describe("Poe live model registry", () => {
     assert.deepEqual(getPoeModelHealth(models).map((model) => model.available), [true, false]);
   });
 
-  test("rejects malformed catalogue rows and preserves only known capabilities", () => {
+  test("does not let catalogue or environment capability claims authorize unknown IDs", () => {
     process.env.POE_MODEL_CAPABILITIES_JSON = JSON.stringify({
       "live-vision-model": ["vision-json", "invented-capability"],
+      "Gemini-3.1-Pro": ["vision-json", "invented-capability"],
     });
     const models = parsePoeModelsResponse({
       data: [
-        { id: "live-text-model", capabilities: ["text-chat-stream"] },
+        { id: "Gemini-3.1-Pro", capabilities: ["text-chat-stream"] },
         { id: "live-vision-model" },
         { id: 42 },
         { capabilities: ["text-chat-stream"] },
@@ -56,15 +57,20 @@ describe("Poe live model registry", () => {
     });
 
     assert.deepEqual(models.map((model) => ({ id: model.id, capabilities: model.capabilities })), [
-      { id: "live-text-model", capabilities: ["text-chat-stream"] },
-      { id: "live-vision-model", capabilities: ["vision-json"] },
+      { id: "Gemini-3.1-Pro", capabilities: ["text-chat-stream", "vision-json"] },
     ]);
   });
 
   test("fails closed for unknown capability claims", () => {
-    const models = parsePoeModelsResponse({ data: [{ id: "live-unknown", capabilities: ["vision"] }] });
+    const models = parsePoeModelsResponse({ data: [{ id: "Gemini-3.1-Pro", capabilities: ["vision"] }] });
     assert.throws(
       () => selectPoeModel(models, "vision-json"),
+      (error: unknown) => error instanceof PoeProviderError && error.code === "capability",
+    );
+    assert.throws(
+      () => selectPoeModel([
+        { id: "unapproved-model", capabilities: ["vision-json"], privacyClass: "approved" },
+      ], "vision-json"),
       (error: unknown) => error instanceof PoeProviderError && error.code === "capability",
     );
   });
@@ -72,11 +78,19 @@ describe("Poe live model registry", () => {
   test("selects an exact live model deterministically", () => {
     const models = parsePoeModelsResponse({
       data: [
-        { id: "z-model", capabilities: ["text-chat-stream"] },
-        { id: "a-model", capabilities: ["text-chat-stream"] },
+        { id: "Gemini-3.1-Pro", capabilities: ["text-chat-stream"] },
+        { id: "Claude-Sonnet-4.5", capabilities: ["text-chat-stream"] },
       ],
     });
-    assert.equal(selectPoeModel(models, "text-chat-stream").id, "a-model");
+    assert.equal(selectPoeModel(models, "text-chat-stream").id, "Claude-Sonnet-4.5");
+    assert.equal(
+      selectPoeModel(models, "text-chat-stream", "Gemini-3.1-Pro").id,
+      "Gemini-3.1-Pro",
+    );
+    assert.throws(
+      () => selectPoeModel(models, "text-chat-stream", "unapproved-model"),
+      (error: unknown) => error instanceof PoeProviderError && error.code === "model",
+    );
   });
 });
 

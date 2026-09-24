@@ -26,6 +26,8 @@ import {
   objectStorageClient,
   registerObjectStorageRoutes,
 } from "./replit_integrations/object_storage";
+import { registerAudioRoutes } from "./replit_integrations/audio";
+import { registerImageRoutes } from "./replit_integrations/image";
 import { z } from "zod";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "./db";
@@ -71,6 +73,7 @@ import {
   type PoeProvider,
   type PoeTextMessage,
 } from "./providers/poe";
+import { isApprovedPoeModelId } from "./providers/approved-models";
 export type PdfExportJob = {
   done: number;
   total: number;
@@ -405,7 +408,11 @@ export function createHelpChatHandler(
   return async (req: any, res: any) => {
     let aborted = false;
     try {
-      const { messages } = (req.body ?? {}) as any;
+      const { messages, model: modelId } = (req.body ?? {}) as any;
+      if (modelId !== undefined &&
+        (typeof modelId !== "string" || !isApprovedPoeModelId(modelId))) {
+        return res.status(400).json({ error: "Unsupported model" });
+      }
       if (!Array.isArray(messages) || messages.length === 0 || messages.length > 12) {
         return res.status(400).json({ error: "messages must be a non-empty array (max 12)" });
       }
@@ -452,6 +459,7 @@ export function createHelpChatHandler(
       providerStream = await provider.streamText({
         messages: chatMessages,
         useCase: "help-chat",
+        modelId,
         maxTokens: 512,
         signal: requestAbort.signal,
         userId: (req as AuthenticatedRequest).user?.claims?.sub ?? null,
@@ -943,6 +951,10 @@ export async function registerRoutes(
 
   registerAuthRoutes(app);
   registerObjectStorageRoutes(app);
+  // The primary text-chat API is /api/help-chat. The legacy Replit chat
+  // registration shares the audio message path, so only audio is mounted here.
+  registerAudioRoutes(app);
+  registerImageRoutes(app);
 
   const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 

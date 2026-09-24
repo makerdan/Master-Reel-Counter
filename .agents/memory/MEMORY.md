@@ -40,3 +40,4 @@
 - [Validation lock survivor ownership](validation-lock-survivor-ownership.md) — stale recovery must inspect recorded process-group/tree ownership when wrapper cleanup cannot be verified.
 - [Live Vite HMR validation](live-vite-hmr-validation.md) — use a real browser, supervised fixture PID, socket lifecycle, and post-restart update rather than option-only checks.
 - [Collision fixture cleanup](collision-fixture-cleanup.md) — collision smoke fixtures must group lock and waiters and install signal cleanup before child startup.
+- [OpenAI SDK retry cancellation](openai-sdk-retry-cancellation.md) — abort signals do not interrupt the SDK's retry sleep; use bounded application-owned retry waits for cancellable requests.
