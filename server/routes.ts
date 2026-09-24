@@ -1,6 +1,7 @@
 import type { Express, Request, Response as ExpressResponse, RequestHandler } from "express";
 import { type Server } from "http";
 import { WebSocketServer, WebSocket, type RawData } from "ws";
+import { LiveConnectionTracker, type LiveConnectionLease } from "./lib/live-connections";
 import { attachWebSocketServerAtPath } from "./websocket-upgrade";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
@@ -855,7 +856,8 @@ export function createSessionHandler(
 
 export async function registerRoutes(
   httpServer: Server,
-  app: Express
+  app: Express,
+  liveConnections = new LiveConnectionTracker(),
 ): Promise<Server> {
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -1022,6 +1024,7 @@ export async function registerRoutes(
 
   app.post("/api/uploads/direct", isAuthenticated, resourceRateLimiter, upload.single("file"), async (req: any, res) => {
     const authedReq = req as AuthenticatedRequest<UploadBody> & { file?: Express.Multer.File; _rejectedMimetype?: string };
+    taskTracker.increment();
     try {
       if (!authedReq.file) {
         if (authedReq._rejectedMimetype) {
@@ -1064,6 +1067,8 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Error uploading file:", error?.message || error, error?.stack);
       res.status(500).json({ error: "Failed to upload file" });
+    } finally {
+      taskTracker.decrement();
     }
   });
 
@@ -6902,8 +6907,15 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   );
 
   // WebSocket
-  const wss = new WebSocketServer({ noServer: true });
-  attachWebSocketServerAtPath(httpServer, wss, "/ws");
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: PRE_AUTH_WEBSOCKET_LIMITS.maxPayloadBytes,
+  });
+  const socketLeases = new WeakMap<WebSocket, LiveConnectionLease>();
+  attachWebSocketServerAtPath(httpServer, wss, "/ws", {
+    acquire: () => liveConnections.tryAcquire(),
+    onLease: (webSocket, lease) => socketLeases.set(webSocket, lease),
+  });
 
   const wsAlive = new WeakMap<WebSocket, boolean>();
 
@@ -6965,6 +6977,11 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   };
 
   wss.on("connection", (ws, req: any) => {
+    const lease = socketLeases.get(ws);
+    if (!lease) {
+      ws.terminate();
+      return;
+    }
     wsUserMap.set(ws, { sessionId: null, userId: null, username: null, role: null });
     wsAlive.set(ws, true);
 
@@ -7013,6 +7030,14 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         return;
       }
       const connUserId = user.claims.sub;
+      if (!lease.identify(connUserId)) {
+        ws.send(JSON.stringify({
+          type: "error",
+          message: "The active connection limit has been reached. Please retry shortly.",
+        }));
+        ws.close(1013, "Connection limit reached");
+        return;
+      }
       const connUsername = user.claims.username || user.claims.firstName || connUserId;
       wsUserMap.set(ws, { sessionId: null, userId: connUserId, username: connUsername, role: null });
       authDone = true;

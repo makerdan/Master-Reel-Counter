@@ -7,10 +7,15 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import test from "node:test";
-import type { Server } from "node:http";
+import http, { createServer as createHttpServer, type Server } from "node:http";
+import { createConnection } from "node:net";
 import { chromium, type Page } from "@playwright/test";
+import { LiveConnectionTracker } from "../lib/live-connections";
 import { createHmrOptions } from "../vite-hmr";
-import { attachWebSocketServerAtPath } from "../websocket-upgrade";
+import {
+  attachUnknownUpgradePathRejector,
+  attachWebSocketServerAtPath,
+} from "../websocket-upgrade";
 
 const server = {} as Server;
 
@@ -58,6 +63,180 @@ test("the application WebSocket server leaves Vite HMR upgrades unclaimed", () =
   httpServer.emit("upgrade", { url: "/ws?session=example" }, {}, Buffer.alloc(0));
   assert.deepEqual(handledPaths, ["/ws?session=example"]);
   assert.deepEqual(emittedEvents, ["connection"]);
+});
+
+test("recognized WebSocket upgrades reserve capacity before allocating a connection", () => {
+  class MockUpgradeSocket extends EventEmitter {
+    destroyed = false;
+    output = "";
+
+    end(data?: string | Uint8Array) {
+      if (data) this.output += data.toString();
+      this.emit("close");
+      return this;
+    }
+
+    destroy() {
+      this.destroyed = true;
+      this.emit("close");
+      return this;
+    }
+  }
+
+  const httpServer = new EventEmitter() as Server;
+  const tracker = new LiveConnectionTracker({
+    maxConnections: 1,
+    maxPendingAuthentication: 1,
+    maxConnectionsPerUser: 1,
+  });
+  let allocations = 0;
+  let webSocket: EventEmitter & {
+    close(code?: number, reason?: string): void;
+    terminate(): void;
+  } | undefined;
+  const webSocketServer = {
+    handleUpgrade(
+      _request: unknown,
+      _socket: unknown,
+      _head: unknown,
+      callback: (socket: object) => void,
+    ) {
+      allocations += 1;
+      webSocket = Object.assign(new EventEmitter(), {
+        close() {},
+        terminate() {},
+      });
+      callback(webSocket);
+    },
+    emit() {},
+  };
+  attachWebSocketServerAtPath(httpServer, webSocketServer as never, "/ws", {
+    acquire: () => tracker.tryAcquire(),
+  });
+
+  const firstSocket = new MockUpgradeSocket();
+  httpServer.emit("upgrade", { url: "/ws" }, firstSocket, Buffer.alloc(0));
+  assert.equal(allocations, 1);
+  assert.equal(tracker.activeCount, 1);
+
+  const excessSocket = new MockUpgradeSocket();
+  httpServer.emit("upgrade", { url: "/ws" }, excessSocket, Buffer.alloc(0));
+  assert.match(excessSocket.output, /^HTTP\/1\.1 503 Service Unavailable/);
+  assert.equal(allocations, 1, "the rejected client must not allocate a WebSocket");
+
+  webSocket?.emit("close");
+  assert.equal(tracker.activeCount, 0);
+  firstSocket.destroy();
+  excessSocket.destroy();
+});
+
+test("concurrent unknown upgrades are rejected before admission without blocking the API", async () => {
+  const tracker = new LiveConnectionTracker({
+    maxConnections: 1,
+    maxPendingAuthentication: 1,
+    maxConnectionsPerUser: 1,
+  });
+  let admissionAttempts = 0;
+  let webSocketAllocations = 0;
+  let viteUpgradeAttempts = 0;
+  const httpServer = createHttpServer((_request, response) => {
+    response.statusCode = 200;
+    response.end("api ok");
+  });
+  const webSocketServer = {
+    handleUpgrade(
+      _request: unknown,
+      _socket: unknown,
+      _head: unknown,
+      callback: (socket: object) => void,
+    ) {
+      webSocketAllocations += 1;
+      callback({ terminate() {} });
+    },
+    emit() {},
+  };
+
+  attachWebSocketServerAtPath(httpServer, webSocketServer as never, "/ws", {
+    acquire: () => {
+      admissionAttempts += 1;
+      return tracker.tryAcquire();
+    },
+  });
+  httpServer.on("upgrade", (request, socket) => {
+    if (request.url?.split("?", 1)[0] !== "/vite-hmr") return;
+    viteUpgradeAttempts += 1;
+    socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+  });
+  attachUnknownUpgradePathRejector(httpServer, ["/ws", "/vite-hmr"]);
+
+  await new Promise<void>((resolvePromise, reject) => {
+    httpServer.once("error", reject);
+    httpServer.listen(0, "127.0.0.1", resolvePromise);
+  });
+  const address = httpServer.address();
+  assert.ok(address && typeof address === "object");
+
+  const sendUpgrade = (pathname: string) => new Promise<string>((resolvePromise, reject) => {
+    const socket = createConnection(address.port, "127.0.0.1");
+    let response = "";
+    socket.setTimeout(5000, () => {
+      socket.destroy();
+      reject(new Error(`Upgrade request for ${pathname} was not closed`));
+    });
+    socket.once("connect", () => {
+      socket.write([
+        `GET ${pathname} HTTP/1.1`,
+        `Host: 127.0.0.1:${address.port}`,
+        "Connection: Upgrade",
+        "Upgrade: websocket",
+        "Sec-WebSocket-Version: 13",
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+        "Cookie: __session=authenticated",
+        "",
+        "",
+      ].join("\r\n"));
+    });
+    socket.on("data", (chunk) => { response += chunk.toString(); });
+    socket.once("end", () => resolvePromise(response));
+    socket.once("error", reject);
+  });
+
+  const ordinaryApiRequest = new Promise<{ status: number; body: string }>((resolvePromise, reject) => {
+    const request = http.get({
+      hostname: "127.0.0.1",
+      port: address.port,
+      path: "/api/healthz",
+    }, (response) => {
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => { body += chunk; });
+      response.on("end", () => resolvePromise({ status: response.statusCode ?? 0, body }));
+    });
+    request.once("error", reject);
+  });
+
+  try {
+    const unknownAttempts = Array.from({ length: 48 }, (_, index) =>
+      sendUpgrade(`/unknown-${index}`),
+    );
+    const [unknownResponses, apiResponse] = await Promise.all([
+      Promise.all(unknownAttempts),
+      ordinaryApiRequest,
+    ]);
+
+    assert.equal(unknownResponses.length, 48);
+    assert.ok(unknownResponses.every((response) => response.startsWith("HTTP/1.1 404 Not Found")));
+    assert.equal(admissionAttempts, 0, "unknown paths must not reserve live capacity");
+    assert.equal(webSocketAllocations, 0, "unknown paths must not allocate WebSocket clients");
+    assert.equal(apiResponse.status, 200);
+    assert.equal(apiResponse.body, "api ok");
+
+    const hmrResponse = await sendUpgrade("/vite-hmr?token=example");
+    assert.ok(hmrResponse.startsWith("HTTP/1.1 403 Forbidden"));
+    assert.equal(viteUpgradeAttempts, 1, "recognized Vite upgrades must reach Vite first");
+  } finally {
+    await new Promise<void>((resolvePromise) => httpServer.close(() => resolvePromise()));
+  }
 });
 
 async function availablePort() {

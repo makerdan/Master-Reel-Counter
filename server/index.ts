@@ -26,6 +26,9 @@ import { createApiErrorHandler } from "./middlewares/apiErrorHandler";
 
 // Fail fast if SESSION_SECRET is absent or too weak.
 validateSessionSecret();
+import { HttpRequestDrainTracker } from "./lib/http-request-drain";
+import { LiveConnectionTracker } from "./lib/live-connections";
+import { attachUnknownUpgradePathRejector } from "./websocket-upgrade";
 
 const CRASH_LOG_PATH = path.join(process.cwd(), ".crash_log.json");
 
@@ -43,6 +46,8 @@ try {
 
 const app = express();
 const httpServer = createServer(app);
+
+const httpRequestDrain = new HttpRequestDrainTracker();
 const clerkPublishableKey = resolveClerkEnvironmentPublishableKey({
   serverPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
   clientPublishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
@@ -58,6 +63,7 @@ declare module "http" {
   }
 }
 
+app.use(httpRequestDrain.middleware);
 app.use(helmet(createSecurityHeadersOptions()));
 
 app.get(CLERK_PROXY_READINESS_PATH, (_req, res) => {
@@ -180,31 +186,41 @@ function beginShutdown(exitCode: number, reason: string) {
   if (drainStarted) return; // idempotent — only the first caller drives the drain
   drainStarted = true;
   shuttingDown = true;
-  log(`${reason} — draining active tasks before exit`, "shutdown");
-  httpServer.close();
+  log(`${reason} — draining active requests, tasks, and collaboration connections`, "shutdown");
+  liveConnections.beginDrain();
+
+  let httpServerClosed = false;
+  httpServer.close((error) => {
+    if (error) {
+      log(`HTTP server close reported: ${error.message}`, "shutdown");
+    }
+    httpServerClosed = true;
+  });
 
   const hardTimeout = setTimeout(() => {
-    log("Drain timeout reached (30 s) — forcing exit", "shutdown");
-    process.exit(exitCode);
+    log(
+      `Drain timeout reached (30 s) — returning bounded failures for ${httpRequestDrain.activeCount} HTTP request(s) and terminating ${liveConnections.activeCount} live connection(s)`,
+      "shutdown",
+    );
+    httpRequestDrain.failActiveRequests();
+    liveConnections.terminateAll();
+    setTimeout(() => process.exit(exitCode), 150);
   }, 30_000);
-  hardTimeout.unref();
 
-  if (taskTracker.count() === 0) {
-    clearTimeout(hardTimeout);
-    log("No active tasks — exiting cleanly", "shutdown");
-    process.exit(exitCode);
-  }
-
-  log(`Waiting for ${taskTracker.count()} active task(s)...`, "shutdown");
   const poll = setInterval(() => {
-    const active = taskTracker.count();
-    if (active === 0) {
+    const activeTasks = taskTracker.count();
+    const activeRequests = httpRequestDrain.activeCount;
+    const activeConnections = liveConnections.activeCount;
+    if (httpServerClosed && activeTasks === 0 && activeRequests === 0 && activeConnections === 0) {
       clearInterval(poll);
       clearTimeout(hardTimeout);
-      log("All tasks drained — exiting", "shutdown");
+      log("All active requests, tasks, and collaboration connections drained — exiting", "shutdown");
       process.exit(exitCode);
     } else {
-      log(`Waiting for ${active} active task(s)...`, "shutdown");
+      log(
+        `Waiting for drain (http=${activeRequests}, tasks=${activeTasks}, live=${activeConnections}, serverClosed=${httpServerClosed})`,
+        "shutdown",
+      );
     }
   }, 500);
 }
@@ -223,6 +239,11 @@ function beginShutdown(exitCode: number, reason: string) {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
+
+  attachUnknownUpgradePathRejector(
+    httpServer,
+    process.env.NODE_ENV === "production" ? ["/ws"] : ["/ws", "/vite-hmr"],
+  );
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
@@ -274,3 +295,5 @@ function beginShutdown(exitCode: number, reason: string) {
     beginShutdown(0, "SIGTERM received");
   });
 })();
+
+const liveConnections = new LiveConnectionTracker();
