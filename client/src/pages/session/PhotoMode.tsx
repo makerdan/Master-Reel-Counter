@@ -27,7 +27,7 @@ import {
   Sheet, SheetContent,
 } from "@/components/ui/sheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
+import { createEntryOperationId, createEntryWithOfflineFallback } from "@/lib/offlineEntryCreate";
 import { saveToQueue } from "@/lib/offlineQueue";
 import { useUpload } from "@/hooks/use-upload";
 import type { UploadResponse } from "@/hooks/use-upload";
@@ -1533,6 +1533,27 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
     );
   }, []);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const { placeholderId, realId, sessionId: eventSessionId, pinId } = (
+        event as CustomEvent<{
+          placeholderId: number;
+          realId: number;
+          sessionId: number;
+          pinId?: number;
+        }>
+      ).detail;
+      if (eventSessionId !== sessionId) return;
+      setCommittedPins((prev) => prev.map((pin) =>
+        pin.entryId === placeholderId
+          ? { ...pin, entryId: realId, dbId: pinId ?? pin.dbId }
+          : pin,
+      ));
+    };
+    window.addEventListener("reelcounter:entry-synced", handler);
+    return () => window.removeEventListener("reelcounter:entry-synced", handler);
+  }, [sessionId]);
+
   const createEntries = useMutation({
     mutationFn: async ({ overwrite = false }: { overwrite?: boolean } = {}) => {
       const allPins = [...localPinsRef.current];
@@ -1586,7 +1607,21 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
           const noteParts: string[] = [];
           if (isDetail) noteParts.push(`From detail shot: ${currentPhoto?.filename || "detail"}`);
           if (pin.aliasUsed) noteParts.push(`Alias: ${pin.aliasUsed}`);
-          const { entry, queued: entryQueued } = await withRetry(async () => {
+          const operationId = createEntryOperationId();
+          const pinCommit = pinPhotoId ? {
+            photoId: pinPhotoId,
+            draftClientId: pin.draftClientId || pin.id,
+            xPercent: pin.x,
+            yPercent: pin.y,
+            label: pin.label,
+            reelCount: pin.reelCount,
+            wireDetails: pin.wireDetails || null,
+            vendorCode: pin.vendorCode || null,
+            footage: pin.footage || null,
+            flagged: false,
+            flagReason: null,
+          } : undefined;
+          const { entry } = await withRetry(async () => {
             return await createEntryWithOfflineFallback(sessionId, {
               aisle: entryAisle,
               section: entrySection,
@@ -1597,36 +1632,11 @@ export default function PhotoMode({ sessionId, photos, navigateToPhotoId, naviga
               reelCount: pin.reelCount,
               photoId: entryPhotoId || undefined,
               notes: noteParts.length > 0 ? noteParts.join(" | ") : undefined,
-            }, identityId);
+              ...(pinCommit ? { pinCommit } : {}),
+            }, identityId, operationId);
           });
-          if (pinPhotoId && !entryQueued) {
-            try {
-              const savedPin = await withRetry(async () => {
-                const pinRes = await apiRequest("POST", `/api/photos/${pinPhotoId}/pins`, {
-                  xPercent: pin.x,
-                  yPercent: pin.y,
-                  label: pin.label,
-                  reelCount: pin.reelCount,
-                  entryId: entry.id,
-                  wireDetails: pin.wireDetails || null,
-                  vendorCode: pin.vendorCode || null,
-                  footage: pin.footage || null,
-                  flagged: false,
-                });
-                return await pinRes.json();
-              });
-              (pin as any)._dbPinId = savedPin.id;
-            } catch (pinErr: any) {
-              const pinErrMsg: string = pinErr?.message || "";
-              console.error(`Failed to create pin for entry ${entry.id}, rolling back entry:`, pinErr);
-              try { await apiRequest("DELETE", `/api/entries/${entry.id}`); } catch (deleteErr) {
-                console.error(`Failed to roll back entry ${entry.id} after pin creation failure:`, deleteErr);
-              }
-              if (/already exists/i.test(pinErrMsg)) {
-                throw new Error("pin-label-taken");
-              }
-              throw new Error("pin-creation-failed");
-            }
+          if (typeof entry.committedPinId === "number") {
+            (pin as any)._dbPinId = entry.committedPinId;
           }
           (pin as any)._entryId = entry.id;
           completed++;

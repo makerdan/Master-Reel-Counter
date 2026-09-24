@@ -4,7 +4,7 @@
  * unsynced offline items must show a warning dialog. After cancelling and
  * clearing the queue the pending-count badge must return to 0 (or hide).
  */
-import { BASE_URL, test, expect, createSessionViaApi } from "./fixtures";
+import { BASE_URL, test, expect, createSessionViaApi, uploadTestPhoto } from "./fixtures";
 
 const protectedPaths = (sessionId: number) => [
   `/api/sessions/${sessionId}`,
@@ -551,5 +551,114 @@ test.describe("offline queue warning @offline-queue", () => {
       const count = parseInt((await pendingCountEl.textContent()) ?? "0", 10);
       expect(count, "Pending-count badge must be 0 after queue is cleared").toBe(0);
     }
+  });
+
+  test("replays a lost entry response once and commits its intended photo pin", async ({
+    page,
+    request,
+    cleanupIds,
+  }) => {
+    const sess = await createSessionViaApi(request, `Offline Entry Replay ${Date.now()}`);
+    cleanupIds.push(sess.id);
+    const photo = await uploadTestPhoto(request, sess.id);
+    if (!photo) {
+      test.skip(true, "Photo upload unavailable in this environment");
+      return;
+    }
+
+    const draftClientId = `offline-entry-pin-${Date.now()}`;
+    const draftResponse = await request.post(`/api/photos/${photo.id}/pins`, {
+      data: {
+        xPercent: 32,
+        yPercent: 67,
+        label: "77",
+        reelCount: 1,
+        wireDetails: "TC1241000",
+        vendorCode: "COP",
+        footage: 1000,
+        draftClientId,
+      },
+    });
+    expect(draftResponse.ok(), `draft pin creation failed: ${await draftResponse.text()}`).toBe(true);
+
+    await page.goto("/");
+    await expect(page.locator('[data-testid="text-dashboard-title"]')).toBeVisible();
+    const userId = await page.evaluate(async () => {
+      const response = await fetch("/api/auth/user", { credentials: "same-origin" });
+      if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
+      return (await response.json()).id as string;
+    });
+
+    let attempts = 0;
+    let originalEntryId: number | undefined;
+    let replayStatus: number | undefined;
+    const operationIds: string[] = [];
+    await page.route(`**/api/sessions/${sess.id}/entries`, async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      attempts++;
+      operationIds.push(route.request().headers()["idempotency-key"] || "");
+      if (attempts === 1) {
+        const committedResponse = await route.fetch();
+        expect(committedResponse.ok(), `initial entry POST failed: ${await committedResponse.text()}`).toBe(true);
+        originalEntryId = (await committedResponse.json()).id;
+        await route.abort("connectionreset");
+        return;
+      }
+      const replayResponse = await route.fetch();
+      replayStatus = replayResponse.status();
+      await route.fulfill({ response: replayResponse });
+    });
+
+    const queued = await page.evaluate(async ({ sessionId, userId, photoId, draftClientId }) => {
+      const modulePath = "/src/lib/offlineEntryCreate.ts";
+      const offlineEntryCreate = await import(modulePath);
+      return offlineEntryCreate.createEntryWithOfflineFallback(sessionId, {
+        aisle: "A",
+        section: "1",
+        position: "77",
+        reelTag: "TC1241000",
+        manufacturer: "COP",
+        footage: 1000,
+        reelCount: 1,
+        photoId,
+        pinCommit: {
+          photoId,
+          draftClientId,
+          xPercent: 32,
+          yPercent: 67,
+          label: "77",
+          reelCount: 1,
+          wireDetails: "TC1241000",
+          vendorCode: "COP",
+          footage: 1000,
+          flagged: false,
+          flagReason: null,
+        },
+      }, userId);
+    }, { sessionId: sess.id, userId, photoId: photo.id, draftClientId });
+
+    expect(queued.queued).toBe(true);
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await expect.poll(() => attempts, { timeout: 15_000 }).toBe(2);
+    await expect.poll(() => replayStatus, { timeout: 15_000 }).toBe(200);
+
+    const entriesResponse = await request.get(`/api/sessions/${sess.id}/entries`);
+    expect(entriesResponse.ok()).toBe(true);
+    const entries = await entriesResponse.json();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].id).toBe(originalEntryId);
+
+    const pinsResponse = await request.get(`/api/photos/${photo.id}/pins`);
+    expect(pinsResponse.ok()).toBe(true);
+    const pins = await pinsResponse.json();
+    expect(pins).toHaveLength(1);
+    expect(pins[0].draftClientId).toBe(draftClientId);
+    expect(pins[0].entryId).toBe(originalEntryId);
+    expect(operationIds).toHaveLength(2);
+    expect(operationIds[0]).toBeTruthy();
+    expect(operationIds[1]).toBe(operationIds[0]);
   });
 });

@@ -49,10 +49,15 @@ export interface QueuedEntry {
   failureReason?: string;
 }
 
-export function dispatchEntrySynced(placeholderId: number, realId: number, sessionId: number): void {
+export function dispatchEntrySynced(
+  placeholderId: number,
+  realId: number,
+  sessionId: number,
+  pinId?: number,
+): void {
   window.dispatchEvent(
     new CustomEvent("reelcounter:entry-synced", {
-      detail: { placeholderId, realId, sessionId },
+      detail: { placeholderId, realId, sessionId, pinId },
     }),
   );
 }

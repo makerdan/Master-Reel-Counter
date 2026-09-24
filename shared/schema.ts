@@ -141,6 +141,7 @@ export const entries = pgTable("entries", {
   aisle: text("aisle").notNull(),
   section: text("section").notNull(),
   position: text("position"),
+  clientOperationId: varchar("client_operation_id", { length: 128 }),
   palletId: text("pallet_id"),
   reelTag: text("reel_tag"),
   wireType: text("wire_type"),
@@ -156,6 +157,11 @@ export const entries = pgTable("entries", {
 }, (table) => [
   index("entries_session_id_idx").on(table.sessionId),
   index("entries_photo_id_idx").on(table.photoId),
+  uniqueIndex("entries_session_user_operation_id_unique").on(
+    table.sessionId,
+    table.userId,
+    table.clientOperationId,
+  ),
 ]);
 
 // Pins are positioned markers overlaid on a photo (xPercent/yPercent are 0–100

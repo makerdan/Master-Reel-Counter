@@ -22,7 +22,12 @@ test.describe("pin label → entry position field @pin-position", () => {
     request,
     cleanupIds,
   }) => {
-    const sess = await createSessionViaApi(request, `Position API ${Date.now()}`);
+    const sess = await createSessionViaApi(
+      request,
+      `Position Scanner ${Date.now()}`,
+    );
+
+    const operationId = `entry-operation-${Date.now()}`;
     cleanupIds.push(sess.id);
 
     const res = await request.post(`/api/sessions/${sess.id}/entries`, {
@@ -46,13 +51,7 @@ test.describe("pin label → entry position field @pin-position", () => {
 
   /**
    * LabelScannerTab commit path: when the user commits a draft pin from the
-   * AI Label Scanner, the POST /api/sessions/:id/entries body must include
-   * `position` set to the pin's label number (as a string).
-   *
-   * The draft pin is seeded with wireDetails/vendorCode/footage so that
-   * applyPinSeed populates editCatalog/editVendor/editFootage without needing
-   * an actual scan result — the card is immediately committable after the
-   * (mocked) analysis completes.
+   * AI Label Scanner, the POST body must include the pin label as position.
    */
   test("LabelScannerTab commit sends pin label as position", async ({
     page,
@@ -63,6 +62,7 @@ test.describe("pin label → entry position field @pin-position", () => {
       request,
       `Position Scanner ${Date.now()}`,
     );
+
     cleanupIds.push(sess.id);
 
     const photo = await uploadTestPhoto(request, sess.id);
@@ -147,5 +147,56 @@ test.describe("pin label → entry position field @pin-position", () => {
       (capturedEntryBody as any)?.position,
       "entries POST body must include position equal to the pin label (regression: was '' or absent)",
     ).toBe("42");
+  });
+
+  test("repeated entry POSTs with one idempotency key return the original entry", async ({
+    request,
+    cleanupIds,
+  }) => {
+    const sess = await createSessionViaApi(
+      request,
+      `Position Scanner ${Date.now()}`,
+    );
+    cleanupIds.push(sess.id);
+
+    const operationId = `entry-operation-${Date.now()}`;
+    const payload = {
+      aisle: "22",
+      section: "46",
+      position: "42",
+      reelTag: "IDEMPOTENT-ENTRY",
+      footage: 1000,
+      reelCount: 1,
+    };
+    const headers = { "Idempotency-Key": operationId };
+
+    const firstResponse = await request.post(
+      `/api/sessions/${sess.id}/entries`,
+      { headers, data: payload },
+    );
+    expect(
+      firstResponse.ok(),
+      `initial entries POST failed: ${await firstResponse.text()}`,
+    ).toBe(true);
+    const firstEntry = await firstResponse.json();
+
+    const retryResponse = await request.post(
+      `/api/sessions/${sess.id}/entries`,
+      { headers, data: payload },
+    );
+    expect(
+      retryResponse.ok(),
+      `repeated entries POST failed: ${await retryResponse.text()}`,
+    ).toBe(true);
+    const retriedEntry = await retryResponse.json();
+    expect(retriedEntry.id).toBe(firstEntry.id);
+
+    const entriesResponse = await request.get(
+      `/api/sessions/${sess.id}/entries`,
+    );
+    expect(entriesResponse.ok()).toBe(true);
+    const entries = await entriesResponse.json();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].id).toBe(firstEntry.id);
   });
 });

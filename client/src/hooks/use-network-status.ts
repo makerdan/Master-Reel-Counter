@@ -137,7 +137,10 @@ export function useNetworkStatus(currentUserId?: string, identityAliases: readon
         try {
           const res = await fetch(`/api/sessions/${entry.sessionId}/entries`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": entry.id,
+            },
             body: JSON.stringify(entry.data),
             credentials: "include",
             signal: abortController.signal,
@@ -154,11 +157,24 @@ export function useNetworkStatus(currentUserId?: string, identityAliases: readon
             // Item deleted from IDB — the inFlight flag goes with it.
             await removeEntryFromQueue(entry.id, currentUserId);
             if (entry.placeholderId != null && created?.id != null) {
-              dispatchEntrySynced(entry.placeholderId, created.id, entry.sessionId);
+              dispatchEntrySynced(
+                entry.placeholderId,
+                created.id,
+                entry.sessionId,
+                typeof created.committedPinId === "number" ? created.committedPinId : undefined,
+              );
             }
             queryClient.invalidateQueries({
               queryKey: ["/api/sessions", entry.sessionId.toString(), "entries"],
             });
+            if (typeof created?.committedPinId === "number") {
+              queryClient.invalidateQueries({
+                queryKey: ["/api/sessions", entry.sessionId.toString(), "pins"],
+              });
+              queryClient.invalidateQueries({
+                queryKey: ["/api/sessions", entry.sessionId.toString(), "incomplete-pins"],
+              });
+            }
           } else if (res.status === 401) {
             // Session expired — retrying won't help. Force re-auth and keep
             // the item in the queue for the next authenticated session.

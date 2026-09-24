@@ -8,6 +8,12 @@ export interface OfflineEntryResult {
   placeholderId?: number;
 }
 
+export function createEntryOperationId(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `entry-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 function isNetworkFailure(err: unknown): boolean {
   if (!navigator.onLine) return true;
   if (err instanceof TypeError) {
@@ -49,19 +55,21 @@ export async function createEntryWithOfflineFallback(
   sessionId: number,
   data: Record<string, unknown>,
   userId?: string,
+  operationId = createEntryOperationId(),
 ): Promise<OfflineEntryResult> {
   if (!navigator.onLine) {
     if (!userId) {
       throw new Error("Cannot queue an offline entry without an authenticated application identity");
     }
-    const id = `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const placeholderId = nextPlaceholderId();
-    await saveEntryToQueue({ id, sessionId, userId, data, createdAt: Date.now(), placeholderId });
+    await saveEntryToQueue({ id: operationId, sessionId, userId, data, createdAt: Date.now(), placeholderId });
     return { entry: { ...data, id: placeholderId, sessionId }, queued: true, placeholderId };
   }
 
   try {
-    const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, data);
+    const res = await apiRequest("POST", `/api/sessions/${sessionId}/entries`, data, {
+      headers: { "Idempotency-Key": operationId },
+    });
     const entry = await res.json();
     return { entry, queued: false };
   } catch (err) {
@@ -69,9 +77,8 @@ export async function createEntryWithOfflineFallback(
       if (!userId) {
         throw new Error("Cannot queue an offline entry without an authenticated application identity");
       }
-      const id = `entry-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const placeholderId = nextPlaceholderId();
-      await saveEntryToQueue({ id, sessionId, userId, data, createdAt: Date.now(), placeholderId });
+      await saveEntryToQueue({ id: operationId, sessionId, userId, data, createdAt: Date.now(), placeholderId });
       return { entry: { ...data, id: placeholderId, sessionId }, queued: true, placeholderId };
     }
     throw err;

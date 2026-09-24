@@ -26,7 +26,7 @@ import {
   registerObjectStorageRoutes,
 } from "./replit_integrations/object_storage";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry, UNREADABLE_SENTINEL } from "./encryption";
 import multer from "multer";
@@ -570,9 +570,24 @@ interface EntryCreateBody {
   notes?: string;
   reelTag?: string;
   photoId?: number;
+  position?: string;
   unitType?: string;
+  pinCommit?: EntryPinCommit;
 }
 
+interface EntryPinCommit {
+  photoId: number;
+  draftClientId: string;
+  xPercent: number;
+  yPercent: number;
+  label?: string | null;
+  reelCount?: number;
+  wireDetails?: string | null;
+  vendorCode?: string | null;
+  footage?: number | null;
+  flagged?: boolean;
+  flagReason?: string | null;
+}
 /** Body shape for POST /api/photos/:photoId/pins */
 interface PinCreateBody {
   x?: number;
@@ -1960,15 +1975,119 @@ export async function registerRoutes(
       const lockMsg = checkLocked(access.session, access.role);
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
+      if (!r.body || typeof r.body !== "object" || Array.isArray(r.body)) {
+        return res.status(400).json({ message: "Entry data must be an object" });
+      }
+      const operationId = r.get("Idempotency-Key");
+      if (operationId !== undefined && !/^[A-Za-z0-9._:-]{1,128}$/.test(operationId)) {
+        return res.status(400).json({ message: "Invalid Idempotency-Key" });
+      }
+      const pinCommitResult = r.body.pinCommit === undefined
+        ? undefined
+        : entryPinCommitSchema.safeParse(r.body.pinCommit);
+      if (pinCommitResult && !pinCommitResult.success) {
+        return res.status(400).json({ message: "Invalid pin commit data" });
+      }
+      const pinCommit = pinCommitResult?.success ? pinCommitResult.data : undefined;
+      if (pinCommit && !operationId) {
+        return res.status(400).json({ message: "Idempotency-Key is required to commit an entry pin" });
+      }
+      const { pinCommit: _pinCommit, ...entryBody } = r.body;
+
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
-      const { entry, encKey } = await db.transaction(async (tx) => {
+      const { entry, encKey, created, committedPinId } = await db.transaction(async (tx) => {
         await acquireSharedEncodingLock(tx, lk1, lk2);
         const key = await getEncryptionKey(access.session.userId);
-        let rawData: any = { ...r.body, sessionId: access.session.id, userId };
-        if (key) rawData = encryptEntry(rawData, key) as any;
-        const parsed = insertEntrySchema.parse(rawData);
-        const [inserted] = await tx.insert(entries).values(parsed).returning();
-        return { entry: inserted, encKey: key };
+        let entry = operationId
+          ? (await tx.select().from(entries).where(and(
+              eq(entries.sessionId, access.session.id),
+              eq(entries.userId, userId),
+              eq(entries.clientOperationId, operationId),
+            )).limit(1))[0]
+          : undefined;
+        let created = false;
+
+        if (!entry) {
+          let rawData: any = {
+            ...entryBody,
+            sessionId: access.session.id,
+            userId,
+            clientOperationId: operationId ?? null,
+          };
+          if (key) rawData = encryptEntry(rawData, key) as any;
+          const parsed = insertEntrySchema.parse(rawData);
+          const insertedRows = operationId
+            ? await tx.insert(entries).values(parsed).onConflictDoNothing({
+                target: [entries.sessionId, entries.userId, entries.clientOperationId],
+              }).returning()
+            : await tx.insert(entries).values(parsed).returning();
+          entry = insertedRows[0];
+          created = !!entry;
+          if (!entry && operationId) {
+            entry = (await tx.select().from(entries).where(and(
+              eq(entries.sessionId, access.session.id),
+              eq(entries.userId, userId),
+              eq(entries.clientOperationId, operationId),
+            )).limit(1))[0];
+          }
+          if (!entry) throw new Error("ENTRY_OPERATION_CONFLICT");
+        }
+
+        let committedPinId: number | undefined;
+        if (pinCommit) {
+          const [pinPhoto] = await tx.select({ id: photos.id }).from(photos).where(and(
+            eq(photos.id, pinCommit.photoId),
+            eq(photos.sessionId, access.session.id),
+          )).limit(1);
+          if (!pinPhoto) throw new Error("ENTRY_PIN_PHOTO_NOT_FOUND");
+
+          const pinValues = {
+            photoId: pinPhoto.id,
+            entryId: entry.id,
+            draftClientId: pinCommit.draftClientId,
+            xPercent: pinCommit.xPercent,
+            yPercent: pinCommit.yPercent,
+            label: pinCommit.label ?? null,
+            reelCount: pinCommit.reelCount ?? 1,
+            wireDetails: pinCommit.wireDetails ?? null,
+            vendorCode: pinCommit.vendorCode ?? null,
+            footage: pinCommit.footage ?? null,
+            flagged: pinCommit.flagged ?? false,
+            flagReason: pinCommit.flagReason ?? null,
+            updatedAt: new Date(),
+          };
+          const [savedPin] = await tx.insert(pins).values(pinValues).onConflictDoUpdate({
+            target: [pins.photoId, pins.draftClientId],
+            set: {
+              entryId: entry.id,
+              xPercent: pinValues.xPercent,
+              yPercent: pinValues.yPercent,
+              label: pinValues.label,
+              reelCount: pinValues.reelCount,
+              wireDetails: pinValues.wireDetails,
+              vendorCode: pinValues.vendorCode,
+              footage: pinValues.footage,
+              flagged: pinValues.flagged,
+              flagReason: pinValues.flagReason,
+              updatedAt: pinValues.updatedAt,
+            },
+            setWhere: or(isNull(pins.entryId), eq(pins.entryId, entry.id)),
+          }).returning({ id: pins.id });
+          if (savedPin) {
+            committedPinId = savedPin.id;
+          } else {
+            const [existingPin] = await tx.select({ id: pins.id, entryId: pins.entryId }).from(pins).where(and(
+              eq(pins.photoId, pinPhoto.id),
+              eq(pins.draftClientId, pinCommit.draftClientId),
+            )).limit(1);
+            if (!existingPin || existingPin.entryId !== entry.id) {
+              throw new Error("ENTRY_PIN_ALREADY_COMMITTED");
+            }
+            committedPinId = existingPin.id;
+          }
+        }
+
+        return { entry, encKey: key, created, committedPinId };
       });
       if (entry.photoId) {
         try {
@@ -1977,15 +2096,32 @@ export async function registerRoutes(
           console.error("Non-fatal: failed to resolve parent pin for detail shot", resolveErr);
         }
       }
-      await storage.updateSession(access.session.id, {});
+      if (created) await storage.updateSession(access.session.id, {});
       const result = encKey ? decryptEntry(entry, encKey) : entry;
-      const username = r.user.claims.first_name || r.user.claims.email || userId;
-      logActivity(access.session.id, userId, username, "entry_created", "entry", entry.id, result.reelTag || undefined);
+      if (created) {
+        const username = r.user.claims.first_name || r.user.claims.email || userId;
+        logActivity(access.session.id, userId, username, "entry_created", "entry", entry.id, result.reelTag || undefined);
+      }
       broadcastToSession(access.session.id, { type: "sync", entity: "entries", sessionId: access.session.id });
-      res.json(result);
+      if (pinCommit) {
+        broadcastToSession(access.session.id, { type: "sync", entity: "pins", sessionId: access.session.id });
+      }
+      res.json(committedPinId === undefined ? result : { ...result, committedPinId });
     } catch (error) {
       if (error instanceof Error && error.message === "ENCODING_TOGGLE_IN_PROGRESS") {
         return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
+      }
+      if (error instanceof Error && error.message === "ENTRY_PIN_PHOTO_NOT_FOUND") {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+      if (error instanceof Error && error.message === "ENTRY_PIN_ALREADY_COMMITTED") {
+        return res.status(409).json({ message: "The pin is already committed to another entry" });
+      }
+      if (
+        (error as any)?.code === "23505" &&
+        (error as any)?.constraint === "pins_photo_label_unique"
+      ) {
+        return res.status(409).json({ message: "A pin with that label already exists on this photo" });
       }
       console.error("Error creating entry:", error);
       res.status(500).json({ message: "Failed to create entry" });
@@ -7742,3 +7878,17 @@ export function respondWithScanResultsPersistenceFailure(
 ): ReturnType<ExpressResponse["status"]> {
   return res.status(503).json(SCAN_RESULTS_PERSISTENCE_ERROR);
 }
+
+const entryPinCommitSchema = z.object({
+  photoId: z.number().int().positive(),
+  draftClientId: z.string().min(1).max(128),
+  xPercent: z.number().min(0).max(100),
+  yPercent: z.number().min(0).max(100),
+  label: z.string().max(128).nullable().optional(),
+  reelCount: z.number().int().positive().optional(),
+  wireDetails: z.string().nullable().optional(),
+  vendorCode: z.string().nullable().optional(),
+  footage: z.number().int().nullable().optional(),
+  flagged: z.boolean().optional(),
+  flagReason: z.string().nullable().optional(),
+}).strict();
