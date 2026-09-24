@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { chmodSync, closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
-import { dirname, join } from "path";
+import { delimiter, dirname, join } from "path";
 import { spawnSync } from "child_process";
 import { loadTiers } from "../lib/tiers.mjs";
 import { findExactRecord, isReferenceable, loadCatalog, maintenanceFindings } from "../lib/baseline.mjs";
@@ -215,6 +215,73 @@ test("manifest parity requires exactly one high-severity security audit", () => 
   });
   assert.equal(duplicated.status, 1);
   assert.match(duplicated.stderr, /exactly one security-audit step/);
+});
+
+test("release validation entry point runs the registered high-severity audit without live advisories", () => {
+  const packageJson = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  assert.equal(packageJson.scripts["test-heavy"], "node scripts/run-tier.mjs test-heavy --allow-no-plan");
+
+  const manifest = JSON.parse(readFileSync(join(ROOT, "docs/validation/manifest.json"), "utf8"));
+  const heavyTier = manifest.tiers["test-heavy"];
+  const auditSteps = heavyTier.steps.filter((step) => step.name === "security-audit");
+  assert.equal(auditSteps.length, 1, "release validation must register exactly one security audit");
+  assert.equal(auditSteps[0].kind, "audit");
+  assert.deepEqual(auditSteps[0].command, ["npm", "audit", "--audit-level=high"]);
+
+  const dir = mkdtempSync(join(tmpdir(), "failure-gate-release-audit-"));
+  try {
+    const binDir = join(dir, "bin");
+    mkdirSync(binDir);
+    const manifestPath = join(dir, "manifest.json");
+    const auditLogPath = join(dir, "audit-invocations.log");
+    const fixtureManifest = structuredClone(manifest);
+    fixtureManifest.tiers["test-heavy"] = {
+      ...heavyTier,
+      resource: `failure-gate-audit-${process.pid}`,
+      priority: 1,
+      timeoutMs: 15_000,
+      steps: heavyTier.steps.map((step) => step.name === "security-audit"
+        ? step
+        : { ...step, command: [process.execPath, "-e", "process.exit(0)"] }),
+    };
+    writeFileSync(manifestPath, JSON.stringify(fixtureManifest));
+
+    const npmShimPath = join(binDir, "npm");
+    writeFileSync(npmShimPath, [
+      "#!/bin/sh",
+      'printf "%s\\n" "$*" >> "$AUDIT_FIXTURE_LOG"',
+      'if [ "$#" -eq 2 ] && [ "$1" = "audit" ] && [ "$2" = "--audit-level=high" ]; then exit 0; fi',
+      'echo "Unexpected npm invocation: $*" >&2',
+      "exit 91",
+      "",
+    ].join("\n"));
+    chmodSync(npmShimPath, 0o755);
+
+    const npmPath = process.env.PATH.split(delimiter)
+      .map((directory) => join(directory, "npm"))
+      .find((candidate) => existsSync(candidate));
+    assert.ok(npmPath, "the release validation fixture requires npm");
+    const result = spawnSync(npmPath, ["run", "test-heavy"], {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        TASK_PLAN_FILE: "",
+        VALIDATION_MANIFEST_PATH: manifestPath,
+        AUDIT_FIXTURE_LOG: auditLogPath,
+        PATH: `${binDir}${delimiter}${process.env.PATH}`,
+      },
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /\[validation\] Step: security-audit/);
+    assert.match(result.stdout, /\[validation\] Command: npm audit --audit-level=high/);
+    assert.match(result.stdout, /\[validation\] PASS: security-audit/);
+    assert.equal(readFileSync(auditLogPath, "utf8"), "audit --audit-level=high\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("manifest parity rejects missing, extra, and malformed tiers", () => {
