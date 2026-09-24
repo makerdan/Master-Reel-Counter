@@ -25,6 +25,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import * as databaseSchema from "@shared/schema";
 import express from "express"
 ;
+import multer from "multer";
+import { createApiErrorHandler } from "../middlewares/apiErrorHandler.js";
 
 import helmet from "helmet"
 ;
@@ -1484,6 +1486,96 @@ async function closeHttpServer(server: http.Server): Promise<void> {
     server.close((error) => (error ? reject(error) : resolve())),
   );
 }
+
+describe("global API error response contract", () => {
+  const diagnostics: unknown[] = [];
+  let server: http.Server;
+  let baseUrl: string;
+
+  before(async () => {
+    const app = express();
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 1 },
+    });
+
+    app.use(express.json());
+    app.post("/api/parser-error", (_req, res) => res.json({ ok: true }));
+    app.post("/api/upload-error", upload.single("file"), (_req, res) => res.json({ ok: true }));
+    app.post("/api/database-error", (_req, _res, next) => {
+      next(Object.assign(new Error("database password=private-db-secret"), {
+        code: "28P01",
+        status: 400,
+      }));
+    });
+    app.post("/api/provider-error", (_req, _res, next) => {
+      next(Object.assign(new Error("provider token=private-provider-secret"), {
+        statusCode: 502,
+      }));
+    });
+    app.use(createApiErrorHandler((error) => diagnostics.push(error)));
+
+    server = http.createServer(app);
+    baseUrl = await listenOnLoopback(server);
+  });
+
+  after(async () => {
+    await closeHttpServer(server);
+  });
+
+  test("returns a safe client error for malformed JSON", async () => {
+    const response = await fetch(`${baseUrl}/api/parser-error`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: '{"secret":"private-parser-secret"',
+    });
+    const body = await response.text();
+
+    assert.equal(response.status, 400);
+    assert.equal(body, JSON.stringify({ message: "Invalid JSON request body." }));
+    assert.doesNotMatch(body, /private-parser-secret|secret/);
+    assert.equal(diagnostics.length, 1);
+  });
+
+  test("classifies upload middleware size failures without exposing details", async () => {
+    const form = new FormData();
+    form.append("file", new Blob(["private-upload-secret"]), "photo.png");
+    const response = await fetch(`${baseUrl}/api/upload-error`, {
+      method: "POST",
+      body: form,
+    });
+    const body = await response.text();
+
+    assert.equal(response.status, 413);
+    assert.equal(body, JSON.stringify({ message: "Uploaded file is too large." }));
+    assert.doesNotMatch(body, /private-upload-secret|MulterError|LIMIT_FILE_SIZE/);
+    assert.equal(diagnostics.length, 2);
+  });
+
+  test("normalizes database-style errors and ignores their untrusted status", async () => {
+    const response = await fetch(`${baseUrl}/api/database-error`, { method: "POST" });
+    const body = await response.text();
+
+    assert.equal(response.status, 500);
+    assert.equal(body, JSON.stringify({ message: "Internal Server Error" }));
+    assert.doesNotMatch(body, /private-db-secret|28P01|password/);
+    assert.ok(diagnostics.some((error) =>
+      error instanceof Error && error.message.includes("private-db-secret"),
+    ));
+  });
+
+  test("normalizes provider-style errors without reflecting provider details", async () => {
+    const response = await fetch(`${baseUrl}/api/provider-error`, { method: "POST" });
+    const body = await response.text();
+
+    assert.equal(response.status, 500);
+    assert.equal(body, JSON.stringify({ message: "Internal Server Error" }));
+    assert.doesNotMatch(body, /private-provider-secret|provider token|502/);
+    assert.ok(diagnostics.some((error) =>
+      error instanceof Error && error.message.includes("private-provider-secret"),
+    ));
+  });
+});
 
 describe("production Clerk proxy lifecycle guards", () => {
   const originalSecretKey = process.env.CLERK_SECRET_KEY;
