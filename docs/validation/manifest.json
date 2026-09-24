@@ -57,6 +57,7 @@
         { "name": "startup-smoke-boundaries", "kind": "test", "command": ["node", "--test", "scripts/__tests__/github-actions-empty-database.test.mjs"] },
         { "name": "security-audit", "kind": "audit", "command": ["npm", "audit", "--audit-level=high"] },
         { "name": "schema-check", "kind": "lint", "command": ["node", "scripts/validate-schema.mjs"] },
+         { "name": "release-schema-contract", "kind": "test", "command": ["npm", "run", "test:managed-clerk-release-contract"] },
         { "name": "workspace-skill-contract", "kind": "test", "command": ["npm", "run", "test:workspace-skill"] },
         { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },

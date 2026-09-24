@@ -14,5 +14,6 @@ contract. Mixing the two can change tier semantics when only routine coverage
 was intended.
 
 **How to apply:** Add ordinary parity or safety checks to the appropriate
-manifest tier and cover the registration with a focused test. Regenerate the
-published archive only when its canonical source files change.
+manifest tier and cover the registration with a focused test. If the packaged
+tier registry changes, regenerate the published archive before running release
+contract tests; those tests fail closed on a stale snapshot.

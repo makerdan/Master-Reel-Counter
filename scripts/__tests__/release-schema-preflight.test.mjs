@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { Client } from "pg";
@@ -12,6 +12,10 @@ import {
   compareReleaseSchema,
   executeReviewedMigrations,
 } from "../release-schema-preflight.mjs";
+import {
+  validateMigrationSet,
+  validateSchemaWithDrizzle,
+} from "../validate-schema.mjs";
 import { createOwnedDatabase, dropOwnedDatabase } from "../release-smoke-database.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -72,6 +76,32 @@ const currentColumns = [
   "capabilities",
 ];
 
+function writeMigrationFixture(directory, tags, contents = {}) {
+  return Promise.all([
+    mkdir(resolve(directory, "meta"), { recursive: true }),
+    writeFile(
+      resolve(directory, "meta/_journal.json"),
+      JSON.stringify({
+        version: "7",
+        dialect: "postgresql",
+        entries: tags.map((tag, idx) => ({
+          idx,
+          version: "7",
+          when: idx + 1,
+          tag,
+          breakpoints: true,
+        })),
+      }),
+    ),
+    ...tags.map((tag) =>
+      writeFile(
+        resolve(directory, `${tag}.sql`),
+        contents[tag] ?? "CREATE TABLE contract_fixture (id integer);",
+      ),
+    ),
+  ]);
+}
+
 test("release target identity ignores credentials and equivalent URL spelling", () => {
   for (const releaseDatabaseUrl of [
     "postgresql://alice:one@DB/release",
@@ -87,6 +117,95 @@ test("release target identity ignores credentials and equivalent URL spelling", 
       }),
       /dedicated target distinct/,
     );
+  }
+});
+
+test("schema contract rejects a source that Drizzle cannot load", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "schema-contract-invalid-"));
+  const schemaPath = resolve(directory, "schema.ts");
+  try {
+    await writeFile(schemaPath, "// export is not a Drizzle schema\n");
+    assert.throws(
+      () => validateSchemaWithDrizzle({ schemaPath, cwd: root }),
+      /configured Drizzle schema could not be loaded|exported no PostgreSQL tables or types/,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("migration contract rejects malformed SQL instead of accepting non-empty text", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "migration-contract-malformed-"));
+  try {
+    await writeMigrationFixture(directory, ["0001_malformed"], {
+      "0001_malformed": "this is not SQL;",
+    });
+    assert.throws(
+      () =>
+        validateMigrationSet({
+          migrationsPath: directory,
+          journalPath: resolve(directory, "meta/_journal.json"),
+        }),
+      /unsupported or malformed SQL statement/,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("migration contract rejects duplicate journal identities", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "migration-contract-duplicate-"));
+  try {
+    await writeMigrationFixture(directory, ["0001_first"]);
+    await writeFile(
+      resolve(directory, "meta/_journal.json"),
+      JSON.stringify({
+        version: "7",
+        dialect: "postgresql",
+        entries: [
+          { idx: 0, version: "7", when: 1, tag: "0001_first", breakpoints: true },
+          { idx: 1, version: "7", when: 2, tag: "0001_first", breakpoints: true },
+        ],
+      }),
+    );
+    assert.throws(
+      () =>
+        validateMigrationSet({
+          migrationsPath: directory,
+          journalPath: resolve(directory, "meta/_journal.json"),
+        }),
+      /duplicate identity/,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("migration contract rejects journal order that moves backward", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "migration-contract-order-"));
+  try {
+    await writeMigrationFixture(directory, ["0001_first", "0002_second"]);
+    await writeFile(
+      resolve(directory, "meta/_journal.json"),
+      JSON.stringify({
+        version: "7",
+        dialect: "postgresql",
+        entries: [
+          { idx: 0, version: "7", when: 1, tag: "0002_second", breakpoints: true },
+          { idx: 1, version: "7", when: 2, tag: "0001_first", breakpoints: true },
+        ],
+      }),
+    );
+    assert.throws(
+      () =>
+        validateMigrationSet({
+          migrationsPath: directory,
+          journalPath: resolve(directory, "meta/_journal.json"),
+        }),
+      /journal order is not monotonic/,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });
 
