@@ -70,7 +70,7 @@ import {
   type PoeProvider,
   type PoeTextMessage,
 } from "./providers/poe";
-const pdfJobs = new Map<string, {
+export type PdfExportJob = {
   done: number;
   total: number;
   complete: boolean;
@@ -81,14 +81,75 @@ const pdfJobs = new Map<string, {
   completedAt?: number;
   userId: string;
   sessionId: number;
-}>();
+};
 
-function invalidatePdfJobs(sessionId: number, userId?: string): void {
-  for (const [jobId, job] of pdfJobs) {
-    if (job.sessionId === sessionId && (!userId || job.userId === userId)) {
-      pdfJobs.delete(jobId);
+const pdfJobs = new Map<string, PdfExportJob>();
+
+function removePdfJobs<T>(
+  jobs: Map<string, T>,
+  shouldRemove: (job: T) => boolean,
+): number {
+  let removed = 0;
+  for (const [jobId, job] of jobs) {
+    if (shouldRemove(job)) {
+      jobs.delete(jobId);
+      removed += 1;
     }
   }
+  return removed;
+}
+
+function invalidatePdfJobs(sessionId: number, userId?: string): void {
+  removePdfJobs(
+    pdfJobs,
+    (job) => job.sessionId === sessionId && (!userId || job.userId === userId),
+  );
+}
+
+export function invalidatePdfJobsForUser(
+  jobs: Map<string, PdfExportJob>,
+  userId: string,
+): number {
+  return removePdfJobs(jobs, (job) => job.userId === userId);
+}
+
+export type PdfJobDownloadResult =
+  | { kind: "not_found" }
+  | { kind: "not_ready" }
+  | { kind: "failed"; error: string }
+  | { kind: "ready"; buffer: Buffer; filename: string };
+
+export async function resolvePdfJobDownload(
+  jobs: Map<string, PdfExportJob>,
+  jobId: string,
+  routeSessionId: number,
+  userId: string,
+  accessChecker: (sessionId: number, userId: string) => Promise<unknown | null>,
+): Promise<PdfJobDownloadResult> {
+  const job = jobs.get(jobId);
+  const access = job && await getCurrentPdfJobAccess(
+    job,
+    routeSessionId,
+    userId,
+    accessChecker,
+  );
+  if (!access) {
+    if (job?.userId === userId && job.sessionId === routeSessionId) {
+      removePdfJobs(
+        jobs,
+        (candidate) => candidate.sessionId === routeSessionId && candidate.userId === userId,
+      );
+    }
+    return { kind: "not_found" };
+  }
+  if (!job.complete) return { kind: "not_ready" };
+  if (job.error) return { kind: "failed", error: job.error };
+  if (!job.buffer) return { kind: "failed", error: "No buffer" };
+  return {
+    kind: "ready",
+    buffer: job.buffer,
+    filename: job.filename || "export.pdf",
+  };
 }
 
 const pdfCleanupTimer = setInterval(() => {
@@ -804,6 +865,7 @@ export async function registerRoutes(
   });
 
   registerAuthorizationChangeHandler((userId, outcome) => {
+    invalidatePdfJobsForUser(pdfJobs, userId);
     evictUserSockets(userId, outcome);
   });
 
@@ -3542,28 +3604,23 @@ export async function registerRoutes(
   app.get("/api/sessions/:id/export/pdf/download/:jobId", isAuthenticated, async (req: any, res) => {
     const userId = resolveUserId(req as AuthenticatedRequest);
     const routeSessionId = parseInt(req.params.id);
-    const job = pdfJobs.get(req.params.jobId);
-    const access = job && await getCurrentPdfJobAccess(
-      job,
+    const result = await resolvePdfJobDownload(
+      pdfJobs,
+      req.params.jobId,
       routeSessionId,
       userId,
       (sessionId, candidateUserId) => verifySessionAccess(sessionId, candidateUserId, getTesterOwner(req as AuthenticatedRequest)),
     );
-    if (!access) {
-      if (job?.userId === userId && job.sessionId === routeSessionId) {
-        invalidatePdfJobs(routeSessionId, userId);
-      }
+    if (result.kind === "not_found") {
       return res.status(404).json({ error: "Job not found" });
     }
-    if (!job.complete) return res.status(202).json({ message: "Not ready" });
-    if (job.error) return res.status(500).json({ error: job.error });
-    if (!job.buffer) return res.status(500).json({ error: "No buffer" });
+    if (result.kind === "not_ready") return res.status(202).json({ message: "Not ready" });
+    if (result.kind === "failed") return res.status(500).json({ error: result.error });
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${job.filename || "export.pdf"}"`);
-    res.setHeader("Content-Length", job.buffer.length);
-    const buf = job.buffer;
+    res.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
+    res.setHeader("Content-Length", result.buffer.length);
     pdfJobs.delete(req.params.jobId);
-    res.send(buf);
+    res.send(result.buffer);
   });
 
   app.get("/api/sessions/:id/export/pdf", isAuthenticated, resourceRateLimiter, async (req: any, res) => {

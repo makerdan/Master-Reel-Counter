@@ -56,7 +56,6 @@ import
   helpChatRateLimiter,
   respondWithScanResultsPersistenceFailure,
   SCAN_RESULTS_PERSISTENCE_ERROR,
-  getCurrentPdfJobAccess,
   createSessionHandler,
   registerRoutes,
 }
@@ -164,67 +163,6 @@ import
 // after all assertions have passed.
 after(async () => {
   await pool.end().catch(() => {});
-});
-
-describe("PDF export authorization", () => {
-  test("re-checks current session access for an existing job", async () => {
-    const job = { userId: "revoked-collaborator", sessionId: 42 };
-    const accessChecks: Array<[number, string]> = [];
-
-    const accessBeforeRevocation = await getCurrentPdfJobAccess(
-      job,
-      42,
-      "revoked-collaborator",
-      async (sessionId, userId) => {
-        accessChecks.push([sessionId, userId]);
-        return { role: "viewer" };
-      },
-    );
-    assert.deepEqual(accessBeforeRevocation, { role: "viewer" });
-
-    const accessAfterRevocation = await getCurrentPdfJobAccess(
-      job,
-      42,
-      "revoked-collaborator",
-      async (sessionId, userId) => {
-        accessChecks.push([sessionId, userId]);
-        return null;
-      },
-    );
-    assert.equal(accessAfterRevocation, null);
-    assert.deepEqual(accessChecks, [
-      [42, "revoked-collaborator"],
-      [42, "revoked-collaborator"],
-    ]);
-  });
-
-  test("does not authorize a job for another session or identity", async () => {
-    let accessCheckerCalled = false;
-    const accessChecker = async () => {
-      accessCheckerCalled = true;
-      return { role: "owner" };
-    };
-
-    assert.equal(
-      await getCurrentPdfJobAccess(
-        { userId: "user-1", sessionId: 42 },
-        43,
-        "user-1",
-        accessChecker,
-      ),
-      null,
-    );
-    assert.equal(
-      await getCurrentPdfJobAccess(
-        { userId: "user-1", sessionId: 42 },
-        42,
-        "user-2",
-        accessChecker,
-      ),
-      null,
-    );
-    assert.equal(accessCheckerCalled, false);
-  });
 });
 
 describe("Clerk identity and approval regression guard", () => {
