@@ -2,25 +2,29 @@ import { appendFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { resolve } from "node:path";
 import { createServer as createViteServer } from "vite";
+import { createHmrOptions } from "../../vite-hmr.ts";
 
 const port = Number(process.env.PORT);
 const root = resolve(process.env.VITE_HMR_FIXTURE_ROOT);
 const stateFile = resolve(process.env.VITE_HMR_STATE_FILE);
+const previewHost = process.env.VITE_HMR_PREVIEW_HOST;
+const previewClientPort = Number(process.env.VITE_HMR_PREVIEW_PORT ?? "443");
+const listenHost = process.env.VITE_HMR_LISTEN_HOST ?? "127.0.0.1";
 
 if (!Number.isInteger(port) || !root || !stateFile) {
   throw new Error("VITE HMR fixture requires PORT, VITE_HMR_FIXTURE_ROOT, and VITE_HMR_STATE_FILE");
 }
 
 const httpServer = http.createServer();
+const hmr = previewHost
+  ? createHmrOptions(httpServer, previewHost, previewClientPort)
+  : { server: httpServer, path: "/vite-hmr" };
 const vite = await createViteServer({
   root,
   configFile: false,
   server: {
     middlewareMode: true,
-    hmr: {
-      server: httpServer,
-      path: "/vite-hmr",
-    },
+    hmr,
   },
   appType: "spa",
   logLevel: "error",
@@ -50,7 +54,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 await new Promise((resolvePromise, reject) => {
   httpServer.once("error", reject);
-  httpServer.listen(port, "127.0.0.1", resolvePromise);
+  httpServer.listen(port, listenHost, resolvePromise);
 });
 
 appendFileSync(
@@ -59,3 +63,4 @@ appendFileSync(
   "utf8",
 );
 writeFileSync(resolve(root, "server-id.js"), `export const serverPid = ${process.pid};\n`);
+console.log(`[vite-hmr-fixture] Server ready on port ${port}.`);

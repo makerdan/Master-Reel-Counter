@@ -4,6 +4,7 @@ import type { HmrOptions } from "vite";
 export function createHmrOptions(
   server: Server,
   replitDevDomain = process.env.REPLIT_DEV_DOMAIN,
+  clientPort = 443,
 ): HmrOptions {
   const sharedOptions: HmrOptions = {
     server,
@@ -18,6 +19,6 @@ export function createHmrOptions(
     ...sharedOptions,
     protocol: "wss",
     host: replitDevDomain,
-    clientPort: 443,
+    clientPort,
   };
 }
