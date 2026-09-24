@@ -593,6 +593,17 @@ test.describe("offline queue warning @offline-queue", () => {
     let originalEntryId: number | undefined;
     let replayStatus: number | undefined;
     const operationIds: string[] = [];
+    const sendThroughAuthenticatedContext = (route: import("@playwright/test").Route) => {
+      const requestToReplay = route.request();
+      const idempotencyKey = requestToReplay.headers()["idempotency-key"];
+      if (!idempotencyKey) {
+        throw new Error("Entry replay request is missing its idempotency key");
+      }
+      return request.post(requestToReplay.url(), {
+        data: requestToReplay.postDataJSON(),
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
+    };
     await page.route(`**/api/sessions/${sess.id}/entries`, async (route) => {
       if (route.request().method() !== "POST") {
         await route.continue();
@@ -601,15 +612,20 @@ test.describe("offline queue warning @offline-queue", () => {
       attempts++;
       operationIds.push(route.request().headers()["idempotency-key"] || "");
       if (attempts === 1) {
-        const committedResponse = await route.fetch();
+        // route.fetch() drops the working Clerk auth context in this request path.
+        const committedResponse = await sendThroughAuthenticatedContext(route);
         expect(committedResponse.ok(), `initial entry POST failed: ${await committedResponse.text()}`).toBe(true);
         originalEntryId = (await committedResponse.json()).id;
         await route.abort("connectionreset");
         return;
       }
-      const replayResponse = await route.fetch();
+      const replayResponse = await sendThroughAuthenticatedContext(route);
       replayStatus = replayResponse.status();
-      await route.fulfill({ response: replayResponse });
+      await route.fulfill({
+        status: replayResponse.status(),
+        headers: replayResponse.headers(),
+        body: await replayResponse.body(),
+      });
     });
 
     const queued = await page.evaluate(async ({ sessionId, userId, photoId, draftClientId }) => {

@@ -465,9 +465,21 @@ function sameLock(left, right) {
   );
 }
 
-function clearLock(expected) {
+function lockPathMatchesDescriptor(fd) {
+  if (fd === null) return false;
+  try {
+    const pathStat = statSync(LOCK_PATH);
+    const descriptorStat = fstatSync(fd);
+    return pathStat.dev === descriptorStat.dev && pathStat.ino === descriptorStat.ino;
+  } catch {
+    return false;
+  }
+}
+
+function clearLock(expected, ownerFd = null) {
   const current = readLock();
   if (!sameLock(current, expected)) return false;
+  if (ownerFd !== null && !lockPathMatchesDescriptor(ownerFd)) return false;
   try {
     unlinkSync(LOCK_PATH);
     return true;
@@ -506,16 +518,40 @@ function writeHeartbeat() {
       holderLockFd !== null &&
       lock?.kind === "valid" &&
       lock.pid === process.pid &&
-      lock.token === LOCK_TOKEN
+      lock.token === LOCK_TOKEN &&
+      lockPathMatchesDescriptor(holderLockFd)
     ) {
-       writeLockToFd(
-         holderLockFd,
-         lockContent(lock.acquiredAt, Date.now(), lock.ownership, lock.holderIdentity),
-       );
+      writeLockToFd(
+        holderLockFd,
+        lockContent(lock.acquiredAt, Date.now(), lock.ownership, lock.holderIdentity),
+      );
+      return true;
     }
   } catch {
-    // A transient heartbeat write failure is handled by the stale recovery path.
+    // The caller stops protected work when a heartbeat cannot be persisted.
   }
+  return false;
+}
+
+function hasCurrentLockOwnership() {
+  const lock = readLock();
+  return (
+    holderLockFd !== null &&
+    lock?.kind === "valid" &&
+    lock.pid === process.pid &&
+    lock.token === LOCK_TOKEN &&
+    lockPathMatchesDescriptor(holderLockFd)
+  );
+}
+
+function reportLockOwnershipLost() {
+  if (lockOwnershipLost) return;
+  lockOwnershipLost = true;
+  clearInterval(heartbeatTimer);
+  console.error(
+    `[serial-lock] ERROR: lock ownership lost for resource '${RESOURCE}'; ` +
+    "heartbeat update failed. Stopping protected work.",
+  );
 }
 
 function updateOwnership(ownership) {
@@ -809,18 +845,42 @@ unlinkSync(attestationPath);
 process.env[ATTESTATION_FD_ENV] = "3";
 process.env[HELD_FD_ENV] = String(attestationFd);
 
-let heartbeatTimer = setInterval(writeHeartbeat, HEARTBEAT_INTERVAL_MS);
+let lockOwnershipLost = false;
+let heartbeatTimer;
+heartbeatTimer = setInterval(() => {
+  if (writeHeartbeat()) return;
+  reportLockOwnershipLost();
+  void terminateChild("lock ownership lost (heartbeat update failed)");
+}, HEARTBEAT_INTERVAL_MS);
 heartbeatTimer.unref();
 let released = false;
 function release() {
-  if (released) return;
+  if (released) return !lockOwnershipLost;
   released = true;
   clearInterval(heartbeatTimer);
   const lock = readLock();
-  if (lock?.kind === "valid" && lock.pid === process.pid && lock.token === LOCK_TOKEN) {
-    if (clearLock(lock)) {
+  let releasedOwnedLock = false;
+  if (
+    lock?.kind === "valid" &&
+    lock.pid === process.pid &&
+    lock.token === LOCK_TOKEN &&
+    lockPathMatchesDescriptor(holderLockFd)
+  ) {
+    if (clearLock(lock, holderLockFd)) {
       console.log(`[serial-lock] PID ${process.pid} released lock for resource '${RESOURCE}'.`);
+      releasedOwnedLock = true;
+    } else {
+      reportLockOwnershipLost();
+      console.error(
+        `[serial-lock] WARNING: unable to safely remove lock state for resource '${RESOURCE}'.`,
+      );
     }
+  } else {
+    reportLockOwnershipLost();
+    console.error(
+      `[serial-lock] WARNING: lock storage changed before release for resource '${RESOURCE}'; ` +
+      "leaving replacement state untouched.",
+    );
   }
   if (holderLockFd !== null) {
     closeSync(holderLockFd);
@@ -828,6 +888,7 @@ function release() {
   }
   closeSync(attestationFd);
   clearWaiter();
+  return releasedOwnedLock && !lockOwnershipLost;
 }
 
 const [command, ...commandArgs] = args.command;
@@ -931,9 +992,14 @@ async function terminateChild(reason, initialSignal = "SIGTERM") {
 
 async function finish(code, signal) {
   if (timeoutTimer) clearTimeout(timeoutTimer);
-  const cleanupVerified = interruptedSignal || timedOut
+  if (!hasCurrentLockOwnership()) reportLockOwnershipLost();
+  const cleanupVerified = interruptedSignal || timedOut || lockOwnershipLost
     ? await terminateChild(
-      timedOut ? `timeout (${args.timeoutMs}ms)` : `signal ${interruptedSignal}`,
+      timedOut
+        ? `timeout (${args.timeoutMs}ms)`
+        : interruptedSignal
+          ? `signal ${interruptedSignal}`
+          : "lock ownership lost (heartbeat update failed)",
       interruptedSignal ?? "SIGTERM",
     )
     : true;
@@ -941,9 +1007,11 @@ async function finish(code, signal) {
     ? 124
     : interruptedSignal
       ? 128 + ({ SIGINT: 2, SIGTERM: 15 }[interruptedSignal] ?? 1)
+      : lockOwnershipLost
+        ? 1
       : code ?? (signal ? 1 : 0);
-  if (cleanupVerified) release();
-  process.exit(cleanupVerified ? exitCode : 1);
+  const releaseVerified = cleanupVerified ? release() : false;
+  process.exit(cleanupVerified && releaseVerified ? exitCode : 1);
 }
 
 if (args.timeoutMs > 0) {

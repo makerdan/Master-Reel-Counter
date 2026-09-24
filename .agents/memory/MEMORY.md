@@ -6,6 +6,7 @@
 - [Failure Gate validation](failure-gate-validation.md) — unchanged dependency audit failures stop the tier; preserve evidence instead of weakening audit thresholds.
 - [Failure Gate runtime manifest](failure-gate-runtime-manifest.md) — routine parity checks belong in the runtime validation manifest, while the published tier registry remains contract data.
 - [Validation lock waiter isolation](validation-lock-waiters.md) — parallel tiers need isolated waiter manifests so nested collision smoke tests do not stall behind unrelated queues.
+- [Validation lock storage identity](validation-lock-storage-identity.md) — bind lock ownership to the acquired file identity as well as its token; stop protected work when ownership is lost.
 - [Support operations schema](support-ops-schema.md) — schema validation checks files, not the live dev DB; apply support migrations before authenticated runtime validation.
 - [GitHub Actions verification access](github-actions-verification-access.md) — an installed GitHub connection can authenticate while lacking repository-scoped access to a private repo.
 - [Canonical HTTPS candidate routing](canonical-https-candidate-routing.md) — use Chromium host/port resolver mapping to test a local TLS candidate under the exact production browser origin.

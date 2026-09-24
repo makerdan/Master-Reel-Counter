@@ -307,6 +307,92 @@ await test("holder refreshes lastHeartbeat over time (heartbeat interval = 400 m
   }
 });
 
+await test("heartbeat storage loss stops the protected command and reports lock loss", async () => {
+  const lockPath = tempLockPath();
+  const holder = runLocked(lockPath, ["sleep", "10"]);
+  let childPid = 0;
+
+  try {
+    assert.ok(
+      await waitFor(() => {
+        const lock = readLockFile(lockPath);
+        if (!lock?.ownership.childPid) return false;
+        childPid = lock.ownership.childPid;
+        return true;
+      }, 4_000),
+      "holder should record its protected child before storage is changed",
+    );
+
+    unlinkSync(lockPath);
+    mkdirSync(lockPath);
+
+    const completion = await Promise.race([
+      holder.done.then((result) => ({ kind: "done" as const, result })),
+      new Promise<{ kind: "timeout" }>((resolve) =>
+        setTimeout(() => resolve({ kind: "timeout" }), 4_000),
+      ),
+    ]);
+    assert.equal(completion.kind, "done", "lock loss should stop the command promptly");
+    if (completion.kind !== "done") return;
+
+    const output = completion.result.stdout + completion.result.stderr;
+    assert.notEqual(completion.result.code, 0, "lost ownership must fail validation");
+    assert.match(output, /lock ownership lost/i, "failure should identify lock loss");
+    assert.ok(
+      await waitFor(() => !processIsRunning(childPid), 2_000),
+      "the protected child should be terminated after heartbeat failure",
+    );
+    assert.ok(existsSync(lockPath), "heartbeat failure cleanup must preserve changed storage");
+  } finally {
+    if (holder.proc.exitCode === null) holder.proc.kill("SIGTERM");
+    await holder.done;
+    try { rmdirSync(lockPath); } catch { /* already removed */ }
+    cleanup(lockPath);
+  }
+});
+
+await test("completion fails and release preserves a same-token replacement lock file", async () => {
+  const lockPath = tempLockPath();
+  const holder = runLocked(
+    lockPath,
+    [process.execPath, "-e", "setTimeout(() => process.exit(0), 500)"],
+    { SERIAL_LOCK_HEARTBEAT_INTERVAL_MS: "5000" },
+  );
+
+  try {
+    assert.ok(
+      await waitFor(() => {
+        const lock = readLockFile(lockPath);
+        return Boolean(lock?.ownership.childPid);
+      }, 4_000),
+      "holder should acquire and record its protected child",
+    );
+
+    const ownedContents = readFileSync(lockPath);
+    unlinkSync(lockPath);
+    writeFileSync(lockPath, ownedContents);
+
+    const result = await holder.done;
+    const output = result.stdout + result.stderr;
+    assert.notEqual(result.code, 0, "validation must fail if lock ownership changed before completion");
+    assert.match(output, /lock ownership lost/i, "completion should report the lost lock");
+    assert.match(
+      output,
+      /lock storage changed before release.*leaving replacement state untouched/i,
+      "release should report that replacement storage was preserved",
+    );
+    assert.equal(
+      readFileSync(lockPath, "utf8"),
+      ownedContents.toString("utf8"),
+      "cleanup must not unlink a replacement that copied the former owner's token",
+    );
+  } finally {
+    if (holder.proc.exitCode === null) holder.proc.kill("SIGTERM");
+    await holder.done;
+    cleanup(lockPath);
+  }
+});
+
 await test("waiter queues behind holder then acquires after holder exits", async () => {
   const lockPath = tempLockPath();
   const holderDone = runLocked(lockPath, ["sleep", "2"]).done;
@@ -461,7 +547,12 @@ await test("max-hold safety valve reclaims a live but overlong holder", async ()
     const output = waiterResult.stdout + waiterResult.stderr;
     assert.ok(output.includes("maximum hold duration exceeded"), "takeover should identify max-hold recovery");
     assert.equal(waiterResult.code, 0);
-    assert.equal(holderResult.code, 0);
+    assert.notEqual(holderResult.code, 0, "the evicted holder must stop protected work");
+    assert.match(
+      holderResult.stdout + holderResult.stderr,
+      /lock ownership lost/i,
+      "the evicted holder should report that heartbeat ownership was lost",
+    );
   } finally {
     holder.proc.kill("SIGTERM");
     waiter.proc.kill("SIGTERM");
