@@ -76,9 +76,9 @@ const currentColumns = [
   "capabilities",
 ];
 
-function writeMigrationFixture(directory, tags, contents = {}) {
+async function writeMigrationFixture(directory, tags, contents = {}) {
+  await mkdir(resolve(directory, "meta"), { recursive: true });
   return Promise.all([
-    mkdir(resolve(directory, "meta"), { recursive: true }),
     writeFile(
       resolve(directory, "meta/_journal.json"),
       JSON.stringify({
@@ -101,6 +101,61 @@ function writeMigrationFixture(directory, tags, contents = {}) {
     ),
   ]);
 }
+
+test("post-merge rejects a closed-stdin Drizzle prompt even when push exits 0", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "post-merge-prompt-"));
+  const npmPath = resolve(directory, "npm");
+  const outputPath = resolve(directory, "push-output");
+  const callsPath = resolve(directory, "calls");
+  try {
+    await writeFile(npmPath, `#!/bin/sh
+echo "$*" >> "$FAKE_NPM_CALLS"
+if [ "$1" = "install" ]; then exit 0; fi
+if [ "$1" = "run" ] && [ "$2" = "db:push" ]; then
+  cat "$FAKE_PUSH_OUTPUT"
+  exit "\${FAKE_PUSH_EXIT:-0}"
+fi
+exit 99
+`);
+    await chmod(npmPath, 0o755);
+    const env = {
+      ...process.env,
+      PATH: `${directory}:${process.env.PATH ?? ""}`,
+      FAKE_PUSH_OUTPUT: outputPath,
+      FAKE_NPM_CALLS: callsPath,
+    };
+    const run = () => execFileAsync("bash", ["scripts/post-merge.sh"], { cwd: root, env });
+
+    await writeFile(
+      outputPath,
+      "Pulling schema from database...\nIs clerk_user_id column in users table created or renamed from another column?\n❯ + clerk_user_id create column\n  ~ is_tester › clerk_user_id rename column\n",
+    );
+    await assert.rejects(run(), (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /requires schema review and an explicit choice/);
+      assert.match(error.stdout, /Is clerk_user_id column/);
+      return true;
+    });
+
+    await writeFile(outputPath, "[✓] Changes applied\n");
+    const success = await run();
+    assert.match(success.stdout, /Changes applied/);
+    assert.equal(success.stderr, "");
+
+    env.FAKE_PUSH_EXIT = "7";
+    await assert.rejects(run(), (error) => {
+      assert.equal(error.code, 7);
+      assert.doesNotMatch(error.stderr, /requires schema review/);
+      return true;
+    });
+    assert.equal(
+      await readFile(callsPath, "utf8"),
+      "install\nrun db:push\ninstall\nrun db:push\ninstall\nrun db:push\n",
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("release target identity ignores credentials and equivalent URL spelling", () => {
   for (const releaseDatabaseUrl of [
