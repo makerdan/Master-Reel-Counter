@@ -54,10 +54,13 @@ message when those assumptions diverge.
 
 ## Local-to-remote coverage
 
-The remote job invokes the same `npm run ci` entrypoint used locally. That
-command owns the registered `test-heavy` tier in
-`docs/validation/manifest.json`; the tier runner remains responsible for its
-lock, plan behavior, ordering, and exit status.
+The remote job invokes the same `npm run ci` entrypoint used locally, through a
+`pipefail`-protected log capture. The route contract requires `ci` to dispatch
+to the exact `test-heavy` package script, which must use `scripts/run-tier.mjs`;
+the tier runner remains responsible for its lock, plan behavior, ordering, and
+exit status. The compatibility entrypoint `scripts/ci.sh` is checked to exec
+that same tier route. The collision smoke exercises each tier, both CI aliases,
+and the e2e route while an isolated fixture lock is held.
 
 | Canonical surface | Remote coverage | Classification and notes |
 | --- | --- | --- |

@@ -10,6 +10,7 @@ import {
 const root = resolve(import.meta.dirname, "../..");
 const workflowPath = resolve(root, ".github/workflows/validation.yml");
 const workflow = readFileSync(workflowPath, "utf8");
+const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const dependabotPath = resolve(root, ".github/dependabot.yml");
 const dependabot = readFileSync(dependabotPath, "utf8");
 const lockfile = readFileSync(resolve(root, "package-lock.json"), "utf8");
@@ -74,7 +75,6 @@ test("Dependabot proposes npm updates and groups only security patches", () => {
 test("Dependabot pull requests run the canonical validation command", () => {
   const triggers = sectionBetween("on:\n", "\n\n# This workflow");
   assert.match(triggers, /pull_request:/);
-  assert.match(workflow, /npm run ci/);
   assert.doesNotMatch(triggers, /paths(?:-ignore)?:/);
 });
 
@@ -221,7 +221,30 @@ test("startup smoke verifies the connected PostgreSQL major before launching the
 });
 
 test("workflow routes validation through the canonical command", () => {
-  assert.match(workflow, /npm run ci/);
+  const canonicalStep = sectionBetween(
+    "      - name: Run canonical validation",
+    "      - name: Upload diagnostic validation artifacts",
+  );
+  const runBlock = canonicalStep.match(/^\s+run:\s*\|\n((?:\s{10,}.*(?:\n|$))+)/m);
+  assert.ok(runBlock, "canonical validation step must have an explicit shell block");
+  const commands = runBlock[1]
+    .split("\n")
+    .map((line) => line.replace(/^\s{10}/, "").trim())
+    .filter(Boolean);
+  assert.deepEqual(commands, [
+    "set -o pipefail",
+    "mkdir -p ci-artifacts",
+    "npm run ci 2>&1 | tee ci-artifacts/canonical-validation.log",
+  ], "GitHub Actions must execute the complete canonical command and preserve its exit status");
+  assert.equal(packageJson.scripts.ci, "npm run test-heavy");
+  assert.equal(
+    packageJson.scripts["test-heavy"],
+    "node scripts/run-tier.mjs test-heavy --allow-no-plan",
+  );
+  assert.equal(
+    packageJson.scripts["test:e2e"],
+    "node scripts/serial-lock.mjs --resource e2e-port --priority 3 --timeout-ms 900000 -- npx playwright test",
+  );
   assert.match(workflow, /timeout-minutes:\s+30/);
 });
 

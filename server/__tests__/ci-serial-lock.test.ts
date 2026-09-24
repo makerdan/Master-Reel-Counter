@@ -946,7 +946,7 @@ await test("collision harness removes its isolated fixture after SIGTERM", async
       if (match) announcedFixture = match[1].trim();
       if (
         announcedFixture &&
-        output.includes("[ci-collision-test] Both npm run commands spawned.")
+        output.includes("[ci-collision-test] All validation entry routes spawned.")
       ) {
         clearTimeout(timer);
         proc.stdout!.off("data", onData);

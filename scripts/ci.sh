@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-# CI_SMOKE_TEST=1 — fast-exit mode used by the serial-lock collision smoke test.
-# Skips all steps and exits 0 immediately to keep the smoke test runtime short
-# without running the full CI suite.
+# CI_SMOKE_TEST=1 is consumed by run-tier only after it acquires the canonical
+# validation lock; the collision smoke skips tier steps without bypassing lock
+# acquisition.
 exec npm run test-heavy

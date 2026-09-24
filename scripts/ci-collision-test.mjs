@@ -2,26 +2,20 @@
 /**
  * ci-collision-test.mjs — Concurrent-trigger smoke test for the serial lock.
  *
- * Validates two things:
+ * Validates the CI route and lock contract:
  *
- * Part 1 — Integration check:
- *   Reads package.json and asserts that `ci` routes through the canonical
- *   test-heavy tier runner and `test:e2e` routes through serial-lock.mjs.
+ * Part 1 — Route contract:
+ *   Requires exact package-script chains for CI, every tier, and e2e, plus an
+ *   exact compatibility route for scripts/ci.sh.
  *
- * Part 2 — Concurrent npm run invocation test:
- *   Launches `npm run ci` and `npm run test:e2e` simultaneously with:
- *     • An isolated temporary SERIAL_LOCK_PATH so the real lockfile is untouched.
- *     • CI_SMOKE_TEST=1 so ci.sh exits 0 in seconds (not a full CI run).
- *     • --pass-with-no-tests --grep CI_SMOKE_NO_TESTS_INTENTIONAL for the e2e
- *       command so playwright exits 0 without running the full test suite.
+ * Part 2 — Held-lock route test:
+ *   Holds a fixture-owned lock while every supported entry route starts, then
+ *   releases it only after each route reports that it is waiting.
  *
- *   Both processes run to natural completion — no forced kills.
+ *   The lock, waiters, plan metadata, and inherited lock controls are isolated
+ *   from unrelated validation jobs.
  *
- *   Assertions:
- *     a) Both processes exit with code 0.
- *     b) At least one process stdout contains "[serial-lock] waiting" — proof
- *        one queued behind the other rather than both running concurrently.
- *     c) Both stdout streams contain "[serial-lock]" with "acquired lock".
+ *   Each route must report waiting, then acquire the lock and exit 0.
  *
  * Run:  node scripts/ci-collision-test.mjs
  */
@@ -34,6 +28,24 @@ import { dirname, join, resolve } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const PKG_PATH = resolve(ROOT, "package.json");
+
+function isolatedValidationEnvironment(base = process.env) {
+  const env = { ...base };
+  for (const key of Object.keys(env)) {
+    if (
+      key === "TASK_PLAN_FILE" ||
+      key === "FAILURE_GATE_PLAN_GUARDS_DONE" ||
+      key === "VALIDATION_MANIFEST_PATH" ||
+      key === "CI_SMOKE_TEST" ||
+      key === "CI_COLLISION_TEST_HOLD_MS" ||
+      key.startsWith("SERIAL_LOCK_") ||
+      key.startsWith("VALIDATION_LOCK_")
+    ) {
+      delete env[key];
+    }
+  }
+  return env;
+}
 
 async function runNonSmokeReentrancyRegression() {
   console.log("[ci-collision-test] Non-smoke mode: reaching a manifest step through a nested tier…");
@@ -73,24 +85,14 @@ async function runNonSmokeReentrancyRegression() {
   }, null, 2));
 
   const fixtureEnv = {
-    ...process.env,
+    ...isolatedValidationEnvironment(),
     VALIDATION_MANIFEST_PATH: manifestPath,
     VALIDATION_LOCK_FILE: join(fixtureDir, "validation.lock"),
     VALIDATION_LOCK_WAITERS_DIR: join(fixtureDir, "waiters"),
     CI_SMOKE_TEST: "",
     SERIAL_LOCK_WAIT_INTERVAL_MS: "100",
-    SERIAL_LOCK_MAX_WAIT_MS: "5_000",
+    SERIAL_LOCK_MAX_WAIT_MS: "5000",
   };
-  // The regression creates its own outer lock. Do not let a task workflow or
-  // another validation run make the fixture appear reentrant before it starts.
-  for (const key of Object.keys(fixtureEnv)) {
-    if (
-      key === "SERIAL_LOCK_HOLDER_PID" ||
-      key.startsWith("VALIDATION_LOCK_HELD_PID_")
-    ) {
-      delete fixtureEnv[key];
-    }
-  }
 
   const result = spawnSync(
     process.execPath,
@@ -132,27 +134,54 @@ if (process.argv.includes("--non-smoke")) {
 // ── Part 1: Integration check ─────────────────────────────────────────────────
 
 console.log(
-  "[ci-collision-test] Part 1: Verifying npm scripts still route through serial-lock.mjs…"
+  "[ci-collision-test] Part 1: Verifying validation entrypoints match their exact lock contract…"
 );
 
 const pkg = JSON.parse(readFileSync(PKG_PATH, "utf8"));
 const scripts = pkg.scripts ?? {};
+const tierRegistryPath = resolve(ROOT, ".agents/skills/validation-tiers/tiers.json");
+const tierRegistry = JSON.parse(readFileSync(tierRegistryPath, "utf8"));
+const tierNames = Object.keys(tierRegistry.tiers ?? {});
 let integrationOk = true;
 
 const expectedRoutes = {
-  ci: "test-heavy",
-  "test:e2e": "serial-lock.mjs",
+  ci: "npm run test-heavy",
+  ...Object.fromEntries(
+    tierNames.map((tier) => [
+      tier,
+      `node scripts/run-tier.mjs ${tier} --allow-no-plan`,
+    ]),
+  ),
+  "test:e2e": "node scripts/serial-lock.mjs --resource e2e-port --priority 3 --timeout-ms 900000 -- npx playwright test",
 };
 for (const [name, expected] of Object.entries(expectedRoutes)) {
   const script = scripts[name] ?? "";
-  if (!script.includes(expected)) {
+  if (script !== expected) {
     console.error(
-      `  FAIL: npm run ${name} does not route through ${expected} (got: "${script}")`
+      `  FAIL: npm run ${name} must be exactly "${expected}" (got: "${script}")`
     );
     integrationOk = false;
   } else {
-    console.log(`  PASS: npm run ${name} → routes through ${expected}`);
+    console.log(`  PASS: npm run ${name} → ${expected}`);
   }
+}
+
+const ciShell = readFileSync(resolve(ROOT, "scripts/ci.sh"), "utf8");
+const ciShellCommands = ciShell
+  .split("\n")
+  .map((line) => line.trim())
+  .filter((line) => line && !line.startsWith("#"));
+if (
+  ciShellCommands.length !== 2 ||
+  ciShellCommands[0] !== "set -euo pipefail" ||
+  ciShellCommands[1] !== "exec npm run test-heavy"
+) {
+  console.error(
+    `  FAIL: scripts/ci.sh must only enable strict shell mode and exec the canonical test-heavy route (got: ${JSON.stringify(ciShellCommands)})`,
+  );
+  integrationOk = false;
+} else {
+  console.log("  PASS: scripts/ci.sh → execs the canonical test-heavy route");
 }
 
 if (!integrationOk) {
@@ -160,10 +189,10 @@ if (!integrationOk) {
   process.exit(1);
 }
 
-// ── Part 2: Concurrent npm run invocation test ────────────────────────────────
+// ── Part 2: Exercise each route behind an isolated held lock ─────────────────
 
 console.log(
-  "\n[ci-collision-test] Part 2: Spawning npm run ci + npm run test:e2e concurrently…"
+  "\n[ci-collision-test] Part 2: Holding the fixture lock while every supported route queues…"
 );
 
 // Isolated fixture so we don't stomp on a real CI run. Keep the lock and
@@ -221,32 +250,17 @@ const LOCK_PATH = join(FIXTURE_DIR, "validation.lock");
 const WAITERS_DIR = join(FIXTURE_DIR, "waiters");
 console.log(`[ci-collision-test] Temporary fixture: ${FIXTURE_DIR}`);
 
-// Shared env for the smoke invocations.
+// Remove inherited task, lock, manifest, and smoke controls before assigning
+// fixture-owned values. An unrelated validation job must not affect this probe.
 const testEnv = {
-  ...process.env,
+  ...isolatedValidationEnvironment(),
   SERIAL_LOCK_PATH: LOCK_PATH,
-  // serial-lock.mjs gives VALIDATION_LOCK_FILE precedence over
-  // SERIAL_LOCK_PATH. Override both so the nested smoke invocations cannot
-  // wait on the validation harness's own lock.
   VALIDATION_LOCK_FILE: LOCK_PATH,
   VALIDATION_LOCK_WAITERS_DIR: WAITERS_DIR,
-  // Short poll interval so queuing is visible quickly.
-  SERIAL_LOCK_WAIT_INTERVAL_MS: "500",
-  // ci.sh checks this and exits 0 immediately — keeps the test fast.
+  SERIAL_LOCK_WAIT_INTERVAL_MS: "50",
+  SERIAL_LOCK_MAX_WAIT_MS: "30000",
   CI_SMOKE_TEST: "1",
 };
-// Smoke mode deliberately tests two independent contenders. Do not let the
-// enclosing heavy manifest's task plan or ownership marker turn either
-// contender into a reentrant child of that unrelated lock.
-for (const key of Object.keys(testEnv)) {
-  if (
-    key === "TASK_PLAN_FILE" ||
-    key === "SERIAL_LOCK_HOLDER_PID" ||
-    key.startsWith("VALIDATION_LOCK_HELD_PID_")
-  ) {
-    delete testEnv[key];
-  }
-}
 
 function capture(proc) {
   let out = "";
@@ -254,49 +268,114 @@ function capture(proc) {
   proc.stderr?.on("data", (d) => { out += d.toString(); });
   const done = new Promise((res) =>
     proc.on("close", (code, signal) =>
-      res({ code: code ?? signalExitCode(signal), signal, out })
+      res({ code: code ?? signalExitCode(signal), signal })
     )
   );
-  return done;
+  return {
+    done,
+    get output() {
+      return out;
+    },
+  };
 }
 
 const holdMs = Number.parseInt(process.env.CI_COLLISION_TEST_HOLD_MS ?? "0", 10);
-
-// Process A: npm run ci — exits 0 immediately because CI_SMOKE_TEST=1.
-const procA = spawn("npm", ["run", "ci"], {
-  cwd: ROOT,
-  env: testEnv,
-  stdio: ["ignore", "pipe", "pipe"],
-  detached: process.platform !== "win32",
-});
-children.push(procA);
-const doneA = capture(procA);
-if (interruptedSignal) signalChild(procA, interruptedSignal);
-
-// Process B: npm run test:e2e with --pass-with-no-tests so playwright exits 0
-// without running the full suite. The extra args are forwarded by npm's `--`.
-const procB = spawn(
-  "npm",
-  ["run", "test:e2e", "--", "--pass-with-no-tests", "--grep", "CI_SMOKE_NO_TESTS_INTENTIONAL"],
+const releaseHolderPath = join(FIXTURE_DIR, "release-holder");
+const holderWaitScript =
+  `const fs=require("node:fs");const started=Date.now();` +
+  `const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(releaseHolderPath)})||Date.now()-started>12000)clearInterval(timer)},25);`;
+const holder = spawn(
+  process.execPath,
+  [
+    resolve(ROOT, "scripts/serial-lock.mjs"),
+    "--resource", "validation",
+    "--priority", "1",
+    "--timeout-ms", "15000",
+    "--",
+    process.execPath,
+    "-e",
+    holderWaitScript,
+  ],
   {
     cwd: ROOT,
     env: testEnv,
     stdio: ["ignore", "pipe", "pipe"],
     detached: process.platform !== "win32",
-  }
+  },
 );
-children.push(procB);
-const doneB = capture(procB);
-if (interruptedSignal) signalChild(procB, interruptedSignal);
+children.push(holder);
+const holderCapture = capture(holder);
 
-console.log(
-  "[ci-collision-test] Both npm run commands spawned. Waiting for both to complete…"
-);
-
-let resultA;
-let resultB;
+const routes = [
+  ...tierNames.map((tier) => ({
+    name: `npm run ${tier}`,
+    command: "npm",
+    args: ["run", tier],
+  })),
+  { name: "npm run ci", command: "npm", args: ["run", "ci"] },
+  { name: "scripts/ci.sh", command: "bash", args: ["scripts/ci.sh"] },
+  {
+    name: "npm run test:e2e",
+    command: "npm",
+    args: [
+      "run",
+      "test:e2e",
+      "--",
+      "--help",
+    ],
+  },
+];
+const routeCaptures = [];
+let holderAcquired = false;
+let allRoutesWaited = false;
 let exitCode = 0;
 try {
+  holderAcquired = await Promise.race([
+    new Promise((resolvePromise) => {
+      const deadline = Date.now() + 5000;
+      const poll = setInterval(() => {
+        if (holderCapture.output.includes("acquired lock")) {
+          clearInterval(poll);
+          resolvePromise(true);
+        } else if (Date.now() >= deadline || holder.exitCode !== null) {
+          clearInterval(poll);
+          resolvePromise(false);
+        }
+      }, 20);
+    }),
+    interruption.then(() => false),
+  ]);
+
+  for (const route of routes) {
+    const proc = spawn(route.command, route.args, {
+      cwd: ROOT,
+      env: testEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
+    });
+    children.push(proc);
+    routeCaptures.push({ ...route, capture: capture(proc) });
+    if (interruptedSignal) signalChild(proc, interruptedSignal);
+  }
+
+  console.log("[ci-collision-test] All validation entry routes spawned.");
+  console.log("[ci-collision-test] Waiting for every route to report lock contention…");
+  allRoutesWaited = await Promise.race([
+    new Promise((resolvePromise) => {
+      const deadline = Date.now() + 5000;
+      const poll = setInterval(() => {
+        if (routeCaptures.every(({ capture: captured }) => captured.output.includes("[serial-lock] waiting"))) {
+          clearInterval(poll);
+          resolvePromise(true);
+        } else if (Date.now() >= deadline || routeCaptures.some(({ capture: captured }) => captured.output.includes("ERROR:"))) {
+          clearInterval(poll);
+          resolvePromise(false);
+        }
+      }, 20);
+    }),
+    interruption.then(() => false),
+  ]);
+
   if (holdMs > 0 && !interruptedSignal) {
     await Promise.race([
       new Promise((resolvePromise) => setTimeout(resolvePromise, holdMs)),
@@ -304,12 +383,11 @@ try {
     ]);
   }
 
-  // Both run to completion unless the harness receives a termination signal.
-  [resultA, resultB] = await Promise.all([doneA, doneB]);
+  if (!interruptedSignal) writeFileSync(releaseHolderPath, "release\n");
+  const routeResults = await Promise.all(routeCaptures.map(({ capture: captured }) => captured.done));
+  const holderResult = await holderCapture.done;
 
   if (!interruptedSignal) {
-    // ── Assertions ──────────────────────────────────────────────────────────
-
     let allPassed = true;
 
     function check(condition, message) {
@@ -321,41 +399,42 @@ try {
       }
     }
 
-    // At least one process printed "waiting" — proof of serialization.
-    const someoneWaited =
-      resultA.out.includes("[serial-lock] waiting") ||
-      resultB.out.includes("[serial-lock] waiting");
-
-    check(
-      resultA.code === 0,
-      `npm run ci exited with code 0 (got ${resultA.code})`
-    );
-
-    check(
-      resultB.code === 0,
-      `npm run test:e2e exited with code 0 (got ${resultB.code})`
-    );
-
-    check(
-      someoneWaited,
-      `At least one process printed "[serial-lock] waiting" — serialized rather than colliding`
-    );
-
-    check(
-      resultA.out.includes("acquired lock") || resultB.out.includes("acquired lock"),
-      "At least one process confirms it acquired the lock"
-    );
+    check(holderAcquired, "the fixture-owned holder acquired the isolated lock first");
+    check(holderResult.code === 0, `fixture lock holder exited 0 (got ${holderResult.code})`);
+    check(allRoutesWaited, "every supported entry route waited behind the held fixture lock");
+    for (const [index, route] of routeCaptures.entries()) {
+      const { code } = routeResults[index];
+      const output = route.capture.output;
+      check(
+        output.includes("[serial-lock] waiting"),
+        `${route.name} reported waiting while the fixture lock was held`,
+      );
+      check(code === 0, `${route.name} exited 0 after the fixture lock was released (got ${code})`);
+      check(
+        output.includes("acquired lock"),
+        `${route.name} confirmed it acquired the canonical fixture lock`,
+      );
+    }
 
     if (!allPassed) {
       console.error("\n[ci-collision-test] FAILED. Captured output:");
-      console.error("\n--- npm run ci output ---");
-      console.error(resultA.out || "(empty)");
-      console.error("\n--- npm run test:e2e output ---");
-      console.error(resultB.out || "(empty)");
+      console.error("\n--- fixture lock holder output ---");
+      console.error(holderCapture.output || "(empty)");
+      for (const route of routeCaptures) {
+        console.error(`\n--- ${route.name} output ---`);
+        console.error(route.capture.output || "(empty)");
+      }
       exitCode = 1;
     }
   }
 } finally {
+  if (FIXTURE_DIR && !interruptedSignal) {
+    try {
+      writeFileSync(releaseHolderPath, "release\n");
+    } catch {
+      // Fixture cleanup or an early startup failure may already have removed it.
+    }
+  }
   cleanupFixture();
   process.removeListener("SIGINT", handleSigint);
   process.removeListener("SIGTERM", handleSigterm);
