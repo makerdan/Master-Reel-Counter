@@ -115,6 +115,53 @@ function sleep(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
+function readLinuxProcessInfo(pid) {
+  if (process.platform !== "linux" || !Number.isInteger(pid) || pid <= 0) {
+    return { kind: "unsupported" };
+  }
+  try {
+    const raw = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const commandEnd = raw.lastIndexOf(")");
+    if (commandEnd < 0) return { kind: "unknown" };
+    const fields = raw.slice(commandEnd + 1).trim().split(/\s+/);
+    const processGroupId = Number(fields[2]);
+    const startTime = Number(fields[19]);
+    if (!Number.isInteger(processGroupId) || !Number.isInteger(startTime) || startTime < 0) {
+      return { kind: "unknown" };
+    }
+    return { kind: "present", processGroupId, startTime };
+  } catch (error) {
+    return error?.code === "ENOENT" ? { kind: "absent" } : { kind: "unknown" };
+  }
+}
+
+function getProcessIdentity(pid) {
+  const info = readLinuxProcessInfo(pid);
+  return info.kind === "present" ? { pid, startTime: info.startTime } : null;
+}
+
+function normalizeProcessIdentity(value, expectedPid = null) {
+  if (!value || typeof value !== "object") return null;
+  if (
+    !Number.isInteger(value.pid) ||
+    value.pid <= 0 ||
+    !Number.isInteger(value.startTime) ||
+    value.startTime < 0 ||
+    (expectedPid !== null && value.pid !== expectedPid)
+  ) {
+    return null;
+  }
+  return { pid: value.pid, startTime: value.startTime };
+}
+
+function isRecordedProcessRunning(pid, identity) {
+  if (!identity || process.platform !== "linux") return isRunning(pid);
+  const current = readLinuxProcessInfo(pid);
+  if (current.kind === "present") return current.startTime === identity.startTime;
+  if (current.kind === "absent") return isAlive(pid);
+  return isRunning(pid);
+}
+
 function isAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -189,8 +236,34 @@ function isProcessGroupRunning(processGroupId) {
 function hasSurvivingOwnership(lock) {
   const ownership = lock?.ownership;
   if (!ownership) return false;
-  if (isProcessGroupRunning(ownership.processGroupId)) return true;
-  return ownership.observedChildPids.some((pid) => isRunning(pid));
+  if (isProcessGroupRunning(ownership.processGroupId)) {
+    const groupIdentity = ownership.processGroupIdentity;
+    if (!groupIdentity || process.platform !== "linux") return true;
+
+    const leader = readLinuxProcessInfo(ownership.processGroupId);
+    if (leader.kind !== "present") {
+      // Without the group leader's identity, retain the existing fail-closed
+      // behavior: the numeric group may still contain the original work.
+      return true;
+    }
+    if (
+      leader.startTime === groupIdentity.startTime &&
+      leader.processGroupId === ownership.processGroupId
+    ) {
+      return true;
+    }
+  }
+
+  const identities = new Map(
+    ownership.observedChildProcessIdentities.map((identity) => [identity.pid, identity]),
+  );
+  return ownership.observedChildPids.some((pid) =>
+    isRecordedProcessRunning(pid, identities.get(pid)),
+  );
+}
+
+function isLockHolderRunning(lock) {
+  return isRecordedProcessRunning(lock.pid, lock.holderIdentity);
 }
 
 function signalPid(pid, signal) {
@@ -255,7 +328,9 @@ function emptyOwnership() {
   return {
     childPid: null,
     processGroupId: null,
+    processGroupIdentity: null,
     observedChildPids: [],
+    observedChildProcessIdentities: [],
     cleanupPending: false,
   };
 }
@@ -267,19 +342,37 @@ function normalizeOwnership(value) {
   return {
     childPid: positiveInteger(value.childPid),
     processGroupId: positiveInteger(value.processGroupId),
+    processGroupIdentity: normalizeProcessIdentity(
+      value.processGroupIdentity,
+      positiveInteger(value.processGroupId),
+    ),
     observedChildPids: Array.isArray(value.observedChildPids)
       ? [...new Set(value.observedChildPids.map(positiveInteger).filter(Boolean))]
+      : [],
+    observedChildProcessIdentities: Array.isArray(value.observedChildProcessIdentities)
+      ? [...new Map(
+        value.observedChildProcessIdentities
+          .map((identity) => normalizeProcessIdentity(identity))
+          .filter(Boolean)
+          .map((identity) => [identity.pid, identity]),
+      ).values()]
       : [],
     cleanupPending: value.cleanupPending === true,
   };
 }
 
-function lockContent(acquiredAt, lastHeartbeat = acquiredAt, ownership = emptyOwnership()) {
+function lockContent(
+  acquiredAt,
+  lastHeartbeat = acquiredAt,
+  ownership = emptyOwnership(),
+  holderIdentity = getProcessIdentity(process.pid),
+) {
   return `${String(process.pid).padStart(12, "0")}\n` +
     `${String(acquiredAt).padStart(16, "0")}\n` +
     `${String(lastHeartbeat).padStart(16, "0")}\n` +
     `${LOCK_TOKEN}\n` +
-    `${JSON.stringify(normalizeOwnership(ownership))}\n`;
+    `${JSON.stringify(normalizeOwnership(ownership))}\n` +
+    `${JSON.stringify(normalizeProcessIdentity(holderIdentity, process.pid))}\n`;
 }
 
 function writeLockToFd(fd, content) {
@@ -312,9 +405,11 @@ function readLock() {
         resource: parsed.resource ?? RESOURCE,
         token: typeof parsed.token === "string" ? parsed.token : null,
         ownership: normalizeOwnership(parsed.ownership),
+          holderIdentity: normalizeProcessIdentity(parsed.holderIdentity, parsed.pid),
       };
     }
-    const [pid, acquiredAt, lastHeartbeat, token, ownershipRaw] = trimmed.split("\n");
+      const [pid, acquiredAt, lastHeartbeat, token, ownershipRaw, holderIdentityRaw] =
+        trimmed.split("\n");
     const numericPid = Number(pid);
     const numericAcquiredAt = Number(acquiredAt);
     const numericLastHeartbeat = Number(lastHeartbeat);
@@ -336,6 +431,16 @@ function readLock() {
           return normalizeOwnership(ownershipRaw ? JSON.parse(ownershipRaw) : null);
         } catch {
           return emptyOwnership();
+        }
+      })(),
+      holderIdentity: (() => {
+        try {
+          return normalizeProcessIdentity(
+            holderIdentityRaw ? JSON.parse(holderIdentityRaw) : null,
+            numericPid,
+          );
+        } catch {
+          return null;
         }
       })(),
     };
@@ -403,7 +508,10 @@ function writeHeartbeat() {
       lock.pid === process.pid &&
       lock.token === LOCK_TOKEN
     ) {
-       writeLockToFd(holderLockFd, lockContent(lock.acquiredAt, Date.now(), lock.ownership));
+       writeLockToFd(
+         holderLockFd,
+         lockContent(lock.acquiredAt, Date.now(), lock.ownership, lock.holderIdentity),
+       );
     }
   } catch {
     // A transient heartbeat write failure is handled by the stale recovery path.
@@ -421,7 +529,12 @@ function updateOwnership(ownership) {
     ) {
       writeLockToFd(
         holderLockFd,
-        lockContent(lock.acquiredAt, Date.now(), normalizeOwnership(ownership)),
+        lockContent(
+          lock.acquiredAt,
+          Date.now(),
+          normalizeOwnership(ownership),
+          lock.holderIdentity,
+        ),
       );
     }
   } catch {
@@ -628,13 +741,14 @@ async function acquireLock() {
       const heldMs = Date.now() - lock.acquiredAt;
       const heartbeatAgeMs = Date.now() - lock.lastHeartbeat;
       let takeoverReason = "";
-      if (!isAlive(lock.pid)) takeoverReason = "holder PID is dead";
+      const holderIsRunning = isLockHolderRunning(lock);
+      if (!holderIsRunning) takeoverReason = "holder PID is dead or has been reused";
       else if (heartbeatAgeMs > HEARTBEAT_STALE_MS) takeoverReason = "heartbeat is stale";
       else if (heldMs > MAX_HOLD_MS) takeoverReason = "maximum hold duration exceeded";
 
       const survivingOwnership = hasSurvivingOwnership(lock);
       const mustPreserveSurvivor =
-        survivingOwnership && (!isAlive(lock.pid) || lock.ownership.cleanupPending);
+        survivingOwnership && (!holderIsRunning || lock.ownership.cleanupPending);
       if (takeoverReason && mustPreserveSurvivor) {
         const waitedMs = waitElapsed();
         if (waitedMs >= MAX_WAIT_MS) {
@@ -728,20 +842,37 @@ let timedOut = false;
 let interruptedSignal = null;
 let cleanupPromise = null;
 const observedChildPids = new Set(child.pid ? [child.pid] : []);
+const observedChildProcessIdentities = new Map();
+
+function rememberChildProcessIdentity(pid) {
+  if (!observedChildProcessIdentities.has(pid)) {
+    const identity = getProcessIdentity(pid);
+    if (identity) observedChildProcessIdentities.set(pid, identity);
+  }
+}
+
+if (child.pid) rememberChildProcessIdentity(child.pid);
 
 function observeChildTree() {
   if (!child.pid) return;
   const parents = getProcessParents();
   for (const pid of getDescendants(String(child.pid), parents)) {
-    observedChildPids.add(Number(pid));
+    const numericPid = Number(pid);
+    observedChildPids.add(numericPid);
+    rememberChildProcessIdentity(numericPid);
   }
 }
 
 function persistChildOwnership(cleanupPending = false) {
+  const processGroupId = process.platform === "win32" ? null : child.pid ?? null;
   updateOwnership({
     childPid: child.pid ?? null,
-    processGroupId: process.platform === "win32" ? null : child.pid ?? null,
+    processGroupId,
+    processGroupIdentity: processGroupId
+      ? observedChildProcessIdentities.get(processGroupId) ?? null
+      : null,
     observedChildPids: [...observedChildPids],
+    observedChildProcessIdentities: [...observedChildProcessIdentities.values()],
     cleanupPending,
   });
 }

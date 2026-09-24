@@ -124,25 +124,52 @@ function readLockFile(path: string): {
   ownership: {
     childPid: number | null;
     processGroupId: number | null;
+    processGroupIdentity: { pid: number; startTime: number } | null;
     observedChildPids: number[];
+    observedChildProcessIdentities: Array<{ pid: number; startTime: number }>;
     cleanupPending: boolean;
   };
+  holderIdentity: { pid: number; startTime: number } | null;
 } | null {
   try {
     const raw = readFileSync(path, "utf8").trim();
-    const [pidStr, tsStr, hbStr, , ownershipRaw] = raw.split("\n");
+    const [pidStr, tsStr, hbStr, , ownershipRaw, holderIdentityRaw] = raw.split("\n");
     const pid = parseInt(pidStr, 10);
     const acquiredAt = parseInt(tsStr, 10);
     if (isNaN(pid) || isNaN(acquiredAt)) return null;
     const lastHeartbeat = hbStr ? parseInt(hbStr, 10) : acquiredAt;
     const ownership = ownershipRaw ? JSON.parse(ownershipRaw) : {};
+    const holderIdentity = holderIdentityRaw ? JSON.parse(holderIdentityRaw) : null;
     return {
       pid,
       acquiredAt,
       lastHeartbeat: isNaN(lastHeartbeat) ? acquiredAt : lastHeartbeat,
-      ownership,
+      ownership: {
+        childPid: ownership.childPid ?? null,
+        processGroupId: ownership.processGroupId ?? null,
+        processGroupIdentity: ownership.processGroupIdentity ?? null,
+        observedChildPids: ownership.observedChildPids ?? [],
+        observedChildProcessIdentities: ownership.observedChildProcessIdentities ?? [],
+        cleanupPending: ownership.cleanupPending === true,
+      },
+      holderIdentity,
     };
   } catch { return null; }
+}
+
+function readProcessIdentity(pid: number): { pid: number; startTime: number } | null {
+  if (process.platform !== "linux") return null;
+  try {
+    const raw = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const commandEnd = raw.lastIndexOf(")");
+    if (commandEnd < 0) return null;
+    const fields = raw.slice(commandEnd + 1).trim().split(/\s+/);
+    const startTime = Number(fields[19]);
+    if (!Number.isInteger(startTime) || startTime < 0) return null;
+    return { pid, startTime };
+  } catch {
+    return null;
+  }
 }
 
 function processIsRunning(pid: number): boolean {
@@ -215,9 +242,29 @@ await test("lock file records holder timing and child ownership metadata", async
       lock!.ownership.childPid,
       "lock should record the detached child process group",
     );
+    assert.equal(
+      lock!.ownership.processGroupIdentity?.pid,
+      lock!.ownership.childPid,
+      "lock should record the process-group leader identity",
+    );
+    assert.ok(
+      Number.isInteger(lock!.ownership.processGroupIdentity?.startTime),
+      "group identity should include the process start time",
+    );
     assert.ok(
       lock!.ownership.observedChildPids.includes(lock!.ownership.childPid),
       "lock should record the child in its observed ownership tree",
+    );
+    assert.ok(
+      lock!.ownership.observedChildProcessIdentities.some(
+        ({ pid, startTime }) => pid === lock!.ownership.childPid && Number.isInteger(startTime),
+      ),
+      "lock should record process identities for observed children",
+    );
+    assert.equal(
+      lock!.holderIdentity?.pid,
+      lock!.pid,
+      "lock should record the holder process identity",
     );
     assert.ok(lock!.acquiredAt > 0, "acquiredAt should be a positive timestamp");
     assert.ok(lock!.lastHeartbeat > 0, "lastHeartbeat should be written on acquisition");
@@ -431,6 +478,71 @@ await test("dead holder is reclaimed loudly", async () => {
     assert.equal(result.code, 0);
     assert.ok((result.stdout + result.stderr).includes("holder PID is dead"));
   } finally {
+    cleanup(lockPath);
+  }
+});
+
+await test("reused holder and process-group IDs do not block stale recovery", async () => {
+  const lockPath = tempLockPath();
+  const unrelated = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000);"],
+    { detached: true, stdio: "ignore" },
+  );
+  const unrelatedPid = unrelated.pid ?? 0;
+
+  try {
+    assert.ok(unrelatedPid > 0, "unrelated process should have a PID");
+    assert.ok(
+      await waitFor(() => readProcessIdentity(unrelatedPid) !== null, 4_000),
+      "unrelated process identity should be readable",
+    );
+    const actualIdentity = readProcessIdentity(unrelatedPid);
+    assert.ok(actualIdentity, "unrelated process identity must be available");
+    const mismatchedIdentity = {
+      pid: unrelatedPid,
+      startTime: actualIdentity.startTime + 1,
+    };
+    const now = Date.now();
+    const ownership = {
+      childPid: unrelatedPid,
+      processGroupId: unrelatedPid,
+      processGroupIdentity: mismatchedIdentity,
+      observedChildPids: [unrelatedPid],
+      observedChildProcessIdentities: [mismatchedIdentity],
+      cleanupPending: true,
+    };
+    writeFileSync(
+      lockPath,
+      `${unrelatedPid}\n${now - 300_000}\n${now}\nreused-owner\n` +
+        `${JSON.stringify(ownership)}\n${JSON.stringify(mismatchedIdentity)}\n`,
+      "utf8",
+    );
+
+    const { done } = runLocked(
+      lockPath,
+      [process.execPath, "-e", "process.exit(0)"],
+      {
+        SERIAL_LOCK_MAX_WAIT_MS: "1_200",
+        SERIAL_LOCK_WAIT_INTERVAL_MS: "100",
+      },
+    );
+    const result = await done;
+    const output = result.stdout + result.stderr;
+
+    assert.equal(
+      result.code,
+      0,
+      `stale recovery should not wait on unrelated reused IDs (got ${result.code}: ${output})`,
+    );
+    assert.ok(output.includes("holder PID is dead or has been reused"), output);
+    assert.ok(processIsRunning(unrelatedPid), "unrelated process must remain untouched");
+  } finally {
+    if (unrelatedPid > 0) {
+      try { process.kill(-unrelatedPid, "SIGKILL"); } catch { /* already gone */ }
+      unrelated.kill("SIGKILL");
+      await new Promise((resolve) => unrelated.once("close", resolve));
+    }
     cleanup(lockPath);
   }
 });
@@ -732,11 +844,14 @@ await test("stale recovery preserves a lock while cleanup survivors still own th
     { detached: true, stdio: "ignore" },
   );
   const survivorPid = survivor.pid ?? 0;
+  const survivorIdentity = survivorPid ? readProcessIdentity(survivorPid) : null;
   const now = Date.now();
   const ownership = {
     childPid: survivorPid,
     processGroupId: survivorPid,
+    processGroupIdentity: survivorIdentity,
     observedChildPids: [survivorPid],
+    observedChildProcessIdentities: survivorIdentity ? [survivorIdentity] : [],
     cleanupPending: true,
   };
   writeFileSync(
