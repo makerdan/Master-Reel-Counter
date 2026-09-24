@@ -66,18 +66,14 @@ test.describe("pin label → entry position field @pin-position", () => {
     cleanupIds.push(sess.id);
 
     const photo = await uploadTestPhoto(request, sess.id);
-    if (!photo) {
-      test.skip(true, "Photo upload unavailable in this environment");
-      return;
-    }
 
     // Create a draft pin with label 42 and pre-filled wire data so that the
     // scanner card is committable (editCatalog/Vendor/Footage come from
     // pin.wireDetails via applyPinSeed, no catalog match required).
-    const pinRes = await request.post(`/api/sessions/${sess.id}/pins`, {
+    const pinRes = await request.post(`/api/photos/${photo.id}/pins`, {
       data: {
         photoId: photo.id,
-        label: 42,
+        label: "42",
         xPercent: 50,
         yPercent: 50,
         reelCount: 1,
@@ -91,19 +87,18 @@ test.describe("pin label → entry position field @pin-position", () => {
     );
     const pin = await pinRes.json();
 
-    // Mock analyze-labels to return immediately (pin is unreadable so no
-    // catalog-match step is required, but the phase still transitions to
-    // "results" and the card is committable via the pin's own wireDetails).
+    // Mock a recognizable catalog result so the scanner selects and populates
+    // the draft card before the commit request is captured.
     await page.route(`**/api/photos/${photo.id}/analyze-labels`, (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           results: [
-            { pinId: pin.id, pinLabel: "42", rawText: null, readable: false },
+            { pinId: pin.id, pinLabel: "42", rawText: "THHN1RD500", readable: true },
           ],
-          skippedPins: 1,
-          skippedPinLabels: ["42"],
+          truncated: false,
+          truncatedCount: 0,
         }),
       }),
     );

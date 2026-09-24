@@ -487,16 +487,33 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
   }) => {
     const session = await createSessionViaApi(request, `Mobile Photo ${Date.now()}`);
     cleanupIds.push(session.id);
-    const settingsResponse = await request.patch("/api/settings", {
-      data: {
-        photoQuality: 65,
-        useReceivingQuality: true,
-        receivingPhotoQuality: 30,
-        useOnFloorQuality: true,
-        onFloorPhotoQuality: 30,
-      },
-    });
-    expect(settingsResponse.ok()).toBe(true);
+    const originalSettingsResponse = await request.get("/api/settings");
+    expect(
+      originalSettingsResponse.ok(),
+      `settings snapshot failed: ${originalSettingsResponse.status()} ${await originalSettingsResponse.text()}`,
+    ).toBe(true);
+    const originalSettings = await originalSettingsResponse.json() as {
+      photoQuality: number;
+      useReceivingQuality: boolean;
+      receivingPhotoQuality: number;
+      useOnFloorQuality: boolean;
+      onFloorPhotoQuality: number;
+    };
+
+    try {
+      const settingsResponse = await request.patch("/api/settings", {
+        data: {
+          photoQuality: 65,
+          useReceivingQuality: true,
+          receivingPhotoQuality: 30,
+          useOnFloorQuality: true,
+          onFloorPhotoQuality: 30,
+        },
+      });
+      expect(
+        settingsResponse.ok(),
+        `settings update failed: ${settingsResponse.status()} ${await settingsResponse.text()}`,
+      ).toBe(true);
 
     await page.addInitScript(() => {
       (window as any).__mobileJpegQualities = [];
@@ -607,6 +624,21 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
       expect.objectContaining({ originalFilename: "mobile-source.png", width: 37, height: 23, registrationKey: expect.any(String) }),
       expect.objectContaining({ originalFilename: "mobile-source.jpg", width: 19, height: 31, registrationKey: expect.any(String) }),
     ]));
+    } finally {
+      const restoreResponse = await request.patch("/api/settings", {
+        data: {
+          photoQuality: originalSettings.photoQuality,
+          useReceivingQuality: originalSettings.useReceivingQuality,
+          receivingPhotoQuality: originalSettings.receivingPhotoQuality,
+          useOnFloorQuality: originalSettings.useOnFloorQuality,
+          onFloorPhotoQuality: originalSettings.onFloorPhotoQuality,
+        },
+      });
+      expect(
+        restoreResponse.ok(),
+        `settings restore failed: ${restoreResponse.status()} ${await restoreResponse.text()}`,
+      ).toBe(true);
+    }
   });
 
   test("reuses the durable registration key after the first response is lost", async ({

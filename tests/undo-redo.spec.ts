@@ -49,7 +49,7 @@ test.describe("undo/redo parity @undo", () => {
     await expect(page.locator('[data-testid^="row-entry-"]').first()).toBeVisible({ timeout: 8_000 });
   });
 
-  test("deleting a pin shows undo toast @undo", async ({
+  test("deleting a draft pin can be undone @undo", async ({
     page,
     request,
     cleanupIds,
@@ -58,45 +58,50 @@ test.describe("undo/redo parity @undo", () => {
     cleanupIds.push(sess.id);
 
     const photo = await uploadTestPhoto(request, sess.id);
-    if (!photo) {
-      test.skip(
-        true,
-        "Photo upload unavailable in this environment — skipping pin undo test",
-      );
-      return;
-    }
+    const draftClientId = `undo-pin-${Date.now()}`;
 
     // Create a draft pin
-    const pinRes = await request.post(`/api/sessions/${sess.id}/pins`, {
+    const pinRes = await request.post(`/api/photos/${photo.id}/pins`, {
       data: {
         photoId: photo.id,
         label: "P1",
         xPercent: 50,
         yPercent: 50,
         reelCount: 1,
-        isDraft: false,
+        draftClientId,
       },
     });
-    if (!pinRes.ok()) {
-      test.skip(true, "Pin creation unavailable — skipping pin undo test");
-      return;
-    }
+    expect(pinRes.ok(), `Pin creation failed: ${await pinRes.text()}`).toBe(true);
     const pin = await pinRes.json();
 
+    // PhotoMode renders pin overlays after the image load completes. Keep this
+    // fixture independent from object-storage availability in the browser
+    // test environment while still exercising the real photo and pin APIs.
+    await page.route("**/uploads/**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          "base64",
+        ),
+      }),
+    );
     await page.goto(`/session/${sess.id}?tab=photo`);
 
     // Wait for photo mode to load with the pin
-    const pinEl = page.locator(`[data-testid="pin-${pin.id}"]`);
+    const pinEl = page.locator(`[data-testid="pin-${draftClientId}"]`);
     await expect(pinEl).toBeVisible({ timeout: 10_000 });
 
     // Delete the pin — must trigger an undo toast (parity check with entry deletion)
-    await page.click(`[data-testid="button-delete-pin-${pin.id}"]`);
+    await page.click(`[data-testid="button-delete-pin-${draftClientId}"]`);
 
-    const undoBtn = page.getByRole("button", { name: /^Undo$/i });
+    await expect(pinEl).toHaveCount(0);
+    const undoBtn = page.locator('[data-testid="button-undo"]');
     await expect(
       undoBtn,
-      "Pin deletion must show an Undo toast — parity with entry deletion",
-    ).toBeVisible({ timeout: 8_000 });
+      "Deleting a draft pin must enable the session Undo control",
+    ).toBeEnabled({ timeout: 8_000 });
 
     // Clicking undo must restore the pin
     await undoBtn.click();

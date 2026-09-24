@@ -18,6 +18,7 @@ import {
   readClerkBrowserFixture,
   removeClerkBrowserFixtureMarker,
   writeClerkBrowserFixture,
+  type ClerkBrowserFixture,
 } from "./clerk-fixture-cleanup";
 
 function findChromium(): string | undefined {
@@ -73,8 +74,10 @@ async function globalSetup() {
   const password = `E2e-${randomUUID()}!9`;
   process.env.E2E_CLERK_EMAIL = email;
   const database = new pg.Client({ connectionString: databaseUrl });
-  await database.connect();
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  let createdFixture: ClerkBrowserFixture | null = null;
   try {
+    await database.connect();
     // Read-only schema validation must precede both provider and database
     // fixture writes. In particular, do not create a Clerk user and then
     // discover that an unmigrated database cannot persist its role.
@@ -93,10 +96,13 @@ async function globalSetup() {
       lastName: "Owner",
       skipLegalChecks: true,
     });
-    await writeClerkBrowserFixture({
+    createdFixture = {
       clerkUserId: clerkUser.id,
       localUserId,
-    });
+    };
+    // Persist the marker before the local insert so a setup failure can be
+    // recovered both in this process and by the next run.
+    await writeClerkBrowserFixture(createdFixture);
     await database.query(
       `INSERT INTO users (
          id, clerk_user_id, email, first_name, last_name, approved, rejected, role
@@ -109,37 +115,49 @@ async function globalSetup() {
            role = 'Admin'`,
       [localUserId, clerkUser.id, email],
     );
+    const chromiumExecutable = findChromium();
+    browser = await chromium.launch(
+      chromiumExecutable ? { executablePath: chromiumExecutable } : undefined,
+    );
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await clerkSetup({
+      publishableKey: clerkConfig.publishableKey,
+      secretKey,
+      frontendApiUrl: clerkConfig.frontendApiHost,
+    });
+    await setupClerkTestingToken({
+      context,
+      options: { frontendApiUrl: clerkConfig.frontendApiHost },
+    });
+    await page.goto(`${BASE_URL}/sign-in`);
+    await clerkTesting.signIn({ page, emailAddress: email });
+    const authenticatedUser = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/auth/user") && response.status() === 200,
+      { timeout: 30_000 },
+    );
+    await page.goto(`${BASE_URL}/`);
+    await authenticatedUser;
+
+    await context.storageState({ path: "tests/.auth/user.json" });
+  } catch (error) {
+    if (createdFixture) {
+      try {
+        await cleanupClerkBrowserFixture(clerk, database, createdFixture);
+        await removeClerkBrowserFixtureMarker();
+      } catch (cleanupError) {
+        throw new AggregateError(
+          [error, cleanupError],
+          "Browser fixture setup and cleanup both failed",
+        );
+      }
+    }
+    throw error;
   } finally {
-    await database.end();
+    await browser?.close().catch(() => {});
+    await database.end().catch(() => {});
   }
-
-  const chromiumExecutable = findChromium();
-  const browser = await chromium.launch(
-    chromiumExecutable ? { executablePath: chromiumExecutable } : undefined,
-  );
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await clerkSetup({
-    publishableKey: clerkConfig.publishableKey,
-    secretKey,
-    frontendApiUrl: clerkConfig.frontendApiHost,
-  });
-  await setupClerkTestingToken({
-    context,
-    options: { frontendApiUrl: clerkConfig.frontendApiHost },
-  });
-  await page.goto(`${BASE_URL}/sign-in`);
-  await clerkTesting.signIn({ page, emailAddress: email });
-  const authenticatedUser = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/api/auth/user") && response.status() === 200,
-    { timeout: 30_000 },
-  );
-  await page.goto(`${BASE_URL}/`);
-  await authenticatedUser;
-
-  await context.storageState({ path: "tests/.auth/user.json" });
-  await browser.close();
 }
 
 export default globalSetup;

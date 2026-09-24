@@ -57,22 +57,43 @@ export async function createEntryViaApi(
 export async function uploadTestPhoto(
   request: APIRequestContext,
   sessionId: number,
-): Promise<{ id: number } | null> {
+): Promise<{ id: number }> {
   const pngBuffer = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
     "base64",
   );
-  const res = await request.post(`/api/sessions/${sessionId}/photos`, {
+  const uploadResponse = await request.post("/api/uploads/direct", {
     multipart: {
-      photo: { name: "test.png", mimeType: "image/png", buffer: pngBuffer },
+      file: { name: "test.png", mimeType: "image/png", buffer: pngBuffer },
+    },
+  });
+  if (!uploadResponse.ok()) {
+    throw new Error(
+      `uploadTestPhoto direct upload failed: ${uploadResponse.status()} ${await uploadResponse.text()}`,
+    );
+  }
+  const upload = await uploadResponse.json() as { objectPath?: string };
+  if (typeof upload.objectPath !== "string" || upload.objectPath.length === 0) {
+    throw new Error("uploadTestPhoto direct upload returned no object path");
+  }
+
+  const res = await request.post(`/api/sessions/${sessionId}/photos`, {
+    data: {
+      objectStorageKey: upload.objectPath,
+      originalFilename: "test.png",
+      mimeType: "image/png",
+      fileSize: pngBuffer.byteLength,
       aisle: "A",
       section: "1",
       notes: "",
-      isReceiving: "false",
-      isOnFloor: "false",
+      isDetailShot: false,
     },
   });
-  if (!res.ok()) return null;
+  if (!res.ok()) {
+    throw new Error(
+      `uploadTestPhoto registration failed: ${res.status()} ${await res.text()}`,
+    );
+  }
   return res.json();
 }
 
@@ -291,16 +312,17 @@ export const test = base.extend<E2EFixtures>({
     const database = new pg.Client({ connectionString: databaseUrl });
     await database.connect();
     const localUserId = `e2e-clerk-second-${randomUUID()}`;
-    const clerkUser = await clerk.users.createUser({
-      externalId: localUserId,
-      emailAddress: [email],
-      password,
-      firstName: "Second",
-      lastName: "Playwright",
-      skipLegalChecks: true,
-    });
-
+    let clerkUser: Awaited<ReturnType<typeof clerk.users.createUser>> | null = null;
+    let cleanupError: unknown;
     try {
+      clerkUser = await clerk.users.createUser({
+        externalId: localUserId,
+        emailAddress: [email],
+        password,
+        firstName: "Second",
+        lastName: "Playwright",
+        skipLegalChecks: true,
+      });
       await database.query(
         `INSERT INTO users (
            id, clerk_user_id, email, first_name, last_name, approved, rejected, role
@@ -312,10 +334,22 @@ export const test = base.extend<E2EFixtures>({
     } finally {
       try {
         await database.query("DELETE FROM users WHERE id = $1", [localUserId]);
-      } finally {
-        await database.end();
-        await clerk.users.deleteUser(clerkUser.id);
+      } catch (error) {
+        cleanupError = error;
       }
+      try {
+        await database.end();
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      if (clerkUser) {
+        try {
+          await clerk.users.deleteUser(clerkUser.id);
+        } catch (error) {
+          cleanupError ??= error;
+        }
+      }
+      if (cleanupError) throw cleanupError;
     }
   },
   sessionId: async ({ request }, use) => {

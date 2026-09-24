@@ -1023,8 +1023,14 @@ test("ordinary browser fixtures persist Clerk external IDs as local account IDs"
 test("ordinary browser fixtures clean disposable provider identities on every run", () => {
   assert.match(ordinaryConfig, /globalTeardown: "\.\/tests\/global-teardown\.ts"/);
   assert.match(browserSetup, /cleanupClerkBrowserFixture\(clerk, database, previousFixture\)/);
-  assert.match(browserSetup, /writeClerkBrowserFixture\(\{/);
+  assert.match(browserSetup, /createdFixture = \{/);
+  assert.match(browserSetup, /writeClerkBrowserFixture\(createdFixture\)/);
+  assert.match(browserSetup, /cleanupClerkBrowserFixture\(clerk, database, createdFixture\)/);
+  assert.match(browserSetup, /Browser fixture setup and cleanup both failed/);
+  assert.match(browserSetup, /browser\?\.close\(\)/);
   assert.match(browserFixtureCleanup, /requires a Clerk development tenant/);
+  assert.match(browserFixtureCleanup, /await database\.query\("BEGIN"\)/);
+  assert.match(browserFixtureCleanup, /await database\.query\("ROLLBACK"\)/);
   assert.match(browserFixtureCleanup, /clerk\.users\.deleteUser\(fixture\.clerkUserId\)/);
   assert.match(browserFixtureCleanup, /DELETE FROM users WHERE id = \$1/);
   assert.doesNotMatch(browserFixtureCleanup, /getUserList|WHERE id LIKE/);

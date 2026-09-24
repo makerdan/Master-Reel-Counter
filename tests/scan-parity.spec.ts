@@ -9,8 +9,8 @@ import { test, expect, createSessionViaApi, uploadTestPhoto } from "./fixtures";
 
 const MOCK_SKIP_PAYLOAD = {
   results: [{ pinId: -1, pinLabel: "P1", rawText: null, readable: false }],
-  skippedPins: 1,
-  skippedPinLabels: ["P1"],
+  truncated: true,
+  truncatedCount: 1,
 };
 
 test.describe("scan result parity @scan", () => {
@@ -23,10 +23,6 @@ test.describe("scan result parity @scan", () => {
     cleanupIds.push(sess.id);
 
     const photo = await uploadTestPhoto(request, sess.id);
-    if (!photo) {
-      test.skip(true, "Photo upload unavailable");
-      return;
-    }
 
     const pinResponse = await request.post(`/api/photos/${photo.id}/pins`, {
       data: { label: "P1", xPercent: 50, yPercent: 50, reelCount: 1, isDraft: true },
@@ -63,14 +59,11 @@ test.describe("scan result parity @scan", () => {
     cleanupIds.push(sess.id);
 
     const photo = await uploadTestPhoto(request, sess.id);
-    if (!photo) {
-      test.skip(true, "Photo upload unavailable");
-      return;
-    }
 
-    await request.post(`/api/sessions/${sess.id}/pins`, {
+    const pinResponse = await request.post(`/api/photos/${photo.id}/pins`, {
       data: { photoId: photo.id, label: "P1", xPercent: 50, yPercent: 50, reelCount: 1, isDraft: true },
     });
+    expect(pinResponse.ok(), `Pin creation failed: ${await pinResponse.text()}`).toBe(true);
 
     await page.route(`**/api/photos/${photo.id}/analyze-labels`, (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_SKIP_PAYLOAD) }),
@@ -87,7 +80,7 @@ test.describe("scan result parity @scan", () => {
     await page.click('[data-testid="btn-analyze-labels"]');
 
     await expect(
-      page.locator('[role="status"]').getByText(/1\s+skip/i).first(),
+      page.locator('[role="status"]').getByText(/1 pin(?:s)? skipped/i).first(),
       "Per-photo scan toast must report skipped-pin count",
     ).toBeVisible({ timeout: 12_000 });
   });
@@ -101,14 +94,11 @@ test.describe("scan result parity @scan", () => {
     cleanupIds.push(sess.id);
 
     const photo = await uploadTestPhoto(request, sess.id);
-    if (!photo) {
-      test.skip(true, "Photo upload unavailable");
-      return;
-    }
 
-    await request.post(`/api/sessions/${sess.id}/pins`, {
+    const pinResponse = await request.post(`/api/photos/${photo.id}/pins`, {
       data: { photoId: photo.id, label: "P1", xPercent: 50, yPercent: 50, reelCount: 1, isDraft: true },
     });
+    expect(pinResponse.ok(), `Pin creation failed: ${await pinResponse.text()}`).toBe(true);
 
     await page.route(`**/api/photos/${photo.id}/analyze-labels`, (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_SKIP_PAYLOAD) }),
@@ -125,7 +115,7 @@ test.describe("scan result parity @scan", () => {
     await page.click('[data-testid="btn-analyze-labels"]');
 
     await expect(
-      page.locator('[role="status"]').getByText(/1\s+skip/i).first(),
+      page.locator('[role="status"]').getByText(/1 pin(?:s)? skipped/i).first(),
       "Per-photo scan toast must report skipped-pin count",
     ).toBeVisible({ timeout: 12_000 });
   });
@@ -139,16 +129,13 @@ test.describe("scan result parity @scan", () => {
     cleanupIds.push(sess.id);
 
     const photo = await uploadTestPhoto(request, sess.id);
-    if (!photo) {
-      test.skip(true, "Photo upload unavailable");
-      return;
-    }
 
-    await request.post(`/api/sessions/${sess.id}/pins`, {
+    const pinResponse = await request.post(`/api/photos/${photo.id}/pins`, {
       data: { photoId: photo.id, label: "P1", xPercent: 50, yPercent: 50, reelCount: 1, isDraft: true },
     });
+    expect(pinResponse.ok(), `Pin creation failed: ${await pinResponse.text()}`).toBe(true);
 
-    await page.route(`**/api/sessions/${sess.id}/analyze-labels`, (route) =>
+    await page.route(`**/api/photos/${photo.id}/analyze-labels`, (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_SKIP_PAYLOAD) }),
     );
 
@@ -171,7 +158,7 @@ test.describe("scan result parity @scan", () => {
 
     // Parity check: session-wide toast must also show skipped count
     await expect(
-      page.locator('[role="status"]').getByText(/1\s+skip/i).first(),
+      page.locator('[role="status"]').getByText(/1 pin(?:s)? skipped/i).first(),
       "Session-wide scan toast must report skipped-pin count — parity with per-photo scan",
     ).toBeVisible({ timeout: 12_000 });
   });

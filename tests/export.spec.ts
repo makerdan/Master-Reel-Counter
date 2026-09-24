@@ -2,8 +2,7 @@
  * @feature export
  * Guards PDF and Excel export functionality end-to-end via the session page UI:
  * - Creates a session with at least one entry via API fixture helpers.
- * - Navigates to the session page and verifies export controls are present
- *   (skips gracefully if the export button is not found in the UI).
+ * - Navigates to the session page and verifies export controls are present.
  * - Excel: clicks the export dropdown → Excel item → captures the browser
  *   download event and asserts a non-empty file with a .xlsx extension.
  * - PDF: clicks the export dropdown → PDF item → handles the "unpinned
@@ -33,15 +32,11 @@ test.describe("export checks @export", () => {
     await page.goto(`/session/${sess.id}`);
     await page.waitForLoadState("domcontentloaded");
 
-    // Guard: skip if the export button is not present in this build
     const exportBtn = page.locator('[data-testid="button-export"]');
-    const exportBtnVisible = await exportBtn
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
-    if (!exportBtnVisible) {
-      test.skip(true, "Export button not found in session UI — skipping");
-      return;
-    }
+    await expect(
+      exportBtn,
+      "Export button must be present in the session UI",
+    ).toBeVisible({ timeout: 10_000 });
 
     // Open the export dropdown — once the button exists the menu item must too
     await exportBtn.click();
@@ -91,15 +86,11 @@ test.describe("export checks @export", () => {
     await page.goto(`/session/${sess.id}`);
     await page.waitForLoadState("domcontentloaded");
 
-    // Guard: skip if the export button is not present in this build
     const exportBtn = page.locator('[data-testid="button-export"]');
-    const exportBtnVisible = await exportBtn
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
-    if (!exportBtnVisible) {
-      test.skip(true, "Export button not found in session UI — skipping");
-      return;
-    }
+    await expect(
+      exportBtn,
+      "Export button must be present in the session UI",
+    ).toBeVisible({ timeout: 10_000 });
 
     // Open the export dropdown — once the button exists the menu item must too
     await exportBtn.click();
