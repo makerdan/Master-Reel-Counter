@@ -86,13 +86,17 @@ test("portable contract separates invariants from host-specific adaptation", () 
     "task validation",
     "completion validation",
     "TIER-LOCK VIOLATION",
-    "passing retry establishes intermittency",
+    "A passing retry establishes",
     "incomplete",
     "not reached",
     "Audit steps preserve their registered command, threshold, and result",
   ]) {
     assert.match(skill, new RegExp(phrase, "i"), `missing portable contract phrase: ${phrase}`);
   }
+  assert.match(
+    skill,
+    /Baseline records,\s+project memory, tier composition, and application paths must never be copied as\s+portable defaults\./i,
+  );
   assert.match(tiers, /example host registry, not as a portable default/i);
   assert.match(tiers, /Only `test` failures are eligible for exact baseline\s+classification/);
   assert.match(tiers, /Audit commands and thresholds are integrity-sensitive/);

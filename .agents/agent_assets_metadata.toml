@@ -14,3 +14,31 @@ mtime_ms = 1789611823627
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/bc22082c-51cb-4c12-8f52-8e2483e266b6/4662ce80-6eed-46b1-9285-291c8c993614"
 storage_version_token = "1789611835701205"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "C_TOP3v4a4F7C67K9lW1K"
+uri = "file://skill-previews/failure-gate/candidate-2026-09-24-b/P3.1-candidate-SKILL.md"
+type = "text"
+title = "Failure Gate P3.1 candidate"
+description = "Corrected compression candidate with the explicit portability safeguard restored. Canonical source remains unchanged pending approval."
+logical_id = "8e756c42-5bad-4b96-afa7-9b317550feaf"
+content_hash = "sha256:b807d7bdce7057d6df2bfb117e5cb667c8e6cc32abc35ca60c543bccbc8ba967"
+size = 16741
+mtime_ms = 1790241702640
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/8e756c42-5bad-4b96-afa7-9b317550feaf/22a868db-b588-455e-98d3-04f83cfe75c9"
+storage_version_token = "1790242230943726"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "gyE_KB-C0rMfyTBZgYEtv"
+uri = "file://skill-previews/failure-gate/candidate-2026-09-24-b/review.md"
+type = "text"
+title = "Failure Gate P3.1 review"
+description = "Invariant comparison, adversarial review, freshness-check evidence, and validation record for the corrected candidate."
+logical_id = "401c8f8a-661a-47df-99ed-436b14bcd45b"
+content_hash = "sha256:0e623f00a3be0e822da670a7471c30ac275f0524d9f8f6324343e0982dd37813"
+size = 5983
+mtime_ms = 1790242204660
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/401c8f8a-661a-47df-99ed-436b14bcd45b/735f96f5-03b4-4a3f-97e7-b7a233312552"
+storage_version_token = "1790242231501836"
+content_type = "text/markdown"
