@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { getBrowserProjectCoverage } from "./scripts/lib/browser-project-coverage.mjs";
 
 const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5000";
 
@@ -18,8 +19,7 @@ function findChromium(): string | undefined {
   }
 }
 const chromiumExecutable = findChromium();
-const webkitEnabled = process.env.CI === "true"
-  || process.env.PLAYWRIGHT_WEBKIT_ENABLED === "true";
+const { webkitEnabled } = getBrowserProjectCoverage(process.env);
 
 export default defineConfig({
   testDir: "./tests",

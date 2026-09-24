@@ -65,9 +65,15 @@ test.describe("scan result parity @scan", () => {
     });
     expect(pinResponse.ok(), `Pin creation failed: ${await pinResponse.text()}`).toBe(true);
 
-    await page.route(`**/api/photos/${photo.id}/analyze-labels`, (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_SKIP_PAYLOAD) }),
-    );
+    let scanRequestCount = 0;
+    await page.route(`**/api/photos/${photo.id}/analyze-labels`, async (route) => {
+      scanRequestCount += 1;
+      await route.fulfill({
+        status: 422,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Scan request could not be processed" }),
+      });
+    });
 
     await page.goto(`/session/${sess.id}?tab=scanner`);
     await page.waitForLoadState("domcontentloaded");
@@ -77,12 +83,19 @@ test.describe("scan result parity @scan", () => {
       page.locator('[data-testid="btn-analyze-labels"]'),
       "btn-analyze-labels must be present in the scanner tab",
     ).toBeVisible({ timeout: 8_000 });
+    const scanResponse = page.waitForResponse(
+      (response) => response.url().includes(`/api/photos/${photo.id}/analyze-labels`),
+    );
     await page.click('[data-testid="btn-analyze-labels"]');
-
+    expect((await scanResponse).status()).toBe(422);
+    expect(scanRequestCount).toBe(1);
     await expect(
-      page.locator('[role="status"]').getByText(/1 pin(?:s)? skipped/i).first(),
-      "Per-photo scan toast must report skipped-pin count",
-    ).toBeVisible({ timeout: 12_000 });
+      page.locator('[role="status"]').getByText(
+        "1 failed — tap Retry on affected cards.",
+        { exact: true },
+      ),
+      "A failed scan must show the retry recovery action",
+    ).toBeVisible({ timeout: 8_000 });
   });
 
   test("per-photo scan toast shows skipped-pin count", async ({
