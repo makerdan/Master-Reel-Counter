@@ -13,19 +13,27 @@ Master Reel Counter uses [Playwright](https://playwright.dev/) for end-to-end te
 ### Local PostgreSQL compatibility
 
 The startup smoke check verifies the connected database before starting the
-application. It requires an explicit `DATABASE_URL`, the `psql` client, and a
-PostgreSQL server whose major version matches the shared GitHub Actions
-validation contract (currently PostgreSQL 16).
+application. It requires an explicit `DATABASE_URL`, the `psql` and `curl`
+clients, and a PostgreSQL server whose major version matches the shared GitHub
+Actions validation contract (currently PostgreSQL 16).
 
 ```bash
 DATABASE_URL=postgresql://... bash scripts/startup-smoke.sh
 ```
 
-Missing connection details, an unavailable `psql` client, a non-PostgreSQL or
-unreachable database, incomplete server metadata, and a PostgreSQL major
-version mismatch all fail explicitly before the application boots. This is
-intentional for externally managed databases too: startup smoke must not
-silently validate against a different database or version.
+Missing connection details, unavailable validation tools, an invalid timeout,
+a non-PostgreSQL or unreachable database, incomplete server metadata, and a
+PostgreSQL major version mismatch all fail explicitly before the application
+boots. CI sets `SMOKE_EXPECTED_DATABASE` to require the validation database
+identity. Local or externally managed database mode remains available when
+that variable is omitted; it is reported as generic external mode rather than
+being treated as the canonical validation target.
+
+Contexts that need endpoint identity can additionally set
+`SMOKE_EXPECTED_SERVER_ADDRESS` and `SMOKE_EXPECTED_SERVER_PORT`. Database
+connection and compatibility-query work is bounded by `SMOKE_DB_TIMEOUT`
+(default 10 seconds), while application readiness is bounded by
+`SMOKE_TIMEOUT` (default 20 seconds).
 
 To intentionally upgrade the validation version, update
 `SUPPORTED_POSTGRES_MAJOR_VERSION` in

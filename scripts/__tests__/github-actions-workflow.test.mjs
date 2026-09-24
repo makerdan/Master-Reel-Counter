@@ -177,6 +177,7 @@ test("workflow provisions and checks the test prerequisites", () => {
   assert.match(browserLaunch, /webkit\.launch/);
   assert.match(browserLaunch, /chromium\.launch/);
   assert.match(workflow, /DATABASE_URL:\s+postgresql:\/\/postgres:postgres@localhost:5432\/master_reel_counter_test/);
+  assert.match(workflow, /SMOKE_EXPECTED_DATABASE:\s+master_reel_counter_test/);
   assert.match(workflow, /Verify blank-database startup and test authentication/);
   assert.match(workflow, /node --test scripts\/__tests__\/github-actions-empty-database\.test\.mjs/);
 });
@@ -199,11 +200,17 @@ test("PostgreSQL contract derives the service image from its supported major ver
 
 test("startup smoke verifies the connected PostgreSQL major before launching the server", () => {
   const preflight = startupSmoke.indexOf("check_postgres_version");
-  const serverLaunch = startupSmoke.indexOf('npx tsx server/index.ts');
+  const serverLaunch = startupSmoke.indexOf('setsid node node_modules/tsx/dist/cli.mjs');
   assert.ok(preflight >= 0, "startup smoke is missing its PostgreSQL preflight");
   assert.ok(serverLaunch > preflight, "PostgreSQL preflight must run before the server launches");
   assert.match(startupSmoke, /DATABASE_URL is required/);
   assert.match(startupSmoke, /psql "\$DATABASE_URL"/);
+  assert.match(startupSmoke, /PGCONNECT_TIMEOUT="\$DB_TIMEOUT"/);
+  assert.match(startupSmoke, /statement_timeout = '\$\{DB_TIMEOUT\}s'/);
+  assert.match(startupSmoke, /PostgreSQL readiness timeout/);
+  assert.match(startupSmoke, /SMOKE_EXPECTED_DATABASE/);
+  assert.match(startupSmoke, /database identity mismatch/);
+  assert.match(startupSmoke, /smoke port \$\{SMOKE_PORT\} is still listening/);
   assert.match(startupSmoke, /current_setting\('server_version'\)/);
   assert.match(startupSmoke, /current_setting\('server_version_num'\)/);
   assert.match(startupSmoke, /postgresMajorVersion/);

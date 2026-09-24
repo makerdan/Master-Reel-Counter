@@ -1,9 +1,19 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import {
+  chmod,
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:net";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Pool } from "pg";
 import test from "node:test";
@@ -16,6 +26,7 @@ const root = resolve(import.meta.dirname, "../..");
 const EXPECTED_DATABASE = "master_reel_counter_test";
 const TEST_OWNER_ID = "github-actions-owner";
 const TEST_OWNER_EMAIL = "github-actions-owner@example.invalid";
+const startupSmokePath = resolve(root, "scripts/startup-smoke.sh");
 
 function quoteIdentifier(identifier) {
   return `"${identifier.replaceAll('"', '""')}"`;
@@ -49,6 +60,145 @@ async function runCommand(command, args, options) {
     child.once("close", (code, signal) => resolveResult({ code, signal }));
   });
   return { ...result, stdout, stderr };
+}
+
+function systemCommand(command) {
+  return execFileSync("bash", ["-lc", `command -v ${command}`], {
+    encoding: "utf8",
+  }).trim();
+}
+
+async function createStartupSmokeFixture({
+  databaseName = EXPECTED_DATABASE,
+  serverAddress = "127.0.0.1",
+  serverPort = 5432,
+  psqlDelaySeconds = 0,
+  healthStatus = 200,
+  includePsql = true,
+  includeCurl = true,
+  expectedServerAddress = "",
+  expectedServerPort = "",
+} = {}) {
+  const directory = await mkdtemp(join(tmpdir(), "startup-smoke-test-"));
+  const binDirectory = join(directory, "bin");
+  await mkdir(binDirectory);
+  await writeFile(join(directory, "fixture-server.mjs"), `
+    import { appendFileSync, writeFileSync } from "node:fs";
+    import { createServer } from "node:http";
+    import { spawn } from "node:child_process";
+
+    const port = Number(process.env.PORT);
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    });
+    writeFileSync(process.env.SMOKE_CHILD_PID_FILE, String(child.pid));
+    const server = createServer((request, response) => {
+      if (request.url === "/api/healthz") {
+        response.statusCode = ${healthStatus};
+        response.end(${healthStatus} === 200 ? JSON.stringify({ ok: true }) : "not ready");
+        return;
+      }
+      response.statusCode = 404;
+      response.end();
+    });
+    const stop = () => {
+      server.close(() => {
+        try { child.kill("SIGTERM"); } catch {}
+        process.exit(0);
+      });
+    };
+    process.on("SIGTERM", stop);
+    process.on("SIGINT", stop);
+    server.listen(port, "127.0.0.1", () => {
+      appendFileSync(process.env.SMOKE_READY_MARKER, "ready\\n");
+    });
+  `);
+  const psqlPath = join(binDirectory, "psql");
+  if (includePsql) {
+    await writeFile(psqlPath, `#!/bin/sh
+if [ "${psqlDelaySeconds}" -gt 0 ]; then
+  exec sleep "${psqlDelaySeconds}"
+fi
+printf '%b\\n' '${databaseName}\\t16.10\\t160000\\t${serverAddress}\\t${serverPort}'
+`);
+    await chmod(psqlPath, 0o755);
+  }
+  await writeFile(join(directory, "child-pid"), "");
+  await writeFile(join(directory, "ready"), "");
+  await symlink(process.execPath, join(binDirectory, "node"));
+  for (const command of ["cat", "env", "grep", "mktemp", "rm", "sleep", "timeout", "setsid"]) {
+    await symlink(systemCommand(command), join(binDirectory, command));
+  }
+  if (includeCurl) {
+    await symlink(systemCommand("curl"), join(binDirectory, "curl"));
+  }
+
+  return {
+    directory,
+    binDirectory,
+    entrypoint: join(directory, "fixture-server.mjs"),
+    childPidFile: join(directory, "child-pid"),
+    readyMarker: join(directory, "ready"),
+    env: {
+      ...process.env,
+      PATH: binDirectory,
+      DATABASE_URL: "postgresql://smoke-user:smoke-password@127.0.0.1:5432/smoke-target",
+      SMOKE_EXPECTED_DATABASE: EXPECTED_DATABASE,
+      SMOKE_EXPECTED_SERVER_ADDRESS: expectedServerAddress,
+      SMOKE_EXPECTED_SERVER_PORT: String(expectedServerPort),
+      SMOKE_SERVER_ENTRYPOINT: join(directory, "fixture-server.mjs"),
+      SMOKE_CHILD_PID_FILE: join(directory, "child-pid"),
+      SMOKE_READY_MARKER: join(directory, "ready"),
+    },
+  };
+}
+
+async function waitForFile(path, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const content = await readFile(path, "utf8");
+      if (content.trim()) return;
+    } catch {
+      // The fixture may not have created the marker yet.
+    }
+    await sleep(50);
+  }
+  throw new Error(`fixture did not create ${path} within ${timeoutMs}ms`);
+}
+
+async function processGone(pid) {
+  if (!pid) return true;
+  try {
+    process.kill(Number(pid), 0);
+    return false;
+  } catch (error) {
+    return error?.code === "ESRCH";
+  }
+}
+
+async function waitForProcessGone(pid, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await processGone(pid)) return true;
+    await sleep(50);
+  }
+  return processGone(pid);
+}
+
+async function assertPortFree(port) {
+  const error = await new Promise((resolveProbe) => {
+    const socket = createServer();
+    socket.once("error", resolveProbe);
+    socket.listen(port, "127.0.0.1", () => {
+      socket.close(() => resolveProbe(null));
+    });
+  });
+  assert.equal(
+    error,
+    null,
+    `port ${port} remained occupied after startup-smoke cleanup`,
+  );
 }
 
 async function findAvailablePort() {
@@ -120,6 +270,200 @@ test("PostgreSQL contract parses server version numbers by major version", () =>
     () => postgresMajorVersion("not-a-version"),
     /invalid PostgreSQL server_version_num/,
   );
+});
+
+test("startup smoke rejects invalid timeout configuration before checking tools", async () => {
+  const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+    cwd: root,
+    env: {
+      ...process.env,
+      SMOKE_TIMEOUT: "nope",
+    },
+  });
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /SMOKE_TIMEOUT must be a positive integer/);
+});
+
+test("startup smoke reports a missing curl prerequisite immediately", async () => {
+  const fixture = await createStartupSmokeFixture({ includeCurl: false });
+  try {
+    const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      cwd: root,
+      env: fixture.env,
+    });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /curl is required for startup smoke/);
+    assert.doesNotMatch(result.stderr, /did not bind|PostgreSQL readiness timeout/);
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("startup smoke reports a missing psql prerequisite immediately", async () => {
+  const fixture = await createStartupSmokeFixture({ includePsql: false });
+  try {
+    const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      cwd: root,
+      env: fixture.env,
+    });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /psql is required for startup smoke/);
+    assert.doesNotMatch(result.stderr, /unable to query the configured database|Starting server on port/);
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("startup smoke bounds a stalled PostgreSQL preflight", async () => {
+  const fixture = await createStartupSmokeFixture({ psqlDelaySeconds: 30 });
+  const startedAt = Date.now();
+  try {
+    const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      cwd: root,
+      env: {
+        ...fixture.env,
+        SMOKE_DB_TIMEOUT: "1",
+      },
+    });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /PostgreSQL readiness timeout after 1s/);
+    assert.ok(Date.now() - startedAt < 5_000, "stalled preflight exceeded its deadline");
+    assert.equal(await readFile(fixture.childPidFile, "utf8"), "");
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("startup smoke rejects an unexpected database identity before launching", async () => {
+  const fixture = await createStartupSmokeFixture({ databaseName: "wrong-target" });
+  try {
+    const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      cwd: root,
+      env: fixture.env,
+    });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /PostgreSQL database identity mismatch/);
+    assert.match(result.stderr, /Expected database: master_reel_counter_test/);
+    assert.doesNotMatch(result.stdout, /Starting server on port/);
+    assert.equal(await readFile(fixture.childPidFile, "utf8"), "");
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("startup smoke rejects unexpected PostgreSQL address and port identities before launching", async (t) => {
+  for (const scenario of [
+    {
+      name: "server address",
+      fixtureOptions: {
+        serverAddress: "10.20.30.40",
+        expectedServerAddress: "127.0.0.1",
+        expectedServerPort: "5432",
+      },
+      diagnostic: /PostgreSQL server endpoint identity mismatch/,
+    },
+    {
+      name: "server port",
+      fixtureOptions: {
+        serverPort: 6432,
+        expectedServerAddress: "127.0.0.1",
+        expectedServerPort: "5432",
+      },
+      diagnostic: /PostgreSQL server endpoint port mismatch/,
+    },
+  ]) {
+    await t.test(scenario.name, async () => {
+      const fixture = await createStartupSmokeFixture(scenario.fixtureOptions);
+      try {
+        const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+          cwd: root,
+          env: fixture.env,
+        });
+        assert.notEqual(result.code, 0);
+        assert.match(result.stderr, scenario.diagnostic);
+        assert.doesNotMatch(result.stdout, /Starting server on port/);
+      } finally {
+        await rm(fixture.directory, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("startup smoke removes the complete server group and listener after success", async () => {
+  const fixture = await createStartupSmokeFixture();
+  const port = await findAvailablePort();
+  try {
+    const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      cwd: root,
+      env: {
+        ...fixture.env,
+        SMOKE_PORT: String(port),
+        SMOKE_TIMEOUT: "5",
+      },
+    });
+    assert.equal(result.code, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /PASS — server started cleanly/);
+    const childPid = await readFile(fixture.childPidFile, "utf8");
+    assert.equal(await waitForProcessGone(childPid.trim()), true);
+    await assertPortFree(port);
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("startup smoke removes the complete server group after readiness failure", async () => {
+  const fixture = await createStartupSmokeFixture({ healthStatus: 503 });
+  const port = await findAvailablePort();
+  try {
+    const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      cwd: root,
+      env: {
+        ...fixture.env,
+        SMOKE_PORT: String(port),
+        SMOKE_TIMEOUT: "1",
+      },
+    });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout, /server did not bind to port/);
+    const childPid = await readFile(fixture.childPidFile, "utf8");
+    assert.equal(await waitForProcessGone(childPid.trim()), true);
+    await assertPortFree(port);
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("startup smoke cleans its process group and port when interrupted", async () => {
+  const fixture = await createStartupSmokeFixture({ healthStatus: 503 });
+  const port = await findAvailablePort();
+  const smoke = spawn(systemCommand("bash"), [startupSmokePath], {
+    cwd: root,
+    env: {
+      ...fixture.env,
+      SMOKE_PORT: String(port),
+      SMOKE_TIMEOUT: "30",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let output = "";
+  smoke.stdout.on("data", (chunk) => { output += chunk; });
+  smoke.stderr.on("data", (chunk) => { output += chunk; });
+
+  try {
+    await waitForFile(fixture.readyMarker);
+    const childPid = (await readFile(fixture.childPidFile, "utf8")).trim();
+    const interruptedAt = Date.now();
+    smoke.kill("SIGINT");
+    const [code, signal] = await once(smoke, "close");
+    assert.notEqual(code, 0, `${output}\ninterrupted smoke unexpectedly passed`);
+    assert.equal(signal, null);
+    assert.ok(Date.now() - interruptedAt < 5_000, "interrupted smoke did not stop within its cleanup deadline");
+    assert.equal(await waitForProcessGone(childPid), true);
+    await assertPortFree(port);
+  } finally {
+    if (smoke.exitCode === null) smoke.kill("SIGKILL");
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
 });
 
 test("GitHub Actions boots the app against a blank disposable database", async (t) => {

@@ -43,6 +43,7 @@ jobs:
       CI: true
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/master_reel_counter_test
+      SMOKE_EXPECTED_DATABASE: master_reel_counter_test
       SESSION_SECRET: github-actions-test-session-secret-not-production
       CLERK_SECRET_KEY: sk_test_github_actions_validation_not_production
       REPL_ID: github-actions-validation
