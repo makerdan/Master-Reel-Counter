@@ -56,6 +56,11 @@ test("workflow covers every required GitHub event", () => {
   assert.match(triggers, /workflow_dispatch:/);
 });
 
+test("workflow configures the application port through its environment", () => {
+  const validationEnvironment = sectionBetween("    env:\n", "\n\n    steps:");
+  assert.match(validationEnvironment, /^\s+PORT:\s+"?\d+"?\s*$/m);
+});
+
 test("Dependabot proposes npm updates and groups only security patches", () => {
   assert.match(dependabot, /^version:\s*2$/m);
   assert.match(dependabot, /package-ecosystem:\s*npm/);

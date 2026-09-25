@@ -12,9 +12,20 @@ function findChromium(): string | undefined {
   }
 }
 
+function localPreviewOrigin(): string {
+  if (process.env.TEST_BASE_URL) return process.env.TEST_BASE_URL;
+  const configuredPort = process.env.PORT;
+  const port =
+    configuredPort && /^\d+$/.test(configuredPort) ? Number(configuredPort) : Number.NaN;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("Local Clerk preview testing requires PORT to be set to a valid port.");
+  }
+  return `http://127.0.0.1:${port}`;
+}
+
 const previewOrigin = process.env.REPLIT_DEV_DOMAIN
   ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-  : process.env.TEST_BASE_URL || "http://127.0.0.1:5000";
+  : localPreviewOrigin();
 const chromiumExecutable = findChromium();
 
 export default defineConfig({

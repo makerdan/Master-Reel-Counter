@@ -28,7 +28,9 @@ commit SHAs. No production credentials, GitHub write token, authenticated
 Replit API, object-storage credential, or AI credential is used. The
 environment values in the workflow are test-only values: AI requests are
 mocked by the browser tests and object storage is not authenticated in GitHub
-Actions. Current application startup does perform public Replit OIDC metadata
+Actions. The job supplies the application listener through `PORT`; executable
+services and browser-test configuration consume that environment value instead
+of relying on a source-level port fallback. Current application startup does perform public Replit OIDC metadata
 discovery. The workflow supplies a non-secret test client identifier for that
 discovery, not a Replit credential. The synthetic database account uses the
 current persisted `Admin` role; it does not use the removed tester-account
@@ -70,6 +72,7 @@ and the e2e route while an isolated fixture lock is held.
 | `workspace-skill-contract` | `npm run ci` → `test-heavy` | **Indirect**; uses only checked-in canonical skill sources. |
 | `typecheck` | `npm run ci` → `test-heavy` | **Indirect**; Node.js 20 is installed explicitly. |
 | `storage-lint` | `npm run ci` → `test-heavy` | **Indirect**; no external storage access is needed. |
+| `port-reference-scan` | `npm run ci` → `test-heavy` | **Indirect**; scans tracked executable source for fixed service ports. |
 | `unit-tests` | `npm run ci` → `test-heavy` | **Indirect**; test-only values are supplied by the job environment. |
 | `serial-lock-tests` | `npm run ci` → `test-heavy` | **Indirect**; uses local filesystem locks on the runner. |
 | `port-authority-tests` | `npm run ci` → `test-heavy` | **Indirect**; owns only ephemeral runner ports. |

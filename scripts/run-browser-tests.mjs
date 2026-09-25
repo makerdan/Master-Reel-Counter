@@ -129,11 +129,24 @@ try {
     );
     validationStatus = setupResult.status;
     if (validationStatus === 0 && !cancellation.signal.aborted) {
+      const browserPort = process.env.PORT;
+      const parsedBrowserPort =
+        browserPort && /^\d+$/.test(browserPort) ? Number(browserPort) : Number.NaN;
+      if (
+        !Number.isInteger(parsedBrowserPort) ||
+        parsedBrowserPort < 1 ||
+        parsedBrowserPort > 65535
+      ) {
+        throw new Error("Browser validation requires PORT to be set to an integer from 1 to 65535.");
+      }
       const browserResult = await run(
         process.execPath,
         [resolve(import.meta.dirname, "../node_modules/@playwright/test/cli.js"), "test", ...process.argv.slice(2)],
         {
           ...process.env,
+          PORT: browserPort,
+          TEST_BASE_URL:
+            process.env.TEST_BASE_URL ?? `http://localhost:${parsedBrowserPort}`,
           DATABASE_URL: browserDatabaseUrl,
           RELEASE_SMOKE_DATABASE_URL: browserDatabaseUrl,
           RELEASE_PUBLICATION_DATABASE_URL: sourceDatabaseUrl,

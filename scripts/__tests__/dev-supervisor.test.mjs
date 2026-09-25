@@ -32,6 +32,27 @@ async function waitForFile(path, predicate, timeoutMs = 15000) {
   throw new Error(`Timed out waiting for ${path}`);
 }
 
+test("dev supervisor rejects missing and invalid ports instead of using a fallback", async () => {
+  for (const port of [undefined, "not-a-port", "0", "65536"]) {
+    const env = { ...process.env, NODE_ENV: "test" };
+    if (port === undefined) delete env.PORT;
+    else env.PORT = port;
+    const supervisor = spawn(
+      process.execPath,
+      [resolve("scripts/dev-supervisor.mjs")],
+      { env, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let output = "";
+    supervisor.stdout.on("data", (chunk) => { output += chunk; });
+    supervisor.stderr.on("data", (chunk) => { output += chunk; });
+    const exitCode = await new Promise((resolvePromise) => {
+      supervisor.once("close", (code) => resolvePromise(code));
+    });
+    assert.equal(exitCode, 2, `PORT=${String(port)} should be rejected`);
+    assert.match(output, /PORT must be set to an integer from 1 to 65535/);
+  }
+});
+
 test("dev supervisor restarts a crashed server and releases its port", async () => {
   const directory = await mkdtemp(join(tmpdir(), "dev-supervisor-"));
   const fixture = join(directory, "fixture.ts");

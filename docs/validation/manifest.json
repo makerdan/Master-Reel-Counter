@@ -21,6 +21,7 @@
       "steps": [
         { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"] },
         { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
         { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
         { "name": "clerk-release-contract", "kind": "test", "command": ["npm", "run", "test:managed-clerk-release-contract"] },
@@ -38,6 +39,7 @@
       "steps": [
         { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"] },
         { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
         { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
         { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
@@ -61,6 +63,7 @@
         { "name": "workspace-skill-contract", "kind": "test", "command": ["npm", "run", "test:workspace-skill"] },
         { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
         { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"] },
         { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
         { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
         { "name": "vite-hmr-recovery-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr-recovery"] },

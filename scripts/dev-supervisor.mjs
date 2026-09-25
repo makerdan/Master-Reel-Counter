@@ -4,7 +4,9 @@ import { spawn } from "node:child_process";
 import http from "node:http";
 import { resolve } from "node:path";
 
-const port = Number.parseInt(process.env.PORT ?? "5000", 10);
+const portValue = process.env.PORT;
+const port =
+  portValue && /^\d+$/.test(portValue) ? Number(portValue) : Number.NaN;
 const startupTimeoutMs = Number.parseInt(
   process.env.DEV_STARTUP_TIMEOUT_MS ?? "30000",
   10,
@@ -16,7 +18,7 @@ const entry = testEntry ? resolve(testEntry) : resolve("server/index.ts");
 const tsxCli = resolve("node_modules", "tsx", "dist", "cli.mjs");
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  console.error("[dev-supervisor] PORT must be an integer from 1 to 65535.");
+  console.error("[dev-supervisor] PORT must be set to an integer from 1 to 65535.");
   process.exit(2);
 }
 

@@ -6,11 +6,17 @@
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createConnection } from "node:net";
 import { resolve } from "node:path";
-import { findHardcodedPortReferences } from "./port-reference-scan.mjs";
+import {
+  findHardcodedPortReferences,
+  scanExecutableSource,
+} from "./port-reference-scan.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const cleanupScript = resolve(root, "scripts/free-ports.mjs");
+const projectScan = scanExecutableSource(root);
+assert.deepEqual(projectScan.findings, [], "project executable sources must not pin service ports");
 
 // Scanner fixtures: a fixed service bind/URL fails closed, while an
 // environment-driven bind and an ephemeral test listener remain valid.
@@ -22,7 +28,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   findHardcodedPortReferences(
-    "server.listen(Number(process.env.PORT || 5000)); server.listen(0); fetch(`http://localhost:${port}`)",
+    "server.listen(Number(process.env.PORT)); server.listen(0); fetch(`http://localhost:${port}`)",
   ),
   [],
 );
@@ -164,4 +170,116 @@ assert.equal(shared.exitCode, null, "shared process must not be terminated");
 shared.kill("SIGTERM");
 await new Promise((resolvePromise) => shared.once("close", resolvePromise));
 
-console.log("[port-authority-test] PASS: isolated cleanup, socket replacement, shared-process, and scanner guards verified.");
+const workerCode = [
+  "const net=require('node:net');",
+  "const server=net.createServer((socket)=>socket.end('ok'));",
+  "server.listen(0,'127.0.0.1',()=>console.log(JSON.stringify({pid:process.pid,port:server.address().port})));",
+  "setInterval(()=>{},1000);",
+].join("");
+const supervisorCode = [
+  "const {spawn}=require('node:child_process');",
+  `const workerCode=${JSON.stringify(workerCode)};`,
+  "const workers=[]; const services={};",
+  "for(const name of ['target','sibling']){",
+  "  const worker=spawn(process.execPath,['-e',workerCode],{stdio:['ignore','pipe','inherit']});",
+  "  workers.push(worker); let output='';",
+  "  worker.stdout.on('data',(chunk)=>{",
+  "    output+=chunk; const line=output.split('\\n')[0];",
+  "    try{services[name]=JSON.parse(line);if(services.target&&services.sibling)console.log(JSON.stringify(services));}catch{}",
+  "  });",
+  "}",
+  "process.stdin.on('data',()=>{",
+  "  for(const worker of workers)worker.kill('SIGTERM');",
+  "  Promise.all(workers.map((worker)=>worker.exitCode!==null?Promise.resolve():new Promise((resolve)=>worker.once('close',resolve))))",
+  "    .then(()=>process.exit(0));",
+  "});",
+  "setInterval(()=>{},1000);",
+].join("");
+
+const supervisor = spawn(process.execPath, ["-e", supervisorCode], {
+  cwd: root,
+  stdio: ["pipe", "pipe", "pipe"],
+});
+const supervisorDone = new Promise((resolvePromise) => supervisor.once("close", resolvePromise));
+let supervisorOutput = "";
+supervisor.stdout.on("data", (data) => { supervisorOutput += data; });
+supervisor.stderr.on("data", (data) => { supervisorOutput += data; });
+let services;
+try {
+  services = await new Promise((resolvePromise, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`multi-process fixture did not become ready: ${supervisorOutput}`)),
+      5000,
+    );
+    supervisor.stdout.on("data", () => {
+      for (const line of supervisorOutput.split("\n")) {
+        try {
+          const value = JSON.parse(line);
+          if (value.target && value.sibling) {
+            clearTimeout(timer);
+            resolvePromise(value);
+            return;
+          }
+        } catch {
+          // Wait for the fixture's complete JSON line.
+        }
+      }
+    });
+  });
+  const targetedCleanup = await run(process.execPath, [
+    cleanupScript,
+    String(services.target.port),
+  ], { FREE_PORTS_GRACE_MS: "50" });
+  assert.equal(
+    targetedCleanup.code,
+    0,
+    `cleanup of one service must succeed: ${targetedCleanup.output}`,
+  );
+  assert.match(targetedCleanup.output, /now free/);
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  assert.equal(supervisor.exitCode, null, "a supervisor with unrelated child work must survive cleanup");
+  const siblingSocket = createConnection({
+    host: "127.0.0.1",
+    port: services.sibling.port,
+  });
+  const siblingStillOwnsPort = await new Promise((resolvePromise) => {
+    siblingSocket.once("connect", () => {
+      siblingSocket.destroy();
+      resolvePromise(true);
+    });
+    siblingSocket.once("error", () => resolvePromise(false));
+  });
+  assert.equal(siblingStillOwnsPort, true, "the unrelated sibling service must keep its port");
+  const targetedSocket = createConnection({
+    host: "127.0.0.1",
+    port: services.target.port,
+  });
+  const targetedPortStillOpen = await new Promise((resolvePromise) => {
+    targetedSocket.once("connect", () => {
+      targetedSocket.destroy();
+      resolvePromise(true);
+    });
+    targetedSocket.once("error", () => resolvePromise(false));
+  });
+  assert.equal(targetedPortStillOpen, false, "the requested service must be removed");
+} finally {
+  if (supervisor.exitCode === null) {
+    supervisor.stdin.write("stop\n");
+    await Promise.race([
+      supervisorDone,
+      new Promise((resolvePromise) => setTimeout(resolvePromise, 2000)),
+    ]);
+  }
+  if (supervisor.exitCode === null) supervisor.kill("SIGKILL");
+  if (services) {
+    for (const service of Object.values(services)) {
+      try {
+        process.kill(service.pid, "SIGTERM");
+      } catch (error) {
+        if (error?.code !== "ESRCH") throw error;
+      }
+    }
+  }
+}
+
+console.log("[port-authority-test] PASS: ownership cleanup, socket replacement, separate-process, and source-scan guards verified.");

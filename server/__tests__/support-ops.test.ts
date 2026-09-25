@@ -40,7 +40,7 @@ test("port scanner rejects fixed service fixtures but allows canonical allocatio
   );
   assert.deepEqual(
     findHardcodedPortReferences(
-      "app.listen(Number(process.env.PORT || 5000)); app.listen(0); fetch(`http://localhost:${port}`)",
+      "app.listen(Number(process.env.PORT)); app.listen(0); fetch(`http://localhost:${port}`)",
     ),
     [],
   );

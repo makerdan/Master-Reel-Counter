@@ -225,17 +225,24 @@ function getSafeSupervisors(pid, selfTree) {
 function findKillTargets(holders, selfTree) {
   const parents = getProcessParents();
   const targets = new Map();
+  const ownedTargetPids = new Set();
   for (const holder of holders) {
     if (selfTree.has(String(holder))) continue;
     targets.set(holder, { pid: holder, holder });
+    ownedTargetPids.add(holder);
     for (const child of getDescendants(holder, parents)) {
       if (!selfTree.has(child)) {
         const pid = Number(child);
         targets.set(pid, { pid, holder });
+        ownedTargetPids.add(pid);
       }
     }
     for (const supervisor of getSafeSupervisors(holder, selfTree)) {
+      const unrelatedDescendant = [...getDescendants(supervisor, parents)]
+        .some((descendant) => !ownedTargetPids.has(Number(descendant)));
+      if (unrelatedDescendant) continue;
       targets.set(supervisor, { pid: supervisor, holder });
+      ownedTargetPids.add(supervisor);
     }
   }
   return [...targets.values()].filter(

@@ -1,7 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 import { getBrowserProjectCoverage } from "./scripts/lib/browser-project-coverage.mjs";
 
-const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5000";
+const configuredPort = process.env.PORT;
+const TEST_PORT =
+  configuredPort && /^\d+$/.test(configuredPort) ? Number(configuredPort) : Number.NaN;
+if (!Number.isInteger(TEST_PORT) || TEST_PORT < 1 || TEST_PORT > 65535) {
+  throw new Error("Playwright requires PORT to be set to an integer from 1 to 65535.");
+}
+const BASE_URL = process.env.TEST_BASE_URL || `http://localhost:${TEST_PORT}`;
 
 // In NixOS/Replit the bundled Playwright browser may not be available; fall
 // back to the system Chromium installed via Nix if the env var is not already
@@ -69,7 +75,7 @@ export default defineConfig({
       : []),
   ],
   webServer: {
-    command: "node scripts/free-ports.mjs 5000 && npm run dev",
+    command: "npm run dev",
     url: `${BASE_URL}/api/healthz`,
     reuseExistingServer: true,
     timeout: 120_000,
