@@ -16,6 +16,7 @@ import
 ;
 
 import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
 
 import http from "node:http"
 ;
@@ -1813,6 +1814,95 @@ type PatchRouteTestContext = {
   cleanup: () => Promise<void>;
 };
 
+type ConfigurablePoolOptions = {
+  max?: number;
+  options?: string;
+};
+
+const routeTestPoolOptions = (pool as unknown as {
+  options: ConfigurablePoolOptions;
+}).options;
+
+async function setPoolSearchPath(searchPath: string): Promise<void> {
+  const clientCount = routeTestPoolOptions.max ?? 10;
+  const clients = await Promise.all(
+    Array.from({ length: clientCount }, () => pool.connect()),
+  );
+  try {
+    await Promise.all(
+      clients.map((client) =>
+        client.query("SELECT set_config('search_path', $1, false)", [searchPath]),
+      ),
+    );
+  } finally {
+    for (const client of clients) client.release();
+  }
+}
+
+async function createIsolatedPatchTestSchema(): Promise<() => Promise<void>> {
+  const schema = `routes_patch_${process.pid}_${randomUUID().replaceAll("-", "")}`;
+  const schemaSql = execFileSync(
+    "npx",
+    [
+      "drizzle-kit",
+      "export",
+      "--sql",
+      "--dialect",
+      "postgresql",
+      "--schema",
+      "./shared/schema.ts",
+    ],
+    { encoding: "utf8" },
+  ).replaceAll('"public".', `"${schema}".`);
+  const setupPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const setupClient = await setupPool.connect();
+  let schemaCreated = false;
+  try {
+    await setupClient.query(`CREATE SCHEMA "${schema}"`);
+    schemaCreated = true;
+    await setupClient.query(`SET search_path TO "${schema}"`);
+    await setupClient.query(schemaSql);
+  } catch (error) {
+    if (schemaCreated) {
+      await setupClient.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {});
+    }
+    await setupPool.end();
+    throw error;
+  } finally {
+    setupClient.release();
+  }
+
+  const previousSearchPath = (
+    await setupPool.query("SHOW search_path")
+  ).rows[0].search_path as string;
+  const previousPoolOptions = routeTestPoolOptions.options;
+  routeTestPoolOptions.options = [previousPoolOptions, `-c search_path=${schema}`]
+    .filter(Boolean)
+    .join(" ");
+
+  try {
+    await setPoolSearchPath(schema);
+  } catch (error) {
+    routeTestPoolOptions.options = previousPoolOptions;
+    await setupPool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {});
+    await setupPool.end();
+    throw error;
+  }
+
+  let disposed = false;
+  return async () => {
+    if (disposed) return;
+    disposed = true;
+    routeTestPoolOptions.options = previousPoolOptions;
+    await setPoolSearchPath(previousSearchPath);
+    try {
+      await setupPool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    } finally {
+      await setupPool.end();
+    }
+  };
+}
+
 async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext> {
   const app = express();
   app.use(express.json());
@@ -1840,6 +1930,7 @@ async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext
   const originalGetUser = authStorage.getUser;
   const originalCreateActivityLog = storage.createActivityLog;
   const pendingActivityLogs = new Set<Promise<unknown>>();
+  let disposeTestSchema: (() => Promise<void>) | undefined;
   let authStoragePatched = false;
   let storagePatched = false;
 
@@ -1849,12 +1940,7 @@ async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext
     while (pendingActivityLogs.size > 0) {
       await Promise.allSettled([...pendingActivityLogs]);
     }
-    if (sessionId) {
-      await db
-        .delete(databaseSchema.countingSessions)
-        .where(eq(databaseSchema.countingSessions.id, sessionId))
-        .catch(() => {});
-    }
+    if (disposeTestSchema) await disposeTestSchema();
     if (authStoragePatched) {
       authStorage.getUserByClerkUserId = originalGetUserByClerkId;
       authStorage.getUser = originalGetUser;
@@ -1867,6 +1953,7 @@ async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext
   };
 
   try {
+    disposeTestSchema = await createIsolatedPatchTestSchema();
     authStorage.getUserByClerkUserId = async (clerkUserId: string) =>
       clerkUserId === userId
         ? testUser as any

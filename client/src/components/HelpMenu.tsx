@@ -26,6 +26,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { HELP_ARTICLES, HELP_CONTENT_VERSION } from "@shared/help-content";
+import { limitHelpChatMessages as trimHelpChatTranscript } from "@shared/help-chat";
 import {
   HELP_CHAT_MAX_MESSAGES,
   helpChatStateKey,
@@ -1575,9 +1576,7 @@ interface ChatMessage {
 }
 
 function limitHelpChatMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.length > HELP_CHAT_MAX_MESSAGES
-    ? messages.slice(-HELP_CHAT_MAX_MESSAGES)
-    : messages;
+  return trimHelpChatTranscript(messages, HELP_CHAT_MAX_MESSAGES);
 }
 
 function readHelpChatMessages(identityId: string | null | undefined): ChatMessage[] {

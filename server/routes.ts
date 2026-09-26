@@ -402,6 +402,7 @@ export function buildScanResultsForPins(
   });
 }
 
+const MAX_HELP_CHAT_INPUT_MESSAGES = 50;
 export function createHelpChatHandler(
   provider: PoeProvider = getPoeProvider(),
   helpSystemPrompt = "",
@@ -414,24 +415,22 @@ export function createHelpChatHandler(
         (typeof modelId !== "string" || !isApprovedPoeModelId(modelId))) {
         return res.status(400).json({ error: "Unsupported model" });
       }
-      if (!Array.isArray(messages) || messages.length === 0 || messages.length > 12) {
-        return res.status(400).json({ error: "messages must be a non-empty array (max 12)" });
+      if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_HELP_CHAT_INPUT_MESSAGES) {
+        return res.status(400).json({ error: `messages must be a non-empty array (max ${MAX_HELP_CHAT_INPUT_MESSAGES})` });
       }
 
       const validRoles = new Set(["user", "assistant"]);
       const sanitized: PoeTextMessage[] = [];
-      let totalCharacters = 0;
       for (const m of messages) {
         if (!m || typeof m.content !== "string" || !validRoles.has(m.role)) {
           return res.status(400).json({ error: "Each message must have role (user/assistant) and content (string)" });
         }
-        const content = m.content.trim().slice(0, 1200);
+        const content = m.content.trim().slice(0, MAX_HELP_CHAT_MESSAGE_CHARACTERS);
         if (!content) return res.status(400).json({ error: "Message content cannot be empty" });
-        totalCharacters += content.length;
-        if (totalCharacters > 8_000) {
-          return res.status(400).json({ error: "Conversation is too long; start a new question." });
-        }
         sanitized.push({ role: m.role as "user" | "assistant", content });
+      }
+      if (sanitized[sanitized.length - 1].role !== "user") {
+        return res.status(400).json({ error: "The latest message must be a user question" });
       }
 
       const chatMessages: PoeTextMessage[] = [
@@ -439,7 +438,7 @@ export function createHelpChatHandler(
           role: "system",
           content: `${helpSystemPrompt}\n\nApproved current help source (use only this source for product facts):\n${HELP_SOURCE_TEXT}\n\nNever invent settings, permissions, integrations, or recovery steps. If the answer is not in the approved source, say that you do not know and direct the user to Feedback.`,
         },
-        ...sanitized,
+        ...boundHelpChatHistory(sanitized),
       ];
 
       res.setHeader("Content-Type", "text/event-stream");
@@ -7989,3 +7988,40 @@ const entryPinCommitSchema = z.object({
   flagged: z.boolean().optional(),
   flagReason: z.string().nullable().optional(),
 }).strict();
+
+function boundHelpChatHistory(messages: PoeTextMessage[]): PoeTextMessage[] {
+  const currentQuestion = messages[messages.length - 1];
+  const completeExchanges: PoeTextMessage[][] = [];
+  for (let index = 0; index < messages.length - 1;) {
+    const userMessage = messages[index];
+    const assistantMessage = messages[index + 1];
+    if (userMessage.role === "user" && assistantMessage?.role === "assistant") {
+      completeExchanges.push([userMessage, assistantMessage]);
+      index += 2;
+    } else {
+      index += 1;
+    }
+  }
+
+  const selectedExchanges: PoeTextMessage[][] = [];
+  let messageCount = 1;
+  let characterCount = currentQuestion.content.length;
+  for (let index = completeExchanges.length - 1; index >= 0; index -= 1) {
+    const exchange = completeExchanges[index];
+    const exchangeCharacters = exchange[0].content.length + exchange[1].content.length;
+    if (
+      messageCount + exchange.length > MAX_HELP_CHAT_PROVIDER_MESSAGES
+      || characterCount + exchangeCharacters > MAX_HELP_CHAT_HISTORY_CHARACTERS
+    ) break;
+    selectedExchanges.unshift(exchange);
+    messageCount += exchange.length;
+    characterCount += exchangeCharacters;
+  }
+  return [...selectedExchanges.flat(), currentQuestion];
+}
+
+const MAX_HELP_CHAT_PROVIDER_MESSAGES = 12;
+
+const MAX_HELP_CHAT_HISTORY_CHARACTERS = 8_000;
+
+const MAX_HELP_CHAT_MESSAGE_CHARACTERS = 1200;
