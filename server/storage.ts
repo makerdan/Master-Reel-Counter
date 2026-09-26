@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { calculateActivityStreaks, dateKeyInTimezone, localActivityDate, localActivityTimestamp } from "./activity-statistics";
 import { eq, and, desc, asc, inArray, notInArray, sql, count, sum, min, max, ilike, or, isNull, isNotNull, lt } from "drizzle-orm";
 import { canonicalPhysicalObjectKey } from "./replit_integrations/object_storage/objectStorageClient.mjs";
 import { users } from "@shared/models/auth";
@@ -322,7 +323,7 @@ export interface IStorage {
 
   clearStalledIntentsForUser(userId: string): Promise<number>;
 
-  getUserStats(userId: string): Promise<{
+  getUserStats(userId: string, timezone?: string): Promise<{
     totalSessions: number;
     activeSessions: number;
     completedSessions: number;
@@ -1877,7 +1878,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getUserStats(userId: string): Promise<{
+  async getUserStats(userId: string, timezone = "UTC"): Promise<{
     totalSessions: number;
     activeSessions: number;
     completedSessions: number;
@@ -1940,14 +1941,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(count()))
       .limit(10);
 
+    const localTimestamp = localActivityTimestamp(entries.createdAt, timezone);
+    const localDay = localActivityDate(entries.createdAt, timezone);
+
     const weeklyStatsRaw = await db.select({
-      week: sql<string>`to_char(date_trunc('week', ${entries.createdAt}), 'YYYY-MM-DD')`,
+      week: sql<string>`to_char(date_trunc('week', ${localTimestamp}), 'YYYY-MM-DD')`,
       entries: count(),
       footage: sql<string>`COALESCE(SUM(${entries.footage}), 0)`,
     }).from(entries)
       .where(inArray(entries.sessionId, sessionIds))
-      .groupBy(sql`date_trunc('week', ${entries.createdAt})`)
-      .orderBy(sql`date_trunc('week', ${entries.createdAt})`)
+      .groupBy(sql`date_trunc('week', ${localTimestamp})`)
+      .orderBy(sql`date_trunc('week', ${localTimestamp})`)
       .limit(12);
 
     const bestSessionRows = await db.select({
@@ -1960,56 +1964,23 @@ export class DatabaseStorage implements IStorage {
     const bestSessionFootage = bestSessionRows.length > 0 ? Number(bestSessionRows[0].totalFootage) : 0;
 
     const entryDatesRaw = await db.select({
-      day: sql<string>`to_char(${entries.createdAt}::date, 'YYYY-MM-DD')`,
+      day: sql<string>`to_char(${localDay}, 'YYYY-MM-DD')`,
     }).from(entries)
       .where(inArray(entries.sessionId, sessionIds))
-      .groupBy(sql`${entries.createdAt}::date`)
-      .orderBy(desc(sql`${entries.createdAt}::date`));
-
-    let currentStreak = 0;
-    let longestStreak = 0;
-    if (entryDatesRaw.length > 0) {
-      const dates = entryDatesRaw.map(d => d.day);
-      const today = new Date();
-      const todayStr = today.toISOString().slice(0, 10);
-      const yesterdayStr = new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
-
-      let streak = 0;
-      let isCurrent = true;
-      let prevDate: Date | null = null;
-      for (const dateStr of dates) {
-        const d = new Date(dateStr + "T00:00:00Z");
-        if (prevDate === null) {
-          if (dateStr === todayStr || dateStr === yesterdayStr) {
-            streak = 1;
-          } else {
-            isCurrent = false;
-            streak = 1;
-          }
-        } else {
-          const diff = (prevDate.getTime() - d.getTime()) / 86400000;
-          if (diff === 1) {
-            streak++;
-          } else {
-            if (isCurrent) currentStreak = streak;
-            longestStreak = Math.max(longestStreak, streak);
-            isCurrent = false;
-            streak = 1;
-          }
-        }
-        prevDate = d;
-      }
-      if (isCurrent) currentStreak = streak;
-      longestStreak = Math.max(longestStreak, streak);
-    }
+      .groupBy(localDay)
+      .orderBy(desc(localDay));
+    const { currentStreak, longestStreak } = calculateActivityStreaks(
+      entryDatesRaw.map(({ day }) => day),
+      dateKeyInTimezone(new Date(), timezone),
+    );
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const busiestDayRaw = await db.select({
-      dow: sql<number>`EXTRACT(dow FROM ${entries.createdAt})`,
+      dow: sql<number>`EXTRACT(dow FROM ${localTimestamp})`,
       cnt: count(),
     }).from(entries)
       .where(inArray(entries.sessionId, sessionIds))
-      .groupBy(sql`EXTRACT(dow FROM ${entries.createdAt})`)
+      .groupBy(sql`EXTRACT(dow FROM ${localTimestamp})`)
       .orderBy(desc(count()))
       .limit(1);
     const busiestDay = busiestDayRaw.length > 0 ? dayNames[Number(busiestDayRaw[0].dow)] || null : null;

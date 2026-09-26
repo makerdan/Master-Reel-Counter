@@ -589,43 +589,43 @@ test.describe("offline queue warning @offline-queue", () => {
       return (await response.json()).id as string;
     });
 
+    const entryPath = `/api/sessions/${sess.id}/entries`;
     let attempts = 0;
     let originalEntryId: number | undefined;
     let replayStatus: number | undefined;
     const operationIds: string[] = [];
-    const sendThroughAuthenticatedContext = (route: import("@playwright/test").Route) => {
-      const requestToReplay = route.request();
-      const idempotencyKey = requestToReplay.headers()["idempotency-key"];
-      if (!idempotencyKey) {
-        throw new Error("Entry replay request is missing its idempotency key");
+    page.on("response", (response) => {
+      if (new URL(response.url()).pathname === entryPath && response.request().method() === "POST") {
+        replayStatus = response.status();
       }
-      return request.post(requestToReplay.url(), {
-        data: requestToReplay.postDataJSON(),
-        headers: { "Idempotency-Key": idempotencyKey },
-      });
-    };
-    await page.route(`**/api/sessions/${sess.id}/entries`, async (route) => {
+    });
+    await page.route(`**${entryPath}`, async (route) => {
       if (route.request().method() !== "POST") {
         await route.continue();
         return;
       }
       attempts++;
-      operationIds.push(route.request().headers()["idempotency-key"] || "");
+      const headers = route.request().headers();
+      const operationId = headers["idempotency-key"] || "";
+      operationIds.push(operationId);
       if (attempts === 1) {
-        // route.fetch() drops the working Clerk auth context in this request path.
-        const committedResponse = await sendThroughAuthenticatedContext(route);
+        const body = route.request().postDataBuffer();
+        expect(body, "initial entry POST must have a body").not.toBeNull();
+        expect(operationId, "initial entry POST must have an idempotency key").toBeTruthy();
+        expect(headers["content-type"]).toContain("application/json");
+        const committedResponse = await request.post(entryPath, {
+          data: body!,
+          headers: {
+            "Content-Type": headers["content-type"],
+            "Idempotency-Key": operationId,
+          },
+        });
         expect(committedResponse.ok(), `initial entry POST failed: ${await committedResponse.text()}`).toBe(true);
         originalEntryId = (await committedResponse.json()).id;
         await route.abort("connectionreset");
         return;
       }
-      const replayResponse = await sendThroughAuthenticatedContext(route);
-      replayStatus = replayResponse.status();
-      await route.fulfill({
-        status: replayResponse.status(),
-        headers: replayResponse.headers(),
-        body: await replayResponse.body(),
-      });
+      await route.continue();
     });
 
     const queued = await page.evaluate(async ({ sessionId, userId, photoId, draftClientId }) => {

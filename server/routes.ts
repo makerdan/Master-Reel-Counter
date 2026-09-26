@@ -5,6 +5,7 @@ import { LiveConnectionTracker, type LiveConnectionLease } from "./lib/live-conn
 import { attachWebSocketServerAtPath } from "./websocket-upgrade";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
+import { getTimezoneConsistentStats } from "./activity-statistics";
 import {
   authenticateWebSocketRequest,
   isAuthenticated,
@@ -6601,20 +6602,22 @@ export async function registerRoutes(
   app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
       const userId = resolveUserId(req as AuthenticatedRequest);
-      const [stats, sharedPerformance, roleComparison] = await Promise.all([
-        storage.getUserStats(userId),
+      const [userSettings, sharedPerformance, roleComparison, userSessions] = await Promise.all([
+        storage.getUserSettings(userId),
         storage.getSharedSessionPerformance(userId),
         storage.getRoleComparisonStats(userId),
+        db.select({ id: countingSessions.id })
+          .from(countingSessions)
+          .where(eq(countingSessions.userId, userId)),
       ]);
-
-      const userSessions = await db.select({ id: countingSessions.id })
-        .from(countingSessions)
-        .where(eq(countingSessions.userId, userId));
       const sessionIds = userSessions.map(s => s.id);
-
-      const userSettings = await storage.getUserSettings(userId);
       const timezone = userSettings?.timezone || "UTC";
-      const enhancedStats = await storage.getEnhancedStats(userId, sessionIds, timezone);
+      const { stats, enhancedStats } = await getTimezoneConsistentStats(
+        userId,
+        sessionIds,
+        timezone,
+        storage,
+      );
 
       res.json({ ...stats, sharedPerformance, roleComparison, currentUserId: userId, ...enhancedStats });
     } catch (error) {
