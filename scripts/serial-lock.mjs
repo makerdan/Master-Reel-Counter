@@ -588,6 +588,7 @@ function writeWaiter() {
       waiterPath(),
       `${JSON.stringify({
         pid: process.pid,
+        processIdentity: getProcessIdentity(process.pid),
         resource: RESOURCE,
         priority: args.priority,
         queuedAt: Date.now(),
@@ -620,23 +621,37 @@ function readWaiters() {
     return readdirSync(WAITERS_DIR)
       .filter((file) => file.endsWith(".json"))
       .map((file) => {
+        const path = `${WAITERS_DIR}/${file}`;
         try {
-          return JSON.parse(readFileSync(`${WAITERS_DIR}/${file}`, "utf8"));
+          const raw = readFileSync(path, "utf8");
+          return { manifest: JSON.parse(raw), path, raw };
         } catch {
           return null;
         }
       })
-      .filter((waiter) => waiter && waiter.pid !== process.pid);
+      .filter((entry) => entry && entry.manifest?.pid !== process.pid);
   } catch {
     return [];
   }
 }
 
+function isWaiterRunning(waiter) {
+  const identity = normalizeProcessIdentity(waiter.processIdentity, waiter.pid);
+  // Manifests written before process identities were added remain authoritative
+  // while their PID is running; only a recorded identity mismatch proves reuse.
+  if (!identity) return isRunning(waiter.pid);
+  return isRecordedProcessRunning(waiter.pid, identity);
+}
+
 function higherPriorityWaiterIsDue() {
   const now = Date.now();
-  for (const waiter of readWaiters()) {
-    if (!isAlive(waiter.pid)) {
-      try { unlinkSync(waiterPath(waiter.pid)); } catch { /* already gone */ }
+  for (const entry of readWaiters()) {
+    const waiter = entry.manifest;
+    if (!isWaiterRunning(waiter)) {
+      try {
+        // Do not remove a new manifest atomically written after this snapshot.
+        if (readFileSync(entry.path, "utf8") === entry.raw) unlinkSync(entry.path);
+      } catch { /* already gone or storage changed */ }
       continue;
     }
     if (

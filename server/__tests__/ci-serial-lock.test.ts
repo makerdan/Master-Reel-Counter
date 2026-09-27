@@ -711,6 +711,16 @@ await test("unusable lock storage fails fast and removes its waiter manifest", a
       await waitFor(() => existsSync(waiterManifest), 4_000),
       "waiter should create its manifest while the lock is held",
     );
+    const waiterDetails = JSON.parse(readFileSync(waiterManifest, "utf8"));
+    assert.equal(
+      waiterDetails.processIdentity?.pid,
+      waiter.proc.pid,
+      "waiter manifest should identify its owning process",
+    );
+    assert.ok(
+      Number.isInteger(waiterDetails.processIdentity?.startTime),
+      "waiter identity should include the process start time where supported",
+    );
 
     unlinkSync(lockPath);
     mkdirSync(lockPath);
@@ -838,6 +848,156 @@ await test("higher-priority waiter acquires before lower-priority waiter", async
     holder.proc.kill("SIGTERM");
     low.proc.kill("SIGTERM");
     high.proc.kill("SIGTERM");
+    cleanup(lockPath);
+  }
+});
+
+await test("priority scheduling ignores a waiter manifest with a reused PID", async () => {
+  const lockPath = tempLockPath();
+  const waitersDir = `${lockPath}.waiters`;
+  mkdirSync(waitersDir);
+  const unrelated = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000);"],
+    { detached: true, stdio: "ignore" },
+  );
+  const unrelatedPid = unrelated.pid ?? 0;
+
+  try {
+    assert.ok(unrelatedPid > 0, "unrelated process should have a PID");
+    assert.ok(
+      await waitFor(() => readProcessIdentity(unrelatedPid) !== null, 4_000),
+      "unrelated process identity should be readable",
+    );
+    const actualIdentity = readProcessIdentity(unrelatedPid);
+    assert.ok(actualIdentity, "unrelated process identity must be available");
+    const now = Date.now();
+    writeFileSync(
+      join(waitersDir, `${unrelatedPid}.json`),
+      `${JSON.stringify({
+        pid: unrelatedPid,
+        processIdentity: { pid: unrelatedPid, startTime: actualIdentity.startTime + 1 },
+        resource: "global",
+        priority: 1,
+        queuedAt: now - 10_000,
+        command: ["stale-waiter"],
+      })}\n`,
+      "utf8",
+    );
+
+    const startedAt = Date.now();
+    const contender = runLocked(
+      lockPath,
+      [process.execPath, "-e", "process.exit(0)"],
+      {
+        VALIDATION_LOCK_WAITERS_DIR: waitersDir,
+        SERIAL_LOCK_MAX_WAIT_MS: "1500",
+        SERIAL_LOCK_WAIT_INTERVAL_MS: "50",
+        SERIAL_LOCK_PRIORITY_GRACE_MS: "0",
+      },
+      "global",
+      8,
+    );
+    const result = await contender.done;
+    const output = result.stdout + result.stderr;
+    assert.equal(
+      result.code,
+      0,
+      `unrelated reused PID must not delay acquisition (got ${result.code}: ${output})`,
+    );
+    assert.ok(
+      Date.now() - startedAt < 1_500,
+      "valid lower-priority check should acquire before its bounded wait expires",
+    );
+    assert.ok(processIsRunning(unrelatedPid), "the unrelated process must remain untouched");
+  } finally {
+    if (unrelatedPid > 0) {
+      try { process.kill(-unrelatedPid, "SIGKILL"); } catch { /* already gone */ }
+      unrelated.kill("SIGKILL");
+      await new Promise((resolve) => unrelated.once("close", resolve));
+    }
+    cleanup(join(waitersDir, `${unrelatedPid}.json`));
+    try { rmdirSync(waitersDir); } catch { /* already removed */ }
+    cleanup(lockPath);
+  }
+});
+
+await test("legacy waiter manifests remain prioritized while their PID is live", async () => {
+  const lockPath = tempLockPath();
+  const waitersDir = `${lockPath}.waiters`;
+  mkdirSync(waitersDir);
+  const legacyWaiter = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000);"],
+    { detached: true, stdio: "ignore" },
+  );
+  const legacyClosed = new Promise<void>((resolve) => {
+    legacyWaiter.once("close", () => resolve());
+  });
+  const legacyPid = legacyWaiter.pid ?? 0;
+  let contender: ReturnType<typeof runLocked> | null = null;
+
+  try {
+    assert.ok(legacyPid > 0, "legacy waiter process should have a PID");
+    assert.ok(
+      await waitFor(() => processIsRunning(legacyPid), 4_000),
+      "legacy waiter process should be running",
+    );
+    writeFileSync(
+      join(waitersDir, `${legacyPid}.json`),
+      `${JSON.stringify({
+        pid: legacyPid,
+        resource: "global",
+        priority: 1,
+        queuedAt: Date.now() - 10_000,
+        command: ["legacy-waiter"],
+      })}\n`,
+      "utf8",
+    );
+
+    contender = runLocked(
+      lockPath,
+      [process.execPath, "-e", "process.exit(0)"],
+      {
+        VALIDATION_LOCK_WAITERS_DIR: waitersDir,
+        SERIAL_LOCK_MAX_WAIT_MS: "3000",
+        SERIAL_LOCK_WAIT_INTERVAL_MS: "50",
+        SERIAL_LOCK_PRIORITY_GRACE_MS: "0",
+      },
+      "global",
+      8,
+    );
+    let contenderOutput = "";
+    contender.proc.stdout!.on("data", (data: Buffer) => { contenderOutput += data.toString(); });
+    contender.proc.stderr!.on("data", (data: Buffer) => { contenderOutput += data.toString(); });
+    const queued = await waitFor(
+      () => existsSync(join(waitersDir, `${contender!.proc.pid}.json`)),
+      2_000,
+    );
+    assert.ok(
+      queued,
+      `lower-priority contender should queue behind the live legacy waiter ` +
+        `(exitCode=${contender.proc.exitCode}; running=${processIsRunning(contender.proc.pid!)}; ` +
+        `output=${contenderOutput})`,
+    );
+    assert.ok(processIsRunning(contender.proc.pid!), "contender should still be waiting");
+    assert.ok(!existsSync(lockPath), "contender should not acquire ahead of the legacy waiter");
+
+    try { process.kill(-legacyPid, "SIGKILL"); } catch { /* already gone */ }
+    legacyWaiter.kill("SIGKILL");
+    const result = await contender.done;
+    assert.equal(result.code, 0, `contender should proceed after the legacy PID exits: ${result.stderr}`);
+  } finally {
+    if (legacyPid > 0) {
+      try { process.kill(-legacyPid, "SIGKILL"); } catch { /* already gone */ }
+      legacyWaiter.kill("SIGKILL");
+      await legacyClosed;
+    }
+    if (contender && contender.proc.exitCode === null) contender.proc.kill("SIGKILL");
+    await (contender?.done ?? Promise.resolve());
+    cleanup(join(waitersDir, `${legacyPid}.json`));
+    if (contender) cleanup(join(waitersDir, `${contender.proc.pid}.json`));
+    try { rmdirSync(waitersDir); } catch { /* already removed */ }
     cleanup(lockPath);
   }
 });
