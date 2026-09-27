@@ -58,7 +58,9 @@ import
   respondWithScanResultsPersistenceFailure,
   SCAN_RESULTS_PERSISTENCE_ERROR,
   createSessionHandler,
+  getCurrentPdfJobAccess,
   registerRoutes,
+  accountCapabilityMiddleware,
 }
  from "../routes.js"
 ;
@@ -2138,6 +2140,95 @@ describe("PATCH production routes — body validation returns 400, not 500", () 
     const { status, body } = await httpReq(baseUrl, "PATCH", `/api/entries/${entryId}`, { body: { wireType: "THHN", footage: 250 } });
     assert.equal(status, 200);
     assert.equal(body.wireType, "THHN");
+  });
+});
+
+describe("account capability route guard", () => {
+  let server: http.Server;
+  let baseUrl: string;
+  let capabilities = {
+    ai_scanning: false,
+    photo_management: false,
+  };
+  const userId = "capability-route-test-user";
+  const originalGetUser = authStorage.getUser;
+
+  before(async () => {
+    authStorage.getUser = async (requestedUserId: string) =>
+      requestedUserId === userId
+        ? {
+            id: userId,
+            approved: true,
+            rejected: false,
+            role: "User",
+            capabilities,
+          } as User
+        : undefined;
+
+    const app = express();
+    app.use((req: any, _res, next) => {
+      req.user = { claims: { sub: userId } };
+      next();
+    });
+    app.use("/api", accountCapabilityMiddleware);
+    app.post("/api/photos/:photoId/analyze-labels", (_req, res) => res.json({ ok: true }));
+    app.post("/api/sessions/:sessionId/analyze-labels", (_req, res) => res.json({ ok: true }));
+    app.patch("/api/photos/:photoId", (_req, res) => res.json({ ok: true }));
+
+    server = http.createServer(app);
+    baseUrl = await listenOnLoopback(server);
+  });
+
+  after(async () => {
+    authStorage.getUser = originalGetUser;
+    await closeHttpServer(server);
+  });
+
+  test("requires AI scanning for both label-analysis URLs and photo management for photo writes", async () => {
+    const labelPaths = [
+      "/api/photos/12/analyze-labels",
+      "/api/sessions/34/analyze-labels",
+    ];
+    const combinations = [
+      { ai_scanning: false, photo_management: false, labelStatus: 403, photoStatus: 403 },
+      { ai_scanning: false, photo_management: true, labelStatus: 403, photoStatus: 200 },
+      { ai_scanning: true, photo_management: false, labelStatus: 200, photoStatus: 403 },
+      { ai_scanning: true, photo_management: true, labelStatus: 200, photoStatus: 200 },
+    ];
+
+    for (const combination of combinations) {
+      capabilities = {
+        ai_scanning: combination.ai_scanning,
+        photo_management: combination.photo_management,
+      };
+      for (const path of labelPaths) {
+        const response = await httpReq(baseUrl, "POST", path);
+        assert.equal(
+          response.status,
+          combination.labelStatus,
+          `${path} with ai_scanning=${combination.ai_scanning} and photo_management=${combination.photo_management}`,
+        );
+        if (combination.labelStatus === 403) {
+          assert.deepEqual(response.body, {
+            message: "capability_denied",
+            capability: "ai_scanning",
+          });
+        }
+      }
+
+      const photoResponse = await httpReq(baseUrl, "PATCH", "/api/photos/12");
+      assert.equal(
+        photoResponse.status,
+        combination.photoStatus,
+        `photo mutation with ai_scanning=${combination.ai_scanning} and photo_management=${combination.photo_management}`,
+      );
+      if (combination.photoStatus === 403) {
+        assert.deepEqual(photoResponse.body, {
+          message: "capability_denied",
+          capability: "photo_management",
+        });
+      }
+    }
   });
 });
 

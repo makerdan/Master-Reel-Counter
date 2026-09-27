@@ -522,6 +522,47 @@ async function requireCapability(
   return requireUserCapability(req, res, capability);
 }
 
+export const accountCapabilityMiddleware: RequestHandler = async (req: any, res, next) => {
+  const path = req.originalUrl.split("?")[0];
+  let capability: UserCapability | undefined;
+  if (
+    req.method === "POST" &&
+    (path === "/api/sessions" || path.endsWith("/duplicate"))
+  ) capability = "session_create";
+  else if (
+    (req.method === "DELETE" && /^\/api\/sessions\/[^/]+(?:\/(?:permanent))?$/.test(path)) ||
+    (req.method === "POST" && (
+      path === "/api/sessions/bulk/delete" ||
+      /^\/api\/sessions\/[^/]+\/restore$/.test(path)
+    ))
+  ) capability = "session_delete";
+  else if (path.includes("/export")) capability = "exports";
+  else if (path === "/api/stats") capability = "statistics";
+  else if (
+    path === "/api/settings" ||
+    path.startsWith("/api/settings/")
+  ) capability = "account_settings";
+  else if (path.includes("analyze-labels")) capability = "ai_scanning";
+  else if (
+    path === "/api/uploads/direct" ||
+    path.includes("/photos") ||
+    path.includes("/pins") ||
+    path.includes("/dismissed-duplicates")
+  ) {
+    if (req.method !== "GET" && req.method !== "HEAD") capability = "photo_management";
+  } else if (
+    path.includes("/collaborators") ||
+    path.includes("/invite-links") ||
+    path === "/api/invite-links" ||
+    path.endsWith("/transfer-ownership")
+  ) {
+    capability = "collaborator_management";
+  } else if (path.includes("/scan")) {
+    capability = "ai_scanning";
+  }
+  if (!capability) return next();
+  if (await requireCapability(req, res, capability)) return next();
+};
 function getTesterOwner(_req: AuthenticatedRequest | any): undefined {
   return undefined;
 }
@@ -896,49 +937,7 @@ export async function registerRoutes(
   // Account capabilities are a second, server-authoritative boundary after
   // authentication and approval. The client may hide controls, but it cannot
   // grant access by replaying a request with a hidden feature enabled.
-  app.use("/api", async (req, res, next) => {
-    const path = req.originalUrl.split("?")[0];
-    let capability: UserCapability | undefined;
-    if (
-      req.method === "POST" &&
-      (path === "/api/sessions" || path.endsWith("/duplicate"))
-    ) capability = "session_create";
-    else if (
-      (req.method === "DELETE" && /^\/api\/sessions\/[^/]+(?:\/(?:permanent))?$/.test(path)) ||
-      (req.method === "POST" && (
-        path === "/api/sessions/bulk/delete" ||
-        /^\/api\/sessions\/[^/]+\/restore$/.test(path)
-      ))
-    ) capability = "session_delete";
-    else if (path.includes("/export")) capability = "exports";
-    else if (path === "/api/stats") capability = "statistics";
-    else if (
-      path === "/api/settings" ||
-      path.startsWith("/api/settings/")
-    ) capability = "account_settings";
-    else if (
-      path === "/api/uploads/direct" ||
-      path.includes("/photos") ||
-      path.includes("/pins") ||
-      path.includes("/dismissed-duplicates")
-    ) {
-      if (req.method !== "GET" && req.method !== "HEAD") capability = "photo_management";
-    } else if (
-      path.includes("/collaborators") ||
-      path.includes("/invite-links") ||
-      path === "/api/invite-links" ||
-      path.endsWith("/transfer-ownership")
-    ) {
-      capability = "collaborator_management";
-    } else if (
-      path.includes("analyze-labels") ||
-      path.includes("/scan")
-    ) {
-      capability = "ai_scanning";
-    }
-    if (!capability) return next();
-    if (await requireCapability(req, res, capability)) return next();
-  });
+  app.use("/api", accountCapabilityMiddleware);
 
   // All admin operations share one deny-by-default owner boundary. Individual
   // handlers still validate their own inputs and resource scope.
