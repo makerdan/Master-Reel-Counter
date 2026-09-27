@@ -98,7 +98,7 @@ app.use(
       const requestPath = req.url?.split("?", 1)[0] ?? "";
       const isVoiceMessage = req.method === "POST" &&
         /^\/api\/conversations\/[^/]+\/messages\/?$/.test(requestPath);
-      return !isVoiceMessage;
+      return !isVoiceMessage && Boolean((req as express.Request).is("application/json"));
     },
     verify: (req, _res, buf) => {
       req.rawBody = buf;

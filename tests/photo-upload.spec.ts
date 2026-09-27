@@ -66,6 +66,43 @@ async function interceptLostFirstRegistration(
 }
 
 test.describe("photo POST validation @photo-upload", () => {
+  test("multipart direct upload can be registered as a session photo", async ({
+    request,
+    cleanupIds,
+  }) => {
+    const sess = await createSessionViaApi(request, `Multipart Photo ${Date.now()}`);
+    cleanupIds.push(sess.id);
+
+    const uploadResponse = await request.post("/api/uploads/direct", {
+      multipart: { file: directPhoto },
+    });
+    expect(uploadResponse.status(), await uploadResponse.text()).toBe(200);
+    const upload = await uploadResponse.json() as {
+      objectPath?: string;
+      metadata?: { name?: string; contentType?: string };
+    };
+    expect(upload.objectPath).toMatch(/^\/uploads\/[^/]+\.png$/);
+    expect(upload.metadata).toMatchObject({
+      name: directPhoto.name,
+      contentType: directPhoto.mimeType,
+    });
+
+    const registrationResponse = await request.post(`/api/sessions/${sess.id}/photos`, {
+      data: {
+        objectStorageKey: upload.objectPath,
+        originalFilename: directPhoto.name,
+        mimeType: directPhoto.mimeType,
+        fileSize: directPhoto.buffer.length,
+      },
+    });
+    expect(registrationResponse.status(), await registrationResponse.text()).toBe(200);
+    const photo = await registrationResponse.json();
+    expect(photo).toMatchObject({
+      sessionId: sess.id,
+      objectStorageKey: upload.objectPath,
+    });
+  });
+
   test("photo mode reuses its registration key after a lost confirmation", async ({
     page,
     context,
