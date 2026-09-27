@@ -860,25 +860,88 @@ await test("SIGTERM releases the lock and terminates the child", async () => {
 
 await test("SIGTERM escalates when the child ignores the signal", async () => {
   const lockPath = tempLockPath();
+  const readyPath = join(tmpdir(), `repl-lock-ignore-sigterm-${randomBytes(4).toString("hex")}.ready`);
   const overrides = {
-    SERIAL_LOCK_CLEANUP_GRACE_MS: "150",
+    SERIAL_LOCK_CLEANUP_GRACE_MS: "300",
     SERIAL_LOCK_CLEANUP_POLL_INTERVAL_MS: "20",
   };
+  const childCode = [
+    "const fs=require('fs');",
+    "process.on('SIGTERM',()=>{});",
+    `fs.writeFileSync(${JSON.stringify(readyPath)},String(process.pid));`,
+    "setInterval(()=>{},1000);",
+  ].join("");
   const holder = runLocked(
     lockPath,
-    [process.execPath, "-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"],
+    [process.execPath, "-e", childCode],
     overrides,
   );
+  let childPid = 0;
   try {
-    assert.ok(await waitFor(() => readLockFile(lockPath) !== null, 4_000));
+    const childReady = await waitFor(() => {
+      const lock = readLockFile(lockPath);
+      childPid = lock?.ownership.childPid ?? childPid;
+      try {
+        const readyPid = Number(readFileSync(readyPath, "utf8"));
+        return readyPid > 0 &&
+          readyPid === childPid &&
+          processIsRunning(readyPid);
+      } catch {
+        return false;
+      }
+    }, 4_000, 10);
+    assert.ok(childReady, "child must install its SIGTERM handler and report readiness before interruption");
+    assert.ok(processIsRunning(childPid), "SIGTERM-ignoring child must be alive before interruption");
+
     const startedAt = Date.now();
-    holder.proc.kill("SIGTERM");
-    const result = await holder.done;
+    assert.ok(holder.proc.kill("SIGTERM"), "wrapper should receive SIGTERM");
+
+    const cleanupStarted = await waitFor(() => {
+      const lock = readLockFile(lockPath);
+      if (lock?.ownership.cleanupPending) return true;
+      assert.ok(existsSync(lockPath), "lock must remain present until child cleanup is verified");
+      return false;
+    }, 1_000, 5);
+    assert.ok(cleanupStarted, "wrapper should record pending cleanup before releasing its lock");
+    assert.ok(processIsRunning(childPid), "child should still be alive because it ignores SIGTERM");
+
+    const cleanupBoundMs = 3_000;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const result = await Promise.race([
+      holder.done,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`wrapper did not finish cleanup within ${cleanupBoundMs}ms`)),
+          cleanupBoundMs,
+        );
+      }),
+    ]).finally(() => {
+      if (timeout) clearTimeout(timeout);
+    });
+
     assert.notEqual(result.code, 0, "interrupted check must exit non-zero");
-    assert.ok(Date.now() - startedAt < 3_000, "cleanup should use a bounded escalation path");
-    assert.ok(!existsSync(lockPath), "lock should be released after SIGKILL cleanup");
+    assert.match(
+      result.stderr,
+      /survived SIGTERM; escalating to SIGKILL/,
+      "wrapper must report that SIGKILL escalation actually occurred",
+    );
+    assert.ok(Date.now() - startedAt < cleanupBoundMs, "cleanup should finish within its bound");
+    assert.ok(
+      await waitFor(() => !processIsRunning(childPid), 1_000, 10),
+      `SIGKILL should leave no child process running (PID ${childPid})`,
+    );
+    assert.ok(!existsSync(lockPath), "lock should be released after child cleanup is verified");
   } finally {
+    if (childPid && processIsRunning(childPid)) {
+      try {
+        process.kill(-childPid, "SIGKILL");
+      } catch {
+        try { process.kill(childPid, "SIGKILL"); } catch { /* already gone */ }
+      }
+      await waitFor(() => !processIsRunning(childPid), 1_000, 10);
+    }
     holder.proc.kill("SIGKILL");
+    cleanup(readyPath);
     cleanup(lockPath);
   }
 });
