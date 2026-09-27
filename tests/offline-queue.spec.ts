@@ -4,6 +4,8 @@
  * unsynced offline items must show a warning dialog. After cancelling and
  * clearing the queue the pending-count badge must return to 0 (or hide).
  */
+import { clerk as clerkTesting, setupClerkTestingToken } from "@clerk/testing/playwright";
+import { parsePublishableKey } from "@clerk/shared/keys";
 import { BASE_URL, test, expect, createSessionViaApi, uploadTestPhoto } from "./fixtures";
 
 const protectedPaths = (sessionId: number) => [
@@ -555,16 +557,15 @@ test.describe("offline queue warning @offline-queue", () => {
 
   test("replays a lost entry response once and commits its intended photo pin", async ({
     page,
+    browser,
     request,
     cleanupIds,
+    secondApprovedIdentity,
   }) => {
     const sess = await createSessionViaApi(request, `Offline Entry Replay ${Date.now()}`);
     cleanupIds.push(sess.id);
     const photo = await uploadTestPhoto(request, sess.id);
-    if (!photo) {
-      test.skip(true, "Photo upload unavailable in this environment");
-      return;
-    }
+    expect(photo.id, "photo upload must succeed for this replay scenario").toBeGreaterThan(0);
 
     const draftClientId = `offline-entry-pin-${Date.now()}`;
     const draftResponse = await request.post(`/api/photos/${photo.id}/pins`, {
@@ -588,11 +589,18 @@ test.describe("offline queue warning @offline-queue", () => {
       if (!response.ok) throw new Error(`Could not resolve current user (${response.status})`);
       return (await response.json()).id as string;
     });
+    const apiUserResponse = await request.get("/api/auth/user");
+    expect(apiUserResponse.status()).toBe(200);
+    expect((await apiUserResponse.json()).id).toBe(userId);
+    const sessionResponse = await request.get(`/api/sessions/${sess.id}`);
+    expect(sessionResponse.status()).toBe(200);
+    expect((await sessionResponse.json()).userId).toBe(userId);
 
     const entryPath = `/api/sessions/${sess.id}/entries`;
     let attempts = 0;
     let originalEntryId: number | undefined;
     let replayStatus: number | undefined;
+    let initialBody: Buffer | null = null;
     const operationIds: string[] = [];
     page.on("response", (response) => {
       if (new URL(response.url()).pathname === entryPath && response.request().method() === "POST") {
@@ -609,12 +617,12 @@ test.describe("offline queue warning @offline-queue", () => {
       const operationId = headers["idempotency-key"] || "";
       operationIds.push(operationId);
       if (attempts === 1) {
-        const body = route.request().postDataBuffer();
-        expect(body, "initial entry POST must have a body").not.toBeNull();
+        initialBody = route.request().postDataBuffer();
+        expect(initialBody, "initial entry POST must have a body").not.toBeNull();
         expect(operationId, "initial entry POST must have an idempotency key").toBeTruthy();
         expect(headers["content-type"]).toContain("application/json");
         const committedResponse = await request.post(entryPath, {
-          data: body!,
+          data: initialBody!,
           headers: {
             "Content-Type": headers["content-type"],
             "Idempotency-Key": operationId,
@@ -657,6 +665,10 @@ test.describe("offline queue warning @offline-queue", () => {
     }, { sessionId: sess.id, userId, photoId: photo.id, draftClientId });
 
     expect(queued.queued).toBe(true);
+    expect(originalEntryId, "the owner must commit before the browser loses the response").toBeGreaterThan(0);
+    const firstEntriesResponse = await request.get(entryPath);
+    expect(firstEntriesResponse.status()).toBe(200);
+    expect((await firstEntriesResponse.json()).map((entry: { id: number }) => entry.id)).toEqual([originalEntryId]);
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
     await expect.poll(() => attempts, { timeout: 15_000 }).toBe(2);
     await expect.poll(() => replayStatus, { timeout: 15_000 }).toBe(200);
@@ -676,5 +688,43 @@ test.describe("offline queue warning @offline-queue", () => {
     expect(operationIds).toHaveLength(2);
     expect(operationIds[0]).toBeTruthy();
     expect(operationIds[1]).toBe(operationIds[0]);
+
+    const rejectedHeaders = {
+      "Content-Type": "application/json",
+      "Idempotency-Key": operationIds[0],
+    };
+    // A bare Node request cannot inherit Playwright's saved Clerk session.
+    const anonymous = await fetch(new URL(entryPath, BASE_URL), {
+      method: "POST",
+      headers: rejectedHeaders,
+      body: initialBody,
+    });
+    expect(anonymous.status, `anonymous replay: ${await anonymous.text()}`).toBe(401);
+
+    const frontendApiUrl = parsePublishableKey(process.env.VITE_CLERK_PUBLISHABLE_KEY)?.frontendApi;
+    if (!frontendApiUrl) throw new Error("Browser replay requires a valid Clerk publishable key");
+    const otherContext = await browser.newContext({
+      baseURL: BASE_URL,
+      storageState: { cookies: [], origins: [] },
+    });
+    try {
+      await setupClerkTestingToken({ context: otherContext, options: { frontendApiUrl } });
+      const otherPage = await otherContext.newPage();
+      await otherPage.goto("/sign-in");
+      await clerkTesting.signIn({ page: otherPage, emailAddress: secondApprovedIdentity.email });
+      const otherUserResponse = await otherContext.request.get("/api/auth/user");
+      expect(otherUserResponse.status()).toBe(200);
+      expect((await otherUserResponse.json()).id).not.toBe(userId);
+      const denied = await otherContext.request.post(entryPath, {
+        data: initialBody!,
+        headers: rejectedHeaders,
+      });
+      expect(denied.status(), "another approved owner must not replay this entry").toBe(404);
+    } finally {
+      await otherContext.close();
+    }
+    const finalEntries = await request.get(entryPath);
+    expect(finalEntries.status()).toBe(200);
+    expect((await finalEntries.json()).map((entry: { id: number }) => entry.id)).toEqual([originalEntryId]);
   });
 });
