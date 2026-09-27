@@ -996,6 +996,81 @@ await test("priority scheduling ignores a waiter manifest with a reused PID", as
   }
 });
 
+await test("priority scheduling ignores waiter manifests with malformed scheduling fields", async () => {
+  const lockPath = tempLockPath();
+  const waitersDir = `${lockPath}.waiters`;
+  mkdirSync(waitersDir);
+  const unrelated = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000);"],
+    { detached: true, stdio: "ignore" },
+  );
+  const unrelatedPid = unrelated.pid ?? 0;
+  const waiterPath = join(waitersDir, `${unrelatedPid}.json`);
+  const validWaiter = {
+    pid: unrelatedPid,
+    resource: "global",
+    priority: 1,
+    queuedAt: Date.now() - 10_000,
+    command: ["malformed-waiter"],
+  };
+  const invalidRecords: Array<{ field: string; override: Record<string, unknown> }> = [
+    { field: "PID", override: { pid: 0 } },
+    { field: "priority", override: { priority: 0 } },
+    { field: "queued time", override: { queuedAt: "0" } },
+    { field: "resource", override: { resource: "different-resource" } },
+  ];
+
+  try {
+    assert.ok(unrelatedPid > 0, "unrelated process should have a PID");
+    assert.ok(
+      await waitFor(() => readProcessIdentity(unrelatedPid) !== null, 4_000),
+      "unrelated process identity should be readable",
+    );
+
+    for (const { field, override } of invalidRecords) {
+      const raw = `${JSON.stringify({ ...validWaiter, ...override })}\n`;
+      writeFileSync(waiterPath, raw, "utf8");
+
+      const contender = runLocked(
+        lockPath,
+        [process.execPath, "-e", "process.exit(0)"],
+        {
+          VALIDATION_LOCK_WAITERS_DIR: waitersDir,
+          SERIAL_LOCK_MAX_WAIT_MS: "1500",
+          SERIAL_LOCK_WAIT_INTERVAL_MS: "50",
+          SERIAL_LOCK_PRIORITY_GRACE_MS: "0",
+        },
+        "global",
+        8,
+      );
+      const result = await contender.done;
+      const output = result.stdout + result.stderr;
+      assert.equal(
+        result.code,
+        0,
+        `malformed ${field} must not delay a valid check (got ${result.code}: ${output})`,
+      );
+      assert.equal(
+        readFileSync(waiterPath, "utf8"),
+        raw,
+        `ignored malformed ${field} manifest should not be removed`,
+      );
+    }
+
+    assert.ok(processIsRunning(unrelatedPid), "the unrelated process must remain untouched");
+  } finally {
+    if (unrelatedPid > 0) {
+      try { process.kill(-unrelatedPid, "SIGKILL"); } catch { /* already gone */ }
+      unrelated.kill("SIGKILL");
+      await new Promise((resolve) => unrelated.once("close", resolve));
+    }
+    cleanup(waiterPath);
+    try { rmdirSync(waitersDir); } catch { /* already gone */ }
+    cleanup(lockPath);
+  }
+});
+
 await test("legacy waiter manifests remain prioritized while their PID is live", async () => {
   const lockPath = tempLockPath();
   const waitersDir = `${lockPath}.waiters`;

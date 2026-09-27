@@ -33,7 +33,7 @@ import {
 } from "fs";
 import { spawn, spawnSync } from "child_process";
 import { randomBytes } from "crypto";
-import { dirname, resolve } from "path";
+import { basename, dirname, resolve } from "path";
 
 const LEGACY_HOLDER_ENV = "SERIAL_LOCK_HOLDER_PID";
 const DEFAULT_RESOURCE = "global";
@@ -638,10 +638,43 @@ function readWaiters() {
           return null;
         }
       })
-      .filter((entry) => entry && entry.manifest?.pid !== process.pid);
+      .filter(Boolean);
   } catch {
     return [];
   }
+}
+
+function isValidWaiterEntry(entry, now) {
+  const waiter = entry.manifest;
+  if (!waiter || typeof waiter !== "object" || Array.isArray(waiter)) return false;
+
+  const fileName = basename(entry.path);
+  const filePidText = fileName.endsWith(".json")
+    ? fileName.slice(0, -".json".length)
+    : "";
+  const filePid = Number(filePidText);
+  if (
+    !Number.isSafeInteger(filePid) ||
+    filePid <= 0 ||
+    String(filePid) !== filePidText ||
+    !Number.isSafeInteger(waiter.pid) ||
+    waiter.pid <= 0 ||
+    waiter.pid !== filePid ||
+    !Number.isInteger(waiter.priority) ||
+    waiter.priority < 1 ||
+    waiter.priority > 9 ||
+    !Number.isSafeInteger(waiter.queuedAt) ||
+    waiter.queuedAt < 0 ||
+    waiter.queuedAt > now ||
+    waiter.resource !== RESOURCE
+  ) {
+    return false;
+  }
+
+  // Missing/null identities are the legacy format. A present but malformed
+  // identity must not silently fall back to trusting a potentially reused PID.
+  return waiter.processIdentity == null ||
+    normalizeProcessIdentity(waiter.processIdentity, waiter.pid) !== null;
 }
 
 function isWaiterRunning(waiter) {
@@ -656,6 +689,7 @@ function higherPriorityWaiterIsDue() {
   const now = Date.now();
   for (const entry of readWaiters()) {
     const waiter = entry.manifest;
+    if (!isValidWaiterEntry(entry, now) || waiter.pid === process.pid) continue;
     if (!isWaiterRunning(waiter)) {
       try {
         // Do not remove a new manifest atomically written after this snapshot.
@@ -664,9 +698,8 @@ function higherPriorityWaiterIsDue() {
       continue;
     }
     if (
-      Number.isInteger(waiter.priority) &&
       waiter.priority < args.priority &&
-      now - Number(waiter.queuedAt) >= PRIORITY_GRACE_MS
+      now - waiter.queuedAt >= PRIORITY_GRACE_MS
     ) {
       return true;
     }
