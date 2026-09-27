@@ -721,6 +721,11 @@ await test("unusable lock storage fails fast and removes its waiter manifest", a
       Number.isInteger(waiterDetails.processIdentity?.startTime),
       "waiter identity should include the process start time where supported",
     );
+    assert.match(
+      waiterDetails.waiterToken,
+      /^[a-f0-9]{32}$/,
+      "waiter manifest should include a per-run ownership token",
+    );
 
     unlinkSync(lockPath);
     mkdirSync(lockPath);
@@ -744,6 +749,75 @@ await test("unusable lock storage fails fast and removes its waiter manifest", a
       holder.done,
       waiter?.done ?? Promise.resolve(),
     ]);
+    try { rmdirSync(lockPath); } catch { /* already removed */ }
+    try { rmdirSync(waitersDir); } catch { /* already removed */ }
+    cleanup(lockPath);
+  }
+});
+
+await test("waiter cleanup preserves a replacement manifest at the same PID path", async () => {
+  const lockPath = tempLockPath();
+  const waitersDir = `${lockPath}.waiters`;
+  mkdirSync(waitersDir);
+  const holder = runLocked(lockPath, ["sleep", "4"], {
+    VALIDATION_LOCK_WAITERS_DIR: waitersDir,
+  });
+  let waiter: ReturnType<typeof runLocked> | null = null;
+
+  try {
+    assert.ok(
+      await waitFor(() => readLockFile(lockPath) !== null, 4_000),
+      "holder should create a lock before the waiter starts",
+    );
+
+    waiter = runLocked(
+      lockPath,
+      [process.execPath, "-e", "process.exit(0)"],
+      {
+        VALIDATION_LOCK_WAITERS_DIR: waitersDir,
+        SERIAL_LOCK_MAX_WAIT_MS: "10_000",
+      },
+    );
+    const waiterManifest = join(waitersDir, `${waiter.proc.pid}.json`);
+    assert.ok(
+      await waitFor(() => existsSync(waiterManifest), 4_000),
+      "waiter should create its manifest while the lock is held",
+    );
+    const originalDetails = JSON.parse(readFileSync(waiterManifest, "utf8"));
+    assert.match(
+      originalDetails.waiterToken,
+      /^[a-f0-9]{32}$/,
+      "original manifest should carry its per-run ownership token",
+    );
+
+    const replacementContents = `${JSON.stringify({
+      ...originalDetails,
+      command: ["replacement-waiter"],
+      waiterToken: "replacement-entry",
+    })}\n`;
+    unlinkSync(waiterManifest);
+    writeFileSync(waiterManifest, replacementContents, "utf8");
+
+    unlinkSync(lockPath);
+    mkdirSync(lockPath);
+    const result = await waiter.done;
+    const output = result.stdout + result.stderr;
+
+    assert.equal(result.code, 1, `waiter should fail clearly (got ${result.code})`);
+    assert.ok(
+      output.includes("lock storage is unusable"),
+      `failure should identify unusable lock storage (got: ${output})`,
+    );
+    assert.equal(
+      readFileSync(waiterManifest, "utf8"),
+      replacementContents,
+      "cleanup must leave replacement manifest contents intact",
+    );
+  } finally {
+    if (waiter && !waiter.proc.killed) waiter.proc.kill("SIGTERM");
+    holder.proc.kill("SIGTERM");
+    await Promise.all([holder.done, waiter?.done ?? Promise.resolve()]);
+    cleanup(join(waitersDir, `${waiter?.proc.pid}.json`));
     try { rmdirSync(lockPath); } catch { /* already removed */ }
     try { rmdirSync(waitersDir); } catch { /* already removed */ }
     cleanup(lockPath);

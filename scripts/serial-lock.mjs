@@ -322,6 +322,8 @@ function atomicWrite(path, content) {
 }
 
 const LOCK_TOKEN = randomBytes(16).toString("hex");
+const WAITER_TOKEN = randomBytes(16).toString("hex");
+let waiterManifestContent = null;
 let holderLockFd = null;
 
 function emptyOwnership() {
@@ -584,25 +586,32 @@ function waiterPath(pid = process.pid) {
 
 function writeWaiter() {
   try {
+    const content = `${JSON.stringify({
+      pid: process.pid,
+      processIdentity: getProcessIdentity(process.pid),
+      resource: RESOURCE,
+      priority: args.priority,
+      queuedAt: Date.now(),
+      command: args.command,
+      waiterToken: WAITER_TOKEN,
+    })}\n`;
     atomicWrite(
       waiterPath(),
-      `${JSON.stringify({
-        pid: process.pid,
-        processIdentity: getProcessIdentity(process.pid),
-        resource: RESOURCE,
-        priority: args.priority,
-        queuedAt: Date.now(),
-        command: args.command,
-      })}\n`,
+      content,
     );
+    waiterManifestContent = content;
   } catch (error) {
     failStorage(`unable to write waiter manifest: ${error?.message ?? "unknown error"}`);
   }
 }
 
 function clearWaiter() {
+  if (waiterManifestContent === null) return;
   try {
-    unlinkSync(waiterPath());
+    const path = waiterPath();
+    if (readFileSync(path, "utf8") !== waiterManifestContent) return;
+    unlinkSync(path);
+    waiterManifestContent = null;
   } catch {
     // Already gone.
   }
