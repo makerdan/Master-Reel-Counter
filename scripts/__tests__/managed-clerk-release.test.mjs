@@ -23,6 +23,7 @@ import {
   createOwnedDatabase,
   dropOwnedDatabase,
 } from "../release-smoke-database.mjs";
+import { validatePublishedSmokeConfiguration } from "../validate-published-smoke-config.mjs";
 import { deletePrivateObjectsAndVerify } from "../../server/replit_integrations/object_storage/objectStorageClient.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
@@ -35,6 +36,10 @@ const workflow = readFileSync(resolve(root, ".github/workflows/managed-clerk-rel
 const candidateBuild = readFileSync(resolve(root, "scripts/build-and-verify-release.sh"), "utf8");
 const publishedRelease = readFileSync(
   resolve(root, "scripts/verify-published-release.mjs"),
+  "utf8",
+);
+const publishedSmokeConfig = readFileSync(
+  resolve(root, "scripts/validate-published-smoke-config.mjs"),
   "utf8",
 );
 const productionUrlValidation = readFileSync(
@@ -351,21 +356,34 @@ test("manual CI release gate verifies the currently published deployment", () =>
   assert.doesNotMatch(workflow, /RELEASE_SMOKE_DATABASE_URL:/);
   assert.doesNotMatch(workflow, /RELEASE_CANDIDATE_ID:/);
   assert.match(packageJson.scripts["verify:managed-clerk-published"], /verify-published-release\.mjs/);
-  assert.match(publishedRelease, /validateProductionBaseUrl/);
-  assert.match(publishedRelease, /validateProductionDeploymentId/);
+  assert.match(publishedSmokeConfig, /validateProductionBaseUrl/);
+  assert.match(publishedSmokeConfig, /validateProductionDeploymentId/);
+  assert.match(publishedRelease, /validatePublishedSmokeConfiguration\(process\.env\)/);
+  assert(
+    publishedRelease.indexOf("validatePublishedSmokeConfiguration(process.env)") <
+      publishedRelease.indexOf("await verifyPublishedDeploymentIdentity()"),
+    "published smoke configuration must validate before network access",
+  );
+  assert(
+    publishedRelease.indexOf("validatePublishedSmokeConfiguration(process.env)") <
+      publishedRelease.indexOf("spawnSync("),
+    "published smoke configuration must validate before Playwright can start",
+  );
   assert.match(publishedRelease, /\/api\/healthz/);
   assert.match(publishedRelease, /deploymentId !== expectedDeploymentId/);
   assert.match(publishedRelease, /playwright\.release\.config\.ts/);
   assert.match(publishedRelease, /publishedReadOnlyEnvironment/);
   assert.match(publishedRelease, /delete publishedReadOnlyEnvironment\[name\]/);
   assert.match(publishedRelease, /RELEASE_SMOKE_PUBLISHED_READ_ONLY = "1"/);
-  assert.match(publishedRelease, /"DATABASE_URL"/);
-  assert.match(publishedRelease, /"CLERK_SECRET_KEY"/);
-  assert.match(publishedRelease, /RELEASE_PUBLISHED_SMOKE_TARGET/);
-  assert.match(publishedRelease, /RELEASE_PUBLISHED_SMOKE_MODE/);
-  assert.match(publishedRelease, /refusing an ambiguous published smoke pairing/);
-  assert.match(publishedRelease, /refuses database or Clerk-secret inputs/);
-  assert.match(publishedRelease, /"RELEASE_SMOKE_INTERNAL_CANDIDATE"/);
+  assert.match(publishedSmokeConfig, /"DATABASE_URL"/);
+  assert.match(publishedSmokeConfig, /"CLERK_SECRET_KEY"/);
+  assert.match(publishedSmokeConfig, /RELEASE_PUBLISHED_SMOKE_TARGET/);
+  assert.match(publishedSmokeConfig, /RELEASE_PUBLISHED_SMOKE_MODE/);
+  assert.match(publishedSmokeConfig, /refusing an ambiguous published smoke pairing/);
+  assert.match(publishedSmokeConfig, /refuses database, Clerk-secret, or internal-candidate inputs/);
+  assert.match(publishedRelease, /FORBIDDEN_PUBLISHED_SMOKE_INPUTS/);
+  assert.match(publishedSmokeConfig, /"RELEASE_SMOKE_INTERNAL_CANDIDATE"/);
+  assert.match(config, /validatePublishedSmokeConfiguration\(process\.env\)/);
   assert.match(config, /!isPublishedReadOnly &&/);
   assert.doesNotMatch(publishedRelease, /release:build|build-and-verify-release/);
   assert.match(candidateBuild, /candidate_id="\$\{RELEASE_CANDIDATE_ID:-/);
@@ -404,6 +422,108 @@ test("published deployment target validation fails closed for missing or unsafe 
   assert.match(productionUrlValidation, /target\.hash/);
   assert.match(productionUrlValidation, /localhost/);
   assert.match(productionUrlValidation, /PRODUCTION_DEPLOYMENT_ID is required/);
+});
+
+test("published smoke configuration rejects missing and invalid values before network or browser startup", async () => {
+  const temporaryDirectory = await mkdtemp(
+    resolve(tmpdir(), "published-smoke-preflight-"),
+  );
+  const markerPath = resolve(temporaryDirectory, "unexpected-side-effect");
+  const preloadPath = resolve(temporaryDirectory, "observe-side-effects.mjs");
+  await writeFile(
+    preloadPath,
+    [
+      'import childProcess from "node:child_process";',
+      'import { syncBuiltinESMExports } from "node:module";',
+      'import { appendFileSync } from "node:fs";',
+      `const marker = ${JSON.stringify(markerPath)};`,
+      'globalThis.fetch = async () => { appendFileSync(marker, "fetch\\n"); throw new Error("unexpected health request"); };',
+      'childProcess.spawnSync = (...args) => { appendFileSync(marker, "spawn\\n"); return { status: 1 }; };',
+      "syncBuiltinESMExports();",
+    ].join("\n"),
+  );
+
+  const validEnvironment = {
+    PRODUCTION_BASE_URL: "https://published.example",
+    PRODUCTION_DEPLOYMENT_ID: "deployment-id-847",
+    RELEASE_PUBLISHED_SMOKE_TARGET: "https://published.example",
+    RELEASE_PUBLISHED_SMOKE_MODE: "read-only",
+    CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZGV2JA",
+    VITE_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZGV2JA",
+  };
+  const missingVariables = [
+    "PRODUCTION_BASE_URL",
+    "PRODUCTION_DEPLOYMENT_ID",
+    "RELEASE_PUBLISHED_SMOKE_TARGET",
+    "RELEASE_PUBLISHED_SMOKE_MODE",
+    "CLERK_PUBLISHABLE_KEY",
+    "VITE_CLERK_PUBLISHABLE_KEY",
+  ];
+  const invalidConfigurations = [
+    ["PRODUCTION_BASE_URL", "not-a-public-url", /PRODUCTION_BASE_URL/],
+    ["PRODUCTION_DEPLOYMENT_ID", "line one\nline two", /PRODUCTION_DEPLOYMENT_ID/],
+    [
+      "RELEASE_PUBLISHED_SMOKE_TARGET",
+      "https://published.example/nested",
+      /must match PRODUCTION_BASE_URL exactly/,
+    ],
+    ["RELEASE_PUBLISHED_SMOKE_MODE", "fixture-writing", /must be read-only/],
+    ["CLERK_PUBLISHABLE_KEY", "not-a-publishable-key", /CLERK_PUBLISHABLE_KEY is malformed/],
+    [
+      "VITE_CLERK_PUBLISHABLE_KEY",
+      "not-a-publishable-key",
+      /VITE_CLERK_PUBLISHABLE_KEY is malformed/,
+    ],
+    [
+      "VITE_CLERK_PUBLISHABLE_KEY",
+      "pk_test_ZXhhbXBsZS5jb20k",
+      /select different tenants/,
+    ],
+    ["DATABASE_URL", "postgres://customer.invalid/customer", /DATABASE_URL/],
+    ["CLERK_SECRET_KEY", "sk_test_never-use", /CLERK_SECRET_KEY/],
+  ];
+
+  try {
+    for (const name of missingVariables) {
+      const environment = { ...validEnvironment };
+      delete environment[name];
+      await assert.rejects(
+        execFileAsync(
+          process.execPath,
+          ["--import", preloadPath, "scripts/verify-published-release.mjs"],
+          { cwd: root, env: environment },
+        ),
+        (error) => {
+          assert.match(error.stderr, new RegExp(name));
+          return true;
+        },
+      );
+      await assert.rejects(readFile(markerPath), { code: "ENOENT" });
+    }
+
+    for (const [name, value, expectedError] of invalidConfigurations) {
+      const environment = { ...validEnvironment, [name]: value };
+      await assert.rejects(
+        execFileAsync(
+          process.execPath,
+          ["--import", preloadPath, "scripts/verify-published-release.mjs"],
+          { cwd: root, env: environment },
+        ),
+        (error) => {
+          assert.match(error.stderr, expectedError);
+          return true;
+        },
+      );
+      await assert.rejects(readFile(markerPath), { code: "ENOENT" });
+    }
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+
+  assert.equal(
+    validatePublishedSmokeConfiguration(validEnvironment).publishedTarget.origin,
+    "https://published.example",
+  );
 });
 
 test("release workflow and production startup share the two-key tenant contract", () => {
@@ -463,6 +583,10 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
   assert.doesNotMatch(candidateBuild, /source "\$database_env"/);
   assert.match(candidateBuild, /timeout --kill-after=1s[\s\S]*release-smoke-database\.mjs cleanup/);
   assert.match(candidateBuild, /RELEASE_SMOKE_DATABASE_URL/);
+  assert.match(
+    candidateBuild,
+    /RELEASE_SMOKE_INTERNAL_CANDIDATE=1[\s\S]*RELEASE_SMOKE_DATABASE_URL="\$selected_smoke_database_url"[\s\S]*RELEASE_PUBLICATION_DATABASE_URL="\$DATABASE_URL"[\s\S]*PRODUCTION_BASE_URL="\$candidate_url"[\s\S]*npm run verify:managed-clerk-release/,
+  );
   assert.match(candidateBuild, /prepare-release-test-database\.mjs/);
   assert.match(candidateBuild, /DATABASE_URL="\$selected_smoke_database_url"/);
   assert.match(releaseSchemaPreparation, /drizzle-kit/);
@@ -543,6 +667,7 @@ test("release candidate schema setup is isolated, migration-aware, and read-only
     "Google candidate isolation must be established before SQL access",
   );
   assert.match(config, /published-auth-read-only\.spec\.ts/);
+  assert.match(config, /validatePublishedSmokeConfiguration\(process\.env\)/);
   assert.match(publishedReadOnlySmoke, /page\.request\.get\("\/api\/auth\/user"\)/);
   assert.match(publishedReadOnlySmoke, /RELEASE_SMOKE_PUBLISHED_READ_ONLY/);
   assert.match(publishedReadOnlySmoke, /RELEASE_PUBLISHED_SMOKE_TARGET/);
@@ -968,18 +1093,26 @@ test("ordinary and release Playwright configurations have disjoint discovery", (
   assert.match(release, /published managed Clerk and Google boundaries are reachable without fixture writes/);
   assert.doesNotMatch(release, /managed Clerk sign-in preserves/);
   assert.doesNotMatch(release, /dashboard\.spec|settings\.spec|session\.spec/);
-  const pollutedPublished = listTests("playwright.release.config.ts", {
-    PRODUCTION_BASE_URL: "https://example.com",
-    RELEASE_SMOKE_PUBLISHED_READ_ONLY: "1",
-    RELEASE_SMOKE_INTERNAL_CANDIDATE: "1",
-    RELEASE_SMOKE_CANDIDATE_HOST: "example.com",
-    RELEASE_SMOKE_CANDIDATE_TLS_PORT: "443",
-  });
-  assert.match(
-    pollutedPublished,
-    /published managed Clerk and Google boundaries are reachable without fixture writes/,
+  assert.throws(
+    () => listTests("playwright.release.config.ts", {
+      PRODUCTION_BASE_URL: "https://example.com",
+      PRODUCTION_DEPLOYMENT_ID: "test-deployment",
+      RELEASE_PUBLISHED_SMOKE_TARGET: "https://example.com",
+      RELEASE_PUBLISHED_SMOKE_MODE: "read-only",
+      CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZGV2JA",
+      VITE_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZGV2JA",
+      DATABASE_URL: "",
+      RELEASE_SMOKE_DATABASE_URL: "",
+      RELEASE_PUBLICATION_DATABASE_URL: "",
+      RELEASE_PUBLISHED_SMOKE_DATABASE_URL: "",
+      CLERK_SECRET_KEY: "",
+      RELEASE_SMOKE_PUBLISHED_READ_ONLY: "1",
+      RELEASE_SMOKE_INTERNAL_CANDIDATE: "1",
+      RELEASE_SMOKE_CANDIDATE_HOST: "example.com",
+      RELEASE_SMOKE_CANDIDATE_TLS_PORT: "443",
+    }),
+    /refuses database, Clerk-secret, or internal-candidate inputs/,
   );
-  assert.doesNotMatch(pollutedPublished, /managed Clerk sign-in preserves/);
 });
 
 test("smoke uses disposable managed identity and preserves local authorization state", () => {

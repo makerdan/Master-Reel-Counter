@@ -1,10 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 import { execSync } from "node:child_process";
 import { validateProductionBaseUrl } from "./scripts/validate-production-base-url.mjs";
+import { validatePublishedSmokeConfiguration } from "./scripts/validate-published-smoke-config.mjs";
 
 const target = validateProductionBaseUrl();
 const isPublishedReadOnly =
   process.env.RELEASE_SMOKE_PUBLISHED_READ_ONLY === "1";
+if (isPublishedReadOnly) {
+  validatePublishedSmokeConfiguration(process.env);
+}
 const candidateHost = process.env.RELEASE_SMOKE_CANDIDATE_HOST;
 const candidateTlsPort = Number(process.env.RELEASE_SMOKE_CANDIDATE_TLS_PORT);
 const isInternalCandidate =
