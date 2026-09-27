@@ -4,8 +4,16 @@ import { once } from "node:events";
 import express, { type RequestHandler } from "express";
 import { describe, test } from "node:test";
 import { registerAudioRoutes } from "../replit_integrations/audio/routes.js";
-import { openai, speechToText } from "../replit_integrations/audio/client.js";
-import { registerImageRoutes } from "../replit_integrations/image/routes.js";
+import {
+  InvalidAudioPayloadError,
+  MAX_AUDIO_BYTES,
+  openai,
+  speechToText,
+} from "../replit_integrations/audio/client.js";
+import {
+  MAX_IMAGE_PROMPT_CHARACTERS,
+  registerImageRoutes,
+} from "../replit_integrations/image/routes.js";
 import type { IChatStorage } from "../replit_integrations/chat/storage.js";
 import { REPLIT_AI_MODELS } from "../providers/approved-models.js";
 import { createHelpChatHandler } from "../routes.js";
@@ -202,6 +210,14 @@ describe("AI provider API safety", () => {
       assert.equal(rejectedImage.status, 400);
       await rejectedImage.arrayBuffer();
 
+      const oversizedImage = await fetch(`${baseUrl}/api/generate-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: "p".repeat(MAX_IMAGE_PROMPT_CHARACTERS + 1) }),
+      });
+      assert.equal(oversizedImage.status, 413);
+      assert.deepEqual(await oversizedImage.json(), { error: "Image prompt is too long" });
+
       assert.equal(transcriptionCalls, 0);
       assert.equal(audioGenerationCalls, 0);
       assert.equal(imageGenerationCalls, 0);
@@ -230,6 +246,74 @@ describe("AI provider API safety", () => {
       assert.equal(audioGenerationCalls, 1);
       assert.deepEqual(imageModels, [REPLIT_AI_MODELS.imageGeneration]);
       assert.deepEqual(savedMessages.map(({ role }) => role), ["user", "assistant"]);
+    });
+  });
+
+  test("rejects malformed and oversized audio before transcription", async () => {
+    const app = express();
+    let conversionCalls = 0;
+    let transcriptionCalls = 0;
+    let audioGenerationCalls = 0;
+
+    registerAudioRoutes(app, {
+      authenticate: authenticatedUser,
+      storage: createStorage(),
+      convertAudio: async (buffer) => {
+        conversionCalls++;
+        if (buffer.toString() === "malformed-audio") throw new InvalidAudioPayloadError();
+        if (buffer.toString() === "expands-audio") {
+          return { buffer: Buffer.alloc(MAX_AUDIO_BYTES + 1), format: "wav" };
+        }
+        return { buffer, format: "wav" };
+      },
+      transcribe: async () => {
+        transcriptionCalls++;
+        return "unexpected transcript";
+      },
+      createAudioStream: async () => {
+        audioGenerationCalls++;
+        return (async function* () {})();
+      },
+    });
+
+    await withServer(app, async (baseUrl) => {
+      const malformedBase64 = await fetch(`${baseUrl}/api/conversations/1/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio: "not-base64!" }),
+      });
+      assert.equal(malformedBase64.status, 400);
+      assert.deepEqual(await malformedBase64.json(), { error: "Invalid audio data" });
+
+      const malformedAudio = await fetch(`${baseUrl}/api/conversations/1/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio: Buffer.from("malformed-audio").toString("base64") }),
+      });
+      assert.equal(malformedAudio.status, 400);
+      assert.deepEqual(await malformedAudio.json(), { error: "Invalid audio data" });
+
+      const oversizedConvertedAudio = await fetch(`${baseUrl}/api/conversations/1/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio: Buffer.from("expands-audio").toString("base64") }),
+      });
+      assert.equal(oversizedConvertedAudio.status, 413);
+      assert.deepEqual(await oversizedConvertedAudio.json(), { error: "Audio payload is too large" });
+
+      const oversizedAudio = await fetch(`${baseUrl}/api/conversations/1/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audio: Buffer.alloc(MAX_AUDIO_BYTES + 1).toString("base64"),
+        }),
+      });
+      assert.equal(oversizedAudio.status, 413);
+      assert.deepEqual(await oversizedAudio.json(), { error: "Audio payload is too large" });
+
+      assert.equal(conversionCalls, 2);
+      assert.equal(transcriptionCalls, 0);
+      assert.equal(audioGenerationCalls, 0);
     });
   });
 

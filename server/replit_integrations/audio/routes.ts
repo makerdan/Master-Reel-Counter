@@ -1,6 +1,17 @@
-import express, { type Express, type Request, type RequestHandler, type Response } from "express";
+import express, {
+  type ErrorRequestHandler,
+  type Express,
+  type Request,
+  type RequestHandler,
+  type Response,
+} from "express";
 import { chatStorage, type IChatStorage } from "../chat/storage";
 import {
+  AudioPayloadTooLargeError,
+  InvalidAudioPayloadError,
+  MAX_AUDIO_BASE64_LENGTH,
+  assertAudioWithinLimit,
+  decodeAudioBase64,
   openai,
   speechToText,
   ensureCompatibleFormat,
@@ -9,7 +20,18 @@ import {
 import { isAuthenticated } from "../auth/replitAuth";
 import { isApprovedReplitAiModel, REPLIT_AI_MODELS } from "../../providers/approved-models";
 
-const audioBodyParser = express.json({ limit: "50mb" });
+// Leave only a small JSON envelope beyond the maximum base64-encoded upload.
+const audioBodyParser = express.json({ limit: MAX_AUDIO_BASE64_LENGTH + 1024 });
+const audioBodyParserErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
+  const errorType = (error as { type?: unknown })?.type;
+  if (errorType === "entity.too.large") {
+    return res.status(413).json({ error: "Audio payload is too large" });
+  }
+  if (error instanceof SyntaxError && "body" in error) {
+    return res.status(400).json({ error: "Invalid JSON payload" });
+  }
+  next(error);
+};
 
 const AUDIO_VOICES = new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]);
 type AudioVoice = "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
@@ -110,6 +132,7 @@ export function registerAudioRoutes(
     "/api/conversations/:id/messages",
     authenticate,
     audioBodyParser,
+    audioBodyParserErrorHandler,
     async (req: Request, res: Response) => {
       const requestAbort = new AbortController();
       const abortForDisconnect = () => {
@@ -131,6 +154,18 @@ export function registerAudioRoutes(
         if (typeof audio !== "string" || audio.length === 0) {
           return res.status(400).json({ error: "Audio data (base64) is required" });
         }
+        let rawBuffer: Buffer;
+        try {
+          rawBuffer = decodeAudioBase64(audio);
+        } catch (error) {
+          if (error instanceof AudioPayloadTooLargeError) {
+            return res.status(413).json({ error: "Audio payload is too large" });
+          }
+          if (error instanceof InvalidAudioPayloadError) {
+            return res.status(400).json({ error: "Invalid audio data" });
+          }
+          throw error;
+        }
         if (typeof voice !== "string" || !AUDIO_VOICES.has(voice)) {
           return res.status(400).json({ error: "Unsupported audio voice" });
         }
@@ -140,9 +175,23 @@ export function registerAudioRoutes(
         }
         if (requestAbort.signal.aborted) return;
 
-        const rawBuffer = Buffer.from(audio, "base64");
-        const { buffer: audioBuffer, format: inputFormat } =
-          await dependencies.convertAudio(rawBuffer, requestAbort.signal);
+        let audioBuffer: Buffer;
+        let inputFormat: "wav" | "mp3";
+        try {
+          const converted = await dependencies.convertAudio(rawBuffer, requestAbort.signal);
+          audioBuffer = converted.buffer;
+          inputFormat = converted.format;
+          assertAudioWithinLimit(audioBuffer);
+        } catch (error) {
+          if (requestAbort.signal.aborted) return;
+          if (error instanceof AudioPayloadTooLargeError) {
+            return res.status(413).json({ error: "Audio payload is too large" });
+          }
+          if (error instanceof InvalidAudioPayloadError) {
+            return res.status(400).json({ error: "Invalid audio data" });
+          }
+          throw error;
+        }
         if (requestAbort.signal.aborted) return;
 
         const userTranscript = await dependencies.transcribe(

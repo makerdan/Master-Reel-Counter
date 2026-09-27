@@ -93,6 +93,13 @@ app.use(
 app.use(
   express.json({
     limit: "20mb",
+    // The voice endpoint has its own base64-aware parser and 25,000,000-byte decoded cap.
+    type: (req) => {
+      const requestPath = req.url?.split("?", 1)[0] ?? "";
+      const isVoiceMessage = req.method === "POST" &&
+        /^\/api\/conversations\/[^/]+\/messages\/?$/.test(requestPath);
+      return !isVoiceMessage;
+    },
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },

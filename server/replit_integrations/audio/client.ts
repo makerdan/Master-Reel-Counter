@@ -14,6 +14,73 @@ export const openai = new OpenAI({
   maxRetries: 0,
 });
 
+/**
+ * Audio uploads are capped at 25,000,000 decoded bytes, matching the
+ * transcription provider's upload ceiling. The JSON limit is derived from it.
+ */
+export const MAX_AUDIO_BYTES = 25_000_000;
+export const MAX_AUDIO_BASE64_LENGTH = Math.ceil(MAX_AUDIO_BYTES / 3) * 4;
+
+export class AudioPayloadTooLargeError extends Error {
+  constructor() {
+    super("Audio payload exceeds the configured size limit");
+    this.name = "AudioPayloadTooLargeError";
+  }
+}
+
+export class InvalidAudioPayloadError extends Error {
+  constructor() {
+    super("Audio payload is invalid");
+    this.name = "InvalidAudioPayloadError";
+  }
+}
+
+function base64Value(code: number): number {
+  if (code >= 0x41 && code <= 0x5a) return code - 0x41;
+  if (code >= 0x61 && code <= 0x7a) return code - 0x61 + 26;
+  if (code >= 0x30 && code <= 0x39) return code - 0x30 + 52;
+  if (code === 0x2b) return 62;
+  if (code === 0x2f) return 63;
+  return -1;
+}
+
+function isStrictBase64Audio(audio: string): boolean {
+  if (audio.length === 0 || audio.length % 4 !== 0) return false;
+  const padding = audio.endsWith("==") ? 2 : audio.endsWith("=") ? 1 : 0;
+  const dataLength = audio.length - padding;
+  if (padding === 2 && dataLength % 4 !== 2) return false;
+  if (padding === 1 && dataLength % 4 !== 3) return false;
+
+  for (let index = 0; index < dataLength; index++) {
+    if (base64Value(audio.charCodeAt(index)) < 0) return false;
+  }
+  for (let index = dataLength; index < audio.length; index++) {
+    if (audio.charCodeAt(index) !== 0x3d) return false;
+  }
+
+  const finalValue = padding > 0 ? base64Value(audio.charCodeAt(dataLength - 1)) : 0;
+  if (padding === 2 && (finalValue & 0x0f) !== 0) return false;
+  if (padding === 1 && (finalValue & 0x03) !== 0) return false;
+  return true;
+}
+
+export function assertAudioWithinLimit(audioBuffer: Buffer): void {
+  if (audioBuffer.length > MAX_AUDIO_BYTES) throw new AudioPayloadTooLargeError();
+}
+
+export function decodeAudioBase64(audio: string): Buffer {
+  if (audio.length > MAX_AUDIO_BASE64_LENGTH) throw new AudioPayloadTooLargeError();
+  const decodedLength = Math.floor(audio.length / 4) * 3 -
+    (audio.endsWith("==") ? 2 : audio.endsWith("=") ? 1 : 0);
+  if (decodedLength > MAX_AUDIO_BYTES) throw new AudioPayloadTooLargeError();
+  if (!isStrictBase64Audio(audio)) throw new InvalidAudioPayloadError();
+
+  const audioBuffer = Buffer.from(audio, "base64");
+  assertAudioWithinLimit(audioBuffer);
+  if (audioBuffer.length !== decodedLength) throw new InvalidAudioPayloadError();
+  return audioBuffer;
+}
+
 function cancellationError(): Error {
   const error = new Error("The audio request was cancelled.");
   error.name = "AbortError";
@@ -110,6 +177,7 @@ export function detectAudioFormat(buffer: Buffer): AudioFormat {
  * require seeking to find the audio track.
  */
 export async function convertToWav(audioBuffer: Buffer, signal?: AbortSignal): Promise<Buffer> {
+  assertAudioWithinLimit(audioBuffer);
   const inputPath = join(tmpdir(), `input-${randomUUID()}`);
   const outputPath = join(tmpdir(), `output-${randomUUID()}.wav`);
 
@@ -135,13 +203,15 @@ export async function convertToWav(audioBuffer: Buffer, signal?: AbortSignal): P
       ffmpeg.stderr.on("data", () => {}); // Suppress logs
       ffmpeg.on("close", (code) => {
         if (code === 0) resolve();
-        else reject(new Error(`ffmpeg exited with code ${code}`));
+        else reject(new InvalidAudioPayloadError());
       });
       ffmpeg.on("error", reject);
     });
 
     // Read converted audio
-    return await readFile(outputPath);
+    const outputBuffer = await readFile(outputPath);
+    assertAudioWithinLimit(outputBuffer);
+    return outputBuffer;
   } finally {
     // Clean up temp files
     await unlink(inputPath).catch(() => {});
@@ -159,11 +229,13 @@ export async function ensureCompatibleFormat(
   signal?: AbortSignal,
 ): Promise<{ buffer: Buffer; format: "wav" | "mp3" }> {
   throwIfAborted(signal);
+  assertAudioWithinLimit(audioBuffer);
   const detected = detectAudioFormat(audioBuffer);
   if (detected === "wav") return { buffer: audioBuffer, format: "wav" };
   if (detected === "mp3") return { buffer: audioBuffer, format: "mp3" };
   // Convert WebM, MP4, OGG, or unknown to WAV
   const wavBuffer = await convertToWav(audioBuffer, signal);
+  assertAudioWithinLimit(wavBuffer);
   return { buffer: wavBuffer, format: "wav" };
 }
 
@@ -180,6 +252,7 @@ export async function voiceChat(
   signal?: AbortSignal,
 ): Promise<{ transcript: string; audioResponse: Buffer }> {
   throwIfAborted(signal);
+  assertAudioWithinLimit(audioBuffer);
   const audioBase64 = audioBuffer.toString("base64");
   const response = await withAudioProviderRetry(signal, (requestSignal) =>
     openai.chat.completions.create({
@@ -219,6 +292,7 @@ export async function voiceChatStream(
   signal?: AbortSignal,
 ): Promise<AsyncIterable<{ type: "transcript" | "audio"; data: string }>> {
   throwIfAborted(signal);
+  assertAudioWithinLimit(audioBuffer);
   const audioBase64 = audioBuffer.toString("base64");
   const stream = await withAudioProviderRetry(signal, (requestSignal) =>
     openai.chat.completions.create({
@@ -317,6 +391,7 @@ export async function speechToText(
   signal?: AbortSignal,
 ): Promise<string> {
   throwIfAborted(signal);
+  assertAudioWithinLimit(audioBuffer);
   const file = await toFile(audioBuffer, `audio.${format}`);
   throwIfAborted(signal);
   const response = await withAudioProviderRetry(signal, (requestSignal) =>
@@ -337,6 +412,7 @@ export async function speechToTextStream(
   signal?: AbortSignal,
 ): Promise<AsyncIterable<string>> {
   throwIfAborted(signal);
+  assertAudioWithinLimit(audioBuffer);
   const file = await toFile(audioBuffer, `audio.${format}`);
   throwIfAborted(signal);
   const stream = await withAudioProviderRetry(signal, (requestSignal) =>
