@@ -49,6 +49,77 @@ test("a direct Playwright CLI package script config cannot bypass coverage", () 
   );
 });
 
+test("a package command cannot hide an untyped Playwright launch in nested helpers", () => {
+  const helperScriptSources = {
+    "scripts/browser-wrapper.mjs": `
+      import { fileURLToPath } from "node:url";
+      import { spawnSync } from "node:child_process";
+      const launcher = new URL("./browser-launcher.mjs", import.meta.url);
+      spawnSync(process.execPath, [fileURLToPath(launcher)]);
+    `,
+    "scripts/browser-launcher.mjs": `
+      import { spawnSync } from "node:child_process";
+      spawnSync("npx", ["playwright", "test"]);
+    `,
+  };
+  const coverage = {
+    packageJson: {
+      scripts: {
+        "test:hidden-browser": "node scripts/browser-wrapper.mjs",
+      },
+    },
+    manifest: { tiers: {} },
+    compilerProject: { include: ["playwright.config.ts"] },
+    rootConfigFiles: ["playwright.config.ts"],
+    helperScriptSources,
+  };
+
+  assert.throws(
+    () => checkPlaywrightConfigCoverage(coverage),
+    /browser package script 'test:hidden-browser' must run 'npm run typecheck' before launching browser validation/,
+  );
+  assert.doesNotThrow(() =>
+    checkPlaywrightConfigCoverage({
+      ...coverage,
+      packageJson: {
+        scripts: {
+          "test:hidden-browser":
+            "npm run typecheck && node scripts/browser-wrapper.mjs",
+        },
+      },
+    }),
+  );
+});
+
+test("Playwright configs passed by a helper are added to compiler coverage", () => {
+  assert.throws(
+    () =>
+      checkPlaywrightConfigCoverage({
+        packageJson: {
+          scripts: {
+            "test:hidden-config":
+              "npm run typecheck && node scripts/browser-launcher.mjs",
+          },
+        },
+        manifest: { tiers: {} },
+        compilerProject: { include: ["playwright.config.ts"] },
+        rootConfigFiles: ["playwright.config.ts", "playwright.hidden.config.ts"],
+        helperScriptSources: {
+          "scripts/browser-launcher.mjs": `
+            import { spawnSync } from "node:child_process";
+            spawnSync("npx", [
+              "playwright",
+              "test",
+              "--config",
+              "playwright.hidden.config.ts",
+            ]);
+          `,
+        },
+      }),
+    /outside compiler coverage: playwright\.hidden\.config\.ts/,
+  );
+});
+
 test("a tier-invoked config cannot bypass compiler coverage", () => {
   assert.throws(
     () =>
