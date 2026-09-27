@@ -197,6 +197,7 @@ export async function createOrientedJpegFixture(
 
 type E2EFixtures = {
   clerkTestingToken: void;
+  anonymousRequest: APIRequestContext;
   cleanupIds: number[];
   sessionId: number;
   secondApprovedIdentity: {
@@ -207,6 +208,26 @@ type E2EFixtures = {
 export const test = base.extend<E2EFixtures>({
   request: async ({ context }, use) => {
     await use(context.request);
+  },
+  anonymousRequest: async ({ playwright, baseURL }, use) => {
+    // The ordinary request fixture shares the browser's saved owner session.
+    // Explicitly discard storage state even if the test config gains new defaults.
+    if (!baseURL) throw new Error("Anonymous requests require the configured test baseURL");
+    const anonymous = await playwright.request.newContext({
+      baseURL,
+      storageState: { cookies: [], origins: [] },
+    });
+    try {
+      const identity = await anonymous.get("/api/auth/user");
+      if (identity.status() !== 401) {
+        throw new Error(
+          `Anonymous request is not anonymous: /api/auth/user returned ${identity.status()}`,
+        );
+      }
+      await use(anonymous);
+    } finally {
+      await anonymous.dispose();
+    }
   },
   clerkTestingToken: [
     async ({ context, page, request }, use) => {

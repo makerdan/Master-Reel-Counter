@@ -559,6 +559,7 @@ test.describe("offline queue warning @offline-queue", () => {
     page,
     browser,
     request,
+    anonymousRequest,
     cleanupIds,
     secondApprovedIdentity,
   }) => {
@@ -693,13 +694,12 @@ test.describe("offline queue warning @offline-queue", () => {
       "Content-Type": "application/json",
       "Idempotency-Key": operationIds[0],
     };
-    // A bare Node request cannot inherit Playwright's saved Clerk session.
-    const anonymous = await fetch(new URL(entryPath, BASE_URL), {
-      method: "POST",
+    // The fixture verifies that this separate request has no owner identity.
+    const anonymous = await anonymousRequest.post(entryPath, {
       headers: rejectedHeaders,
-      body: initialBody,
+      data: initialBody!,
     });
-    expect(anonymous.status, `anonymous replay: ${await anonymous.text()}`).toBe(401);
+    expect(anonymous.status(), `anonymous replay: ${await anonymous.text()}`).toBe(401);
 
     const frontendApiUrl = parsePublishableKey(process.env.VITE_CLERK_PUBLISHABLE_KEY)?.frontendApi;
     if (!frontendApiUrl) throw new Error("Browser replay requires a valid Clerk publishable key");
