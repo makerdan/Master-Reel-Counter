@@ -66,6 +66,44 @@ async function interceptLostFirstRegistration(
 }
 
 test.describe("photo POST validation @photo-upload", () => {
+  test("multipart avatar upload persists its image reference", async ({ request }) => {
+    try {
+      const response = await request.post("/api/user/profile/avatar", {
+        multipart: { file: directPhoto },
+      });
+      expect(response.status(), await response.text()).toBe(200);
+      const uploaded = await response.json() as { customAvatarKey: string };
+      expect(uploaded.customAvatarKey).toMatch(/^\/uploads\/avatar-[^/]+\.jpg$/);
+
+      const profileResponse = await request.get("/api/auth/user");
+      expect(profileResponse.status(), await profileResponse.text()).toBe(200);
+      expect((await profileResponse.json()).customAvatarKey).toBe(uploaded.customAvatarKey);
+    } finally {
+      const removed = await request.delete("/api/user/profile/avatar");
+      expect(removed.status(), await removed.text()).toBe(200);
+      expect((await removed.json()).customAvatarKey).toBeNull();
+    }
+  });
+
+  test("multipart company logo upload persists its image reference", async ({ request }) => {
+    try {
+      const response = await request.post("/api/settings/logo", {
+        multipart: { file: directPhoto },
+      });
+      expect(response.status(), await response.text()).toBe(200);
+      const uploaded = await response.json() as { companyLogoKey: string };
+      expect(uploaded.companyLogoKey).toMatch(/^\/uploads\/logo-[^/]+\.png$/);
+
+      const settingsResponse = await request.get("/api/settings");
+      expect(settingsResponse.status(), await settingsResponse.text()).toBe(200);
+      expect((await settingsResponse.json()).companyLogoKey).toBe(uploaded.companyLogoKey);
+    } finally {
+      const removed = await request.delete("/api/settings/logo");
+      expect(removed.status(), await removed.text()).toBe(200);
+      expect((await removed.json()).companyLogoKey).toBeNull();
+    }
+  });
+
   test("multipart direct upload can be registered as a session photo", async ({
     request,
     cleanupIds,
