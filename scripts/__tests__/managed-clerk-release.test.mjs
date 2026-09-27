@@ -296,7 +296,7 @@ function listTests(configPath, environment = {}) {
 test("release command uses an isolated production-only Playwright configuration", () => {
   assert.match(
     packageJson.scripts["verify:managed-clerk-release"],
-    /playwright test --config playwright\.release\.config\.ts/,
+    /scripts\/run-typechecked-playwright\.mjs --config playwright\.release\.config\.ts/,
   );
   assert.match(config, /validateProductionBaseUrl/);
   assert.match(productionUrlValidation, /PRODUCTION_BASE_URL is required/);

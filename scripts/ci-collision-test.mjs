@@ -152,7 +152,7 @@ const expectedRoutes = {
       `node scripts/run-tier.mjs ${tier} --allow-no-plan`,
     ]),
   ),
-  "test:e2e": "node scripts/serial-lock.mjs --resource e2e-port --priority 3 --timeout-ms 900000 -- npx playwright test",
+  "test:e2e": "node scripts/serial-lock.mjs --resource e2e-port --priority 3 --timeout-ms 900000 -- node scripts/run-typechecked-playwright.mjs",
 };
 for (const [name, expected] of Object.entries(expectedRoutes)) {
   const script = scripts[name] ?? "";

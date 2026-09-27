@@ -60,7 +60,7 @@ npm run test:e2e
 ### 3. Run a single spec
 
 ```bash
-npx playwright test tests/undo-redo.spec.ts
+npm run test:e2e -- tests/undo-redo.spec.ts
 ```
 
 ### 4. Run tests matching a tag
@@ -68,8 +68,8 @@ npx playwright test tests/undo-redo.spec.ts
 All specs are tagged with `@<feature>` labels (e.g. `@undo`, `@scan`, `@mobile`):
 
 ```bash
-npx playwright test --grep "@undo"
-npx playwright test --grep "@mobile"
+npm run test:e2e -- --grep "@undo"
+npm run test:e2e -- --grep "@mobile"
 ```
 
 ### 5. View the HTML report

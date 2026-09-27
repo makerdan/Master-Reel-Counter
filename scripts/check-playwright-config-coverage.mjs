@@ -27,6 +27,9 @@ function configFromPlaywrightCommand(command) {
     /(?:^|\s)(?:node\s+)?\S*node_modules\/@playwright\/test\/cli\.js\s+test\b/.test(
       normalizedCommand,
     ) ||
+    /(?:^|\s)(?:node\s+)?(?:\.\/)?scripts\/run-typechecked-playwright\.mjs(?:\s|$)/.test(
+      normalizedCommand,
+    ) ||
     /(?:^|\s)(?:node\s+)?(?:\.\/)?scripts\/run-browser-tests\.mjs(?:\s|$)/.test(
       normalizedCommand,
     );
@@ -37,6 +40,57 @@ function configFromPlaywrightCommand(command) {
     /(?:^|\s)--config(?:=|\s+)(["']?)([^"' \t]+)\1/,
   )?.[2];
   return [normalizePath(explicitConfig || "playwright.config.ts")];
+}
+
+function browserValidationCommandIndex(command) {
+  const normalizedCommand = shellCommand(command);
+  const matches = [
+    /\b(?:npx\s+)?playwright\s+test\b/,
+    /(?:^|\s)(?:node\s+)?\S*node_modules\/@playwright\/test\/cli\.js\s+test\b/,
+    /(?:^|\s)(?:node\s+)?(?:\.\/)?scripts\/run-typechecked-playwright\.mjs(?:\s|$)/,
+    /(?:^|\s)(?:node\s+)?(?:\.\/)?scripts\/run-browser-tests\.mjs(?:\s|$)/,
+    /(?:^|\s)(?:node\s+)?(?:\.\/)?scripts\/verify-published-release\.mjs(?:\s|$)/,
+  ]
+    .map((pattern) => pattern.exec(normalizedCommand)?.index)
+    .filter((index) => index !== undefined);
+  return matches.length > 0 ? Math.min(...matches) : -1;
+}
+
+function assertBrowserTypecheckPrerequisites({ packageJson, manifest }) {
+  for (const [scriptName, command] of Object.entries(packageJson.scripts ?? {})) {
+    const normalizedCommand = shellCommand(command);
+    const browserIndex = browserValidationCommandIndex(normalizedCommand);
+    if (browserIndex < 0) continue;
+    if (/scripts\/run-typechecked-playwright\.mjs(?:\s|$)/.test(normalizedCommand)) {
+      continue;
+    }
+
+    const typecheckIndex = normalizedCommand.indexOf("npm run typecheck");
+    if (
+      typecheckIndex < 0 ||
+      typecheckIndex > browserIndex ||
+      !normalizedCommand.slice(typecheckIndex, browserIndex).includes("&&")
+    ) {
+      throw new Error(
+        `browser package script '${scriptName}' must run 'npm run typecheck' before launching browser validation or use scripts/run-typechecked-playwright.mjs`,
+      );
+    }
+  }
+
+  for (const [tierName, tier] of Object.entries(manifest.tiers ?? {})) {
+    let typecheckPassedInTier = false;
+    for (const step of tier.steps ?? []) {
+      const command = shellCommand(step.command);
+      if (step.kind === "typecheck" || /\bnpm\s+run\s+typecheck\b/.test(command)) {
+        typecheckPassedInTier = true;
+      }
+      if (browserValidationCommandIndex(command) >= 0 && !typecheckPassedInTier) {
+        throw new Error(
+          `browser validation step '${step.name}' in tier '${tierName}' must follow a typecheck step`,
+        );
+      }
+    }
+  }
 }
 
 function referencedPackageScripts(command) {
@@ -129,6 +183,8 @@ export function checkPlaywrightConfigCoverage({
       `Playwright configuration file(s) are outside compiler coverage: ${uncovered.join(", ")}`,
     );
   }
+
+  assertBrowserTypecheckPrerequisites({ packageJson, manifest });
 
   return configs;
 }

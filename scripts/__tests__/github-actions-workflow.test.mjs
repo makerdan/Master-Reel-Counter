@@ -248,7 +248,7 @@ test("workflow routes validation through the canonical command", () => {
   );
   assert.equal(
     packageJson.scripts["test:e2e"],
-    "node scripts/serial-lock.mjs --resource e2e-port --priority 3 --timeout-ms 900000 -- npx playwright test",
+    "node scripts/serial-lock.mjs --resource e2e-port --priority 3 --timeout-ms 900000 -- node scripts/run-typechecked-playwright.mjs",
   );
   assert.match(workflow, /timeout-minutes:\s+30/);
 });
