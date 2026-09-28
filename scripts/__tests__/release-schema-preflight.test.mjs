@@ -448,6 +448,27 @@ test("publication accepts an already-current schema without a transition", async
   );
 });
 
+test("publication fingerprint uses canonical index order, not the database collation", async () => {
+  const indexes = [
+    { indexname: "IDX_session_expire", indexdef: 'CREATE INDEX "IDX_session_expire" ON public.sessions USING btree (expire)' },
+    { indexname: "activity_logs_pkey", indexdef: "CREATE UNIQUE INDEX activity_logs_pkey ON public.activity_logs USING btree (id)" },
+  ];
+  const original = await readReleaseSchema(fakeClient({
+    columns: currentColumns,
+    indexes,
+  }));
+  const reordered = await readReleaseSchema(fakeClient({
+    columns: [...currentColumns].reverse(),
+    indexes: [...indexes].reverse(),
+  }));
+  assert.equal(releaseSchemaFingerprint(original), releaseSchemaFingerprint(reordered));
+  assert.deepEqual(compareReleaseSchema(original, reordered), []);
+  assert.equal(
+    releaseSchemaFingerprint(original),
+    "40d165f4e17df9344bdabd701ba5caf558a23a4119947608af7a1bd907f33b97",
+  );
+});
+
 test("publication accepts only the exact reviewed legacy and candidate pair", async () => {
   const current = await assertReleaseSchema(fakeClient({ columns: currentColumns }));
   const legacyColumns = currentColumns.filter(

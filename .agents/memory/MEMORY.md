@@ -47,3 +47,4 @@
 - [Large base64 validation](large-base64-validation.md) — validate large untrusted base64 strings with a bounded scan, not a whole-input repeated-group regex.
 - [Completion-validation commit boundary](completion-validation-commit-boundary.md) — after final validation fails, HEAD may already be the task commit; use its parent for pre-task evidence.
 - [Browser validation server reuse](browser-validation-server-reuse.md) — an existing preview server can route isolated-browser tests to the wrong database; clear the preview port before the tier.
+- [Release schema fingerprint provenance](release-schema-fingerprint-provenance.md) — calculate reviewed production fingerprints through the application canonicalizer, not SQL or separately sorted metadata.

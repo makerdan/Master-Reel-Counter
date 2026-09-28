@@ -30,7 +30,7 @@ const REVIEWED_MIGRATION_NAMES = [
 // Re-review BOTH sides before updating these values.
 export const REVIEWED_PUBLICATION_TRANSITION = Object.freeze({
   schemaName: "public",
-  legacyFingerprint: "ae07fb502896d44e9a81b9270e035dd6b1abddf9ed3329b8e5bc98dd8172f701",
+  legacyFingerprint: "dad8f2e20ffdf33fa056d5e0bb384ea7489b3464e131d4c70e5f5cb949c26764",
   candidateFingerprint: "ab7c906a008a22f19d2c976cab07f15b57180009ec564e0bc73b007c4d74063c",
 });
 
@@ -414,7 +414,9 @@ export async function assertPublicationSchema(
   }
   throw new ReleaseSchemaPreflightError(
     "target-drift",
-    `publishing schema differs from the reviewed isolated schema and the one approved legacy transition (${differences.join("; ")})`,
+    `publishing schema differs from the reviewed isolated schema and the one approved legacy transition ` +
+      `(candidate=${releaseSchemaFingerprint(expectedSchema)}, publishing=${releaseSchemaFingerprint(actual)}; ` +
+      `${differences.join("; ")})`,
   );
 }
 
