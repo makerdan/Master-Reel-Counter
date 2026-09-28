@@ -1,8 +1,168 @@
-import { readFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 
 const hash = (text) => createHash("sha256").update(text).digest("hex");
+const playwrightReport = "test-results/failure-gate/playwright.json";
+const reentrancyChecks = [
+  "nested validation exited 0",
+  "outer run reached its manifest step",
+  "nested tier reached its manifest step",
+  "nested tier did not inherit the outer task plan",
+  "nested tier used the owned reentrancy path",
+  "nested tier did not wait behind its owning lock",
+  "nested manifest step ran exactly once",
+];
+
+function boundedPlaywrightReport(root) {
+  if (!root) throw new Error("FAILURE-GATE BLOCKED: Playwright report root unavailable");
+  // Fixed relative path; reject symlinked parents as well as the file itself.
+  for (const parent of ["test-results", "test-results/failure-gate"]) {
+    if (!lstatSync(resolve(root, parent)).isDirectory())
+      throw new Error("FAILURE-GATE BLOCKED: unsafe Playwright report directory");
+  }
+  const fd = openSync(resolve(root, playwrightReport), constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const before = fstatSync(fd);
+    if (!before.isFile() || before.size < 1 || before.size > 16 * 1024 * 1024)
+      throw new Error("FAILURE-GATE BLOCKED: invalid Playwright report size");
+    const bytes = Buffer.alloc(before.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const read = readSync(fd, bytes, offset, bytes.length - offset, offset);
+      if (!read) throw new Error("FAILURE-GATE BLOCKED: partial Playwright report");
+      offset += read;
+    }
+    const after = fstatSync(fd);
+    if (after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs)
+      throw new Error("FAILURE-GATE BLOCKED: changing Playwright report");
+    return JSON.parse(bytes.toString("utf8"));
+  } finally { closeSync(fd); }
+}
+
+function parsePlaywright(root, step, environment, outputDigest) {
+  const report = boundedPlaywrightReport(root);
+  if (!Array.isArray(report.errors) && report.errors !== undefined ||
+      report.errors?.length || !Array.isArray(report.suites))
+    throw new Error("FAILURE-GATE BLOCKED: incomplete Playwright run");
+  const identities = new Set();
+  const failures = [];
+  const passedTests = [];
+  let tests = 0;
+  let skipped = 0;
+  const walk = (suites, titles = []) => {
+    if (!Array.isArray(suites)) throw new Error("FAILURE-GATE BLOCKED: missing Playwright suites");
+    for (const suite of suites) {
+      if (!Array.isArray(suite.specs) && suite.specs !== undefined ||
+          !Array.isArray(suite.suites) && suite.suites !== undefined)
+        throw new Error("FAILURE-GATE BLOCKED: incomplete Playwright suite");
+      const path = suite.title ? [...titles, suite.title] : titles;
+      for (const spec of suite.specs ?? []) {
+        if (!Array.isArray(spec.tests) || !spec.tests.length || typeof spec.title !== "string")
+          throw new Error("FAILURE-GATE BLOCKED: incomplete Playwright spec");
+        for (const entry of spec.tests) {
+          if (typeof entry.projectName !== "string" || !entry.projectName ||
+              !Array.isArray(entry.results) || !entry.results.length ||
+              !["expected", "unexpected", "flaky", "skipped"].includes(entry.status))
+            throw new Error("FAILURE-GATE BLOCKED: incomplete Playwright test");
+          const name = [...path, spec.title].filter(Boolean).join(" > ");
+          const identity = { suite: step.name, test: `${entry.projectName}: ${name}`,
+            variant: entry.projectName, environment };
+          if (!name || identities.has(identity.test))
+            throw new Error("FAILURE-GATE BLOCKED: duplicate Playwright test identity");
+          identities.add(identity.test);
+          tests++;
+          if (entry.status === "skipped") { skipped++; continue; }
+          if (entry.status === "unexpected") {
+            failures.push({ ...identity, signature: `sha256:${hash(JSON.stringify(entry.results.map(
+              ({ status, errors }) => ({ status, errors }))))}` });
+          } else if (entry.status === "expected" || entry.status === "flaky") {
+            if (!entry.results.some((result) => result.status === "passed"))
+              throw new Error("FAILURE-GATE BLOCKED: Playwright pass without passing result");
+            passedTests.push(identity);
+          }
+        }
+      }
+      walk(suite.suites ?? [], path);
+    }
+  };
+  walk(report.suites);
+  if (!Number.isSafeInteger(report.stats?.expected) || !Number.isSafeInteger(report.stats?.unexpected) ||
+      !Number.isSafeInteger(report.stats?.flaky) || !Number.isSafeInteger(report.stats?.skipped) ||
+      tests < 1 || report.stats.expected + report.stats.unexpected +
+      report.stats.flaky + report.stats.skipped !== tests ||
+      report.stats.unexpected !== failures.length || report.stats.skipped !== skipped ||
+      report.stats.expected + report.stats.flaky !== passedTests.length)
+    throw new Error("FAILURE-GATE BLOCKED: Playwright discovery mismatch");
+  return { tests, skipped, outputDigest, parser: "playwright-json-v1", complete: true,
+    expectedRuns: 1, observedRuns: 1, failures, passedTests };
+}
+
+function parseReentrancy(text, step, environment, outputDigest) {
+  const checks = [...text.matchAll(/^  (PASS|FAIL): (.+)$/gm)];
+  const seen = new Set();
+  const failures = [];
+  const passedTests = [];
+  for (const [, state, message] of checks) {
+    const name = reentrancyChecks.find((check) => message === check ||
+      (check === "nested validation exited 0" && /^nested validation exited 0 \(got .+\)$/.test(message)));
+    if (!name || seen.has(name)) throw new Error("FAILURE-GATE BLOCKED: unknown or duplicate reentrancy check");
+    seen.add(name);
+    const identity = { suite: step.name, test: name, variant: "non-smoke", environment };
+    if (state === "FAIL") failures.push({ ...identity, signature: `sha256:${hash(message)}` });
+    else passedTests.push(identity);
+  }
+  return { tests: seen.size, skipped: 0, outputDigest, parser: "reentrancy-assertions-v1",
+    complete: seen.size === reentrancyChecks.length && (failures.length > 0 ||
+      text.includes("[ci-collision-test] Non-smoke reentrancy regression passed.")),
+    expectedRuns: 1, observedRuns: seen.size === reentrancyChecks.length ? 1 : 0,
+    failures, passedTests };
+}
+
+function identitiesForRows(rows, step, environment, variant, signature) {
+  const seen = new Set();
+  const failures = [];
+  const passedTests = [];
+  for (const [state, name] of rows) {
+    if (!name || seen.has(name)) throw new Error("FAILURE-GATE BLOCKED: duplicate or unnamed test");
+    seen.add(name);
+    const identity = { suite: step.name, test: name, variant, environment };
+    if (state === "fail") failures.push({ ...identity, signature });
+    else passedTests.push(identity);
+  }
+  return { failures, passedTests };
+}
+
+function nodeTapRows(body) {
+  const headings = new Map();
+  const rows = [];
+  for (const line of body.split(/\r?\n/)) {
+    const heading = line.match(/^(\s*)# Subtest: (.+)$/);
+    if (heading) {
+      const depth = heading[1].length;
+      for (const key of headings.keys()) if (key >= depth) headings.delete(key);
+      headings.set(depth, { name: heading[2], hasChildren: false });
+      continue;
+    }
+    const result = line.match(/^(\s*)(ok|not ok) \d+ - (.+)$/);
+    if (!result) continue;
+    const depth = result[1].length;
+    const entry = headings.get(depth);
+    if (entry && entry.name !== result[3])
+      throw new Error("FAILURE-GATE BLOCKED: Node TAP heading/result mismatch");
+    const parents = [...headings.entries()].filter(([level]) => level < depth)
+      .sort(([a], [b]) => a - b);
+    for (const [, parent] of parents) parent.hasChildren = true;
+    if (entry?.hasChildren) {
+      // A completed suite is not a test identity; its children are.
+    } else {
+      rows.push([result[2] === "ok" ? "pass" : "fail",
+        [...parents.map(([, parent]) => parent.name), result[3]].join(" > ")]);
+    }
+    if (entry) headings.delete(depth);
+  }
+  return rows;
+}
 
 // Discover only known, non-filtered Node test chains. Original commands remain
 // byte-for-byte argv-equivalent; npm still executes its own approved scripts.
@@ -41,11 +201,10 @@ export function adaptRuntimeTiers({ root }) {
       } else if (step.name === "nested-tier-regression" &&
           step.command.join(" ") === "npm run test:validation-reentrancy" &&
           pkg.scripts["test:validation-reentrancy"] === "node scripts/ci-collision-test.mjs --non-smoke") {
-        adapter = { kind: "nested-reentrancy-v1", expectedRuns: 1 };
+        adapter = { kind: "reentrancy-assertions-v1", expectedRuns: 1 };
       } else if (step.name === "browser-tests" &&
           step.command.join(" ") === "node scripts/run-browser-tests.mjs") {
-        adapter = { kind: "playwright-json-v1",
-          source: "test-results/failure-gate/browser-tests.playwright.json" };
+        adapter = { kind: "playwright-json-v1", expectedRuns: 1 };
       }
       if (!adapter) {
         const reason = step.name === "browser-tests"
@@ -64,14 +223,22 @@ export function adaptRuntimeTiers({ root }) {
 // Output is bounded in the process collector. We never persist raw console text:
 // it can contain credentials, endpoints, SQL, or user content. Failure identities
 // are exact opaque fingerprints; no volatile normalization or baseline widening.
-export function parseRuntimeReport({ output, step, environment, truncated = false, playwrightReport }) {
+export function parseRuntimeReport({ output, step, environment, root, truncated = false }) {
   if (truncated) throw new Error("FAILURE-GATE BLOCKED: truncated test output");
   const text = output.replace(/\u001b\[[0-9;]*m/g, "");
+  const outputDigest = hash(text);
+  if (step.reportAdapter?.kind === "playwright-json-v1")
+    return parsePlaywright(root, step, environment, outputDigest);
+  if (step.reportAdapter?.kind === "reentrancy-assertions-v1")
+    return parseReentrancy(text, step, environment, outputDigest);
   let summaries = [];
+  let failures = [];
+  let passedTests = [];
   if (step.reportAdapter?.kind === "node-console-v1") {
     const starts = [...text.matchAll(/^(?:#|ℹ)\s+tests\s+(\d+)\s*$/gm)];
     for (let i = 0; i < starts.length; i++) {
       const section = text.slice(starts[i].index, starts[i + 1]?.index ?? text.length);
+      const body = text.slice(i === 0 ? 0 : starts[i - 1].index, starts[i].index);
       const number = (field) => {
         const values = [...section.matchAll(new RegExp("^(?:#|ℹ)\\s+" + field + "\\s+(\\d+)\\s*$", "gm"))];
         if (values.length !== 1) throw new Error("FAILURE-GATE BLOCKED: incomplete Node summary");
@@ -80,70 +247,34 @@ export function parseRuntimeReport({ output, step, environment, truncated = fals
       summaries.push({ tests: Number(starts[i][1]), passed: number("pass"),
         failed: number("fail"), skipped: number("skipped"), todo: number("todo"),
         cancelled: number("cancelled") });
+      const tap = nodeTapRows(body);
+      const spec = [...body.matchAll(/^(✔|✖)\s+(.+?)\s+\([\d.,]+(?:ms|s)\)\s*$/gm)]
+        .map(([, state, name]) => [state === "✔" ? "pass" : "fail", name]);
+      if (tap.length && spec.length)
+        throw new Error("FAILURE-GATE BLOCKED: mixed Node test reporters");
+      const rows = tap.length ? tap : spec;
+      if (rows.length !== summaries[i].passed + summaries[i].failed ||
+          rows.filter(([state]) => state === "fail").length !== summaries[i].failed)
+        throw new Error("FAILURE-GATE BLOCKED: Node test identity count mismatch");
+      const identified = identitiesForRows(rows, step, environment,
+        `node-run-${i + 1}`, `sha256:${outputDigest}`);
+      failures.push(...identified.failures);
+      passedTests.push(...identified.passedTests);
     }
   } else if (step.reportAdapter?.kind === "serial-lock-summary-v1") {
     summaries = [...text.matchAll(/^Results: (\d+) passed, (\d+) failed\s*$/gm)].map((match) => ({
       tests: Number(match[1]) + Number(match[2]), passed: Number(match[1]),
       failed: Number(match[2]), skipped: 0, todo: 0, cancelled: 0,
     }));
-  } else if (step.reportAdapter?.kind === "nested-reentrancy-v1") {
-    const expected = [
-      "nested validation exited 0 (got 0)", "outer run reached its manifest step",
-      "nested tier reached its manifest step", "nested tier did not inherit the outer task plan",
-      "nested tier used the owned reentrancy path", "nested tier did not wait behind its owning lock",
-      "nested manifest step ran exactly once",
-    ];
-    const observed = [...text.matchAll(/^  (PASS|FAIL): (.+)$/gm)];
-    const complete = text.includes("[ci-collision-test] Non-smoke reentrancy regression passed.");
-    if (observed.length !== expected.length || !complete ||
-        observed.some(([_, status, label], index) => status !== "PASS" || label !== expected[index]) ||
-        text.match(/\[ci-collision-test\] Non-smoke reentrancy regression passed\./g)?.length !== 1) {
-      throw new Error("FAILURE-GATE BLOCKED: incomplete nested-tier discovery");
-    }
-    summaries = [{ tests: observed.length, passed: observed.length, failed: 0,
-      skipped: 0, todo: 0, cancelled: 0 }];
-  } else if (step.reportAdapter?.kind === "playwright-json-v1") {
-    if (!playwrightReport || typeof playwrightReport !== "object" ||
-        !Array.isArray(playwrightReport.suites) || !playwrightReport.stats) {
-      throw new Error("FAILURE-GATE BLOCKED: missing Playwright discovery");
-    }
-    const cases = [];
-    function walk(suite, parents = []) {
-      if (!suite || !Array.isArray(suite.specs) || !Array.isArray(suite.suites)) {
-        throw new Error("FAILURE-GATE BLOCKED: malformed Playwright suite");
-      }
-      for (const spec of suite.specs) {
-        if (!Array.isArray(spec.tests)) throw new Error("FAILURE-GATE BLOCKED: malformed Playwright spec");
-        for (const item of spec.tests) cases.push({ item,
-          identity: [parents, suite.title, spec.title, item.projectName] });
-      }
-      suite.suites.forEach((child) => walk(child, [...parents, suite.title]));
-    }
-    playwrightReport.suites.forEach(walk);
-    if (!cases.length || cases.some(({ item }) =>
-      !["expected", "unexpected", "flaky", "skipped"].includes(item.status) ||
-        !Array.isArray(item.results) || !item.projectName)) {
-      throw new Error("FAILURE-GATE BLOCKED: incomplete Playwright case results");
-    }
-    const counts = { passed: cases.filter(({ item }) => item.status === "expected").length,
-      failed: cases.filter(({ item }) => ["unexpected", "flaky"].includes(item.status)).length,
-      skipped: cases.filter(({ item }) => item.status === "skipped").length };
-    const stats = playwrightReport.stats;
-    if (stats.expected !== counts.passed || stats.unexpected + stats.flaky !== counts.failed ||
-        stats.skipped !== counts.skipped || cases.some(({ item }) =>
-          item.status !== "skipped" && item.results.length === 0)) {
-      throw new Error("FAILURE-GATE BLOCKED: mismatched Playwright totals");
-    }
-    const outputDigest = hash(JSON.stringify(playwrightReport));
-    return { tests: cases.length, skipped: counts.skipped, outputDigest,
-      parser: step.reportAdapter.kind, complete: true, expectedRuns: 1, observedRuns: 1,
-      failures: cases.filter(({ item }) => item.status !== "expected" && item.status !== "skipped")
-        .map(({ item, identity }) => ({
-          suite: step.name, test: `sha256:${hash(JSON.stringify(identity))}`,
-          signature: `sha256:${hash(JSON.stringify(item.results.map((result) =>
-            [result.status, result.errors?.map((error) => [error.message, error.stack]) ?? []])))}`,
-          variant: item.projectName, environment,
-        })), passedTests: [] };
+    const rows = [...text.matchAll(/^  (PASS|FAIL)  (.+)$/gm)]
+      .map(([, state, name]) => [state === "PASS" ? "pass" : "fail", name]);
+    if (summaries.length !== 1 || rows.length !== summaries[0].tests ||
+        rows.filter(([state]) => state === "fail").length !== summaries[0].failed)
+      throw new Error("FAILURE-GATE BLOCKED: serial-lock test identity count mismatch");
+    const identified = identitiesForRows(rows, step, environment,
+      "serial-lock", `sha256:${outputDigest}`);
+    failures = identified.failures;
+    passedTests = identified.passedTests;
   } else throw new Error("FAILURE-GATE BLOCKED: report adapter unavailable");
   if (summaries.length === 0 ||
       summaries.some((s) => s.tests < 1 || s.tests !== s.passed + s.failed + s.skipped + s.todo + s.cancelled)) {
@@ -151,13 +282,8 @@ export function parseRuntimeReport({ output, step, environment, truncated = fals
   }
   const tests = summaries.reduce((n, s) => n + s.tests, 0);
   const skipped = summaries.reduce((n, s) => n + s.skipped + s.todo + s.cancelled, 0);
-  const failed = summaries.reduce((n, s) => n + s.failed, 0);
-  const outputDigest = hash(text);
   return { tests, skipped, outputDigest, parser: step.reportAdapter.kind,
     complete: summaries.length === step.reportAdapter.expectedRuns,
     expectedRuns: step.reportAdapter.expectedRuns, observedRuns: summaries.length,
-    failures: Array.from({ length: failed }, (_, i) => ({
-      suite: step.name, test: `opaque-failure-${i + 1}`, signature: `sha256:${outputDigest}`,
-      variant: step.reportAdapter.kind, environment,
-    })), passedTests: [] };
+    failures, passedTests };
 }

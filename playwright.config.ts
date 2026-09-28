@@ -26,7 +26,6 @@ function findChromium(): string | undefined {
 }
 const chromiumExecutable = findChromium();
 const { webkitEnabled } = getBrowserProjectCoverage(process.env);
-
 export default defineConfig({
   testDir: "./tests",
   testIgnore: ["release/**"],
@@ -34,9 +33,12 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: process.env.FAILURE_GATE_BROWSER_REPORT === "1"
-    ? [["json", { outputFile: "test-results/failure-gate/browser-tests.playwright.json" }]]
-    : [["html", { open: "never" }]],
+  // Playwright clears outputDir at startup; keep it apart from earlier step reports.
+  outputDir: "test-results/playwright-artifacts",
+  reporter: [
+    ["html", { open: "never" }],
+    ["json", { outputFile: "test-results/failure-gate/playwright.json" }],
+  ],
   globalSetup: "./tests/global-setup.ts",
   globalTeardown: "./tests/global-teardown.ts",
   use: {

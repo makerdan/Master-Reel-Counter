@@ -246,14 +246,8 @@ export class CheckedExecution {
           if (step.kind === "test") {
             try {
               if (step.reportAdapter) {
-                let playwrightReport;
-                if (playwrightSource) {
-                  const source = projectFile(snapshot.root, playwrightSource);
-                  requireValue(lstatSync(source).size <= 8 * 1024 * 1024, "Playwright report exceeds bound");
-                  playwrightReport = JSON.parse(readFileSync(source, "utf8"));
-                }
-                const parsed = parseRuntimeReport({ output, step, truncated: raw.truncated,
-                  environment: snapshot.manifest?.environment?.identity ?? "unknown", playwrightReport });
+                const parsed = parseRuntimeReport({ output, step, root: snapshot.root, truncated: raw.truncated,
+                  environment: snapshot.manifest?.environment?.identity ?? "unknown" });
                 const path = resolve(snapshot.root, step.report);
                 requireValue(relative(snapshot.root, path).startsWith(`test-results${sep}`),
                   "runner report must stay in approved output directory");

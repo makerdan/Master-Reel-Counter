@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { Coordinator, digest } from "../lib/failure-gate/coordinator.mjs";
 import { CheckedExecution, policyDigest, checkedEnvironment, projectFile,
@@ -320,23 +320,57 @@ test("actual runtime mapping preserves all argv, tiers, resource budgets and aud
   assert.equal(tiers["test-heavy"].steps.length, manifest.tiers["test-heavy"].steps.length);
   assert.equal(tiers["test-heavy"].steps.find(({ name }) => name === "browser-tests")
     .reportAdapter.kind, "playwright-json-v1");
+  assert.equal(tiers["test-heavy"].steps.find(({ name }) => name === "nested-tier-regression")
+    .reportAdapter.kind, "reentrancy-assertions-v1");
   assert.equal(tiers["test-standard"].steps.find(({ name }) => name === "clerk-release-contract")
     .reportAdapter.expectedRuns, 2);
 });
 
 test("Node machine-summary capture rejects partial npm chains, truncation and zero discovery", () => {
   const step = { name: "compound", reportAdapter: { kind: "node-console-v1", expectedRuns: 2 } };
-  const summary = "# tests 2\n# suites 0\n# pass 1\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n";
+  const summary = "TAP version 13\nok 1 - owned repair\nnot ok 2 - unrelated failure\n" +
+    "# tests 2\n# suites 0\n# pass 1\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n";
   const partial = parseRuntimeReport({ output: summary, step, environment: "fixture" });
   assert.equal(partial.complete, false);
   assert.equal(partial.failures.length, 1);
+  assert.equal(partial.passedTests[0].test, "owned repair");
   const result = parseRuntimeReport({ output: summary + summary, step, environment: "fixture" });
   assert.equal(result.tests, 4);
   assert.equal(result.failures.length, 2);
   assert.ok(result.failures.every(({ signature }) => /^sha256:[a-f0-9]{64}$/.test(signature)));
+  assert.notEqual(result.passedTests[0].variant, result.passedTests[1].variant);
   assert.throws(() => parseRuntimeReport({ output: summary + summary, step, truncated: true }), /truncated/);
   const zero = summary.replace("# tests 2", "# tests 0").replace("# pass 1", "# pass 0").replace("# fail 1", "# fail 0");
-  assert.throws(() => parseRuntimeReport({ output: zero + zero, step }), /discovery/);
+  assert.throws(() => parseRuntimeReport({ output: zero + zero, step }), /identity count mismatch|discovery/);
+  assert.throws(() => parseRuntimeReport({ output: summary.replace("ok 1 - owned repair\n", ""), step }),
+    /identity count mismatch/);
+  const spec = "✔ a named test (1.24ms)\nℹ tests 1\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\n";
+  assert.equal(parseRuntimeReport({ output: spec, step: {
+    ...step, reportAdapter: { kind: "node-console-v1", expectedRuns: 1 },
+  } }).passedTests[0].test, "a named test");
+  const nested = "TAP version 13\n# Subtest: invariant suite\n" +
+    "    # Subtest: owned repair\n    ok 1 - owned repair\n" +
+    "    # Subtest: other case\n    not ok 2 - other case\n" +
+    "not ok 1 - invariant suite\n# tests 2\n# pass 1\n# fail 1\n" +
+    "# cancelled 0\n# skipped 0\n# todo 0\n";
+  // A failing suite row is the aggregate result, not a new failure identity.
+  const nestedReport = parseRuntimeReport({ output: nested, step: {
+    ...step, reportAdapter: { kind: "node-console-v1", expectedRuns: 1 },
+  }, environment: "fixture" });
+  assert.deepEqual(nestedReport.passedTests.map(({ test }) => test), ["invariant suite > owned repair"]);
+  assert.deepEqual(nestedReport.failures.map(({ test }) => test), ["invariant suite > other case"]);
+});
+
+test("serial-lock summary requires matching named passing and failing cases", () => {
+  const step = { name: "serial-lock-tests", reportAdapter: {
+    kind: "serial-lock-summary-v1", expectedRuns: 1,
+  } };
+  const output = "  PASS  first lock check\n  FAIL  second lock check\nResults: 1 passed, 1 failed\n";
+  const report = parseRuntimeReport({ output, step, environment: "fixture" });
+  assert.equal(report.passedTests[0].test, "first lock check");
+  assert.equal(report.failures[0].test, "second lock check");
+  assert.throws(() => parseRuntimeReport({ output: output.replace("  PASS  first lock check\n", ""),
+    step }), /identity count mismatch/);
 });
 
 test("actual Node report capture runs unchanged argv and excludes raw secrets from evidence", async (t) => {
@@ -349,45 +383,94 @@ test("actual Node report capture runs unchanged argv and excludes raw secrets fr
   const result = await f.runner.run(f.request);
   assert.equal(result.rawExitCode, 0);
   assert.equal(result.evidence.steps[0].report.tests, 1);
+  assert.equal(result.evidence.steps[0].report.passedTests[0].test, "passes");
   assert.equal(JSON.stringify(result.evidence).includes("fixture-secret-never-retain"), false);
   assert.deepEqual(result.evidence.steps[0].command, step.command);
 });
 
-test("nested-tier adapter requires every named check and terminal evidence", () => {
-  const step = { name: "nested-tier-regression",
-    reportAdapter: { kind: "nested-reentrancy-v1", expectedRuns: 1 } };
-  const labels = ["nested validation exited 0 (got 0)", "outer run reached its manifest step",
+test("reentrancy report binds every named assertion, refuses partial and duplicate output", () => {
+  const step = { name: "nested-tier-regression", reportAdapter: { kind: "reentrancy-assertions-v1" } };
+  const checks = [
+    "nested validation exited 0", "outer run reached its manifest step",
     "nested tier reached its manifest step", "nested tier did not inherit the outer task plan",
     "nested tier used the owned reentrancy path", "nested tier did not wait behind its owning lock",
-    "nested manifest step ran exactly once"];
-  const output = labels.map((label) => `  PASS: ${label}`).join("\n") +
-    "\n[ci-collision-test] Non-smoke reentrancy regression passed.\n";
-  assert.equal(parseRuntimeReport({ output, step, environment: "fixture" }).tests, 7);
-  for (const broken of [output.replace("PASS:", "FAIL:"),
-    output.replace(`  PASS: ${labels[0]}\n`, ""),
-    output.replace("Non-smoke reentrancy regression passed.", "interrupted"),
-    output + `  PASS: ${labels[0]}\n`]) {
-    assert.throws(() => parseRuntimeReport({ output: broken, step }), /BLOCKED/);
-  }
+    "nested manifest step ran exactly once",
+  ];
+  const output = checks.map((name) => `  PASS: ${name}\n`).join("") +
+    "[ci-collision-test] Non-smoke reentrancy regression passed.\n";
+  const result = parseRuntimeReport({ output, step, environment: "fixture" });
+  assert.equal(result.tests, 7);
+  assert.equal(result.complete, true);
+  assert.deepEqual(result.passedTests.map(({ test }) => test), checks);
+  assert.equal(parseRuntimeReport({ output: output.replace(`  PASS: ${checks[2]}\n`, ""),
+    step }).complete, false);
+  assert.throws(() => parseRuntimeReport({ output: output + `  PASS: ${checks[0]}\n`, step }), /duplicate/);
+  const failed = parseRuntimeReport({ output: output.replace(`PASS: ${checks[0]}`, `FAIL: ${checks[0]} (got 1)`)
+    .replace("Non-smoke reentrancy regression passed.", ""), step, environment: "fixture" });
+  assert.equal(failed.failures[0].test, checks[0]);
+  assert.equal(failed.complete, true);
   assert.throws(() => parseRuntimeReport({ output, step, truncated: true }), /truncated/);
 });
 
-test("browser adapter binds actual discovered cases to Playwright totals", () => {
+test("Playwright report discovers per-project tests and blocks incomplete, skipped or stale reports", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "playwright-report-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const path = join(root, "test-results/failure-gate/playwright.json");
+  mkdirSync(dirname(path), { recursive: true });
   const step = { name: "browser-tests", reportAdapter: { kind: "playwright-json-v1" } };
-  const result = (status, projectName) => ({ status, projectName,
-    results: [{ status: status === "unexpected" ? "failed" : "passed" }] });
-  const report = { suites: [{ suites: [], specs: [
-    { tests: [result("expected", "chromium"), result("unexpected", "mobile-chromium")] },
-  ] }], stats: { expected: 1, unexpected: 1, flaky: 0, skipped: 0 } };
-  const parsed = parseRuntimeReport({ output: "", step, playwrightReport: report, environment: "fixture" });
-  assert.equal(parsed.tests, 2);
-  assert.equal(parsed.failures.length, 1);
-  assert.match(parsed.failures[0].signature, /^sha256:/);
-  assert.throws(() => parseRuntimeReport({ output: "", step }), /discovery/);
-  assert.throws(() => parseRuntimeReport({ output: "", step, playwrightReport:
-    { ...report, stats: { ...report.stats, expected: 2 } } }), /totals/);
-  assert.equal(parseRuntimeReport({ output: "", step, playwrightReport:
-    { ...report, suites: [{ suites: [], specs: [{ tests: [result("skipped", "chromium")] }] }],
-      stats: { expected: 0, unexpected: 0, flaky: 0, skipped: 1 } } }).skipped, 1);
-  assert.throws(() => parseRuntimeReport({ output: "", step, playwrightReport: report, truncated: true }), /truncated/);
+  const report = {
+    suites: [{ title: "sample.spec.ts", specs: [{ title: "works", tests: [
+      { projectName: "chromium", status: "expected", results: [{ status: "passed" }] },
+      { projectName: "mobile-webkit", status: "unexpected",
+        results: [{ status: "failed", errors: [{ message: "secret-not-retained" }] }] },
+    ] }] }],
+    stats: { expected: 1, unexpected: 1, flaky: 0, skipped: 0 },
+  };
+  const parse = () => parseRuntimeReport({ output: "browser runner", step, root, environment: "fixture" });
+  assert.throws(parse, /ENOENT/);
+  writeFileSync(path, JSON.stringify(report));
+  const result = parse();
+  assert.equal(result.tests, 2);
+  assert.equal(result.complete, true);
+  assert.deepEqual(result.passedTests.map(({ test }) => test), ["chromium: sample.spec.ts > works"]);
+  assert.equal(result.failures[0].test, "mobile-webkit: sample.spec.ts > works");
+  assert.equal(JSON.stringify(result).includes("secret-not-retained"), false);
+  report.stats.skipped = 1;
+  writeFileSync(path, JSON.stringify(report));
+  assert.throws(parse, /discovery mismatch/);
+  report.stats.skipped = 0;
+  report.suites[0].specs[0].tests.push(report.suites[0].specs[0].tests[0]);
+  writeFileSync(path, JSON.stringify(report));
+  assert.throws(parse, /duplicate/);
+  assert.throws(() => parseRuntimeReport({ output: "", step, root, truncated: true }), /truncated/);
+});
+
+test("real Playwright reporter preserves earlier candidate reports when clearing its artifacts", (t) => {
+  assert.match(readFileSync("playwright.config.ts", "utf8"),
+    /outputDir:\s*"test-results\/playwright-artifacts"/);
+  const root = mkdtempSync(join(tmpdir(), "playwright-survival-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, "cases"));
+  mkdirSync(join(root, "test-results/failure-gate"), { recursive: true });
+  symlinkSync(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+  const sentinel = join(root, "test-results/failure-gate/earlier.json");
+  writeFileSync(sentinel, '{"tests":1,"skipped":0,"failures":[]}\n');
+  writeFileSync(join(root, "cases/example.spec.mjs"),
+    "import { test } from '@playwright/test'; test('named case', () => {});\n");
+  writeFileSync(join(root, "playwright.config.mjs"), `export default {
+    testDir: "./cases",
+    outputDir: "./test-results/playwright-artifacts",
+    projects: [{ name: "chromium" }],
+    reporter: [["json", { outputFile: "./test-results/failure-gate/playwright.json" }]],
+  };\n`);
+  const result = spawnSync(process.execPath, [
+    join(process.cwd(), "node_modules/@playwright/test/cli.js"), "test",
+    "--config", join(root, "playwright.config.mjs"),
+  ], { cwd: root, encoding: "utf8", timeout: 30000 });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(sentinel, "utf8"), '{"tests":1,"skipped":0,"failures":[]}\n');
+  const report = parseRuntimeReport({ output: result.stdout, root, environment: "fixture",
+    step: { name: "browser-tests", reportAdapter: { kind: "playwright-json-v1" } } });
+  assert.equal(report.tests, 1);
+  assert.equal(report.passedTests[0].test, "chromium: example.spec.mjs > named case");
 });
