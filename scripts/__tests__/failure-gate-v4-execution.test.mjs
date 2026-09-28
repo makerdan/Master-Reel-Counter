@@ -83,6 +83,17 @@ test("task, tier, plan, override and policy substitutions launch nothing", async
   assert.equal(f.coordinator.db.prepare("SELECT count(*) AS n FROM runs").get().n, 0);
 });
 
+test("stale approved plan and unsupported report deny before a command starts", async (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.root, "plan.md"), "changed draft");
+  await assert.rejects(f.runner.run(f.request), /stale plan/);
+  assert.equal(f.coordinator.db.prepare("SELECT count(*) AS n FROM runs").get().n, 0);
+  writeFileSync(join(f.root, "plan.md"), "approved fixture plan");
+  f.host.tiers.fixture.steps[0].unsupportedReport = "review unavailable";
+  await assert.rejects(f.runner.run(f.request), /unsupported report/);
+  assert.equal(f.coordinator.db.prepare("SELECT count(*) AS n FROM runs").get().n, 0);
+});
+
 test("a symlink plan cannot pass path confinement", (t) => {
   const f = fixture(t);
   symlinkSync(join(f.root, "plan.md"), join(f.root, "linked.md"));
@@ -123,6 +134,8 @@ test("unknown snapshot integrity leaves lease unresolved, preventing replacement
 test("environment policy preserves approved runtime values, excludes unknown selectors", () => {
   assert.deepEqual(checkedEnvironment({ PATH: "/bin", LANG: "C", CUSTOM_FILTER: "skip" },
     { allowedEnvironment: ["PATH", "LANG"] }), { PATH: "/bin", LANG: "C" });
+  assert.throws(() => checkedEnvironment({ FAILURE_GATE_BROWSER_REPORT: "1" },
+    { allowedEnvironment: ["FAILURE_GATE_BROWSER_REPORT"] }), /coverage override/);
 });
 
 test("unavailable production control and platform dispatch never fall back to legacy", () => {
@@ -130,6 +143,8 @@ test("unavailable production control and platform dispatch never fall back to le
   assert.equal(managedCompletion().assessment, "BLOCKED");
   for (const args of [["scripts/failure-gate.mjs", "activate", "--approved"],
     ["scripts/run-locked-tier.mjs", "--v4", "missing.md"],
+    ["scripts/run-locked-tier.mjs", "--v4=1"],
+    ["scripts/run-locked-tier.mjs", "missing.md", "--task-id=other"],
     ["scripts/run-locked-tier.mjs", "--managed-completion"]]) {
     const result = spawnSync(process.execPath, args, { encoding: "utf8" });
     assert.equal(result.status, 2);
@@ -301,7 +316,10 @@ test("actual runtime mapping preserves all argv, tiers, resource budgets and aud
       tier.steps.map(({ name, kind, command }) => ({ name, kind, command })));
   }
   assert.ok(!unsupported.some(({ tier }) => ["test-fast", "test-standard", "test-standard-plus"].includes(tier)));
-  assert.deepEqual(unsupported.map(({ step }) => step).sort(), ["browser-tests", "nested-tier-regression"]);
+  assert.deepEqual(unsupported, []);
+  assert.equal(tiers["test-heavy"].steps.length, manifest.tiers["test-heavy"].steps.length);
+  assert.equal(tiers["test-heavy"].steps.find(({ name }) => name === "browser-tests")
+    .reportAdapter.kind, "playwright-json-v1");
   assert.equal(tiers["test-standard"].steps.find(({ name }) => name === "clerk-release-contract")
     .reportAdapter.expectedRuns, 2);
 });
@@ -333,4 +351,43 @@ test("actual Node report capture runs unchanged argv and excludes raw secrets fr
   assert.equal(result.evidence.steps[0].report.tests, 1);
   assert.equal(JSON.stringify(result.evidence).includes("fixture-secret-never-retain"), false);
   assert.deepEqual(result.evidence.steps[0].command, step.command);
+});
+
+test("nested-tier adapter requires every named check and terminal evidence", () => {
+  const step = { name: "nested-tier-regression",
+    reportAdapter: { kind: "nested-reentrancy-v1", expectedRuns: 1 } };
+  const labels = ["nested validation exited 0 (got 0)", "outer run reached its manifest step",
+    "nested tier reached its manifest step", "nested tier did not inherit the outer task plan",
+    "nested tier used the owned reentrancy path", "nested tier did not wait behind its owning lock",
+    "nested manifest step ran exactly once"];
+  const output = labels.map((label) => `  PASS: ${label}`).join("\n") +
+    "\n[ci-collision-test] Non-smoke reentrancy regression passed.\n";
+  assert.equal(parseRuntimeReport({ output, step, environment: "fixture" }).tests, 7);
+  for (const broken of [output.replace("PASS:", "FAIL:"),
+    output.replace(`  PASS: ${labels[0]}\n`, ""),
+    output.replace("Non-smoke reentrancy regression passed.", "interrupted"),
+    output + `  PASS: ${labels[0]}\n`]) {
+    assert.throws(() => parseRuntimeReport({ output: broken, step }), /BLOCKED/);
+  }
+  assert.throws(() => parseRuntimeReport({ output, step, truncated: true }), /truncated/);
+});
+
+test("browser adapter binds actual discovered cases to Playwright totals", () => {
+  const step = { name: "browser-tests", reportAdapter: { kind: "playwright-json-v1" } };
+  const result = (status, projectName) => ({ status, projectName,
+    results: [{ status: status === "unexpected" ? "failed" : "passed" }] });
+  const report = { suites: [{ suites: [], specs: [
+    { tests: [result("expected", "chromium"), result("unexpected", "mobile-chromium")] },
+  ] }], stats: { expected: 1, unexpected: 1, flaky: 0, skipped: 0 } };
+  const parsed = parseRuntimeReport({ output: "", step, playwrightReport: report, environment: "fixture" });
+  assert.equal(parsed.tests, 2);
+  assert.equal(parsed.failures.length, 1);
+  assert.match(parsed.failures[0].signature, /^sha256:/);
+  assert.throws(() => parseRuntimeReport({ output: "", step }), /discovery/);
+  assert.throws(() => parseRuntimeReport({ output: "", step, playwrightReport:
+    { ...report, stats: { ...report.stats, expected: 2 } } }), /totals/);
+  assert.equal(parseRuntimeReport({ output: "", step, playwrightReport:
+    { ...report, suites: [{ suites: [], specs: [{ tests: [result("skipped", "chromium")] }] }],
+      stats: { expected: 0, unexpected: 0, flaky: 0, skipped: 1 } } }).skipped, 1);
+  assert.throws(() => parseRuntimeReport({ output: "", step, playwrightReport: report, truncated: true }), /truncated/);
 });

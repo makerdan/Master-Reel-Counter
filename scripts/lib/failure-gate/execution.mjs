@@ -11,7 +11,7 @@ const requireValue = (condition, message) => {
   if (!condition) throw new Error(`FAILURE-GATE BLOCKED: ${message}`);
 };
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const forbiddenEnvironment = /^(CI_SMOKE_TEST|VALIDATION_MANIFEST_PATH|FAILURE_GATE_TIERS_PATH|NODE_OPTIONS|NODE_TEST_CONTEXT|TEST_ONLY|TEST_FILTER|GREP|PLAYWRIGHT_TEST_GREP|TASK_PLAN_FILE)$/;
+const forbiddenEnvironment = /^(CI_SMOKE_TEST|VALIDATION_MANIFEST_PATH|FAILURE_GATE_TIERS_PATH|NODE_OPTIONS|NODE_TEST_CONTEXT|TEST_ONLY|TEST_FILTER|GREP|PLAYWRIGHT_TEST_GREP|TASK_PLAN_FILE|FAILURE_GATE_BROWSER_REPORT)$/;
 
 // No shell interpolation, external paths, symlinks, or caller-selected reports.
 export function projectFile(root, reference) {
@@ -229,7 +229,14 @@ export class CheckedExecution {
           if (step.report && existsSync(resolve(snapshot.root, step.report))) {
             unlinkSync(projectFile(snapshot.root, step.report));
           }
-          const { output, ...raw } = await executeArgv(step.command, { cwd: snapshot.root, env, timeoutMs: step.timeoutMs });
+          const playwrightSource = step.reportAdapter?.kind === "playwright-json-v1"
+            ? step.reportAdapter.source : null;
+          if (playwrightSource && existsSync(resolve(snapshot.root, playwrightSource))) {
+            unlinkSync(projectFile(snapshot.root, playwrightSource));
+          }
+          const { output, ...raw } = await executeArgv(step.command, { cwd: snapshot.root,
+            env: playwrightSource ? { ...env, FAILURE_GATE_BROWSER_REPORT: "1" } : env,
+            timeoutMs: step.timeoutMs });
           let report = null;
           let status = raw.exitCode === 0 ? "passed" : "failed";
           if (raw.exitCode === null || raw.signal || raw.timedOut) {
@@ -239,8 +246,14 @@ export class CheckedExecution {
           if (step.kind === "test") {
             try {
               if (step.reportAdapter) {
+                let playwrightReport;
+                if (playwrightSource) {
+                  const source = projectFile(snapshot.root, playwrightSource);
+                  requireValue(lstatSync(source).size <= 8 * 1024 * 1024, "Playwright report exceeds bound");
+                  playwrightReport = JSON.parse(readFileSync(source, "utf8"));
+                }
                 const parsed = parseRuntimeReport({ output, step, truncated: raw.truncated,
-                  environment: snapshot.manifest?.environment?.identity ?? "unknown" });
+                  environment: snapshot.manifest?.environment?.identity ?? "unknown", playwrightReport });
                 const path = resolve(snapshot.root, step.report);
                 requireValue(relative(snapshot.root, path).startsWith(`test-results${sep}`),
                   "runner report must stay in approved output directory");

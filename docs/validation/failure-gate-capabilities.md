@@ -1,5 +1,9 @@
 # Failure Gate v4 capability and cutover map
 
+For the later cutover attempt and its current (still inactive) candidate,
+see [cutover acceptance](failure-gate-v4-cutover-acceptance.md). The task 907
+record below is historical bootstrap evidence, not current approval.
+
 This tracks **verified pre-bootstrap interfaces** and the current **candidate**
 modules, not an assertion that v4 is active. Task 907 is authorized to build the
 candidate under prior policy; its implementation cannot accept its own policy.

@@ -37,7 +37,8 @@ export function policyDeclaration({ root, policyInputs, tiers, parameters, envir
 }
 
 export function runtimePolicyInputs(root) {
-  const inputs = ["package.json", "package-lock.json", "docs/validation/manifest.json",
+  const inputs = ["package.json", "package-lock.json", "playwright.config.ts",
+    "docs/validation/manifest.json",
     ".agents/skills/validation-tiers/tiers.json"];
   function walk(path) {
     for (const entry of readdirSync(resolve(root, path), { withFileTypes: true })) {
