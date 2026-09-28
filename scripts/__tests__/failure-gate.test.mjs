@@ -106,6 +106,58 @@ test("portable contract separates invariants from host-specific adaptation", () 
   assert.match(tiers, /Audit commands and thresholds are integrity-sensitive/);
 });
 
+test("tier guidance documents runtime manifest coverage separately from the packaged example registry", () => {
+  const guidance = readFileSync(join(ROOT, ".agents/skills/validation-tiers/SKILL.md"), "utf8");
+  const manifest = JSON.parse(readFileSync(join(ROOT, "docs/validation/manifest.json"), "utf8"));
+  const packaged = JSON.parse(readFileSync(join(ROOT, ".agents/skills/validation-tiers/tiers.json"), "utf8"));
+  const runtimeSection = guidance.split("## Runtime tier coverage")[1]?.split("\n## ")[0];
+
+  assert.ok(runtimeSection, "guidance must have a distinct runtime coverage section");
+  assert.match(guidance, /`docs\/validation\/manifest\.json`\s+is the runtime source of truth/);
+  assert.match(guidance, /`tiers\.json` is a separate portable example host registry, not the runtime\s+step list/i);
+
+  for (const [tier, entry] of Object.entries(manifest.tiers)) {
+    const start = runtimeSection.indexOf(`- **${tier}**:`);
+    assert.notEqual(start, -1, `guidance must describe runtime tier ${tier}`);
+    const nextTier = runtimeSection.indexOf("\n- **test-", start + 1);
+    const nextParagraph = runtimeSection.indexOf("\n\n", start);
+    const endCandidates = [nextTier, nextParagraph].filter((index) => index !== -1);
+    const end = endCandidates.length > 0 ? Math.min(...endCandidates) : undefined;
+    const description = runtimeSection.slice(start, end);
+    const manifestStepsStart = description.indexOf("Manifest steps:");
+    assert.notEqual(manifestStepsStart, -1, `${tier} guidance must label its manifest step list`);
+    const describedSteps = [
+      ...description.slice(manifestStepsStart + "Manifest steps:".length)
+        .matchAll(/`([^`]+)`/g),
+    ].map((match) => match[1]);
+    assert.deepEqual(
+      describedSteps,
+      entry.steps.map((step) => step.name),
+      `${tier} guidance must enumerate the runtime manifest steps in order`,
+    );
+  }
+
+  const runtimeStandardNames = manifest.tiers["test-standard"].steps.map((step) => step.name);
+  const packagedStandardNames = packaged.tiers["test-standard"].steps.map((step) => step.name);
+  assert.ok(packagedStandardNames.includes("backend-tests"));
+  assert.ok(runtimeStandardNames.includes("unit-tests"));
+  for (const runtimeOnlyStep of [
+    "vite-hmr-tests",
+    "failure-gate-contract",
+    "failure-gate-parity",
+    "manifest-parity",
+  ]) {
+    assert.ok(runtimeStandardNames.includes(runtimeOnlyStep), `runtime test-standard must retain ${runtimeOnlyStep}`);
+    assert.ok(!packagedStandardNames.includes(runtimeOnlyStep), `packaged example must remain distinct at ${runtimeOnlyStep}`);
+  }
+  assert.match(guidance, /narrower `backend-tests` command/);
+  assert.match(guidance, /runtime uses `unit-tests` and additionally runs Vite HMR, Failure Gate\s+contract, archive-parity, and manifest-parity checks/);
+  assert.match(guidance, /Unlike `test-standard`, it omits the managed Clerk release contract and\s+Failure Gate contract/);
+  assert.ok(!manifest.tiers["test-standard-plus"].steps.some(
+    (step) => step.name === "clerk-release-contract" || step.name === "failure-gate-contract",
+  ));
+});
+
 test("runner reports incomplete and not-reached steps without executing later work", () => {
   const dir = mkdtempSync(join(tmpdir(), "failure-gate-manifest-"));
   const manifestPath = join(dir, "manifest.json");
