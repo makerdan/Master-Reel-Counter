@@ -213,10 +213,46 @@ enforcement mode, and limitations. Every locally controlled success route
 must consult the same decision; uncontrolled platform routes remain disclosed
 bypasses, not enforced controls.
 
+### Separate task and completion validation reports
+
+Keep two independent report entries. A task-tier result is not the result of
+platform-managed completion validation, and neither result may be copied into
+or used as evidence for the other.
+
+**Task-validation report**
+
+- Record the trusted task ID, exact approved plan reference/version, authorized
+  registered tier and selected command, run ID, tested snapshot, and relevant
+  environment.
+- Record each required step's raw status/result and complete report reference,
+  including named **not reached** steps; then record the overall raw status and
+  the separate assessment.
+
+**Platform-managed completion-validation report**
+
+- Record dispatch state as `NOT REACHED`, `STARTED`, `COMPLETED`, or `UNKNOWN`.
+  Explain why dispatch was not reached; if it started but has no trustworthy
+  final result, report the raw result as incomplete and assess it as
+  `INCOMPLETE`, rather than treating a timeout as cancellation or success.
+- Record the completion check's actual selected command/tier, run ID, raw
+  status/result, and separate assessment only when supplied by the platform.
+  If a field or result was not supplied, say so; do not infer it from task-tier
+  validation.
+- State whether trusted task identity, the exact approved plan reference, the
+  same active task lock, and a single checked dispatch resolving the same
+  authorized tier were verified. Assess a missing or unverified handoff as
+  `BLOCKED`.
+- Assess an unsupported broader dispatch as `BLOCKED`, not an automatic
+  escalation exemption. Its raw result cannot replace the task-tier result or
+  count as authorized evidence. Keep raw status/result distinct from the
+  assessment in this entry too.
+
 Managed completion is supported only with actual cross-boundary evidence:
 the platform provides the authoritative active task ID and exact approved
 plan reference, dispatches exactly once through the checked task-validation
 entry point, and accepts its result. A local launcher test cannot prove the
 platform made that invocation. If the handoff is missing or unverified,
 report managed completion **BLOCKED**, not protected or successful. Broader
-completion checks require separate explicit authorization.
+completion checks require separate explicit authorization; unsupported broader
+dispatch must be assessed **BLOCKED** and cannot be treated as an automatic
+exemption from the task's authorized tier.

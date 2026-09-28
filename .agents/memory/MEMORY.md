@@ -27,6 +27,7 @@
 - [Durable queue claim rereads](durable-queue-claim-rereads.md) — after claiming a queued item, reread it before side effects so concurrent drainers do not act on stale snapshots.
 - [Agent build failure evidence](agent-build-failure-evidence.md) — count only explicit dated validation records; missing artifacts make historical root cause inconclusive.
 - [Clerk Playwright session lifecycle](clerk-playwright-session-lifecycle.md) — refresh each browser context and share its live cookies with API fixtures.
+- [Markdown report-contract boundaries](markdown-report-contract-boundaries.md) — delimit repeated report labels with standalone headings, not the first matching phrase.
 - [External Clerk browser configuration](external-clerk-browser-config.md) — keep tenant hosts out of tracked config; browser validation needs a valid env-provided key or host.
 - [Offline queue identity barrier](offline-queue-identity-barrier.md) — reconcile only server-verified aliases before any owner-scoped read, claim recovery, cleanup, or drain.
 - [Drizzle enum bootstrap](drizzle-enum-bootstrap.md) — empty release databases need reviewed enum creation before exported schema SQL; push can attempt a dependent-type drop.

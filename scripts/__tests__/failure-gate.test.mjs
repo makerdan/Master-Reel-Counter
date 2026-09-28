@@ -106,6 +106,39 @@ test("portable contract separates invariants from host-specific adaptation", () 
   assert.match(tiers, /Audit commands and thresholds are integrity-sensitive/);
 });
 
+test("task-tier and platform completion validation have separate report contracts", () => {
+  const sources = [
+    [".agents/skills/failure-gate/SKILL.md", readFileSync(join(ROOT, ".agents/skills/failure-gate/SKILL.md"), "utf8")],
+    ["replit.md", readFileSync(join(ROOT, "replit.md"), "utf8")],
+  ];
+
+  for (const [sourceName, source] of sources) {
+    const taskStart = source.indexOf("**Task-validation report**\n");
+    const completionStart = source.indexOf("**Platform-managed completion-validation report**\n");
+    assert.notEqual(taskStart, -1, `${sourceName} must name the task-validation report`);
+    assert.ok(completionStart > taskStart, `${sourceName} must report completion validation separately`);
+
+    const taskReport = source.slice(taskStart, completionStart).replace(/\s+/g, " ");
+    const completionReport = source.slice(completionStart).replace(/\s+/g, " ");
+    assert.match(taskReport, /authorized\s+registered tier and selected command/i);
+    assert.match(taskReport, /raw (?:status|per-step)[\s\S]*assessment/i);
+    assert.match(completionReport, /dispatch state/i);
+    assert.match(completionReport, /NOT REACHED[\s\S]*STARTED[\s\S]*COMPLETED[\s\S]*UNKNOWN/i);
+    assert.match(completionReport, /actual selected (?:command\/tier|check\/command\/tier)/i);
+    assert.match(completionReport, /run ID/i);
+    assert.match(completionReport, /exact approved plan reference/i);
+    assert.match(completionReport, /raw (?:status|result)/i);
+    assert.match(completionReport, /separate assessment/i);
+    assert.match(completionReport, /assessment.*BLOCKED/is);
+    assert.match(completionReport, /NOT REACHED/i);
+    assert.match(completionReport, /INCOMPLETE/i);
+    assert.match(completionReport, /same\s+active task lock/i);
+    assert.match(completionReport, /same\s+authorized tier/i);
+    assert.match(completionReport, /unsupported broader\s+dispatch/i);
+    assert.match(completionReport, /Do not (?:reuse|copy)[\s\S]*result|cannot replace the task-tier result/i);
+  }
+});
+
 test("tier guidance documents runtime manifest coverage separately from the packaged example registry", () => {
   const guidance = readFileSync(join(ROOT, ".agents/skills/validation-tiers/SKILL.md"), "utf8");
   const manifest = JSON.parse(readFileSync(join(ROOT, "docs/validation/manifest.json"), "utf8"));
