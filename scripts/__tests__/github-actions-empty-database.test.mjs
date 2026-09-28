@@ -1,19 +1,21 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
   chmod,
   mkdtemp,
   mkdir,
   readFile,
+  readlink,
   rm,
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { accessSync, constants, statSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Pool } from "pg";
 import test from "node:test";
@@ -62,10 +64,19 @@ async function runCommand(command, args, options) {
   return { ...result, stdout, stderr };
 }
 
-function systemCommand(command) {
-  return execFileSync("bash", ["-lc", `command -v ${command}`], {
-    encoding: "utf8",
-  }).trim();
+function systemCommand(command, path = process.env.PATH ?? "") {
+  for (const directory of path.split(delimiter)) {
+    // Empty PATH entries mean the current directory; do not import tools from the repository.
+    if (!directory) continue;
+    const candidate = resolve(directory, command);
+    try {
+      accessSync(candidate, constants.X_OK);
+      if (statSync(candidate).isFile()) return candidate;
+    } catch {
+      // Keep looking through the active validation process's PATH.
+    }
+  }
+  throw new Error(`startup smoke fixture prerequisite missing: ${command} is not executable on the validation PATH`);
 }
 
 async function createStartupSmokeFixture({
@@ -76,13 +87,15 @@ async function createStartupSmokeFixture({
   healthStatus = 200,
   includePsql = true,
   includeCurl = true,
+  toolPath = process.env.PATH ?? "",
   expectedServerAddress = "",
   expectedServerPort = "",
 } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "startup-smoke-test-"));
-  const binDirectory = join(directory, "bin");
-  await mkdir(binDirectory);
-  await writeFile(join(directory, "fixture-server.mjs"), `
+  try {
+    const binDirectory = join(directory, "bin");
+    await mkdir(binDirectory);
+    await writeFile(join(directory, "fixture-server.mjs"), `
     import { appendFileSync, writeFileSync } from "node:fs";
     import { createServer } from "node:http";
     import { spawn } from "node:child_process";
@@ -112,45 +125,49 @@ async function createStartupSmokeFixture({
     server.listen(port, "127.0.0.1", () => {
       appendFileSync(process.env.SMOKE_READY_MARKER, "ready\\n");
     });
-  `);
-  const psqlPath = join(binDirectory, "psql");
-  if (includePsql) {
-    await writeFile(psqlPath, `#!/bin/sh
+    `);
+    const psqlPath = join(binDirectory, "psql");
+    if (includePsql) {
+      await writeFile(psqlPath, `#!/bin/sh
 if [ "${psqlDelaySeconds}" -gt 0 ]; then
   exec sleep "${psqlDelaySeconds}"
 fi
 printf '%b\\n' '${databaseName}\\t16.10\\t160000\\t${serverAddress}\\t${serverPort}'
 `);
-    await chmod(psqlPath, 0o755);
-  }
-  await writeFile(join(directory, "child-pid"), "");
-  await writeFile(join(directory, "ready"), "");
-  await symlink(process.execPath, join(binDirectory, "node"));
-  for (const command of ["cat", "env", "grep", "mktemp", "rm", "sleep", "timeout", "setsid"]) {
-    await symlink(systemCommand(command), join(binDirectory, command));
-  }
-  if (includeCurl) {
-    await symlink(systemCommand("curl"), join(binDirectory, "curl"));
-  }
+      await chmod(psqlPath, 0o755);
+    }
+    await writeFile(join(directory, "child-pid"), "");
+    await writeFile(join(directory, "ready"), "");
+    await symlink(process.execPath, join(binDirectory, "node"));
+    for (const command of ["cat", "env", "grep", "mktemp", "rm", "sleep", "timeout", "setsid"]) {
+      await symlink(systemCommand(command, toolPath), join(binDirectory, command));
+    }
+    if (includeCurl) {
+      await symlink(systemCommand("curl", toolPath), join(binDirectory, "curl"));
+    }
 
-  return {
-    directory,
-    binDirectory,
-    entrypoint: join(directory, "fixture-server.mjs"),
-    childPidFile: join(directory, "child-pid"),
-    readyMarker: join(directory, "ready"),
-    env: {
-      ...process.env,
-      PATH: binDirectory,
-      DATABASE_URL: "postgresql://smoke-user:smoke-password@127.0.0.1:5432/smoke-target",
-      SMOKE_EXPECTED_DATABASE: EXPECTED_DATABASE,
-      SMOKE_EXPECTED_SERVER_ADDRESS: expectedServerAddress,
-      SMOKE_EXPECTED_SERVER_PORT: String(expectedServerPort),
-      SMOKE_SERVER_ENTRYPOINT: join(directory, "fixture-server.mjs"),
-      SMOKE_CHILD_PID_FILE: join(directory, "child-pid"),
-      SMOKE_READY_MARKER: join(directory, "ready"),
-    },
-  };
+    return {
+      directory,
+      binDirectory,
+      entrypoint: join(directory, "fixture-server.mjs"),
+      childPidFile: join(directory, "child-pid"),
+      readyMarker: join(directory, "ready"),
+      env: {
+        ...process.env,
+        PATH: binDirectory,
+        DATABASE_URL: "postgresql://smoke-user:smoke-password@127.0.0.1:5432/smoke-target",
+        SMOKE_EXPECTED_DATABASE: EXPECTED_DATABASE,
+        SMOKE_EXPECTED_SERVER_ADDRESS: expectedServerAddress,
+        SMOKE_EXPECTED_SERVER_PORT: String(expectedServerPort),
+        SMOKE_SERVER_ENTRYPOINT: join(directory, "fixture-server.mjs"),
+        SMOKE_CHILD_PID_FILE: join(directory, "child-pid"),
+        SMOKE_READY_MARKER: join(directory, "ready"),
+      },
+    };
+  } catch (error) {
+    await rm(directory, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 async function waitForFile(path, timeoutMs = 5_000) {
@@ -282,6 +299,33 @@ test("startup smoke rejects invalid timeout configuration before checking tools"
   });
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /SMOKE_TIMEOUT must be a positive integer/);
+});
+
+test("startup smoke fixture uses the active PATH and reports a missing real timeout prerequisite", async () => {
+  const fixture = await createStartupSmokeFixture();
+  try {
+    assert.equal(await readlink(join(fixture.binDirectory, "timeout")), systemCommand("timeout"));
+    const result = await runCommand(join(fixture.binDirectory, "timeout"), ["--version"], {
+      env: fixture.env,
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /coreutils/);
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+
+  const restrictedPath = await mkdtemp(join(tmpdir(), "startup-smoke-tools-"));
+  try {
+    for (const command of ["cat", "env", "grep", "mktemp", "rm", "sleep", "setsid", "curl"]) {
+      await symlink(systemCommand(command), join(restrictedPath, command));
+    }
+    await assert.rejects(
+      createStartupSmokeFixture({ toolPath: restrictedPath }),
+      /startup smoke fixture prerequisite missing: timeout is not executable on the validation PATH/,
+    );
+  } finally {
+    await rm(restrictedPath, { recursive: true, force: true });
+  }
 });
 
 test("startup smoke reports a missing curl prerequisite immediately", async () => {
