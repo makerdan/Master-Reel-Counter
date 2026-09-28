@@ -63,6 +63,9 @@ jobs:
           node-version: "20"
           cache: npm
 
+      - name: Check workflow contract
+        run: node --test scripts/__tests__/github-actions-workflow.test.mjs
+
       - name: Install frozen dependencies
         shell: bash
         run: |
@@ -106,9 +109,6 @@ jobs:
           path: ~/.cache/ms-playwright
           # package-lock.json records the exact Playwright version used by npm ci.
           key: playwright-browsers-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Check workflow contract
-        run: node --test scripts/__tests__/github-actions-workflow.test.mjs
 
       - name: Verify PostgreSQL readiness
         shell: bash

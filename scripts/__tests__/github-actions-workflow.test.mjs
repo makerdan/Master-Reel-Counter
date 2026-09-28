@@ -18,6 +18,31 @@ const schema = readFileSync(resolve(root, "shared/schema.ts"), "utf8");
 const startupSmokePath = resolve(root, "scripts/startup-smoke.sh");
 const startupSmoke = readFileSync(startupSmokePath, "utf8");
 
+function assertPortableTarballs(packages) {
+  for (const [name, metadata] of Object.entries(packages)) {
+    if (!metadata.resolved) continue;
+    let url;
+    try {
+      url = new URL(metadata.resolved);
+    } catch {
+      assert.fail(`${name} has an invalid resolved tarball URL: ${metadata.resolved}`);
+    }
+    assert.equal(
+      url.protocol,
+      "https:",
+      `${name} must use an HTTPS public npm tarball URL`,
+    );
+    assert.equal(
+      url.hostname,
+      "registry.npmjs.org",
+      `${name} must resolve through the public npm registry, not ${url.hostname}`,
+    );
+    assert.equal(url.port, "", `${name} must not use a custom registry port`);
+    assert.equal(url.username, "", `${name} must not embed registry credentials`);
+    assert.equal(url.password, "", `${name} must not embed registry credentials`);
+  }
+}
+
 function sectionBetween(start, end) {
   const startIndex = workflow.indexOf(start);
   assert.notEqual(startIndex, -1, `workflow is missing ${start}`);
@@ -109,10 +134,27 @@ test("workflow installs the declared runtime with frozen dependencies", () => {
   assert.match(workflow, /node_modules\/@clerk\/express\/package\.json/);
   assert.match(workflow, /run: node --test scripts\/__tests__\/github-actions-workflow\.test\.mjs/);
   assert.match(workflow, /npm ci --ignore-scripts --no-audit --no-fund/);
-  assert.doesNotMatch(
-    lockfile,
-    /package-firewall\.replit\.(?:local|internal)/,
-    "public GitHub Actions runs must not resolve packages through Replit-only hosts",
+});
+
+test("every locked tarball resolves from the public npm registry", () => {
+  const packages = JSON.parse(lockfile).packages;
+  assert.ok(Object.keys(packages).length > 0);
+  assertPortableTarballs(packages);
+  assert.throws(
+    () => assertPortableTarballs({
+      "node_modules/private": {
+        resolved: "http://package-firewall.replit.internal/npm/private/-/private-1.0.0.tgz",
+      },
+    }),
+    /public npm tarball URL/,
+  );
+  assert.throws(
+    () => assertPortableTarballs({
+      "node_modules/intranet": {
+        resolved: "https://registry.npmjs.org.internal/package.tgz",
+      },
+    }),
+    /public npm registry/,
   );
 });
 
@@ -156,7 +198,7 @@ test("workflow provisions and checks the test prerequisites", () => {
   );
   const browserCache = sectionBetween(
     "      - name: Cache Playwright browser engines",
-    "      - name: Check workflow contract",
+    "      - name: Verify PostgreSQL readiness",
   );
   assert.match(browserCache, /uses:\s+actions\/cache@[0-9a-f]{40}/);
   assert.match(browserCache, /id:\s+playwright-cache/);
@@ -187,14 +229,16 @@ test("workflow provisions and checks the test prerequisites", () => {
   assert.match(workflow, /node --test scripts\/__tests__\/github-actions-empty-database\.test\.mjs/);
 });
 
-test("workflow checks its contract before database and application validation", () => {
+test("workflow checks its contract before installing dependencies or running validation", () => {
   const contractCheck = workflow.indexOf("run: node --test scripts/__tests__/github-actions-workflow.test.mjs");
+  const frozenInstall = workflow.indexOf("name: Install frozen dependencies");
   const readinessCheck = workflow.indexOf("name: Verify PostgreSQL readiness");
   assert.ok(contractCheck >= 0, "workflow contract check is missing");
+  assert.ok(frozenInstall >= 0, "frozen install is missing");
   assert.ok(readinessCheck >= 0, "PostgreSQL readiness check is missing");
   assert.ok(
-    contractCheck < readinessCheck,
-    "workflow contract check must run before PostgreSQL readiness and application validation",
+    contractCheck < frozenInstall && frozenInstall < readinessCheck,
+    "workflow contract check must run before frozen installation and application validation",
   );
 });
 
