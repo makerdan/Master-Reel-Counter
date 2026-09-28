@@ -19,7 +19,63 @@ const { Client } = pg;
 const SMOKE_ID_PREFIX = "google-release-smoke-";
 const STALE_SMOKE_AGE_MS = 60 * 60 * 1000;
 const CLIENT_TRUST_TIMEOUT_MS = 10_000;
+const MAX_ROUTE_STATES = 20;
+const MAX_SESSION_OBSERVATIONS = 20;
 const internalCandidate = process.env.RELEASE_SMOKE_INTERNAL_CANDIDATE === "1";
+
+type SessionTransitionStatus =
+  | "clerk-unloaded"
+  | "loaded-without-session"
+  | "active-session-on-sign-in"
+  | "active-session-route-ready";
+
+type SessionObservationPhase =
+  | "poll"
+  | "completed"
+  | "timeout"
+  | "client-trust-timeout";
+
+type SessionFailureCategory =
+  | "not-observed"
+  | "none"
+  | "clerk-unloaded-timeout"
+  | "loaded-without-session-timeout"
+  | "active-session-route-timeout"
+  | "client-trust-timeout"
+  | "observation-unavailable";
+
+interface SessionObservation {
+  path: string;
+  clerkLoaded: boolean;
+  hasActiveSession: boolean;
+  status: SessionTransitionStatus;
+  phase: SessionObservationPhase;
+  elapsedMs: number;
+}
+
+interface SessionDiagnostics {
+  observations: SessionObservation[];
+  failureCategory: SessionFailureCategory;
+}
+
+const SAFE_SESSION_PATHS = new Set([
+  "/",
+  "/settings",
+  "/stats",
+  "/sign-in",
+  "/sign-in/client-trust",
+  "/sign-in/[other-step]",
+  "/[other-route]",
+]);
+const SAFE_RELEASE_REQUEST_PATHS = new Set([
+  `${CLERK_PROXY_PATH}/v1/client`,
+  `${CLERK_PROXY_PATH}/v1/client/sign_ins`,
+  `${CLERK_PROXY_PATH}/v1/client/sign_ups`,
+  `${CLERK_PROXY_PATH}/v1/client/sessions`,
+  `${CLERK_PROXY_PATH}/v1/client/verify`,
+  `${CLERK_PROXY_PATH}/v1/client/tasks`,
+  "/other-route",
+]);
 
 const requiredEnvironment = [
   "PRODUCTION_BASE_URL",
@@ -54,6 +110,18 @@ function safeDiagnosticPath(rawUrl: string): string {
   }
 }
 
+function safeSessionPath(rawUrl: string): string {
+  const path = safeDiagnosticPath(rawUrl);
+  if (SAFE_SESSION_PATHS.has(path)) return path;
+  if (path.startsWith("/sign-in/")) return "/sign-in/[other-step]";
+  return "/[other-route]";
+}
+
+function safeReleaseRequestPath(rawUrl: string): string {
+  const path = safeDiagnosticPath(rawUrl);
+  return SAFE_RELEASE_REQUEST_PATHS.has(path) ? path : "/other-route";
+}
+
 function normalizedFailureClass(errorText: string | undefined): string {
   const match = errorText?.match(/\b(?:net::)?ERR_[A-Z_]+\b/);
   return match?.[0] ?? "REQUEST_FAILED";
@@ -65,40 +133,106 @@ function normalizedPageError(error: Error): string {
     : "PageError";
 }
 
+function appendBounded<T>(items: T[], item: T, limit: number): void {
+  items.push(item);
+  if (items.length > limit) items.splice(0, items.length - limit);
+}
+
 async function waitForCompletedSignIn(
   page: Page,
   routeStates: string[],
+  sessionDiagnostics: SessionDiagnostics,
 ): Promise<void> {
-  const deadline = Date.now() + 30_000;
+  const startedAt = Date.now();
+  const deadline = startedAt + 30_000;
   let clientTrustStartedAt: number | undefined;
+  let lastRecordedAt: number | undefined;
+  let lastRecordedKey: string | undefined;
+  let latestObservation: SessionObservation | undefined;
+
+  const recordObservation = (
+    observation: Omit<SessionObservation, "phase" | "elapsedMs">,
+    phase: SessionObservationPhase,
+    force = false,
+  ) => {
+    const elapsedMs = Math.min(Date.now() - startedAt, 30_000);
+    const key = JSON.stringify(observation);
+    if (
+      force ||
+      key !== lastRecordedKey ||
+      lastRecordedAt === undefined ||
+      elapsedMs - lastRecordedAt >= 1_000
+    ) {
+      const sample: SessionObservation = { ...observation, phase, elapsedMs };
+      appendBounded(
+        sessionDiagnostics.observations,
+        sample,
+        MAX_SESSION_OBSERVATIONS,
+      );
+      lastRecordedAt = elapsedMs;
+      lastRecordedKey = key;
+    }
+    latestObservation = {
+      ...observation,
+      phase,
+      elapsedMs,
+    };
+  };
 
   while (Date.now() < deadline) {
-    const path = safeDiagnosticPath(page.url());
-    if (routeStates.at(-1) !== path) routeStates.push(path);
+    const path = safeSessionPath(page.url());
+    if (routeStates.at(-1) !== path) {
+      appendBounded(routeStates, path, MAX_ROUTE_STATES);
+    }
 
-    const clerkState = await page.evaluate(() => {
-      const clerk = (
-        window as typeof window & {
-          Clerk?: { loaded?: boolean; session?: { id?: string } | null };
-        }
-      ).Clerk;
-      return {
-        loaded: clerk?.loaded === true,
-        hasActiveSession: Boolean(clerk?.session?.id),
-      };
-    });
+    let clerkState: { loaded: boolean; hasActiveSession: boolean };
+    try {
+      clerkState = await page.evaluate(() => {
+        const clerk = (
+          window as typeof window & {
+            Clerk?: { loaded?: boolean; session?: { id?: string } | null };
+          }
+        ).Clerk;
+        return {
+          loaded: clerk?.loaded === true,
+          hasActiveSession: Boolean(clerk?.session?.id),
+        };
+      });
+    } catch {
+      sessionDiagnostics.failureCategory = "observation-unavailable";
+      throw new Error("Google Clerk boundary session state could not be observed");
+    }
+
+    const status: SessionTransitionStatus = !clerkState.loaded
+      ? "clerk-unloaded"
+      : !clerkState.hasActiveSession
+        ? "loaded-without-session"
+        : path.startsWith("/sign-in")
+          ? "active-session-on-sign-in"
+          : "active-session-route-ready";
+    const observation = {
+      path,
+      clerkLoaded: clerkState.loaded,
+      hasActiveSession: clerkState.hasActiveSession,
+      status,
+    };
+    recordObservation(observation, "poll");
 
     if (
       !path.startsWith("/sign-in") &&
       clerkState.loaded &&
       clerkState.hasActiveSession
     ) {
+      recordObservation(observation, "completed", true);
+      sessionDiagnostics.failureCategory = "none";
       return;
     }
 
     if (path.startsWith("/sign-in/client-trust")) {
       clientTrustStartedAt ??= Date.now();
       if (Date.now() - clientTrustStartedAt >= CLIENT_TRUST_TIMEOUT_MS) {
+        recordObservation(observation, "client-trust-timeout", true);
+        sessionDiagnostics.failureCategory = "client-trust-timeout";
         throw new Error(
           "Google Clerk boundary did not complete the supported client-trust step",
         );
@@ -108,8 +242,19 @@ async function waitForCompletedSignIn(
     await page.waitForTimeout(250);
   }
 
+  if (latestObservation) {
+    recordObservation(latestObservation, "timeout", true);
+    sessionDiagnostics.failureCategory =
+      latestObservation.status === "clerk-unloaded"
+        ? "clerk-unloaded-timeout"
+        : latestObservation.status === "loaded-without-session"
+          ? "loaded-without-session-timeout"
+          : "active-session-route-timeout";
+  } else {
+    sessionDiagnostics.failureCategory = "observation-unavailable";
+  }
   throw new Error(
-    `Google Clerk boundary did not reach an active session from ${safeDiagnosticPath(page.url())}`,
+    `Google Clerk boundary did not reach an active session from ${safeSessionPath(page.url())}`,
   );
 }
 
@@ -225,27 +370,37 @@ test.describe("Google-backed Clerk application boundary", () => {
       const routeStates: string[] = [];
       const requestFailures: string[] = [];
       const pageErrors: string[] = [];
+      const sessionDiagnostics: SessionDiagnostics = {
+        observations: [],
+        failureCategory: "not-observed",
+      };
 
       page.on("requestfailed", (request) => {
-        requestFailures.push(
-          `${request.method()} ${safeDiagnosticPath(request.url())} ${normalizedFailureClass(request.failure()?.errorText)}`,
+        appendBounded(
+          requestFailures,
+          `${request.method()} ${safeReleaseRequestPath(request.url())} ${normalizedFailureClass(request.failure()?.errorText)}`,
+          20,
         );
       });
       page.on("response", (response) => {
         const url = new URL(response.url());
         if (url.origin === baseURL && url.pathname.startsWith(CLERK_PROXY_PATH)) {
-          proxyRequests.push(
-            `${response.request().method()} ${safeDiagnosticPath(response.url())} ${response.status()}`,
+          appendBounded(
+            proxyRequests,
+            `${response.request().method()} ${safeReleaseRequestPath(response.url())} ${response.status()}`,
+            50,
           );
         }
       });
       page.on("pageerror", (error) => {
-        pageErrors.push(normalizedPageError(error));
+        appendBounded(pageErrors, normalizedPageError(error), 20);
       });
       page.on("framenavigated", (frame) => {
         if (frame === page.mainFrame()) {
-          const path = safeDiagnosticPath(frame.url());
-          if (routeStates.at(-1) !== path) routeStates.push(path);
+          const path = safeSessionPath(frame.url());
+          if (routeStates.at(-1) !== path) {
+            appendBounded(routeStates, path, MAX_ROUTE_STATES);
+          }
         }
       });
 
@@ -275,7 +430,7 @@ test.describe("Google-backed Clerk application boundary", () => {
           },
         });
 
-        await waitForCompletedSignIn(page, routeStates);
+        await waitForCompletedSignIn(page, routeStates, sessionDiagnostics);
         expect(proxyRequests.length, "Clerk traffic must use the release proxy").toBeGreaterThan(0);
 
         const authResponse = await page.evaluate(async () => {
@@ -339,36 +494,27 @@ test.describe("Google-backed Clerk application boundary", () => {
         expect(signedOutStatus).toBe(401);
       } finally {
         delete process.env.CLERK_TESTING_TOKEN;
-        await mkdir("test-results/release-diagnostics", { recursive: true });
-        await writeFile(
-          `test-results/release-diagnostics/google-${roleCase.role.toLowerCase()}.json`,
-          JSON.stringify(
-            {
-              finalPath: safeDiagnosticPath(page.url()),
-              routeStates: routeStates.slice(-20),
-              clerkRequests: proxyRequests.slice(-50),
-              requestFailures: requestFailures.slice(-20),
-              pageErrors: pageErrors.slice(-20),
-            },
-            null,
-            2,
+        const diagnosticsDirectory =
+          process.env.RELEASE_DIAGNOSTICS_DIR ?? "test-results/release-diagnostics";
+        await mkdir(diagnosticsDirectory, { recursive: true });
+        const diagnosticPayload = {
+          finalPath: safeSessionPath(page.url()),
+          routeStates: routeStates.slice(-MAX_ROUTE_STATES),
+          clerkRequests: proxyRequests.slice(-50),
+          requestFailures: requestFailures.slice(-20),
+          pageErrors: pageErrors.slice(-20),
+          sessionObservations: sessionDiagnostics.observations.slice(
+            -MAX_SESSION_OBSERVATIONS,
           ),
+          sessionFailureCategory: sessionDiagnostics.failureCategory,
+        };
+        await writeFile(
+          `${diagnosticsDirectory}/google-${roleCase.role.toLowerCase()}.json`,
+          JSON.stringify(diagnosticPayload, null, 2),
           { encoding: "utf8", mode: 0o600 },
         );
         await testInfo.attach(`google-${roleCase.role.toLowerCase()}-diagnostics`, {
-          body: Buffer.from(
-            JSON.stringify(
-              {
-                finalPath: safeDiagnosticPath(page.url()),
-                routeStates: routeStates.slice(-20),
-                clerkRequests: proxyRequests.slice(-50),
-                requestFailures: requestFailures.slice(-20),
-                pageErrors: pageErrors.slice(-20),
-              },
-              null,
-              2,
-            ),
-          ),
+          body: Buffer.from(JSON.stringify(diagnosticPayload, null, 2)),
           contentType: "application/json",
         });
 

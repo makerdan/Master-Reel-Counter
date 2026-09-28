@@ -17,6 +17,8 @@ release_status=0
 cleanup_timeout_seconds="${RELEASE_CLEANUP_TIMEOUT_SECONDS:-10}"
 selection_timeout_seconds="${RELEASE_DATABASE_SELECTION_TIMEOUT_SECONDS:-30}"
 diagnostics_dir="${RELEASE_DIAGNOSTICS_DIR:-test-results/release-diagnostics}"
+google_admin_diagnostic="$diagnostics_dir/google-admin.json"
+google_user_diagnostic="$diagnostics_dir/google-user.json"
 database_state="${RELEASE_DATABASE_STATE:-$(mktemp /tmp/managed-clerk-release-database.XXXXXX.json)}"
 database_selected=0
 
@@ -78,11 +80,13 @@ print_failure_diagnostics() {
   if [[ -n "${RELEASE_DIAGNOSTICS_COMMAND:-}" ]]; then
     timeout --kill-after=1s "${cleanup_timeout_seconds}s" \
       "$RELEASE_DIAGNOSTICS_COMMAND" \
-      "$browser_diagnostic" "$server_log" "$proxy_log" >&2
+      "$browser_diagnostic" "$server_log" "$proxy_log" \
+      "$google_admin_diagnostic" "$google_user_diagnostic" >&2
   else
     timeout --kill-after=1s "${cleanup_timeout_seconds}s" \
       node scripts/print-release-diagnostics.mjs \
-      "$browser_diagnostic" "$server_log" "$proxy_log" >&2
+      "$browser_diagnostic" "$server_log" "$proxy_log" \
+      "$google_admin_diagnostic" "$google_user_diagnostic" >&2
   fi
 }
 
@@ -141,6 +145,9 @@ on_exit() {
 trap on_exit EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+
+mkdir -p "$diagnostics_dir"
+rm -f "$google_admin_diagnostic" "$google_user_diagnostic"
 
 if [[ "${RELEASE_CLEANUP_HARNESS:-0}" == "1" ]]; then
   exit "${RELEASE_CLEANUP_EXIT_STATUS:-1}"
@@ -210,7 +217,7 @@ RELEASE_SMOKE_DATABASE_URL="$selected_smoke_database_url" \
 RELEASE_PUBLICATION_DATABASE_URL="$DATABASE_URL" \
 DATABASE_URL="$selected_smoke_database_url" \
 PRODUCTION_BASE_URL="$candidate_url" \
-npm run verify:managed-clerk-release
+  npm run verify:managed-clerk-release
 kill -0 "$server_pid"
 kill -0 "$proxy_pid"
 

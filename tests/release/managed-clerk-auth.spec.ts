@@ -315,7 +315,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     });
 
     await waitForCompletedSignIn(page, routeStates);
-    await page.goto("/");
+    await page.goto("/settings");
     const authResponse = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", {
         credentials: "same-origin",

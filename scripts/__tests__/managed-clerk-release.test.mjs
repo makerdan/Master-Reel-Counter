@@ -1256,7 +1256,10 @@ test("smoke uses Clerk's supported testing sign-in and keeps safe failure eviden
   assert.match(smoke, /CLERK_TESTING_TOKEN/);
   assert.match(smoke, /clerkTesting\.signIn\(\{/);
   assert.match(smoke, /frontendApiUrl: new URL\(CLERK_TESTING_FRONTEND_API_ORIGIN\)\.host/);
-  assert.match(smoke, /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/"\)/);
+  assert.match(
+    smoke,
+    /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/settings"\)/,
+  );
   assert.match(smoke, /clerkScriptResponses/);
   assert.match(smoke, /Clerk JavaScript must load once from the exact candidate proxy/);
   assert.match(smoke, /contentType/);
@@ -1517,6 +1520,9 @@ test("failed release diagnostics are structured, bounded, and secret-redacted", 
     proxyLogPath,
   });
   assert.match(output, /MANAGED CLERK RELEASE DIAGNOSTICS/);
+  assert.match(output, /\[google-admin\]/);
+  assert.match(output, /\[google-user\]/);
+  assert.match(output, /sessionFailureCategory="diagnostics-unavailable"/);
   assert.match(output, /finalPath="\/sign-in\/client-trust"/);
   assert.match(output, /POST \/api\/__clerk\/v1\/client\/sign_ins 200/);
   assert.match(output, /ERR_CONNECTION_RESET/);
@@ -1558,6 +1564,149 @@ test("browser diagnostic values fail closed and cannot crowd out log tails", asy
   assert.match(output, /candidate evidence/);
   assert.match(output, /proxy evidence/);
   assert.match(output, /END MANAGED CLERK RELEASE DIAGNOSTICS/);
+});
+
+test("Google role diagnostics expose bounded safe session transitions", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-role-diagnostics-"));
+  const browserPath = resolve(directory, "browser.json");
+  const adminPath = resolve(directory, "google-admin.json");
+  const userPath = resolve(directory, "google-user.json");
+  const candidateLogPath = resolve(directory, "candidate.log");
+  const proxyLogPath = resolve(directory, "proxy.log");
+  const observation = (overrides) => ({
+    path: "/sign-in",
+    clerkLoaded: false,
+    hasActiveSession: false,
+    status: "clerk-unloaded",
+    phase: "poll",
+    elapsedMs: 0,
+    ...overrides,
+  });
+
+  await writeFile(browserPath, "{}");
+  await writeFile(candidateLogPath, "candidate evidence");
+  await writeFile(proxyLogPath, "proxy evidence");
+  await writeFile(
+    adminPath,
+    JSON.stringify({
+      finalPath: "/sign-in",
+      routeStates: ["/sign-in"],
+      clerkRequests: ["POST /api/__clerk/v1/client/sign_ins 200"],
+      requestFailures: [],
+      pageErrors: [],
+      sessionObservations: [
+        observation({ elapsedMs: 0 }),
+        observation({
+          clerkLoaded: true,
+          status: "loaded-without-session",
+          elapsedMs: 1_000,
+        }),
+        observation({
+          clerkLoaded: true,
+          hasActiveSession: true,
+          status: "active-session-on-sign-in",
+          phase: "timeout",
+          elapsedMs: 30_000,
+        }),
+      ],
+      sessionFailureCategory: "active-session-route-timeout",
+    }),
+  );
+  await writeFile(
+    userPath,
+    JSON.stringify({
+      finalPath: "/sign-in",
+      routeStates: ["/sign-in"],
+      clerkRequests: [],
+      requestFailures: [],
+      pageErrors: [],
+      sessionObservations: [
+        observation({
+          clerkLoaded: true,
+          status: "loaded-without-session",
+          phase: "timeout",
+          elapsedMs: 30_000,
+        }),
+      ],
+      sessionFailureCategory: "loaded-without-session-timeout",
+    }),
+  );
+
+  const output = await formatReleaseDiagnostics({
+    browserPath,
+    candidateLogPath,
+    proxyLogPath,
+    googleAdminPath: adminPath,
+    googleUserPath: userPath,
+  });
+
+  assert.match(output, /\[google-admin\]/);
+  assert.match(output, /\[google-user\]/);
+  assert.match(output, /"status":"clerk-unloaded"/);
+  assert.match(output, /"status":"loaded-without-session"/);
+  assert.match(output, /"status":"active-session-on-sign-in"/);
+  assert.match(output, /sessionFailureCategory="active-session-route-timeout"/);
+  assert.match(output, /sessionFailureCategory="loaded-without-session-timeout"/);
+  assert(Buffer.byteLength(output) <= MAX_DIAGNOSTIC_BYTES);
+  assert(output.split(/\r?\n/).length <= MAX_DIAGNOSTIC_LINES);
+});
+
+test("Google role diagnostic input rejects unsafe and oversized values", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-role-diagnostics-invalid-"));
+  const browserPath = resolve(directory, "browser.json");
+  const adminPath = resolve(directory, "google-admin.json");
+  const userPath = resolve(directory, "google-user.json");
+  const candidateLogPath = resolve(directory, "candidate.log");
+  const proxyLogPath = resolve(directory, "proxy.log");
+  const malicious = [
+    "account-identifier-secret",
+    "person@example.invalid",
+    "query-string-secret",
+    "credential-secret",
+    "unbounded-status-secret",
+  ];
+  await writeFile(browserPath, "{}");
+  await writeFile(candidateLogPath, "candidate evidence");
+  await writeFile(proxyLogPath, "proxy evidence");
+  await writeFile(adminPath, "x".repeat(40_000));
+  await writeFile(
+    userPath,
+    JSON.stringify({
+      finalPath: `/sign-in?email=${malicious[1]}`,
+      routeStates: [`/settings/${malicious[0]}`],
+      clerkRequests: [`POST /api/__clerk/v1/client/sessions/${malicious[0]} 200`],
+      requestFailures: [`GET /api/__clerk/v1/client/${malicious[0]} ERR_CONNECTION_RESET`],
+      pageErrors: [],
+      sessionObservations: Array(21).fill(
+        {
+          path: `/sign-in?token=${malicious[3]}`,
+          clerkLoaded: "true",
+          hasActiveSession: true,
+          status: malicious[4],
+          phase: "timeout",
+          elapsedMs: 30_001,
+          rawClerkObject: malicious[2],
+        },
+      ),
+      sessionFailureCategory: `token=${malicious[3]}`,
+    }),
+  );
+
+  const output = await formatReleaseDiagnostics({
+    browserPath,
+    candidateLogPath,
+    proxyLogPath,
+    googleAdminPath: adminPath,
+    googleUserPath: userPath,
+  });
+
+  for (const value of malicious) assert.equal(output.includes(value), false);
+  assert.match(output, /\[REDACTED INVALID ENTRY\]/);
+  assert.match(output, /\[role diagnostic unavailable\]/);
+  assert.match(output, /sessionFailureCategory="diagnostics-unavailable"/);
+  assert.match(output, /\[OMITTED\]/);
+  assert(Buffer.byteLength(output) <= MAX_DIAGNOSTIC_BYTES);
+  assert(output.split(/\r?\n/).length <= MAX_DIAGNOSTIC_LINES);
 });
 
 test("maximum valid diagnostic input preserves every bounded section", async () => {
@@ -1602,6 +1751,14 @@ test("smoke proves proxy, cookie-only API, protected pages, and sign-out", () =>
   assert.match(smoke, /fetch\("\/api\/healthz"/);
   assert.match(smoke, /credentials: "same-origin"/);
   assert.doesNotMatch(smoke, /page\.request/);
+  assert.match(
+    smoke,
+    /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/settings"\)/,
+  );
+  assert.match(
+    smoke,
+    /await page\.goto\("\/settings"\);[\s\S]*?getByTestId\("text-settings-title"\)/,
+  );
   assert.match(smoke, /page\.goto\("\/settings"\)/);
   assert.match(smoke, /page\.goto\("\/stats"\)/);
   assert.match(smoke, /button-login/);
@@ -1609,6 +1766,29 @@ test("smoke proves proxy, cookie-only API, protected pages, and sign-out", () =>
   assert.match(smoke, /clerkTesting\.signIn/);
   assert.doesNotMatch(smoke, /\.fill\(password\)/);
   assert.doesNotMatch(smoke, /Authorization|__test__|owner-login|tester-login/);
+});
+
+test("Google role smoke requires an active Clerk session and emits only coarse state", () => {
+  assert.match(
+    googleReleaseSmoke,
+    /waitForCompletedSignIn\(page, routeStates, sessionDiagnostics\)/,
+  );
+  assert.match(googleReleaseSmoke, /clerkLoaded: clerkState\.loaded/);
+  assert.match(googleReleaseSmoke, /hasActiveSession: clerkState\.hasActiveSession/);
+  assert.match(googleReleaseSmoke, /"active-session-on-sign-in"/);
+  assert.match(googleReleaseSmoke, /"loaded-without-session"/);
+  assert.match(googleReleaseSmoke, /"clerk-unloaded"/);
+  assert.match(
+    googleReleaseSmoke,
+    /!path\.startsWith\("\/sign-in"\)[\s\S]*clerkState\.loaded[\s\S]*clerkState\.hasActiveSession/,
+  );
+  assert.match(googleReleaseSmoke, /sessionObservations/);
+  assert.match(googleReleaseSmoke, /sessionFailureCategory/);
+  assert.match(googleReleaseSmoke, /testInfo\.attach/);
+  assert.match(googleReleaseSmoke, /google-\$\{roleCase\.role\.toLowerCase\(\)\}\.json/);
+  assert.match(candidateBuild, /google_admin_diagnostic/);
+  assert.match(candidateBuild, /google_user_diagnostic/);
+  assert.match(candidateBuild, /google_admin_diagnostic"\s+"\$google_user_diagnostic"/);
 });
 
 test("Clerk-only auth leaves no tester session or password machinery", () => {
