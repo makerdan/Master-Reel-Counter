@@ -10,4 +10,5 @@ tests/.auth/
 .agents/skills/.workspace-projections/
 .agents/skills/.workspace-projections.lock
 .crash_log.json
+.failure-gate-state/
 .crash_log.json
