@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.curl
     pkgs.dbus
     pkgs.expat
     pkgs.at-spi2-core
