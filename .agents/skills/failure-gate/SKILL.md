@@ -116,6 +116,12 @@ None observed.
 **Do not escalate:** Run only the authorized tier; request approval for changes.
 ```
 
+For this repository, a `test-heavy` plan's Validation `**Why:**` must name at
+least one step present in `test-heavy` but absent from `test-standard-plus` in
+the runtime manifest, and explain why that coverage applies to the task. Generic
+requests for confidence do not justify the heavier tier. Other registered tiers
+still require a meaningful explanation but have no heavy-only step requirement.
+
 An exact referenced catalog baseline must declare one ownership:
 `**Ignored baseline:**` or `**Owned baseline repair:**`, with suite, test,
 environment/variant and signature. Non-active, ambiguous, or expired records

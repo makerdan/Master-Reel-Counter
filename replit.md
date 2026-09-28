@@ -70,6 +70,13 @@ task run is accepted. A caller-selected path, task ID, or ad-hoc
 `--allow-no-plan` result cannot be used as completion evidence. Preserve
 existing lock, audit, startup, collision, and Playwright controls.
 
+Plans selecting `test-heavy` must use the Validation `**Why:**` to name at least
+one step in the runtime `test-heavy` manifest that is absent from
+`test-standard-plus`, and explain why that specific coverage applies to the
+task. The plan guard derives those names from `docs/validation/manifest.json`;
+generic reasons such as “full confidence” are insufficient. Other registered
+tiers still need meaningful explanations, without this heavy-only rule.
+
 Only exact, active, unexpired, applicable baseline matches may waive
 unrelated test failures. An owned repair survives expiry. A passing retry
 proves intermittency only; unlisted pre-existing ownership requires direct

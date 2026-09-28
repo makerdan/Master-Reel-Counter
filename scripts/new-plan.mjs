@@ -3,7 +3,11 @@ import { mkdirSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { randomUUID } from "node:crypto";
 import { loadCatalog, findExactRecord } from "./lib/baseline.mjs";
-import { loadTiers } from "./lib/tiers.mjs";
+import {
+  getHeavyOnlyStepNames,
+  loadTiers,
+  referencedHeavyOnlyStepNames,
+} from "./lib/tiers.mjs";
 
 const args = process.argv.slice(2);
 const value = (flag) => {
@@ -18,10 +22,17 @@ if (!name || !/^[a-z0-9][a-z0-9-]*$/.test(name) || !why?.trim()) {
   process.exit(2);
 }
 const tier = value("--tier") ?? "test-standard";
-if (!loadTiers()[tier]) throw new Error(`unregistered validation tier ${tier}`);
+const tiers = loadTiers();
+if (!tiers[tier]) throw new Error(`unregistered validation tier ${tier}`);
 const heavyRationale = value("--heavy-rationale");
 if (tier === "test-heavy" && !heavyRationale?.trim()) {
-  throw new Error("test-heavy requires --heavy-rationale explaining its prerequisite coverage need");
+  throw new Error("test-heavy requires --heavy-rationale naming relevant heavy-only validation coverage");
+}
+if (tier === "test-heavy" && referencedHeavyOnlyStepNames(heavyRationale, tiers).length === 0) {
+  throw new Error(
+    `test-heavy --heavy-rationale must name a heavy-only runtime step ` +
+    `(${getHeavyOnlyStepNames(tiers).join(", ")}) and explain why that coverage applies`,
+  );
 }
 const draftReference = `draft:${randomUUID()}`;
 const catalog = loadCatalog();
@@ -65,9 +76,8 @@ ${observations.length ? observations.map((item) => `- ${item}`).join("\n") : "No
 
 ## Validation
 **Command:** \`${tier}\`
-**Why:** FILL IN — explain why this registered tier covers the task.
+**Why:** ${tier === "test-heavy" ? heavyRationale.trim() : "FILL IN — explain why this registered tier covers the task."}
 **Do not escalate:** Run exactly this command. Pre-existing failures are not a reason to run a heavier tier.
-${heavyRationale ? `**Heavy-tier rationale:** ${heavyRationale.trim()}` : ""}
 
 ## Regression Guard
 **Self-satisfying** — replace this with a concrete guard when the task changes existing behavior.

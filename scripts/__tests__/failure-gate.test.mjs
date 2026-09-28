@@ -4,7 +4,11 @@ import { chmodSync, closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync,
 import { tmpdir } from "os";
 import { delimiter, dirname, join } from "path";
 import { spawnSync } from "child_process";
-import { loadTiers } from "../lib/tiers.mjs";
+import {
+  getHeavyOnlyStepNames,
+  loadTiers,
+  referencedHeavyOnlyStepNames,
+} from "../lib/tiers.mjs";
 import "./failure-gate-v4-coordinator.test.mjs";
 import "./failure-gate-v4-evidence.test.mjs";
 import "./failure-gate-v4-execution.test.mjs";
@@ -512,6 +516,7 @@ test("plan scaffold rejects unknown tiers and creates exact baseline markers", (
 
 test("plan scaffold accepts every canonical validation tier", () => {
   const created = [];
+  const heavyOnlyStepNames = getHeavyOnlyStepNames(loadTiers());
   try {
     for (const tier of Object.keys(loadTiers())) {
       const name = `fixture-tier-${tier}`;
@@ -519,14 +524,65 @@ test("plan scaffold accepts every canonical validation tier", () => {
         "--name", name,
         "--why", "exercise canonical tier registration",
         "--tier", tier,
-        ...(tier === "test-heavy" ? ["--heavy-rationale", "Fixture exercises the registered heavy coverage contract"] : []),
+        ...(tier === "test-heavy"
+          ? ["--heavy-rationale", `${heavyOnlyStepNames[0]} validates the affected startup boundary`]
+          : []),
       ]);
       assert.equal(result.status, 0, `${tier}: ${result.stderr}`);
       created.push(join(ROOT, "docs/validation/plans", `${name}.md`));
     }
+    const heavyPlan = readFileSync(join(ROOT, "docs/validation/plans/fixture-tier-test-heavy.md"), "utf8");
+    assert.match(heavyPlan, new RegExp(`\\*\\*Why:\\*\\* ${heavyOnlyStepNames[0]}`));
+    assert.doesNotMatch(heavyPlan, /\*\*Heavy-tier rationale:\*\*/);
   } finally {
     for (const path of created) rmSync(path, { force: true });
   }
+});
+
+test("heavy plan rationale names runtime coverage beyond standard-plus", () => {
+  const tiers = loadTiers();
+  const heavyOnlySteps = getHeavyOnlyStepNames(tiers);
+  assert.ok(heavyOnlySteps.length > 0, "test-heavy must retain coverage absent from test-standard-plus");
+  assert.deepEqual(getHeavyOnlyStepNames({
+    "test-heavy": { steps: [{ name: "shared-step" }, { name: "new-heavy-step" }] },
+    "test-standard-plus": { steps: [{ name: "shared-step" }] },
+  }), ["new-heavy-step"]);
+
+  const planWith = (tier, why) => validPlan
+    .replace("`test-fast`", `\`${tier}\``)
+    .replace("Static checks cover this documentation-only fixture.", why);
+  const vaguePath = fixturePlan(planWith("test-heavy", "Full confidence across the project."));
+  const vague = run("scripts/check-failure-gate.mjs", [], { TASK_PLAN_FILE: vaguePath });
+  assert.equal(vague.status, 1);
+  assert.match(vague.stderr, /Validation Why must name at least one heavy-only runtime step/);
+
+  const missingPath = fixturePlan(planWith("test-heavy", "FILL IN — explain why this registered tier covers the task."));
+  const missing = run("scripts/check-failure-gate.mjs", [], { TASK_PLAN_FILE: missingPath });
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /Validation Why is empty or a placeholder/);
+
+  const relevantWhy = `${heavyOnlySteps[0]} covers the changed startup behavior and catches its regressions.`;
+  assert.deepEqual(referencedHeavyOnlyStepNames(relevantWhy, tiers), [heavyOnlySteps[0]]);
+  const relevantPath = fixturePlan(planWith("test-heavy", relevantWhy));
+  const relevant = run("scripts/check-failure-gate.mjs", [], { TASK_PLAN_FILE: relevantPath });
+  assert.equal(relevant.status, 0, relevant.stderr);
+
+  for (const tier of ["test-fast", "test-standard", "test-standard-plus"]) {
+    const ordinaryPath = fixturePlan(planWith(tier, `The ${tier} checks cover this task's changed contract.`));
+    const ordinary = run("scripts/check-failure-gate.mjs", [], { TASK_PLAN_FILE: ordinaryPath });
+    assert.equal(ordinary.status, 0, `${tier}: ${ordinary.stderr}`);
+  }
+});
+
+test("heavy plan scaffold rejects generic rationale without a heavy-only step name", () => {
+  const result = run("scripts/new-plan.mjs", [
+    "--name", "fixture-heavy-vague",
+    "--why", "exercise canonical tier registration",
+    "--tier", "test-heavy",
+    "--heavy-rationale", "Full confidence across the project.",
+  ]);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /must name a heavy-only runtime step/);
 });
 
 test("valid plan passes both scoped guards", () => {

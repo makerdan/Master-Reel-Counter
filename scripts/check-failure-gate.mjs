@@ -2,7 +2,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { loadCatalog, findExactRecord } from "./lib/baseline.mjs";
-import { loadTiers } from "./lib/tiers.mjs";
+import { getHeavyOnlyStepNames, loadTiers, referencedHeavyOnlyStepNames } from "./lib/tiers.mjs";
 
 const fix = process.argv.includes("--fix-stub");
 const archive = process.argv.includes("--archive");
@@ -56,12 +56,17 @@ for (const file of files) {
   if (!validation) errors.push(`${file}: missing ## Validation`);
   const command = validation.match(/^\*\*Command:\*\*\s*`?([^`\n]+)`?\s*$/m)?.[1]?.trim();
   if (!command || !tiers[command]) errors.push(`${file}: Validation Command must be a registered tier`);
-  if (command === "test-heavy" && /^## Task identity\s*$/m.test(content) &&
-      placeholder(validation.match(/^\*\*Heavy-tier rationale:\*\*\s*(.+)$/m)?.[1])) {
-    errors.push(`${file}: new heavy-tier plans require a prerequisite coverage rationale`);
-  }
   const why = validation.match(/^\*\*Why:\*\*\s*(.+)$/m)?.[1]?.trim();
   if (placeholder(why)) errors.push(`${file}: Validation Why is empty or a placeholder`);
+  if (command === "test-heavy") {
+    const heavyOnlyStepNames = getHeavyOnlyStepNames(tiers);
+    if (referencedHeavyOnlyStepNames(why, tiers).length === 0) {
+      errors.push(
+        `${file}: test-heavy Validation Why must name at least one heavy-only runtime step ` +
+        `(${heavyOnlyStepNames.join(", ")}) and explain why that coverage applies`,
+      );
+    }
+  }
   const ceiling = validation.match(/^\*\*Do not escalate:\*\*\s*(.+)$/m)?.[1]?.trim();
   if (placeholder(ceiling)) errors.push(`${file}: Validation Do not escalate is empty or a placeholder`);
   const markerLines = baseline.split("\n").filter((line) => /^\s*-\s*\*\*(Ignored baseline|Owned baseline repair):/.test(line));

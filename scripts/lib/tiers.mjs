@@ -45,3 +45,23 @@ export function loadTiers(path = TIERS_PATH) {
     name, { ...tier, serial: tier.serial ?? Boolean(tier.resource) },
   ]));
 }
+
+export function getHeavyOnlyStepNames(tiers) {
+  const heavy = tiers["test-heavy"];
+  const standardPlus = tiers["test-standard-plus"];
+  if (!heavy || !standardPlus) {
+    throw new Error("runtime tier registry must include test-heavy and test-standard-plus");
+  }
+  const standardPlusNames = new Set(standardPlus.steps.map((step) => step.name));
+  return [...new Set(heavy.steps
+    .map((step) => step.name)
+    .filter((name) => !standardPlusNames.has(name)))];
+}
+
+export function referencedHeavyOnlyStepNames(reason, tiers) {
+  if (typeof reason !== "string") return [];
+  return getHeavyOnlyStepNames(tiers).filter((name) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?:^|[^A-Za-z0-9_-])${escaped}(?:$|[^A-Za-z0-9_-])`, "i").test(reason);
+  });
+}
