@@ -1,30 +1,35 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
 import { resolve } from "path";
 import { execFileSync } from "child_process";
 const outDir = resolve("artifacts/bathyscan/public");
-const staging = resolve("/tmp/failure-gate-package");
+const staging = mkdtempSync(resolve(tmpdir(), "failure-gate-package-"));
 const zipPath = resolve(outDir, "failure-gate-skill.zip");
 const packageDate = new Date("1980-01-01T00:00:00Z");
 const packageFiles = [
   ["SKILL.md", ".agents/skills/failure-gate/SKILL.md"],
+  ["reference/implementation.md", ".agents/skills/failure-gate/reference/implementation.md"],
+  ["reference/acceptance.md", ".agents/skills/failure-gate/reference/acceptance.md"],
   ["validation-tiers.md", ".agents/skills/validation-tiers/SKILL.md"],
   ["tiers.json", ".agents/skills/validation-tiers/tiers.json"],
 ];
-rmSync(staging, { recursive: true, force: true });
-mkdirSync(staging, { recursive: true });
 mkdirSync(outDir, { recursive: true });
-for (const [name, source] of packageFiles) {
-  const target = resolve(staging, name);
-  writeFileSync(target, readFileSync(source));
-  utimesSync(target, packageDate, packageDate);
+try {
+  for (const [name, source] of packageFiles) {
+    const target = resolve(staging, name);
+    mkdirSync(resolve(target, ".."), { recursive: true });
+    writeFileSync(target, readFileSync(source));
+    utimesSync(target, packageDate, packageDate);
+  }
+  rmSync(zipPath, { force: true });
+  execFileSync("zip", [
+    "-q",
+    "-X",
+    zipPath,
+    ...packageFiles.map(([name]) => name),
+  ], { cwd: staging });
+} finally {
+  rmSync(staging, { recursive: true, force: true });
 }
-rmSync(zipPath, { force: true });
-execFileSync("zip", [
-  "-q",
-  "-X",
-  "-j",
-  zipPath,
-  ...packageFiles.map(([name]) => resolve(staging, name)),
-]);
 console.log(zipPath);

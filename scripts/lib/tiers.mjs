@@ -1,13 +1,14 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-export const TIERS_PATH = resolve(import.meta.dirname, "../../.agents/skills/validation-tiers/tiers.json");
+// The packaged registry is a derivative example, never a fallback live authority.
+export const TIERS_PATH = resolve(import.meta.dirname, "../../docs/validation/manifest.json");
 const STEP_KINDS = new Set(["typecheck", "test", "lint", "audit", "smoke", "harness"]);
 
 export function loadTiers(path = TIERS_PATH) {
   const data = JSON.parse(readFileSync(path, "utf8"));
   if (
-    data.schemaVersion !== 1 ||
+    (data.schemaVersion !== 1 && data.version !== 1) ||
     !data.tiers ||
     typeof data.tiers !== "object" ||
     Array.isArray(data.tiers) ||
@@ -40,5 +41,7 @@ export function loadTiers(path = TIERS_PATH) {
       }
     }
   }
-  return data.tiers;
+  return Object.fromEntries(Object.entries(data.tiers).map(([name, tier]) => [
+    name, { ...tier, serial: tier.serial ?? Boolean(tier.resource) },
+  ]));
 }

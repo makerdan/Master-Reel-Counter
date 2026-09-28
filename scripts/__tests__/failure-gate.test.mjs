@@ -5,11 +5,16 @@ import { tmpdir } from "os";
 import { delimiter, dirname, join } from "path";
 import { spawnSync } from "child_process";
 import { loadTiers } from "../lib/tiers.mjs";
+import "./failure-gate-v4-coordinator.test.mjs";
+import "./failure-gate-v4-evidence.test.mjs";
+import "./failure-gate-v4-execution.test.mjs";
 import { findExactRecord, isReferenceable, loadCatalog, maintenanceFindings } from "../lib/baseline.mjs";
 
 const ROOT = process.cwd();
 const PACKAGE_FILES = [
   ["SKILL.md", ".agents/skills/failure-gate/SKILL.md"],
+  ["reference/implementation.md", ".agents/skills/failure-gate/reference/implementation.md"],
+  ["reference/acceptance.md", ".agents/skills/failure-gate/reference/acceptance.md"],
   ["validation-tiers.md", ".agents/skills/validation-tiers/SKILL.md"],
   ["tiers.json", ".agents/skills/validation-tiers/tiers.json"],
 ];
@@ -79,23 +84,22 @@ test("portable contract separates invariants from host-specific adaptation", () 
   const skill = readFileSync(join(ROOT, ".agents/skills/failure-gate/SKILL.md"), "utf8");
   const tiers = readFileSync(join(ROOT, ".agents/skills/validation-tiers/SKILL.md"), "utf8");
   for (const phrase of [
-    "## Portability boundary",
-    "### Portable requirements",
-    "### Required host adaptation",
-    "## Host-project adapter: this repository",
-    "task validation",
-    "completion validation",
-    "TIER-LOCK VIOLATION",
-    "A passing retry establishes",
+    "Workflow mode",
+    "Protected mode",
+    "Discover host capabilities",
+    "independent",
+    "completion",
+    "BLOCKED",
+    "intermittency",
     "incomplete",
     "not reached",
-    "Audit steps preserve their registered command, threshold, and result",
+    "audit",
   ]) {
     assert.match(skill, new RegExp(phrase, "i"), `missing portable contract phrase: ${phrase}`);
   }
   assert.match(
     skill,
-    /Baseline records,\s+project memory, tier composition, and application paths must never be copied as\s+portable defaults\./i,
+    /Examples in this skill are not portable dependencies/i,
   );
   assert.match(tiers, /example host registry, not as a portable default/i);
   assert.match(tiers, /Only `test` failures are eligible for exact baseline\s+classification/);
@@ -175,6 +179,8 @@ test("Failure Gate package regeneration is byte-for-byte stable", () => {
   assert.equal(entries.status, 0, entries.stderr);
   assert.deepEqual(entries.stdout.trim().split("\n"), [
     "SKILL.md",
+    "reference/implementation.md",
+    "reference/acceptance.md",
     "validation-tiers.md",
     "tiers.json",
   ]);
@@ -410,7 +416,7 @@ test("plan scaffold rejects unknown tiers and creates exact baseline markers", (
       "--baseline-id", "BASE-FIXTURE",
     ]);
     assert.equal(result.status, 0, result.stderr);
-    const planPath = join(ROOT, ".local/tasks/fixture-plan.md");
+    const planPath = join(ROOT, "docs/validation/plans/fixture-plan.md");
     const plan = readFileSync(planPath, "utf8");
     assert.match(plan, /Ignored baseline:.*unit › case; match only this signature: boom/);
     rmSync(planPath, { force: true });
@@ -428,9 +434,10 @@ test("plan scaffold accepts every canonical validation tier", () => {
         "--name", name,
         "--why", "exercise canonical tier registration",
         "--tier", tier,
+        ...(tier === "test-heavy" ? ["--heavy-rationale", "Fixture exercises the registered heavy coverage contract"] : []),
       ]);
       assert.equal(result.status, 0, `${tier}: ${result.stderr}`);
-      created.push(join(ROOT, ".local/tasks", `${name}.md`));
+      created.push(join(ROOT, "docs/validation/plans", `${name}.md`));
     }
   } finally {
     for (const path of created) rmSync(path, { force: true });

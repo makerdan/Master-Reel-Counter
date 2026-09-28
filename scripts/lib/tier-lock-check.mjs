@@ -3,13 +3,7 @@ import { loadTiers } from "./tiers.mjs";
 import { resolve } from "path";
 
 function isRegisteredTier(command) {
-  if (loadTiers()[command]) return true;
-  try {
-    const manifest = JSON.parse(readFileSync(resolve("docs/validation/manifest.json"), "utf8"));
-    return Boolean(manifest.tiers?.[command]);
-  } catch {
-    return false;
-  }
+  return Boolean(loadTiers()[command]);
 }
 
 export function readPlanTier(planPath) {

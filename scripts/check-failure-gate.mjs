@@ -56,6 +56,10 @@ for (const file of files) {
   if (!validation) errors.push(`${file}: missing ## Validation`);
   const command = validation.match(/^\*\*Command:\*\*\s*`?([^`\n]+)`?\s*$/m)?.[1]?.trim();
   if (!command || !tiers[command]) errors.push(`${file}: Validation Command must be a registered tier`);
+  if (command === "test-heavy" && /^## Task identity\s*$/m.test(content) &&
+      placeholder(validation.match(/^\*\*Heavy-tier rationale:\*\*\s*(.+)$/m)?.[1])) {
+    errors.push(`${file}: new heavy-tier plans require a prerequisite coverage rationale`);
+  }
   const why = validation.match(/^\*\*Why:\*\*\s*(.+)$/m)?.[1]?.trim();
   if (placeholder(why)) errors.push(`${file}: Validation Why is empty or a placeholder`);
   const ceiling = validation.match(/^\*\*Do not escalate:\*\*\s*(.+)$/m)?.[1]?.trim();

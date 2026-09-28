@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, writeFileSync } from "fs";
 import { resolve } from "path";
+import { randomUUID } from "node:crypto";
 import { loadCatalog, findExactRecord } from "./lib/baseline.mjs";
 import { loadTiers } from "./lib/tiers.mjs";
 
@@ -18,6 +19,11 @@ if (!name || !/^[a-z0-9][a-z0-9-]*$/.test(name) || !why?.trim()) {
 }
 const tier = value("--tier") ?? "test-standard";
 if (!loadTiers()[tier]) throw new Error(`unregistered validation tier ${tier}`);
+const heavyRationale = value("--heavy-rationale");
+if (tier === "test-heavy" && !heavyRationale?.trim()) {
+  throw new Error("test-heavy requires --heavy-rationale explaining its prerequisite coverage need");
+}
+const draftReference = `draft:${randomUUID()}`;
 const catalog = loadCatalog();
 const ids = [...all("--baseline-id"), ...all("--owned-baseline-id")];
 const records = new Map();
@@ -37,6 +43,12 @@ const marker = (flag, id) => {
 };
 const plan = `# ${name}
 
+## Task identity
+**Draft reference:** \`${draftReference}\`
+**Purpose:** planning_guards
+This draft is non-authorizing. Bind the independently assigned task and exact
+approved plan through the coordinator before v4 execution.
+
 ## Why
 ${why.trim()}
 
@@ -55,6 +67,7 @@ ${observations.length ? observations.map((item) => `- ${item}`).join("\n") : "No
 **Command:** \`${tier}\`
 **Why:** FILL IN — explain why this registered tier covers the task.
 **Do not escalate:** Run exactly this command. Pre-existing failures are not a reason to run a heavier tier.
+${heavyRationale ? `**Heavy-tier rationale:** ${heavyRationale.trim()}` : ""}
 
 ## Regression Guard
 **Self-satisfying** — replace this with a concrete guard when the task changes existing behavior.
@@ -62,7 +75,7 @@ ${observations.length ? observations.map((item) => `- ${item}`).join("\n") : "No
 ## Relevant files
 - <FILL IN>
 `;
-const path = resolve(".local/tasks", `${name}.md`);
-mkdirSync(resolve(".local/tasks"), { recursive: true });
-writeFileSync(path, plan);
+const path = resolve("docs/validation/plans", `${name}.md`);
+mkdirSync(resolve("docs/validation/plans"), { recursive: true });
+writeFileSync(path, plan, { flag: "wx" });
 console.log(path);

@@ -49,30 +49,41 @@ The application is built with a React frontend, an Express.js backend, and Postg
 
 ## Agent Validation Contract
 
-Failure Gate applies to every task plan and execution. Plans are created with
-`npm run new-plan -- --name <slug> --why "<reason>"`, must document
-`## Pre-existing failures to ignore` and `## Validation`, and may reference
-only exact, active, unexpired records in
-`docs/validation/failure-baseline.json`. The plan's registered command is the
-validation ceiling.
+The canonical Failure Gate v4 contract lives in
+`.agents/skills/failure-gate/SKILL.md` and its `reference/` files. It
+distinguishes the single approved tier for an independently assigned task,
+failure ownership, and evidence applicable to completion. Updating the
+tracked guidance does not activate a new authorization or approve the
+governing policy. Task 907 implements the candidate under prior-policy
+bootstrap validation; operational cutover requires independent acceptance.
+See `docs/validation/task-907-bootstrap-observation.md` for the pre-edit
+failure without treating it as an authorized baseline ignore.
 
-Use `TASK_PLAN_FILE=.local/tasks/<name>.md node scripts/run-locked-tier.mjs`
-for task validation. Missing or malformed plans, unregistered tiers, and tier
-mismatches fail closed. The only no-plan escape hatch is an explicit
-`node scripts/run-tier.mjs <tier> --allow-no-plan` for ad-hoc work.
+The runtime registry is `docs/validation/manifest.json`.
+`.agents/skills/validation-tiers/tiers.json` is a packaged example and is
+not the runtime authority. Existing `scripts/new-plan.mjs` and both plan
+guards supply bounded planning checks. Existing `scripts/run-locked-tier.mjs`
+is the single checked entry point; it must resolve an independently
+assigned task's one authorized tier and exact approved plan before any
+task run is accepted. A caller-selected path, task ID, or ad-hoc
+`--allow-no-plan` result cannot be used as completion evidence. Preserve
+existing lock, audit, startup, collision, and Playwright controls.
 
-`test-fast`, `test-standard`, `test-standard-plus`, and `test-heavy` are
-declarative registered tiers. Heavy validation retains the existing
-`serial-lock.mjs`, `free-ports.mjs`, startup smoke, CI collision, and Playwright
-controls. Task validation and platform completion validation are separate:
-completion checks may be broader and are not a reason to escalate the task tier.
+Only exact, active, unexpired, applicable baseline matches may waive
+unrelated test failures. An owned repair survives expiry. A passing retry
+proves intermittency only; unlisted pre-existing ownership requires direct
+evidence of the same failure on a verified unaffected earlier snapshot
+plus independent corroboration. Keep raw failing results and account for
+every required step; incomplete and not-reached work cannot pass. Maintain
+the catalog separately with `npm run maintain:validation-baseline`.
 
-Failure classification requires exact baseline matching, and a passing retry
-establishes intermittency only. An unlisted failure needs two of three
-provenance factors before it can be self-classified as pre-existing. Do not
-promote a task-local observation directly into the catalog. Run
-`npm run maintain:validation-baseline` for opt-in review/staleness reporting;
-maintenance findings do not fail unrelated task validation.
+Enforcement is **workflow mode**: project-local controls are cooperative
+under unrestricted shell/write access, not protected attestation. Managed
+task completion is **BLOCKED** until verified platform-origin current task ID,
+exact approved plan reference, and exactly one dispatch through the checked
+task-validation entry point yield a run and decision. Local launcher tests
+cannot establish this platform handoff. Do not modify platform-owned
+`.replit` workflow configuration or launch all tiers as a substitute.
 
 ## External Dependencies
 - **Replit-managed Clerk:** Cookie-based authentication for normal web users, with managed development/production keys and the canonical production proxy.
