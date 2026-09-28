@@ -1,0 +1,25 @@
+Master Reel Counter — task 922 Failure Gate migration handoff
+Scope and evidence
+This is a migration brief, not a completed repository change or an authorization. This conversation can see the project listing but not task 922's files, plan, task record, checked CLI, or validation logs. The task output supplied by the user says:
+
+The existing approved plan calls for test-heavy browser coverage of the photo handoff.
+An owner-review adapter and live task-to-plan binding are reported as not installed.
+An approval request returned approval: not granted; no tier was run.
+Verify those facts against current project state before applying any change. Do not infer the approved plan's exact content or digest from this brief.
+
+Intended contract
+Adopt the canonical project-local Failure Gate v4 skill from .agents/skills/failure-gate-v4/ in this conversation's workspace. It is a cooperative project workflow, not an Agent Task Board completion gate or a tamper-resistant owner-review service. Do not copy a generated .local/ mirror.
+
+Within checked project tooling, keep one local task record, one authorized tier, approved plan/digest and tier-definition digest, checked run records, and a local completion checker. Record actual human approval or an owner-approved deterministic activation policy. An agent-written approved: true or a task number alone is not an approval. Local records do not authenticate their author against an agent with write access.
+
+Migration sequence in the project
+Inventory the existing gate, canonical policy, checked CLI, live task 922 plan and status, the test-heavy tier definition, approval records, and current validation output. Confirm which interfaces are project-owned versus platform-owned. Do not run tests or mutate authorization during discovery.
+Obtain explicit authorization for a separately scoped gate migration. Record the old policy/version and the proposed new local-only semantics, especially the loss of any claimed external owner-enforcement. If the owner does not approve that policy change, stop; implement the old gate's missing approval capability instead.
+Preserve and back up the task ledger and evidence. Build/test the local registry, transactional task state, checked runner, approval record handling, and local completion checker against v4's acceptance matrix. Run existing safe installation checks under an approved bootstrap route. Do not silently replace registered validation commands or lower browser-test coverage.
+Cut over atomically: suspend affected runs, verify projection and policy versions, migrate local task/plan records explicitly, retire the old gate authority, and ensure there is no period where both gates can authorize runs. Preserve terminal history and IDs. Failed cutover leaves task 922 blocked under a known recorded policy, never unlocked.
+For task 922, obtain its actual approved plan reference and digest and current test-heavy definition/digest. Bind them to its local task record through a recorded approved plan or owner-approved deterministic activation policy. If the plan, coverage, or approval cannot be established, remain blocked rather than manufacturing a record.
+Use the project's checked task-validation entry point to run only the authorized tier. Preserve browser-test coverage and capture actual snapshot, raw results, and reports. The local completion checker decides only the project's local task status. Replit Agent's Ready/Done transition remains outside this gate.
+Verification and non-goals
+Test invalid/wrong-task plans, stale policy and tier digests, direct ad-hoc result injection, approval changes and cancellation races, skipped browser tests, and edits after a run. These are checked-workflow tests; do not describe them as prevention of arbitrary shell use or local tampering.
+Confirm test-heavy is actually run once for task 922 only after activation; do not count the prior approval request as validation.
+Report old and new policy versions, exact approved plan reference/digest, authorizing decision, tier definition, run IDs, raw results, and any remaining platform limitations. Do not declare task 922 complete based on this brief.
