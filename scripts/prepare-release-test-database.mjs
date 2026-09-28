@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { Client } from "pg";
 import {
   assertIsolatedReleaseDatabase,
+  assertPublicationSchema,
   assertReleaseSchema,
   executeReviewedMigrations,
   ReleaseSchemaPreflightError,
@@ -83,6 +84,7 @@ const client = new Client({ connectionString: releaseDatabaseUrl });
 try {
   await client.connect();
   let schema;
+  let publicationMode;
   try {
     await client.query(`
       ${bootstrap.stdout}
@@ -104,10 +106,8 @@ try {
     const publication = new Client({ connectionString: publicationDatabaseUrl });
     try {
       await publication.connect();
-      await assertReleaseSchema(publication, {
-        expectedSchema: schema,
-        target: "publishing",
-      });
+      const result = await assertPublicationSchema(publication, { expectedSchema: schema });
+      publicationMode = result.mode;
     } catch (error) {
       if (error?.classification === "target-drift") throw error;
       throw new ReleaseSchemaPreflightError(
@@ -122,9 +122,16 @@ try {
     }
   }
 
+  if (publicationMode === "reviewed-legacy") {
+    console.warn(
+      "[release-schema] REVIEW REQUIRED — the publishing database matches the one reviewed older schema. " +
+      "This build did not modify it. Publish must review the schema diff, including removal of the legacy " +
+      "sessions table, users.is_tester, and user_settings.tester_password; do not approve data loss blindly.",
+    );
+  }
   console.log(
     verifyPublicationSchema
-      ? `[release-schema] PASS — ${schema.databaseName}.${schema.schemaName} is initialized and matches the publishing schema`
+      ? `[release-schema] PASS — ${schema.databaseName}.${schema.schemaName} is initialized; publishing schema is ${publicationMode === "current" ? "current" : "the reviewed older version awaiting Publish migration review"}`
       : `[release-schema] PASS — ${schema.databaseName}.${schema.schemaName} is initialized for isolated browser validation`,
   );
 } finally {

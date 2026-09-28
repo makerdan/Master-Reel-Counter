@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -22,6 +23,16 @@ const REVIEWED_MIGRATION_NAMES = [
   "0026_add_users_clerk_user_id.sql",
   "0027_add_user_capabilities.sql",
 ];
+
+// Metadata-only fingerprints of the reviewed public-schema transition. The
+// legacy target was read without mutation; the candidate was exported into
+// an owned disposable database and checked with the reviewed migrations.
+// Re-review BOTH sides before updating these values.
+export const REVIEWED_PUBLICATION_TRANSITION = Object.freeze({
+  schemaName: "public",
+  legacyFingerprint: "ae07fb502896d44e9a81b9270e035dd6b1abddf9ed3329b8e5bc98dd8172f701",
+  candidateFingerprint: "ab7c906a008a22f19d2c976cab07f15b57180009ec564e0bc73b007c4d74063c",
+});
 
 export class ReleaseSchemaPreflightError extends Error {
   constructor(classification, message, options = {}) {
@@ -299,17 +310,56 @@ export async function readReleaseSchema(client) {
   };
 }
 
+function canonicalReleaseShape(schema) {
+  if (
+    !Array.isArray(schema?.schemaState?.columns) ||
+    !Array.isArray(schema?.schemaState?.indexes) ||
+    !Array.isArray(schema?.roleValues) ||
+    !Array.isArray(schema?.legacyObjects)
+  ) {
+    throw new ReleaseSchemaPreflightError(
+      "target-drift",
+      "Cannot fingerprint incomplete publication schema metadata",
+    );
+  }
+  const shape = {
+    // A Publish migration appends columns; a fresh export may place them
+    // elsewhere. Column position is not part of the schema contract.
+    columns: [...schema.schemaState.columns].sort(
+      (a, b) => a.table_name.localeCompare(b.table_name) ||
+        a.column_name.localeCompare(b.column_name),
+    ),
+    indexes: [...schema.schemaState.indexes].sort(
+      (a, b) => a.indexname.localeCompare(b.indexname),
+    ),
+    roleValues: [...schema.roleValues].sort(),
+    legacyObjects: [...schema.legacyObjects].sort(),
+  };
+  return shape;
+}
+
+export function releaseSchemaFingerprint(schema) {
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalReleaseShape(schema)))
+    .digest("hex");
+}
+
 function schemaDifferences(expected, actual) {
   const differences = [];
-  if (JSON.stringify(expected.schemaState) !== JSON.stringify(actual.schemaState)) {
+  const expectedShape = canonicalReleaseShape(expected);
+  const actualShape = canonicalReleaseShape(actual);
+  if (
+    JSON.stringify([expectedShape.columns, expectedShape.indexes]) !==
+    JSON.stringify([actualShape.columns, actualShape.indexes])
+  ) {
     differences.push("columns or indexes differ from the reviewed schema");
   }
-  if (JSON.stringify(expected.roleValues) !== JSON.stringify(actual.roleValues)) {
+  if (JSON.stringify(expectedShape.roleValues) !== JSON.stringify(actualShape.roleValues)) {
     differences.push(
       `account_role values differ (expected ${[...REQUIRED_ROLE_VALUES].join(", ")})`,
     );
   }
-  if (JSON.stringify(expected.legacyObjects) !== JSON.stringify(actual.legacyObjects)) {
+  if (JSON.stringify(expectedShape.legacyObjects) !== JSON.stringify(actualShape.legacyObjects)) {
     differences.push("legacy auth objects differ");
   }
   return differences;
@@ -317,6 +367,55 @@ function schemaDifferences(expected, actual) {
 
 export function compareReleaseSchema(expected, actual) {
   return schemaDifferences(expected, actual);
+}
+
+export async function assertPublicationSchema(
+  client,
+  { expectedSchema, transition = REVIEWED_PUBLICATION_TRANSITION } = {},
+) {
+  if (
+    !expectedSchema || !transition || transition.schemaName !== "public" ||
+    !/^[a-f0-9]{64}$/.test(transition.legacyFingerprint ?? "") ||
+    !/^[a-f0-9]{64}$/.test(transition.candidateFingerprint ?? "")
+  ) {
+    throw new ReleaseSchemaPreflightError(
+      "target-drift",
+      "Publication schema transition metadata is missing or invalid",
+    );
+  }
+  await verifyReviewedMigrations();
+  const actual = await readReleaseSchema(client);
+  if (
+    expectedSchema.schemaName !== transition.schemaName ||
+    actual.schemaName !== transition.schemaName ||
+    !expectedSchema.databaseName ||
+    !actual.databaseName
+  ) {
+    throw new ReleaseSchemaPreflightError(
+      "target-drift",
+      "Publication schema identity differs from the reviewed public schema",
+    );
+  }
+  const differences = compareReleaseSchema(expectedSchema, actual);
+  if (differences.length === 0) {
+    if (actual.missingColumns.length || actual.missingRoleValues.length || actual.legacyObjects.length) {
+      throw new ReleaseSchemaPreflightError(
+        "target-drift",
+        "Publishing database is missing required auth schema or retains legacy auth objects",
+      );
+    }
+    return { mode: "current", schema: actual };
+  }
+  if (
+    releaseSchemaFingerprint(expectedSchema) === transition.candidateFingerprint &&
+    releaseSchemaFingerprint(actual) === transition.legacyFingerprint
+  ) {
+    return { mode: "reviewed-legacy", schema: actual };
+  }
+  throw new ReleaseSchemaPreflightError(
+    "target-drift",
+    `publishing schema differs from the reviewed isolated schema and the one approved legacy transition (${differences.join("; ")})`,
+  );
 }
 
 function migrationBody(sql) {

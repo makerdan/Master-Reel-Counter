@@ -8,9 +8,13 @@ import test from "node:test";
 import { promisify } from "node:util";
 import {
   assertIsolatedReleaseDatabase,
+  assertPublicationSchema,
   assertReleaseSchema,
   compareReleaseSchema,
   executeReviewedMigrations,
+  readReleaseSchema,
+  releaseSchemaFingerprint,
+  REVIEWED_PUBLICATION_TRANSITION,
 } from "../release-schema-preflight.mjs";
 import {
   validateMigrationSet,
@@ -419,6 +423,93 @@ test("publishing schema comparison reports structural drift", async () => {
   }), ["columns or indexes differ from the reviewed schema"]);
 });
 
+test("publication accepts an already-current schema without a transition", async () => {
+  const expected = await assertReleaseSchema(fakeClient({ columns: currentColumns }));
+  const reordered = fakeClient({ columns: [...currentColumns].reverse() });
+  const result = await assertPublicationSchema(
+    reordered,
+    { expectedSchema: expected },
+  );
+  assert.equal(result.mode, "current");
+  const changedDefault = fakeClient({
+    columns: currentColumns,
+    schemaColumns: currentColumns.map((column_name) => ({
+      table_name: "users",
+      column_name,
+      data_type: "character varying",
+      udt_name: "varchar",
+      is_nullable: "YES",
+      column_default: column_name === "approved" ? "'different'" : null,
+    })),
+  });
+  await assert.rejects(
+    assertPublicationSchema(changedDefault, { expectedSchema: expected }),
+    (error) => error.classification === "target-drift",
+  );
+});
+
+test("publication accepts only the exact reviewed legacy and candidate pair", async () => {
+  const current = await assertReleaseSchema(fakeClient({ columns: currentColumns }));
+  const legacyColumns = currentColumns.filter(
+    (column) => !["clerk_user_id", "role", "capabilities"].includes(column),
+  ).concat("is_tester");
+  const legacyOptions = {
+    columns: legacyColumns,
+    roleValues: [],
+    legacyColumns: [["users", "is_tester"], ["user_settings", "tester_password"]],
+    sessions: ["sessions"],
+  };
+  const legacy = fakeClient(legacyOptions);
+  const legacySchema = await readReleaseSchema(legacy);
+  const transition = {
+    schemaName: "public",
+    legacyFingerprint: releaseSchemaFingerprint(legacySchema),
+    candidateFingerprint: releaseSchemaFingerprint(current),
+  };
+  const readOnly = (client) => ({
+    query: (sql) => {
+      assert.match(sql.trimStart(), /^SELECT /);
+      return client.query(sql);
+    },
+  });
+  const result = await assertPublicationSchema(readOnly(fakeClient(legacyOptions)), {
+    expectedSchema: current,
+    transition,
+  });
+  assert.equal(result.mode, "reviewed-legacy");
+
+  for (const changed of [
+    { ...legacyOptions, columns: legacyColumns.concat("unreviewed") },
+    { ...legacyOptions, indexes: [{ indexname: "unreviewed", indexdef: "CREATE INDEX unreviewed" }] },
+    { ...legacyOptions, sessions: [] },
+    { ...legacyOptions, roleValues: ["Unexpected"] },
+  ]) {
+    await assert.rejects(
+      assertPublicationSchema(readOnly(fakeClient(changed)), { expectedSchema: current, transition }),
+      (error) => error.classification === "target-drift",
+    );
+  }
+  const changedCandidate = await assertReleaseSchema(fakeClient({
+    columns: currentColumns.concat("unreviewed"),
+  }));
+  await assert.rejects(
+    assertPublicationSchema(readOnly(fakeClient(legacyOptions)), {
+      expectedSchema: changedCandidate,
+      transition,
+    }),
+    (error) => error.classification === "target-drift",
+  );
+  for (const invalid of [null, {}, { ...transition, candidateFingerprint: "not-a-hash" }]) {
+    await assert.rejects(
+      assertPublicationSchema(readOnly(fakeClient(legacyOptions)), {
+        expectedSchema: current,
+        transition: invalid,
+      }),
+      (error) => error.classification === "target-drift",
+    );
+  }
+});
+
 test("release-critical migration SQL executes against an isolated PostgreSQL target", {
   skip: !process.env.DATABASE_URL,
 }, async () => {
@@ -455,6 +546,15 @@ test("release-critical migration SQL executes against an isolated PostgreSQL tar
       const schema = await assertReleaseSchema(client);
       assert.deepEqual(schema.missingColumns, []);
       assert.deepEqual(schema.missingRoleValues, []);
+      assert.equal(
+        releaseSchemaFingerprint(schema),
+        REVIEWED_PUBLICATION_TRANSITION.candidateFingerprint,
+        "a changed candidate schema needs a fresh review of the transition pair",
+      );
+      assert.equal(
+        (await assertPublicationSchema(client, { expectedSchema: schema })).mode,
+        "current",
+      );
     } finally {
       await client.end();
     }
