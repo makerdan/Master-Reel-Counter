@@ -6,23 +6,45 @@ import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { Coordinator, digest } from "../lib/failure-gate/coordinator.mjs";
 import { CheckedExecution, policyDigest, checkedEnvironment, projectFile,
-  managedCompletion, candidateStatus } from "../lib/failure-gate/execution.mjs";
+  candidateStatus } from "../lib/failure-gate/execution.mjs";
 import { createLocalHost, policyDeclaration } from "../lib/failure-gate/host.mjs";
 import { inputManifest } from "../lib/failure-gate/evidence.mjs";
 import { adaptRuntimeTiers, parseRuntimeReport } from "../lib/failure-gate/runtime-tiers.mjs";
 import { readFileSync } from "node:fs";
 
+const fixturePlan = (taskId, tier = "fixture") => `# Fixture task
+
+## Task identity
+**Task ID:** \`${taskId}\`
+
+## Pre-existing failures to ignore
+None authorized.
+
+## Validation
+**Command:** ${tier}
+**Why:** The registered tier covers this fixture change.
+**Do not escalate:** Do not substitute another tier.
+
+## Regression Guard
+**Covers:** Checked execution remains bound to its approved local task.
+**Test location:** scripts/__tests__/failure-gate-v4-execution.test.mjs
+**What it checks:** Invalid task, plan, and report evidence is rejected.
+`;
+
 function fixture(t, steps) {
   const directory = mkdtempSync(join(tmpdir(), "fg-v4-execution-"));
   const root = join(directory, "source");
   mkdirSync(root);
-  writeFileSync(join(root, "plan.md"), "approved fixture plan");
+  mkdirSync(join(root, "docs/validation"), { recursive: true });
+  writeFileSync(join(root, "docs/validation/manifest.json"), JSON.stringify({ tiers: { fixture: {} } }));
+  writeFileSync(join(root, "plan.md"), "draft fixture plan");
   writeFileSync(join(root, "governor.txt"), "accepted fixture policy");
   writeFileSync(join(root, "check.mjs"), `
     import {writeFileSync} from 'node:fs';
     writeFileSync('report.json', JSON.stringify({tests:1, skipped:0, failures:[]}));
   `);
   const coordinator = new Coordinator({ directory: join(directory, "state"), namespace: "fixture", root,
+    testPlanValidator: () => true,
     control: {
       validatePlan: () => true,
       review: (request) => ({ ...request, reviewer: "fixture-owner" }),
@@ -50,8 +72,10 @@ function fixture(t, steps) {
     readEvidence: (reference) => structuredClone(host.records.get(reference)),
   };
   const draft = coordinator.reserve({ key: "reserve" });
+  const planContent = fixturePlan(draft.taskId);
+  writeFileSync(join(root, "plan.md"), planContent);
   const active = coordinator.activate({ taskId: draft.taskId, approvalReference: "fixture-approval", key: "activate",
-    config: { planReference: "plan.md", planContent: "approved fixture plan", planVersion: 1,
+    config: { planReference: "plan.md", planContent, planVersion: 1,
       authorizedTier: "fixture", policyVersion: "fixture-v4", policyDigest: policyDigest(root, host.policyInputs),
       tierDefinitionDigest: digest(tier), parametersDigest: digest(host.parameters) } });
   coordinator.assign({ taskId: active.taskId, approvalReference: "fixture-assignment", key: "assign" });
@@ -88,7 +112,7 @@ test("stale approved plan and unsupported report deny before a command starts", 
   writeFileSync(join(f.root, "plan.md"), "changed draft");
   await assert.rejects(f.runner.run(f.request), /stale plan/);
   assert.equal(f.coordinator.db.prepare("SELECT count(*) AS n FROM runs").get().n, 0);
-  writeFileSync(join(f.root, "plan.md"), "approved fixture plan");
+  writeFileSync(join(f.root, "plan.md"), f.task.planContent);
   f.host.tiers.fixture.steps[0].unsupportedReport = "review unavailable";
   await assert.rejects(f.runner.run(f.request), /unsupported report/);
   assert.equal(f.coordinator.db.prepare("SELECT count(*) AS n FROM runs").get().n, 0);
@@ -140,17 +164,38 @@ test("environment policy preserves approved runtime values, excludes unknown sel
 
 test("unavailable production control and platform dispatch never fall back to legacy", () => {
   assert.equal(candidateStatus().operational, false);
-  assert.equal(managedCompletion().assessment, "BLOCKED");
+  assert.match(candidateStatus().activation, /designated project-local human-review decision source/);
+  assert.equal("managedCompletion" in candidateStatus(), false);
   for (const args of [["scripts/failure-gate.mjs", "activate", "--approved"],
+    ["scripts/failure-gate.mjs", "managed-completion"],
     ["scripts/run-locked-tier.mjs", "--v4", "missing.md"],
     ["scripts/run-locked-tier.mjs", "--v4=1"],
     ["scripts/run-locked-tier.mjs", "missing.md", "--task-id=other"],
-    ["scripts/run-locked-tier.mjs", "--managed-completion"]]) {
+    ["scripts/run-locked-tier.mjs", "docs/validation/plans/failure-gate-v4-bootstrap.md"]]) {
     const result = spawnSync(process.execPath, args, { encoding: "utf8" });
     assert.equal(result.status, 2);
     assert.match(result.stderr, /BLOCKED/);
     assert.doesNotMatch(result.stdout, /Step:/);
   }
+});
+
+test("read-only tier-status CLI reports the current registry without granting activation", (t) => {
+  const f = fixture(t);
+  const state = join(f.directory, "cli-state");
+  const draftResult = spawnSync(process.execPath, ["scripts/failure-gate.mjs", "draft",
+    "--root", f.root, "--state", state, "--namespace", "cli-fixture"], { encoding: "utf8" });
+  assert.equal(draftResult.status, 0, draftResult.stderr);
+  const draft = JSON.parse(draftResult.stdout);
+  const statusResult = spawnSync(process.execPath, ["scripts/failure-gate.mjs", "tier-status",
+    "--root", f.root, "--state", state, "--namespace", "cli-fixture", "--task-id", draft.taskId],
+  { encoding: "utf8" });
+  assert.equal(statusResult.status, 0, statusResult.stderr);
+  const status = JSON.parse(statusResult.stdout);
+  assert.equal(status.statuses.length, 1);
+  assert.equal(status.statuses[0].taskId, draft.taskId);
+  assert.equal(status.statuses[0].tier, "fixture");
+  assert.equal(status.statuses[0].status, "NOT ALLOWED");
+  assert.equal(status.statuses[0].executionStatus, "BLOCKED");
 });
 
 function concreteHost(f, control = {}) {

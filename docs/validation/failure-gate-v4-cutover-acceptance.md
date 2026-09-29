@@ -1,5 +1,12 @@
 # Failure Gate v4 cutover acceptance — current candidate
 
+> Historical record of the prior cutover attempt and its then-current
+> requirements. It is retained as evidence, not as instructions or acceptance
+> for the new project-local reinstallation. See
+> [the approved reinstallation design](../superpowers/specs/2026-09-28-failure-gate-v4-local-reinstallation-design.md)
+> and [current reinstallation status](failure-gate-v4-reinstallation-status.md)
+> before making a present-tense claim.
+
 ## Authority and starting evidence
 
 Starting revision: `930471e025cd3d7e15417e7ee3e23b6265fc425b`.

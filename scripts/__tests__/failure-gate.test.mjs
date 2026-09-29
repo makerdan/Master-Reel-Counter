@@ -16,11 +16,10 @@ import { findExactRecord, isReferenceable, loadCatalog, maintenanceFindings } fr
 
 const ROOT = process.cwd();
 const PACKAGE_FILES = [
-  ["SKILL.md", ".agents/skills/failure-gate/SKILL.md"],
-  ["reference/implementation.md", ".agents/skills/failure-gate/reference/implementation.md"],
-  ["reference/acceptance.md", ".agents/skills/failure-gate/reference/acceptance.md"],
-  ["validation-tiers.md", ".agents/skills/validation-tiers/SKILL.md"],
-  ["tiers.json", ".agents/skills/validation-tiers/tiers.json"],
+  ["README.md", ".agents/skills/failure-gate-v4/README.md"],
+  ["SKILL.md", ".agents/skills/failure-gate-v4/SKILL.md"],
+  ["reference/acceptance.md", ".agents/skills/failure-gate-v4/reference/acceptance.md"],
+  ["reference/implementation.md", ".agents/skills/failure-gate-v4/reference/implementation.md"],
 ];
 const run = (script, args, env = {}) => spawnSync(process.execPath, [script, ...args], {
   cwd: ROOT,
@@ -32,6 +31,29 @@ const runIn = (cwd, script, args, env = {}) => spawnSync(process.execPath, [scri
   env: { ...process.env, ...env },
   encoding: "utf8",
 });
+const failureGatePackagingFixture = () => {
+  const dir = mkdtempSync(join(tmpdir(), "failure-gate-packaging-"));
+  mkdirSync(join(dir, "scripts"), { recursive: true });
+  mkdirSync(join(dir, "artifacts/bathyscan/public"), { recursive: true });
+  copyFileSync(
+    join(ROOT, "scripts/check-failure-gate-parity.mjs"),
+    join(dir, "scripts/check-failure-gate-parity.mjs"),
+  );
+  copyFileSync(
+    join(ROOT, "scripts/build-and-verify-release.sh"),
+    join(dir, "scripts/build-and-verify-release.sh"),
+  );
+  for (const [, source] of PACKAGE_FILES) {
+    const target = join(dir, source);
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(join(ROOT, source), target);
+  }
+  copyFileSync(
+    join(ROOT, "artifacts/bathyscan/public/failure-gate-skill.zip"),
+    join(dir, "artifacts/bathyscan/public/failure-gate-skill.zip"),
+  );
+  return dir;
+};
 const fixturePlan = (body) => {
   const dir = mkdtempSync(join(tmpdir(), "failure-gate-"));
   const path = join(dir, "plan.md");
@@ -59,6 +81,10 @@ const manifestValidatorFixture = (mutate) => {
 };
 const validPlan = `# Fixture
 
+## Task identity
+**Task ID:** \`TASK-FIXTURE\`
+**Materiality:** material
+
 ## Pre-existing failures to ignore
 None known at plan time.
 
@@ -68,7 +94,9 @@ None known at plan time.
 **Do not escalate:** Run exactly this command.
 
 ## Regression Guard
-**Self-satisfying** — this fixture tests the guard.
+**Covers:** Scoped guards accept a valid plan with complete validation and regression details.
+**Test location:** scripts/__tests__/failure-gate.test.mjs — valid plan passes both scoped guards
+**What it checks:** Both scoped guards accept this exact plan with its named validation tier and regression assertion.
 `;
 
 test("registry exposes every canonical validation tier with executable commands", () => {
@@ -84,63 +112,34 @@ test("registry exposes every canonical validation tier with executable commands"
   assert.equal(tiers["test-heavy"].serial, true);
 });
 
-test("portable contract separates invariants from host-specific adaptation", () => {
-  const skill = readFileSync(join(ROOT, ".agents/skills/failure-gate/SKILL.md"), "utf8");
+test("canonical v4 contract is cooperative and separates invariants from host adaptation", () => {
+  const skill = readFileSync(join(ROOT, ".agents/skills/failure-gate-v4/SKILL.md"), "utf8");
   const tiers = readFileSync(join(ROOT, ".agents/skills/validation-tiers/SKILL.md"), "utf8");
   for (const phrase of [
-    "Workflow mode",
-    "Protected mode",
     "Discover host capabilities",
-    "independent",
-    "completion",
-    "BLOCKED",
+    "project-local, cooperative workflow",
+    "one stable local task ID",
+    "authorized tier",
     "intermittency",
     "incomplete",
-    "not reached",
-    "audit",
+    "local completion checker",
   ]) {
     assert.match(skill, new RegExp(phrase, "i"), `missing portable contract phrase: ${phrase}`);
   }
   assert.match(
     skill,
-    /Examples in this skill are not portable dependencies/i,
+    /All example names, paths, tiers, and commands are illustrative, not dependencies/i,
   );
   assert.match(tiers, /example host registry, not as a portable default/i);
   assert.match(tiers, /Only `test` failures are eligible for exact baseline\s+classification/);
   assert.match(tiers, /Audit commands and thresholds are integrity-sensitive/);
 });
 
-test("task-tier and platform completion validation have separate report contracts", () => {
-  const sources = [
-    [".agents/skills/failure-gate/SKILL.md", readFileSync(join(ROOT, ".agents/skills/failure-gate/SKILL.md"), "utf8")],
-    ["replit.md", readFileSync(join(ROOT, "replit.md"), "utf8")],
-  ];
-
-  for (const [sourceName, source] of sources) {
-    const taskStart = source.indexOf("**Task-validation report**\n");
-    const completionStart = source.indexOf("**Platform-managed completion-validation report**\n");
-    assert.notEqual(taskStart, -1, `${sourceName} must name the task-validation report`);
-    assert.ok(completionStart > taskStart, `${sourceName} must report completion validation separately`);
-
-    const taskReport = source.slice(taskStart, completionStart).replace(/\s+/g, " ");
-    const completionReport = source.slice(completionStart).replace(/\s+/g, " ");
-    assert.match(taskReport, /authorized\s+registered tier and selected command/i);
-    assert.match(taskReport, /raw (?:status|per-step)[\s\S]*assessment/i);
-    assert.match(completionReport, /dispatch state/i);
-    assert.match(completionReport, /NOT REACHED[\s\S]*STARTED[\s\S]*COMPLETED[\s\S]*UNKNOWN/i);
-    assert.match(completionReport, /actual selected (?:command\/tier|check\/command\/tier)/i);
-    assert.match(completionReport, /run ID/i);
-    assert.match(completionReport, /exact approved plan reference/i);
-    assert.match(completionReport, /raw (?:status|result)/i);
-    assert.match(completionReport, /separate assessment/i);
-    assert.match(completionReport, /assessment.*BLOCKED/is);
-    assert.match(completionReport, /NOT REACHED/i);
-    assert.match(completionReport, /INCOMPLETE/i);
-    assert.match(completionReport, /same\s+active task lock/i);
-    assert.match(completionReport, /same\s+authorized tier/i);
-    assert.match(completionReport, /unsupported broader\s+dispatch/i);
-    assert.match(completionReport, /Do not (?:reuse|copy)[\s\S]*result|cannot replace the task-tier result/i);
-  }
+test("current project instructions name only the local v4 workflow", () => {
+  const instructions = readFileSync(join(ROOT, "replit.md"), "utf8");
+  assert.match(instructions, /\.agents\/skills\/failure-gate-v4\//);
+  assert.match(instructions, /cooperative\s+project-local workflow/i);
+  assert.equal(existsSync(join(ROOT, ".agents/skills/failure-gate")), false);
 });
 
 test("tier guidance documents runtime manifest coverage separately from the packaged example registry", () => {
@@ -267,11 +266,10 @@ test("Failure Gate package regeneration is byte-for-byte stable", () => {
   });
   assert.equal(entries.status, 0, entries.stderr);
   assert.deepEqual(entries.stdout.trim().split("\n"), [
+    "README.md",
     "SKILL.md",
-    "reference/implementation.md",
     "reference/acceptance.md",
-    "validation-tiers.md",
-    "tiers.json",
+    "reference/implementation.md",
   ]);
 });
 
@@ -407,16 +405,16 @@ test("manifest parity rejects missing, extra, and malformed tiers", () => {
 });
 
 test("published archive drift fails with regeneration guidance", () => {
-  const sourcePath = join(ROOT, ".agents/skills/validation-tiers/tiers.json");
-  const original = readFileSync(sourcePath);
-  writeFileSync(sourcePath, Buffer.concat([original, Buffer.from("\n// deliberate mismatch\n")]));
+  const fixture = failureGatePackagingFixture();
   try {
-    const result = run("scripts/check-failure-gate-parity.mjs", []);
+    const sourcePath = join(fixture, ".agents/skills/failure-gate-v4/SKILL.md");
+    writeFileSync(sourcePath, Buffer.concat([readFileSync(sourcePath), Buffer.from("\n// deliberate mismatch\n")]));
+    const result = runIn(fixture, "scripts/check-failure-gate-parity.mjs", []);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /published tiers\.json differs from its canonical source/);
+    assert.match(result.stderr, /published SKILL\.md differs from its canonical source/);
     assert.match(result.stderr, /npm run publish:failure-gate/);
   } finally {
-    writeFileSync(sourcePath, original);
+    rmSync(fixture, { recursive: true, force: true });
   }
 });
 
@@ -434,12 +432,12 @@ test("current Failure Gate archive passes the release packaging preflight", () =
 });
 
 test("stale Failure Gate archive blocks release packaging with regeneration guidance", () => {
-  const sourcePath = join(ROOT, ".agents/skills/validation-tiers/tiers.json");
-  const original = readFileSync(sourcePath);
-  writeFileSync(sourcePath, Buffer.concat([original, Buffer.from("\n// deliberate release mismatch\n")]));
+  const fixture = failureGatePackagingFixture();
   try {
-    const result = spawnSync("bash", [join(ROOT, "scripts/build-and-verify-release.sh")], {
-      cwd: ROOT,
+    const sourcePath = join(fixture, ".agents/skills/failure-gate-v4/README.md");
+    writeFileSync(sourcePath, Buffer.concat([readFileSync(sourcePath), Buffer.from("\n// deliberate release mismatch\n")]));
+    const result = spawnSync("bash", ["scripts/build-and-verify-release.sh"], {
+      cwd: fixture,
       env: {
         ...process.env,
         RELEASE_CLEANUP_HARNESS: "1",
@@ -448,10 +446,10 @@ test("stale Failure Gate archive blocks release packaging with regeneration guid
       encoding: "utf8",
     });
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /published tiers\.json differs from its canonical source/);
+    assert.match(result.stderr, /published README\.md differs from its canonical source/);
     assert.match(result.stderr, /npm run publish:failure-gate/);
   } finally {
-    writeFileSync(sourcePath, original);
+    rmSync(fixture, { recursive: true, force: true });
   }
 });
 
@@ -751,16 +749,25 @@ test("maintenance reports review deadlines and stale verification", () => {
   assert.deepEqual(findings.map((item) => item.category), ["review-due", "stale-verification"]);
 });
 
-test("regression guard rejects filled-looking placeholders and accepts N/A", () => {
+test("regression guard rejects placeholders and requires explicit non-materiality for N/A", () => {
   const placeholder = fixturePlan(validPlan.replace(
-    "**Self-satisfying** — this fixture tests the guard.",
+    "**Covers:** Scoped guards accept a valid plan with complete validation and regression details.\n"
+      + "**Test location:** scripts/__tests__/failure-gate.test.mjs — valid plan passes both scoped guards\n"
+      + "**What it checks:** Both scoped guards accept this exact plan with its named validation tier and regression assertion.",
     "**Covers:** FILL IN\n**Test location:** tests/example.test.ts\n**What it checks:** assertion",
   ));
   const result = run("scripts/check-regression-guard.mjs", [], { TASK_PLAN_FILE: placeholder });
   assert.equal(result.status, 1);
+  assert.match(result.stderr, /Regression Guard Covers is empty or a placeholder/);
   const na = fixturePlan(validPlan.replace(
-    "**Self-satisfying** — this fixture tests the guard.",
-    "**N/A**\n**Why N/A:** The behavior depends on an unmockable external API.",
+    "**Materiality:** material",
+    "**Materiality:** non-material",
+  ).replace(
+    "**Covers:** Scoped guards accept a valid plan with complete validation and regression details.\n"
+      + "**Test location:** scripts/__tests__/failure-gate.test.mjs — valid plan passes both scoped guards\n"
+      + "**What it checks:** Both scoped guards accept this exact plan with its named validation tier and regression assertion.",
+    "**N/A**\n**Why N/A:** This documentation-only fixture has no material behavior change to protect.",
   ));
-  assert.equal(run("scripts/check-regression-guard.mjs", [], { TASK_PLAN_FILE: na }).status, 0);
+  const accepted = run("scripts/check-regression-guard.mjs", [], { TASK_PLAN_FILE: na });
+  assert.equal(accepted.status, 0, accepted.stderr);
 });

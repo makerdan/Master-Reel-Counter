@@ -1,5 +1,15 @@
 # Failure Gate v4 capability and cutover map
 
+> Historical snapshot of the earlier candidate, including prior-policy
+> bootstrap evidence and then-current acceptance blockers. It is not current
+> activation guidance for the reinstalled package. The canonical source is
+> now `.agents/skills/failure-gate-v4/`; ordinary local-ID validation remains
+> blocked until a real project-local review source and host-control adapter
+> are configured. The only enabled checked operation is the separately
+> authorized, digest-pinned `test-standard` reinstallation bootstrap plan.
+> See [current reinstallation status](failure-gate-v4-reinstallation-status.md)
+> for the verified result and remaining blockers.
+
 For the later cutover attempt and its current (still inactive) candidate,
 see [cutover acceptance](failure-gate-v4-cutover-acceptance.md). The task 907
 record below is historical bootstrap evidence, not current approval.

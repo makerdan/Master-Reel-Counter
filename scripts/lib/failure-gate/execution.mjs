@@ -387,13 +387,7 @@ export class CheckedExecution {
   }
 }
 
-export function managedCompletion() {
-  return { assessment: "BLOCKED", mode: "workflow",
-    reason: "Platform-origin active task identity, exact approved plan reference, and single checked dispatch are unverified." };
-}
-
 export function candidateStatus() {
   return { version: 4, mode: "workflow", operational: false,
-    activation: "BLOCKED: independent policy acceptance and host control adapter required",
-    managedCompletion: managedCompletion() };
+    activation: "BLOCKED: no usable designated project-local human-review decision source or accepted host control adapter is installed" };
 }

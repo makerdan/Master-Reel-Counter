@@ -18,27 +18,48 @@ if (!target && existsSync(".local/tasks")) {
 if (files.length === 0) process.exit(0);
 const errors = [];
 const placeholder = (value) => !value || /<[^>]+>|\b(FILL IN|TBD|TODO)\b/i.test(value);
+const section = (content, title) => {
+  const lines = content.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === `## ${title}`);
+  if (start < 0) return "";
+  const next = lines.slice(start + 1).findIndex((line) => /^## /.test(line));
+  return lines.slice(start + 1, next < 0 ? lines.length : start + 1 + next).join("\n");
+};
+const field = (body, name) => body.match(new RegExp(`^\\*\\*${name}:\\*\\*\\s*(.+)$`, "m"))?.[1]?.trim();
+const nonMaterialClassification = (content) => {
+  const taskIdentity = section(content, "Task identity");
+  const classifications = [...taskIdentity.matchAll(/^\*\*Materiality:\*\*\s*(.*?)\s*$/gm)]
+    .map((match) => match[1].trim());
+  const classification = classifications[0];
+  const titleLine = content.split(/\r?\n/).find((line) => line.trim())?.trim() ?? "";
+  const titleIsDeletion = /^# DELETE -(?:\s|$)/.test(titleLine);
+  if (classifications.length > 1 ||
+      (classification !== undefined &&
+        !["material", "non-material"].includes(classification.toLowerCase()))) {
+    return { nonMaterial: false, invalid: true };
+  }
+  return { nonMaterial: classification
+    ? classification.toLowerCase() === "non-material"
+    : titleIsDeletion, invalid: false };
+};
 for (const file of files) {
   let content = readFileSync(file, "utf8");
-  const qualifies = !/DELETE\s*-|cosmetic|purely additive|not-applicable/i.test(content);
+  const classification = nonMaterialClassification(content);
+  if (classification.invalid) errors.push(`${file}: Task identity Materiality must be exactly material or non-material`);
+  const qualifies = !classification.nonMaterial;
   if (fix && !stubsOnly && qualifies && !/^## Regression Guard\s*$/m.test(content)) {
-    const selfSatisfying = /failure[\s-]?gate|validation contract|regression guard/i.test(content.slice(0, 400));
-    content += selfSatisfying
-      ? "\n## Regression Guard\n**Self-satisfying** — this task's deliverable is the validation guard itself.\n"
-      : "\n## Regression Guard\n**Covers:** FILL IN\n**Test location:** FILL IN\n**What it checks:** FILL IN\n";
+    content += "\n## Regression Guard\n**Covers:** FILL IN\n**Test location:** FILL IN\n**What it checks:** FILL IN\n";
     writeFileSync(file, content);
   }
-  const lines = content.split(/\r?\n/);
-  const start = lines.findIndex((line) => line.trim() === "## Regression Guard");
-  if (start < 0) {
+  const body = section(content, "Regression Guard");
+  if (!body) {
     if (qualifies && !stubsOnly) errors.push(`${file}: missing ## Regression Guard`);
     continue;
   }
-  const next = lines.slice(start + 1).findIndex((line) => /^## /.test(line));
-  const body = lines.slice(start + 1, next < 0 ? lines.length : start + 1 + next).join("\n");
-  if (/^\s*\*\*Self-satisfying\*\*/m.test(body)) continue;
   if (/^\s*\*\*N\/A\*\*/m.test(body)) {
-    if (placeholder(body.match(/^\*\*Why N\/A:\*\*\s*(.+)$/m)?.[1])) errors.push(`${file}: N/A reason is empty or a placeholder`);
+    if (qualifies) errors.push(`${file}: N/A requires an explicit non-material classification`);
+    const reasons = [...body.matchAll(/^\*\*Why N\/A:\*\*\s*(.*?)\s*$/gm)].map((match) => match[1].trim());
+    if (reasons.length !== 1 || placeholder(reasons[0])) errors.push(`${file}: N/A reason is missing, ambiguous, or a placeholder`);
     continue;
   }
   for (const field of ["Covers", "Test location", "What it checks"]) {

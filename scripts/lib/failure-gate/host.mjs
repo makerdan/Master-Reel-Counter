@@ -29,7 +29,10 @@ export function policyDeclaration({ root, policyInputs, tiers, parameters, envir
       "scripts/serial-lock.mjs", "scripts/lib/failure-gate/host.mjs",
       "scripts/lib/failure-gate/execution.mjs", "scripts/lib/failure-gate/assessment.mjs",
       "scripts/lib/failure-gate/evidence.mjs", "scripts/lib/failure-gate/coordinator.mjs",
-      "scripts/lib/failure-gate/runtime-tiers.mjs",
+      "scripts/lib/failure-gate/runtime-tiers.mjs", "scripts/lib/failure-gate/plan-guards.mjs",
+      "scripts/lib/failure-gate/bootstrap.mjs",
+      "scripts/run-locked-tier.mjs", "scripts/run-tier.mjs",
+      "scripts/check-failure-gate.mjs", "scripts/check-regression-guard.mjs",
     ]),
     tiersDigest: digest(tiers), parametersDigest: digest(parameters),
     environmentDigest: digest(environment), exclusionsDigest: digest(exclusions),
@@ -61,9 +64,9 @@ export function createRuntimeHost(options) {
 }
 
 /**
- * Single-workspace concrete adapter. `control` belongs to the workspace owner
- * and is injected by the coordinator installation, not a project CLI flag.
- * This is procedural workflow approval, not cryptographic attestation.
+ * Single-workspace concrete adapter. `control` is supplied by an installed
+ * project-local review route and is never selected by a project CLI flag.
+ * Its reviewer decision is procedural, not cryptographic attestation.
  */
 export function createLocalHost({
   root, directory, tiers, policyInputs, parameters, environment, exclusions = [],

@@ -1,33 +1,21 @@
 #!/usr/bin/env node
-import { spawnSync } from "child_process";
-import { assertRequestedTier } from "./lib/tier-lock-check.mjs";
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+import { assertBootstrapDispatch } from "./lib/failure-gate/bootstrap.mjs";
 
-// Candidate v4 never falls through to the legacy bootstrap path. Operational
-// cutover requires independent acceptance and an installed host-control
-// adapter, not a task-authored flag or environment-selected active identity.
-if (process.argv.slice(2).some((arg) =>
-  /^(--v4|--task-id|--managed-completion)(?:=|$)/.test(arg))) {
-  console.error("FAILURE-GATE BLOCKED: v4 host control and platform dispatch are not activated; no legacy fallback permitted");
-  process.exit(2);
-}
-
-const planPath = process.argv[2] ?? process.env.TASK_PLAN_FILE;
-if (process.argv.length > 3) {
-  console.error("FAILURE-GATE BLOCKED: unexpected task validation arguments");
-  process.exit(2);
-}
-if (!planPath) {
-  console.error("TIER-LOCK VIOLATION: a task plan path is required");
-  process.exit(2);
-}
+const root = resolve(import.meta.dirname, "..");
+const [planArgument, ...extraArgs] = process.argv.slice(2);
 try {
-  const { command } = assertRequestedTier(planPath);
-  // Keep this as the single task-validation entrypoint. run-tier owns plan
-  // guards and serial-lock owns reentrancy; neither responsibility should be
-  // duplicated here or bypassed by a nested package-script invocation.
-  const result = spawnSync(process.execPath, ["scripts/run-tier.mjs", command], {
-    stdio: "inherit",
-    env: { ...process.env, TASK_PLAN_FILE: planPath },
+  const { planPath, command } = assertBootstrapDispatch({
+    root, planArgument, extraArgs, environment: process.env,
+  });
+  // The single digest-pinned bootstrap is executed through run-tier so its
+  // existing strict plan guards, lock, and registered tier semantics apply.
+  const environment = { ...process.env, TASK_PLAN_FILE: planPath };
+  for (const key of ["NODE_OPTIONS", "NODE_TEST_CONTEXT", "CI_SMOKE_TEST",
+    "VALIDATION_MANIFEST_PATH", "FAILURE_GATE_TIERS_PATH"]) delete environment[key];
+  const result = spawnSync(process.execPath, [resolve(root, "scripts/run-tier.mjs"), command], {
+    cwd: root, stdio: "inherit", env: environment,
   });
   process.exit(result.status ?? 1);
 } catch (error) {

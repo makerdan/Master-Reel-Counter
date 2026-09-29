@@ -194,34 +194,42 @@ run the check or that branch protection requires it.
 
 ## Failure Gate validation
 
-Task plans are created with `npm run new-plan -- --name <slug> --why
-"<reason>"`. Before editing, record exact pre-existing failures in
-`docs/validation/failure-baseline.json` only when an active, unexpired record
-matches the suite, test, and signature. A passing retry means intermittent,
-not pre-existing.
+The canonical project-local workflow is documented in
+`.agents/skills/failure-gate-v4/SKILL.md`, with its host implementation and
+acceptance contracts beside it. It is cooperative guidance for local task
+validation, not control over Replit Agent's task lifecycle.
 
-Run the tier locked by the plan:
+The legacy `npm run new-plan` scaffold writes disposable `.local` plans; those
+are not durable local task IDs, approvals, or completion evidence. Ordinary
+local-ID activation and validation remain blocked until the required
+project-local review and host-control adapters are configured. The only
+currently enabled checked launcher operation is the explicitly authorized
+reinstallation bootstrap:
 
 ```bash
-TASK_PLAN_FILE=.local/tasks/<name>.md node scripts/run-locked-tier.mjs
+node scripts/run-locked-tier.mjs docs/validation/plans/failure-gate-v4-reinstallation-bootstrap.md
 ```
 
-The registered tiers are `test-fast`, `test-standard`, `test-standard-plus`, and
-`test-heavy`.
-Task validation cannot be escalated above the plan. Completion validation is a
-separate platform check. Missing, malformed, unreadable, or mismatched plans
-fail before any suite starts. An ad-hoc caller must opt in explicitly with
-`node scripts/run-tier.mjs test-standard --allow-no-plan`.
+This exact plan is pinned to `test-standard`; it is not ordinary task
+validation. The registered runtime tiers are `test-fast`, `test-standard`,
+`test-standard-plus`, and `test-heavy`. After a local task is authorized,
+only its selected tier is eligible in checked tooling. Until then, an
+ad-hoc diagnostic caller must opt in explicitly with
+`node scripts/run-tier.mjs test-standard --allow-no-plan`; that diagnostic
+result is not required-task evidence.
 
 The plan guards run as an auto-remediate plus strict pair. `--fix-stub` adds
 structure only; the strict pass still requires a real tier, rationale,
 ownership, and exact baseline resolution. Archive inspection is opt-in with
 `node scripts/check-failure-gate.mjs --archive`. Baseline review and stale
 verification reporting is opt-in with `npm run maintain:validation-baseline`.
+For a genuinely non-material plan, put `**Materiality:** non-material` under
+`## Task identity` and give a specific `**Why N/A:**` in `## Regression Guard`;
+mentioning "cosmetic" elsewhere in a material plan does not waive the guard.
 
-The Failure Gate capability map is maintained in
-`docs/validation/failure-gate-capabilities.md`. Add future suites and tiers to
-`.agents/skills/validation-tiers/tiers.json`, with a contract test, rather
+The historical capability map is in
+`docs/validation/failure-gate-capabilities.md`. Add runtime suites and tiers
+to `docs/validation/manifest.json` with a contract test, rather
 than adding runner-specific branching.
 ## Canonical validation tiers
 

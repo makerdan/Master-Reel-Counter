@@ -8,21 +8,42 @@ import { once } from "node:events";
 import { Coordinator, digest } from "../lib/failure-gate/coordinator.mjs";
 
 const modulePath = new URL("../lib/failure-gate/coordinator.mjs", import.meta.url).href;
+const taskPlan = (taskId, tier) => `# Fixture task
+
+## Task identity
+**Task ID:** \`${taskId}\`
+
+## Pre-existing failures to ignore
+None authorized.
+
+## Validation
+**Command:** ${tier}
+**Why:** The registered tier covers this fixture change.
+**Do not escalate:** Do not substitute another tier.
+
+## Regression Guard
+**Covers:** Tier authorization changes remain exact.
+**Test location:** scripts/__tests__/failure-gate-v4-coordinator.test.mjs
+**What it checks:** Every registry tier has a single derived status.
+`;
 function fixture(t) {
   const base = mkdtempSync(resolve(tmpdir(), "gate-coordinator-"));
   const root = resolve(base, "project");
   const directory = resolve(base, "state");
   mkdirSync(root);
-  writeFileSync(resolve(root, "plan.md"), "# Approved fixture task\n");
+  writeFileSync(resolve(root, "plan.md"), "# Draft fixture task\n");
+  mkdirSync(resolve(root, "docs/validation"), { recursive: true });
+  writeFileSync(resolve(root, "docs/validation/manifest.json"),
+    JSON.stringify({ tiers: { "fixture-check": {}, "fixture-expanded": {}, "newly-registered": {} } }));
   const approvals = new Map();
   const options = { directory, namespace: "fixture-workspace", root };
   const control = {
     review(request) { return approvals.get(request.reference); },
     validatePlan(config) { return config.authorizedTier === "fixture-check" || config.authorizedTier === "fixture-expanded"; },
   };
-  const c = new Coordinator({ ...options, control });
+  const c = new Coordinator({ ...options, control, testPlanValidator: control.validatePlan });
   t.after(() => { if (c.db.open) c.close(); rmSync(base, { recursive: true, force: true }); });
-  const config = { planReference: "plan.md", planContent: "# Approved fixture task\n",
+  let config = { planReference: "plan.md", planContent: "",
     planVersion: 1, authorizedTier: "fixture-check", policyVersion: "fixture-v1",
     policyDigest: digest("policy"), tierDefinitionDigest: digest("tier"), parametersDigest: digest("parameters") };
   let sequence = 0;
@@ -33,13 +54,22 @@ function fixture(t) {
       action, subjectDigest: digest(subject) });
     return reference;
   }
+  function configFor(taskId, overrides = {}) {
+    const current = { ...config, ...overrides };
+    const planContent = taskPlan(taskId, current.authorizedTier);
+    writeFileSync(resolve(root, "plan.md"), planContent);
+    config = { ...current, planContent };
+    return config;
+  }
   function active() {
     const draft = c.reserve({ key: key() });
-    const approvedConfig = { ...c.plan(config.planReference, config.planContent),
-      planVersion: config.planVersion, authorizedTier: config.authorizedTier, policyVersion: config.policyVersion,
-      policyDigest: config.policyDigest, tierDefinitionDigest: config.tierDefinitionDigest, parametersDigest: config.parametersDigest };
-    const task = c.activate({ taskId: draft.taskId, config, key: key(),
-      approvalReference: approve("activate", { taskId: draft.taskId, expectedVersion: 0, config: approvedConfig }) });
+    const activeConfig = configFor(draft.taskId);
+    const task = c.activate({ taskId: draft.taskId, config: activeConfig, key: key(),
+      approvalReference: approve("activate", { taskId: draft.taskId, expectedVersion: 0,
+        config: { ...c.plan(activeConfig.planReference, activeConfig.planContent),
+          planVersion: activeConfig.planVersion, authorizedTier: activeConfig.authorizedTier,
+          policyVersion: activeConfig.policyVersion, policyDigest: activeConfig.policyDigest,
+          tierDefinitionDigest: activeConfig.tierDefinitionDigest, parametersDigest: activeConfig.parametersDigest } }) });
     c.assign({ taskId: task.taskId, key: key(),
       approvalReference: approve("assign", { taskId: task.taskId, authorizationVersion: 1 }) });
     return task;
@@ -50,7 +80,8 @@ function fixture(t) {
       parametersDigest: task.parametersDigest, processIdentity: { pid: process.pid, startIdentity: "fixture-process-start" },
       key: key() };
   }
-  return { c, config, control, key, approve, active, runInput, options, root, directory, base };
+  return { c, get config() { return config; }, configFor, control, key, approve, active, runInput,
+    options, root, directory, base };
 }
 
 test("coordinator retains namespace-scoped UUIDs across restart and permanent terminal tombstones", (t) => {
@@ -63,7 +94,8 @@ test("coordinator retains namespace-scoped UUIDs across restart and permanent te
   assert.equal(ended.authorizedTier, null);
   assert.throws(() => f.c.db.prepare("DELETE FROM tasks WHERE id=?").run(draft.taskId), /tombstones/);
   f.c.close();
-  const restarted = new Coordinator({ ...f.options, control: f.control });
+  const restarted = new Coordinator({ ...f.options, control: f.control,
+    testPlanValidator: f.control.validatePlan });
   try {
     assert.equal(restarted.task(draft.taskId).status, "cancelled");
     assert.notEqual(restarted.reserve({ key: "new-reservation" }).taskId, draft.taskId);
@@ -75,15 +107,91 @@ test("coordinator retains namespace-scoped UUIDs across restart and permanent te
 test("activation requires independently resolved exact approval, guards, projection and policy", (t) => {
   const f = fixture(t);
   const draft = f.c.reserve({ key: f.key() });
+  const config = f.configFor(draft.taskId);
   assert.throws(() => f.c.activate({ taskId: draft.taskId, config: f.config,
     approvalReference: "approved-true", approved: true, actor: "owner", key: f.key() }), /approval/);
   assert.equal(f.c.task(draft.taskId).status, "draft");
+  const wrongIdContent = config.planContent.replace(draft.taskId, "another-local-task");
+  writeFileSync(resolve(f.root, "plan.md"), wrongIdContent);
+  assert.throws(() => f.c.activate({ taskId: draft.taskId,
+    config: { ...config, planContent: wrongIdContent }, key: f.key() }), /allocated local task ID/);
+  const missingGuardContent = config.planContent.replace(/## Regression Guard[\s\S]*$/, "");
+  writeFileSync(resolve(f.root, "plan.md"), missingGuardContent);
+  assert.throws(() => f.c.activate({ taskId: draft.taskId,
+    config: { ...config, planContent: missingGuardContent }, key: f.key() }), /Regression Guard/);
+  writeFileSync(resolve(f.root, "plan.md"), config.planContent);
   const wrong = f.approve("activate", { taskId: "another-task" });
-  assert.throws(() => f.c.activate({ taskId: draft.taskId, config: f.config, approvalReference: wrong, key: f.key() }), /exact change/);
-  assert.throws(() => f.c.activate({ taskId: draft.taskId, config: { ...f.config, authorizedTier: "unknown" }, key: f.key() }), /guards/);
-  assert.throws(() => f.c.activate({ taskId: draft.taskId, config: { ...f.config, planContent: "wrong" }, key: f.key() }), /projection/);
+  assert.throws(() => f.c.activate({ taskId: draft.taskId, config, approvalReference: wrong, key: f.key() }), /exact change/);
+  const unknown = f.configFor(draft.taskId, { authorizedTier: "unknown" });
+  assert.throws(() => f.c.activate({ taskId: draft.taskId, config: unknown, key: f.key() }), /guards/);
+  assert.throws(() => f.c.activate({ taskId: draft.taskId, config: { ...config, planContent: "wrong" }, key: f.key() }), /projection/);
   assert.equal(f.c.task(draft.taskId).authorizationVersion, 0);
   assert.ok(f.c.audit().some((a) => a.event === "denied-activate"));
+});
+
+test("an otherwise accepted tier absent from the canonical registry cannot activate", (t) => {
+  const f = fixture(t);
+  const draft = f.c.reserve({ key: f.key() });
+  const config = f.configFor(draft.taskId, { authorizedTier: "fixture-expanded" });
+  writeFileSync(resolve(f.root, "docs/validation/manifest.json"), JSON.stringify({ tiers: { "fixture-check": {} } }));
+  const approvedConfig = { ...f.c.plan(config.planReference, config.planContent),
+    planVersion: config.planVersion, authorizedTier: config.authorizedTier, policyVersion: config.policyVersion,
+    policyDigest: config.policyDigest, tierDefinitionDigest: config.tierDefinitionDigest,
+    parametersDigest: config.parametersDigest };
+  assert.throws(() => f.c.activate({ taskId: draft.taskId, config, key: f.key(),
+    approvalReference: f.approve("activate", { taskId: draft.taskId, expectedVersion: 0, config: approvedConfig }) }),
+  /not currently registered/);
+  assert.equal(f.c.task(draft.taskId).status, "draft");
+});
+
+test("plan guards allow valid non-material N/A but reject material N/A and placeholders", (t) => {
+  const f = fixture(t);
+  const draft = f.c.reserve({ key: f.key() });
+  const plan = f.configFor(draft.taskId);
+  const nA = plan.planContent
+    .replace(`**Task ID:** \`${draft.taskId}\``, `**Task ID:** \`${draft.taskId}\`\n**Materiality:** non-material`)
+    .replace("# Fixture task", "# Cosmetic fixture task")
+    .replace("The registered tier covers this fixture change.", "The registered tier covers this cosmetic copy change.")
+    .replace(/## Regression Guard[\s\S]*$/, "## Regression Guard\n**N/A**\n**Why N/A:** Copy text changes, with no behavior or interface impact.\n");
+  writeFileSync(resolve(f.root, "plan.md"), nA);
+  const approved = { ...f.c.plan("plan.md", nA), authorizedTier: "fixture-check" };
+  assert.doesNotThrow(() => f.c.validatePlanGuards(draft.taskId, approved));
+
+  const materialNA = nA.replace("**Materiality:** non-material\n", "");
+  writeFileSync(resolve(f.root, "plan.md"), materialNA);
+  assert.throws(() => f.c.validatePlanGuards(draft.taskId,
+    { ...f.c.plan("plan.md", materialNA), authorizedTier: "fixture-check" }), /non-material classification/);
+
+  const duplicateMateriality = nA.replace("**Materiality:** non-material",
+    "**Materiality:** non-material\n**Materiality:** material");
+  writeFileSync(resolve(f.root, "plan.md"), duplicateMateriality);
+  assert.throws(() => f.c.validatePlanGuards(draft.taskId,
+    { ...f.c.plan("plan.md", duplicateMateriality), authorizedTier: "fixture-check" }), /Materiality/);
+
+  const titleDelete = plan.planContent.replace("# Fixture task", "# DELETE - retired fixture capability")
+    .replace(/## Regression Guard[\s\S]*$/, "## Regression Guard\n**N/A**\n**Why N/A:** This work removes the obsolete fixture capability.\n");
+  writeFileSync(resolve(f.root, "plan.md"), titleDelete);
+  assert.doesNotThrow(() => f.c.validatePlanGuards(draft.taskId,
+    { ...f.c.plan("plan.md", titleDelete), authorizedTier: "fixture-check" }));
+
+  const quotedDeleteHeading = plan.planContent
+    .replace("# Fixture task", "# Fixture task\n\n# DELETE - quoted heading in the description")
+    .replace(/## Regression Guard[\s\S]*$/, "## Regression Guard\n**N/A**\n**Why N/A:** No change has been authorized.\n");
+  writeFileSync(resolve(f.root, "plan.md"), quotedDeleteHeading);
+  assert.throws(() => f.c.validatePlanGuards(draft.taskId,
+    { ...f.c.plan("plan.md", quotedDeleteHeading), authorizedTier: "fixture-check" }), /non-material classification/);
+
+  const selfSatisfying = plan.planContent.replace(/## Regression Guard[\s\S]*$/,
+    "## Regression Guard\n**Self-satisfying** — this task changes the validation guard.\n");
+  writeFileSync(resolve(f.root, "plan.md"), selfSatisfying);
+  assert.throws(() => f.c.validatePlanGuards(draft.taskId,
+    { ...f.c.plan("plan.md", selfSatisfying), authorizedTier: "fixture-check" }), /complete Regression Guard/);
+
+  const placeholderPlan = plan.planContent.replace("The registered tier covers this fixture change.", "TBD")
+    .replace("Every registry tier has a single derived status.", "FILL IN");
+  writeFileSync(resolve(f.root, "plan.md"), placeholderPlan);
+  assert.throws(() => f.c.validatePlanGuards(draft.taskId,
+    { ...f.c.plan("plan.md", placeholderPlan), authorizedTier: "fixture-check" }), /placeholder/);
 });
 
 test("audit failure rolls back task state, idempotency and assignment", (t) => {
@@ -154,7 +262,8 @@ test("amendments are CAS and one pending only; rejection cannot erase suspension
 test("approved amendment advances all digests atomically and invalidates earlier versions", (t) => {
   const f = fixture(t);
   const task = f.active();
-  const config = { ...f.config, planVersion: 2, authorizedTier: "fixture-expanded", tierDefinitionDigest: digest("expanded") };
+  const config = f.configFor(task.taskId,
+    { planVersion: 2, authorizedTier: "fixture-expanded", tierDefinitionDigest: digest("expanded") });
   const requested = f.c.requestChange({ taskId: task.taskId, expectedVersion: 1, config, key: f.key() });
   const input = { taskId: task.taskId, expectedVersion: 2, accept: true, key: f.key(),
     approvalReference: f.approve("amend", { taskId: task.taskId, expectedVersion: 2, pendingChange: requested.pendingChange }) };
@@ -164,6 +273,55 @@ test("approved amendment advances all digests atomically and invalidates earlier
   assert.equal(amended.authorizedTier, "fixture-expanded");
   assert.equal(amended.tierDefinitionDigest, config.tierDefinitionDigest);
   assert.throws(() => f.c.startRun(f.runInput(task)), /stale/);
+});
+
+test("one authoritative tier mapping exposes and audits current per-tier status", (t) => {
+  const f = fixture(t);
+  const task = f.active();
+  const status = f.c.tierStatuses(task.taskId);
+  assert.deepEqual(status.map(({ tier, status: value }) => [tier, value]), [
+    ["fixture-check", "ALLOWED"], ["fixture-expanded", "NOT ALLOWED"],
+    ["newly-registered", "NOT ALLOWED"],
+  ]);
+  assert.equal(status[0].authorizationStatus, "ALLOWED");
+  assert.equal(status[0].executionStatus, "UNVERIFIED");
+  assert.match(status[0].executionReason, /current policy\/tier\/parameter digests/);
+  const firstHistory = f.c.tierStatusHistory(task.taskId);
+  assert.equal(firstHistory.length, 1);
+  assert.deepEqual(firstHistory[0].statuses, status);
+
+  const proposal = f.c.requestChange({ taskId: task.taskId, expectedVersion: 1,
+    config: f.configFor(task.taskId, { planVersion: 2, authorizedTier: "fixture-expanded" }), key: f.key() });
+  assert.deepEqual(f.c.tierStatuses(task.taskId), status);
+  const changed = f.c.resolveChange({ taskId: task.taskId, expectedVersion: proposal.authorizationVersion,
+    accept: true, key: f.key(), approvalReference: f.approve("amend", {
+      taskId: task.taskId, expectedVersion: proposal.authorizationVersion, pendingChange: proposal.pendingChange,
+    }) });
+  assert.deepEqual(f.c.tierStatuses(task.taskId).map(({ tier, status: value }) => [tier, value]), [
+    ["fixture-check", "NOT ALLOWED"], ["fixture-expanded", "ALLOWED"],
+    ["newly-registered", "NOT ALLOWED"],
+  ]);
+  const history = f.c.tierStatusHistory(task.taskId);
+  assert.equal(history.length, 2);
+  assert.equal(history[1].authorization_version, changed.authorizationVersion);
+  assert.ok(f.c.audit().some(({ event, subject }) =>
+    event === "tier-status-snapshot" && subject.includes(changed.taskId) && subject.includes("ALLOWED")));
+
+  // Even after the current tier definition is edited, the authorization label
+  // does not claim execution readiness; only checked preflight can verify it.
+  writeFileSync(resolve(f.root, "docs/validation/manifest.json"), JSON.stringify({
+    tiers: { "fixture-check": {}, "fixture-expanded": { changed: true }, "newly-registered": {}, extra: {} },
+  }));
+  const changedRegistry = f.c.tierStatuses(task.taskId);
+  assert.equal(changedRegistry.find(({ tier }) => tier === "fixture-expanded").authorizationStatus, "ALLOWED");
+  assert.equal(changedRegistry.find(({ tier }) => tier === "fixture-expanded").executionStatus, "UNVERIFIED");
+  assert.equal(changedRegistry.find(({ tier }) => tier === "extra").authorizationStatus, "NOT ALLOWED");
+
+  const suspended = f.c.suspend({ taskId: task.taskId, expectedVersion: changed.authorizationVersion,
+    reason: "review", key: f.key() });
+  assert.ok(f.c.tierStatuses(suspended.taskId).every(({ status: value }) => value === "NOT ALLOWED"));
+  assert.throws(() => f.c.db.prepare("DELETE FROM tier_status_history WHERE task_id=?").run(task.taskId),
+    /append-only|permanent/);
 });
 
 test("diagnostics consume exactly three atomic retry slots, cannot reset by selector or satisfy completion", (t) => {

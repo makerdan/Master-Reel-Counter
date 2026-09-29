@@ -8,11 +8,10 @@ const staging = mkdtempSync(resolve(tmpdir(), "failure-gate-package-"));
 const zipPath = resolve(outDir, "failure-gate-skill.zip");
 const packageDate = new Date("1980-01-01T00:00:00Z");
 const packageFiles = [
-  ["SKILL.md", ".agents/skills/failure-gate/SKILL.md"],
-  ["reference/implementation.md", ".agents/skills/failure-gate/reference/implementation.md"],
-  ["reference/acceptance.md", ".agents/skills/failure-gate/reference/acceptance.md"],
-  ["validation-tiers.md", ".agents/skills/validation-tiers/SKILL.md"],
-  ["tiers.json", ".agents/skills/validation-tiers/tiers.json"],
+  ["README.md", ".agents/skills/failure-gate-v4/README.md"],
+  ["SKILL.md", ".agents/skills/failure-gate-v4/SKILL.md"],
+  ["reference/acceptance.md", ".agents/skills/failure-gate-v4/reference/acceptance.md"],
+  ["reference/implementation.md", ".agents/skills/failure-gate-v4/reference/implementation.md"],
 ];
 mkdirSync(outDir, { recursive: true });
 try {

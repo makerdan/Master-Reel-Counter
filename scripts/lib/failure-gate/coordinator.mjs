@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync, readFileSync, lstatSync, existsSync, chmodSync } from "node:fs";
 import { resolve, relative, sep } from "node:path";
+import { validateProjectPlan } from "./plan-guards.mjs";
 
 // Workflow-local coordination, NOT an attestation service. The separately
 // supplied control adapter resolves actual review references. There is no
@@ -16,10 +17,26 @@ const text = (value) => typeof value === "string" && value.length > 0 &&
   value.length <= 2048 && !/[\x00-\x1f]/.test(value);
 const hash = (value) => /^[a-f0-9]{64}$/.test(value ?? "");
 const terminal = new Set(["completed", "failed", "cancelled"]);
+const placeholder = (value) => !text(value) || /<[^>]+>|\b(FILL IN|TBD|TODO)\b/i.test(value);
+const section = (content, heading) => {
+  const headings = [...content.matchAll(/^## (.+?)\s*$/gm)];
+  const index = headings.findIndex((match) => new RegExp(`^(?:${heading})$`).test(match[1]));
+  if (index < 0) return null;
+  const start = headings[index].index + headings[index][0].length;
+  return content.slice(start, headings[index + 1]?.index ?? content.length);
+};
+const field = (content, name) => {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = content?.match(new RegExp(`^\\*\\*${escaped}:\\*\\*\\s*(.*?)\\s*$`, "m"));
+  return match?.[1]?.replace(/^`(.*)`$/, "$1") ?? null;
+};
 
 export class Coordinator {
-  constructor({ directory, namespace, root, control = null }) {
+  constructor({ directory, namespace, root, control = null, testPlanValidator = null }) {
     requireValue(text(namespace), "namespace required");
+    requireValue(testPlanValidator === null ||
+      (typeof testPlanValidator === "function" && Boolean(process.env.NODE_TEST_CONTEXT)),
+    "fixture plan validator is available only inside the Node test harness");
     this.root = realpathSync(root);
     requireValue(typeof directory === "string", "durable directory required");
     const storage = resolve(directory);
@@ -28,6 +45,7 @@ export class Coordinator {
     requireValue(realpathSync(storage) === storage, "storage symlink is forbidden");
     this.namespace = namespace;
     this.control = control;
+    this.testPlanValidator = testPlanValidator;
     this.identity = randomUUID();
     const databasePath = resolve(storage, "coordinator.sqlite");
     for (const name of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
@@ -59,6 +77,11 @@ export class Coordinator {
         reference TEXT NOT NULL, action TEXT NOT NULL, subject_digest TEXT NOT NULL,
         reviewer TEXT NOT NULL, PRIMARY KEY(reference, action, subject_digest)
       );
+      CREATE TABLE IF NOT EXISTS tier_status_history (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL REFERENCES tasks(id),
+        authorization_version INTEGER NOT NULL, mapping_digest TEXT NOT NULL, statuses TEXT NOT NULL,
+        occurred TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS diagnostics (
         initial_run TEXT NOT NULL REFERENCES runs(id), failure_digest TEXT NOT NULL,
         attempts INTEGER NOT NULL CHECK(attempts BETWEEN 1 AND 3),
@@ -72,6 +95,8 @@ export class Coordinator {
       );
       CREATE TRIGGER IF NOT EXISTS retain_ids BEFORE DELETE ON tasks BEGIN SELECT RAISE(ABORT, 'task tombstones are permanent'); END;
       CREATE TRIGGER IF NOT EXISTS retain_audit BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT, 'audit history is permanent'); END;
+      CREATE TRIGGER IF NOT EXISTS retain_tier_status_history BEFORE DELETE ON tier_status_history BEGIN SELECT RAISE(ABORT, 'tier status history is permanent'); END;
+      CREATE TRIGGER IF NOT EXISTS retain_tier_status_updates BEFORE UPDATE ON tier_status_history BEGIN SELECT RAISE(ABORT, 'tier status history is append-only'); END;
     `);
     this.db.transaction(() => {
       for (const [key, value] of [["namespace", namespace], ["root", this.root], ["schema", "1"]]) {
@@ -94,6 +119,47 @@ export class Coordinator {
     return JSON.parse(row.data);
   }
   audit() { return this.db.prepare("SELECT * FROM audit ORDER BY sequence").all(); }
+  registeredTiers() {
+    const manifestPath = resolve(this.root, "docs/validation/manifest.json");
+    requireValue(existsSync(manifestPath) && lstatSync(manifestPath).isFile() &&
+      realpathSync(manifestPath) === manifestPath && lstatSync(manifestPath).size <= 1024 * 1024,
+    "registered tier manifest unavailable or unsafe");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const tiers = Object.keys(manifest?.tiers ?? {});
+    requireValue(tiers.length > 0 && tiers.every(text) && new Set(tiers).size === tiers.length,
+      "registered tier manifest is malformed");
+    return tiers.sort();
+  }
+  tierStatuses(taskId) {
+    const task = this.task(taskId);
+    const allowed = task.status === "active" && !task.suspension && task.authorizedTier;
+    return this.registeredTiers().map((tier) => {
+      const status = allowed && tier === task.authorizedTier ? "ALLOWED" : "NOT ALLOWED";
+      return {
+        taskId: task.taskId, tier, status, authorizationStatus: status,
+        executionStatus: status === "ALLOWED" ? "UNVERIFIED" : "BLOCKED",
+        executionReason: status === "ALLOWED"
+          ? "Read-only tier status does not verify current policy/tier/parameter digests, accepted host control, or assignment; checked execution preflight is required."
+          : "This tier is not authorized by the current task mapping and state.",
+      };
+    });
+  }
+  tierStatusHistory(taskId) {
+    this.task(taskId);
+    return this.db.prepare("SELECT * FROM tier_status_history WHERE task_id=? ORDER BY sequence").all(taskId)
+      .map((row) => ({ ...row, statuses: JSON.parse(row.statuses) }));
+  }
+  recordTierStatus(task) {
+    const statuses = this.tierStatuses(task.taskId);
+    const mappingDigest = digest({ taskId: task.taskId, authorizedTier: task.authorizedTier,
+      status: task.status, suspension: task.suspension, authorizationVersion: task.authorizationVersion, statuses });
+    this.db.prepare(`INSERT INTO tier_status_history
+      (task_id,authorization_version,mapping_digest,statuses,occurred) VALUES (?,?,?,?,?)`)
+      .run(task.taskId, task.authorizationVersion, mappingDigest, JSON.stringify(statuses), new Date().toISOString());
+    this.event("tier-status-snapshot", JSON.stringify({ taskId: task.taskId,
+      authorizationVersion: task.authorizationVersion, mappingDigest, statuses }));
+    return statuses;
+  }
   event(event, subject) {
     this.db.prepare("INSERT INTO audit(event,subject,occurred) VALUES (?,?,?)")
       .run(event, subject, new Date().toISOString());
@@ -171,12 +237,59 @@ export class Coordinator {
     requireValue(config && text(config.authorizedTier) && text(config.policyVersion) &&
       hash(config.policyDigest) && hash(config.tierDefinitionDigest) && hash(config.parametersDigest) &&
       Number.isSafeInteger(config.planVersion) && config.planVersion > 0, "malformed authorization configuration");
-    requireValue(typeof this.control?.validatePlan === "function" &&
-      this.control.validatePlan(config) === true, "plan guards or tier policy unavailable/rejected");
-    return { ...this.plan(config.planReference, config.planContent),
+    const projection = this.plan(config.planReference, config.planContent);
+    const projectGuards = this.testPlanValidator
+      ? this.testPlanValidator(config) === true
+      : validateProjectPlan({ root: this.root, planReference: projection.planReference,
+        planContent: projection.planContent });
+    const policyAccepted = typeof this.control?.validatePlan !== "function" ||
+      this.control.validatePlan(config) === true;
+    requireValue(projectGuards && policyAccepted, "plan guards or tier policy unavailable/rejected");
+    return { ...projection,
       planVersion: config.planVersion, authorizedTier: config.authorizedTier,
       policyVersion: config.policyVersion, policyDigest: config.policyDigest,
       tierDefinitionDigest: config.tierDefinitionDigest, parametersDigest: config.parametersDigest };
+  }
+  validatePlanGuards(taskId, approved) {
+    const identity = section(approved.planContent, "Task identity");
+    const priorFailures = section(approved.planContent, "Pre-existing failures(?: to ignore)?");
+    const validation = section(approved.planContent, "Validation");
+    const regression = section(approved.planContent, "Regression Guard");
+    requireValue(field(identity, "Task ID") === taskId, "plan must name its allocated local task ID");
+    const materialityFields = [...(identity ?? "").matchAll(/^\*\*Materiality:\*\*\s*(.*?)\s*$/gm)]
+      .map((match) => match[1].trim());
+    const materiality = materialityFields[0] ?? null;
+    requireValue(materialityFields.length <= 1 && (materiality === null ||
+      ["material", "non-material"].includes(materiality.toLowerCase())),
+      "Task identity Materiality must be exactly material or non-material");
+    requireValue(priorFailures?.trim() && !placeholder(priorFailures.trim()),
+      "pre-existing-failures section is missing or a placeholder");
+    requireValue(field(validation, "Command") === approved.authorizedTier &&
+      !placeholder(field(validation, "Why")) && !placeholder(field(validation, "Do not escalate")),
+    "validation tier or plan guard fields are missing or contain placeholders");
+    const titleLine = approved.planContent.split(/\r?\n/).find((line) => line.trim())?.trim() ?? "";
+    const titleIsDeletion = /^# DELETE -(?:\s|$)/.test(titleLine);
+    const nonMaterial = materiality
+      ? materiality.toLowerCase() === "non-material"
+      : titleIsDeletion;
+    const qualifies = !nonMaterial;
+    const notApplicable = /^\s*\*\*N\/A\*\*/m.test(regression ?? "");
+    if (notApplicable) {
+      const reasons = [...(regression ?? "").matchAll(/^\*\*Why N\/A:\*\*\s*(.*?)\s*$/gm)]
+        .map((match) => match[1].trim());
+      requireValue(!qualifies && reasons.length === 1 && !placeholder(reasons[0]),
+        "Regression Guard N/A requires a reviewed non-material classification and one specific reason");
+    } else if (qualifies) {
+      requireValue(regression && !placeholder(field(regression, "Covers")) &&
+        !placeholder(field(regression, "Test location")) &&
+        !placeholder(field(regression, "What it checks")),
+      "material plan requires a complete Regression Guard");
+    } else if (regression) {
+      requireValue(!placeholder(field(regression, "Covers")) &&
+        !placeholder(field(regression, "Test location")) &&
+        !placeholder(field(regression, "What it checks")),
+      "Regression Guard is incomplete or contains a placeholder");
+    }
   }
   activate({ taskId, expectedVersion = 0, config, approvalReference, key }) {
     return this.mutate(key, "activate", { taskId, expectedVersion, config, approvalReference }, () => {
@@ -184,9 +297,14 @@ export class Coordinator {
       this.version(task, expectedVersion);
       requireValue(task.status === "draft", "only draft may activate");
       const approved = this.configuration(config);
+      this.validatePlanGuards(taskId, approved);
+      requireValue(this.registeredTiers().includes(approved.authorizedTier),
+        "authorized tier is not currently registered");
       const approval = this.review(approvalReference, "activate", { taskId, expectedVersion, config: approved });
-      return this.saveTask({ ...task, ...approved, approval, status: "active",
+      const activated = this.saveTask({ ...task, ...approved, approval, status: "active",
         authorizationVersion: expectedVersion + 1 }, expectedVersion);
+      this.recordTierStatus(activated);
+      return activated;
     });
   }
   assign({ taskId, approvalReference, key }) {
@@ -213,9 +331,11 @@ export class Coordinator {
       requireValue(task.status === "active" && !task.pendingChange, "one pending change allowed on active task");
       // Proposed content need not have replaced the approved projection yet.
       requireValue(config && typeof config.planContent === "string", "proposed plan required");
-      return this.saveTask({ ...task, pendingChange: { id: randomUUID(), config, coverageInadequate },
+      const updated = this.saveTask({ ...task, pendingChange: { id: randomUUID(), config, coverageInadequate },
         suspension: task.suspension ?? (coverageInadequate ? "coverage-inadequate" : null),
         authorizationVersion: expectedVersion + 1 }, expectedVersion);
+      if (coverageInadequate) this.recordTierStatus(updated);
+      return updated;
     });
   }
   resolveChange({ taskId, expectedVersion, accept, approvalReference, key }) {
@@ -223,14 +343,19 @@ export class Coordinator {
       const task = this.task(taskId);
       this.version(task, expectedVersion); this.idle(taskId);
       requireValue(task.pendingChange && typeof accept === "boolean", "pending change required");
+      const update = accept ? this.configuration(task.pendingChange.config) : {};
+      if (accept) this.validatePlanGuards(taskId, update);
+      requireValue(!accept || update.planVersion > task.planVersion, "amendment must advance plan version");
+      if (accept) requireValue(this.registeredTiers().includes(update.authorizedTier),
+        "amended tier is not currently registered");
       const approval = this.review(approvalReference, accept ? "amend" : "reject",
         { taskId, expectedVersion, pendingChange: task.pendingChange });
-      const update = accept ? this.configuration(task.pendingChange.config) : {};
-      requireValue(!accept || update.planVersion > task.planVersion, "amendment must advance plan version");
-      return this.saveTask({ ...task, ...update, approval, pendingChange: null,
+      const updated = this.saveTask({ ...task, ...update, approval, pendingChange: null,
         // Rejecting or accepting a proposal never clears independent suspension.
         suspension: accept && task.suspension === "coverage-inadequate" ? null : task.suspension,
         authorizationVersion: expectedVersion + 1 }, expectedVersion);
+      this.recordTierStatus(updated);
+      return updated;
     });
   }
   suspend({ taskId, expectedVersion, reason, key }) {
@@ -238,7 +363,9 @@ export class Coordinator {
     return this.mutate(key, "suspend", { taskId, expectedVersion, reason }, () => {
       const task = this.task(taskId);
       this.version(task, expectedVersion); this.idle(taskId);
-      return this.saveTask({ ...task, suspension: reason, authorizationVersion: expectedVersion + 1 }, expectedVersion);
+      const updated = this.saveTask({ ...task, suspension: reason, authorizationVersion: expectedVersion + 1 }, expectedVersion);
+      this.recordTierStatus(updated);
+      return updated;
     });
   }
   resume({ taskId, expectedVersion, approvalReference, key }) {
@@ -248,7 +375,9 @@ export class Coordinator {
       requireValue(task.suspension && !task.pendingChange, "unresolved change or no suspension");
       this.plan(task.planReference, task.planContent);
       this.review(approvalReference, "resume", { taskId, expectedVersion, suspension: task.suspension });
-      return this.saveTask({ ...task, suspension: null, authorizationVersion: expectedVersion + 1 }, expectedVersion);
+      const updated = this.saveTask({ ...task, suspension: null, authorizationVersion: expectedVersion + 1 }, expectedVersion);
+      this.recordTierStatus(updated);
+      return updated;
     });
   }
   startRun({ taskId, expectedVersion, planReference, policyDigest, tierDefinitionDigest,
@@ -260,6 +389,8 @@ export class Coordinator {
         requireValue(task.taskId === taskId, "task substitution denied");
         this.version(task, expectedVersion); this.idle(taskId);
         requireValue(task.status === "active" && !task.suspension, "task is not runnable");
+        requireValue(this.tierStatuses(task.taskId).some(({ tier, status }) =>
+           tier === task.authorizedTier && status === "ALLOWED"), "task has no currently allowed tier");
         requireValue(planReference === task.planReference && policyDigest === task.policyDigest &&
           tierDefinitionDigest === task.tierDefinitionDigest && parametersDigest === task.parametersDigest,
         "plan, policy, tier, or parameter mismatch");
@@ -394,8 +525,10 @@ export class Coordinator {
         this.review(approvalReference, "terminate", { taskId, expectedVersion, status });
       }
       this.db.prepare("DELETE FROM assignment WHERE task_id=?").run(taskId);
-      return this.saveTask({ ...task, status, authorizedTier: null, pendingChange: null,
+      const updated = this.saveTask({ ...task, status, authorizedTier: null, pendingChange: null,
         authorizationVersion: expectedVersion + 1 }, expectedVersion);
+      this.recordTierStatus(updated);
+      return updated;
     });
   }
 }

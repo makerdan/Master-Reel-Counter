@@ -49,26 +49,26 @@ The application is built with a React frontend, an Express.js backend, and Postg
 
 ## Agent Validation Contract
 
-The tracked project adaptation of the workspace-designated Failure Gate v4
-source lives in `.agents/skills/failure-gate/SKILL.md` and its `reference/`
-files. It distinguishes the single approved tier for an independently assigned
-task, failure ownership, and evidence applicable to completion. This migration
-target is not proof that v4 authorization or platform handoff is installed.
-Updating the tracked guidance does not activate a new authorization or approve
-the governing policy. Task 907 implements the candidate under prior-policy
-bootstrap validation; operational cutover requires independent acceptance.
-See `docs/validation/task-907-bootstrap-observation.md` for the pre-edit
-failure without treating it as an authorized baseline ignore.
+The canonical Failure Gate v4 instructions and implementation/acceptance
+contracts are in `.agents/skills/failure-gate-v4/`. They define a cooperative
+project-local workflow: they do not control Replit Agent's task lifecycle or
+prevent people with shell/write access from bypassing local controls. Use
+verified project-local equivalents and report missing required capabilities
+instead of claiming platform enforcement.
 
 The runtime registry is `docs/validation/manifest.json`.
 `.agents/skills/validation-tiers/tiers.json` is a packaged example and is
 not the runtime authority. Existing `scripts/new-plan.mjs` and both plan
-guards supply bounded planning checks. Existing `scripts/run-locked-tier.mjs`
-is the single checked entry point; it must resolve an independently
-assigned task's one authorized tier and exact approved plan before any
-task run is accepted. A caller-selected path, task ID, or ad-hoc
-`--allow-no-plan` result cannot be used as completion evidence. Preserve
-existing lock, audit, startup, collision, and Playwright controls.
+guards supply bounded planning checks. The project-local checked entry point
+is `scripts/run-locked-tier.mjs`, but ordinary local-ID dispatch is currently
+**blocked** pending a configured reviewer-decision source and accepted host
+adapter. Its sole enabled operation is the digest-pinned reinstallation plan at
+`docs/validation/plans/failure-gate-v4-reinstallation-bootstrap.md`, using only
+`test-standard`. Do not treat this bootstrap or caller-selected/ad-hoc
+validation as required evidence for an ordinary local task. Preserve existing
+lock, audit, startup, collision, and Playwright controls. See
+`docs/validation/failure-gate-v4-reinstallation-status.md` for the checked
+bootstrap result and missing live-activation capabilities.
 
 Plans selecting `test-heavy` must use the Validation `**Why:**` to name at least
 one step in the runtime `test-heavy` manifest that is absent from
@@ -85,39 +85,14 @@ plus independent corroboration. Keep raw failing results and account for
 every required step; incomplete and not-reached work cannot pass. Maintain
 the catalog separately with `npm run maintain:validation-baseline`.
 
-Keep two separate report entries. A task-tier result is not the result of
-platform-managed completion validation, and neither process's result may be
-reused as the other's evidence.
+For local task-validation reports, record the local task identity, approved
+plan reference/version, authorized tier, run identity, tested snapshot and
+environment, raw per-step and overall results, failure ownership, and a
+separate assessment. A local result describes this project workflow only; it
+does not attest to or control a Replit Agent task-board transition.
 
-**Task-validation report**
-
-- Record the trusted task ID, exact approved plan reference/version, authorized
-  registered tier and selected command, run ID, tested snapshot/environment,
-  raw per-step and overall status, and a separate assessment.
-
-**Platform-managed completion-validation report**
-
-- Record dispatch state (`NOT REACHED`, `STARTED`, `COMPLETED`, or `UNKNOWN`),
-  the actual selected check/command/tier and run ID/result when supplied; state
-  when a field was not supplied, and give the reason when dispatch was not
-  reached.
-- Verify the same task ID, exact approved plan reference, the same active task
-  lock, and one checked dispatch resolving the same authorized tier. Record its
-  raw status/result and separate assessment; do not infer missing details from
-  task-tier validation.
-- Assess a started dispatch without a trustworthy final result as
-  `INCOMPLETE`. If the handoff cannot preserve the lock, or an unsupported
-  broader dispatch is attempted, assess managed completion as `BLOCKED`; do not
-  treat a broader sweep as an escalation exemption or authorized evidence, and
-  do not copy the task-tier result into this entry.
-
-Enforcement is **workflow mode**: project-local controls are cooperative
-under unrestricted shell/write access, not protected attestation. Managed
-task completion is **BLOCKED** until verified platform-origin current task ID,
-exact approved plan reference, and exactly one dispatch through the checked
-task-validation entry point yield a run and decision. Local launcher tests
-cannot establish this platform handoff. Do not modify platform-owned
-`.replit` workflow configuration or launch all tiers as a substitute.
+Do not modify platform-owned `.replit` workflow configuration or launch all
+tiers as a substitute for the one tier selected by the project-local policy.
 
 ## External Dependencies
 - **Replit-managed Clerk:** Cookie-based authentication for normal web users, with managed development/production keys and the canonical production proxy.

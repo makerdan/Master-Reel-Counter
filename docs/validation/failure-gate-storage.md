@@ -107,5 +107,6 @@ recompute applicable evidence, and return its decision. SQLite serializes
 authorization changes, not arbitrary filesystem writes. A claimed `PASS` or
 before/after worktree hash cannot substitute for the adapter's responsibilities.
 Local records and approvals remain editable in workflow mode; they are not
-cryptographic attestations. Platform-managed completion still requires its own
-verified dispatch boundary.
+cryptographic attestations. No project command may dispatch or rely on
+platform-managed completion; the only terminal decision in this workflow is
+the project-local one.
