@@ -389,6 +389,6 @@ export class CheckedExecution {
 
 export function candidateStatus() {
   return { version: 4, mode: "workflow", operational: false,
-    activation: "BLOCKED: tracked review source installed, but no designated human reviewer or accepted host control adapter is configured",
+    activation: "BLOCKED: reviewer designation is not a task or policy decision; no accepted runtime host control adapter is configured",
     completion: "BLOCKED: final input check, evidence assessment, and terminal write lack verified coordination with project file writers" };
 }

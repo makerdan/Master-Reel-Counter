@@ -166,7 +166,7 @@ test("environment policy preserves approved runtime values, excludes unknown sel
 
 test("unavailable production control and platform dispatch never fall back to legacy", () => {
   assert.equal(candidateStatus().operational, false);
-  assert.match(candidateStatus().activation, /no designated human reviewer/);
+  assert.match(candidateStatus().activation, /designation is not a task or policy decision/);
   assert.equal("managedCompletion" in candidateStatus(), false);
   for (const args of [["scripts/failure-gate.mjs", "activate", "--approved"],
     ["scripts/failure-gate.mjs", "managed-completion"],

@@ -71,8 +71,11 @@ plan/version/digest, tier definition, permitted parameters, policy, and
 authorization versions. The coordinator reads the record and roster from one
 committed Git revision, checks their working projections, and retains the
 source commit before accepting the decision. This is a
-cooperative reviewable source, not proof of human identity. With no reviewer
-designated, the roster remains empty and activation stays blocked.
+cooperative reviewable source, not proof of human identity. The requesting
+human subsequently designated themselves with project-local ID
+`reviewer-primary`; this designation does not approve any task or policy.
+Activation stays blocked without a matching committed decision and an
+accepted host control.
 
 A previously approved deterministic activation policy can later cover
 specific tasks, but none is created or presumed by this migration. Such a

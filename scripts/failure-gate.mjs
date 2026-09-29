@@ -35,7 +35,7 @@ if (["draft", "review-request", "tier-status"].includes(operation)) {
     } else {
       const bytes = readFileSync(projectFile(options["--root"], options["--plan"]), "utf8");
       console.log(JSON.stringify({ purpose: "review-request", planDigest: digest(bytes),
-        approval: "not granted", activation: "BLOCKED: no designated human reviewer or accepted host control adapter" }));
+        approval: "not granted", activation: "BLOCKED: reviewer designation is not an exact recorded decision or accepted host control" }));
     }
   } catch (error) {
     console.error(`FAILURE-GATE BLOCKED: ${error.message}`);
@@ -44,6 +44,6 @@ if (["draft", "review-request", "tier-status"].includes(operation)) {
 } else if (operation === "status" && extra.length === 0) {
   console.log(JSON.stringify(candidateStatus(), null, 2));
 } else {
-  console.error("FAILURE-GATE BLOCKED: tracked review records do not themselves authorize activation; no designated human reviewer or accepted host control adapter is configured. Use status or tier-status for read-only capability state.");
+  console.error("FAILURE-GATE BLOCKED: reviewer designation and a caller reference do not authorize activation; no exact recorded decision or accepted host control is available. Use status or tier-status for read-only capability state.");
   process.exitCode = 2;
 }

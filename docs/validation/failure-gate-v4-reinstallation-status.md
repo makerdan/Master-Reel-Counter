@@ -49,7 +49,7 @@ bootstrap tier.
 ## Ordinary local-ID cutover: BLOCKED
 
 The project now has a tracked record location at
-`docs/validation/reviews/`, an intentionally empty designated-reviewer
+`docs/validation/reviews/`, a designated-reviewer
 roster at `docs/validation/reviewers.json`, and a default coordinator check
 for an exact recorded human decision. It reads roster and record from one
 committed Git revision, verifies their working projections,
@@ -58,8 +58,11 @@ explicit task, plan/version/digest, tier-definition/parameter, policy, and
 authorization-version scope. The coordinator retains the used record digest
 and source commit
 with its audited decision. Focused fixture tests cover missing and altered
-records, mismatched scope, and replay. **No actual reviewer has been
-designated or approved a decision.** A review request is not an approval.
+records, mismatched scope, and replay. The requesting human designated
+themselves under the project-local ID `reviewer-primary`; see the
+[designation record](reviewer-designation.md). **No actual task or policy
+decision has been recorded.** A reviewer designation or review request is
+not an approval.
 
 The CLI still exposes only draft, review-request, status, and read-only
 tier-status operations. It does not offer activation, assignment, ordinary
