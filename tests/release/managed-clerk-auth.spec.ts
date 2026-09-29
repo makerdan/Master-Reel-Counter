@@ -14,6 +14,7 @@ import {
   assertReleaseSchema,
 } from "../../scripts/release-schema-preflight.mjs";
 import { resolveClerkEnvironmentPublishableKey } from "../../shared/clerk-config";
+import { createClerkScriptBootTracker } from "../../scripts/lib/managed-clerk-script-assertion.mjs";
 
 const { Client } = pg;
 const SMOKE_ID_PREFIX = "release-smoke-";
@@ -216,12 +217,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   let clerkUserId: string | undefined;
   let localUserCreated = false;
   const proxyRequests: string[] = [];
-  const clerkScriptResponses: Array<{
-    origin: string;
-    path: string;
-    status: number;
-    contentType: string;
-  }> = [];
+  const clerkScriptBoots = createClerkScriptBootTracker(baseURL, CLERK_PROXY_PATH);
   const routeStates: string[] = [];
   const requestFailures: string[] = [];
   const pageErrors: string[] = [];
@@ -235,18 +231,21 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
   page.on("response", (response) => {
     const request = response.request();
     const url = new URL(response.url());
+    if (
+      request.isNavigationRequest() &&
+      request.resourceType() === "document" &&
+      request.frame() === page.mainFrame() &&
+      response.status() === 200
+    ) {
+      clerkScriptBoots.recordDocument(safeDiagnosticPath(response.url()));
+    }
     if (url.origin === baseURL && url.pathname.startsWith(CLERK_PROXY_PATH)) {
       proxyRequests.push(
         `${request.method()} ${safeDiagnosticPath(response.url())} ${response.status()}`,
       );
     }
     if (url.pathname.endsWith("/dist/clerk.browser.js")) {
-      clerkScriptResponses.push({
-        origin: url.origin,
-        path: url.pathname,
-        status: response.status(),
-        contentType: response.headers()["content-type"] ?? "",
-      });
+      clerkScriptBoots.recordScript(response.url(), response.status(), response.headers()["content-type"] ?? "");
     }
   });
   page.on("pageerror", (error) => {
@@ -352,19 +351,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     });
     await expect(page.getByTestId("text-settings-title")).toBeVisible({ timeout: 30_000 });
     expect(proxyRequests.length, "Clerk browser traffic must pass through the production proxy").toBeGreaterThan(0);
-    const loadedClerkScripts = clerkScriptResponses.filter(
-      (response) => response.status === 200,
-    );
-    expect(loadedClerkScripts, "Clerk JavaScript must load once from the exact candidate proxy").toHaveLength(1);
-    expect(loadedClerkScripts[0]).toMatchObject({
-      origin: baseURL,
-    });
-    expect(loadedClerkScripts[0].path).toMatch(
-      new RegExp(`^${CLERK_PROXY_PATH}/npm/@clerk/clerk-js@[^/]+/dist/clerk\\.browser\\.js$`),
-    );
-    expect(loadedClerkScripts[0].contentType).toMatch(
-      /^(?:application|text)\/javascript\b/i,
-    );
+    clerkScriptBoots.assertValid();
 
     const authorization = await database.query(
       "SELECT approved, rejected, role FROM users WHERE id = $1",
@@ -443,6 +430,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
         safeDiagnosticPath(new URL(path, baseURL).href),
       ),
       clerkRequests: proxyRequests.slice(-50),
+      clerkScriptBoots: clerkScriptBoots.diagnostic(),
       requestFailures: requestFailures.slice(-20),
       pageErrors: pageErrors.slice(-20),
     };

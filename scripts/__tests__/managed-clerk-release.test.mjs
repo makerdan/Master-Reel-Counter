@@ -25,6 +25,7 @@ import {
 } from "../release-smoke-database.mjs";
 import { validatePublishedSmokeConfiguration } from "../validate-published-smoke-config.mjs";
 import { deletePrivateObjectsAndVerify } from "../../server/replit_integrations/object_storage/objectStorageClient.mjs";
+import { createClerkScriptBootTracker } from "../lib/managed-clerk-script-assertion.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
@@ -1261,9 +1262,13 @@ test("smoke uses Clerk's supported testing sign-in and keeps safe failure eviden
     /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/settings"\);\s*await expect\(page\)\.toHaveURL\(`\$\{baseURL\}\/settings`\);\s*await expect\(page\.getByTestId\("text-settings-title"\)\)/,
   );
   assert.doesNotMatch(smoke, /history\.replaceState/);
-  assert.match(smoke, /clerkScriptResponses/);
-  assert.match(smoke, /Clerk JavaScript must load once from the exact candidate proxy/);
-  assert.match(smoke, /contentType/);
+  assert.match(smoke, /request\.isNavigationRequest\(\)/);
+  assert.match(smoke, /request\.resourceType\(\) === "document"/);
+  assert.match(smoke, /request\.frame\(\) === page\.mainFrame\(\)/);
+  assert.match(smoke, /clerkScriptBoots\.recordDocument\(safeDiagnosticPath\(response\.url\(\)\)\)/);
+  assert.match(smoke, /clerkScriptBoots\.recordScript\(response\.url\(\), response\.status\(\), response\.headers\(\)\["content-type"\]/);
+  assert.match(smoke, /clerkScriptBoots\.assertValid\(\)/);
+  assert.match(smoke, /clerkScriptBoots: clerkScriptBoots\.diagnostic\(\)/);
   assert.match(smoke, /managed-clerk-browser-trace/);
   assert.match(smoke, /clerkRequests/);
   assert.match(
@@ -1288,6 +1293,62 @@ test("smoke uses Clerk's supported testing sign-in and keeps safe failure eviden
   assert.match(candidateBuild, /tail -n 300/);
   assert.match(candidateBuild, /print-release-diagnostics\.mjs/);
   assert.match(workflow, /test-results\//);
+});
+
+test("Clerk release scripts are checked once per completed document boot, not once per page", () => {
+  const origin = "https://candidate.example";
+  const proxy = "/api/__clerk";
+  const script = `${origin}${proxy}/npm/@clerk/clerk-js@5.0.0/dist/clerk.browser.js`;
+  const create = () => createClerkScriptBootTracker(origin, proxy);
+  const valid = (tracker) => tracker.recordScript(script, 200, "application/javascript; charset=utf-8");
+
+  const single = create();
+  single.recordDocument("/settings");
+  valid(single);
+  assert.doesNotThrow(() => single.assertValid());
+
+  const navigated = create();
+  navigated.recordDocument("/settings");
+  valid(navigated);
+  navigated.recordDocument("/sign-in");
+  valid(navigated);
+  navigated.recordDocument("/settings");
+  valid(navigated);
+  assert.doesNotThrow(() => navigated.assertValid());
+  assert.deepEqual(navigated.diagnostic().boots.map(({ document, scriptCount }) => [document, scriptCount]), [
+    ["/settings", 1], ["/sign-in", 1], ["/settings", 1],
+  ]);
+
+  const duplicate = create();
+  duplicate.recordDocument("/settings");
+  valid(duplicate);
+  duplicate.recordScript(script, 200, "text/javascript");
+  assert.throws(() => duplicate.assertValid(), /document boot 1 \(observed 2\)/);
+
+  const missing = create();
+  missing.recordDocument("/settings");
+  assert.throws(() => missing.assertValid(), /document boot 1 \(observed 0\)/);
+  const missingAfterNavigation = create();
+  missingAfterNavigation.recordDocument("/settings");
+  valid(missingAfterNavigation);
+  missingAfterNavigation.recordDocument("/sign-in");
+  assert.throws(() => missingAfterNavigation.assertValid(), /document boot 2 \(observed 0\)/);
+
+  for (const [url, status, mime] of [
+    [script.replace(origin, "https://other.example"), 200, "application/javascript"],
+    [script.replace(proxy, "/other-proxy"), 200, "application/javascript"],
+    [script.replace("/npm/", "/other/npm/"), 200, "application/javascript"],
+    [script, 404, "application/javascript"],
+    [script, 200, "text/html"],
+  ]) {
+    const invalid = create();
+    invalid.recordDocument("/settings");
+    invalid.recordScript(url, status, mime);
+    assert.throws(() => invalid.assertValid(), /200 JavaScript response from the exact candidate proxy/);
+  }
+  const orphan = create();
+  orphan.recordScript(script, 200, "application/javascript");
+  assert.throws(() => orphan.assertValid(), /completed candidate document boot/);
 });
 
 test("failed EXIT cleanup keeps the release status and removes its fixtures", async () => {
