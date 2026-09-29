@@ -79,3 +79,28 @@ The project-local workflow is cooperative, not tamper-proof: people with
 shell/write access can bypass or modify its local files. None of these
 records controls Replit's task board. Historical task records and unrelated
 task work were not reauthorized by the reinstallation.
+
+## Mobile photo handoff (#922): prepared, NOT AUTHORIZED
+
+The human requester approved using the existing photo-handoff plan as the
+source for an owner-reviewed per-task request. A **draft** local ID,
+`master-reel-counter:dbb04932-e28e-463c-837c-8c7a87bcf4fb`, is associated
+with platform task #922 in this workspace's ignored `.failure-gate-state/`
+coordinator. The tracked candidate plan is
+[`plans/mobile-photo-handoff-922.md`](plans/mobile-photo-handoff-922.md)
+(version 1, SHA-256
+`97fa823a4c8b49e3ab40e151b46dd5158939d807f1db101238bab5a7bf4c30e2`).
+It passed the strict plan and Regression Guard checks. Its only requested tier
+is `test-heavy`, but **all four tiers currently report NOT ALLOWED** for this
+draft. The platform association does not bind an isolated task agent or
+authorize that agent to run a tier.
+
+No reviewer-authored, committed decision binds this exact local ID, plan,
+tier, parameters, policy, and authorization version. The checked CLI has no
+accepted ordinary activation/assignment/run route or accepted runtime host
+control. The requester's instruction in chat and the agent-prepared plan do
+not substitute for those capabilities or a separate reviewer decision. Do
+not claim approval is available, run `test-heavy` as checked task evidence,
+or make a terminal decision until the missing controls are installed and
+verified. Before reuse, verify the local draft still exists: ignored SQLite
+state is not shared with isolated task-agent workspaces.
