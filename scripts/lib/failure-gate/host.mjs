@@ -7,6 +7,7 @@ import { createSnapshot, verifySnapshot, inputManifest } from "./evidence.mjs";
 import { digest } from "./coordinator.mjs";
 import { policyDigest, projectFile } from "./execution.mjs";
 import { adaptRuntimeTiers } from "./runtime-tiers.mjs";
+import { withInputWriterBoundary } from "./input-writer-boundary.mjs";
 
 const here = fileURLToPath(import.meta.url);
 const repository = resolve(here, "../../../..");
@@ -31,8 +32,10 @@ export function policyDeclaration({ root, policyInputs, tiers, parameters, envir
       "scripts/lib/failure-gate/evidence.mjs", "scripts/lib/failure-gate/coordinator.mjs",
        "scripts/lib/failure-gate/review-records.mjs",
       "scripts/lib/failure-gate/runtime-tiers.mjs", "scripts/lib/failure-gate/plan-guards.mjs",
+       "scripts/lib/failure-gate/input-writer-boundary.mjs",
       "scripts/lib/failure-gate/bootstrap.mjs",
       "scripts/run-locked-tier.mjs", "scripts/run-tier.mjs",
+       "scripts/new-plan.mjs", "scripts/publish-failure-gate.mjs",
       "scripts/check-failure-gate.mjs", "scripts/check-regression-guard.mjs",
     ]),
     tiersDigest: digest(tiers), parametersDigest: digest(parameters),
@@ -164,10 +167,7 @@ export function createLocalHost({
       if (bytes.length > 1024 * 1024) blocked("evidence exceeds bound");
       return JSON.parse(bytes.toString("utf8"));
     },
-    withFinalWriterLock: (action) => {
-      if (typeof control.withFinalWriterLock !== "function") blocked("final writer coordination unavailable");
-      return control.withFinalWriterLock(action);
-    },
+    withFinalWriterLock: (action) => withInputWriterBoundary(root, action),
     currentCatalog: () => control.currentCatalog?.() ?? [],
     reviewedProvenance: (runId) => control.reviewedProvenance?.(runId) ?? [],
   };

@@ -5,6 +5,7 @@ import { resolve, relative, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { validateProjectPlan } from "./plan-guards.mjs";
 import { createTrackedReviewControl } from "./review-records.mjs";
+import { inputWriterBoundaryHeld } from "./input-writer-boundary.mjs";
 
 // Workflow-local coordination, NOT an attestation service. The separately
 // supplied control adapter resolves actual review references. There is no
@@ -557,11 +558,12 @@ export class Coordinator {
         "completion run is not applicable");
         this.plan(task.planReference, task.planContent);
         requireValue(typeof this.control?.complete === "function", "completion checker unavailable");
-        // The adapter must hold snapshot/writer coordination through this entire
-        // transaction; checking hashes in an uncontrolled worktree is insufficient.
+        // The boundary must be owned by this process across the whole transaction.
+        // A caller's writerCoordinationHeld assertion is never evidence of a lock.
+        requireValue(inputWriterBoundaryHeld(this.root), "input writer boundary unavailable");
         const decision = this.control.complete({ task, run });
-        requireValue(decision?.writerCoordinationHeld === true &&
-          ["PASS", "ACCEPTABLE_WITH_IGNORED_FAILURES"].includes(decision.assessment),
+        requireValue(inputWriterBoundaryHeld(this.root) &&
+          ["PASS", "ACCEPTABLE_WITH_IGNORED_FAILURES"].includes(decision?.assessment),
         "completion evidence rejected");
       } else {
          this.review(approvalReference, "terminate", { taskId, expectedVersion, status },

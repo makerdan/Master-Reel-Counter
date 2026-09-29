@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, symlinkSync, existsSync } from "node:fs";
+import { inputWriterBoundaryHeld } from "../lib/failure-gate/input-writer-boundary.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { Coordinator, digest } from "../lib/failure-gate/coordinator.mjs";
 import { CheckedExecution, policyDigest, checkedEnvironment, projectFile,
   candidateStatus } from "../lib/failure-gate/execution.mjs";
@@ -210,7 +211,6 @@ function concreteHost(f, control = {}) {
     control: {
       acceptPolicy: ({ reference, declaration }) => ({ reference,
         declarationDigest: digest(declaration), reviewer: "fixture-owner" }),
-      withFinalWriterLock: (action) => action(),
       ...control,
     },
   });
@@ -234,17 +234,14 @@ test("concrete local adapter isolates, resource-locks, verifies artifacts and re
 
 test("terminal completion recomputes inside the transaction and writer boundary", async (t) => {
   const f = fixture(t);
-  let held = false;
-  const host = concreteHost(f, { withFinalWriterLock: (action) => {
-    assert.equal(held, false);
-    held = true;
-    try { return action(); } finally { held = false; }
+  const host = concreteHost(f, { withFinalWriterLock: () => {
+    throw new Error("caller lock must not be trusted");
   } });
   const runner = new CheckedExecution({ coordinator: f.coordinator, root: f.root, host });
   const result = await runner.run(f.request);
   const assess = runner.assessCompletion.bind(runner);
   runner.assessCompletion = (request) => {
-    assert.equal(held, true);
+    assert.equal(inputWriterBoundaryHeld(f.root), true);
     assert.equal(f.coordinator.db.inTransaction, true);
     return assess(request);
   };
@@ -252,6 +249,33 @@ test("terminal completion recomputes inside the transaction and writer boundary"
   assert.equal(terminal.status, "completed");
   assert.equal(terminal.authorizedTier, null);
   assert.throws(() => f.coordinator.assignedTask(), /assignment unavailable/);
+});
+
+test("terminal completion waits for an intervening cooperative file writer and rejects its change", async (t) => {
+  const f = fixture(t);
+  const host = concreteHost(f);
+  const runner = new CheckedExecution({ coordinator: f.coordinator, root: f.root, host });
+  const result = await runner.run(f.request);
+  const ready = join(f.directory, "writer-ready");
+  const moduleUrl = new URL("../lib/failure-gate/input-writer-boundary.mjs", import.meta.url).href;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", `
+    import { writeFileSync } from 'node:fs';
+    import { withInputWriterBoundary } from ${JSON.stringify(moduleUrl)};
+    withInputWriterBoundary(${JSON.stringify(f.root)}, () => {
+      writeFileSync(${JSON.stringify(ready)}, "locked");
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
+      writeFileSync(${JSON.stringify(join(f.root, "intervening.txt"))}, "changed");
+    });
+  `], { stdio: "ignore" });
+  t.after(() => { if (child.exitCode === null) child.kill(); });
+  const deadline = Date.now() + 5000;
+  while (!existsSync(ready) && Date.now() < deadline) {
+    await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+  }
+  assert.equal(existsSync(ready), true, "writer acquired the boundary");
+  await assert.rejects(runner.terminate({ taskId: f.task.taskId, runId: result.runId }),
+    /completion evidence rejected/);
+  assert.equal(f.coordinator.task(f.task.taskId).status, "active");
 });
 
 test("changed final input denies terminal acceptance despite earlier PASS", async (t) => {

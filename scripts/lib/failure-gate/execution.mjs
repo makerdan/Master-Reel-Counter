@@ -375,7 +375,7 @@ export class CheckedExecution {
         requireValue(current.taskId === taskId && run.runId === runId,
           "terminal checker identity mismatch");
         const decision = this.assessCompletion({ taskId, runId });
-        return { assessment: decision.status, writerCoordinationHeld: true };
+        return { assessment: decision.status };
       };
       try {
         return this.coordinator.terminate({ taskId, runId, status, approvalReference, key,

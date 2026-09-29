@@ -2,6 +2,7 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import { randomUUID } from "node:crypto";
+import { withInputWriterBoundary } from "./lib/failure-gate/input-writer-boundary.mjs";
 import { loadCatalog, findExactRecord } from "./lib/baseline.mjs";
 import {
   getHeavyOnlyStepNames,
@@ -86,6 +87,8 @@ ${observations.length ? observations.map((item) => `- ${item}`).join("\n") : "No
 - <FILL IN>
 `;
 const path = resolve("docs/validation/plans", `${name}.md`);
-mkdirSync(resolve("docs/validation/plans"), { recursive: true });
-writeFileSync(path, plan, { flag: "wx" });
+withInputWriterBoundary(process.cwd(), () => {
+  mkdirSync(resolve("docs/validation/plans"), { recursive: true });
+  writeFileSync(path, plan, { flag: "wx" });
+});
 console.log(path);

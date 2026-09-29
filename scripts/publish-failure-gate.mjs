@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from "os";
 import { resolve } from "path";
 import { execFileSync } from "child_process";
+import { withInputWriterBoundary } from "./lib/failure-gate/input-writer-boundary.mjs";
 const outDir = resolve("artifacts/bathyscan/public");
 const staging = mkdtempSync(resolve(tmpdir(), "failure-gate-package-"));
 const zipPath = resolve(outDir, "failure-gate-skill.zip");
@@ -21,13 +22,15 @@ try {
     writeFileSync(target, readFileSync(source));
     utimesSync(target, packageDate, packageDate);
   }
-  rmSync(zipPath, { force: true });
-  execFileSync("zip", [
-    "-q",
-    "-X",
-    zipPath,
-    ...packageFiles.map(([name]) => name),
-  ], { cwd: staging });
+  withInputWriterBoundary(process.cwd(), () => {
+    rmSync(zipPath, { force: true });
+    execFileSync("zip", [
+      "-q",
+      "-X",
+      zipPath,
+      ...packageFiles.map(([name]) => name),
+    ], { cwd: staging });
+  });
 } finally {
   rmSync(staging, { recursive: true, force: true });
 }

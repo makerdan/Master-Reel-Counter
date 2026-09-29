@@ -51,3 +51,4 @@
 - [Release schema fingerprint provenance](release-schema-fingerprint-provenance.md) — calculate reviewed production fingerprints through the application canonicalizer, not SQL or separately sorted metadata.
 - [Clerk testing sign-in navigation](clerk-testing-sign-in-navigation.md) — the testing helper activates a session without submitting the form; do not treat its route as a UI redirect verdict.
 - [Release Clerk script boot scope](release-clerk-script-boot-scope.md) — count successful Clerk script loads per completed main-document boot, not per Playwright page lifetime.
+- [Failure Gate writer coordination](failure-gate-writer-coordination.md) — a real file lock protects only cooperative writers; keep live completion blocked until writer coverage is verified.

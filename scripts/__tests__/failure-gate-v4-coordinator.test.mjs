@@ -1,4 +1,5 @@
 import test from "node:test";
+import { withInputWriterBoundary } from "../lib/failure-gate/input-writer-boundary.mjs";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -354,14 +355,17 @@ test("completion adapter executes inside transaction, rejects labels and preserv
   const run = f.c.startRun(f.runInput(task));
   f.c.finishRun({ runId: run.runId, expectedVersion: 1, evidence: { reference: "reports/run.json", digest: digest("raw") }, key: f.key() });
   const complete = () => f.c.terminate({ taskId: task.taskId, expectedVersion: 1, status: "completed", runId: run.runId, key: f.key() });
-  assert.throws(complete, /checker unavailable/);
+  assert.throws(() => withInputWriterBoundary(f.root, complete), /checker unavailable/);
   f.control.complete = () => ({ assessment: "PASS" });
-  assert.throws(complete, /rejected/);
+  assert.throws(complete, /input writer boundary unavailable/);
   f.control.complete = () => {
     assert.equal(f.c.db.inTransaction, true);
     return { assessment: "PASS", writerCoordinationHeld: true };
   };
-  assert.equal(complete().status, "completed");
+  assert.throws(complete, /input writer boundary unavailable/);
+  // Even a passing checker assertion is insufficient without the shared OS lock.
+  assert.equal(f.c.task(task.taskId).status, "active");
+  assert.equal(withInputWriterBoundary(f.root, complete).status, "completed");
   assert.throws(() => f.c.assignedTask(), /unavailable/);
   assert.throws(() => f.c.startRun(f.runInput(task)), /assignment/);
 });

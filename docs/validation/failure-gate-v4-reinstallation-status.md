@@ -26,6 +26,15 @@ attempts, not current authorization.
 - The project CLI no longer offers a platform-managed completion operation.
   Project code does not dispatch or depend on a platform completion result.
   Direct package tier commands remain diagnostics, not ordinary task evidence.
+- The local completion implementation now uses a cooperative OS file lock on
+  `.failure-gate-state/input-writers.lock` (excluded from evidence inputs).
+  The process retains the locked descriptor through final manifest reading,
+  evidence assessment, and the synchronous coordinator transaction. The
+  coordinator verifies actual in-process ownership instead of accepting a
+  callback's `writerCoordinationHeld` assertion. Plan creation, plan-guard
+  stub writes, and Failure Gate archive replacement acquire that same lock.
+  A concurrent locked writer is proven to delay completion until its change
+  can be detected by the final manifest check.
 
 ## Bootstrap validation
 
@@ -67,10 +76,15 @@ not an approval.
 The CLI still exposes only draft, review-request, status, and read-only
 tier-status operations. It does not offer activation, assignment, ordinary
 checked-run, or completion. No accepted runtime host-control adapter or
-verified final writer coordination covering relevant project file writers is
-installed. A database-only lock cannot cover the final input check, evidence
-assessment, and terminal write if file writers can intervene. Until those
-capabilities and a real human decision exist, no local-ID checked run or
+verified *complete* writer inventory is installed. The known script writers
+above cooperate, but direct editor/shell/Git edits, tests writing source files,
+build output, and other project-specific generators do not use this boundary.
+The lock is therefore not a claim of stable inputs against every writer;
+an uncoordinated edit can still intervene during a final check. The local
+coordinator refuses completion without its actual lock, but this alone cannot
+enable ordinary completion. Until the remaining writers are covered or an
+isolated immutable final input is verified, and the separate reviewer and
+host-control requirements are satisfied, no local-ID checked run or
 terminal decision can be demonstrated; live cutover stays **BLOCKED**.
 Do not manufacture a reviewer reference or substitute a caller-written
 approval flag, ad-hoc tier result, fixture test, or bootstrap pass.
@@ -79,7 +93,6 @@ The project-local workflow is cooperative, not tamper-proof: people with
 shell/write access can bypass or modify its local files. None of these
 records controls Replit's task board. Historical task records and unrelated
 task work were not reauthorized by the reinstallation.
-
 ## Mobile photo handoff (#922): prepared, NOT AUTHORIZED
 
 The human requester approved using the existing photo-handoff plan as the

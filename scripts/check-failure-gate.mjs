@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { withInputWriterBoundary } from "./lib/failure-gate/input-writer-boundary.mjs";
 import { resolve } from "path";
 import { loadCatalog, findExactRecord } from "./lib/baseline.mjs";
 import { getHeavyOnlyStepNames, loadTiers, referencedHeavyOnlyStepNames } from "./lib/tiers.mjs";
@@ -48,7 +49,7 @@ for (const file of files) {
       content += `\n## Validation\n**Command:** \`test-standard\`\n**Why:** FILL IN — explain why this registered tier covers the task.\n**Do not escalate:** Run exactly this command. Pre-existing failures are not a reason to run a heavier tier.\n`;
       changed = true;
     }
-    if (changed) writeFileSync(file, content);
+    if (changed) withInputWriterBoundary(process.cwd(), () => writeFileSync(file, content));
   }
   const baseline = section(content, "Pre-existing failures to ignore");
   const validation = section(content, "Validation");

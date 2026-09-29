@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
+import { withInputWriterBoundary } from "./lib/failure-gate/input-writer-boundary.mjs";
 
 const fix = process.argv.includes("--fix-stub");
 const stubsOnly = process.argv.includes("--stubs-only");
@@ -49,7 +50,7 @@ for (const file of files) {
   const qualifies = !classification.nonMaterial;
   if (fix && !stubsOnly && qualifies && !/^## Regression Guard\s*$/m.test(content)) {
     content += "\n## Regression Guard\n**Covers:** FILL IN\n**Test location:** FILL IN\n**What it checks:** FILL IN\n";
-    writeFileSync(file, content);
+    withInputWriterBoundary(process.cwd(), () => writeFileSync(file, content));
   }
   const body = section(content, "Regression Guard");
   if (!body) {

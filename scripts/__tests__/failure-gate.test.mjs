@@ -462,6 +462,9 @@ test("Failure Gate package reproduces byte-for-byte from a clean checkout", () =
   try {
     mkdirSync(dirname(publisher), { recursive: true });
     copyFileSync(join(ROOT, "scripts/publish-failure-gate.mjs"), publisher);
+    mkdirSync(join(checkout, "scripts/lib/failure-gate"), { recursive: true });
+    copyFileSync(join(ROOT, "scripts/lib/failure-gate/input-writer-boundary.mjs"),
+      join(checkout, "scripts/lib/failure-gate/input-writer-boundary.mjs"));
     for (const [, source] of PACKAGE_FILES) {
       const target = join(checkout, source);
       mkdirSync(dirname(target), { recursive: true });
