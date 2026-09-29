@@ -12,6 +12,7 @@ import {
 import "./failure-gate-v4-coordinator.test.mjs";
 import "./failure-gate-v4-evidence.test.mjs";
 import "./failure-gate-v4-execution.test.mjs";
+import "./failure-gate-v4-review-records.test.mjs";
 import { findExactRecord, isReferenceable, loadCatalog, maintenanceFindings } from "../lib/baseline.mjs";
 
 const ROOT = process.cwd();

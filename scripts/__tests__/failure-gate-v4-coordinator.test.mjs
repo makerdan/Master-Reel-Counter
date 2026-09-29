@@ -38,7 +38,11 @@ function fixture(t) {
   const approvals = new Map();
   const options = { directory, namespace: "fixture-workspace", root };
   const control = {
-    review(request) { return approvals.get(request.reference); },
+    review(request) {
+      const saved = approvals.get(request.reference);
+      return saved && { ...saved, recordReference: request.reference,
+        recordDigest: digest(saved), sourceCommit: "a".repeat(40), scope: request.scope };
+    },
     validatePlan(config) { return config.authorizedTier === "fixture-check" || config.authorizedTier === "fixture-expanded"; },
   };
   const c = new Coordinator({ ...options, control, testPlanValidator: control.validatePlan });

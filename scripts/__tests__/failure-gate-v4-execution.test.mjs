@@ -47,7 +47,9 @@ function fixture(t, steps) {
     testPlanValidator: () => true,
     control: {
       validatePlan: () => true,
-      review: (request) => ({ ...request, reviewer: "fixture-owner" }),
+      review: (request) => ({ ...request, reviewer: "fixture-owner",
+        recordReference: request.reference, recordDigest: digest(request),
+        sourceCommit: "a".repeat(40) }),
     } });
   t.after(() => { coordinator.close(); rmSync(directory, { recursive: true, force: true }); });
   const tier = { resource: "fixture", steps: steps ?? [
@@ -164,7 +166,7 @@ test("environment policy preserves approved runtime values, excludes unknown sel
 
 test("unavailable production control and platform dispatch never fall back to legacy", () => {
   assert.equal(candidateStatus().operational, false);
-  assert.match(candidateStatus().activation, /designated project-local human-review decision source/);
+  assert.match(candidateStatus().activation, /no designated human reviewer/);
   assert.equal("managedCompletion" in candidateStatus(), false);
   for (const args of [["scripts/failure-gate.mjs", "activate", "--approved"],
     ["scripts/failure-gate.mjs", "managed-completion"],

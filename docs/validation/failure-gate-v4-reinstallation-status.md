@@ -42,22 +42,35 @@ the subsequent checked `test-standard` run exited **0**: all **10 registered
 steps passed**, including the Failure Gate contract, four-file package
 parity, and manifest parity. No other tier was run for this bootstrap.
 These results validate the bounded installation, **not** an ordinary local-ID
-run or terminal decision.
+run or terminal decision. The later tracked-review adapter was not part of
+that bootstrap run; its focused tests are diagnostic, not another approved
+bootstrap tier.
 
 ## Ordinary local-ID cutover: BLOCKED
 
-The CLI currently exposes draft, review-request, status, and read-only
-tier-status operations. A review request is not an approval. There is **no
-configured source of actual decisions by a designated project-local human
-reviewer**, no accepted runtime host-control adapter binding those decisions
-to exact plans, policy/parameter/tier versions and task IDs, and no verified
-final writer coordination covering project writers. Thus the CLI does not
-offer activation, assignment, ordinary checked-run, or completion operations.
-The fixture coordinator/execution tests exercise those library paths but
-cannot establish live authority. The host control must be supplied and
-accepted before a real local-ID checked run and terminal decision can be
-demonstrated. Do not manufacture a reviewer reference or substitute a
-caller-written approval flag, ad-hoc tier result, or bootstrap pass.
+The project now has a tracked record location at
+`docs/validation/reviews/`, an intentionally empty designated-reviewer
+roster at `docs/validation/reviewers.json`, and a default coordinator check
+for an exact recorded human decision. It reads roster and record from one
+committed Git revision, verifies their working projections,
+reviewer designation, real record path, action, full subject digest, and
+explicit task, plan/version/digest, tier-definition/parameter, policy, and
+authorization-version scope. The coordinator retains the used record digest
+and source commit
+with its audited decision. Focused fixture tests cover missing and altered
+records, mismatched scope, and replay. **No actual reviewer has been
+designated or approved a decision.** A review request is not an approval.
+
+The CLI still exposes only draft, review-request, status, and read-only
+tier-status operations. It does not offer activation, assignment, ordinary
+checked-run, or completion. No accepted runtime host-control adapter or
+verified final writer coordination covering relevant project file writers is
+installed. A database-only lock cannot cover the final input check, evidence
+assessment, and terminal write if file writers can intervene. Until those
+capabilities and a real human decision exist, no local-ID checked run or
+terminal decision can be demonstrated; live cutover stays **BLOCKED**.
+Do not manufacture a reviewer reference or substitute a caller-written
+approval flag, ad-hoc tier result, fixture test, or bootstrap pass.
 
 The project-local workflow is cooperative, not tamper-proof: people with
 shell/write access can bypass or modify its local files. None of these

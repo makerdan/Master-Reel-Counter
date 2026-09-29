@@ -29,6 +29,7 @@ export function policyDeclaration({ root, policyInputs, tiers, parameters, envir
       "scripts/serial-lock.mjs", "scripts/lib/failure-gate/host.mjs",
       "scripts/lib/failure-gate/execution.mjs", "scripts/lib/failure-gate/assessment.mjs",
       "scripts/lib/failure-gate/evidence.mjs", "scripts/lib/failure-gate/coordinator.mjs",
+       "scripts/lib/failure-gate/review-records.mjs",
       "scripts/lib/failure-gate/runtime-tiers.mjs", "scripts/lib/failure-gate/plan-guards.mjs",
       "scripts/lib/failure-gate/bootstrap.mjs",
       "scripts/run-locked-tier.mjs", "scripts/run-tier.mjs",
@@ -41,7 +42,7 @@ export function policyDeclaration({ root, policyInputs, tiers, parameters, envir
 
 export function runtimePolicyInputs(root) {
   const inputs = ["package.json", "package-lock.json", "playwright.config.ts",
-    "docs/validation/manifest.json",
+    "docs/validation/manifest.json", "docs/validation/reviewers.json",
     ".agents/skills/validation-tiers/tiers.json"];
   function walk(path) {
     for (const entry of readdirSync(resolve(root, path), { withFileTypes: true })) {

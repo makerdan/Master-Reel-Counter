@@ -63,6 +63,17 @@ and policy/authorization versions. A self-declared actor name, CLI
 is a procedural rule with local consistency checks, not identity attestation;
 if no valid review is available, activation is blocked.
 
+The selected project-local source is a tracked review record under
+`docs/validation/reviews/`, with designated human reviewer IDs maintained in
+`docs/validation/reviewers.json`. Each decision names its tracked record path
+as a real reference and binds the full exact request plus explicit task,
+plan/version/digest, tier definition, permitted parameters, policy, and
+authorization versions. The coordinator reads the record and roster from one
+committed Git revision, checks their working projections, and retains the
+source commit before accepting the decision. This is a
+cooperative reviewable source, not proof of human identity. With no reviewer
+designated, the roster remains empty and activation stays blocked.
+
 A previously approved deterministic activation policy can later cover
 specific tasks, but none is created or presumed by this migration. Such a
 policy must have a separately recorded approval, precise matching conditions,
@@ -109,9 +120,12 @@ qualifies as acceptable with an ignored failure.
 
 The project-local terminal checker compares complete evidence for **that
 same authorized tier** with the final inputs and authorization, under the
-required writer coordination. Incomplete reports, stale snapshots, changed
-policy, unknown environment, or unavailable coordination block local
-completion. Failed/cancelled task cleanup remains possible without a
+required writer coordination. The final input check, evidence assessment,
+and terminal write must share a verified boundary with relevant project
+file writers; a SQLite-only transaction does not suffice if those writers
+can intervene. Incomplete reports, stale snapshots, changed policy,
+unknown environment, or unavailable coordination block local completion
+and cutover. Failed/cancelled task cleanup remains possible without a
 passing run. This local decision neither calls nor relies on any
 platform-managed completion route.
 

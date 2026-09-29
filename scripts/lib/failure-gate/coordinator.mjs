@@ -2,7 +2,9 @@ import Database from "better-sqlite3";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync, readFileSync, lstatSync, existsSync, chmodSync } from "node:fs";
 import { resolve, relative, sep } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { validateProjectPlan } from "./plan-guards.mjs";
+import { createTrackedReviewControl } from "./review-records.mjs";
 
 // Workflow-local coordination, NOT an attestation service. The separately
 // supplied control adapter resolves actual review references. There is no
@@ -10,12 +12,21 @@ import { validateProjectPlan } from "./plan-guards.mjs";
 export const digest = (value) => createHash("sha256").update(
   typeof value === "string" ? value : JSON.stringify(value),
 ).digest("hex");
+export const reviewScope = (taskId, config, before, after) => ({
+  taskId, planReference: config.planReference ?? null, planVersion: config.planVersion ?? null,
+  planDigest: config.planDigest ?? null, authorizedTier: config.authorizedTier ?? null,
+  tierDefinitionDigest: config.tierDefinitionDigest ?? null,
+  parametersDigest: config.parametersDigest ?? null, policyVersion: config.policyVersion ?? null,
+  policyDigest: config.policyDigest ?? null,
+  authorizationVersionBefore: before, authorizationVersionAfter: after,
+});
 const requireValue = (condition, message) => {
   if (!condition) throw new Error(`FAILURE-GATE BLOCKED: ${message}`);
 };
 const text = (value) => typeof value === "string" && value.length > 0 &&
   value.length <= 2048 && !/[\x00-\x1f]/.test(value);
 const hash = (value) => /^[a-f0-9]{64}$/.test(value ?? "");
+const gitCommit = (value) => /^[a-f0-9]{40,64}$/.test(value ?? "");
 const terminal = new Set(["completed", "failed", "cancelled"]);
 const placeholder = (value) => !text(value) || /<[^>]+>|\b(FILL IN|TBD|TODO)\b/i.test(value);
 const section = (content, heading) => {
@@ -44,7 +55,7 @@ export class Coordinator {
     mkdirSync(storage, { recursive: true, mode: 0o700 });
     requireValue(realpathSync(storage) === storage, "storage symlink is forbidden");
     this.namespace = namespace;
-    this.control = control;
+    this.control = control ?? createTrackedReviewControl({ root: this.root });
     this.testPlanValidator = testPlanValidator;
     this.identity = randomUUID();
     const databasePath = resolve(storage, "coordinator.sqlite");
@@ -77,6 +88,11 @@ export class Coordinator {
         reference TEXT NOT NULL, action TEXT NOT NULL, subject_digest TEXT NOT NULL,
         reviewer TEXT NOT NULL, PRIMARY KEY(reference, action, subject_digest)
       );
+      CREATE TABLE IF NOT EXISTS approval_record_evidence (
+        reference TEXT NOT NULL, action TEXT NOT NULL, subject_digest TEXT NOT NULL,
+        record_digest TEXT NOT NULL, source_commit TEXT NOT NULL, scope TEXT NOT NULL,
+        PRIMARY KEY(reference, action, subject_digest)
+      );
       CREATE TABLE IF NOT EXISTS tier_status_history (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL REFERENCES tasks(id),
         authorization_version INTEGER NOT NULL, mapping_digest TEXT NOT NULL, statuses TEXT NOT NULL,
@@ -97,6 +113,8 @@ export class Coordinator {
       CREATE TRIGGER IF NOT EXISTS retain_audit BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT, 'audit history is permanent'); END;
       CREATE TRIGGER IF NOT EXISTS retain_tier_status_history BEFORE DELETE ON tier_status_history BEGIN SELECT RAISE(ABORT, 'tier status history is permanent'); END;
       CREATE TRIGGER IF NOT EXISTS retain_tier_status_updates BEFORE UPDATE ON tier_status_history BEGIN SELECT RAISE(ABORT, 'tier status history is append-only'); END;
+      CREATE TRIGGER IF NOT EXISTS retain_approval_record_evidence BEFORE DELETE ON approval_record_evidence BEGIN SELECT RAISE(ABORT, 'review evidence is permanent'); END;
+      CREATE TRIGGER IF NOT EXISTS retain_approval_record_updates BEFORE UPDATE ON approval_record_evidence BEGIN SELECT RAISE(ABORT, 'review evidence is append-only'); END;
     `);
     this.db.transaction(() => {
       for (const [key, value] of [["namespace", namespace], ["root", this.root], ["schema", "1"]]) {
@@ -185,18 +203,36 @@ export class Coordinator {
       throw error;
     }
   }
-  review(reference, action, subject) {
+  review(reference, action, subject, scope) {
     requireValue(text(reference) && typeof this.control?.review === "function", "independent approval route unavailable");
     const subjectDigest = digest(subject);
-    const evidence = this.control.review({ reference, action, subjectDigest, namespace: this.namespace });
+    const evidence = this.control.review({ reference, action, subject, subjectDigest, scope,
+      namespace: this.namespace });
     requireValue(evidence && evidence.reference === reference && evidence.action === action &&
       evidence.subjectDigest === subjectDigest && text(evidence.reviewer) &&
-      evidence.namespace === this.namespace, "approval does not bind exact change");
+       evidence.namespace === this.namespace && evidence.recordReference === reference &&
+       hash(evidence.recordDigest) && gitCommit(evidence.sourceCommit) &&
+       isDeepStrictEqual(evidence.scope, scope),
+    "approval does not bind exact change");
     requireValue(this.db.inTransaction, "review must bind a transaction");
+    const prior = this.db.prepare(`SELECT record_digest,source_commit,scope FROM approval_record_evidence
+      WHERE reference=? AND action=? AND subject_digest=?`).get(reference, action, subjectDigest);
+    const priorApproval = this.db.prepare(`SELECT reviewer FROM approvals
+      WHERE reference=? AND action=? AND subject_digest=?`).get(reference, action, subjectDigest);
+    requireValue(!prior || (prior.record_digest === evidence.recordDigest &&
+      prior.source_commit === evidence.sourceCommit &&
+      isDeepStrictEqual(JSON.parse(prior.scope), scope)), "review record changed after use");
+    requireValue(!priorApproval || priorApproval.reviewer === evidence.reviewer,
+      "reviewer changed after use");
     this.db.prepare("INSERT OR IGNORE INTO approvals VALUES (?,?,?,?)")
       .run(reference, action, subjectDigest, evidence.reviewer);
-    // Store references, not arbitrary conversation bodies or credentials.
-    return { reference, action, subjectDigest, reviewer: evidence.reviewer, mode: "workflow" };
+    this.db.prepare(`INSERT OR IGNORE INTO approval_record_evidence
+      (reference,action,subject_digest,record_digest,source_commit,scope) VALUES (?,?,?,?,?,?)`)
+      .run(reference, action, subjectDigest, evidence.recordDigest, evidence.sourceCommit,
+        JSON.stringify(scope));
+    // Retain the exact tracked record digest, not arbitrary conversation bodies.
+    return { reference, action, subjectDigest, reviewer: evidence.reviewer,
+      recordDigest: evidence.recordDigest, sourceCommit: evidence.sourceCommit, mode: "workflow" };
   }
   saveTask(task, expected) {
     const row = this.db.prepare("UPDATE tasks SET status=?,version=?,data=? WHERE id=? AND version=?")
@@ -300,7 +336,8 @@ export class Coordinator {
       this.validatePlanGuards(taskId, approved);
       requireValue(this.registeredTiers().includes(approved.authorizedTier),
         "authorized tier is not currently registered");
-      const approval = this.review(approvalReference, "activate", { taskId, expectedVersion, config: approved });
+       const approval = this.review(approvalReference, "activate", { taskId, expectedVersion, config: approved },
+         reviewScope(taskId, approved, expectedVersion, expectedVersion + 1));
       const activated = this.saveTask({ ...task, ...approved, approval, status: "active",
         authorizationVersion: expectedVersion + 1 }, expectedVersion);
       this.recordTierStatus(activated);
@@ -314,7 +351,8 @@ export class Coordinator {
       const old = this.db.prepare("SELECT task_id FROM assignment WHERE singleton=1").get();
       if (old?.task_id) this.idle(old.task_id);
       this.idle(taskId);
-      this.review(approvalReference, "assign", { taskId, authorizationVersion: task.authorizationVersion });
+       this.review(approvalReference, "assign", { taskId, authorizationVersion: task.authorizationVersion },
+         reviewScope(taskId, task, task.authorizationVersion, task.authorizationVersion));
       this.db.prepare("INSERT INTO assignment VALUES (1,?) ON CONFLICT(singleton) DO UPDATE SET task_id=excluded.task_id").run(taskId);
       return { taskId };
     });
@@ -348,8 +386,9 @@ export class Coordinator {
       requireValue(!accept || update.planVersion > task.planVersion, "amendment must advance plan version");
       if (accept) requireValue(this.registeredTiers().includes(update.authorizedTier),
         "amended tier is not currently registered");
-      const approval = this.review(approvalReference, accept ? "amend" : "reject",
-        { taskId, expectedVersion, pendingChange: task.pendingChange });
+       const approval = this.review(approvalReference, accept ? "amend" : "reject",
+         { taskId, expectedVersion, pendingChange: task.pendingChange },
+         reviewScope(taskId, accept ? update : task, expectedVersion, expectedVersion + 1));
       const updated = this.saveTask({ ...task, ...update, approval, pendingChange: null,
         // Rejecting or accepting a proposal never clears independent suspension.
         suspension: accept && task.suspension === "coverage-inadequate" ? null : task.suspension,
@@ -374,7 +413,8 @@ export class Coordinator {
       this.version(task, expectedVersion); this.idle(taskId);
       requireValue(task.suspension && !task.pendingChange, "unresolved change or no suspension");
       this.plan(task.planReference, task.planContent);
-      this.review(approvalReference, "resume", { taskId, expectedVersion, suspension: task.suspension });
+       this.review(approvalReference, "resume", { taskId, expectedVersion, suspension: task.suspension },
+         reviewScope(taskId, task, expectedVersion, expectedVersion + 1));
       const updated = this.saveTask({ ...task, suspension: null, authorizationVersion: expectedVersion + 1 }, expectedVersion);
       this.recordTierStatus(updated);
       return updated;
@@ -493,7 +533,9 @@ export class Coordinator {
     return this.mutate(key, "recover", { runId, expectedVersion, approvalReference }, () => {
       const run = this.run(runId);
       requireValue(["running", "quarantined"].includes(run.status) && run.leaseVersion === expectedVersion, "not a recoverable lease");
-      this.review(approvalReference, "recover", { runId, expectedVersion, processIdentity: run.processIdentity });
+       const task = this.task(run.taskId);
+       this.review(approvalReference, "recover", { runId, expectedVersion, processIdentity: run.processIdentity },
+         reviewScope(task.taskId, task, task.authorizationVersion, task.authorizationVersion));
       // Only a host adapter which verifies process start identity can confirm stop.
       // An elapsed timer, PID alone, or a caller flag is never enough.
       const stopped = this.control?.processStopped?.(run.processIdentity) === true;
@@ -522,7 +564,8 @@ export class Coordinator {
           ["PASS", "ACCEPTABLE_WITH_IGNORED_FAILURES"].includes(decision.assessment),
         "completion evidence rejected");
       } else {
-        this.review(approvalReference, "terminate", { taskId, expectedVersion, status });
+         this.review(approvalReference, "terminate", { taskId, expectedVersion, status },
+           reviewScope(taskId, task, expectedVersion, expectedVersion + 1));
       }
       this.db.prepare("DELETE FROM assignment WHERE task_id=?").run(taskId);
       const updated = this.saveTask({ ...task, status, authorizedTier: null, pendingChange: null,
