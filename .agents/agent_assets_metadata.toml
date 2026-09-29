@@ -42,3 +42,17 @@ mtime_ms = 1790242204660
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/401c8f8a-661a-47df-99ed-436b14bcd45b/735f96f5-03b4-4a3f-97e7-b7a233312552"
 storage_version_token = "1790242231501836"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "d5NpMVLeerss7igSOYYOX"
+uri = "file://docs/superpowers/specs/2026-09-28-failure-gate-v4-local-reinstallation-design.md"
+type = "text"
+title = "Failure Gate v4 reinstallation design"
+description = "Approved project-local design specification (Markdown)."
+logical_id = "18ef9c9f-3338-4cb9-963c-9b6b2bbbc3cf"
+content_hash = "sha256:1b17d14ca88c19cd5557b1eff3dd83c1bba1cc795834d78d6da822a89fa49f87"
+size = 8271
+mtime_ms = 1790650620339
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/18ef9c9f-3338-4cb9-963c-9b6b2bbbc3cf/3f0a48e0-8769-4411-b36a-8d452f03328a"
+storage_version_token = "1790650999478453"
+content_type = "text/markdown"
