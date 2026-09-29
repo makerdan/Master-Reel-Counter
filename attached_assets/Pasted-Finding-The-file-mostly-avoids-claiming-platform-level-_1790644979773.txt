@@ -1,0 +1,137 @@
+Finding
+The file mostly avoids claiming platform-level enforcement, but there are still parts that can be read as requiring or depending on capabilities that Failure Gate v4 explicitly says it does not provide, especially around:
+
+active task / task identity binding
+approval / review authority
+baseline owner/reviewer workflow
+1. Platform active-task binding issue
+The document correctly says:
+
+“installing it does not install the runner or registry or change Replit Agent's task lifecycle.”
+
+It also says:
+
+“A local record cannot attest the identity of a Replit Agent platform task.”
+
+And:
+
+“This does not gate Replit Agent's Task Board or any platform-owned success path.”
+
+Those are good v4-compatible limitations.
+
+However, the skill still contains language that may imply an active-task binding exists or can be relied on:
+
+“Within checked project tooling, one stable local task ID has one active authorized tier.”
+
+This is okay if strictly interpreted as project-local, but it could be confused with a Replit Agent active task.
+
+More importantly:
+
+“Use the explicit planning capability, not an active task lock.”
+
+This references an active task lock, even to say not to use it. If the v4 migration no longer claims any platform active-task binding, this wording should probably be tightened so it does not imply such a lock is a supported or expected platform integration.
+
+Also:
+
+“Do not unset task context, invoke another task's lock, or relabel work as ad hoc.”
+
+This line refers to task context and another task's lock. Again, it may be intended as local-runner behavior, but it risks implying the skill can bind to or control a platform active task.
+
+Suggested fix
+Replace platform-sounding lock language with explicitly local wording.
+
+For example:
+
+markdown
+Use the explicit project-local planning capability, not any platform active-task
+binding. If the host has no verified local activation mechanism, report the
+setup as blocked rather than implying platform task enforcement.
+
+And revise:
+
+markdown
+Do not unset task context, invoke another task's lock, or relabel work as ad hoc.
+
+to:
+
+markdown
+Do not remove the project-local task ID from checked runner inputs, invoke
+another local task's authorization record, or relabel project validation as
+ad hoc.
+
+2. Owner-review route issue
+There is no exact phrase “owner review.”
+
+But this file does ask for review/approval paths that may be interpreted as requiring a human owner-review route:
+
+“Approval must identify the authorized human or policy authority and its evidence.”
+
+And:
+
+“Catalog promotion is separate maintenance with evidence, owner, reviewer, applicability, matching rule, and review deadline.”
+
+This is probably the closest match to the issue.
+
+The phrase:
+
+“owner, reviewer”
+
+does not literally say owner-review route, but it does require a maintenance process with both an owner and reviewer. If the planned project-local v4 migration no longer claims to provide such a route, this is too strong unless framed as only when the host already has that governance capability.
+
+Suggested fix
+Change:
+
+markdown
+Catalog promotion is separate maintenance with evidence,
+owner, reviewer, applicability, matching rule, and review deadline.
+
+to:
+
+markdown
+Catalog promotion is separate maintenance only when the host has a verified
+catalog-governance route. Record the evidence, applicable owner/reviewer fields
+or policy authority, applicability, matching rule, and review deadline required
+by that host route. If no such route exists, do not promote catalog entries;
+leave the failure task-local or report the maintenance path as unavailable.
+
+And change:
+
+markdown
+Approval must identify the authorized human or policy authority and its evidence.
+
+to:
+
+markdown
+Approval must identify the verified project-local approval authority, if one
+exists, and its evidence. If the host has no verified approval route for the
+requested change, report the change as unavailable or blocked rather than
+inventing owner review.
+
+3. Overall assessment
+The skill is already mostly aligned with project-local v4. It repeatedly says it cannot enforce Replit platform behavior.
+
+However, the issue is still valid because the document includes terms and requirements that can imply unavailable routes:
+
+active task lock
+task context
+another task's lock
+authorized human
+owner, reviewer
+review deadline
+These should be clarified as verified host/project-local capabilities only, not as guaranteed Failure Gate v4 functionality.
+
+Recommended patch summary
+Add or strengthen wording that says:
+
+markdown
+Failure Gate v4 does not provide a Replit platform active-task binding, owner-review
+workflow, human approval service, or catalog-governance route. Use only verified
+project-local host capabilities. If those routes are absent, report the capability
+as unavailable or blocked; do not imply that this skill supplies them.
+
+Best places to add this:
+
+Purpose and boundary
+Discover, then install or operate
+Change authorization deliberately
+Classify failures without expanding scope, near catalog promotion.
