@@ -70,9 +70,12 @@ async function globalSetup() {
   await assertClerkTestPermissions(clerk);
 
   const localUserId = `e2e-clerk-${randomUUID()}`;
-  const email = `e2e-clerk+${randomUUID()}@example.com`;
+  // Clerk's reserved development test-email subaddress accepts verification
+  // code 424242 without a dashboard allowlist or a real mailbox.
+  const email = `e2e-clerk-${randomUUID()}+clerk_test@example.com`;
   const password = `E2e-${randomUUID()}!9`;
   process.env.E2E_CLERK_EMAIL = email;
+  process.env.E2E_CLERK_PASSWORD = password;
   const database = new pg.Client({ connectionString: databaseUrl });
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   let createdFixture: ClerkBrowserFixture | null = null;

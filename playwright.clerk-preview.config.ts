@@ -30,7 +30,9 @@ const chromiumExecutable = findChromium();
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "clerk-*.spec.ts",
+  // This command is bootstrap-only: fixture-backed sign-in tests run under
+  // playwright.config.ts, whose global setup creates their disposable account.
+  testMatch: ["clerk-bootstrap-recovery.spec.ts", "clerk-preview-bootstrap.spec.ts"],
   workers: 1,
   retries: 0,
   reporter: "line",

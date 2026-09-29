@@ -218,11 +218,9 @@ async function waitForCompletedSignIn(
     };
     recordObservation(observation, "poll");
 
-    if (
-      !path.startsWith("/sign-in") &&
-      clerkState.loaded &&
-      clerkState.hasActiveSession
-    ) {
+    // clerkTesting.signIn sets the session directly without submitting the
+    // SignIn form; do not mistake this for a completed UI fallback redirect.
+    if (clerkState.loaded && clerkState.hasActiveSession) {
       recordObservation(observation, "completed", true);
       sessionDiagnostics.failureCategory = "none";
       return;
@@ -409,6 +407,8 @@ test.describe("Google-backed Clerk application boundary", () => {
         await removeStaleSmokeUsers(database, clerk);
         await page.goto("/settings");
         await page.getByTestId("button-login").click();
+        await expect(page).toHaveURL(/\/sign-in(?:\?|$)/);
+        expect(new URL(page.url()).searchParams.get("redirect_url")).toBe("/settings");
         await expect(
           page.getByRole("button", { name: /google/i }),
           "Clerk sign-in must expose the Google provider",
@@ -431,6 +431,9 @@ test.describe("Google-backed Clerk application boundary", () => {
         });
 
         await waitForCompletedSignIn(page, routeStates, sessionDiagnostics);
+        await page.goto("/settings");
+        await expect(page).toHaveURL(`${baseURL}/settings`);
+        await expect(page.getByTestId("text-settings-title")).toBeVisible();
         expect(proxyRequests.length, "Clerk traffic must use the release proxy").toBeGreaterThan(0);
 
         const authResponse = await page.evaluate(async () => {

@@ -1258,8 +1258,9 @@ test("smoke uses Clerk's supported testing sign-in and keeps safe failure eviden
   assert.match(smoke, /frontendApiUrl: new URL\(CLERK_TESTING_FRONTEND_API_ORIGIN\)\.host/);
   assert.match(
     smoke,
-    /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/settings"\)/,
+    /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/settings"\);\s*await expect\(page\)\.toHaveURL\(`\$\{baseURL\}\/settings`\);\s*await expect\(page\.getByTestId\("text-settings-title"\)\)/,
   );
+  assert.doesNotMatch(smoke, /history\.replaceState/);
   assert.match(smoke, /clerkScriptResponses/);
   assert.match(smoke, /Clerk JavaScript must load once from the exact candidate proxy/);
   assert.match(smoke, /contentType/);
@@ -1753,11 +1754,11 @@ test("smoke proves proxy, cookie-only API, protected pages, and sign-out", () =>
   assert.doesNotMatch(smoke, /page\.request/);
   assert.match(
     smoke,
-    /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/settings"\)/,
+    /waitForCompletedSignIn\(page, routeStates\);\s*await page\.goto\("\/settings"\);\s*await expect\(page\)\.toHaveURL\(`\$\{baseURL\}\/settings`\)/,
   );
   assert.match(
     smoke,
-    /await page\.goto\("\/settings"\);[\s\S]*?getByTestId\("text-settings-title"\)/,
+    /await page\.getByTestId\("button-login"\)\.click\(\);[\s\S]*?await expect\(page\.getByTestId\("text-settings-title"\)\)/,
   );
   assert.match(smoke, /page\.goto\("\/settings"\)/);
   assert.match(smoke, /page\.goto\("\/stats"\)/);
@@ -1780,7 +1781,11 @@ test("Google role smoke requires an active Clerk session and emits only coarse s
   assert.match(googleReleaseSmoke, /"clerk-unloaded"/);
   assert.match(
     googleReleaseSmoke,
-    /!path\.startsWith\("\/sign-in"\)[\s\S]*clerkState\.loaded[\s\S]*clerkState\.hasActiveSession/,
+    /if \(clerkState\.loaded && clerkState\.hasActiveSession\)/,
+  );
+  assert.match(
+    googleReleaseSmoke,
+    /waitForCompletedSignIn\(page, routeStates, sessionDiagnostics\);\s*await page\.goto\("\/settings"\);\s*await expect\(page\)\.toHaveURL\(`\$\{baseURL\}\/settings`\)/,
   );
   assert.match(googleReleaseSmoke, /sessionObservations/);
   assert.match(googleReleaseSmoke, /sessionFailureCategory/);

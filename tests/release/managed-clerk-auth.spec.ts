@@ -83,6 +83,8 @@ async function waitForCompletedSignIn(
         hasActiveSession: Boolean(clerk?.session?.id),
       };
     });
+    // The testing helper sets the session directly. It does not submit the
+    // SignIn component's form or trigger its fallback redirect.
     if (clerkState.loaded && clerkState.hasActiveSession) {
       return;
     }
@@ -91,7 +93,7 @@ async function waitForCompletedSignIn(
   }
 
   throw new Error(
-    `Managed Clerk sign-in did not reach a loaded Clerk instance with an active session from ${safeBrowserPath(
+    `Managed Clerk sign-in did not reach a loaded Clerk instance with an active session from ${safeDiagnosticPath(
       page.url(),
     )}`,
   );
@@ -294,9 +296,8 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
         throw new Error("Managed Clerk protected entry page failed to load");
       });
     await page.getByTestId("button-login").click();
-    await page.evaluate(() => {
-      history.replaceState(null, "", `${location.pathname}${location.hash}`);
-    });
+    await expect(page).toHaveURL(/\/sign-in(?:\?|$)/);
+    expect(new URL(page.url()).searchParams.get("redirect_url")).toBe("/settings");
     const expectedCandidateId = process.env.RELEASE_SMOKE_CANDIDATE_ID;
     if (expectedCandidateId) {
       const candidateId = await page.evaluate(async () => {
@@ -316,6 +317,8 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
 
     await waitForCompletedSignIn(page, routeStates);
     await page.goto("/settings");
+    await expect(page).toHaveURL(`${baseURL}/settings`);
+    await expect(page.getByTestId("text-settings-title")).toBeVisible({ timeout: 30_000 });
     const authResponse = await page.evaluate(async () => {
       const response = await fetch("/api/auth/user", {
         credentials: "same-origin",
@@ -337,7 +340,7 @@ test("managed Clerk sign-in preserves local authorization and protected navigati
     });
     expect(
       authResponse.status,
-      `Post-sign-in local authorization failed at ${page.url()}: ${JSON.stringify(authResponse.user)}`,
+      `Post-sign-in local authorization failed at ${safeDiagnosticPath(page.url())}`,
     ).toBe(200);
     const appUser = authResponse.user;
     expect(appUser).toMatchObject({
