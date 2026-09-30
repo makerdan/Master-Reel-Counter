@@ -232,6 +232,114 @@ async function enterMobileFlow(page: import("@playwright/test").Page): Promise<v
 }
 
 test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
+  test("hands a captured photo to Photos Reel and reloads its protected image @mobile-image-orientation", async ({
+    page,
+    context,
+    request,
+  }, testInfo) => {
+    expect(testInfo.project.use.isMobile, "this handoff must run in a phone project").toBe(true);
+    expect(testInfo.project.use.hasTouch, "the phone project must support touch").toBe(true);
+    const session = await createSessionViaApi(request, `Mobile Reel Handoff ${Date.now()}`);
+    const uploadResponses: import("@playwright/test").Response[] = [];
+    const registrationResponses: import("@playwright/test").Response[] = [];
+    const imageResponses: import("@playwright/test").Response[] = [];
+    const photoApiPath = `/api/sessions/${session.id}/photos`;
+    page.on("response", response => {
+      if (response.request().method() === "POST" && response.url().endsWith("/api/uploads/direct")) {
+        uploadResponses.push(response);
+      }
+      if (response.request().method() === "POST" && response.url().endsWith(photoApiPath)) {
+        registrationResponses.push(response);
+      }
+      if (response.request().method() === "GET" && new URL(response.url()).pathname.startsWith("/uploads/")) {
+        imageResponses.push(response);
+      }
+    });
+
+    await page.goto(`/session/${session.id}`);
+    await enterMobileFlow(page);
+    await page.locator('[data-testid="input-mobile-aisle"]').fill("B");
+    await page.locator('[data-testid="input-mobile-section"]').fill("007");
+    const image = await sharp({
+      create: { width: 37, height: 23, channels: 3, background: { r: 42, g: 116, b: 204 } },
+    }).jpeg({ quality: 90 }).toBuffer();
+    await context.setOffline(true);
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.locator('[data-testid="button-mobile-upload"]').click();
+    const chooser = await chooserPromise;
+    await chooser.setFiles({ name: "handoff.jpg", mimeType: "image/jpeg", buffer: image });
+
+    await expect.poll(() => queuedPhotoCount(page)).toBe(1);
+    await expect(page.locator('[data-testid="upload-queue-status"]')).toBeVisible();
+    expect(uploadResponses).toHaveLength(0);
+    expect(registrationResponses).toHaveLength(0);
+    await context.setOffline(false);
+    await expect.poll(() => registrationResponses.length, { timeout: 30_000 }).toBe(1);
+    await expect.poll(() => queuedPhotoCount(page), { timeout: 20_000 }).toBe(0);
+    await expect(page.locator('[data-testid="upload-queue-status"]')).toBeHidden();
+    expect(uploadResponses, "direct upload response").toHaveLength(1);
+    expect(uploadResponses[0].ok(), `direct upload returned ${uploadResponses[0].status()}`).toBe(true);
+    const upload = await uploadResponses[0].json() as { objectPath: string };
+    expect(upload.objectPath).toMatch(/^\/uploads\/[A-Za-z0-9._-]+$/);
+    expect(registrationResponses, "photo registration response").toHaveLength(1);
+    expect(registrationResponses[0].ok(), `photo registration returned ${registrationResponses[0].status()}`).toBe(true);
+    const registered = await registrationResponses[0].json() as { id: number; objectStorageKey: string };
+    expect(registered.id).toEqual(expect.any(Number));
+    expect(registered.objectStorageKey).toBe(upload.objectPath);
+
+    const readPhotos = async () => {
+      const response = await request.get(photoApiPath);
+      expect(response.ok(), `session photos returned ${response.status()}: ${await response.text()}`).toBe(true);
+      return response.json() as Promise<Array<{
+        id: number; objectStorageKey: string; width: number; height: number;
+        aisle: string; section: string; originalFilename: string;
+      }>>;
+    };
+    const photos = await readPhotos();
+    expect(photos).toHaveLength(1);
+    expect(photos[0]).toMatchObject({
+      id: registered.id,
+      objectStorageKey: upload.objectPath,
+      width: 37,
+      height: 23,
+      aisle: "B",
+      section: "007",
+      originalFilename: "handoff.jpg",
+    });
+
+    const successfulImageReads = () => imageResponses.filter(response =>
+      new URL(response.url()).pathname === upload.objectPath && response.ok()
+    ).length;
+    const assertReelImage = async (previousReads: number) => {
+      await expect(page.locator('[data-testid="tab-strip-mode"]')).toHaveAttribute("data-state", "active");
+      const card = page.locator(`[data-testid="strip-card-${registered.id}"]`);
+      await expect(card).toBeVisible();
+      const thumb = card.locator(`[data-testid="img-strip-thumb-${registered.id}"]`);
+      await thumb.scrollIntoViewIfNeeded();
+      await expect(thumb).toHaveAttribute("src", upload.objectPath);
+      await expect.poll(() => thumb.evaluate((element: HTMLImageElement) => ({
+        loaded: element.complete && element.naturalWidth > 0 && element.naturalHeight > 0,
+        width: element.naturalWidth,
+        height: element.naturalHeight,
+      })), { timeout: 20_000 }).toEqual({ loaded: true, width: 37, height: 23 });
+      await expect.poll(successfulImageReads, { timeout: 20_000 }).toBeGreaterThan(previousReads);
+      await expect(page.locator('[data-testid^="strip-card-"]')).toHaveCount(1);
+    };
+
+    await page.locator('[data-testid="button-toggle-mobile"]').click();
+    await page.locator('[data-testid="tab-strip-mode"]').click();
+    await assertReelImage(0);
+    const readsBeforeReload = successfulImageReads();
+    await page.reload();
+    // Phone layouts open Mobile Flow on a fresh document.
+    await enterMobileFlow(page);
+    await page.locator('[data-testid="button-toggle-mobile"]').click();
+    await page.locator('[data-testid="tab-strip-mode"]').click();
+    await assertReelImage(readsBeforeReload);
+    expect(await readPhotos()).toEqual(photos);
+    expect(await queuedPhotoCount(page)).toBe(0);
+  });
+
   test("reconciles both queue stores atomically and only recovers current-owner claims", async ({
     page,
   }) => {
