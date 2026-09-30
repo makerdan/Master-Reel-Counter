@@ -24,6 +24,7 @@ import { randomUUID } from "node:crypto";
 import {
   executePhotoDeletion,
   executeSessionPhotoFileCleanup,
+  resolveLocalUploadPath,
   type PhotoDeletionDeps,
 } from "../routes.js";
 import { physicalObjectKeyAliases, storage } from "../storage.js";
@@ -98,6 +99,78 @@ describe("canonical physical object identity", () => {
       physicalObjectKeyAliases("/objects/uploads/shared.jpg"),
       ["/uploads/shared.jpg", "/objects/uploads/shared.jpg"],
     );
+  });
+});
+
+describe("safe local upload paths", () => {
+  test("accepts direct and legacy aliases only when they identify one upload filename", () => {
+    assert.deepEqual(
+      resolveLocalUploadPath("/tmp/uploads", "/uploads/photo-1.jpg"),
+      { filename: "photo-1.jpg", path: "/tmp/uploads/photo-1.jpg" },
+    );
+    assert.deepEqual(
+      resolveLocalUploadPath("/tmp/uploads", "/objects/uploads/photo-1.jpg"),
+      { filename: "photo-1.jpg", path: "/tmp/uploads/photo-1.jpg" },
+    );
+  });
+
+  test("rejects traversal, nested paths, and keys outside the upload namespace", () => {
+    for (const key of [
+      "/uploads/../../etc/passwd",
+      "/uploads/subdirectory/photo.jpg",
+      "/uploads/..",
+      "/objects/private/secret.txt",
+      "/uploads/..\\..\\secret.txt",
+    ]) {
+      assert.equal(resolveLocalUploadPath("/tmp/uploads", key), undefined, key);
+    }
+  });
+});
+
+describe("photo upload intent ownership", () => {
+  test("only the intent owner can register the upload, and retries remain idempotent", async () => {
+    const ownerUserId = `photo-upload-owner-${randomUUID()}`;
+    const otherUserId = `photo-upload-other-${randomUUID()}`;
+    const objectPath = `/uploads/${randomUUID()}.jpg`;
+    const [session] = await db.insert(countingSessions).values({
+      userId: ownerUserId,
+      name: `__photo-upload-intent-${ownerUserId}__`,
+    }).returning();
+
+    try {
+      await db.insert(uploadIntents).values({ objectPath, userId: ownerUserId });
+      const registrationKey = randomUUID();
+      const otherUserPhoto = {
+        sessionId: session.id,
+        userId: otherUserId,
+        objectStorageKey: objectPath,
+        originalFilename: "photo.jpg",
+        registrationKey,
+      };
+
+      await assert.rejects(
+        storage.atomicCreatePhoto(otherUserPhoto, ".jpg"),
+        /upload intent is invalid or expired/i,
+      );
+      assert.equal(
+        (await db.select().from(photos).where(eq(photos.sessionId, session.id))).length,
+        0,
+        "failed ownership checks must roll back the photo row",
+      );
+
+      const ownerPhoto = { ...otherUserPhoto, userId: ownerUserId };
+      const created = await storage.atomicCreatePhoto(ownerPhoto, ".jpg");
+      const retry = await storage.atomicCreatePhoto(ownerPhoto, ".jpg");
+      assert.equal(retry.id, created.id);
+      assert.equal(
+        (await db.select().from(uploadIntents).where(eq(uploadIntents.objectPath, objectPath))).length,
+        0,
+        "successful registration consumes the matching intent",
+      );
+    } finally {
+      await db.delete(uploadIntents).where(eq(uploadIntents.objectPath, objectPath)).catch(() => {});
+      await db.delete(countingSessions).where(eq(countingSessions.id, session.id)).catch(() => {});
+    }
   });
 });
 

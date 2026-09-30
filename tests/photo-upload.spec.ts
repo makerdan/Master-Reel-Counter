@@ -25,18 +25,7 @@ async function interceptLostFirstRegistration(
   const keys: string[] = [];
   await context.route("**/api/uploads/direct", async (route) => {
     uploadCount++;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        objectPath: `/uploads/direct-retry-${sessionId}.png`,
-        metadata: {
-          name: `direct-retry-${sessionId}.png`,
-          size: directPhoto.buffer.length,
-          contentType: directPhoto.mimeType,
-        },
-      }),
-    });
+    await route.continue();
   });
   await context.route(`**/api/sessions/${sessionId}/photos`, async route => {
     if (route.request().method() !== "POST") {
@@ -235,6 +224,44 @@ test.describe("photo POST validation @photo-upload", () => {
     expect(body.errors).toHaveProperty("objectStorageKey");
   });
 
+  test("rejects storage-key traversal before photo registration", async ({
+    request,
+    cleanupIds,
+  }) => {
+    const sess = await createSessionViaApi(request, `Photo Traversal ${Date.now()}`);
+    cleanupIds.push(sess.id);
+
+    const res = await request.post(`/api/sessions/${sess.id}/photos`, {
+      data: {
+        objectStorageKey: "/uploads/../../../../etc/passwd",
+        originalFilename: "passwd",
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const photosResponse = await request.get(`/api/sessions/${sess.id}/photos`);
+    expect(photosResponse.status()).toBe(200);
+    expect(await photosResponse.json()).toHaveLength(0);
+  });
+
+  test("rejects an in-namespace key with no pending upload intent", async ({
+    request,
+    cleanupIds,
+  }) => {
+    const sess = await createSessionViaApi(request, `Unclaimed Photo ${Date.now()}`);
+    cleanupIds.push(sess.id);
+
+    const res = await request.post(`/api/sessions/${sess.id}/photos`, {
+      data: {
+        objectStorageKey: `/uploads/unclaimed-${Date.now()}.jpg`,
+        originalFilename: "unclaimed.jpg",
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    expect(await (await request.get(`/api/sessions/${sess.id}/photos`)).json()).toHaveLength(0);
+  });
+
   test("client-supplied userId and sessionId are overridden by server values", async ({
     request,
     cleanupIds,
@@ -242,9 +269,15 @@ test.describe("photo POST validation @photo-upload", () => {
     const sess = await createSessionViaApi(request, `Photo Override ${Date.now()}`);
     cleanupIds.push(sess.id);
 
+    const uploadResponse = await request.post("/api/uploads/direct", {
+      multipart: { file: directPhoto },
+    });
+    expect(uploadResponse.status(), await uploadResponse.text()).toBe(200);
+    const upload = await uploadResponse.json() as { objectPath: string };
+
     const res = await request.post(`/api/sessions/${sess.id}/photos`, {
       data: {
-        objectStorageKey: `uploads/fake-regression-test-${Date.now()}.jpg`,
+        objectStorageKey: upload.objectPath,
         originalFilename: "regression.jpg",
         userId: "INJECTED-USER-ID",
         sessionId: 99999,

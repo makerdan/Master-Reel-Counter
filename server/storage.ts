@@ -56,6 +56,13 @@ export function physicalObjectKeyAliases(objectPath: string): [string, string] {
   return [physicalKey, `/objects${physicalKey}`];
 }
 
+export class InvalidPhotoUploadIntentError extends Error {
+  constructor() {
+    super("Photo upload intent is invalid or expired");
+    this.name = "InvalidPhotoUploadIntentError";
+  }
+}
+
 export interface IStorage {
   createSession(session: InsertSession): Promise<Session>;
   getSession(id: number): Promise<Session | undefined>;
@@ -521,6 +528,20 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Photo registration conflict did not resolve to an existing photo");
       }
       if (!inserted) throw new Error("Photo registration did not create a photo");
+
+      // A photo row may only claim an upload that this user created. Locking
+      // the matching intent prevents the same upload from being registered
+      // concurrently in multiple sessions.
+      const [uploadIntent] = await tx.select({ id: uploadIntents.id })
+        .from(uploadIntents)
+        .where(and(
+          inArray(uploadIntents.objectPath, physicalObjectKeyAliases(photo.objectStorageKey)),
+          eq(uploadIntents.userId, photo.userId),
+        ))
+        .for("update")
+        .limit(1);
+      if (!uploadIntent) throw new InvalidPhotoUploadIntentError();
+
       const uniqueFilename = `S${inserted.sessionId}_P${String(inserted.id).padStart(4, "0")}${ext}`;
       const [updated] = await tx.update(photos)
         .set({ originalFilename: uniqueFilename })
@@ -528,9 +549,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       // Resolve the upload intent so the orphan-cleanup job won't delete this file.
       if (photo.objectStorageKey) {
-        await tx.delete(uploadIntents).where(
-          inArray(uploadIntents.objectPath, physicalObjectKeyAliases(photo.objectStorageKey)),
-        );
+        await tx.delete(uploadIntents).where(eq(uploadIntents.id, uploadIntent.id));
       }
       return updated;
     });

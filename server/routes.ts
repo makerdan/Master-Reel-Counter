@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket, type RawData } from "ws";
 import { LiveConnectionTracker, type LiveConnectionLease } from "./lib/live-connections";
 import { attachWebSocketServerAtPath } from "./websocket-upgrade";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import { storage, pinRetryStats, getPinRetryBuckets } from "./storage";
+import { storage, pinRetryStats, getPinRetryBuckets, InvalidPhotoUploadIntentError } from "./storage";
 import { getTimezoneConsistentStats } from "./activity-statistics";
 import {
   authenticateWebSocketRequest,
@@ -63,6 +63,28 @@ import {
   CLERK_PROXY_HEALTH_PATH,
   clerkProxyHealth,
 } from "./middlewares/clerkProxyMiddleware";
+
+export function resolveLocalUploadPath(
+  uploadsDir: string,
+  objectStorageKey: string,
+): { filename: string; path: string } | undefined {
+  const physicalKey = canonicalPhysicalObjectKey(objectStorageKey);
+  if (!physicalKey.startsWith("/uploads/")) return undefined;
+
+  const filename = physicalKey.slice("/uploads/".length);
+  if (
+    filename.length === 0
+    || filename.length > 255
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(filename)
+  ) {
+    return undefined;
+  }
+
+  const root = path.resolve(uploadsDir);
+  const localPath = path.resolve(root, filename);
+  if (path.dirname(localPath) !== root) return undefined;
+  return { filename, path: localPath };
+}
 
 // Fire-and-forget helper: records one AI API call to ai_usage_logs.
 // Errors are suppressed so logging never disrupts the caller's flow.
@@ -1044,7 +1066,8 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No file provided" });
       }
 
-      const ext = path.extname(authedReq.file.originalname) || "";
+      const requestedExt = path.extname(authedReq.file.originalname);
+      const ext = /^\.[A-Za-z0-9_-]{1,16}$/.test(requestedExt) ? requestedExt : "";
       const objectId = `${randomUUID()}${ext}`;
       const objectPath = `/uploads/${objectId}`;
       const objectName = toStorageObjectName(objectPath);
@@ -1592,22 +1615,31 @@ export async function registerRoutes(
         if (!folder || folder.userId !== userId || folder.deletedAt !== null) return res.status(403).json({ message: "Target folder not found or access denied" });
       }
       const copyFileCallback = async (srcKey: string): Promise<string> => {
-        const ext = path.extname(srcKey || "");
+        const safeLocalSource = resolveLocalUploadPath(UPLOADS_DIR, srcKey);
+        if (!safeLocalSource) throw new Error("Photo storage key is invalid");
+        const sourceKey = canonicalPhysicalObjectKey(srcKey);
+        const ext = path.extname(safeLocalSource.filename);
         const newId = `${randomUUID()}${ext}`;
         const newObjectPath = `/uploads/${newId}`;
-        const srcObjectName = toStorageObjectName(srcKey);
+        const srcObjectName = toStorageObjectName(sourceKey);
         const destObjectName = toStorageObjectName(newObjectPath);
-        const localSrcFilename = srcKey.startsWith("/uploads/") ? srcKey.slice("/uploads/".length) : srcKey;
-        const localSrcPath = path.join(UPLOADS_DIR, localSrcFilename);
+        const localSrcPath = safeLocalSource.path;
         const localDestPath = path.join(UPLOADS_DIR, newId);
         try {
           await objectStorageClient.bucket(BUCKET_NAME).file(srcObjectName)
             .copy(objectStorageClient.bucket(BUCKET_NAME).file(destObjectName));
         } catch {
           try {
-            await fs.copyFile(localSrcPath, localDestPath);
+            const [realUploadsDir, realSourcePath] = await Promise.all([
+              fs.realpath(UPLOADS_DIR),
+              fs.realpath(localSrcPath),
+            ]);
+            if (path.dirname(realSourcePath) !== realUploadsDir) {
+              throw new Error("Photo source resolves outside uploads directory");
+            }
+            await fs.copyFile(realSourcePath, localDestPath);
           } catch {
-            return srcKey;
+            return sourceKey;
           }
         }
         return newObjectPath;
@@ -1738,6 +1770,9 @@ export async function registerRoutes(
       broadcastToSession(access.session.id, { type: "sync", entity: "photos", sessionId: access.session.id });
       res.json(photo);
     } catch (error) {
+      if (error instanceof InvalidPhotoUploadIntentError) {
+        return res.status(400).json({ message: "Photo upload is invalid or has already been registered" });
+      }
       console.error("Error creating photo:", error);
       res.status(500).json({ message: "Failed to create photo" });
     }
@@ -1837,15 +1872,17 @@ export async function registerRoutes(
       const displayName = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.username || userId;
 
       // Generate a unique storage key for the copied file so the two photos are independent
-      const ext = path.extname(original.objectStorageKey || "");
+      const safeLocalSource = resolveLocalUploadPath(UPLOADS_DIR, original.objectStorageKey);
+      if (!safeLocalSource) {
+        return res.status(400).json({ message: "Photo storage key is invalid" });
+      }
+      const sourceKey = canonicalPhysicalObjectKey(original.objectStorageKey);
+      const ext = path.extname(safeLocalSource.filename);
       const newId = `${randomUUID()}${ext}`;
       const newObjectPath = `/uploads/${newId}`;
-      const srcObjectName = toStorageObjectName(original.objectStorageKey!);
+      const srcObjectName = toStorageObjectName(sourceKey);
       const destObjectName = toStorageObjectName(newObjectPath);
-      const localSrcFilename = original.objectStorageKey!.startsWith("/uploads/")
-        ? original.objectStorageKey!.slice("/uploads/".length)
-        : original.objectStorageKey!;
-      const localSrcPath = path.join(UPLOADS_DIR, localSrcFilename);
+      const localSrcPath = safeLocalSource.path;
       const localDestPath = path.join(UPLOADS_DIR, newId);
 
       try {
@@ -1855,7 +1892,14 @@ export async function registerRoutes(
       } catch {
         // Fall back to local-disk copy if GCS is unavailable
         try {
-          await fs.copyFile(localSrcPath, localDestPath);
+          const [realUploadsDir, realSourcePath] = await Promise.all([
+            fs.realpath(UPLOADS_DIR),
+            fs.realpath(localSrcPath),
+          ]);
+          if (path.dirname(realSourcePath) !== realUploadsDir) {
+            throw new Error("Photo source resolves outside uploads directory");
+          }
+          await fs.copyFile(realSourcePath, localDestPath);
         } catch (copyErr) {
           // Both copy paths failed — abort so no DB row is created pointing to
           // the original's storage object (which would cause data loss on delete).
@@ -1936,6 +1980,9 @@ export async function registerRoutes(
       const body = req.body;
       if (!body.objectStorageKey || typeof body.objectStorageKey !== "string") {
         return res.status(400).json({ message: "objectStorageKey is required" });
+      }
+      if (!resolveLocalUploadPath(UPLOADS_DIR, body.objectStorageKey)) {
+        return res.status(400).json({ message: "objectStorageKey must identify a file in /uploads" });
       }
 
       const safePhotoData: any = {

@@ -333,6 +333,11 @@ export const insertPhotoBodySchema = insertPhotoSchema.pick({
   height: true,
   exifTimestamp: true,
   exifGps: true,
+}).extend({
+  objectStorageKey: z.string().regex(
+    /^\/uploads\/[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/,
+    "Must be a direct-upload path within /uploads",
+  ),
 });
 
 export const insertEntrySchema = createInsertSchema(entries).omit({

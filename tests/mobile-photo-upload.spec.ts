@@ -394,6 +394,29 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
     expect(previousOwner, "authenticated response must provide a server-verified prior identity")
       .toEqual(expect.any(String));
 
+    const queuedImage = await sharp({
+      create: {
+        width: 2,
+        height: 2,
+        channels: 3,
+        background: { r: 90, g: 120, b: 180 },
+      },
+    }).png().toBuffer();
+    const restoredUploadResponse = await request.post("/api/uploads/direct", {
+      multipart: {
+        file: { name: "restored-queue.png", mimeType: "image/png", buffer: queuedImage },
+      },
+    });
+    expect(restoredUploadResponse.ok(), await restoredUploadResponse.text()).toBe(true);
+    const restoredUpload = await restoredUploadResponse.json() as { objectPath: string };
+    const futureUploadResponse = await request.post("/api/uploads/direct", {
+      multipart: {
+        file: { name: "future-queue.png", mimeType: "image/png", buffer: queuedImage },
+      },
+    });
+    expect(futureUploadResponse.ok(), await futureUploadResponse.text()).toBe(true);
+    const futureUpload = await futureUploadResponse.json() as { objectPath: string };
+
     await page.goto("/");
     await context.setOffline(true);
     const restoredId = `restored-${Date.now()}`;
@@ -401,7 +424,8 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
     const ownerlessId = `ownerless-${Date.now()}`;
     const foreignId = `foreign-${Date.now()}`;
     const registrationKey = `registration-${Date.now()}`;
-    const uploadedObjectPath = `/objects/already-uploaded-${Date.now()}.jpg`;
+    const uploadedObjectPath = restoredUpload.objectPath;
+    const futureUploadedObjectPath = futureUpload.objectPath;
     await seedQueuedPhoto(page, {
       id: restoredId,
       sessionId: session.id,
@@ -416,7 +440,7 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
       sessionId: session.id,
       owner: previousOwner!,
       registrationKey: `${registrationKey}-future`,
-      uploadedObjectPath: `${uploadedObjectPath}-future`,
+      uploadedObjectPath: futureUploadedObjectPath,
       inFlight: true,
       claimedAt: Date.now() + 10 * 60 * 1000,
     });
@@ -467,7 +491,7 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
       }),
       expect.objectContaining({
         registrationKey: `${registrationKey}-future`,
-        objectStorageKey: `${uploadedObjectPath}-future`,
+        objectStorageKey: futureUploadedObjectPath,
       }),
     ]));
     expect(new Set(registrationPayloads.map(payload => payload.registrationKey))).toEqual(
@@ -798,9 +822,24 @@ test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
   }) => {
     const session = await createSessionViaApi(request, `Mobile Detail Review ${Date.now()}`);
     cleanupIds.push(session.id);
+    const parentImage = await sharp({
+      create: {
+        width: 20,
+        height: 20,
+        channels: 3,
+        background: { r: 80, g: 140, b: 200 },
+      },
+    }).jpeg().toBuffer();
+    const parentUploadResponse = await request.post("/api/uploads/direct", {
+      multipart: {
+        file: { name: "detail-parent.jpg", mimeType: "image/jpeg", buffer: parentImage },
+      },
+    });
+    expect(parentUploadResponse.ok(), await parentUploadResponse.text()).toBe(true);
+    const parentUpload = await parentUploadResponse.json() as { objectPath: string };
     const parentResponse = await request.post(`/api/sessions/${session.id}/photos`, {
       data: {
-        objectStorageKey: `/uploads/detail-parent-${Date.now()}.jpg`,
+        objectStorageKey: parentUpload.objectPath,
         originalFilename: "detail-parent.jpg",
         mimeType: "image/jpeg",
         width: 20,
