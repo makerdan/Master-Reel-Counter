@@ -1435,6 +1435,84 @@ test("failed EXIT cleanup keeps the release status and removes its fixtures", as
   }
 });
 
+test("early release failure excludes browser and role diagnostics from a prior run", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "release-stale-diagnostics-"));
+  const diagnosticsDirectory = resolve(directory, "diagnostics");
+  const browserPath = resolve(directory, "browser.json");
+  const priorAdminPath = "/settings";
+  const priorUserPath = "/stats";
+  try {
+    await mkdir(diagnosticsDirectory);
+    await writeFile(
+      browserPath,
+      JSON.stringify({
+        finalPath: "/sign-in/client-trust",
+        routeStates: ["/sign-in", "/sign-in/client-trust"],
+        clerkRequests: ["POST /api/__clerk/v1/client/sign_ins 200"],
+      }),
+    );
+    await writeFile(
+      resolve(diagnosticsDirectory, "google-admin.json"),
+      JSON.stringify({
+        finalPath: priorAdminPath,
+        routeStates: [priorAdminPath],
+        sessionObservations: [
+          {
+            path: priorAdminPath,
+            clerkLoaded: true,
+            hasActiveSession: true,
+            status: "active-session-route-ready",
+            phase: "completed",
+            elapsedMs: 1,
+          },
+        ],
+        sessionFailureCategory: "none",
+      }),
+    );
+    await writeFile(
+      resolve(diagnosticsDirectory, "google-user.json"),
+      JSON.stringify({ finalPath: priorUserPath, routeStates: [priorUserPath] }),
+    );
+
+    const failure = await execFileAsync(
+      "bash",
+      [resolve(root, "scripts/build-and-verify-release.sh")],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          RELEASE_CLEANUP_HARNESS: "1",
+          RELEASE_CLEANUP_EXIT_STATUS: "23",
+          RELEASE_CLEANUP_TIMEOUT_SECONDS: "2",
+          RELEASE_BROWSER_DIAGNOSTIC: browserPath,
+          RELEASE_DIAGNOSTICS_DIR: diagnosticsDirectory,
+        },
+      },
+    ).then(
+      () => null,
+      (error) => error,
+    );
+
+    assert(failure);
+    assert.equal(failure.code, 23);
+    assert.match(failure.stderr, /\[browser diagnostic unavailable\]/);
+    assert.match(failure.stderr, /\[role diagnostic unavailable\]/);
+    assert.match(failure.stderr, /sessionFailureCategory="diagnostics-unavailable"/);
+    for (const staleValue of [
+      "/sign-in/client-trust",
+      "POST /api/__clerk/v1/client/sign_ins 200",
+      priorAdminPath,
+      priorUserPath,
+      "active-session-route-ready",
+    ]) {
+      assert.equal(failure.stderr.includes(staleValue), false, `reported stale value ${staleValue}`);
+    }
+    await assert.rejects(readFile(browserPath, "utf8"));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("release diagnostic redaction removes complete auth and cookie values", () => {
   const redacted = redactReleaseDiagnostics(
     [

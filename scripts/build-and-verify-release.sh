@@ -147,7 +147,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 mkdir -p "$diagnostics_dir"
-rm -f "$google_admin_diagnostic" "$google_user_diagnostic"
+rm -f "$browser_diagnostic" "$google_admin_diagnostic" "$google_user_diagnostic"
 
 if [[ "${RELEASE_CLEANUP_HARNESS:-0}" == "1" ]]; then
   exit "${RELEASE_CLEANUP_EXIT_STATUS:-1}"

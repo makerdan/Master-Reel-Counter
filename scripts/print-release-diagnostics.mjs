@@ -141,6 +141,16 @@ function unavailableRoleLedger() {
   };
 }
 
+function unavailableBrowserLedger() {
+  return {
+    finalPath: "[browser diagnostic unavailable]",
+    routeStates: [],
+    clerkRequests: [],
+    requestFailures: [],
+    pageErrors: [],
+  };
+}
+
 function safeRolePath(value) {
   return (
     typeof value === "string" &&
@@ -313,12 +323,16 @@ export async function formatReleaseDiagnostics({
   googleAdminPath,
   googleUserPath,
 }) {
-  const browserRaw = await readSafe(browserPath, "{}");
+  const browserRaw = await readSafe(browserPath, null);
   let browser;
-  try {
-    browser = safeLedger(JSON.parse(browserRaw));
-  } catch {
-    browser = { finalPath: "[invalid browser diagnostic]" };
+  if (typeof browserRaw !== "string") {
+    browser = unavailableBrowserLedger();
+  } else {
+    try {
+      browser = safeLedger(JSON.parse(browserRaw));
+    } catch {
+      browser = { finalPath: "[invalid browser diagnostic]" };
+    }
   }
   const readRoleLedger = async (path) => {
     const raw = await readSafe(path, null, MAX_ROLE_INPUT_BYTES);
