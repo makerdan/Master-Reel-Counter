@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { pathToFileURL } from "node:url";
+import { build as esbuild } from "esbuild";
 import pg from "pg";
 import { redactReleaseDiagnostics } from "../redact-release-diagnostics.mjs";
 import {
@@ -29,6 +31,11 @@ import { createClerkScriptBootTracker } from "../lib/managed-clerk-script-assert
 
 const root = resolve(import.meta.dirname, "../..");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+const buildScript = readFileSync(resolve(root, "script/build.ts"), "utf8");
+const productionBuildIdentity = readFileSync(
+  resolve(root, "server/lib/production-build-identity.ts"),
+  "utf8",
+);
 const replitConfig = readFileSync(resolve(root, ".replit"), "utf8");
 const config = readFileSync(resolve(root, "playwright.release.config.ts"), "utf8");
 const ordinaryConfig = readFileSync(resolve(root, "playwright.config.ts"), "utf8");
@@ -371,7 +378,7 @@ test("manual CI release gate verifies the currently published deployment", () =>
     "published smoke configuration must validate before Playwright can start",
   );
   assert.match(publishedRelease, /\/api\/healthz/);
-  assert.match(publishedRelease, /deploymentId !== expectedDeploymentId/);
+  assert.match(publishedRelease, /buildId !== expectedBuildId/);
   assert.match(publishedRelease, /playwright\.release\.config\.ts/);
   assert.match(publishedRelease, /publishedReadOnlyEnvironment/);
   assert.match(publishedRelease, /delete publishedReadOnlyEnvironment\[name\]/);
@@ -388,6 +395,14 @@ test("manual CI release gate verifies the currently published deployment", () =>
   assert.match(config, /!isPublishedReadOnly &&/);
   assert.doesNotMatch(publishedRelease, /release:build|build-and-verify-release/);
   assert.match(candidateBuild, /candidate_id="\$\{RELEASE_CANDIDATE_ID:-/);
+  assert.match(
+    buildScript,
+    /"process\.env\.PRODUCTION_DEPLOYMENT_ID": JSON\.stringify\(productionDeploymentId\)/,
+  );
+  assert.match(
+    productionBuildIdentity,
+    /process\.env\.PRODUCTION_DEPLOYMENT_ID\?\.trim\(\) \|\| undefined/,
+  );
 });
 
 test("manual CI published deployment check requires only matched publishable keys", () => {
@@ -997,15 +1012,81 @@ test("production Clerk proxy fails closed and exposes public readiness before au
   assert(proxyMount < clerkAuth);
   assert(readinessRoute < routeRegistration);
   assert.match(serverIndex, /candidateId: process\.env\.RELEASE_CANDIDATE_ID/);
-  assert.match(serverIndex, /deploymentId: productionDeploymentId/);
+  assert.match(serverIndex, /buildId: productionBuildId/);
 });
 
-test("published verification requires and checks the immutable deployment identity", () => {
+test("published verification requires and checks the immutable build identity", () => {
   assert.match(publishedReadOnlySmoke, /PRODUCTION_DEPLOYMENT_ID/);
   assert.match(publishedReadOnlySmoke, /\/api\/healthz/);
-  assert.match(publishedReadOnlySmoke, /deploymentId: process\.env\.PRODUCTION_DEPLOYMENT_ID/);
+  assert.match(publishedReadOnlySmoke, /buildId: process\.env\.PRODUCTION_DEPLOYMENT_ID/);
   assert.match(publishedRelease, /redirect: "manual"/);
   assert.match(publishedRelease, /refusing to verify an unknown deployment/);
+});
+
+test("a stale built artifact cannot pass published verification with the expected runtime ID", async () => {
+  const temporaryDirectory = await mkdtemp(
+    resolve(tmpdir(), "published-build-identity-"),
+  );
+  const staleArtifactPath = resolve(temporaryDirectory, "stale-release-identity.mjs");
+  const preloadPath = resolve(temporaryDirectory, "mock-stale-release-health.mjs");
+  const markerPath = resolve(temporaryDirectory, "browser-started");
+  const staleBuildId = "previous-release-build";
+  const expectedBuildId = "intended-release-build";
+
+  try {
+    await esbuild({
+      entryPoints: [resolve(root, "server/lib/production-build-identity.ts")],
+      platform: "node",
+      bundle: true,
+      format: "esm",
+      outfile: staleArtifactPath,
+      define: {
+        "process.env.PRODUCTION_DEPLOYMENT_ID": JSON.stringify(staleBuildId),
+      },
+    });
+
+    await writeFile(
+      preloadPath,
+      [
+        'import childProcess from "node:child_process";',
+        'import { syncBuiltinESMExports } from "node:module";',
+        'import { appendFileSync } from "node:fs";',
+        "const { productionBuildId } = await import(process.env.STALE_BUILD_ID_MODULE_URL);",
+        'globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, buildId: productionBuildId }), { status: 200 });',
+        `childProcess.spawnSync = () => { appendFileSync(${JSON.stringify(markerPath)}, "started\\n"); return { status: 0 }; };`,
+        "syncBuiltinESMExports();",
+      ].join("\n"),
+    );
+
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        ["--import", preloadPath, "scripts/verify-published-release.mjs"],
+        {
+          cwd: root,
+          env: {
+            PRODUCTION_BASE_URL: "https://published.example",
+            PRODUCTION_DEPLOYMENT_ID: expectedBuildId,
+            RELEASE_PUBLISHED_SMOKE_TARGET: "https://published.example",
+            RELEASE_PUBLISHED_SMOKE_MODE: "read-only",
+            CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZGV2JA",
+            VITE_CLERK_PUBLISHABLE_KEY: "pk_test_Y2xlcmsuZGV2JA",
+            STALE_BUILD_ID_MODULE_URL: pathToFileURL(staleArtifactPath).href,
+          },
+        },
+      ),
+      (error) => {
+        assert.match(
+          error.stderr,
+          /Published build identity is absent or does not match the intended release/,
+        );
+        return true;
+      },
+    );
+    await assert.rejects(readFile(markerPath), { code: "ENOENT" });
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
 });
 
 test("development retains its proxy-free Clerk path", () => {

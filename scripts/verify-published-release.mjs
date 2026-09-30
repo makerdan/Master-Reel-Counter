@@ -8,7 +8,7 @@ import {
 } from "./validate-published-smoke-config.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const { publishedTarget, expectedDeploymentId } =
+const { publishedTarget, expectedDeploymentId: expectedBuildId } =
   validatePublishedSmokeConfiguration(process.env);
 
 async function verifyPublishedDeploymentIdentity() {
@@ -43,9 +43,9 @@ async function verifyPublishedDeploymentIdentity() {
     );
   }
 
-  if (body?.ok !== true || body?.deploymentId !== expectedDeploymentId) {
+  if (body?.ok !== true || body?.buildId !== expectedBuildId) {
     throw new Error(
-      "Published deployment identity is absent or does not match the intended deployment.",
+      "Published build identity is absent or does not match the intended release.",
     );
   }
 }

@@ -34,6 +34,9 @@ const allowlist = [
 
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
+  // Keep this project variable in sync with the protected GitHub release ID.
+  // Esbuild replaces it so runtime-only changes cannot bless a stale artifact.
+  const productionDeploymentId = process.env.PRODUCTION_DEPLOYMENT_ID?.trim() ?? "";
 
   console.log("building client...");
   await viteBuild();
@@ -54,6 +57,7 @@ async function buildAll() {
     outfile: "dist/index.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
+      "process.env.PRODUCTION_DEPLOYMENT_ID": JSON.stringify(productionDeploymentId),
     },
     minify: true,
     external: externals,

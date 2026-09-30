@@ -23,6 +23,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import { createSecurityHeadersOptions } from "./contentSecurityPolicy";
 import { createApiErrorHandler } from "./middlewares/apiErrorHandler";
+import { productionBuildId } from "./lib/production-build-identity";
 
 // Fail fast if SESSION_SECRET is absent or too weak.
 validateSessionSecret();
@@ -52,8 +53,6 @@ const clerkPublishableKey = resolveClerkEnvironmentPublishableKey({
   serverPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
   clientPublishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
 });
-const productionDeploymentId = process.env.PRODUCTION_DEPLOYMENT_ID?.trim();
-
 let shuttingDown = false;
 let drainStarted = false;
 
@@ -73,7 +72,7 @@ app.get(CLERK_PROXY_READINESS_PATH, (_req, res) => {
     ...(process.env.RELEASE_CANDIDATE_ID
       ? { candidateId: process.env.RELEASE_CANDIDATE_ID }
       : {}),
-    ...(productionDeploymentId ? { deploymentId: productionDeploymentId } : {}),
+    ...(productionBuildId ? { buildId: productionBuildId } : {}),
   });
 });
 
@@ -158,7 +157,7 @@ app.get("/api/healthz", async (_req, res) => {
       ...(process.env.RELEASE_CANDIDATE_ID
         ? { candidateId: process.env.RELEASE_CANDIDATE_ID }
         : {}),
-        ...(productionDeploymentId ? { deploymentId: productionDeploymentId } : {}),
+      ...(productionBuildId ? { buildId: productionBuildId } : {}),
     });
   } catch {
     res.status(503).json({ ok: false });

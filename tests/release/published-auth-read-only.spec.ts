@@ -69,7 +69,7 @@ test("published managed Clerk and Google boundaries are reachable without fixtur
   const health = await healthResponse.json();
   expect(health).toMatchObject({
     ok: true,
-    deploymentId: process.env.PRODUCTION_DEPLOYMENT_ID,
+    buildId: process.env.PRODUCTION_DEPLOYMENT_ID,
   });
 
   const anonymousAuth = await page.request.get("/api/auth/user");

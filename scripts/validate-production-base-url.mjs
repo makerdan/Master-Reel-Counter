@@ -36,7 +36,7 @@ export function validateProductionDeploymentId(
   const deploymentId = rawValue?.trim();
   if (!deploymentId) {
     throw new Error(
-      "PRODUCTION_DEPLOYMENT_ID is required. Refusing to verify an unpublished or ambiguous deployment.",
+      "PRODUCTION_DEPLOYMENT_ID is required. Refusing to verify a release without an expected build identity.",
     );
   }
   if (deploymentId.length > 256 || /[\r\n]/.test(deploymentId)) {
@@ -48,5 +48,5 @@ export function validateProductionDeploymentId(
 if (import.meta.url === `file://${process.argv[1]}`) {
   validateProductionBaseUrl();
   validateProductionDeploymentId();
-  console.log("Published production URL and deployment identity are configured.");
+  console.log("Published production URL and build identity are configured.");
 }
