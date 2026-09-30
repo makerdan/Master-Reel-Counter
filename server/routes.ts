@@ -1733,7 +1733,7 @@ export async function registerRoutes(
         userId,
         uploadedBy: displayName,
       }, ext);
-      console.log(`Photo uploaded: id=${photo.id}, by="${displayName}" (${userId}), session=${access.session.id}, filename="${photo.originalFilename}", at=${photo.createdAt.toISOString()}`);
+      console.log(`Photo uploaded: id=${photo.id}, user=${userId}`);
       logActivity(access.session.id, userId, displayName, "photo_uploaded", "photo", photo.id, photo.originalFilename || undefined);
       broadcastToSession(access.session.id, { type: "sync", entity: "photos", sessionId: access.session.id });
       res.json(photo);
