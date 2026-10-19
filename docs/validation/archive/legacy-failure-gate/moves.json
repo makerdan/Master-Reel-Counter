@@ -1,0 +1,587 @@
+[
+  {
+    "source": "scripts/lib/failure-gate/assessment.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/assessment.mjs.retired.txt",
+    "sha256": "31613cd77791079d65e6e93a59942c8792921be9be6b8f472e1aa50ffd3490f7"
+  },
+  {
+    "source": "scripts/lib/failure-gate/bootstrap.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/bootstrap.mjs.retired.txt",
+    "sha256": "53ba863ac30ec0f7c54651e532bbfe1bbe151dffc1445a0c246dd58a496012f9"
+  },
+  {
+    "source": "scripts/lib/failure-gate/coordinator.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/coordinator.mjs.retired.txt",
+    "sha256": "290bc85fa7db232da168b603d9ad04fa41dd393318efbeadb5e58302128504d0"
+  },
+  {
+    "source": "scripts/lib/failure-gate/evidence.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/evidence.mjs.retired.txt",
+    "sha256": "89120c46d4d4bf57f4759f334fffd94a2bfc37f7224d58757e8aae9c980e4941"
+  },
+  {
+    "source": "scripts/lib/failure-gate/execution.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/execution.mjs.retired.txt",
+    "sha256": "8b2d6945f132eb9335cd346bef7809e0ba77ada68a727aaf10c9554770adcb9c"
+  },
+  {
+    "source": "scripts/lib/failure-gate/host.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/host.mjs.retired.txt",
+    "sha256": "9d30eb0496162d4eaf9620f82669f9a493de94541f4e36547e5e2fd212f3f67c"
+  },
+  {
+    "source": "scripts/lib/failure-gate/input-writer-boundary.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/input-writer-boundary.mjs.retired.txt",
+    "sha256": "27296f47f04d379e8f3b41a0a146b3c3864cc0db1336ba2e5b7842ceca00620d"
+  },
+  {
+    "source": "scripts/lib/failure-gate/plan-guards.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/plan-guards.mjs.retired.txt",
+    "sha256": "848d9cd7fda68533ec04624906443b8fb45d2a419b850e6311124597949e8d06"
+  },
+  {
+    "source": "scripts/lib/failure-gate/review-records.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/review-records.mjs.retired.txt",
+    "sha256": "044d8c69f97ca79d28b532177716e5c818fa6cbeb20b3096cecae0b67d72b3dc"
+  },
+  {
+    "source": "scripts/lib/failure-gate/runtime-tiers.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/failure-gate/runtime-tiers.mjs.retired.txt",
+    "sha256": "7b000c903ea838a448a882838fa72d1abd985fbb559aa0764f23fa6a58d68307"
+  },
+  {
+    "source": "scripts/__tests__/failure-gate-v4-bootstrap.test.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/__tests__/failure-gate-v4-bootstrap.test.mjs.retired.txt",
+    "sha256": "a2c57379dfd55fe6d2d37f251ac3af150221647bf3cffb617d1a5605d7022038"
+  },
+  {
+    "source": "scripts/__tests__/failure-gate-v4-coordinator.test.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/__tests__/failure-gate-v4-coordinator.test.mjs.retired.txt",
+    "sha256": "311c33db65688a65f87c0f8f17194226da4d2bcb0e184a33ff4b71a760c49e66"
+  },
+  {
+    "source": "scripts/__tests__/failure-gate-v4-evidence.test.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/__tests__/failure-gate-v4-evidence.test.mjs.retired.txt",
+    "sha256": "21e112dfbad905226712faad8ad73719bd80b3baab61e3b012917439fa5168a6"
+  },
+  {
+    "source": "scripts/__tests__/failure-gate-v4-execution.test.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/__tests__/failure-gate-v4-execution.test.mjs.retired.txt",
+    "sha256": "50d200b1921be4eca4cc8eccaf32c8433cdf9b01f2059deaf609c03ef728d41f"
+  },
+  {
+    "source": "scripts/__tests__/failure-gate-v4-regression-guard.test.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/__tests__/failure-gate-v4-regression-guard.test.mjs.retired.txt",
+    "sha256": "f2f39c514a04536ac55771a8d638b4952098c638edb809107a3a3c4c62daccd8"
+  },
+  {
+    "source": "scripts/__tests__/failure-gate-v4-review-records.test.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/__tests__/failure-gate-v4-review-records.test.mjs.retired.txt",
+    "sha256": "c44079e83c01549373294ae6c4e472c6c951235bab54089bb6afa9bdcc0ce524"
+  },
+  {
+    "source": "scripts/__tests__/failure-gate.test.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/__tests__/failure-gate.test.mjs.retired.txt",
+    "sha256": "252bb46ae4c49c43c59d55993231e518da3137686ef28ad9d022d99155d41281"
+  },
+  {
+    "source": "scripts/failure-gate.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/failure-gate.mjs.retired.txt",
+    "sha256": "4d0f8439db9bf72df88500df669c8490583421a2b8ad4daf5b0a3a6c7e370b7c"
+  },
+  {
+    "source": "scripts/check-failure-gate.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/check-failure-gate.mjs.retired.txt",
+    "sha256": "0f9a59bd71309b59ba2d4b2902f5d19105cbcf8b7cffb166f34e6a81989f468c"
+  },
+  {
+    "source": "scripts/check-failure-gate-parity.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/check-failure-gate-parity.mjs.retired.txt",
+    "sha256": "6fb326cf3b434e7bdf9f2d76aa1921147061423db74c8ab84123b40ec56323f3"
+  },
+  {
+    "source": "scripts/check-regression-guard.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/check-regression-guard.mjs.retired.txt",
+    "sha256": "59ad02767883929053586e5a1762c2313e93bb3baf781241b613e7c66732e9bf"
+  },
+  {
+    "source": "scripts/publish-failure-gate.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/publish-failure-gate.mjs.retired.txt",
+    "sha256": "9751b4dd509ca53870ba2d541cec6e1b1ba14df232315a60705ddb819539708b"
+  },
+  {
+    "source": "scripts/run-locked-tier.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/run-locked-tier.mjs.retired.txt",
+    "sha256": "8fbeb493068c904850562410200add8cea95460d4a5b081189a2c2e8edfb2283"
+  },
+  {
+    "source": "scripts/new-plan.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/new-plan.mjs.retired.txt",
+    "sha256": "ff70b1cc65861495b63436a68ae9fddf2eea0e52d3334ee3af23dba6e1225598"
+  },
+  {
+    "source": "scripts/validation-steps.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/validation-steps.mjs.retired.txt",
+    "sha256": "4f5feeac7786c7f245be93a91ef9568482eea35b22198b9579d7f1be2960eead"
+  },
+  {
+    "source": "scripts/lib/tier-lock-check.mjs",
+    "destination": "docs/validation/archive/legacy-failure-gate/scripts/lib/tier-lock-check.mjs.retired.txt",
+    "sha256": "f5a8c655d3ea0355f90e42472ab50692645af68e846e6ffac40a5cd22ea8e610"
+  },
+  {
+    "source": "docs/validation/failure-gate-capabilities.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/failure-gate-capabilities.md",
+    "sha256": "d78d0ab430f6a49a95881bef925774ef654a4660597396e8f7022e9d942942bb"
+  },
+  {
+    "source": "docs/validation/failure-gate-storage.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/failure-gate-storage.md",
+    "sha256": "47afaf5edccea88bf1db725b6cb187d081f491f2b5989de89213be5d80c09d29"
+  },
+  {
+    "source": "docs/validation/failure-gate-v4-bootstrap-authorization.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/failure-gate-v4-bootstrap-authorization.md",
+    "sha256": "b4f7851226d8609e719b649976d93483072bc4bdf76428d4c8d31f913d5aacb4"
+  },
+  {
+    "source": "docs/validation/failure-gate-v4-cutover-acceptance.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/failure-gate-v4-cutover-acceptance.md",
+    "sha256": "d44ee94be5cafb88b61354954b7c096c60f09a5a6e3ba5d2e944a7dc4422ea8b"
+  },
+  {
+    "source": "docs/validation/failure-gate-v4-reinstallation-status.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/failure-gate-v4-reinstallation-status.md",
+    "sha256": "9e9b1e9c10a476705dde4b9820bfd9f06145863368855bdcd09fa705b69eacfd"
+  },
+  {
+    "source": "docs/validation/reviewer-designation.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/reviewer-designation.md",
+    "sha256": "f0be5770a1c644537258cfdbde516eafd5035517adac2338f748e54a84e0b19a"
+  },
+  {
+    "source": "docs/validation/task-907-acceptance-outcomes.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/task-907-acceptance-outcomes.md",
+    "sha256": "8709b806bf4050fa097c26b9df9682840b4113d0f16baa270200ba5cbb0cb196"
+  },
+  {
+    "source": "docs/validation/task-907-bootstrap-observation.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/task-907-bootstrap-observation.md",
+    "sha256": "46be9f9e7b3ae81dec60a3c035563ffa4c7868e8532b9a303c083d8efc034b1e"
+  },
+  {
+    "source": "docs/validation/reviewers.json",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/reviewers.json",
+    "sha256": "d7dfec6ce1db921c5767ad6b142b224dec40ebb3e5b277c108524d9a613f5d1b"
+  },
+  {
+    "source": "docs/validation/plans/failure-gate-v4-bootstrap.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/plans/failure-gate-v4-bootstrap.md",
+    "sha256": "4aae50118455d5b3a0df6b0939c90f25fded6a9982656e409c920f9872709afc"
+  },
+  {
+    "source": "docs/validation/plans/failure-gate-v4-reinstallation-bootstrap.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/plans/failure-gate-v4-reinstallation-bootstrap.md",
+    "sha256": "bd93f85b1a542cf12a1a1b8800f0d9ae94a26a7684946acbe51e99040702c76e"
+  },
+  {
+    "source": "docs/validation/plans/mobile-photo-handoff-922.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/plans/mobile-photo-handoff-922.md",
+    "sha256": "97fa823a4c8b49e3ab40e151b46dd5158939d807f1db101238bab5a7bf4c30e2"
+  },
+  {
+    "source": "docs/validation/reviews/README.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/reviews/README.md",
+    "sha256": "9b05bf034f150c6a2b1ebc615db948314b8c84164f91c96b4f5e451e4c848485"
+  },
+  {
+    "source": "docs/plans/prevent-cached-errors-from-breaking-auth-scripts.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/plans/prevent-cached-errors-from-breaking-auth-scripts.md",
+    "sha256": "d9ed9333f3a82cdea1f0688c3f77ed11cbde7c8a1473b66723d5396ea27aa0e7"
+  },
+  {
+    "source": "docs/plans/review-the-complete-clerk-repair.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/plans/review-the-complete-clerk-repair.md",
+    "sha256": "c05236bb1bd5644995e43b2fba0b27c09793817ccb56905b920ade8b479af66f"
+  },
+  {
+    "source": "docs/plans/task-641.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/plans/task-641.md",
+    "sha256": "cdacb075016f1580ca908de1be0c063315be6f2d90da85ed5a6ac55883e09ac8"
+  },
+  {
+    "source": "docs/plans/task-642-recover-visibly-when-clerk-cannot-start.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/plans/task-642-recover-visibly-when-clerk-cannot-start.md",
+    "sha256": "07d5787d895789216582047b498074136cccf6dcaecfa27a866582ff423267d3"
+  },
+  {
+    "source": "docs/plans/task-909.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/plans/task-909.md",
+    "sha256": "97cb50bb41fe334238ac771e04bc3329a6f841812eeb91c871f237f6c1ce6c81"
+  },
+  {
+    "source": "docs/plans/tier-1-bound-websocket-work-before-clerk-authentication.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/plans/tier-1-bound-websocket-work-before-clerk-authentication.md",
+    "sha256": "5a9cab47f6be48df2705b3be7238b2f4fecbba8893d25d57bea9136495779b18"
+  },
+  {
+    "source": "docs/plans/tier-1-repair-clerk-environment-and-script-loading.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/plans/tier-1-repair-clerk-environment-and-script-loading.md",
+    "sha256": "771e73acb1bd856408439b6925172c4078e88b3eb568c7ee4f62d6aac35f29c7"
+  },
+  {
+    "source": "docs/plans/tier-1-validate-actual-clerk-release-candidate-in-ci.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/plans/tier-1-validate-actual-clerk-release-candidate-in-ci.md",
+    "sha256": "096bf88341133718109ea30af507c405ed8d854563f8e79c9066d78906cc0f95"
+  },
+  {
+    "source": "docs/superpowers/specs/2026-09-28-failure-gate-v4-local-reinstallation-design.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/superpowers/specs/2026-09-28-failure-gate-v4-local-reinstallation-design.md",
+    "sha256": "de0543d2ae7f9949b0fdb6b7b45dd611943ce9b9fd254ac7564c5846d3f4bc94"
+  },
+  {
+    "source": "docs/agent-build-failure-review.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/agent-build-failure-review.md",
+    "sha256": "38f2a3d0fed2ed281eeb365d93d1fafcc70b3265b507df908f46b7f177ab734b"
+  },
+  {
+    "source": "docs/api-data-integrity-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/api-data-integrity-audit-report.md",
+    "sha256": "65dec44edf7e524a1a40957d288fcfdd9f3e0bd10ab0e04edafd844e5da2b45e"
+  },
+  {
+    "source": "docs/api-provider-integrations-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/api-provider-integrations-audit-report.md",
+    "sha256": "4ed03541e4ce1d2201bf68490b1d6dfadfb329b2321359b09cda68250cfd2fc6"
+  },
+  {
+    "source": "docs/api-route-security-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/api-route-security-audit-report.md",
+    "sha256": "ccae5ed1e156e507245b8c5ab2d8d75bcad8e4652bcf75091495aa8cf5247d19"
+  },
+  {
+    "source": "docs/api-runtime-reliability-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/api-runtime-reliability-audit-report.md",
+    "sha256": "23f20d26dfee72fb3748cbafecd8af80d7b4ef33518335b1c7b25f10a2a0ffe0"
+  },
+  {
+    "source": "docs/bug-audit-browser-tests-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/bug-audit-browser-tests-report.md",
+    "sha256": "b932e01d927ab88a0eb441f8a19a6f28356dee93e02d9dff33d5b7cc25e26550"
+  },
+  {
+    "source": "docs/bug-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/bug-audit-report.md",
+    "sha256": "1916bff5de46d55154c1e1c5f2408b84e9177332d54f1af57b3f2f64091c26fe"
+  },
+  {
+    "source": "docs/ux-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/ux-audit-report.md",
+    "sha256": "17666aedc06a0e56f8b44e7db7ffe373da00e8b58c2b0fd75022a1dfc6fd0b91"
+  },
+  {
+    "source": ".local/tasks/activate-project-local-failure-gate-v4.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/activate-project-local-failure-gate-v4.md",
+    "sha256": "b8f7b418f4cddbb03dbcea1d41c951bfc1f760016901206f799817c777100633"
+  },
+  {
+    "source": ".local/tasks/add-github-actions-workflow.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/add-github-actions-workflow.md",
+    "sha256": "247f6c4dfeafe6bd70bfa48ea0292b38447258373942d28b347f3c032e7cc934"
+  },
+  {
+    "source": ".local/tasks/apply-development-auth-schema-again.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/apply-development-auth-schema-again.md",
+    "sha256": "5329c3bab7e94796e4ec6ac7477ba7c583dc283f0d1a26470a65c418ee1bc4b2"
+  },
+  {
+    "source": ".local/tasks/apply-development-auth-schema.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/apply-development-auth-schema.md",
+    "sha256": "e083d02e26e14e93160b4134135d0e48184639aec61b956d7c1c4d9798b28ee5"
+  },
+  {
+    "source": ".local/tasks/apply-failure-gate-v4-workflow.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/apply-failure-gate-v4-workflow.md",
+    "sha256": "1bef6b9eb318f2e06863d4bc50e5367e1be97a148c77f2620d7f4392ac3a709a"
+  },
+  {
+    "source": ".local/tasks/approve-review-package-failure-gate.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/approve-review-package-failure-gate.md",
+    "sha256": "d997d00db673709bb9e612e156d602165dc6b3b911f4ca4dc9ed3965b7f2d31c"
+  },
+  {
+    "source": ".local/tasks/bug-audit-manifest-parity.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/bug-audit-manifest-parity.md",
+    "sha256": "adfa0e87febab38eb6d1d962ed869917335497eac25460f09ebf852a42e3913f"
+  },
+  {
+    "source": ".local/tasks/bug-audit-serial-lock.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/bug-audit-serial-lock.md",
+    "sha256": "0e0ac92760ebfce28753ee722b2c63716f587f213ed37833a1c5d9dae5ee6319"
+  },
+  {
+    "source": ".local/tasks/clerk-complete-repair-review.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/clerk-complete-repair-review.md",
+    "sha256": "d6e5dbd1ceeafdbcdeb6af01bd206317e958afe3105a84ff5e00e9d346a580d5"
+  },
+  {
+    "source": ".local/tasks/compress-failure-gate-skill.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/compress-failure-gate-skill.md",
+    "sha256": "d5e9bbaf7e945b6d05a701088896dba64dc9f59d09f52b0ce72cd2d7c005f2e6"
+  },
+  {
+    "source": ".local/tasks/confirm-complete-failure-gate.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/confirm-complete-failure-gate.md",
+    "sha256": "3de85f180d9bca282569839afb91259d59dd3d1c2d6d2bd8e412bb0a2841ac5b"
+  },
+  {
+    "source": ".local/tasks/confirm-failure-gate-local-cutover.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/confirm-failure-gate-local-cutover.md",
+    "sha256": "259b209d37bb163fcac356fea49dc2982491ddd0c9db5d4f2a59ff17bcc8ed1d"
+  },
+  {
+    "source": ".local/tasks/critical-main-logic-bug-audit.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/critical-main-logic-bug-audit.md",
+    "sha256": "93a51ebc389b86e23128e2e4102b96373581311fee7930a1b5da772d53f9b4ce"
+  },
+  {
+    "source": ".local/tasks/document-runtime-validation-tiers.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/document-runtime-validation-tiers.md",
+    "sha256": "1731440f4ba48cdd1c60350bfbaaaef93a9baacba005fb6db9d206f7771bd637"
+  },
+  {
+    "source": ".local/tasks/failure-gate-archive-parity.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/failure-gate-archive-parity.md",
+    "sha256": "1b5c3f4404e52b2835b9e27ca30590b9e3fc491aa91e5c8a8936e307a0bec82d"
+  },
+  {
+    "source": ".local/tasks/failure-gate-local-approval-binding.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/failure-gate-local-approval-binding.md",
+    "sha256": "b40159b6df9c904563dd10c0feea088cb62693ae37f0617e04be45a48f876f12"
+  },
+  {
+    "source": ".local/tasks/failure-gate-local-checked-cutover.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/failure-gate-local-checked-cutover.md",
+    "sha256": "1e1c706f03e0133231fd22157ab66b119590ec435a760a47b11101ca985cb17e"
+  },
+  {
+    "source": ".local/tasks/finish-failure-gate-v4-cutover.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/finish-failure-gate-v4-cutover.md",
+    "sha256": "4d4e4409b4a939b33d96065eee05e032d257f107509c90a1f518f502a79726cd"
+  },
+  {
+    "source": ".local/tasks/fully-apply-github-actions.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/fully-apply-github-actions.md",
+    "sha256": "edd46b4e27d0d0fb93fafd77a7355125e40c4595ea1976c751c30ef09274042f"
+  },
+  {
+    "source": ".local/tasks/install-complete-failure-gate.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/install-complete-failure-gate.md",
+    "sha256": "7700882a9f30a2fddeb5a5d7813058842a07bc7a0a6fb026cd41f38eadbc7022"
+  },
+  {
+    "source": ".local/tasks/integrate-app-support-operations.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/integrate-app-support-operations.md",
+    "sha256": "37898c080eba870fa4dc0bd2956a005305cf2b0ca736a3449919183775aee2e4"
+  },
+  {
+    "source": ".local/tasks/migrate-to-clerk-preserve-testers.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/migrate-to-clerk-preserve-testers.md",
+    "sha256": "51f2dcd3ded27780852d6167286f092b4dbc096970bb6e04974d938290b88422"
+  },
+  {
+    "source": ".local/tasks/portable-failure-gate-contract.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/portable-failure-gate-contract.md",
+    "sha256": "b6e1dcd1aaa48cc655df84792147d4d94994a401567390862cdd69f1972baa6b"
+  },
+  {
+    "source": ".local/tasks/prove-mobile-flow-photo-handoff.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/prove-mobile-flow-photo-handoff.md",
+    "sha256": "f3c0d9cea8f4c2706834bc16bb462e98281803000e4ab6e2b41e6b025935d190"
+  },
+  {
+    "source": ".local/tasks/require-heavy-tier-evidence.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/require-heavy-tier-evidence.md",
+    "sha256": "10eec8331061fdb2adc1554527b85e28448fbdb825aa8b5996e15a244ef7e9d2"
+  },
+  {
+    "source": ".local/tasks/restore-failure-gate-package-parity.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/restore-failure-gate-package-parity.md",
+    "sha256": "f17582faf71a5ddda9afe56a4c072079a1513bd521e2aa53c1a447326ed94cd7"
+  },
+  {
+    "source": ".local/tasks/separate-validation-result-reporting.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/separate-validation-result-reporting.md",
+    "sha256": "caa5f6f2956b728476292b2f29180e47d2c4e8612348d49e7aa4cb9f7d3b08df"
+  },
+  {
+    "source": ".local/tasks/switch-skill-mirror-sync-to-workspace.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/switch-skill-mirror-sync-to-workspace.md",
+    "sha256": "0b3ebdbe8e27765a89233e4bce6d826e9cb28e543594128183c78259bbd02a8f"
+  },
+  {
+    "source": ".local/tasks/triage-failure-gate-compression-safety.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/triage-failure-gate-compression-safety.md",
+    "sha256": "7988803678c0b12256a01b36546a150c13019e1f8719343497cf3597f9ec8dd6"
+  },
+  {
+    "source": "skill-previews/failure-gate/candidate-2026-09-16-a/review.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/skill-previews/failure-gate/candidate-2026-09-16-a/review.md",
+    "sha256": "3595f3dcda63696a685b8ef1513b930cd0d53b658ad84a2fe3cbe0c288a7c4ac"
+  },
+  {
+    "source": "skill-previews/failure-gate/candidate-2026-09-24-b/P3-review.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/skill-previews/failure-gate/candidate-2026-09-24-b/P3-review.md",
+    "sha256": "3595f3dcda63696a685b8ef1513b930cd0d53b658ad84a2fe3cbe0c288a7c4ac"
+  },
+  {
+    "source": "skill-previews/failure-gate/candidate-2026-09-24-b/review.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/skill-previews/failure-gate/candidate-2026-09-24-b/review.md",
+    "sha256": "0e623f00a3be0e822da670a7471c30ac275f0524d9f8f6324343e0982dd37813"
+  },
+  {
+    "source": ".agents/memory/failure-gate-validation.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.agents/memory/failure-gate-validation.md",
+    "sha256": "47fef772ce2c317f6536229f6519c33e7f2a03b11a6a0d0bc12f462cf40841b6"
+  },
+  {
+    "source": ".agents/memory/failure-gate-runtime-manifest.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.agents/memory/failure-gate-runtime-manifest.md",
+    "sha256": "caeef4b680f055d11022e76bed3d223855a7926175a157293bfce68e85fd7d34"
+  },
+  {
+    "source": ".agents/memory/failure-gate-writer-coordination.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.agents/memory/failure-gate-writer-coordination.md",
+    "sha256": "e3a48a3bd9784b81b096c110e65accd4e1663c4af638d872b0ffcc281943f47c"
+  },
+  {
+    "source": ".agents/memory/tracked-approval-snapshot-stability.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.agents/memory/tracked-approval-snapshot-stability.md",
+    "sha256": "40f87a509caf826fc449d31da8577644fec0c48b994f0186bb30a7d1c4444142"
+  },
+  {
+    "source": "attached_assets/Pasted-Master-Reel-Counter-task-922-Failure-Gate-migration-han_1790627263186.txt",
+    "destination": "docs/validation/archive/legacy-failure-gate/attached_assets/Pasted-Master-Reel-Counter-task-922-Failure-Gate-migration-han_1790627263186.txt",
+    "sha256": "564d127e07dc967efa008cc0e68e116da284b08d253f2267d8147a64205b1cd1"
+  },
+  {
+    "source": "attached_assets/Pasted-Finding-The-file-mostly-avoids-claiming-platform-level-_1790644979773.txt",
+    "destination": "docs/validation/archive/legacy-failure-gate/attached_assets/Pasted-Finding-The-file-mostly-avoids-claiming-platform-level-_1790644979773.txt",
+    "sha256": "1377061f973d1df2a170b84baab82b3a73fbaf518d8c24f6f46970006f010187"
+  },
+  {
+    "source": ".failure-gate-state/coordinator.sqlite",
+    "destination": "docs/validation/archive/legacy-failure-gate/.failure-gate-state/coordinator.sqlite",
+    "sha256": "15149e3cd490fca86d57e61b5f2131179d73ab4d6fe3b27f24f773f7deab7f37"
+  },
+  {
+    "source": ".failure-gate-state/input-writers.lock",
+    "destination": "docs/validation/archive/legacy-failure-gate/.failure-gate-state/input-writers.lock",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "source": "test-results/failure-gate/playwright.json",
+    "destination": "docs/validation/archive/legacy-failure-gate/test-results/failure-gate/playwright.json",
+    "sha256": "496e779ac81d728dd31afbf3ee5d6b2b8a6b7c3425b380ad7d79cabf652e3dd4"
+  },
+  {
+    "source": "docs/validation/github-actions.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/github-actions.md",
+    "sha256": "a751d8fbdd11f7fee6e6ef6a41e2b86110ff52ef896ba6c687c4def651ac7f53"
+  },
+  {
+    "source": "docs/validation/managed-clerk-credential-capabilities.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/validation/managed-clerk-credential-capabilities.md",
+    "sha256": "4f2f1b8d9537a704cd7fc2d40c6a983b628e53b31b3487f8a2c1d96f64477d83"
+  },
+  {
+    "source": "docs/typecheck-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/typecheck-audit-report.md",
+    "sha256": "823e5e5c38b81f7f926b289651f3258d9359adc5df685fb1bc53135f69780553"
+  },
+  {
+    "source": ".local/tasks/admin-model-availability-chips.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/admin-model-availability-chips.md",
+    "sha256": "38fe34da1172b0af8e07e0a94f43a2de91ad9c5fb8c44cdbcba38455ddedee79"
+  },
+  {
+    "source": ".local/tasks/bug-audit-collision-smoke.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/bug-audit-collision-smoke.md",
+    "sha256": "5eda5a5ac5cf63b54c5401aaa05069267379b705502a2d959084c7c2d61b5277"
+  },
+  {
+    "source": ".local/tasks/bug-audit-storage-lint.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/bug-audit-storage-lint.md",
+    "sha256": "337a968a62bce3ad6cd86dc29ff5ee593614e8e39a7923b2c6e96f1217f3c9e2"
+  },
+  {
+    "source": ".local/tasks/bug-audit-typecheck.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/bug-audit-typecheck.md",
+    "sha256": "5035683081c88fb63ac8c9dff01fd46feba01896bde494f9e048f38bfddf3408"
+  },
+  {
+    "source": ".local/tasks/clerk-release-environment-contract.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/clerk-release-environment-contract.md",
+    "sha256": "8204efc58bb2c92525e55329796ff0e793b68f2050cd2faad0ed8850b7f203b3"
+  },
+  {
+    "source": ".local/tasks/complete-managed-clerk-cutover.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/complete-managed-clerk-cutover.md",
+    "sha256": "cf2982f2236b64f85efe0d209e914ee7ea8868db7c98d4715ce7454cbf1e0954"
+  },
+  {
+    "source": ".local/tasks/complete-port-authority-setup.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/complete-port-authority-setup.md",
+    "sha256": "554a86e3e9f66f7174b196e4cab28cc08c74b2f601b3cfd8ad7df3d2bb50ddb8"
+  },
+  {
+    "source": ".local/tasks/install-complete-skill-mirror-sync.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/install-complete-skill-mirror-sync.md",
+    "sha256": "7f36f11d7b70e0e3363f9849d98ec1db1b00078fc54945df9d9aecd681047acc"
+  },
+  {
+    "source": ".local/tasks/live-preview-hmr-recovery.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/live-preview-hmr-recovery.md",
+    "sha256": "1b02d0ce267be5db5cc49ef8f500e3a398bce540cb26a1f2994ebea2f775386e"
+  },
+  {
+    "source": ".local/tasks/replit-agent-build-failure-review.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/replit-agent-build-failure-review.md",
+    "sha256": "66506a0ccefc7169eff73d4ebeb52dd8e64e2ac5e26a99121684bd62ad26480b"
+  },
+  {
+    "source": ".local/tasks/storage-lint-enforcement.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/storage-lint-enforcement.md",
+    "sha256": "3d6f92ce0fd08eb2a2a9b30ea974c70422b68cd4cde09a8eedaadf735fb27710"
+  },
+  {
+    "source": ".local/tasks/validation-reentrancy-waiter-isolation.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/validation-reentrancy-waiter-isolation.md",
+    "sha256": "90769ba429b0fe489dbf62aa6ba2e61e9910090283a1733de7b2701c170adade"
+  },
+  {
+    "source": ".local/tasks/validation-tier-contracts.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/.local/tasks/validation-tier-contracts.md",
+    "sha256": "94b94b01145ffdd5bfdf2608dfb0afefb4101b50bcf5b21313ad380d31cee503"
+  },
+  {
+    "source": "docs/ci-collision-smoke-bug-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/ci-collision-smoke-bug-audit-report.md",
+    "sha256": "a1eeca615a6a148ca57fa9fdee5953a120db53fb55ea45a9532fc7b1a9c64fe5"
+  },
+  {
+    "source": "docs/serial-lock-bug-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/serial-lock-bug-audit-report.md",
+    "sha256": "25c6f725676ea2e5f02908f5af5e320e8ec4ffc267415488a2e4bcab1ba284f8"
+  },
+  {
+    "source": "docs/startup-smoke-bug-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/startup-smoke-bug-audit-report.md",
+    "sha256": "772d6f5c725f06f3ec396bd5ee89c791ca35e4b346fe675aaa8a6f7ed64dd49e"
+  },
+  {
+    "source": "docs/storage-lint-audit-report.md",
+    "destination": "docs/validation/archive/legacy-failure-gate/docs/storage-lint-audit-report.md",
+    "sha256": "1b9e4511f151d372ac14209436fd8832550e155c30a63bdda3444e922317eb88"
+  }
+]

@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "tiers": {
+    "test-fast": {
+      "description": "Fast static and storage checks.",
+      "serial": false,
+      "steps": [
+        {"name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"]},
+        {"name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"]},
+        {"name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"]}
+      ]
+    },
+    "test-standard": {
+      "description": "Application checks and backend tests.",
+      "serial": true,
+      "steps": [
+        {"name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"]},
+        {"name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"]},
+        {"name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"]},
+        {"name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"]},
+        {"name": "backend-tests", "kind": "test", "command": ["node", "--import", "tsx/esm", "--test", "server/__tests__/routes.test.ts", "server/__tests__/photo-delete.test.ts"]},
+        {"name": "managed-clerk-release-contract", "kind": "test", "command": ["npm", "run", "test:managed-clerk-release-contract"]}
+      ]
+    },
+    "test-standard-plus": {
+      "description": "Standard checks plus lock and resource-isolation tests.",
+      "serial": true,
+      "steps": [
+        {"name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"]},
+        {"name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"]},
+        {"name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"]},
+        {"name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"]},
+        {"name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"]},
+        {"name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"]},
+        {"name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"]},
+        {"name": "port-authority-tests", "kind": "harness", "command": ["node", "scripts/port-authority-test.mjs"]},
+        {"name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"]},
+        {"name": "manifest-parity", "kind": "lint", "command": ["node", "scripts/validate-validation-manifest.mjs"]}
+      ]
+    },
+    "test-heavy": {
+      "description": "Complete registered validation including CI and browser coverage.",
+      "serial": true,
+      "steps": [
+        {"name": "startup-smoke", "kind": "smoke", "command": ["bash", "scripts/startup-smoke.sh"]},
+        {"name": "security-audit", "kind": "audit", "command": ["npm", "audit", "--audit-level=high"]},
+        {"name": "schema-check", "kind": "lint", "command": ["node", "scripts/validate-schema.mjs"]},
+         {"name": "release-schema-contract", "kind": "test", "command": ["npm", "run", "test:managed-clerk-release-contract"]},
+        {"name": "workspace-skill-contract", "kind": "test", "command": ["npm", "run", "test:workspace-skill"]},
+        {"name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"]},
+        {"name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"]},
+        {"name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"]},
+        {"name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"]},
+        {"name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"]},
+        {"name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"]},
+        {"name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"]},
+        {"name": "port-authority-tests", "kind": "harness", "command": ["node", "scripts/port-authority-test.mjs"]},
+        {"name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"]},
+        {"name": "manifest-parity", "kind": "lint", "command": ["node", "scripts/validate-validation-manifest.mjs"]},
+        {"name": "nested-tier-regression", "kind": "test", "command": ["npm", "run", "test:validation-reentrancy"]},
+        {"name": "collision-smoke", "kind": "smoke", "command": ["node", "scripts/ci-collision-test.mjs"]},
+        {"name": "browser-tests", "kind": "test", "command": ["node", "scripts/run-browser-tests.mjs"]}
+      ]
+    }
+  }
+}

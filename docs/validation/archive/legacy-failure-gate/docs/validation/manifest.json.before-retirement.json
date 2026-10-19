@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "description": "Canonical validation tiers for Master Reel Counter.",
+  "tiers": {
+    "test-fast": {
+      "packageScript": "npm run test-fast",
+      "resource": "validation",
+      "priority": 1,
+      "timeoutMs": 180000,
+      "steps": [
+        { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
+        { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] }
+      ]
+    },
+    "test-standard": {
+      "packageScript": "npm run test-standard",
+      "resource": "validation",
+      "priority": 2,
+      "timeoutMs": 300000,
+      "steps": [
+        { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
+        { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"] },
+        { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
+        { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
+        { "name": "clerk-release-contract", "kind": "test", "command": ["npm", "run", "test:managed-clerk-release-contract"] },
+        { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
+        { "name": "failure-gate-contract", "kind": "test", "command": ["node", "--test", "scripts/__tests__/failure-gate.test.mjs"] },
+        { "name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"] },
+        { "name": "manifest-parity", "kind": "lint", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
+      ]
+    },
+    "test-standard-plus": {
+      "packageScript": "npm run test-standard-plus",
+      "resource": "validation",
+      "priority": 2,
+      "timeoutMs": 420000,
+      "steps": [
+        { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
+        { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"] },
+        { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
+        { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
+        { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
+        { "name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
+        { "name": "port-authority-tests", "kind": "harness", "command": ["node", "scripts/port-authority-test.mjs"] },
+        { "name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"] },
+        { "name": "manifest-parity", "kind": "lint", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
+      ]
+    },
+    "test-heavy": {
+      "packageScript": "npm run test-heavy",
+      "resource": "validation",
+      "priority": 3,
+      "timeoutMs": 900000,
+      "steps": [
+        { "name": "startup-smoke", "kind": "smoke", "command": ["bash", "scripts/startup-smoke.sh"] },
+        { "name": "startup-smoke-boundaries", "kind": "test", "command": ["node", "--test", "scripts/__tests__/github-actions-empty-database.test.mjs"] },
+        { "name": "security-audit", "kind": "audit", "command": ["npm", "audit", "--audit-level=high"] },
+        { "name": "schema-check", "kind": "lint", "command": ["node", "scripts/validate-schema.mjs"] },
+         { "name": "release-schema-contract", "kind": "test", "command": ["npm", "run", "test:managed-clerk-release-contract"] },
+        { "name": "workspace-skill-contract", "kind": "test", "command": ["npm", "run", "test:workspace-skill"] },
+        { "name": "typecheck", "kind": "typecheck", "command": ["npm", "run", "typecheck"] },
+        { "name": "storage-lint", "kind": "lint", "command": ["npm", "run", "lint:storage"] },
+        { "name": "port-reference-scan", "kind": "lint", "command": ["npm", "run", "check:port-references"] },
+        { "name": "storage-lint-contract", "kind": "test", "command": ["npm", "run", "test:storage-lint-contract"] },
+        { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
+        { "name": "vite-hmr-recovery-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr-recovery"] },
+        { "name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
+        { "name": "port-authority-tests", "kind": "harness", "command": ["node", "scripts/port-authority-test.mjs"] },
+        { "name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"] },
+        { "name": "manifest-parity", "kind": "lint", "command": ["node", "scripts/validate-validation-manifest.mjs"] },
+        { "name": "nested-tier-regression", "kind": "test", "command": ["npm", "run", "test:validation-reentrancy"] },
+        { "name": "collision-smoke", "kind": "smoke", "command": ["node", "scripts/ci-collision-test.mjs"] },
+        { "name": "browser-tests", "kind": "test", "command": ["node", "scripts/run-browser-tests.mjs"] }
+      ]
+    }
+  }
+}

@@ -26,8 +26,6 @@
         { "name": "unit-tests", "kind": "test", "command": ["npm", "run", "test:unit"] },
         { "name": "clerk-release-contract", "kind": "test", "command": ["npm", "run", "test:managed-clerk-release-contract"] },
         { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
-        { "name": "failure-gate-contract", "kind": "test", "command": ["node", "--test", "scripts/__tests__/failure-gate.test.mjs"] },
-        { "name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"] },
         { "name": "manifest-parity", "kind": "lint", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
       ]
     },
@@ -45,7 +43,6 @@
         { "name": "vite-hmr-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr"] },
         { "name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
         { "name": "port-authority-tests", "kind": "harness", "command": ["node", "scripts/port-authority-test.mjs"] },
-        { "name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"] },
         { "name": "manifest-parity", "kind": "lint", "command": ["node", "scripts/validate-validation-manifest.mjs"] }
       ]
     },
@@ -69,7 +66,6 @@
         { "name": "vite-hmr-recovery-tests", "kind": "test", "command": ["npm", "run", "test:vite-hmr-recovery"] },
         { "name": "serial-lock-tests", "kind": "test", "command": ["npx", "tsx", "server/__tests__/ci-serial-lock.test.ts"] },
         { "name": "port-authority-tests", "kind": "harness", "command": ["node", "scripts/port-authority-test.mjs"] },
-        { "name": "failure-gate-parity", "kind": "lint", "command": ["node", "scripts/check-failure-gate-parity.mjs"] },
         { "name": "manifest-parity", "kind": "lint", "command": ["node", "scripts/validate-validation-manifest.mjs"] },
         { "name": "nested-tier-regression", "kind": "test", "command": ["npm", "run", "test:validation-reentrancy"] },
         { "name": "collision-smoke", "kind": "smoke", "command": ["node", "scripts/ci-collision-test.mjs"] },

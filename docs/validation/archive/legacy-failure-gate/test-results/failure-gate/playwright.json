@@ -1,0 +1,2880 @@
+{
+  "config": {
+    "configFile": "/home/runner/workspace/playwright.config.ts",
+    "rootDir": "/home/runner/workspace/tests",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/home/runner/workspace/tests/global-setup.ts",
+    "globalTeardown": "/home/runner/workspace/tests/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/workspace/test-results/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/home/runner/workspace/tests",
+        "testIgnore": [
+          "release/**"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/home/runner/workspace/test-results/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-chromium",
+        "name": "mobile-chromium",
+        "testDir": "/home/runner/workspace/tests",
+        "testIgnore": [
+          "release/**"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/failure-gate/playwright.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:5000/api/healthz",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "clerk-bootstrap-recovery.spec.ts",
+      "file": "clerk-bootstrap-recovery.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "shows a safe recovery view after Clerk fails and retries without losing the return path",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 21847,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-30T02:19:22.532Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "9540bfa7e8f6b18e5d68-96c585a7b402a65a0a77",
+          "file": "clerk-bootstrap-recovery.spec.ts",
+          "line": 3,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "clerk-preview-bootstrap.spec.ts",
+      "file": "clerk-preview-bootstrap.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real preview loads Clerk JavaScript over valid HTTPS with bounded CSP",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3038,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-30T02:19:44.764Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "6dc5feb55d9aa2d55f9a-0417f4193412f978e916",
+          "file": "clerk-preview-bootstrap.spec.ts",
+          "line": 9,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "clerk-sign-in-navigation.spec.ts",
+      "file": "clerk-sign-in-navigation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "signed-out Settings entry returns to protected Settings after form sign-in",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7126,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-30T02:19:47.830Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1e11bf4f39e3d042fcff-ec3d224e6b37ec5bc2cd",
+          "file": "clerk-sign-in-navigation.spec.ts",
+          "line": 53,
+          "column": 1
+        },
+        {
+          "title": "unsafe sign-in return targets cannot control the authenticated route",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8625,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-30T02:19:54.965Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1e11bf4f39e3d042fcff-e958e12a93b9febe38a4",
+          "file": "clerk-sign-in-navigation.spec.ts",
+          "line": 91,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "dashboard-search.spec.ts",
+      "file": "dashboard-search.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "dashboard search",
+          "file": "dashboard-search.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "loads matches beyond the first owned page and keeps recent searches available",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6324,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:03.764Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f558dda0b3d22053ee94-2cac59ca4900adc99105",
+              "file": "dashboard-search.spec.ts",
+              "line": 4,
+              "column": 3
+            },
+            {
+              "title": "applies structured filters and preserves sorting and search state after reload",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4908,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:10.104Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f558dda0b3d22053ee94-1aed1297acb5a98aeef7",
+              "file": "dashboard-search.spec.ts",
+              "line": 38,
+              "column": 3
+            },
+            {
+              "title": "shows a retryable search failure instead of no results",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3492,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:15.023Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f558dda0b3d22053ee94-f74a6bf420deb207cd78",
+              "file": "dashboard-search.spec.ts",
+              "line": 69,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "export.spec.ts",
+      "file": "export.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "export checks @export",
+          "file": "export.spec.ts",
+          "line": 19,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Excel export initiates a non-empty .xlsx download from the UI",
+              "ok": true,
+              "tags": [
+                "export"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4465,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:18.540Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0667f272bb733ff6f62f-9f8cecafd64ba12b64b8",
+              "file": "export.spec.ts",
+              "line": 20,
+              "column": 3
+            },
+            {
+              "title": "PDF export initiates a non-empty .pdf download from the UI",
+              "ok": true,
+              "tags": [
+                "export"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5179,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:23.024Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0667f272bb733ff6f62f-35cf9808fff6c5dee1fb",
+              "file": "export.spec.ts",
+              "line": 74,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "folder-expand.spec.ts",
+      "file": "folder-expand.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "folder auto-expand @folder-expand",
+          "file": "folder-expand.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "creating a folder and moving a session into it auto-expands the folder",
+              "ok": true,
+              "tags": [
+                "folder-expand"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4060,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:28.234Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ed276641991a38aa0283-4164fe9179b4c23700af",
+              "file": "folder-expand.spec.ts",
+              "line": 13,
+              "column": 3
+            },
+            {
+              "title": "moving a session via Move-to-Folder menu auto-expands the target folder",
+              "ok": true,
+              "tags": [
+                "folder-expand"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3981,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:32.309Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ed276641991a38aa0283-858b6c36f9d5e9d07876",
+              "file": "folder-expand.spec.ts",
+              "line": 96,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "help-guide.spec.ts",
+      "file": "help-guide.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "support help",
+          "file": "help-guide.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "searchable help guide is available without hover-only controls",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3218,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:36.321Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "94a92350a2d0b4fd3870-040e46d16c01af05b92f",
+              "file": "help-guide.spec.ts",
+              "line": 5,
+              "column": 3
+            },
+            {
+              "title": "help chat renders a streamed answer in the Ask AI panel",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3977,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:39.554Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "94a92350a2d0b4fd3870-a583a3d6ca602bc04b8c",
+              "file": "help-guide.spec.ts",
+              "line": 14,
+              "column": 3
+            },
+            {
+              "title": "help chat preserves the active identity transcript across navigation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6467,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:43.559Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "94a92350a2d0b4fd3870-162477ce546339fe96a5",
+              "file": "help-guide.spec.ts",
+              "line": 37,
+              "column": 3
+            },
+            {
+              "title": "help chat trims oversized transcripts while restoring and streaming",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5739,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:50.047Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "94a92350a2d0b4fd3870-cd5c5f0f94cd49f3547a",
+              "file": "help-guide.spec.ts",
+              "line": 66,
+              "column": 3
+            },
+            {
+              "title": "help chat does not expose one approved identity transcript to another",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 7206,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:20:55.800Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "94a92350a2d0b4fd3870-fc6fc43a4d3b639c05d6",
+              "file": "help-guide.spec.ts",
+              "line": 120,
+              "column": 3
+            },
+            {
+              "title": "help chat shows a recovery message when the route returns an error",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5484,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:03.018Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "94a92350a2d0b4fd3870-de3604613aca5314b31a",
+              "file": "help-guide.spec.ts",
+              "line": 157,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "mobile-layout.spec.ts",
+      "file": "mobile-layout.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "mobile layout parity @mobile",
+          "file": "mobile-layout.spec.ts",
+          "line": 23,
+          "column": 6,
+          "specs": [
+            {
+              "title": "offline pending-count badge is visible on mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3318,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:08.527Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2463d90220c817a01905-9168f5f25c34c1afcffd",
+              "file": "mobile-layout.spec.ts",
+              "line": 115,
+              "column": 3
+            },
+            {
+              "title": "WS reconnect countdown banner is visible on mobile",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4094,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:11.866Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2463d90220c817a01905-a09ec6b30d52a31a460b",
+              "file": "mobile-layout.spec.ts",
+              "line": 189,
+              "column": 3
+            },
+            {
+              "title": "denied join shows an access outcome without reconnecting",
+              "ok": true,
+              "tags": [
+                "mobile"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4679,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:15.980Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2463d90220c817a01905-17ef5829961a70cfc8cb",
+              "file": "mobile-layout.spec.ts",
+              "line": 249,
+              "column": 3
+            },
+            {
+              "title": "Mobile Flow input text size remains stable across rotation @mobile-image-orientation",
+              "ok": true,
+              "tags": [
+                "mobile",
+                "mobile-image-orientation"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "mobile-chromium",
+                  "projectName": "mobile-chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5020,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:24:13.266Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2463d90220c817a01905-4a10b6c5a041d34db945",
+              "file": "mobile-layout.spec.ts",
+              "line": 26,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "mobile-photo-upload.spec.ts",
+      "file": "mobile-photo-upload.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "prepares mirrored-horizontal-exif-2.jpg with oriented pixels and dimensions @mobile-image-orientation",
+          "ok": true,
+          "tags": [
+            "mobile-image-orientation"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chromium",
+              "projectName": "mobile-chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2342,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "mobile-chromium: mirrored-horizontal-exif-2.jpg",
+                      "duration": 820
+                    }
+                  ],
+                  "startTime": "2026-09-30T02:24:20.269Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e03d2e010cfd9bbe780-0b88c04a84ee27341d46",
+          "file": "mobile-photo-upload.spec.ts",
+          "line": 15,
+          "column": 3
+        },
+        {
+          "title": "prepares mirrored-vertical-exif-4.jpg with oriented pixels and dimensions @mobile-image-orientation",
+          "ok": true,
+          "tags": [
+            "mobile-image-orientation"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chromium",
+              "projectName": "mobile-chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3065,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "mobile-chromium: mirrored-vertical-exif-4.jpg",
+                      "duration": 1201
+                    }
+                  ],
+                  "startTime": "2026-09-30T02:24:22.623Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e03d2e010cfd9bbe780-5cdb4758be735bc703a7",
+          "file": "mobile-photo-upload.spec.ts",
+          "line": 15,
+          "column": 3
+        },
+        {
+          "title": "prepares mirrored-90-transpose-exif-5.jpg with oriented pixels and dimensions @mobile-image-orientation",
+          "ok": true,
+          "tags": [
+            "mobile-image-orientation"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chromium",
+              "projectName": "mobile-chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4061,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "mobile-chromium: mirrored-90-transpose-exif-5.jpg",
+                      "duration": 2322
+                    }
+                  ],
+                  "startTime": "2026-09-30T02:24:25.717Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e03d2e010cfd9bbe780-bd7d6078afae04ba0c7e",
+          "file": "mobile-photo-upload.spec.ts",
+          "line": 15,
+          "column": 3
+        },
+        {
+          "title": "prepares portrait-exif-6.jpg with oriented pixels and dimensions @mobile-image-orientation",
+          "ok": true,
+          "tags": [
+            "mobile-image-orientation"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chromium",
+              "projectName": "mobile-chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5490,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "mobile-chromium: portrait-exif-6.jpg",
+                      "duration": 2462
+                    }
+                  ],
+                  "startTime": "2026-09-30T02:24:29.797Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e03d2e010cfd9bbe780-7f165e74baf7569178cd",
+          "file": "mobile-photo-upload.spec.ts",
+          "line": 15,
+          "column": 3
+        },
+        {
+          "title": "prepares mirrored-90-transverse-exif-7.jpg with oriented pixels and dimensions @mobile-image-orientation",
+          "ok": true,
+          "tags": [
+            "mobile-image-orientation"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chromium",
+              "projectName": "mobile-chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6974,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "mobile-chromium: mirrored-90-transverse-exif-7.jpg",
+                      "duration": 3082
+                    }
+                  ],
+                  "startTime": "2026-09-30T02:24:35.314Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e03d2e010cfd9bbe780-eb3fbcda51ecd3a792c3",
+          "file": "mobile-photo-upload.spec.ts",
+          "line": 15,
+          "column": 3
+        },
+        {
+          "title": "prepares landscape-exif-8.jpg with oriented pixels and dimensions @mobile-image-orientation",
+          "ok": true,
+          "tags": [
+            "mobile-image-orientation"
+          ],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chromium",
+              "projectName": "mobile-chromium",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5365,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "steps": [
+                    {
+                      "title": "mobile-chromium: landscape-exif-8.jpg",
+                      "duration": 1284
+                    }
+                  ],
+                  "startTime": "2026-09-30T02:24:42.424Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "5e03d2e010cfd9bbe780-aa8bf1c02195a3b7fe75",
+          "file": "mobile-photo-upload.spec.ts",
+          "line": 15,
+          "column": 3
+        }
+      ],
+      "suites": [
+        {
+          "title": "Mobile Flow photo queue @mobile-photo-upload",
+          "file": "mobile-photo-upload.spec.ts",
+          "line": 234,
+          "column": 6,
+          "specs": [
+            {
+              "title": "reconciles both queue stores atomically and only recovers current-owner claims",
+              "ok": true,
+              "tags": [
+                "mobile-photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2673,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:20.690Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5e03d2e010cfd9bbe780-f4c2dd34d40690541c46",
+              "file": "mobile-photo-upload.spec.ts",
+              "line": 235,
+              "column": 3
+            },
+            {
+              "title": "reconciles a verified previous owner before recovery without adopting unrelated photos",
+              "ok": true,
+              "tags": [
+                "mobile-photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5051,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:23.380Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5e03d2e010cfd9bbe780-962cf446037c3ace25dc",
+              "file": "mobile-photo-upload.spec.ts",
+              "line": 379,
+              "column": 3
+            },
+            {
+              "title": "converts, uploads, registers once, and clears the durable queue",
+              "ok": true,
+              "tags": [
+                "mobile-photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 15472,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:28.442Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5e03d2e010cfd9bbe780-6ad85f3107edf3815ca2",
+              "file": "mobile-photo-upload.spec.ts",
+              "line": 506,
+              "column": 3
+            },
+            {
+              "title": "reuses the durable registration key after the first response is lost",
+              "ok": true,
+              "tags": [
+                "mobile-photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5225,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:43.928Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5e03d2e010cfd9bbe780-2a136dd503538756d627",
+              "file": "mobile-photo-upload.spec.ts",
+              "line": 668,
+              "column": 3
+            },
+            {
+              "title": "does not retain stale items while an online multi-file selection is still preparing",
+              "ok": true,
+              "tags": [
+                "mobile-photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5196,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:49.164Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5e03d2e010cfd9bbe780-282ec97dfd8f10b11f3a",
+              "file": "mobile-photo-upload.spec.ts",
+              "line": 760,
+              "column": 3
+            },
+            {
+              "title": "keeps the detail review image loaded after durable queue cleanup",
+              "ok": true,
+              "tags": [
+                "mobile-photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3858,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:54.371Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5e03d2e010cfd9bbe780-10a40d8730b04e1096ab",
+              "file": "mobile-photo-upload.spec.ts",
+              "line": 818,
+              "column": 3
+            },
+            {
+              "title": "shows an undecodable file as terminal without upload retries",
+              "ok": true,
+              "tags": [
+                "mobile-photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5582,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:21:58.242Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5e03d2e010cfd9bbe780-be4623f362ff0607e264",
+              "file": "mobile-photo-upload.spec.ts",
+              "line": 900,
+              "column": 3
+            },
+            {
+              "title": "uses 95 percent when no saved photo quality is returned",
+              "ok": true,
+              "tags": [
+                "mobile-photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3821,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:03.835Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5e03d2e010cfd9bbe780-da97ff534849fb01f51d",
+              "file": "mobile-photo-upload.spec.ts",
+              "line": 931,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "offline-queue.spec.ts",
+      "file": "offline-queue.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "offline queue warning @offline-queue",
+          "file": "offline-queue.spec.ts",
+          "line": 196,
+          "column": 6,
+          "specs": [
+            {
+              "title": "script cache admits only valid application assets and cleans legacy errors",
+              "ok": true,
+              "tags": [
+                "offline-queue"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3148,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:07.694Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "11db15508d7bfe3962e6-c897628a6c197538f0e0",
+              "file": "offline-queue.spec.ts",
+              "line": 197,
+              "column": 3
+            },
+            {
+              "title": "logout and identity changes cannot expose legacy protected caches offline",
+              "ok": true,
+              "tags": [
+                "offline-queue"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4856,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:10.853Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "11db15508d7bfe3962e6-232b65a35e509b27a7c4",
+              "file": "offline-queue.spec.ts",
+              "line": 290,
+              "column": 3
+            },
+            {
+              "title": "public cache writes survive offline use and handled storage failures",
+              "ok": true,
+              "tags": [
+                "offline-queue"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8667,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:15.720Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "11db15508d7bfe3962e6-2ceb7aabd027b7dcd59a",
+              "file": "offline-queue.spec.ts",
+              "line": 379,
+              "column": 3
+            },
+            {
+              "title": "logout guard dialog appears when there are pending offline items",
+              "ok": true,
+              "tags": [
+                "offline-queue"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5214,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:24.399Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "11db15508d7bfe3962e6-949c15b7733cde2b6487",
+              "file": "offline-queue.spec.ts",
+              "line": 475,
+              "column": 3
+            },
+            {
+              "title": "replays a lost entry response once and commits its intended photo pin",
+              "ok": true,
+              "tags": [
+                "offline-queue"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6459,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:29.629Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "11db15508d7bfe3962e6-f6366a0bad498526fc87",
+              "file": "offline-queue.spec.ts",
+              "line": 558,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "pageview-rate-limit.spec.ts",
+      "file": "pageview-rate-limit.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "pageview rate limit @security",
+          "file": "pageview-rate-limit.spec.ts",
+          "line": 11,
+          "column": 6,
+          "specs": [
+            {
+              "title": "POST /api/track/pageview returns 429 after threshold",
+              "ok": true,
+              "tags": [
+                "security"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1964,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:36.114Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "720b8fa6fa2ce7ebfde7-a22413bf3f785d8a0697",
+              "file": "pageview-rate-limit.spec.ts",
+              "line": 12,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "photo-upload.spec.ts",
+      "file": "photo-upload.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "photo POST validation @photo-upload",
+          "file": "photo-upload.spec.ts",
+          "line": 57,
+          "column": 6,
+          "specs": [
+            {
+              "title": "multipart avatar upload persists its image reference",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1939,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:38.100Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-19993bfa24327dfdbc61",
+              "file": "photo-upload.spec.ts",
+              "line": 58,
+              "column": 3
+            },
+            {
+              "title": "multipart company logo upload persists its image reference",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2142,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:40.049Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-d8eae71ec39d3ddda933",
+              "file": "photo-upload.spec.ts",
+              "line": 77,
+              "column": 3
+            },
+            {
+              "title": "multipart direct upload can be registered as a session photo",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1987,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:42.205Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-4ab033b7a89d5e23ef7c",
+              "file": "photo-upload.spec.ts",
+              "line": 96,
+              "column": 3
+            },
+            {
+              "title": "photo mode reuses its registration key after a lost confirmation",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4731,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:44.204Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-f8c8be33556b861957f2",
+              "file": "photo-upload.spec.ts",
+              "line": 133,
+              "column": 3
+            },
+            {
+              "title": "quick entry reuses its registration key after a lost confirmation",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3963,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:48.945Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-18911f9dbf05f3b56d1c",
+              "file": "photo-upload.spec.ts",
+              "line": 164,
+              "column": 3
+            },
+            {
+              "title": "missing body (no Content-Type) returns 400 not 500",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1514,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:52.920Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-a658c994a80daecfe664",
+              "file": "photo-upload.spec.ts",
+              "line": 193,
+              "column": 3
+            },
+            {
+              "title": "empty JSON body returns 400 (objectStorageKey required)",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1440,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:54.445Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-0db89f0c8924fd2ce248",
+              "file": "photo-upload.spec.ts",
+              "line": 210,
+              "column": 3
+            },
+            {
+              "title": "rejects storage-key traversal before photo registration",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1441,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:55.900Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-b2b3a18cdb0e8b14bd65",
+              "file": "photo-upload.spec.ts",
+              "line": 227,
+              "column": 3
+            },
+            {
+              "title": "rejects an in-namespace key with no pending upload intent",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1401,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:57.355Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-c1ca2747ed60de45d822",
+              "file": "photo-upload.spec.ts",
+              "line": 247,
+              "column": 3
+            },
+            {
+              "title": "client-supplied userId and sessionId are overridden by server values",
+              "ok": true,
+              "tags": [
+                "photo-upload"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1876,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:22:58.768Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "b1af0a6fb6cda320ea74-c8860fb9343ef080ffb5",
+              "file": "photo-upload.spec.ts",
+              "line": 265,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "pin-position.spec.ts",
+      "file": "pin-position.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "pin label → entry position field @pin-position",
+          "file": "pin-position.spec.ts",
+          "line": 15,
+          "column": 6,
+          "specs": [
+            {
+              "title": "API stores position when provided in entry creation",
+              "ok": true,
+              "tags": [
+                "pin-position"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1542,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:00.664Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ef1512a31080f9d03c1-0abdb6950d11aa27bb2e",
+              "file": "pin-position.spec.ts",
+              "line": 21,
+              "column": 3
+            },
+            {
+              "title": "LabelScannerTab commit sends pin label as position",
+              "ok": true,
+              "tags": [
+                "pin-position"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5605,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:02.217Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ef1512a31080f9d03c1-ee7c0207493e265e8a8f",
+              "file": "pin-position.spec.ts",
+              "line": 56,
+              "column": 3
+            },
+            {
+              "title": "repeated entry POSTs with one idempotency key return the original entry",
+              "ok": true,
+              "tags": [
+                "pin-position"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1547,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:07.834Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "2ef1512a31080f9d03c1-87b8235f7fc0b05750c4",
+              "file": "pin-position.spec.ts",
+              "line": 152,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "review-tab.spec.ts",
+      "file": "review-tab.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "review tab persistence @review",
+          "file": "review-tab.spec.ts",
+          "line": 14,
+          "column": 6,
+          "specs": [
+            {
+              "title": "reviewer position is restored after hard reload",
+              "ok": true,
+              "tags": [
+                "review"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5788,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:09.402Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "5622dbe4724903cd9bca-2043586c5e3851a16375",
+              "file": "review-tab.spec.ts",
+              "line": 15,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "scan-parity.spec.ts",
+      "file": "scan-parity.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "scan result parity @scan",
+          "file": "scan-parity.spec.ts",
+          "line": 16,
+          "column": 6,
+          "specs": [
+            {
+              "title": "per-photo scan shows a successful result from the route contract",
+              "ok": true,
+              "tags": [
+                "scan"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3248,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:15.208Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9b95399acee2b529cdf2-29114f69d7312b427c1a",
+              "file": "scan-parity.spec.ts",
+              "line": 17,
+              "column": 3
+            },
+            {
+              "title": "per-photo scan shows a user-visible error when the route fails",
+              "ok": true,
+              "tags": [
+                "scan"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3285,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:18.468Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9b95399acee2b529cdf2-89ed11b3fba4f6bd5ad8",
+              "file": "scan-parity.spec.ts",
+              "line": 53,
+              "column": 3
+            },
+            {
+              "title": "per-photo scan toast shows skipped-pin count",
+              "ok": true,
+              "tags": [
+                "scan"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3832,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:21.766Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9b95399acee2b529cdf2-114cbde3526eba08f6c9",
+              "file": "scan-parity.spec.ts",
+              "line": 101,
+              "column": 3
+            },
+            {
+              "title": "session-wide scan toast shows skipped-pin count",
+              "ok": true,
+              "tags": [
+                "scan"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4598,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:25.611Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "9b95399acee2b529cdf2-01f539b73d4bbd072906",
+              "file": "scan-parity.spec.ts",
+              "line": 136,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "session-cleanup.spec.ts",
+      "file": "session-cleanup.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "session state cleanup @session-cleanup",
+          "file": "session-cleanup.spec.ts",
+          "line": 23,
+          "column": 6,
+          "specs": [
+            {
+              "title": "trashing a session removes all *-{id} localStorage keys",
+              "ok": true,
+              "tags": [
+                "session-cleanup"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 7351,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:30.532Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1c177494959f5073f45e-e173cf54f49023aa8423",
+              "file": "session-cleanup.spec.ts",
+              "line": 24,
+              "column": 3
+            },
+            {
+              "title": "resetting a session clears scanner/undo keys but preserves session-tab",
+              "ok": true,
+              "tags": [
+                "session-cleanup"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 7325,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:37.907Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1c177494959f5073f45e-9e89e784ddd5bd39d935",
+              "file": "session-cleanup.spec.ts",
+              "line": 84,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "session-fixture-cleanup.spec.ts",
+      "file": "session-fixture-cleanup.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "E2E session fixture cleanup",
+          "file": "session-fixture-cleanup.spec.ts",
+          "line": 5,
+          "column": 15,
+          "specs": [
+            {
+              "title": "tracks every session created through the shared helper",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2213,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:45.265Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d1eb92aa9dd36b3748b7-0b224900d77811513133",
+              "file": "session-fixture-cleanup.spec.ts",
+              "line": 6,
+              "column": 3
+            },
+            {
+              "title": "permanently removes the prior test's tracked session",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1824,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:47.495Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d1eb92aa9dd36b3748b7-5d2065b73791a3969498",
+              "file": "session-fixture-cleanup.spec.ts",
+              "line": 17,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "settings-admin-account-management.spec.ts",
+      "file": "settings-admin-account-management.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "keeps block-list confirmation accurate when its count request fails",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2108,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-30T02:23:53.914Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7f5ce9677da6d83f0dc5-aaae6cd4b8873d66505e",
+          "file": "settings-admin-account-management.spec.ts",
+          "line": 73,
+          "column": 1
+        },
+        {
+          "title": "shows exactly the supported AI models with independent availability",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2671,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-30T02:23:56.032Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "7f5ce9677da6d83f0dc5-7c2549bbd6a03e35556e",
+          "file": "settings-admin-account-management.spec.ts",
+          "line": 107,
+          "column": 1
+        }
+      ],
+      "suites": [
+        {
+          "title": "owner account-management loading",
+          "file": "settings-admin-account-management.spec.ts",
+          "line": 31,
+          "column": 6,
+          "specs": [
+            {
+              "title": "shows loading and a retryable owner error before succeeding",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2739,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:49.836Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7f5ce9677da6d83f0dc5-6ae5136038508716dd95",
+              "file": "settings-admin-account-management.spec.ts",
+              "line": 32,
+              "column": 3
+            },
+            {
+              "title": "does not show a non-owner denial as an owner error",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 1321,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:52.585Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "7f5ce9677da6d83f0dc5-10f9082ec99195b9e386",
+              "file": "settings-admin-account-management.spec.ts",
+              "line": 55,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "undo-redo.spec.ts",
+      "file": "undo-redo.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "undo/redo parity @undo",
+          "file": "undo-redo.spec.ts",
+          "line": 9,
+          "column": 6,
+          "specs": [
+            {
+              "title": "deleting an entry shows undo toast and restoring it works",
+              "ok": true,
+              "tags": [
+                "undo"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5983,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:23:58.796Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bf73367cfbacf7e40d3b-6cc30563ef57ff092d8a",
+              "file": "undo-redo.spec.ts",
+              "line": 10,
+              "column": 3
+            },
+            {
+              "title": "deleting a draft pin can be undone @undo",
+              "ok": true,
+              "tags": [
+                "undo",
+                "undo"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3713,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-30T02:24:04.790Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bf73367cfbacf7e40d3b-257d6c7da1a9c3c90229",
+              "file": "undo-redo.spec.ts",
+              "line": 52,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-30T02:19:03.517Z",
+    "duration": 345036.40900000004,
+    "expected": 69,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

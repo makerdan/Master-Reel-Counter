@@ -3,10 +3,7 @@
 - [E2E test auth — run as Admin](e2e-owner-auth.md) — global setup must use a real Clerk account with persisted Admin role for full CRUD browser coverage.
 - [Undo delete-entry creates new ID](undo-entry-id.md) — undo for delete-entry POSTs a new entry with a new server-assigned ID; tests must not check for the original entry ID after undo.
 - [Typed-request migration in Express](typed-request-migration.md) — handler signatures must stay req:any; use inline cast (req as AuthenticatedRequest) for typed user access.
-- [Failure Gate validation](failure-gate-validation.md) — unchanged dependency audit failures stop the tier; preserve evidence instead of weakening audit thresholds.
-- [Tracked approval snapshot stability](tracked-approval-snapshot-stability.md) — Git index membership is not stable approval evidence; use an immutable review snapshot or a writer barrier.
 - [Failed completion checks can commit](completion-validation-commit-boundary.md) — after a failed completion check, inspect HEAD and status before editing; task changes may already be committed.
-- [Failure Gate runtime manifest](failure-gate-runtime-manifest.md) — routine parity checks belong in the runtime validation manifest, while the published tier registry remains contract data.
 - [Validation lock waiter isolation](validation-lock-waiters.md) — parallel tiers need isolated waiter manifests so nested collision smoke tests do not stall behind unrelated queues.
 - [Validation lock storage identity](validation-lock-storage-identity.md) — bind lock ownership to the acquired file identity as well as its token; stop protected work when ownership is lost.
 - [Support operations schema](support-ops-schema.md) — schema validation checks files, not the live dev DB; apply support migrations before authenticated runtime validation.
@@ -51,4 +48,3 @@
 - [Release schema fingerprint provenance](release-schema-fingerprint-provenance.md) — calculate reviewed production fingerprints through the application canonicalizer, not SQL or separately sorted metadata.
 - [Clerk testing sign-in navigation](clerk-testing-sign-in-navigation.md) — the testing helper activates a session without submitting the form; do not treat its route as a UI redirect verdict.
 - [Release Clerk script boot scope](release-clerk-script-boot-scope.md) — count successful Clerk script loads per completed main-document boot, not per Playwright page lifetime.
-- [Failure Gate writer coordination](failure-gate-writer-coordination.md) — a real file lock protects only cooperative writers; keep live completion blocked until writer coverage is verified.

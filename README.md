@@ -236,11 +236,9 @@ The application focuses on practical warehouse usage: mobile capture, industrial
     - AI Scanner-related and duplicate detection structures.
 
 - **Scripts & Validation**
-  - `scripts/run-locked-tier.mjs` for **task validation** with tier locking.
-  - `scripts/run-tier.mjs` for ad-hoc work with `--allow-no-plan`.
+  - `scripts/run-tier.mjs` executes independent application-check workloads, not task admission.
   - `scripts/workspace-skill-sync.mjs` for workspace-managed skill projections.
   - Validation-related commands:
-    - `npm run new-plan -- --name <slug> --why "<reason>"`
     - `workspace-skill:refresh`
     - `workspace-skill:validate`
     - `workspace-skill:audit`
@@ -280,44 +278,10 @@ The **Managed Clerk production release gate** GitHub workflow is a separate read
 
 ## Contributing / Conventions
 
-This project employs a **task plan and validation** contract, along with workspace-managed skill projections. Contributing changes should respect these conventions:
-
-- **Task Plans & Failure Gate**
-  - Every task requires a plan created with:
-    - `npm run new-plan -- --name <slug> --why "<reason>"`.
-  - Plans must include:
-    - `## Pre-existing failures to ignore`
-    - `## Validation`
-  - Plans may reference only **exact, active, unexpired records** in `docs/validation/failure-baseline.json`.
-  - The plan’s registered command is the **validation ceiling**; task validation must not exceed this tier.
-
-- **Task Validation**
-  - Run validation using:
-    - `TASK_PLAN_FILE=.local/tasks/<name>.md node scripts/run-locked-tier.mjs`.
-  - Missing or malformed plans, unregistered tiers, and tier mismatches **fail closed**.
-  - No-plan escape hatch:
-    - `node scripts/run-tier.mjs <tier> --allow-no-plan` for ad-hoc work.
-  - Declarative tiers:
-    - `test-fast`
-    - `test-standard`
-    - `test-standard-plus`
-    - `test-heavy`
-  - Heavy validation includes:
-    - `serial-lock.mjs`
-    - `free-ports.mjs`
-    - Startup smoke tests
-    - CI collision checks
-    - Playwright controls
-  - Task validation and platform completion validation are separate; completion checks are not grounds to escalate the task tier.
-
-- **Failure Classification**
-  - Failure classification requires **exact baseline matching**.
-  - A passing retry establishes **intermittency** only.
-  - Unlisted failures need **two of three provenance factors** before being self-classified as pre-existing.
-  - Do not promote a task-local observation directly into the failure catalog.
-  - Use:
-    - `npm run maintain:validation-baseline`
-    - For opt-in review and staleness reporting; maintenance findings do not fail unrelated task validation.
+Application check workloads remain defined in `docs/validation/manifest.json`.
+The old task-admission tooling is retired; these commands do not authorize
+implementation tasks or decide their completion. Historical records are under
+`docs/validation/archive/legacy-failure-gate/`. The replacement gate is not installed.
 
 - **Workspace Skills & Mirrors**
   - `scripts/workspace-skill-sync.mjs` implements **Skill Mirror Sync**.

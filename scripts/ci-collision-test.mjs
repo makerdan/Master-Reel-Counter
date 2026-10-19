@@ -34,7 +34,6 @@ function isolatedValidationEnvironment(base = process.env) {
   for (const key of Object.keys(env)) {
     if (
       key === "TASK_PLAN_FILE" ||
-      key === "FAILURE_GATE_PLAN_GUARDS_DONE" ||
       key === "VALIDATION_MANIFEST_PATH" ||
       key === "CI_SMOKE_TEST" ||
       key === "CI_COLLISION_TEST_HOLD_MS" ||

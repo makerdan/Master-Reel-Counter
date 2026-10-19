@@ -1,0 +1,6 @@
+{
+  "docs/validation/failure-baseline.json": "18a7b1b87f77d04f8af7572a45698ca36fe9e7fed2a20f14807770507bb046d3",
+  "docs/validation/failure-baseline.md": "dfd6c33e082d7a253174941b8ce0d1a96728cd618e3d57a4e7e87d33a9f69ed7",
+  ".github/workflows/validation.yml": "f59910ed6ca901ec96250824845974a1d85a8f15bff43119a9638de8d87e1883",
+  ".github/workflows/managed-clerk-release.yml": "b66383fa9aa9d6ec0925e93538638127881936e0dd2561c9f0f0b08fd726201f"
+}

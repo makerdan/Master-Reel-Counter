@@ -192,45 +192,12 @@ rollback procedure. The workflow file itself is not evidence that GitHub has
 run the check or that branch protection requires it.
 
 
-## Failure Gate validation
+## Independent workload checks
 
-The canonical project-local workflow is documented in
-`.agents/skills/failure-gate-v4/SKILL.md`, with its host implementation and
-acceptance contracts beside it. It is cooperative guidance for local task
-validation, not control over Replit Agent's task lifecycle.
-
-The legacy `npm run new-plan` scaffold writes disposable `.local` plans; those
-are not durable local task IDs, approvals, or completion evidence. Ordinary
-local-ID activation and validation remain blocked until the required
-project-local review and host-control adapters are configured. The only
-currently enabled checked launcher operation is the explicitly authorized
-reinstallation bootstrap:
-
-```bash
-node scripts/run-locked-tier.mjs docs/validation/plans/failure-gate-v4-reinstallation-bootstrap.md
-```
-
-This exact plan is pinned to `test-standard`; it is not ordinary task
-validation. The registered runtime tiers are `test-fast`, `test-standard`,
-`test-standard-plus`, and `test-heavy`. After a local task is authorized,
-only its selected tier is eligible in checked tooling. Until then, an
-ad-hoc diagnostic caller must opt in explicitly with
-`node scripts/run-tier.mjs test-standard --allow-no-plan`; that diagnostic
-result is not required-task evidence.
-
-The plan guards run as an auto-remediate plus strict pair. `--fix-stub` adds
-structure only; the strict pass still requires a real tier, rationale,
-ownership, and exact baseline resolution. Archive inspection is opt-in with
-`node scripts/check-failure-gate.mjs --archive`. Baseline review and stale
-verification reporting is opt-in with `npm run maintain:validation-baseline`.
-For a genuinely non-material plan, put `**Materiality:** non-material` under
-`## Task identity` and give a specific `**Why N/A:**` in `## Regression Guard`;
-mentioning "cosmetic" elsewhere in a material plan does not waive the guard.
-
-The historical capability map is in
-`docs/validation/failure-gate-capabilities.md`. Add runtime suites and tiers
-to `docs/validation/manifest.json` with a contract test, rather
-than adding runner-specific branching.
+The previous task-admission tooling has been retired. Historical reports and
+plans are under `docs/validation/archive/legacy-failure-gate/`; they are not
+current instructions. No replacement gate is installed. The workload commands
+below remain available for application diagnostics and CI, not task admission.
 ## Canonical validation tiers
 
 The tracked source of truth is `docs/validation/manifest.json`. Each tier is
