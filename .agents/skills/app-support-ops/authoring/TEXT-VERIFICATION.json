@@ -1,0 +1,19 @@
+{
+  "scope": "Text/package checks only; no app execution or tier PASS",
+  "checks": {
+    "frontmatter_byte_identical": true,
+    "## 3. Help mode unchanged": true,
+    "## 4. Admin Analytics mode unchanged": true,
+    "outage_control_contract_unchanged": true,
+    "retired_specialist_reference_absent": true,
+    "four_existing_tier_names_present": true,
+    "bounded_length": true,
+    "no_unclosed_code_fences": true,
+    "prompt_starts_backup": true,
+    "evals_parse_and_preserved_count": true,
+    "critical_boundaries_present": true,
+    "frontmatter_structure_preserved": true
+  },
+  "passed": 12,
+  "total": 12
+}

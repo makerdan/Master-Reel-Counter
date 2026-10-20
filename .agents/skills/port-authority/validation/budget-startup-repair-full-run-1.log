@@ -1,0 +1,144 @@
+{"scope":"isolated-bundle-fixture-only","testTimeoutMs":30000,"fixtureHookTimeoutMs":5000,"executionLimitMs":180000,"hostActivationEvidence":false,"stateDirectory":"/tmp/port-authority-regression-DHx1e0"}
+{"tool":"validation-lock","state":"ACQUIRED","resource":"global","nested":false,"token":"9bdab3a8-34e4-46eb-9ac6-596aa879ca74","queueWaitMs":29,"queueLimitMs":5000,"executionLimitMs":180000,"stopGraceMs":3000,"stopVerificationMs":5000,"clock":"monotonic","authority":"local-supervision-not-checked-approval"}
+{"incident":"independent-watchdog-registered","pid":15467,"startTime":"1016792"}
+✔ core: busy inventory is read-only with unconfigured authority adapters (126.259096ms)
+✔ core: default denies every reclaim/development option without reading manifests (344.801871ms)
+✔ core: free fixture port observes FREE; malformed inputs and disable do not (305.215659ms)
+✔ core: all production indicators deny; plausible development records cannot override (314.550794ms)
+✔ core: ordinary local lease needs no reclaim adapter and preserves raw child exits (659.409034ms)
+✔ core: resource/priority/PID/token reentry requests cannot dispatch (212.906755ms)
+✔ core: command's advanced-looking argument never enables the profile (366.704049ms)
+✔ core: actual nested wrapper is rejected, not admitted by inherited context (517.222781ms)
+✔ core: same-file actual callers serialize without advanced flags (1144.191438ms)
+✔ core: queue expiry is separate and cannot steal live ownership (1365.422993ms)
+✔ core: missing/overflow limits deny and execution expiry cannot become success (5388.480945ms)
+✔ contract: one identity, reduced defaults and explicit optional features (111.995312ms)
+✔ contract: stages retain authority and actual host acceptance (2.739516ms)
+✔ contract: advanced reclaim requires genuine providers and is not supplied by Unified (2.409191ms)
+✔ contract: Unified integration preserves tier, recovery and process identity boundaries (0.885005ms)
+✔ contract: optional review preserves runtime evidence and post-Start safety (12.739772ms)
+✔ contract: complete core criteria preserve installed wiring and independent review (1.445573ms)
+✔ contract: health remains actual-route proof; unrelated symptoms are conditional (3.12153ms)
+✔ invalid inputs and production flags win over development/disable markers (1238.073587ms)
+✔ valid audited-fixture development context admits both scripts without changing flags (726.052068ms)
+✔ hard production and deployment markers reject even valid development evidence (530.409095ms)
+✔ unconfigured bundled host adapters reject plausible attestation and reclaim records (431.736773ms)
+✔ local development records without independent provider backing do not admit either script (450.14091ms)
+✔ attestation alone cannot replace an unavailable Failure Gate authorization source (370.120204ms)
+✔ forged references and altered approved plan/run/port/process scope cannot signal (825.002919ms)
+✔ legacy reclaim manifests cannot be upgraded by claiming authorization (441.810315ms)
+✔ reclaim replay is rejected even after the target and listener stopped (482.759542ms)
+✔ concurrent reclaim of one grant admits only one operation (3577.072429ms)
+✔ Failure Gate revocation prevents escalation and records the partial outcome (3622.201732ms)
+✔ different grants cannot concurrently reclaim conflicting project resources (3577.826421ms)
+✔ Failure Gate grant expiry prevents escalation even when the manifest remains fresh (3418.052623ms)
+✔ failure to record authoritative evidence preserves raw cleanup success but cannot pass (404.571409ms)
+✔ timed-out claims and malformed handles cannot signal or be retried automatically (2798.036089ms)
+✔ missing, stale, unsafe, or unverified development evidence cannot authorize signals or dispatch (2987.318197ms)
+✔ development evidence expiring during queue wait blocks child dispatch (2285.436974ms)
+✔ expired admission evidence does not disable supervision of an already dispatched child (2369.140964ms)
+✔ expired development context prevents cleanup escalation and requires recovery (3442.327007ms)
+✔ unreadable socket inventories fail UNKNOWN without signals (313.374451ms)
+✔ absent IPv6 table without positive disabled-capability proof stays UNKNOWN (324.68264ms)
+✔ unused ephemeral port succeeds without a cleanup manifest (325.190603ms)
+✔ unapproved and protected-own-tree listeners are not signaled (520.718024ms)
+✔ expired/wrong-boot/wrong-incarnation/ancestor manifests cannot signal (679.883032ms)
+✔ unapproved descendant blocks all cleanup signals (405.209307ms)
+✔ dry-run changes nothing; authorized exact target stops and unrelated target survives (520.138138ms)
+✔ closing port cannot hide an authorized surviving process (3463.776385ms)
+✔ action manifest verifies targets even if the listener closed before invocation (490.803324ms)
+✔ raw child statuses propagate; missing executable fails without stranded lease (1300.240276ms)
+✔ same-resource commands serialize; disjoint resources can overlap (3279.946381ms)
+✔ stale heartbeat/max-hold does not reclaim a live owner (713.575742ms)
+✔ quiescent dead owner recovers; surviving workload blocks recovery (775.09582ms)
+✔ launch gaps, legacy/corrupt leases, and abandoned transition mutexes fail closed (853.470216ms)
+✔ PID-only and forged token/path reentry cannot bypass the lease (494.101202ms)
+✖ deep sequential reentry finishes; inherited-context parallel siblings serialize (974.870746ms)
+✔ parent exit cleans surviving descendants and cannot become a successful run (993.953431ms)
+✔ cancellation holds exclusion until resistant child stops (1120.368319ms)
+✔ execution budget stops owned work before replacement (5908.158269ms)
+✔ all validation budgets are explicit, finite and timer-safe before dispatch (1359.939149ms)
+✔ direct package-script dispatcher fixture cannot bypass outer execution deadline (5556.305637ms)
+✔ async test and hanging hook report finite timeout; outer wrapper stops remaining handles (10801.663286ms)
+✔ outer supervisor stops synchronous test despite its blocked per-test timer (5401.02047ms)
+✔ wall-clock reversal: expiry before dispatch returns 4 and retains the unfinalized lease (559.6617ms)
+✔ wall-clock reversal: confirmed dispatched work times out with exit 1 and verified cleanup (5414.501893ms)
+✔ wall-clock reversal: queue expiry returns 3 without dispatch or changing the live owner's lease (831.052277ms)
+✖ late raw zero cannot win the execution deadline race (960.192206ms)
+✔ admission rechecks cannot dispatch after the execution budget has expired (777.950293ms)
+✔ post-spawn journal failure cleans owned work but retains lease and blocks replacement (2026.124913ms)
+✔ descendant spawned on SIGTERM is discovered and receives termination (5751.22013ms)
+✔ FIFO and oversized JSON cannot hang manifest, lease or advisory waiter reads (1086.535367ms)
+✔ transient post-signal discovery is bounded and preserved in authoritative raw evidence (482.76411ms)
+✔ persistent or permission-denied shutdown discovery cannot authorize escalation or success (3840.004059ms)
+✔ malformed manifest members return structured INVALID without any signals (714.446794ms)
+✔ retained transient error blocks replacement even without an abandoned transition (1222.253581ms)
+✔ older leases without recovery disposition cannot be upgraded by ordinary recovery (422.075629ms)
+✔ independent watchdog stops detached work when wrapper stalls or its original group dies (4951.546551ms)
+✔ user work cannot dispatch without independent watchdog registration (2766.564509ms)
+✔ loss of independent watchdog stops known work and retains recovery exclusion (868.210085ms)
+✔ gated command preserves actual signal outcome rather than worker exit 1 (610.863797ms)
+✔ exit during contended journal await is re-observed before survivor classification (788.794033ms)
+ℹ tests 78
+ℹ suites 0
+ℹ pass 76
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 125630.103535
+
+✖ failing tests:
+
+test at .agents/skills/port-authority/tests/hardening.test.mjs:19:28
+✖ deep sequential reentry finishes; inherited-context parallel siblings serialize (974.870746ms)
+  AssertionError [ERR_ASSERTION]: {"tool":"validation-lock","state":"ACQUIRED","resource":"global","nested":false,"token":"c3859c35-1e10-4bc0-a884-d0e3d3450732","queueWaitMs":48,"queueLimitMs":5000,"executionLimitMs":10000,"stopGraceMs":150,"stopVerificationMs":1000,"clock":"monotonic","authority":"local-supervision-not-checked-approval"}
+  {"incident":"independent-watchdog-registered","pid":17259,"startTime":"1022761"}
+  {"tool":"validation-lock","state":"ACQUIRED","resource":"global","nested":true,"token":"7aaca055-a8a5-43ec-836c-5f3db78a0bdb","queueWaitMs":43,"queueLimitMs":5000,"executionLimitMs":10000,"stopGraceMs":150,"stopVerificationMs":1000,"clock":"monotonic","authority":"local-supervision-not-checked-approval"}
+  {"incident":"independent-watchdog-registered","pid":17280,"startTime":"1022786"}
+  {"tool":"validation-lock","state":"BLOCKED","reason":"unsafe or oversized JSON file"}
+  {"tool":"validation-lock","state":"FAILED","rawExitCode":4,"signal":null,"reason":null,"workloadStopped":true,"commandOutcome":{"exitCode":4,"signal":null},"token":"7aaca055-a8a5-43ec-836c-5f3db78a0bdb"}
+  {"tool":"validation-lock","state":"FAILED","rawExitCode":4,"signal":null,"reason":null,"workloadStopped":true,"commandOutcome":{"exitCode":4,"signal":null},"token":"c3859c35-1e10-4bc0-a884-d0e3d3450732"}
+  
+  
+  4 !== 0
+  
+      at TestContext.<anonymous> (file:///home/runner/workspace/.agents/skills/port-authority/tests/hardening.test.mjs:832:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at .agents/skills/port-authority/tests/hardening.test.mjs:19:28
+✖ late raw zero cannot win the execution deadline race (960.192206ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"rawExitCode":0/. Input:
+  
+  '{"tool":"validation-lock","state":"ACQUIRED","resource":"global","nested":false,"token":"a1ba1295-4b76-411f-a28e-38cb0374daff","queueWaitMs":32,"queueLimitMs":5000,"executionLimitMs":500,"stopGraceMs":150,"stopVerificationMs":1000,"clock":"monotonic","authority":"local-supervision-not-checked-approval"}\n' +
+    '{"incident":"independent-watchdog-registered","pid":17735,"startTime":"1026652"}\n' +
+    '{"incident":"independent-watchdog-stop","reason":"execution-budget","workloadStopped":false}\n' +
+    '{"incident":"independent-watchdog-signal","pid":17742,"startTime":"1026658","signal":"SIGTERM"}\n' +
+    '{"incident":"independent-watchdog-signal","pid":17749,"startTime":"1026671","signal":"SIGTERM"}\n' +
+    '{"incident":"independent-watchdog-stop","reason":"execution-budget","workloadStopped":false}\n' +
+    '{"incident":"independent-watchdog-stop","reason":"execution-budget","workloadStopped":true}\n' +
+    '{"tool":"validation-lock","state":"FAILED","rawExitCode":null,"signal":"SIGTERM","reason":"execution-budget","workloadStopped":true,"commandOutcome":{"exitCode":null,"signal":"SIGTERM"},"token":"a1ba1295-4b76-411f-a28e-38cb0374daff"}\n'
+  
+      at TestContext.<anonymous> (file:///home/runner/workspace/.agents/skills/port-authority/tests/hardening.test.mjs:1079:53)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{"tool":"validation-lock","state":"ACQUIRED","resource":"global","nested":false,"token":"a1ba1295-4b76-411f-a28e-38cb0374daff","queueWaitMs":32,"queueLimitMs":5000,"executionLimitMs":500,"stopGraceMs":150,"stopVerificationMs":1000,"clock":"monotonic","authority":"local-supervision-not-checked-approval"}\n{"incident":"independent-watchdog-registered","pid":17735,"startTime":"1026652"}\n{"incident":"independent-watchdog-stop","reason":"execution-budget","workloadStopped":false}\n{"incident":"independent-watchdog-signal","pid":17742,"startTime":"1026658","signal":"SIGTERM"}\n{"incident":"independent-watchdog-signal","pid":17749,"startTime":"1026671","signal":"SIGTERM"}\n{"incident":"independent-watchdog-stop","reason":"execution-budget","workloadStopped":false}\n{"incident":"independent-watchdog-stop","reason":"execution-budget","workloadStopped":true}\n{"tool":"validation-lock","state":"FAILED","rawExitCode":null,"signal":"SIGTERM","reason":"execution-budget","workloadStopped":true,"commandOutcome":{"exitCode":null,"signal":"SIGTERM"},"token":"a1ba1295-4b76-411f-a28e-38cb0374daff"}\n',
+    expected: /"rawExitCode":0/,
+    operator: 'match',
+    diff: 'simple'
+  }
+{"tool":"validation-lock","state":"FAILED","rawExitCode":1,"signal":null,"reason":null,"workloadStopped":true,"commandOutcome":{"exitCode":1,"signal":null},"token":"9bdab3a8-34e4-46eb-9ac6-596aa879ca74"}
+
+RECORDED_SHELL_EXIT=1

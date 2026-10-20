@@ -1,0 +1,48 @@
+Create a Remix of this Application as a backup.
+
+Verify the recovery point through the supported host interface before edits. If
+you cannot create it, ask the owner to create it and wait for confirmation before
+changes. Read-only discovery may continue. A Remix does not back up external data.
+
+Add this Failure Gate Unified package to the consolidated five-package CloudPainter
+installation plan as the sixth candidate. This prompt requests planning only.
+Do not install, activate tasks, run workloads, change remote systems or deploy.
+
+Inspect the current canonical .agents source, governing instructions, adopted gate,
+revision pin, actual gate implementation, source-management routes, and current
+tasks. Use this package's exact SKILL.md as the candidate, not an alternate mirror.
+If identical, record no update needed. If different, compare the complete texts
+and preserve newer or unrelated requirements through an explicit reconciliation
+decision; do not silently mix retired gate variants into Unified.
+
+Plan an actual revision update through the canonical gate's owner-directed
+maintenance route, including the canonical file and its pin in the same change.
+Do not execute it under this planning request. Keep gate-maintenance checks
+distinct from ordinary assigned-tier validation and do not claim a tier PASS
+from maintenance results.
+
+Preserve historical sealed plans, contract revisions, IDs, tombstones, bindings,
+ledgers, baselines and evidence. In-flight tasks retain the revision they were
+sealed under. Do not rewrite, reseal, rebind, start, cancel or retroactively
+migrate active tasks. Inspect actual pin/hash/projection behavior for shared
+effects; stage affected changes until safe sequencing or separately approved
+supported amendments resolve those effects.
+
+Keep exactly one adequate registered tier per ordinary task. Inspect actual
+workloads and coverage, not tier names. Where the consolidated installation
+requires genuinely missing executable coverage, prepare a concrete requirement,
+test, assertion and command mapping and the smallest appropriate existing-tier
+amendment under applicable authorization. Do not invent a fifth tier, weaken
+checks or prerequisites, increase budgets silently, or run application work
+through the maintenance exception.
+
+Use actual preflight, provisioning, amendment and supervised execution routes.
+Do not invent machine-bound task authority, a bootstrap specification, a new
+allocator, a platform Start interceptor or a universal independent reviewer.
+Preserve real existing review obligations and keep implementer validation and
+the requirement-to-delivery handoff.
+
+Report package/source identity, required implementation differences, pin effects,
+active-task protection, proposed bounded maintenance checks, ordinary validation
+coverage and remaining capability gaps in the same consolidated plan. Definition
+presence is not evidence of installed enforcement or runtime readiness.

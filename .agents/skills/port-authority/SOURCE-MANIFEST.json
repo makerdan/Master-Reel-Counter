@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "skillIdentity": "port-authority",
+  "revisionLabel": "historical core-default revision; not the current source manifest",
+  "scope": "definition/package authoring; isolated package checks only",
+  "canonicalSourceRoot": ".agents/skills/port-authority",
+  "originalArchive": {
+    "path": "attached_assets/port-authority_(10.10.2026)_1791743364013.zip",
+    "sha256": "7d3419d65985e73c68a58313930b8a4c6f19f5120cb858a99211d748a1fcae44",
+    "members": [
+      {
+        "path": "port-authority/SKILL.md",
+        "bytes": 30396,
+        "sha256": "33d6cd82ee6a66486d6b8e87507c1aebe2877ae84a1da27fed8cba39aec78e0e"
+      },
+      {
+        "path": "port-authority/reference/runtime-contract.md",
+        "bytes": 49343,
+        "sha256": "8508f871bc90fa456850aa10df6b6ab9698ba83b1f43b6613b51b6be6909f85d"
+      },
+      {
+        "path": "port-authority/scripts/free-ports.mjs",
+        "bytes": 14686,
+        "sha256": "d31d5817fe4635e7e586631be91846cc26ba6683337399d2b969b1fd223cda4f"
+      },
+      {
+        "path": "port-authority/scripts/host-capabilities.mjs",
+        "bytes": 1446,
+        "sha256": "cde66e139ecbb541f168edf34adbf6583369fd14e6c0590b9f67716fc0514061"
+      },
+      {
+        "path": "port-authority/scripts/runtime-environment.mjs",
+        "bytes": 6357,
+        "sha256": "ded3050e2f4505bfc192378ae031f059ba0d6361f1ea3a4c0b7f36beb40bfc4e"
+      },
+      {
+        "path": "port-authority/scripts/validation-lock.mjs",
+        "bytes": 30139,
+        "sha256": "d819f38df10b914751471066e36239d843cdbfd3aaa5540563047f9ca49797bb"
+      },
+      {
+        "path": "port-authority/tests/hardening.test.mjs",
+        "bytes": 75691,
+        "sha256": "80c2f81388c217fa03af8ed3fc05185b0fd1128ab9d2261657d07babaf093486"
+      }
+    ]
+  },
+  "historicalCanonicalSources": [
+    {
+      "path": ".agents/skills/port-authority/SKILL.md",
+      "bytes": 10373,
+      "sha256": "d208f7b8f0aa9c3e2d681b9ce4b3ccda7f4259a2a67014b69ce9dddd26c5533f",
+      "mode": "0o644"
+    },
+    {
+      "path": ".agents/skills/port-authority/reference/advanced-controls.md",
+      "bytes": 11044,
+      "sha256": "41ff3c12c3e82d476d885464d1cf7f8654b9f169d1a3a0d68d66dd55ecfb09cb",
+      "mode": "0o644"
+    },
+    {
+      "path": ".agents/skills/port-authority/reference/runtime-contract.md",
+      "bytes": 10417,
+      "sha256": "1fa56e8ec713427b5f9bd3d80f4dc8b07d61120ade9bbb41b441ba708aaa8e73",
+      "mode": "0o644"
+    },
+    {
+      "path": ".agents/skills/port-authority/reference/symptom-guidance.md",
+      "bytes": 2365,
+      "sha256": "5d5479363dd0c04c53fbc4b7b48e2c8df4e7548863cc32f531c89d2966d4d322",
+      "mode": "0o644"
+    },
+    {
+      "path": ".agents/skills/port-authority/scripts/free-ports.mjs",
+      "bytes": 15177,
+      "sha256": "a1afa0b0234beb83de9eeaabf091166ca1d248c09b17656275291abc3167dcae",
+      "mode": "0o755"
+    },
+    {
+      "path": ".agents/skills/port-authority/scripts/host-capabilities.mjs",
+      "bytes": 1446,
+      "sha256": "cde66e139ecbb541f168edf34adbf6583369fd14e6c0590b9f67716fc0514061",
+      "mode": "0o644"
+    },
+    {
+      "path": ".agents/skills/port-authority/scripts/runtime-environment.mjs",
+      "bytes": 6558,
+      "sha256": "530e8a18d6dbd50ef764ee4b276319f0cfa4307e1c6889f43f1686af95bae9b6",
+      "mode": "0o644"
+    },
+    {
+      "path": ".agents/skills/port-authority/scripts/validation-lock.mjs",
+      "bytes": 30755,
+      "sha256": "7d1ac732db42a85bfc6c5a747e24fa293dd398ed9ca4499cd549a751e99bdfe2",
+      "mode": "0o755"
+    },
+    {
+      "path": ".agents/skills/port-authority/tests/core.test.mjs",
+      "bytes": 10059,
+      "sha256": "99e7d6f1bc41e5955c6c8bc128bc78eaf193a05f1dc8962d3f88ddf1246504ff",
+      "mode": "0o644"
+    },
+    {
+      "path": ".agents/skills/port-authority/tests/hardening.test.mjs",
+      "bytes": 72579,
+      "sha256": "ce698d36a7b93256bc9cb235e337ea7ad3d58f901a2d664b85deb22c34b56bdf",
+      "mode": "0o644"
+    }
+  ],
+  "historicalPackageRegressionRuns": [
+    {
+      "run": 1,
+      "archivePath": "validation/run-1.log",
+      "sha256": "3d97592499605199f19aabda4a5749fe0cf4182faae00cbd38a63ef250d8dece",
+      "result": {
+        "tests": 74,
+        "pass": 74,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 84518.34236,
+      "outerOutcome": {
+        "tool": "validation-lock",
+        "state": "FINISHED",
+        "rawExitCode": 0,
+        "signal": null,
+        "reason": null,
+        "workloadStopped": true,
+        "commandOutcome": {
+          "exitCode": 0,
+          "signal": null
+        },
+        "token": "61b0c024-feeb-4b5a-9fc2-776503bec33b"
+      }
+    },
+    {
+      "run": 2,
+      "archivePath": "validation/run-2.log",
+      "sha256": "a2bb0b54af5f4d94d8f44c0556b75555d6e59d0699ee9a693d88b910374c5568",
+      "result": {
+        "tests": 74,
+        "pass": 74,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 84853.287074,
+      "outerOutcome": {
+        "tool": "validation-lock",
+        "state": "FINISHED",
+        "rawExitCode": 0,
+        "signal": null,
+        "reason": null,
+        "workloadStopped": true,
+        "commandOutcome": {
+          "exitCode": 0,
+          "signal": null
+        },
+        "token": "e93de589-0869-433a-8f67-e7262bfe90c5"
+      }
+    }
+  ],
+  "historicalChecks": {
+    "sourceFileCount": 10,
+    "relativeReferenceLinks": "passed",
+    "nodeSyntaxAllRuntimeAndTestModules": "passed",
+    "hostAdapterByteIdenticalToOriginal": true,
+    "originalAdvancedBehaviorCaseNamesRetained": 58,
+    "defaultBehaviorCasesAdded": 11,
+    "staticContractCases": 5
+  },
+  "historicalReadingMetrics": {
+    "originalRequiredWords": 10369,
+    "coreRequiredWords": 2689,
+    "allRevisedInstructionWords": 4348,
+    "originalEntryLines": 498,
+    "revisedEntryLines": 168
+  },
+  "environment": {
+    "node": "v24.13.0",
+    "platform": "Linux"
+  },
+  "excludedClaims": [
+    "project installation",
+    "independent host acceptance",
+    "genuine runtime attestation or reclaim authorization",
+    "deployment or native task completion"
+  ]
+}

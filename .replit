@@ -90,7 +90,7 @@ task = "shell.exec"
 args = "npm run test-standard"
 
 [workflows.workflow.metadata]
-isValidation = true
+outputType = "console"
 
 [[workflows.workflow]]
 name = "test-standard-plus"
@@ -101,7 +101,7 @@ task = "shell.exec"
 args = "npm run test-standard-plus"
 
 [workflows.workflow.metadata]
-isValidation = true
+outputType = "console"
 
 [[workflows.workflow]]
 name = "test-heavy"
@@ -112,7 +112,7 @@ task = "shell.exec"
 args = "npm run test-heavy"
 
 [workflows.workflow.metadata]
-isValidation = true
+outputType = "console"
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0", "github:1.0.0"]

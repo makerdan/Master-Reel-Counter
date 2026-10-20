@@ -1,0 +1,84 @@
+{
+  "sourceArchive": "Skill_Application_Router_(10.04.2026)_1792459618977.zip",
+  "sourceArchiveSha256": "30aa9cf2d048185dc78501f32ac278d99377133128f79b555c6b9f3f922fcbe0",
+  "scope": "Targeted Unified compatibility revision of the user-attached package; no application installation or runtime enforcement claimed.",
+  "changedOriginalMembers": [
+    "CHANGELOG.md",
+    "README.md",
+    "SKILL.md",
+    "references/custom-skill-command-manifest.json",
+    "references/custom-skill-commands.md",
+    "references/installation-verification-plan.md"
+  ],
+  "files": {
+    "CHANGELOG.md": {
+      "bytes": 2838,
+      "sha256": "c18b0df673565a4f52f2c6890d42d3d932653468cb668609716498422994385d"
+    },
+    "README.md": {
+      "bytes": 5717,
+      "sha256": "8e60eb49135b10655b864d709043fab0b25e12ef00d11719b9d40f849220201c"
+    },
+    "SKILL.md": {
+      "bytes": 24916,
+      "sha256": "4af94adff1cbe8b86034b6c3696c89e8471079d8fac7ba9af407ad0f8749e4ca"
+    },
+    "references/custom-skill-command-manifest.json": {
+      "bytes": 2419,
+      "sha256": "bb08b4f3e5ab6e6329698fa90369364acb1879ab9b7685c5b5ddf3f1849fdcdf"
+    },
+    "references/custom-skill-commands.md": {
+      "bytes": 23776,
+      "sha256": "d8053c910a98127445fe8d3ffac4a694469f4e0c8dbd6b2a2a38cc8567e3e63f"
+    },
+    "references/delivery-reconciliation.md": {
+      "bytes": 11454,
+      "sha256": "fd908bd54a3d2db4d25cc6a3f2e6fbdfece0e9276a28e02db48d5dcfdfa3f3ca"
+    },
+    "references/handoff-binding-and-recovery.md": {
+      "bytes": 13829,
+      "sha256": "7e95d74645e0c1184b2ae24488ffd5936237fb6fc1d9596734a3e57bb1fe0ff5"
+    },
+    "references/installation-verification-plan.md": {
+      "bytes": 24281,
+      "sha256": "b5fc2c0745a981ca3e4cb448034a6bb4f8416698119b786209a0f61be8bf71de"
+    },
+    "references/router-task-handoff-acceptance.md": {
+      "bytes": 16089,
+      "sha256": "811bc5201d5067a4dc09d74c73880c4798f3407d7955182a923c95b3b897c849"
+    }
+  },
+  "checks": [
+    "All nine original members retained",
+    "Skill metadata preserved",
+    "Unrelated reference unchanged: references/handoff-binding-and-recovery.md",
+    "Unrelated reference unchanged: references/delivery-reconciliation.md",
+    "Unrelated reference unchanged: references/router-task-handoff-acceptance.md",
+    "Root skill below 500 lines",
+    "No retired gate identity: SKILL.md",
+    "Resolved link: SKILL.md -> references/installation-verification-plan.md",
+    "Resolved link: SKILL.md -> references/handoff-binding-and-recovery.md",
+    "Resolved link: SKILL.md -> references/delivery-reconciliation.md",
+    "Resolved link: SKILL.md -> references/installation-verification-plan.md",
+    "Resolved link: SKILL.md -> references/router-task-handoff-acceptance.md",
+    "No retired gate identity: README.md",
+    "No retired gate identity: CHANGELOG.md",
+    "No retired gate identity: references/delivery-reconciliation.md",
+    "No retired gate identity: references/handoff-binding-and-recovery.md",
+    "Resolved link: references/handoff-binding-and-recovery.md -> delivery-reconciliation.md",
+    "No retired gate identity: references/router-task-handoff-acceptance.md",
+    "Resolved link: references/router-task-handoff-acceptance.md -> handoff-binding-and-recovery.md",
+    "Resolved link: references/router-task-handoff-acceptance.md -> delivery-reconciliation.md",
+    "No retired gate identity: references/installation-verification-plan.md",
+    "Resolved link: references/installation-verification-plan.md -> delivery-reconciliation.md",
+    "Resolved link: references/installation-verification-plan.md -> handoff-binding-and-recovery.md",
+    "Resolved link: references/installation-verification-plan.md -> router-task-handoff-acceptance.md",
+    "No retired gate identity: references/custom-skill-command-manifest.json",
+    "No retired gate identity: references/custom-skill-commands.md",
+    "Resolved link: references/custom-skill-commands.md -> installation-verification-plan.md",
+    "Resolved link: references/custom-skill-commands.md -> handoff-binding-and-recovery.md",
+    "Unified source hash independently matches",
+    "Retired mandatory live race removed",
+    "Exact tier and gate-maintenance distinction"
+  ]
+}

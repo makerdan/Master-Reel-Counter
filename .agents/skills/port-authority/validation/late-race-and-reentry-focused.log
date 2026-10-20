@@ -1,0 +1,14 @@
+{"scope":"isolated-bundle-fixture-only","testTimeoutMs":30000,"fixtureHookTimeoutMs":5000,"executionLimitMs":180000,"hostActivationEvidence":false,"stateDirectory":"/tmp/port-authority-regression-PwBMKe"}
+{"tool":"validation-lock","state":"ACQUIRED","resource":"global","nested":false,"token":"753153fb-eba0-43be-ad06-1b118e9ed4be","queueWaitMs":32,"queueLimitMs":5000,"executionLimitMs":180000,"stopGraceMs":3000,"stopVerificationMs":5000,"clock":"monotonic","authority":"local-supervision-not-checked-approval"}
+{"incident":"independent-watchdog-registered","pid":21169,"startTime":"1051335"}
+✔ deep sequential reentry finishes; inherited-context parallel siblings serialize (3756.795446ms)
+✔ late raw zero cannot win the execution deadline race (6112.318398ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9984.952801
+{"tool":"validation-lock","state":"FINISHED","rawExitCode":0,"signal":null,"reason":null,"workloadStopped":true,"commandOutcome":{"exitCode":0,"signal":null},"token":"753153fb-eba0-43be-ad06-1b118e9ed4be"}

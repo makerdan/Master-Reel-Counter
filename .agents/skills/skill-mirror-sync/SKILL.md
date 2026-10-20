@@ -1,5 +1,5 @@
 ---
-name: Skill Mirror Sync
+name: skill-mirror-sync
 title: Skill Mirror Sync
 description: >-
   Add, audit, project, invoke, validate, verify, or repair workspace-managed
@@ -13,21 +13,21 @@ description: >-
 Use this skill when adding, auditing, invoking, validating, repairing, or
 investigating a workspace-managed skill projection or runtime mirror. Keep the
 boundary one-way and fail closed: the workspace source is authoritative, the
-workspace projection is generated, and the runtime mirror is disposable.
+project projection is generated, and the runtime mirror is disposable.
 
 ## Authority and boundaries
 
 - `WORKSPACE_SKILLS_SOURCE` is the required, explicit, authoritative
-  workspace source. Treat its workspace-wide `.workspace-revision` as opaque;
+  workspace/platform source. Treat its workspace-wide `.workspace-revision` as opaque;
   it must be present and non-empty. Never invent, infer, or silently substitute
   a fallback source.
 - The generated project projection belongs only under
-  `.agents/skills/.workspace-projections/`. Workspace-authored skills elsewhere
+  `.agents/skills/.workspace-projections/`. Project-authored skills elsewhere
   under `.agents/skills/` must not be overwritten or removed.
 - `.local/custom_skills/<skill-id>/` is a platform-owned runtime mirror. It is
   downstream and disposable. Never edit it directly, promote it back, or use
   its body, timestamps, or metadata to claim that the workspace source is current.
-- The direction is workspace source → generated projection → runtime mirror.
+- The direction is workspace source → generated project projection → runtime mirror.
   A runtime mirror never flows back into either upstream stage, and repository
   automation must not simulate platform provisioning by writing its sidecar.
 - Do not copy private workspace instructions, credentials, secrets, or a
@@ -63,27 +63,21 @@ Refresh only through the supported projection helper:
    busy and do not remove active work.
 2. Recover an abandoned lock only when its structured owner is provably dead,
    or an unstructured lock is provably stale under the helper's timeout.
-   Invalid owner records, including non-positive PIDs, follow the bounded
-   unstructured-lock timeout. Recovery must quarantine and recheck the exact
-   stale lock identity before removal, so it cannot remove a replacement
-   worker's lock.
+   Recovery must be atomic and race-safe.
 3. Under the lock, remove only helper-owned staging and backup directories
    whose names have the expected format and valid identifier. Never delete a
    similarly named or active directory.
 4. Build the complete projection in a new staging directory. Validate its
    recursive manifest and all bytes before installation, then re-read the
    source revision. If the source changed, discard staging and retry or report
-   the change; do not install a mixed snapshot. The manifest carries a
-   deterministic generation derived from that source snapshot.
+   the change; do not install a mixed snapshot.
 5. Install with guarded directory renames: move an existing projection to an
    owned backup, rename staging into place, and restore the backup if the
    install fails. Clean staging and backup artifacts in a `finally` path.
    Never replace the destination by an unguarded delete-and-copy operation.
-6. Validate the installed projection again immediately before loading and
-   verify the source still has the same generation after installation. If the
-   requested skill is absent or validation fails, fail closed. Load returns
-   bytes captured during that validation, so a later path swap cannot redirect
-   consumption to a symlink or a different generation.
+6. Validate the installed projection again immediately before loading. If the
+   requested skill is absent or validation fails, fail closed. Return only
+   supported content from the validated projection.
 
 An interrupted refresh is handled by the same ownership-safe cleanup on the
 next supported refresh. Do not manually rescue partial files, merge staging
@@ -94,13 +88,11 @@ contents, or load a prior projection while the source is unavailable.
 Use the supported non-mutating command:
 
 ```sh
-npm run workspace-skill:status -- --skill <skill-id>
+pnpm workspace-skill:status -- --skill <skill-id>
 ```
 
 It reads the workspace source and the platform-owned
 `.local/custom_skills/<skill-id>/.workspace-skill-metadata.json` sidecar. The
-mirror root and all ancestors, the selected skill directory, and the sidecar
-must be real non-symlinked paths inside the configured mirror boundary. The
 sidecar's format, skill ID, source revision, and fingerprint must exactly match
 the canonical workspace metadata. Interpret outcomes as:
 
@@ -121,9 +113,9 @@ Classify before remediating:
 
 | Observation | Owner | Repository action |
 |---|---|---|
-| Workspace content, revision, or publication is wrong | Workspace skill owner | Report identity and bounded result; do not patch a mirror |
-| Mirror is missing or stale after supported refresh | Workspace provisioning or sync owner | Report environment, identity, and opaque metadata; request platform remediation |
-| Canonical source or validation metadata is unavailable | Workspace owner | Report unavailable and preserve fail-closed loading |
+| Workspace content, revision, or publication is wrong | Workspace/platform skill owner | Report identity and bounded result; do not patch a mirror |
+| Mirror is missing or stale after supported refresh | Workspace/platform provisioning or sync owner | Report environment, identity, and opaque metadata; request platform remediation |
+| Canonical workspace source or validation metadata is unavailable | Workspace/platform owner | Report unavailable and preserve fail-closed loading |
 | Projection implementation, boundary, or focused contract is wrong | Repository maintainer | Fix the repository contract or implementation |
 
 Reports should contain the skill ID, environment, validation surface, bounded

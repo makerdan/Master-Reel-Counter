@@ -1,5 +1,831 @@
 {
   "schemaVersion": 1,
-  "tasks": {},
-  "tombstones": []
+  "tasks": {
+    "2cf86765-b2fc-4d01-a337-d1f80548fb37": {
+      "history": [
+        {
+          "op": "provision",
+          "at": "2026-10-20T02:18:55.140Z",
+          "previous": null,
+          "state": {
+            "id": "2cf86765-b2fc-4d01-a337-d1f80548fb37",
+            "createdAt": "2026-10-20T02:18:55.139Z",
+            "status": "reserved",
+            "revision": 0,
+            "tier": "test-fast",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md",
+            "specHash": "3ffc1c8764396641242a900cd254b2429754d8512c485edf01e570c04cb8ee0e",
+            "runs": []
+          },
+          "digest": "42e706cff9da4b9edf15af3884a8e6fbba9f2e25971c5d0de4db0f5a19bcd74e"
+        },
+        {
+          "op": "amend",
+          "at": "2026-10-20T02:18:55.540Z",
+          "previous": "42e706cff9da4b9edf15af3884a8e6fbba9f2e25971c5d0de4db0f5a19bcd74e",
+          "state": {
+            "id": "2cf86765-b2fc-4d01-a337-d1f80548fb37",
+            "createdAt": "2026-10-20T02:18:55.139Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-fast",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md",
+            "specHash": "3ffc1c8764396641242a900cd254b2429754d8512c485edf01e570c04cb8ee0e",
+            "runs": [],
+            "spec": {
+              "title": "Install Attached Skill Bundles — native task 945",
+              "scope": "Package installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/configuration/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders.",
+              "tier": "test-fast",
+              "why": "Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.",
+              "approval": {
+                "reference": "Active owner request, Task 945: Install Attached Skill Bundles, exact 16-row archive mapping and implementation handoff",
+                "direction": "Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application.",
+                "applicability": "The active request authorizes this same package-only scope and the supported provisioner/preflight with exactly test-fast. This sealed plan implements that unchanged handoff; no additional scope, gate policy changes, mirror refresh, app integration or prior-record migration is authorized."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "All 16 mapped archives are safe and installed exactly, with no stale files",
+                  "check": "Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint."
+                },
+                {
+                  "requirement": "No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets",
+                  "check": "Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback."
+                },
+                {
+                  "requirement": "Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged",
+                  "check": "Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward."
+                },
+                {
+                  "requirement": "Fast validation executes under supported admission and package presence is not misrepresented as integration",
+                  "check": "Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed."
+                }
+              ]
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Install Attached Skill Bundles — native task 945\n\n## Task identity\n**Task ID:** 2cf86765-b2fc-4d01-a337-d1f80548fb37\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nPackage installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/configuration/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders.\n\n## Approval evidence\n**Reference:** Active owner request, Task 945: Install Attached Skill Bundles, exact 16-row archive mapping and implementation handoff\n**Owner direction:** Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application.\n**Applicability:** The active request authorizes this same package-only scope and the supported provisioner/preflight with exactly test-fast. This sealed plan implements that unchanged handoff; no additional scope, gate policy changes, mirror refresh, app integration or prior-record migration is authorized.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.; supported invocation: TASK_ID=2cf86765-b2fc-4d01-a337-d1f80548fb37 TASK_PLAN_FILE=.local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md npm run gate:run -- --id 2cf86765-b2fc-4d01-a337-d1f80548fb37 --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- All 16 mapped archives are safe and installed exactly, with no stale files — Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint.\n- No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets — Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback.\n- Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged — Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward.\n- Fast validation executes under supported admission and package presence is not misrepresented as integration — Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed.\n",
+            "planHash": "a157a284469e74441a1bdf4ffe7cc6c3ff3e6cb389940d728b133058d8f1a6b0",
+            "approvalHash": "ea41b7bed94187481d5fadcb6727821738e9e9db8689ebb808041d6b175c88e1"
+          },
+          "digest": "9639e681e521f0a75f9e78c5d16371a98fbb66afed4245ef14fbe45786903535"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-20T02:21:37.683Z",
+          "previous": "9639e681e521f0a75f9e78c5d16371a98fbb66afed4245ef14fbe45786903535",
+          "state": {
+            "id": "2cf86765-b2fc-4d01-a337-d1f80548fb37",
+            "createdAt": "2026-10-20T02:18:55.139Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-fast",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md",
+            "specHash": "3ffc1c8764396641242a900cd254b2429754d8512c485edf01e570c04cb8ee0e",
+            "runs": [
+              {
+                "id": "4e46b109-1510-4b10-bc5f-72d7c53db142",
+                "purpose": "bound-tier",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-fast",
+                "planHash": "a157a284469e74441a1bdf4ffe7cc6c3ff3e6cb389940d728b133058d8f1a6b0",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "startedAt": "2026-10-20T02:21:37.682Z",
+                "cleanupDeadline": "2026-10-20T02:24:40.682Z",
+                "evidencePath": ".local/failure-gate-unified/runs/4e46b109-1510-4b10-bc5f-72d7c53db142.jsonl",
+                "observations": []
+              }
+            ],
+            "spec": {
+              "title": "Install Attached Skill Bundles — native task 945",
+              "scope": "Package installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/configuration/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders.",
+              "tier": "test-fast",
+              "why": "Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.",
+              "approval": {
+                "reference": "Active owner request, Task 945: Install Attached Skill Bundles, exact 16-row archive mapping and implementation handoff",
+                "direction": "Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application.",
+                "applicability": "The active request authorizes this same package-only scope and the supported provisioner/preflight with exactly test-fast. This sealed plan implements that unchanged handoff; no additional scope, gate policy changes, mirror refresh, app integration or prior-record migration is authorized."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "All 16 mapped archives are safe and installed exactly, with no stale files",
+                  "check": "Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint."
+                },
+                {
+                  "requirement": "No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets",
+                  "check": "Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback."
+                },
+                {
+                  "requirement": "Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged",
+                  "check": "Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward."
+                },
+                {
+                  "requirement": "Fast validation executes under supported admission and package presence is not misrepresented as integration",
+                  "check": "Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed."
+                }
+              ]
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Install Attached Skill Bundles — native task 945\n\n## Task identity\n**Task ID:** 2cf86765-b2fc-4d01-a337-d1f80548fb37\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nPackage installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/configuration/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders.\n\n## Approval evidence\n**Reference:** Active owner request, Task 945: Install Attached Skill Bundles, exact 16-row archive mapping and implementation handoff\n**Owner direction:** Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application.\n**Applicability:** The active request authorizes this same package-only scope and the supported provisioner/preflight with exactly test-fast. This sealed plan implements that unchanged handoff; no additional scope, gate policy changes, mirror refresh, app integration or prior-record migration is authorized.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.; supported invocation: TASK_ID=2cf86765-b2fc-4d01-a337-d1f80548fb37 TASK_PLAN_FILE=.local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md npm run gate:run -- --id 2cf86765-b2fc-4d01-a337-d1f80548fb37 --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- All 16 mapped archives are safe and installed exactly, with no stale files — Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint.\n- No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets — Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback.\n- Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged — Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward.\n- Fast validation executes under supported admission and package presence is not misrepresented as integration — Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed.\n",
+            "planHash": "a157a284469e74441a1bdf4ffe7cc6c3ff3e6cb389940d728b133058d8f1a6b0",
+            "approvalHash": "ea41b7bed94187481d5fadcb6727821738e9e9db8689ebb808041d6b175c88e1"
+          },
+          "digest": "6c0d06644f42259ecc2f8be6d89a14adef52b7c39ff4d1e87f350e96c2fa6a9a"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-20T02:22:02.327Z",
+          "previous": "6c0d06644f42259ecc2f8be6d89a14adef52b7c39ff4d1e87f350e96c2fa6a9a",
+          "state": {
+            "id": "2cf86765-b2fc-4d01-a337-d1f80548fb37",
+            "createdAt": "2026-10-20T02:18:55.139Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-fast",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md",
+            "specHash": "3ffc1c8764396641242a900cd254b2429754d8512c485edf01e570c04cb8ee0e",
+            "runs": [
+              {
+                "id": "4e46b109-1510-4b10-bc5f-72d7c53db142",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-fast",
+                "planHash": "a157a284469e74441a1bdf4ffe7cc6c3ff3e6cb389940d728b133058d8f1a6b0",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "startedAt": "2026-10-20T02:21:37.682Z",
+                "cleanupDeadline": "2026-10-20T02:24:40.682Z",
+                "evidencePath": ".local/failure-gate-unified/runs/4e46b109-1510-4b10-bc5f-72d7c53db142.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 10591,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2580,
+                    "outputHash": "0783ecbe9aa8c0ef421f5e4233878fda77e619ffcbd8a96d8eea8f0c8fc626ea",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 130.258349\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.490434\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.324333\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.556746\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.209292\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.517577\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.397934\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.380398\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.77674\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.509469\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.205335\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 191.655896\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1364,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 4926,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3113,
+                    "outputHash": "430834a03a684d090c3a6e58a0dec132b5657c6c0d540b5b442fa76b65a58807",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 517.66004\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 526.002533\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 506.007851\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 534.815877\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 502.276835\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 566.767285\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 505.336561\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 543.292304\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 2.863638\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.519256\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.1493\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.426715\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.504224\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.428892\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.485743\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.695951\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4714.194623\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "finishedAt": "2026-10-20T02:22:02.327Z"
+              }
+            ],
+            "spec": {
+              "title": "Install Attached Skill Bundles — native task 945",
+              "scope": "Package installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/configuration/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders.",
+              "tier": "test-fast",
+              "why": "Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.",
+              "approval": {
+                "reference": "Active owner request, Task 945: Install Attached Skill Bundles, exact 16-row archive mapping and implementation handoff",
+                "direction": "Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application.",
+                "applicability": "The active request authorizes this same package-only scope and the supported provisioner/preflight with exactly test-fast. This sealed plan implements that unchanged handoff; no additional scope, gate policy changes, mirror refresh, app integration or prior-record migration is authorized."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "All 16 mapped archives are safe and installed exactly, with no stale files",
+                  "check": "Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint."
+                },
+                {
+                  "requirement": "No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets",
+                  "check": "Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback."
+                },
+                {
+                  "requirement": "Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged",
+                  "check": "Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward."
+                },
+                {
+                  "requirement": "Fast validation executes under supported admission and package presence is not misrepresented as integration",
+                  "check": "Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed."
+                }
+              ]
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Install Attached Skill Bundles — native task 945\n\n## Task identity\n**Task ID:** 2cf86765-b2fc-4d01-a337-d1f80548fb37\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nPackage installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/configuration/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders.\n\n## Approval evidence\n**Reference:** Active owner request, Task 945: Install Attached Skill Bundles, exact 16-row archive mapping and implementation handoff\n**Owner direction:** Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application.\n**Applicability:** The active request authorizes this same package-only scope and the supported provisioner/preflight with exactly test-fast. This sealed plan implements that unchanged handoff; no additional scope, gate policy changes, mirror refresh, app integration or prior-record migration is authorized.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.; supported invocation: TASK_ID=2cf86765-b2fc-4d01-a337-d1f80548fb37 TASK_PLAN_FILE=.local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md npm run gate:run -- --id 2cf86765-b2fc-4d01-a337-d1f80548fb37 --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- All 16 mapped archives are safe and installed exactly, with no stale files — Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint.\n- No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets — Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback.\n- Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged — Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward.\n- Fast validation executes under supported admission and package presence is not misrepresented as integration — Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed.\n",
+            "planHash": "a157a284469e74441a1bdf4ffe7cc6c3ff3e6cb389940d728b133058d8f1a6b0",
+            "approvalHash": "ea41b7bed94187481d5fadcb6727821738e9e9db8689ebb808041d6b175c88e1"
+          },
+          "digest": "6cb9dbb5aa59165022103803d71d7c711525bdb4cb58ecfbe0f5d01456949346"
+        },
+        {
+          "op": "amend",
+          "at": "2026-10-20T02:51:58.548Z",
+          "previous": "6cb9dbb5aa59165022103803d71d7c711525bdb4cb58ecfbe0f5d01456949346",
+          "state": {
+            "id": "2cf86765-b2fc-4d01-a337-d1f80548fb37",
+            "createdAt": "2026-10-20T02:18:55.139Z",
+            "status": "sealed",
+            "revision": 2,
+            "tier": "test-fast",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md",
+            "specHash": "3ffc1c8764396641242a900cd254b2429754d8512c485edf01e570c04cb8ee0e",
+            "runs": [
+              {
+                "id": "4e46b109-1510-4b10-bc5f-72d7c53db142",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-fast",
+                "planHash": "a157a284469e74441a1bdf4ffe7cc6c3ff3e6cb389940d728b133058d8f1a6b0",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "startedAt": "2026-10-20T02:21:37.682Z",
+                "cleanupDeadline": "2026-10-20T02:24:40.682Z",
+                "evidencePath": ".local/failure-gate-unified/runs/4e46b109-1510-4b10-bc5f-72d7c53db142.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 10591,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2580,
+                    "outputHash": "0783ecbe9aa8c0ef421f5e4233878fda77e619ffcbd8a96d8eea8f0c8fc626ea",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 130.258349\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.490434\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.324333\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.556746\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.209292\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.517577\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.397934\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.380398\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.77674\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.509469\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.205335\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 191.655896\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1364,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 4926,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3113,
+                    "outputHash": "430834a03a684d090c3a6e58a0dec132b5657c6c0d540b5b442fa76b65a58807",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 517.66004\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 526.002533\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 506.007851\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 534.815877\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 502.276835\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 566.767285\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 505.336561\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 543.292304\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 2.863638\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.519256\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.1493\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.426715\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.504224\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.428892\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.485743\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.695951\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4714.194623\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "finishedAt": "2026-10-20T02:22:02.327Z"
+              }
+            ],
+            "spec": {
+              "title": "Install Attached Skill Bundles — native task 945",
+              "scope": "Package installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders. Owner-authorized amendment: align the platform's registered completion validations with test-fast by retaining that command and unregistering test-standard, test-standard-plus and test-heavy as automatic completion checks. Preserve every tier's package script and canonical manifest workloads; preserve named workflows as ordinary manually available workflows if the registration API removes them. No dependency changes, passing heavy-tier claim, baseline waiver or Port Authority migration.",
+              "tier": "test-fast",
+              "why": "Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.",
+              "approval": {
+                "reference": "Active owner request, Task 945: Install Attached Skill Bundles, plus latest owner instruction: align completion validation with test-fast",
+                "direction": "Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application. Align completion validation with test-fast.",
+                "applicability": "The latest owner direction expressly authorizes the previously reported platform completion-registration mismatch to be corrected for the original package-only scope and unchanged test-fast binding. Preserve other tier definitions and scripts, existing validation evidence and prior records; do not repair dependencies, change gate policy, refresh mirrors or implement any Port Authority migration."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "All 16 mapped archives are safe and installed exactly, with no stale files",
+                  "check": "Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint."
+                },
+                {
+                  "requirement": "No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets",
+                  "check": "Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback."
+                },
+                {
+                  "requirement": "Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged",
+                  "check": "Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward."
+                },
+                {
+                  "requirement": "Fast validation executes under supported admission and package presence is not misrepresented as integration",
+                  "check": "Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed."
+                },
+                {
+                  "requirement": "Platform completion selects only test-fast without deleting tier workloads or hiding the earlier failed independent heavy audit",
+                  "check": "Before and after the supported registration changes, inspect getValidationCommands; require exactly test-fast mapped to npm run test-fast afterward. Preserve all four tier entries and package scripts by comparing package.json and docs/validation/manifest.json to the pre-task revision. Keep prior raw heavy-audit failure separately in the installation report. Register no false PASS, skip flag, alternative tier or dependency repair."
+                }
+              ]
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "Owner explicitly authorized aligning platform completion registration with the existing test-fast binding; preserve all other tier workloads and prior failed audit evidence.",
+            "plan": "# Install Attached Skill Bundles — native task 945\n\n## Task identity\n**Task ID:** 2cf86765-b2fc-4d01-a337-d1f80548fb37\n**Revision:** 2\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nPackage installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders. Owner-authorized amendment: align the platform's registered completion validations with test-fast by retaining that command and unregistering test-standard, test-standard-plus and test-heavy as automatic completion checks. Preserve every tier's package script and canonical manifest workloads; preserve named workflows as ordinary manually available workflows if the registration API removes them. No dependency changes, passing heavy-tier claim, baseline waiver or Port Authority migration.\n\n## Approval evidence\n**Reference:** Active owner request, Task 945: Install Attached Skill Bundles, plus latest owner instruction: align completion validation with test-fast\n**Owner direction:** Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application. Align completion validation with test-fast.\n**Applicability:** The latest owner direction expressly authorizes the previously reported platform completion-registration mismatch to be corrected for the original package-only scope and unchanged test-fast binding. Preserve other tier definitions and scripts, existing validation evidence and prior records; do not repair dependencies, change gate policy, refresh mirrors or implement any Port Authority migration.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.; supported invocation: TASK_ID=2cf86765-b2fc-4d01-a337-d1f80548fb37 TASK_PLAN_FILE=.local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md npm run gate:run -- --id 2cf86765-b2fc-4d01-a337-d1f80548fb37 --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- All 16 mapped archives are safe and installed exactly, with no stale files — Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint.\n- No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets — Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback.\n- Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged — Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward.\n- Fast validation executes under supported admission and package presence is not misrepresented as integration — Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed.\n- Platform completion selects only test-fast without deleting tier workloads or hiding the earlier failed independent heavy audit — Before and after the supported registration changes, inspect getValidationCommands; require exactly test-fast mapped to npm run test-fast afterward. Preserve all four tier entries and package scripts by comparing package.json and docs/validation/manifest.json to the pre-task revision. Keep prior raw heavy-audit failure separately in the installation report. Register no false PASS, skip flag, alternative tier or dependency repair.\n",
+            "planHash": "7cda758ef995c58edbebcb7f2dfb7496bd1e6077748d1713b70bdafb5eda34af",
+            "approvalHash": "e4c9bfe53a0f4d05fde00c0d0b85f31e8990ba14c7e94877fa87795b854b9628"
+          },
+          "digest": "4a2789a4e1f0761fa07f163dcaf73125eda16c2a1116ad6f67ada352e9b5a5ba"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-20T02:53:39.540Z",
+          "previous": "4a2789a4e1f0761fa07f163dcaf73125eda16c2a1116ad6f67ada352e9b5a5ba",
+          "state": {
+            "id": "2cf86765-b2fc-4d01-a337-d1f80548fb37",
+            "createdAt": "2026-10-20T02:18:55.139Z",
+            "status": "sealed",
+            "revision": 2,
+            "tier": "test-fast",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md",
+            "specHash": "3ffc1c8764396641242a900cd254b2429754d8512c485edf01e570c04cb8ee0e",
+            "runs": [
+              {
+                "id": "4e46b109-1510-4b10-bc5f-72d7c53db142",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-fast",
+                "planHash": "a157a284469e74441a1bdf4ffe7cc6c3ff3e6cb389940d728b133058d8f1a6b0",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "startedAt": "2026-10-20T02:21:37.682Z",
+                "cleanupDeadline": "2026-10-20T02:24:40.682Z",
+                "evidencePath": ".local/failure-gate-unified/runs/4e46b109-1510-4b10-bc5f-72d7c53db142.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 10591,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2580,
+                    "outputHash": "0783ecbe9aa8c0ef421f5e4233878fda77e619ffcbd8a96d8eea8f0c8fc626ea",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 130.258349\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.490434\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.324333\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.556746\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.209292\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.517577\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.397934\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.380398\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.77674\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.509469\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.205335\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 191.655896\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1364,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 4926,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3113,
+                    "outputHash": "430834a03a684d090c3a6e58a0dec132b5657c6c0d540b5b442fa76b65a58807",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 517.66004\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 526.002533\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 506.007851\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 534.815877\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 502.276835\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 566.767285\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 505.336561\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 543.292304\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 2.863638\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.519256\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.1493\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.426715\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.504224\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.428892\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.485743\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.695951\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4714.194623\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "finishedAt": "2026-10-20T02:22:02.327Z"
+              },
+              {
+                "id": "400ebc79-b13b-4f9b-bdbc-b8305063e0cf",
+                "purpose": "bound-tier",
+                "state": "RUNNING",
+                "revision": 2,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-fast",
+                "planHash": "7cda758ef995c58edbebcb7f2dfb7496bd1e6077748d1713b70bdafb5eda34af",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "905ff6b11dbf0d3d61e0b36a897103bfa95e0f24",
+                  "filesHash": "9b7d2345ddd023a61d583857e736b663e79b0a91a8f591d3562c843ffd26e6da"
+                },
+                "startedAt": "2026-10-20T02:53:39.347Z",
+                "cleanupDeadline": "2026-10-20T02:56:42.540Z",
+                "evidencePath": ".local/failure-gate-unified/runs/400ebc79-b13b-4f9b-bdbc-b8305063e0cf.jsonl",
+                "observations": []
+              }
+            ],
+            "spec": {
+              "title": "Install Attached Skill Bundles — native task 945",
+              "scope": "Package installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders. Owner-authorized amendment: align the platform's registered completion validations with test-fast by retaining that command and unregistering test-standard, test-standard-plus and test-heavy as automatic completion checks. Preserve every tier's package script and canonical manifest workloads; preserve named workflows as ordinary manually available workflows if the registration API removes them. No dependency changes, passing heavy-tier claim, baseline waiver or Port Authority migration.",
+              "tier": "test-fast",
+              "why": "Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.",
+              "approval": {
+                "reference": "Active owner request, Task 945: Install Attached Skill Bundles, plus latest owner instruction: align completion validation with test-fast",
+                "direction": "Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application. Align completion validation with test-fast.",
+                "applicability": "The latest owner direction expressly authorizes the previously reported platform completion-registration mismatch to be corrected for the original package-only scope and unchanged test-fast binding. Preserve other tier definitions and scripts, existing validation evidence and prior records; do not repair dependencies, change gate policy, refresh mirrors or implement any Port Authority migration."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "All 16 mapped archives are safe and installed exactly, with no stale files",
+                  "check": "Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint."
+                },
+                {
+                  "requirement": "No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets",
+                  "check": "Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback."
+                },
+                {
+                  "requirement": "Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged",
+                  "check": "Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward."
+                },
+                {
+                  "requirement": "Fast validation executes under supported admission and package presence is not misrepresented as integration",
+                  "check": "Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed."
+                },
+                {
+                  "requirement": "Platform completion selects only test-fast without deleting tier workloads or hiding the earlier failed independent heavy audit",
+                  "check": "Before and after the supported registration changes, inspect getValidationCommands; require exactly test-fast mapped to npm run test-fast afterward. Preserve all four tier entries and package scripts by comparing package.json and docs/validation/manifest.json to the pre-task revision. Keep prior raw heavy-audit failure separately in the installation report. Register no false PASS, skip flag, alternative tier or dependency repair."
+                }
+              ]
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "Owner explicitly authorized aligning platform completion registration with the existing test-fast binding; preserve all other tier workloads and prior failed audit evidence.",
+            "plan": "# Install Attached Skill Bundles — native task 945\n\n## Task identity\n**Task ID:** 2cf86765-b2fc-4d01-a337-d1f80548fb37\n**Revision:** 2\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nPackage installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders. Owner-authorized amendment: align the platform's registered completion validations with test-fast by retaining that command and unregistering test-standard, test-standard-plus and test-heavy as automatic completion checks. Preserve every tier's package script and canonical manifest workloads; preserve named workflows as ordinary manually available workflows if the registration API removes them. No dependency changes, passing heavy-tier claim, baseline waiver or Port Authority migration.\n\n## Approval evidence\n**Reference:** Active owner request, Task 945: Install Attached Skill Bundles, plus latest owner instruction: align completion validation with test-fast\n**Owner direction:** Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application. Align completion validation with test-fast.\n**Applicability:** The latest owner direction expressly authorizes the previously reported platform completion-registration mismatch to be corrected for the original package-only scope and unchanged test-fast binding. Preserve other tier definitions and scripts, existing validation evidence and prior records; do not repair dependencies, change gate policy, refresh mirrors or implement any Port Authority migration.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.; supported invocation: TASK_ID=2cf86765-b2fc-4d01-a337-d1f80548fb37 TASK_PLAN_FILE=.local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md npm run gate:run -- --id 2cf86765-b2fc-4d01-a337-d1f80548fb37 --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- All 16 mapped archives are safe and installed exactly, with no stale files — Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint.\n- No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets — Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback.\n- Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged — Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward.\n- Fast validation executes under supported admission and package presence is not misrepresented as integration — Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed.\n- Platform completion selects only test-fast without deleting tier workloads or hiding the earlier failed independent heavy audit — Before and after the supported registration changes, inspect getValidationCommands; require exactly test-fast mapped to npm run test-fast afterward. Preserve all four tier entries and package scripts by comparing package.json and docs/validation/manifest.json to the pre-task revision. Keep prior raw heavy-audit failure separately in the installation report. Register no false PASS, skip flag, alternative tier or dependency repair.\n",
+            "planHash": "7cda758ef995c58edbebcb7f2dfb7496bd1e6077748d1713b70bdafb5eda34af",
+            "approvalHash": "e4c9bfe53a0f4d05fde00c0d0b85f31e8990ba14c7e94877fa87795b854b9628"
+          },
+          "digest": "2ec965b72f83f492ed0babce5d25300670f605be5ebb87385cd8cfb00c085de5"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-20T02:54:28.057Z",
+          "previous": "2ec965b72f83f492ed0babce5d25300670f605be5ebb87385cd8cfb00c085de5",
+          "state": {
+            "id": "2cf86765-b2fc-4d01-a337-d1f80548fb37",
+            "createdAt": "2026-10-20T02:18:55.139Z",
+            "status": "sealed",
+            "revision": 2,
+            "tier": "test-fast",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md",
+            "specHash": "3ffc1c8764396641242a900cd254b2429754d8512c485edf01e570c04cb8ee0e",
+            "runs": [
+              {
+                "id": "4e46b109-1510-4b10-bc5f-72d7c53db142",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-fast",
+                "planHash": "a157a284469e74441a1bdf4ffe7cc6c3ff3e6cb389940d728b133058d8f1a6b0",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "startedAt": "2026-10-20T02:21:37.682Z",
+                "cleanupDeadline": "2026-10-20T02:24:40.682Z",
+                "evidencePath": ".local/failure-gate-unified/runs/4e46b109-1510-4b10-bc5f-72d7c53db142.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 10591,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2580,
+                    "outputHash": "0783ecbe9aa8c0ef421f5e4233878fda77e619ffcbd8a96d8eea8f0c8fc626ea",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 130.258349\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.490434\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.324333\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.556746\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.209292\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.517577\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.397934\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.380398\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.77674\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.509469\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.205335\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 191.655896\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1364,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 4926,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3113,
+                    "outputHash": "430834a03a684d090c3a6e58a0dec132b5657c6c0d540b5b442fa76b65a58807",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 517.66004\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 526.002533\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 506.007851\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 534.815877\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 502.276835\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 566.767285\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 505.336561\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 543.292304\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 2.863638\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.519256\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.1493\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.426715\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.504224\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.428892\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.485743\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.695951\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4714.194623\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "97205c4d69f9d3fa754ac8195a3e94eadc19c74c",
+                  "filesHash": "9a3c85b01c69f35cec039be8d5cce34b89a6b8ee396b1ebbd579526f63d31ca0"
+                },
+                "finishedAt": "2026-10-20T02:22:02.327Z"
+              },
+              {
+                "id": "400ebc79-b13b-4f9b-bdbc-b8305063e0cf",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 2,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-fast",
+                "planHash": "7cda758ef995c58edbebcb7f2dfb7496bd1e6077748d1713b70bdafb5eda34af",
+                "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+                "target": {
+                  "head": "905ff6b11dbf0d3d61e0b36a897103bfa95e0f24",
+                  "filesHash": "9b7d2345ddd023a61d583857e736b663e79b0a91a8f591d3562c843ffd26e6da"
+                },
+                "startedAt": "2026-10-20T02:53:39.347Z",
+                "cleanupDeadline": "2026-10-20T02:56:42.540Z",
+                "evidencePath": ".local/failure-gate-unified/runs/400ebc79-b13b-4f9b-bdbc-b8305063e0cf.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 24653,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2579,
+                    "outputHash": "696c1656b78029d74f72c1c2954670f663594ba2059a2c2b53a511026faae569",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 166.90366\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.864435\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.538351\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.75998\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.303049\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.693566\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.354573\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.487651\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 2.027072\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.646847\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.284217\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 257.109115\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1501,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 5156,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3116,
+                    "outputHash": "df93a65bf81decb22ca6959fc8979fc0a6e1736869d0dea3da1c0b0caafffbe3",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 527.301642\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 492.918768\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 496.227904\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 576.371145\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 487.264136\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 507.327645\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 513.052698\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 817.348168\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 3.433591\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.807232\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.282773\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.459581\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.552606\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.512759\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.576934\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.870494\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4950.605269\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "905ff6b11dbf0d3d61e0b36a897103bfa95e0f24",
+                  "filesHash": "9b7d2345ddd023a61d583857e736b663e79b0a91a8f591d3562c843ffd26e6da"
+                },
+                "finishedAt": "2026-10-20T02:54:28.057Z"
+              }
+            ],
+            "spec": {
+              "title": "Install Attached Skill Bundles — native task 945",
+              "scope": "Package installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders. Owner-authorized amendment: align the platform's registered completion validations with test-fast by retaining that command and unregistering test-standard, test-standard-plus and test-heavy as automatic completion checks. Preserve every tier's package script and canonical manifest workloads; preserve named workflows as ordinary manually available workflows if the registration API removes them. No dependency changes, passing heavy-tier claim, baseline waiver or Port Authority migration.",
+              "tier": "test-fast",
+              "why": "Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.",
+              "coverage": "docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.",
+              "approval": {
+                "reference": "Active owner request, Task 945: Install Attached Skill Bundles, plus latest owner instruction: align completion validation with test-fast",
+                "direction": "Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application. Align completion validation with test-fast.",
+                "applicability": "The latest owner direction expressly authorizes the previously reported platform completion-registration mismatch to be corrected for the original package-only scope and unchanged test-fast binding. Preserve other tier definitions and scripts, existing validation evidence and prior records; do not repair dependencies, change gate policy, refresh mirrors or implement any Port Authority migration."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "All 16 mapped archives are safe and installed exactly, with no stale files",
+                  "check": "Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint."
+                },
+                {
+                  "requirement": "No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets",
+                  "check": "Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback."
+                },
+                {
+                  "requirement": "Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged",
+                  "check": "Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward."
+                },
+                {
+                  "requirement": "Fast validation executes under supported admission and package presence is not misrepresented as integration",
+                  "check": "Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed."
+                },
+                {
+                  "requirement": "Platform completion selects only test-fast without deleting tier workloads or hiding the earlier failed independent heavy audit",
+                  "check": "Before and after the supported registration changes, inspect getValidationCommands; require exactly test-fast mapped to npm run test-fast afterward. Preserve all four tier entries and package scripts by comparing package.json and docs/validation/manifest.json to the pre-task revision. Keep prior raw heavy-audit failure separately in the installation report. Register no false PASS, skip flag, alternative tier or dependency repair."
+                }
+              ]
+            },
+            "workloadHash": "ae2305e90fbc3dc0ce3a53588cf7081aa986c955aba4e270cb9fe4c205466010",
+            "amendmentReason": "Owner explicitly authorized aligning platform completion registration with the existing test-fast binding; preserve all other tier workloads and prior failed audit evidence.",
+            "plan": "# Install Attached Skill Bundles — native task 945\n\n## Task identity\n**Task ID:** 2cf86765-b2fc-4d01-a337-d1f80548fb37\n**Revision:** 2\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nPackage installation only: fully replace the 16 explicitly mapped canonical .agents/skills folders with the current-message ZIP payloads, stripping only documented wrappers; preserve all file bytes, explicit directories and metadata files. Do not execute or apply bundled programs or prompts, refresh projections or mirrors, change app/workloads/databases/services, or migrate prior task records. Verify the unchanged Failure Gate entrypoint pin before replacement. Save installation evidence outside package folders. Owner-authorized amendment: align the platform's registered completion validations with test-fast by retaining that command and unregistering test-standard, test-standard-plus and test-heavy as automatic completion checks. Preserve every tier's package script and canonical manifest workloads; preserve named workflows as ordinary manually available workflows if the registration API removes them. No dependency changes, passing heavy-tier claim, baseline waiver or Port Authority migration.\n\n## Approval evidence\n**Reference:** Active owner request, Task 945: Install Attached Skill Bundles, plus latest owner instruction: align completion validation with test-fast\n**Owner direction:** Install the 16 ZIP bundles as project-owned canonical skills; replace each named destination in full rather than merging; package installation only, not application. Align completion validation with test-fast.\n**Applicability:** The latest owner direction expressly authorizes the previously reported platform completion-registration mismatch to be corrected for the original package-only scope and unchanged test-fast binding. Preserve other tier definitions and scripts, existing validation evidence and prior records; do not repair dependencies, change gate policy, refresh mirrors or implement any Port Authority migration.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-fast`\n**Why:** Exact recursive archive parity is the primary acceptance check for package-only installation; fast checks cover accidental application/type/storage regressions without executing installed bundles.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-fast: typecheck, storage-lint, storage-lint-contract, 180000ms budget. Run TASK_ID and TASK_PLAN_FILE through gate:run --tier test-fast. Independently compare archive versus staged and installed path sets and SHA-256 for every file, explicit directories and SKILL.md entrypoints; capture per-package evidence outside installed folders.; supported invocation: TASK_ID=2cf86765-b2fc-4d01-a337-d1f80548fb37 TASK_PLAN_FILE=.local/tasks/2cf86765-b2fc-4d01-a337-d1f80548fb37.md npm run gate:run -- --id 2cf86765-b2fc-4d01-a337-d1f80548fb37 --tier test-fast\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- All 16 mapped archives are safe and installed exactly, with no stale files — Independently re-open each ZIP after replacement and compare normalized recursive file sets and SHA-256 with installed files, verify explicit directories, exactly one root SKILL.md, 34 port-authority files, retained list-skills __MACOSX file and absence of old Poe contract test; report per-package count and aggregate path/hash fingerprint.\n- No unsafe archive paths, links, special files, duplicate normalized entries or overlapping/escaping targets — Inspect every ZIP central-directory entry and existing target/ancestor lstat before staging; reject unsafe absolute/dot/traversal/backslash/drive paths, collisions, nonregular types, conflicting file/directory paths, wrong wrapper, symlinks and special destination files; stage separately and replace using guarded directory renames with transaction rollback.\n- Gate pin and unrelated canonical packages, projections, mirrors, application and configuration remain unchanged — Compare pre-install and post-install tracked-file bytes outside mapped targets and supported gate registry/evidence outputs; recursively hash unrelated skill folders, generated projections and .local/custom_skills before and after. Verify canonical and ZIP Failure Gate SKILL.md equal the current pin before replacement and afterward.\n- Fast validation executes under supported admission and package presence is not misrepresented as integration — Provision this scope with gate:new, run Agent-first gate:guard, then run the one bound test-fast tier via gate:run with the provisioned context. Report exact run outcome; no installed scripts, application prompts, audits, providers, CI setup or runtime mirror operations are executed.\n- Platform completion selects only test-fast without deleting tier workloads or hiding the earlier failed independent heavy audit — Before and after the supported registration changes, inspect getValidationCommands; require exactly test-fast mapped to npm run test-fast afterward. Preserve all four tier entries and package scripts by comparing package.json and docs/validation/manifest.json to the pre-task revision. Keep prior raw heavy-audit failure separately in the installation report. Register no false PASS, skip flag, alternative tier or dependency repair.\n",
+            "planHash": "7cda758ef995c58edbebcb7f2dfb7496bd1e6077748d1713b70bdafb5eda34af",
+            "approvalHash": "e4c9bfe53a0f4d05fde00c0d0b85f31e8990ba14c7e94877fa87795b854b9628"
+          },
+          "digest": "396ea1beef810552ca598db45fac87dd57fcd4e7d89189ebab46293f8620273b"
+        }
+      ]
+    }
+  },
+  "tombstones": [
+    "2cf86765-b2fc-4d01-a337-d1f80548fb37"
+  ]
 }
