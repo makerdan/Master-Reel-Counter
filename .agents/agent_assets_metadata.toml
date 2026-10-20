@@ -56,3 +56,31 @@ mtime_ms = 1790650620339
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/18ef9c9f-3338-4cb9-963c-9b6b2bbbc3cf/3f0a48e0-8769-4411-b36a-8d452f03328a"
 storage_version_token = "1790650999478453"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "EfeL0kM-vIzOziPlmmqxo"
+uri = "file://generated-artifacts/legacy-gate-retirement/search-summary.html"
+type = "html"
+title = "Retirement diff and search summary"
+description = "Diff summary, verification results, and every matched file with its disposition."
+logical_id = "de7ce787-a05a-41c6-b5d5-8a0e81b5a58c"
+content_hash = "sha256:9456fd1808e611ecb259c29c9cbc689b6f7578782b5d936c13a2d17ca7a5e624"
+size = 74522
+mtime_ms = 1792444557702
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/de7ce787-a05a-41c6-b5d5-8a0e81b5a58c/d43db471-b57a-4e32-9ae2-df201b46ab69"
+storage_version_token = "1792450954791319"
+content_type = "text/html"
+
+[[outputs]]
+id = "O9KUXzsbjritHXG7fT1s0"
+uri = "file://generated-artifacts/legacy-gate-retirement/remaining-matches.csv"
+type = "table"
+title = "Complete remaining-match inventory"
+description = "All 20,168 recorded matches, with file, line, byte offset, and status."
+logical_id = "eaa89df3-7841-496c-9b49-4e3c0c42093d"
+content_hash = "sha256:53df6929496d2fb987f6d0d30b2828b9d5ebe2de781d1145fdaeff819f3eb756"
+size = 4971620
+mtime_ms = 1792444557504
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:49cb79aa-e0b4-43e3-9725-318db9cca44f/eaa89df3-7841-496c-9b49-4e3c0c42093d/6dea928b-a303-4acf-abad-75fe6d97c436"
+storage_version_token = "1792450963365023"
+content_type = "text/csv"
