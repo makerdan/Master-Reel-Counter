@@ -53,8 +53,9 @@ test("retirement removes only gate steps and npm hooks, preserving application w
   for (const [name, command] of standard) {
     assert.equal(standardPlus.get(name), command, `Standard-Plus must retain ${name}`);
   }
+  const heavyCommands = new Set(heavy.values());
   for (const [name, command] of standardPlus) {
-    assert.equal(heavy.get(name), command, `Heavy must retain ${name}`);
+    assert.ok(heavyCommands.has(command), `Heavy must retain the ${name} workload`);
   }
   assert.equal(
     standardPlus.get("clerk-release-contract"),

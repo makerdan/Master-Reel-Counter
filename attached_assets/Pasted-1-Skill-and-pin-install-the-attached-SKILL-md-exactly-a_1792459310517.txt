@@ -1,0 +1,16 @@
+1. Skill and pin: install the attached SKILL.md exactly at .agents/skills/failure-gate-unified/SKILL.md and record its SHA-256 as the pin. Gate operations must stop if the file doesn't match the pin.
+2. Instructions: make replit.md and AGENTS.md (create AGENTS.md if absent) say: the only Failure Gate source is the canonical skill; new plans use the provisioner, one bound tier and sealed plans; if admission or a plan guard fails, follow the skill's "Installing, updating and repairing the gate" section; never manufacture an ID or implement an unprovisioned task; legacy tasks keep their original IDs and are not rebound.
+3. Tiers as approved, with a registry the runner reads.
+4. Baseline catalog at docs/validation/failure-baseline.json: convert the old catalog if one was marked Adapt, keeping exact suite, test and signature; otherwise create an empty valid catalog. Never invent entries.
+5. Provisioner: random UUID IDs, permanent tombstones, plan and stubs, exactly one bound tier, and the current pin recorded on each task.
+6. Renderer producing the skill's required sections exactly, including Coverage evidence and Do not switch tiers; sealed-plan guards.
+7. Runner: TASK_PLAN_FILE context, wrong-tier rejection before tests run, timeouts, process cleanup, single-flight, honest reporting.
+8. Classification log, owner_direction closure, and baseline maintenance warnings.
+9. Each task is checked against the pin it was sealed under; new tasks use the current pin.
+10. Merge guard: compared with the last committed registry, no task ID or tombstone may disappear, and existing records change only through amend, cancel or run.
+11. No workspace-identity or machine-bound admission check. Admission must work after restarts and in task environments.
+12. Tests (bounded fixtures; no reboot; no live resources) covering items 5 to 11.
+13. Run gate tests directly with a timeout; report them as setup checks, not a tier PASS. Run the gate status check.
+14. Record in docs/validation/unified-installation.md: what was retired, adapted and installed, the tiers, test results, and the pin.
+
+Do not change application code, mint task IDs, run database hooks, or start paid/provider/browser operations. Finish with the diff summary and results.
