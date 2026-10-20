@@ -209,17 +209,23 @@ export async function runOwnedProcessGroup(
     signal,
     terminationGraceMs = 2_000,
     terminationWaitMs = 5_000,
+    onOutput,
   } = {},
 ) {
   const child = spawn(command, args, {
     cwd,
     env,
-    stdio,
+    stdio: onOutput ? ["ignore", "pipe", "pipe"] : stdio,
     detached: true,
   });
   const processGroupId = child.pid;
   if (!processGroupId) {
-    throw new Error(`Could not start owned process group for ${command}`);
+    const error = await new Promise((done) => child.once("error", done));
+    throw error;
+  }
+  if (onOutput) {
+    child.stdout.on("data", onOutput);
+    child.stderr.on("data", onOutput);
   }
   const processTree = new OwnedProcessTree(processGroupId, processGroupId);
   processTree.observe();

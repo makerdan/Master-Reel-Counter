@@ -37,6 +37,16 @@
     "test-heavy": "node scripts/run-tier.mjs test-heavy --allow-no-plan",
     "ci": "npm run test-heavy",
     "check-baseline": "node scripts/check-baseline.mjs",
+    "gate:new": "node scripts/unified-gate.mjs new",
+    "gate:guard": "node scripts/unified-gate.mjs guard",
+    "gate:amend": "node scripts/unified-gate.mjs amend",
+    "gate:restore-plan": "node scripts/unified-gate.mjs restore-plan",
+    "gate:cancel": "node scripts/unified-gate.mjs cancel",
+    "gate:run": "node scripts/unified-gate.mjs run",
+    "gate:classify": "node scripts/unified-gate.mjs classify",
+    "gate:merge-guard": "node scripts/unified-gate.mjs merge-guard",
+    "gate:status": "node scripts/unified-gate.mjs status",
+    "gate:baseline-warnings": "node scripts/unified-gate.mjs baseline-warnings",
     "maintain:validation-baseline": "node scripts/maintain-validation-baseline.mjs"
   },
   "dependencies": {

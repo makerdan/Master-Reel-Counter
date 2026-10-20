@@ -197,7 +197,14 @@ run the check or that branch protection requires it.
 The previous task-admission tooling has been retired. Historical reports and
 plans are under `docs/validation/archive/legacy-failure-gate/`; they are not
 current instructions. No replacement gate is installed. The workload commands
-below remain available for application diagnostics and CI, not task admission.
+below remain available for explicit independent application diagnostics and CI;
+their results do not establish task admission or task completion. With `TASK_ID`
+or `TASK_PLAN_FILE` context, the same entry point routes through Unified and
+cannot use independent/execute flags to evade the bound-tier guard.
+The only current Failure Gate source is
+`.agents/skills/failure-gate-unified/SKILL.md`; see
+[`validation/unified-installation.md`](validation/unified-installation.md) for
+provisioning, sealed-plan preflight, amendments and task-bound validation.
 ## Canonical validation tiers
 
 The tracked source of truth is `docs/validation/manifest.json`. Each tier is

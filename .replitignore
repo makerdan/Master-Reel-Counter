@@ -1,1 +1,3 @@
 /generated-artifacts/
+/.local/failure-gate-unified/
+/.local/tasks/

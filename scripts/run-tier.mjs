@@ -3,8 +3,9 @@
  * Execute a registered validation tier.
  *
  * This is an ungated workload runner, retained for application CI.
- * It does not admit tasks, bind tiers, seal plans, or decide task completion.
- * --allow-no-plan remains accepted for existing workload callers.
+ * Explicit independent CI workloads are not task-validation evidence.
+ * Task context routes through the Unified runner; it cannot use --execute
+ * or --allow-no-plan to evade admission.
  */
 
 import { readFileSync } from "fs";
@@ -13,13 +14,20 @@ import { resolve } from "path";
 import { loadTiers } from "./lib/tiers.mjs";
 
 const root = resolve(import.meta.dirname, "..");
+const executeOnly = process.argv.includes("--execute");
+const executeIndex = process.argv.indexOf("--execute");
+const requested = executeOnly ? process.argv[executeIndex + 1] : process.argv[2];
+if (process.env.TASK_PLAN_FILE || process.env.TASK_ID) {
+  const gate = spawnSync(process.execPath, [
+    resolve(root, "scripts/unified-gate.mjs"), "run", "--tier", requested ?? "",
+    ...(process.env.TASK_ID ? ["--id", process.env.TASK_ID] : []),
+  ], { cwd: root, stdio: "inherit", env: process.env });
+  process.exit(gate.status ?? 2);
+}
 const manifestPath = process.env.VALIDATION_MANIFEST_PATH ??
   resolve(root, "docs/validation/manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const localTiers = loadTiers();
-const executeOnly = process.argv.includes("--execute");
-const executeIndex = process.argv.indexOf("--execute");
-const requested = executeOnly ? process.argv[executeIndex + 1] : process.argv[2];
 const manifestEntry = manifest.tiers[requested];
 const localEntry = localTiers[requested];
 const entry = manifestEntry ?? (localEntry ? {
@@ -41,7 +49,7 @@ if (!entry) {
 
 function requireIndependentWorkload() {
   if (process.env.TASK_PLAN_FILE) {
-    console.error("[validation] Task admission is retired; this runner only executes independent workloads.");
+    console.error("[validation] Task context must use the Unified bound-tier runner.");
     process.exit(2);
   } else {
     console.log("[validation] independent workload; no task plan is in force");

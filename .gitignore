@@ -11,6 +11,8 @@ tests/.auth/
 .agents/skills/.workspace-projections.lock
 .crash_log.json
 /generated-artifacts/
+/.local/failure-gate-unified/
+/.local/tasks/
 # Keep requested historical records even when their original directory names
 # are globally ignored runtime paths.
 !docs/validation/archive/legacy-failure-gate/.local/

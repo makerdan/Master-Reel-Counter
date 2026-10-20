@@ -67,6 +67,10 @@ test("retirement removes only gate steps and npm hooks, preserving application w
   );
   const expectedPackage = json(`${archive}/package.json.before-retirement.json`);
   for (const name of retiredScripts) delete expectedPackage.scripts[name];
+  for (const operation of ["new", "guard", "amend", "restore-plan", "cancel", "run",
+    "classify", "merge-guard", "status", "baseline-warnings"]) {
+    expectedPackage.scripts[`gate:${operation}`] = `node scripts/unified-gate.mjs ${operation}`;
+  }
   assert.deepEqual(json("package.json"), expectedPackage);
 });
 
@@ -84,10 +88,9 @@ test("archived records retain original bytes, and protected workflows/catalogs a
   assert.ok(json(`${archive}/task-records/platform-tasks.json`).tasks.length >= 5);
 });
 
-test("legacy definitions and task admission are absent, without installing the replacement", () => {
+test("legacy admission stays absent while only pinned canonical Unified is installed", () => {
   for (const path of [
     ".agents/skills/failure-gate-v4/SKILL.md",
-    ".agents/skills/failure-gate-unified/SKILL.md",
     "scripts/run-locked-tier.mjs", "scripts/new-plan.mjs",
     "scripts/check-failure-gate.mjs", "scripts/check-regression-guard.mjs",
     "scripts/publish-failure-gate.mjs", "scripts/check-failure-gate-parity.mjs",
@@ -96,8 +99,10 @@ test("legacy definitions and task admission are absent, without installing the r
     "artifacts/bathyscan/public/failure-gate-skill.zip",
   ]) assert.equal(existsSync(resolve(root, path)), false, path);
   for (const path of ["replit.md", "AGENTS.md"]) {
-    if (existsSync(resolve(root, path))) assert.doesNotMatch(read(path), /failure[ -]gate/i);
+    assert.ok(read(path).includes(".agents/skills/failure-gate-unified/SKILL.md"));
   }
+  const pin = json("docs/validation/unified-pin.json");
+  assert.equal(createHash("sha256").update(read(pin.source)).digest("hex"), pin.current);
   assert.doesNotMatch(read("scripts/run-tier.mjs"),
     /assertRequestedTier|runPlanGuards|\/proc\/|fstatSync|realpathSync|FAILURE_GATE_PLAN_GUARDS_DONE/);
   const releaseBefore = read(`${archive}/scripts/build-and-verify-release.sh.before-retirement.txt`);

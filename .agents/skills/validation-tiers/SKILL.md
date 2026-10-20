@@ -5,7 +5,10 @@ description: Existing application-check workloads retained for later gate adapta
 
 # Validation workloads
 
-These are independent application-check groups, not task-admission rules.
+These describe application-check workloads, not a second task-admission policy.
+The only Failure Gate source is `.agents/skills/failure-gate-unified/SKILL.md`.
+Unified reads the approved runtime registry at `docs/validation/manifest.json`.
+The adjacent `tiers.json` is older example data, not Unified's runtime registry.
 No task ID, sealed-plan mechanism, tier binding, or completion permission is
 provided by this document. The replacement gate is not installed.
 
