@@ -205,12 +205,18 @@ registered as an on-demand validation command and acquires one resource-aware
 lock before running its steps. The timeout budget begins after lock acquisition,
 so queue time is reported separately from test duration.
 
-| Tier | Scope | Post-lock budget |
-|---|---|---:|
-| `npm run test-fast` | TypeScript and storage-key lint | 3 minutes |
-| `npm run test-standard` | Fast checks, unit tests, and manifest parity | 5 minutes |
-| `npm run test-standard-plus` | Standard checks plus lock, cleanup, and resource-isolation tests | 7 minutes |
-| `npm run test-heavy` | Startup, high-severity audit, schema check, all static/unit checks, collision checks, and Playwright | 15 minutes |
+| Tier | Scope | Expected run time (excluding lock queue) | Post-lock budget |
+|---|---|---:|---:|
+| `npm run test-fast` | TypeScript, storage lint, and lint-contract tests | About 25 seconds | 3 minutes |
+| `npm run test-standard` | Fast checks, port scan, unit tests, Clerk release contract, Vite HMR, and manifest parity | About 2 minutes 40 seconds | 5 minutes |
+| `npm run test-standard-plus` | Standard checks plus serial-lock and port-authority tests | About 3½–4 minutes | 7 minutes |
+| `npm run test-heavy` | Standard-Plus, startup/database/schema checks, dependency audit, HMR recovery, collision checks, and browser tests | 5–10 minute target; successful full run not yet measured | 15 minutes |
+
+The Standard-Plus workload includes every Standard step, including the Clerk
+release contract. Heavy additionally runs both the regular HMR test and its
+recovery variant. Its time range is provisional: recent runs failed at startup
+smoke or the high-severity dependency audit, so it is not a passing-duration
+measurement.
 
 Do not run tier scripts inside another tier step. The public tier command owns
 the lock; inner commands are deliberately unwrapped to avoid double-locking.

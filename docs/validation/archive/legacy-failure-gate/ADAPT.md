@@ -5,7 +5,7 @@ admission or authorization and must not be described as an enforced gate.
 
 | Item | Disposition for a later installation |
 | --- | --- |
-| `docs/validation/manifest.json` | Retain all application workloads, budgets and audit thresholds; remove only retired gate contract/package checks. Owner approval of future workloads still applies. |
+| `docs/validation/manifest.json` | Retain all application workloads, budgets and audit thresholds. Standard-Plus now includes Standard's Clerk contract, and Heavy includes both regular HMR and recovery checks. |
 | `.agents/skills/validation-tiers/tiers.json` | Retain workload example data, without retired gate checks. |
 | `scripts/run-tier.mjs`, `scripts/lib/tiers.mjs` | Ungated workload execution and registry reading. Legacy task-plan admission and host-bound execute attestation are removed. |
 | `scripts/serial-lock.mjs`, collision/reentrancy tests | Shared process/resource concurrency and cleanup, not workspace or machine task admission. Process identity and file ownership checks here prevent killing unrelated processes or losing locks; do not confuse them with workspace receipts. |
