@@ -21,7 +21,6 @@
     "test:vite-hmr-recovery": "VITE_HMR_RECOVERY=1 npm run test:vite-hmr",
     "test:workspace-skill": "node --test scripts/workspace-skill-sync.test.mjs",
     "test:validation-reentrancy": "node scripts/ci-collision-test.mjs --non-smoke",
-    "test:poe-setup-skill": "node --test .agents/skills/poe-setup/targeted-correction-contract.test.mjs",
     "workspace-skill:refresh": "node scripts/workspace-skill-sync.mjs refresh",
     "workspace-skill:validate": "node scripts/workspace-skill-sync.mjs validate",
     "workspace-skill:audit": "node scripts/workspace-skill-sync.mjs audit",

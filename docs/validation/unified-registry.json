@@ -823,9 +823,1057 @@
           "digest": "396ea1beef810552ca598db45fac87dd57fcd4e7d89189ebab46293f8620273b"
         }
       ]
+    },
+    "9af9b4d3-d322-47a1-8953-89efa669e2a2": {
+      "history": [
+        {
+          "op": "provision",
+          "at": "2026-10-20T03:01:34.321Z",
+          "previous": null,
+          "state": {
+            "id": "9af9b4d3-d322-47a1-8953-89efa669e2a2",
+            "createdAt": "2026-10-20T03:01:34.321Z",
+            "status": "reserved",
+            "revision": 0,
+            "tier": "test-standard",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md",
+            "specHash": "ca9ffe8db823887622766293c6669c2b8906bcb0faec29b92899f7dec11b42a7",
+            "runs": []
+          },
+          "digest": "3e2d32de7ae142234f62f4f03cb64b9dfee8a7120748eba173a70af3c9ad1971"
+        },
+        {
+          "op": "amend",
+          "at": "2026-10-20T03:01:34.488Z",
+          "previous": "3e2d32de7ae142234f62f4f03cb64b9dfee8a7120748eba173a70af3c9ad1971",
+          "state": {
+            "id": "9af9b4d3-d322-47a1-8953-89efa669e2a2",
+            "createdAt": "2026-10-20T03:01:34.321Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md",
+            "specHash": "ca9ffe8db823887622766293c6669c2b8906bcb0faec29b92899f7dec11b42a7",
+            "runs": [],
+            "spec": {
+              "title": "Remove the obsolete Poe skill test command",
+              "scope": "Remove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.",
+              "tier": "test-standard",
+              "why": "The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.",
+              "coverage": "docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.",
+              "approval": {
+                "reference": ".local/tasks/task-946.md and the active assigned user task description",
+                "direction": "Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.",
+                "applicability": "This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 obsolete command retired",
+                  "check": "Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent."
+                },
+                {
+                  "requirement": "R2 exact skill package preserved",
+                  "check": "Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes."
+                },
+                {
+                  "requirement": "R3 validation and historical bindings preserved",
+                  "check": "Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity."
+                }
+              ]
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Remove the obsolete Poe skill test command\n\n## Task identity\n**Task ID:** 9af9b4d3-d322-47a1-8953-89efa669e2a2\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nRemove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.\n\n## Approval evidence\n**Reference:** .local/tasks/task-946.md and the active assigned user task description\n**Owner direction:** Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.\n**Applicability:** This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.; supported invocation: TASK_ID=9af9b4d3-d322-47a1-8953-89efa669e2a2 TASK_PLAN_FILE=.local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md npm run gate:run -- --id 9af9b4d3-d322-47a1-8953-89efa669e2a2 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 obsolete command retired — Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent.\n- R2 exact skill package preserved — Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes.\n- R3 validation and historical bindings preserved — Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity.\n",
+            "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+            "approvalHash": "44f93e72a03f0183fd986d75e20e1d05269aeb1e4fce97626dff382f04afcd0e"
+          },
+          "digest": "3c4b850be61620040a0e4f2b720fe464a6d4586f27d4c97866f1343d2f0e1e01"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-20T03:02:13.152Z",
+          "previous": "3c4b850be61620040a0e4f2b720fe464a6d4586f27d4c97866f1343d2f0e1e01",
+          "state": {
+            "id": "9af9b4d3-d322-47a1-8953-89efa669e2a2",
+            "createdAt": "2026-10-20T03:01:34.321Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md",
+            "specHash": "ca9ffe8db823887622766293c6669c2b8906bcb0faec29b92899f7dec11b42a7",
+            "runs": [
+              {
+                "id": "8190d675-e738-430c-b3d5-0ea166e3d210",
+                "purpose": "bound-tier",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-standard",
+                "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "3b13eed842694cfacf41ade405070da606917d0c9c4f75e81c55316133f1afd8"
+                },
+                "startedAt": "2026-10-20T03:02:13.150Z",
+                "cleanupDeadline": "2026-10-20T03:07:16.152Z",
+                "evidencePath": ".local/failure-gate-unified/runs/8190d675-e738-430c-b3d5-0ea166e3d210.jsonl",
+                "observations": []
+              }
+            ],
+            "spec": {
+              "title": "Remove the obsolete Poe skill test command",
+              "scope": "Remove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.",
+              "tier": "test-standard",
+              "why": "The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.",
+              "coverage": "docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.",
+              "approval": {
+                "reference": ".local/tasks/task-946.md and the active assigned user task description",
+                "direction": "Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.",
+                "applicability": "This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 obsolete command retired",
+                  "check": "Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent."
+                },
+                {
+                  "requirement": "R2 exact skill package preserved",
+                  "check": "Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes."
+                },
+                {
+                  "requirement": "R3 validation and historical bindings preserved",
+                  "check": "Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity."
+                }
+              ]
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Remove the obsolete Poe skill test command\n\n## Task identity\n**Task ID:** 9af9b4d3-d322-47a1-8953-89efa669e2a2\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nRemove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.\n\n## Approval evidence\n**Reference:** .local/tasks/task-946.md and the active assigned user task description\n**Owner direction:** Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.\n**Applicability:** This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.; supported invocation: TASK_ID=9af9b4d3-d322-47a1-8953-89efa669e2a2 TASK_PLAN_FILE=.local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md npm run gate:run -- --id 9af9b4d3-d322-47a1-8953-89efa669e2a2 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 obsolete command retired — Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent.\n- R2 exact skill package preserved — Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes.\n- R3 validation and historical bindings preserved — Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity.\n",
+            "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+            "approvalHash": "44f93e72a03f0183fd986d75e20e1d05269aeb1e4fce97626dff382f04afcd0e"
+          },
+          "digest": "131a725bde890739ba84fecd05161127c04ef8f3b1c4db4c256a929381b1b61b"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-20T03:03:19.381Z",
+          "previous": "131a725bde890739ba84fecd05161127c04ef8f3b1c4db4c256a929381b1b61b",
+          "state": {
+            "id": "9af9b4d3-d322-47a1-8953-89efa669e2a2",
+            "createdAt": "2026-10-20T03:01:34.321Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md",
+            "specHash": "ca9ffe8db823887622766293c6669c2b8906bcb0faec29b92899f7dec11b42a7",
+            "runs": [
+              {
+                "id": "8190d675-e738-430c-b3d5-0ea166e3d210",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-standard",
+                "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "3b13eed842694cfacf41ade405070da606917d0c9c4f75e81c55316133f1afd8"
+                },
+                "startedAt": "2026-10-20T03:02:13.150Z",
+                "cleanupDeadline": "2026-10-20T03:07:16.152Z",
+                "evidencePath": ".local/failure-gate-unified/runs/8190d675-e738-430c-b3d5-0ea166e3d210.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 12548,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2578,
+                    "outputHash": "81697593ec802814331158ac80122e34731edb815ae6205bc488922b285595f6",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 146.793114\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.5019\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.374477\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.535762\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.189475\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.51144\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.257022\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.315837\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 2.131866\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.590331\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.221538\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 207.863817\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1486,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 399,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "b9b9afb159d543240ae441588785787852089fa9fc9099c2545efe33e544e6ec",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 211 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 6713,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3116,
+                    "outputHash": "2e5111afe6f5285d8890a772907326f2ec6e4a6cd57c4bac0bb867b2a1ae57fb",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 588.647918\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 686.735401\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 598.13348\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 584.051237\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 766.555782\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 726.342201\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 703.359165\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 1065.062809\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 8.988213\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 2.915716\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.821363\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 17.83015\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.955436\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.607949\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.658383\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 1.064819\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6453.828997\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 7592,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 38356,
+                    "outputHash": "093d94e35e9904f94fdb58cb95dd5b6f5e10620906326044319be3acc5b2d216",
+                    "outputExcerpt": "btest: production Clerk proxy lifecycle guards\n    # Subtest: returns a bounded 504 for an upstream that never returns headers\n    ok 1 - returns a bounded 504 for an upstream that never returns headers\n      ---\n      duration_ms: 49.385731\n      ...\n# [clerk-proxy] upstream-response-timeout\n    # Subtest: terminates an upstream response that stalls after sending part of its body\n    ok 2 - terminates an upstream response that stalls after sending part of its body\n      ---\n      duration_ms: 46.854699\n      ...\n# [clerk-proxy] downstream-aborted\n    # Subtest: destroys upstream work when the downstream browser disconnects\n    ok 3 - destroys upstream work when the downstream browser disconnects\n      ---\n      duration_ms: 6.432308\n      ...\n    # Subtest: preserves successful and bodyless Clerk response headers and bodies\n    ok 4 - preserves successful and bodyless Clerk response headers and bodies\n      ---\n      duration_ms: 8.603336\n      ...\n    # Subtest: preserves a healthy streamed response while each chunk arrives before the deadline\n    ok 5 - preserves a healthy streamed response while each chunk arrives before the deadline\n      ---\n      duration_ms: 18.093624\n      ...\n    # Subtest: normalizes upstream errors and does not log sensitive request material\n    ok 6 - normalizes upstream errors and does not log sensitive request material\n      ---\n      duration_ms: 10.352103\n      ...\n    # Subtest: keeps each health failure class distinct and caps aggregate counters\n    ok 7 - keeps each health failure class distinct and caps aggregate counters\n      ---\n      duration_ms: 0.335009\n      ...\n    1..7\nok 51 - production Clerk proxy lifecycle guards\n  ---\n  duration_ms: 140.598622\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 11.421743\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 5.042845\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 5.815829\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 21.434232\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 7.096638\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 7.032349\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 5.004007\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 11.259379\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 14.025925\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 5.72702\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 5.982576\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 33.393334\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 6.607952\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 3.779154\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 4.890803\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 17.958636\n      ...\n    1..16\nok 52 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 2189.877442\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 11.436116\n      ...\n    1..1\nok 53 - account capability route guard\n  ---\n  duration_ms: 14.020466\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 24.75768\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 7.47514\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 7.413735\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 50.504929\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 30.925909\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.545469\n      ...\n    1..6\nok 54 - authenticated Poe route contracts\n  ---\n  duration_ms: 121.991308\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 0.447402\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.354001\n      ...\n    1..2\nok 55 - Admin AI health route contract\n  ---\n  duration_ms: 1.031939\n  type: 'suite'\n  ...\n# Subtest: support help is versioned and app-only\nok 56 - support help is versioned and app-only\n  ---\n  duration_ms: 0.724345\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 57 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.630794\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 58 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.708094\n  ...\n1..58\n# tests 163\n# suites 28\n# pass 163\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 7358.187755\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 18254,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17930,
+                    "outputHash": "7137f60766e8acecae32fbfc27a949b616f069b90c342dc62a5fcb847ff382db",
+                    "outputExcerpt": "2 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 4.481058\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 5.48028\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 4.420837\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 3.491666\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.335171\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.30254\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 1.620425\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.146719\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 0.553772\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.380784\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 39.435148\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.166134\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.189263\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 277.059723\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 2.365423\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 877.196056\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 3.577495\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 4.692032\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 5.577343\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 0.662168\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.267567\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 74.558019\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 2.571973\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 2.59109\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 3.085185\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 2.043877\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 10.125535\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 6.919899\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.807756\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 7.705689\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 3499.422565\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 17595.866224\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 0.864635\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.249621\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.493058\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.511863\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.575035\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.093678\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 50.191557\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 18.992762\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 1.794295\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 381.914628\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 7339,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2190,
+                    "outputHash": "68ebfd72834d64595b187acb53b3db67897a11cb5e716a367c769d2ce38275a3",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.241591\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.168046\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.353646\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.636938\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 44.264214\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 1780.781426\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 1535.599042\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1337.70653\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 1915.592716\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 0.362966\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 7126.684776\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 82,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "3b13eed842694cfacf41ade405070da606917d0c9c4f75e81c55316133f1afd8"
+                },
+                "finishedAt": "2026-10-20T03:03:19.381Z"
+              }
+            ],
+            "spec": {
+              "title": "Remove the obsolete Poe skill test command",
+              "scope": "Remove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.",
+              "tier": "test-standard",
+              "why": "The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.",
+              "coverage": "docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.",
+              "approval": {
+                "reference": ".local/tasks/task-946.md and the active assigned user task description",
+                "direction": "Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.",
+                "applicability": "This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 obsolete command retired",
+                  "check": "Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent."
+                },
+                {
+                  "requirement": "R2 exact skill package preserved",
+                  "check": "Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes."
+                },
+                {
+                  "requirement": "R3 validation and historical bindings preserved",
+                  "check": "Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity."
+                }
+              ]
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Remove the obsolete Poe skill test command\n\n## Task identity\n**Task ID:** 9af9b4d3-d322-47a1-8953-89efa669e2a2\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nRemove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.\n\n## Approval evidence\n**Reference:** .local/tasks/task-946.md and the active assigned user task description\n**Owner direction:** Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.\n**Applicability:** This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.; supported invocation: TASK_ID=9af9b4d3-d322-47a1-8953-89efa669e2a2 TASK_PLAN_FILE=.local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md npm run gate:run -- --id 9af9b4d3-d322-47a1-8953-89efa669e2a2 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 obsolete command retired — Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent.\n- R2 exact skill package preserved — Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes.\n- R3 validation and historical bindings preserved — Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity.\n",
+            "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+            "approvalHash": "44f93e72a03f0183fd986d75e20e1d05269aeb1e4fce97626dff382f04afcd0e"
+          },
+          "digest": "a05367bb0c2e68aa0b4bfc8da89f53cb6a806ead068364f1cb71659a414aa160"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-20T03:04:27.186Z",
+          "previous": "a05367bb0c2e68aa0b4bfc8da89f53cb6a806ead068364f1cb71659a414aa160",
+          "state": {
+            "id": "9af9b4d3-d322-47a1-8953-89efa669e2a2",
+            "createdAt": "2026-10-20T03:01:34.321Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md",
+            "specHash": "ca9ffe8db823887622766293c6669c2b8906bcb0faec29b92899f7dec11b42a7",
+            "runs": [
+              {
+                "id": "8190d675-e738-430c-b3d5-0ea166e3d210",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-standard",
+                "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "3b13eed842694cfacf41ade405070da606917d0c9c4f75e81c55316133f1afd8"
+                },
+                "startedAt": "2026-10-20T03:02:13.150Z",
+                "cleanupDeadline": "2026-10-20T03:07:16.152Z",
+                "evidencePath": ".local/failure-gate-unified/runs/8190d675-e738-430c-b3d5-0ea166e3d210.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 12548,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2578,
+                    "outputHash": "81697593ec802814331158ac80122e34731edb815ae6205bc488922b285595f6",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 146.793114\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.5019\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.374477\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.535762\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.189475\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.51144\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.257022\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.315837\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 2.131866\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.590331\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.221538\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 207.863817\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1486,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 399,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "b9b9afb159d543240ae441588785787852089fa9fc9099c2545efe33e544e6ec",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 211 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 6713,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3116,
+                    "outputHash": "2e5111afe6f5285d8890a772907326f2ec6e4a6cd57c4bac0bb867b2a1ae57fb",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 588.647918\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 686.735401\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 598.13348\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 584.051237\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 766.555782\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 726.342201\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 703.359165\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 1065.062809\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 8.988213\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 2.915716\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.821363\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 17.83015\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.955436\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.607949\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.658383\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 1.064819\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6453.828997\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 7592,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 38356,
+                    "outputHash": "093d94e35e9904f94fdb58cb95dd5b6f5e10620906326044319be3acc5b2d216",
+                    "outputExcerpt": "btest: production Clerk proxy lifecycle guards\n    # Subtest: returns a bounded 504 for an upstream that never returns headers\n    ok 1 - returns a bounded 504 for an upstream that never returns headers\n      ---\n      duration_ms: 49.385731\n      ...\n# [clerk-proxy] upstream-response-timeout\n    # Subtest: terminates an upstream response that stalls after sending part of its body\n    ok 2 - terminates an upstream response that stalls after sending part of its body\n      ---\n      duration_ms: 46.854699\n      ...\n# [clerk-proxy] downstream-aborted\n    # Subtest: destroys upstream work when the downstream browser disconnects\n    ok 3 - destroys upstream work when the downstream browser disconnects\n      ---\n      duration_ms: 6.432308\n      ...\n    # Subtest: preserves successful and bodyless Clerk response headers and bodies\n    ok 4 - preserves successful and bodyless Clerk response headers and bodies\n      ---\n      duration_ms: 8.603336\n      ...\n    # Subtest: preserves a healthy streamed response while each chunk arrives before the deadline\n    ok 5 - preserves a healthy streamed response while each chunk arrives before the deadline\n      ---\n      duration_ms: 18.093624\n      ...\n    # Subtest: normalizes upstream errors and does not log sensitive request material\n    ok 6 - normalizes upstream errors and does not log sensitive request material\n      ---\n      duration_ms: 10.352103\n      ...\n    # Subtest: keeps each health failure class distinct and caps aggregate counters\n    ok 7 - keeps each health failure class distinct and caps aggregate counters\n      ---\n      duration_ms: 0.335009\n      ...\n    1..7\nok 51 - production Clerk proxy lifecycle guards\n  ---\n  duration_ms: 140.598622\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 11.421743\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 5.042845\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 5.815829\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 21.434232\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 7.096638\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 7.032349\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 5.004007\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 11.259379\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 14.025925\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 5.72702\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 5.982576\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 33.393334\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 6.607952\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 3.779154\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 4.890803\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 17.958636\n      ...\n    1..16\nok 52 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 2189.877442\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 11.436116\n      ...\n    1..1\nok 53 - account capability route guard\n  ---\n  duration_ms: 14.020466\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 24.75768\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 7.47514\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 7.413735\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 50.504929\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 30.925909\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.545469\n      ...\n    1..6\nok 54 - authenticated Poe route contracts\n  ---\n  duration_ms: 121.991308\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 0.447402\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.354001\n      ...\n    1..2\nok 55 - Admin AI health route contract\n  ---\n  duration_ms: 1.031939\n  type: 'suite'\n  ...\n# Subtest: support help is versioned and app-only\nok 56 - support help is versioned and app-only\n  ---\n  duration_ms: 0.724345\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 57 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.630794\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 58 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.708094\n  ...\n1..58\n# tests 163\n# suites 28\n# pass 163\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 7358.187755\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 18254,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17930,
+                    "outputHash": "7137f60766e8acecae32fbfc27a949b616f069b90c342dc62a5fcb847ff382db",
+                    "outputExcerpt": "2 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 4.481058\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 5.48028\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 4.420837\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 3.491666\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.335171\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.30254\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 1.620425\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.146719\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 0.553772\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.380784\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 39.435148\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.166134\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.189263\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 277.059723\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 2.365423\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 877.196056\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 3.577495\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 4.692032\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 5.577343\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 0.662168\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.267567\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 74.558019\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 2.571973\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 2.59109\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 3.085185\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 2.043877\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 10.125535\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 6.919899\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.807756\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 7.705689\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 3499.422565\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 17595.866224\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 0.864635\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.249621\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.493058\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.511863\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.575035\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.093678\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 50.191557\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 18.992762\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 1.794295\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 381.914628\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 7339,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2190,
+                    "outputHash": "68ebfd72834d64595b187acb53b3db67897a11cb5e716a367c769d2ce38275a3",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.241591\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.168046\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.353646\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.636938\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 44.264214\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 1780.781426\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 1535.599042\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1337.70653\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 1915.592716\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 0.362966\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 7126.684776\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 82,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "3b13eed842694cfacf41ade405070da606917d0c9c4f75e81c55316133f1afd8"
+                },
+                "finishedAt": "2026-10-20T03:03:19.381Z"
+              },
+              {
+                "id": "237d7c1f-12e2-4181-a144-2b20c08a5a33",
+                "purpose": "bound-tier",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-standard",
+                "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "79eefb16589c4c805dea4028da76a1f02b298e020b24e31c50904d4612fea4e8"
+                },
+                "startedAt": "2026-10-20T03:04:27.185Z",
+                "cleanupDeadline": "2026-10-20T03:09:30.185Z",
+                "evidencePath": ".local/failure-gate-unified/runs/237d7c1f-12e2-4181-a144-2b20c08a5a33.jsonl",
+                "observations": []
+              }
+            ],
+            "spec": {
+              "title": "Remove the obsolete Poe skill test command",
+              "scope": "Remove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.",
+              "tier": "test-standard",
+              "why": "The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.",
+              "coverage": "docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.",
+              "approval": {
+                "reference": ".local/tasks/task-946.md and the active assigned user task description",
+                "direction": "Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.",
+                "applicability": "This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 obsolete command retired",
+                  "check": "Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent."
+                },
+                {
+                  "requirement": "R2 exact skill package preserved",
+                  "check": "Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes."
+                },
+                {
+                  "requirement": "R3 validation and historical bindings preserved",
+                  "check": "Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity."
+                }
+              ]
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Remove the obsolete Poe skill test command\n\n## Task identity\n**Task ID:** 9af9b4d3-d322-47a1-8953-89efa669e2a2\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nRemove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.\n\n## Approval evidence\n**Reference:** .local/tasks/task-946.md and the active assigned user task description\n**Owner direction:** Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.\n**Applicability:** This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.; supported invocation: TASK_ID=9af9b4d3-d322-47a1-8953-89efa669e2a2 TASK_PLAN_FILE=.local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md npm run gate:run -- --id 9af9b4d3-d322-47a1-8953-89efa669e2a2 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 obsolete command retired — Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent.\n- R2 exact skill package preserved — Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes.\n- R3 validation and historical bindings preserved — Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity.\n",
+            "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+            "approvalHash": "44f93e72a03f0183fd986d75e20e1d05269aeb1e4fce97626dff382f04afcd0e"
+          },
+          "digest": "02f218a22c2db3b6a5f87ff003b0b280a8d5b8f41d5f0c364763d6329cb16c3b"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-20T03:05:29.894Z",
+          "previous": "02f218a22c2db3b6a5f87ff003b0b280a8d5b8f41d5f0c364763d6329cb16c3b",
+          "state": {
+            "id": "9af9b4d3-d322-47a1-8953-89efa669e2a2",
+            "createdAt": "2026-10-20T03:01:34.321Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+            "planPath": ".local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md",
+            "specHash": "ca9ffe8db823887622766293c6669c2b8906bcb0faec29b92899f7dec11b42a7",
+            "runs": [
+              {
+                "id": "8190d675-e738-430c-b3d5-0ea166e3d210",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-standard",
+                "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "3b13eed842694cfacf41ade405070da606917d0c9c4f75e81c55316133f1afd8"
+                },
+                "startedAt": "2026-10-20T03:02:13.150Z",
+                "cleanupDeadline": "2026-10-20T03:07:16.152Z",
+                "evidencePath": ".local/failure-gate-unified/runs/8190d675-e738-430c-b3d5-0ea166e3d210.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 12548,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2578,
+                    "outputHash": "81697593ec802814331158ac80122e34731edb815ae6205bc488922b285595f6",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 146.793114\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.5019\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.374477\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.535762\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.189475\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.51144\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.257022\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.315837\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 2.131866\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.590331\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.221538\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 207.863817\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1486,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 399,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "b9b9afb159d543240ae441588785787852089fa9fc9099c2545efe33e544e6ec",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 211 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 6713,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3116,
+                    "outputHash": "2e5111afe6f5285d8890a772907326f2ec6e4a6cd57c4bac0bb867b2a1ae57fb",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 588.647918\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 686.735401\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 598.13348\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 584.051237\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 766.555782\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 726.342201\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 703.359165\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 1065.062809\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 8.988213\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 2.915716\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.821363\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 17.83015\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.955436\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.607949\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.658383\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 1.064819\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6453.828997\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 7592,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 38356,
+                    "outputHash": "093d94e35e9904f94fdb58cb95dd5b6f5e10620906326044319be3acc5b2d216",
+                    "outputExcerpt": "btest: production Clerk proxy lifecycle guards\n    # Subtest: returns a bounded 504 for an upstream that never returns headers\n    ok 1 - returns a bounded 504 for an upstream that never returns headers\n      ---\n      duration_ms: 49.385731\n      ...\n# [clerk-proxy] upstream-response-timeout\n    # Subtest: terminates an upstream response that stalls after sending part of its body\n    ok 2 - terminates an upstream response that stalls after sending part of its body\n      ---\n      duration_ms: 46.854699\n      ...\n# [clerk-proxy] downstream-aborted\n    # Subtest: destroys upstream work when the downstream browser disconnects\n    ok 3 - destroys upstream work when the downstream browser disconnects\n      ---\n      duration_ms: 6.432308\n      ...\n    # Subtest: preserves successful and bodyless Clerk response headers and bodies\n    ok 4 - preserves successful and bodyless Clerk response headers and bodies\n      ---\n      duration_ms: 8.603336\n      ...\n    # Subtest: preserves a healthy streamed response while each chunk arrives before the deadline\n    ok 5 - preserves a healthy streamed response while each chunk arrives before the deadline\n      ---\n      duration_ms: 18.093624\n      ...\n    # Subtest: normalizes upstream errors and does not log sensitive request material\n    ok 6 - normalizes upstream errors and does not log sensitive request material\n      ---\n      duration_ms: 10.352103\n      ...\n    # Subtest: keeps each health failure class distinct and caps aggregate counters\n    ok 7 - keeps each health failure class distinct and caps aggregate counters\n      ---\n      duration_ms: 0.335009\n      ...\n    1..7\nok 51 - production Clerk proxy lifecycle guards\n  ---\n  duration_ms: 140.598622\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 11.421743\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 5.042845\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 5.815829\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 21.434232\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 7.096638\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 7.032349\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 5.004007\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 11.259379\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 14.025925\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 5.72702\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 5.982576\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 33.393334\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 6.607952\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 3.779154\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 4.890803\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 17.958636\n      ...\n    1..16\nok 52 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 2189.877442\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 11.436116\n      ...\n    1..1\nok 53 - account capability route guard\n  ---\n  duration_ms: 14.020466\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 24.75768\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 7.47514\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 7.413735\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 50.504929\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 30.925909\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.545469\n      ...\n    1..6\nok 54 - authenticated Poe route contracts\n  ---\n  duration_ms: 121.991308\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 0.447402\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.354001\n      ...\n    1..2\nok 55 - Admin AI health route contract\n  ---\n  duration_ms: 1.031939\n  type: 'suite'\n  ...\n# Subtest: support help is versioned and app-only\nok 56 - support help is versioned and app-only\n  ---\n  duration_ms: 0.724345\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 57 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.630794\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 58 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.708094\n  ...\n1..58\n# tests 163\n# suites 28\n# pass 163\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 7358.187755\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 18254,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17930,
+                    "outputHash": "7137f60766e8acecae32fbfc27a949b616f069b90c342dc62a5fcb847ff382db",
+                    "outputExcerpt": "2 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 4.481058\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 5.48028\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 4.420837\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 3.491666\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.335171\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.30254\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 1.620425\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.146719\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 0.553772\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.380784\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 39.435148\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.166134\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.189263\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 277.059723\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 2.365423\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 877.196056\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 3.577495\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 4.692032\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 5.577343\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 0.662168\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.267567\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 74.558019\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 2.571973\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 2.59109\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 3.085185\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 2.043877\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 10.125535\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 6.919899\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.807756\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 7.705689\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 3499.422565\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 17595.866224\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 0.864635\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.249621\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.493058\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.511863\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.575035\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.093678\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 50.191557\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 18.992762\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 1.794295\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 381.914628\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 7339,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2190,
+                    "outputHash": "68ebfd72834d64595b187acb53b3db67897a11cb5e716a367c769d2ce38275a3",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.241591\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.168046\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.353646\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.636938\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 44.264214\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 1780.781426\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 1535.599042\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1337.70653\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 1915.592716\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 0.362966\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 7126.684776\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 82,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "3b13eed842694cfacf41ade405070da606917d0c9c4f75e81c55316133f1afd8"
+                },
+                "finishedAt": "2026-10-20T03:03:19.381Z"
+              },
+              {
+                "id": "237d7c1f-12e2-4181-a144-2b20c08a5a33",
+                "purpose": "bound-tier",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22",
+                "tier": "test-standard",
+                "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "79eefb16589c4c805dea4028da76a1f02b298e020b24e31c50904d4612fea4e8"
+                },
+                "startedAt": "2026-10-20T03:04:27.185Z",
+                "cleanupDeadline": "2026-10-20T03:09:30.185Z",
+                "evidencePath": ".local/failure-gate-unified/runs/237d7c1f-12e2-4181-a144-2b20c08a5a33.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 13448,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2580,
+                    "outputHash": "4beba3e64799379464dfc6f70094e6721297675803ce0a5adbebd26ef96220d3",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 134.860924\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.584233\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.315756\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.64474\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.205312\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.674746\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.255264\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.407522\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.894804\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.465452\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.194669\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 207.362173\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1688,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 342,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "b9b9afb159d543240ae441588785787852089fa9fc9099c2545efe33e544e6ec",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 211 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 5520,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3115,
+                    "outputHash": "bd97c72ad1eee9a8905565040a8b669643757b31ef9536e1cc5480cdff42c3f6",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 575.570501\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 621.94801\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 633.862007\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 625.816885\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 536.525085\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 575.396561\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 552.679333\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 540.651387\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 2.695417\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.276575\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.085896\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.357466\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.683149\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.583423\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.469139\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.963304\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 5295.738133\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 6970,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 38352,
+                    "outputHash": "96252a2c69bccb75e4ca154a4a8186a272974fb9a9291e750c30edf6c462151d",
+                    "outputExcerpt": " Subtest: production Clerk proxy lifecycle guards\n    # Subtest: returns a bounded 504 for an upstream that never returns headers\n    ok 1 - returns a bounded 504 for an upstream that never returns headers\n      ---\n      duration_ms: 51.649572\n      ...\n# [clerk-proxy] upstream-response-timeout\n    # Subtest: terminates an upstream response that stalls after sending part of its body\n    ok 2 - terminates an upstream response that stalls after sending part of its body\n      ---\n      duration_ms: 46.357321\n      ...\n# [clerk-proxy] downstream-aborted\n    # Subtest: destroys upstream work when the downstream browser disconnects\n    ok 3 - destroys upstream work when the downstream browser disconnects\n      ---\n      duration_ms: 7.331319\n      ...\n    # Subtest: preserves successful and bodyless Clerk response headers and bodies\n    ok 4 - preserves successful and bodyless Clerk response headers and bodies\n      ---\n      duration_ms: 9.912382\n      ...\n    # Subtest: preserves a healthy streamed response while each chunk arrives before the deadline\n    ok 5 - preserves a healthy streamed response while each chunk arrives before the deadline\n      ---\n      duration_ms: 17.308265\n      ...\n    # Subtest: normalizes upstream errors and does not log sensitive request material\n    ok 6 - normalizes upstream errors and does not log sensitive request material\n      ---\n      duration_ms: 8.375552\n      ...\n    # Subtest: keeps each health failure class distinct and caps aggregate counters\n    ok 7 - keeps each health failure class distinct and caps aggregate counters\n      ---\n      duration_ms: 0.201727\n      ...\n    1..7\nok 51 - production Clerk proxy lifecycle guards\n  ---\n  duration_ms: 141.615668\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 9.491936\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 6.0228\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 4.932815\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 28.014585\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 5.934543\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 16.410114\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 5.631177\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 12.320201\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 6.693291\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 10.435154\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 5.982221\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 36.77417\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 7.189552\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 4.684743\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 5.171931\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 18.484222\n      ...\n    1..16\nok 52 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 1857.035941\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 13.686123\n      ...\n    1..1\nok 53 - account capability route guard\n  ---\n  duration_ms: 16.29275\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 27.148288\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 8.694237\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 6.506748\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 47.22381\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 32.088849\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.451733\n      ...\n    1..6\nok 54 - authenticated Poe route contracts\n  ---\n  duration_ms: 122.553751\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 0.423789\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.215638\n      ...\n    1..2\nok 55 - Admin AI health route contract\n  ---\n  duration_ms: 0.733105\n  type: 'suite'\n  ...\n# Subtest: support help is versioned and app-only\nok 56 - support help is versioned and app-only\n  ---\n  duration_ms: 1.329524\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 57 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.941366\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 58 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.746268\n  ...\n1..58\n# tests 163\n# suites 28\n# pass 163\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6766.450563\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 19858,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17923,
+                    "outputHash": "b399d6ff1aff1e2407d42d11caf638e2ded4f83facdfd5ea4889fa4b09dc8901",
+                    "outputExcerpt": "ok 42 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 10.754549\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 6.698557\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 5.147939\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 5.727516\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.508666\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.263725\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 1.274776\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.17667\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 0.393102\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.834896\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 44.980649\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.221913\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.235819\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 111.194496\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 1.36131\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 758.171\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 11.249529\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 5.00422\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 4.985679\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 0.495528\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.278186\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 115.691773\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 2.751897\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 1.512582\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 2.772265\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 2.746901\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 11.783777\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 3.68151\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.601018\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 8.500172\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 4827.980467\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 19020.598605\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 0.96519\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.366433\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.577592\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.564415\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.72826\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.144944\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 55.749436\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 21.308111\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 2.02462\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 505.202686\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 10531,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2192,
+                    "outputHash": "13f261332ca8d6c8e558d7817b7b8934f844d1da5da350cfd485b6385d2ea6a6",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.530993\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.170243\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.692896\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.795565\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 64.058323\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 4525.318189\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 1531.340144\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1495.848134\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 2019.633116\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 0.502344\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 10292.769564\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 85,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "847f5b739efdbe198c369d13c31887fada6162d5",
+                  "filesHash": "79eefb16589c4c805dea4028da76a1f02b298e020b24e31c50904d4612fea4e8"
+                },
+                "finishedAt": "2026-10-20T03:05:29.894Z"
+              }
+            ],
+            "spec": {
+              "title": "Remove the obsolete Poe skill test command",
+              "scope": "Remove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.",
+              "tier": "test-standard",
+              "why": "The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.",
+              "coverage": "docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.",
+              "approval": {
+                "reference": ".local/tasks/task-946.md and the active assigned user task description",
+                "direction": "Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.",
+                "applicability": "This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 obsolete command retired",
+                  "check": "Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent."
+                },
+                {
+                  "requirement": "R2 exact skill package preserved",
+                  "check": "Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes."
+                },
+                {
+                  "requirement": "R3 validation and historical bindings preserved",
+                  "check": "Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity."
+                }
+              ]
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Remove the obsolete Poe skill test command\n\n## Task identity\n**Task ID:** 9af9b4d3-d322-47a1-8953-89efa669e2a2\n**Revision:** 1\n**Skill pin:** 2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22\n\n## Scope\nRemove only test:poe-setup-skill from package.json. Do not replace it with an unrelated check or add files to the exact installed Poe package. Preserve all surviving scripts, validation registrations, manifest workloads, historical gate bindings, package-lock.json and installation evidence. Record verification in docs/validation/poe-command-retirement.md.\n\n## Regression Guard\n**N/A**\n**Why N/A:** The obsolete command is entirely removed, leaving no execution path to its intentionally absent test file. This is deletion-only maintenance, not a change to the Poe provider. Surviving contracts are checked by comparing every other package script and all historical gate records with the pre-task snapshot, verifying the exact Poe package path/hash set against docs/validation/skill-bundle-installation.json, and running the selected tier including manifest-parity. No new package payload or general-purpose missing-file scanner is in scope.\n\n## Approval evidence\n**Reference:** .local/tasks/task-946.md and the active assigned user task description\n**Owner direction:** Retire or replace the obsolete Poe skill command in a separately admitted task without changing the exact installed package payload; preserve registered validation coverage and gate bindings.\n**Applicability:** This initial sealed revision implements the requested retirement only, using test-standard and read-only preservation assertions. It introduces no provider, package, dependency, tier-workload or registration changes beyond deleting the obsolete unregistered alias.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** The lightest tier with manifest-parity directly checks surviving validation registration, alongside compiler and existing API/provider tests.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard: manifest-parity checks tier/package-command parity; typecheck and unit-tests retain existing compiler and Poe provider coverage. No tier workloads are changed.; supported invocation: TASK_ID=9af9b4d3-d322-47a1-8953-89efa669e2a2 TASK_PLAN_FILE=.local/tasks/9af9b4d3-d322-47a1-8953-89efa669e2a2.md npm run gate:run -- --id 9af9b4d3-d322-47a1-8953-89efa669e2a2 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 obsolete command retired — Assert package.json scripts has no test:poe-setup-skill key after the change and its removed target remains absent.\n- R2 exact skill package preserved — Compare sorted installed Poe relative file paths and SHA-256 hashes with the poe-setup package entry in docs/validation/skill-bundle-installation.json; reject additions, removals or changed bytes.\n- R3 validation and historical bindings preserved — Compare package.json against HEAD after deleting only the obsolete alias in the expected object; require byte-identical manifest, lockfile, installation evidence and configuration, and preserve every prior registry task/history entry. Run test-standard including manifest-parity.\n",
+            "planHash": "07d59fa44448afbd111bdc5bc2f24ec3b08ae38781bedb042f9106d4e9185994",
+            "approvalHash": "44f93e72a03f0183fd986d75e20e1d05269aeb1e4fce97626dff382f04afcd0e"
+          },
+          "digest": "4ef474e157e55c563ff7e152ae8410e45c69ba9945a14a573c4417c2d68b6125"
+        }
+      ]
     }
   },
   "tombstones": [
-    "2cf86765-b2fc-4d01-a337-d1f80548fb37"
+    "2cf86765-b2fc-4d01-a337-d1f80548fb37",
+    "9af9b4d3-d322-47a1-8953-89efa669e2a2"
   ]
 }
