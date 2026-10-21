@@ -33,7 +33,7 @@ import { z } from "zod";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry, UNREADABLE_SENTINEL } from "./encryption";
-import multer from "multer";
+import { createImageUpload } from "./lib/imageUpload";
 import PDFDocument from "pdfkit";
 import { toDisplayUnit, unitLabel, type UnitType } from "./unit-conversion";
 import sharp from "sharp";
@@ -1040,20 +1040,7 @@ export async function registerRoutes(
     }
   };
 
-  const ALLOWED_IMAGE_MIMETYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-  // Reject files whose MIME type is not in the allow-list. cb(null, false) is
-  // used so multer does not call next(err), keeping the error in route-handler
-  // territory. The rejected MIME type is annotated on the request so each
-  // handler can return a descriptive 400 JSON payload.
-  const imageFileFilter: multer.Options["fileFilter"] = (req: any, file, cb) => {
-    if (ALLOWED_IMAGE_MIMETYPES.has(file.mimetype)) {
-      cb(null, true);
-    } else {
-      req._rejectedMimetype = file.mimetype;
-      cb(null, false);
-    }
-  };
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 }, fileFilter: imageFileFilter });
+  const upload = createImageUpload();
 
   app.post("/api/uploads/direct", isAuthenticated, resourceRateLimiter, upload.single("file"), async (req: any, res) => {
     const authedReq = req as AuthenticatedRequest<UploadBody> & { file?: Express.Multer.File; _rejectedMimetype?: string };
