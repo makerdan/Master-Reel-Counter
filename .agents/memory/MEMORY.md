@@ -49,4 +49,5 @@
 - [Clerk testing sign-in navigation](clerk-testing-sign-in-navigation.md) — the testing helper activates a session without submitting the form; do not treat its route as a UI redirect verdict.
 - [Release Clerk script boot scope](release-clerk-script-boot-scope.md) — count successful Clerk script loads per completed main-document boot, not per Playwright page lifetime.
 - [Node test harness budgets](node-test-harness-budgets.md) — whole-file setup deadlines must cover cumulative fixture work, not only the slowest individual case.
+- [Transitive npm override verification](npm-transitive-override-verification.md) — a successful install can leave a grandparent-scoped leaf override unapplied; verify actual consumers and a clean install.
 - [Nested Node test runners](nested-node-test-runners.md) — inherited runner context can silently return success without running nested tests; isolate the child context.

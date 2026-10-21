@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "include": [
+    "server/__tests__/dependency-network-security.test.ts",
     "server/__tests__/routes.test.ts",
     "server/__tests__/photo-delete.test.ts",
     "server/__tests__/support-ops.test.ts",
