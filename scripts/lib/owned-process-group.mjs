@@ -210,6 +210,7 @@ export async function runOwnedProcessGroup(
     terminationGraceMs = 2_000,
     terminationWaitMs = 5_000,
     onOutput,
+    onSpawn,
   } = {},
 ) {
   const child = spawn(command, args, {
@@ -229,7 +230,10 @@ export async function runOwnedProcessGroup(
   }
   const processTree = new OwnedProcessTree(processGroupId, processGroupId);
   processTree.observe();
-  child.once("spawn", () => processTree.observe());
+  child.once("spawn", () => {
+    processTree.observe();
+    onSpawn?.(child);
+  });
   const monitor = setInterval(() => processTree.observe(), 100);
 
   let spawnError;

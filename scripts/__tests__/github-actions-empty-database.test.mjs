@@ -222,6 +222,29 @@ async function processGone(pid) {
   }
 }
 
+async function processRunning(pid) {
+  if (!pid) return false;
+  try {
+    const stat = await readFile(`/proc/${pid}/stat`, "utf8");
+    const closingParen = stat.lastIndexOf(")");
+    if (closingParen < 0) return false;
+    const state = stat.slice(closingParen + 1).trim().split(/\s+/)[0];
+    return state !== "Z" && state !== "X";
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function waitForProcessStopped(pid, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!(await processRunning(pid))) return true;
+    await sleep(50);
+  }
+  return !(await processRunning(pid));
+}
+
 async function waitForProcessGone(pid, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -294,28 +317,6 @@ async function withInterruptibleSmoke(t, fixture, port, exercise) {
     });
   } finally {
     await cleanup();
-  }
-}
-
-async function stopProcess(child) {
-  if (!child || child.exitCode !== null) return;
-  try {
-    process.kill(-child.pid, "SIGTERM");
-  } catch {
-    child.kill("SIGTERM");
-  }
-
-  await Promise.race([
-    once(child, "close"),
-    sleep(5_000),
-  ]);
-  if (child.exitCode === null) {
-    try {
-      process.kill(-child.pid, "SIGKILL");
-    } catch {
-      child.kill("SIGKILL");
-    }
-    await once(child, "close").catch(() => {});
   }
 }
 
@@ -450,6 +451,66 @@ test("hung command ${mode}", { timeout: ${mode === "deadline" ? 8_000 : 1_000} }
     });
   }
 });
+
+for (const { name, ignoreTerm } of [
+  { name: "an exited launcher with a surviving child", ignoreTerm: false },
+  { name: "a TERM-resistant child", ignoreTerm: true },
+]) {
+  test(`owned cleanup stops ${name} before the port is reused`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), "empty-database-process-"));
+    const launcherPath = join(directory, "launcher.mjs");
+    const childPath = join(directory, "server.mjs");
+    const pidPath = join(directory, "child.pid");
+    const exitedPath = join(directory, "launcher-exited");
+    const port = await findAvailablePort();
+    await writeFile(childPath, [
+      'import { writeFileSync } from "node:fs";',
+      'import { createServer } from "node:net";',
+      ignoreTerm ? 'process.on("SIGTERM", () => {});' : "",
+      "const server = createServer();",
+      `server.listen(${port}, "127.0.0.1", () => writeFileSync(${JSON.stringify(pidPath)}, String(process.pid)));`,
+      "setInterval(() => {}, 1_000);",
+    ].filter(Boolean).join("\n"));
+    await writeFile(launcherPath, [
+      'import { spawn } from "node:child_process";',
+      'import { access, writeFile } from "node:fs/promises";',
+      `const child = spawn(process.execPath, [${JSON.stringify(childPath)}], { stdio: "ignore" });`,
+      "child.unref();",
+      "let ready = false;",
+      "for (let attempt = 0; attempt < 500; attempt += 1) {",
+      `  try { await access(${JSON.stringify(pidPath)}); ready = true; break; } catch { await new Promise((resolve) => setTimeout(resolve, 10)); }`,
+      "}",
+      "if (!ready) process.exit(99);",
+      "await new Promise((resolve) => setTimeout(resolve, 250));",
+      `await writeFile(${JSON.stringify(exitedPath)}, "exited");`,
+    ].join("\n"));
+
+    let running;
+    try {
+      running = runOwnedProcessGroup(process.execPath, [launcherPath], {
+        cwd: root,
+        env: process.env,
+        stdio: "ignore",
+        terminationGraceMs: 100,
+        terminationWaitMs: 2_000,
+      });
+      const cleanupStartedAt = Date.now();
+      await waitForFile(pidPath);
+      const childPid = Number((await readFile(pidPath, "utf8")).trim());
+      const result = await running;
+      assert.ok(Date.now() - cleanupStartedAt < 4_000, "owned cleanup exceeded its bound");
+      assert.equal(result.groupGone, true, "owned process group should be confirmed stopped");
+      assert.equal(result.terminationError, undefined);
+      assert.equal(await processGone(result.processGroupId), true, "launcher did not exit before cleanup");
+      assert.equal((await readFile(exitedPath, "utf8")), "exited");
+      assert.equal(await waitForProcessStopped(childPid), true, "fixture child survived cleanup");
+      await assertPortFree(port);
+    } finally {
+      if (running) await running.catch(() => {});
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+}
 
 test("startup smoke rejects invalid timeout configuration before checking tools", async (t) => {
   const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
@@ -818,9 +879,12 @@ test("GitHub Actions boots the app against a blank disposable database", async (
     max: 1,
   });
   let server;
+  let serverRun;
   let serverOutput = "";
   let primaryError;
   const cleanupErrors = [];
+  let processCleanupConfirmed = true;
+  let serverController;
 
   try {
     const versionResult = await adminPool.query(
@@ -878,18 +942,30 @@ test("GitHub Actions boots the app against a blank disposable database", async (
     }
 
     const port = await findAvailablePort();
-    server = spawn(
+    let resolveServerSpawn;
+    let rejectServerSpawn;
+    const serverSpawned = new Promise((resolve, reject) => {
+      resolveServerSpawn = resolve;
+      rejectServerSpawn = reject;
+    });
+    serverController = new AbortController();
+    serverRun = runOwnedProcessGroup(
       process.execPath,
       [resolve(root, "node_modules/tsx/dist/cli.mjs"), "server/index.ts"],
       {
         cwd: root,
-        detached: true,
         env: { ...bootstrapEnv, PORT: String(port) },
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: "ignore",
+        signal: serverController.signal,
+        onOutput: (chunk) => { serverOutput += chunk; },
+        onSpawn: (child) => {
+          server = child;
+          resolveServerSpawn(child);
+        },
       },
     );
-    server.stdout.on("data", (chunk) => { serverOutput += chunk; });
-    server.stderr.on("data", (chunk) => { serverOutput += chunk; });
+    serverRun.catch(rejectServerSpawn);
+    server = await serverSpawned;
 
     const healthUrl = await waitForHealth(server, port, () => serverOutput);
     const baseUrl = new URL(healthUrl);
@@ -900,25 +976,37 @@ test("GitHub Actions boots the app against a blank disposable database", async (
   } catch (error) {
     primaryError = error;
   } finally {
+    serverController?.abort("SIGTERM");
     try {
-      await stopProcess(server);
+      if (serverRun) {
+        const result = await serverRun;
+        if (!result.groupGone || result.terminationError) {
+          processCleanupConfirmed = false;
+          cleanupErrors.push(
+            `failed to confirm application process cleanup${result.terminationError ? `: ${result.terminationError.message}` : ""}`,
+          );
+        }
+      }
     } catch (error) {
+      processCleanupConfirmed = false;
       cleanupErrors.push(`failed to stop application: ${error.message}`);
     }
 
-    try {
-      await adminPool.query(
-        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()",
-        [disposableDatabase],
-      );
-    } catch (error) {
-      cleanupErrors.push(`failed to terminate disposable-database connections: ${error.message}`);
-    }
+    if (processCleanupConfirmed) {
+      try {
+        await adminPool.query(
+          "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()",
+          [disposableDatabase],
+        );
+      } catch (error) {
+        cleanupErrors.push(`failed to terminate disposable-database connections: ${error.message}`);
+      }
 
-    try {
-      await adminPool.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(disposableDatabase)}`);
-    } catch (error) {
-      cleanupErrors.push(`failed to drop disposable database: ${error.message}`);
+      try {
+        await adminPool.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(disposableDatabase)}`);
+      } catch (error) {
+        cleanupErrors.push(`failed to drop disposable database: ${error.message}`);
+      }
     }
 
     try {
