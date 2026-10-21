@@ -51,4 +51,5 @@
 - [Node test harness budgets](node-test-harness-budgets.md) — whole-file setup deadlines must cover cumulative fixture work, not only the slowest individual case.
 - [Transitive npm override verification](npm-transitive-override-verification.md) — a successful install can leave a grandparent-scoped leaf override unapplied; verify actual consumers and a clean install.
 - [Nested Node test runners](nested-node-test-runners.md) — inherited runner context can silently return success without running nested tests; isolate the child context.
+- [Indexed source-map fixtures](indexed-source-map-fixtures.md) — separate offset rejection from indexed-consumer helper quirks when testing valid map serialization.
 - [Process-fixture zombie detection](process-fixture-zombie-detection.md) — on minimal Linux containers, a killed orphan can remain as a zombie; distinguish that from a live process and check its port separately.

@@ -4,7 +4,7 @@
  * - Creates a session with at least one entry via API fixture helpers.
  * - Navigates to the session page and verifies export controls are present.
  * - Excel: clicks the export dropdown → Excel item → captures the browser
- *   download event and asserts a non-empty file with a .xlsx extension.
+ *   download event and reopens the workbook to verify contents and styling.
  * - PDF: clicks the export dropdown → PDF item → handles the "unpinned
  *   entries" warning dialog and the PDF quality chooser dialog → captures
  *   the browser download event and asserts a non-empty .pdf file.
@@ -27,7 +27,10 @@ test.describe("export checks @export", () => {
       `Export Excel E2E ${Date.now()}`,
     );
     cleanupIds.push(sess.id);
-    await createEntryViaApi(request, sess.id);
+    await createEntryViaApi(request, sess.id, {
+      reelTag: "EXPORT-TOOLING-14",
+      notes: "Export dependency regression",
+    });
 
     await page.goto(`/session/${sess.id}`);
     await page.waitForLoadState("domcontentloaded");
@@ -69,6 +72,31 @@ test.describe("export checks @export", () => {
     const { statSync } = await import("fs");
     const { size } = statSync(path!);
     expect(size, "Downloaded Excel file must be non-empty").toBeGreaterThan(0);
+
+    const { default: ExcelJS } = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(path!);
+    expect(workbook.creator).toBe("Master Reel Counter");
+    const worksheet = workbook.getWorksheet("Reel Count");
+    expect(worksheet, "Exported worksheet must reopen").toBeDefined();
+    const cells: import("exceljs").Cell[] = [];
+    worksheet!.eachRow((row) => row.eachCell((cell) => { cells.push(cell); }));
+    const title = cells.find((cell) => cell.value === "Master Reel Counter");
+    expect(title?.font.bold).toBe(true);
+    expect(title?.font.color?.argb).toBe("EA580C");
+    expect(cells.some((cell) => cell.value === sess.name)).toBe(true);
+    const catalog = cells.find((cell) => cell.value === "EXPORT-TOOLING-14");
+    expect(catalog, "Export retains entry catalog").toBeDefined();
+    const entryRow = worksheet!.getRow(catalog!.fullAddress.row);
+    expect(entryRow.getCell(6).value).toBe(1);
+    expect(entryRow.getCell(7).text).toBe("500");
+    expect(entryRow.getCell(9).value).toBe("Export dependency regression");
+    const header = cells.find((cell) => cell.value === "Catalog:");
+    expect(header?.font.bold).toBe(true);
+    expect(header?.fill).toMatchObject({
+      type: "pattern", pattern: "solid", fgColor: { argb: "F5F0EB" },
+    });
+    expect(worksheet!.getColumn(4).width).toBe(22);
   });
 
   test("PDF export initiates a non-empty .pdf download from the UI", async ({
