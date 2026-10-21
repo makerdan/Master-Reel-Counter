@@ -19,6 +19,7 @@ import { delimiter, join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Pool } from "pg";
 import test from "node:test";
+import { runOwnedProcessGroup } from "../lib/owned-process-group.mjs";
 import {
   postgresMajorVersion,
   SUPPORTED_POSTGRES_MAJOR_VERSION,
@@ -229,6 +230,44 @@ async function findAvailablePort() {
   const port = address.port;
   await new Promise((resolveClose, reject) => probe.close((error) => error ? reject(error) : resolveClose()));
   return port;
+}
+
+// Always await owned-tree cleanup before deleting fixture files. Killing only
+// bash bypasses its EXIT trap and can strand the server's separate setsid group.
+async function withInterruptibleSmoke(t, fixture, port, exercise) {
+  const controller = new AbortController();
+  let output = "";
+  const finished = runOwnedProcessGroup(systemCommand("bash"), [startupSmokePath], {
+    cwd: root,
+    env: {
+      ...fixture.env,
+      SMOKE_PORT: String(port),
+      SMOKE_TIMEOUT: "30",
+    },
+    signal: controller.signal,
+    terminationGraceMs: 2_000,
+    terminationWaitMs: 2_000,
+    onOutput: (chunk) => { output += chunk; },
+  });
+  // Attach immediately, including when readiness fails before we await it.
+  finished.catch(() => {});
+  const cleanup = async () => {
+    controller.abort("SIGTERM");
+    const result = await finished;
+    assert.equal(result.groupGone, true, `smoke process tree survived cleanup\n${output}`);
+    assert.equal(result.terminationError, undefined);
+    await assertPortFree(port);
+  };
+  t.after(cleanup);
+  try {
+    return await exercise({
+      interrupt: () => controller.abort("SIGINT"),
+      finished,
+      output: () => output,
+    });
+  } finally {
+    await cleanup();
+  }
 }
 
 async function stopProcess(child) {
@@ -477,35 +516,133 @@ test("startup smoke removes the complete server group after readiness failure", 
   }
 });
 
-test("startup smoke cleans its process group and port when interrupted", async () => {
+test("startup smoke cleans its process group and port when interrupted", async (t) => {
   const fixture = await createStartupSmokeFixture({ healthStatus: 503 });
   const port = await findAvailablePort();
-  const smoke = spawn(systemCommand("bash"), [startupSmokePath], {
-    cwd: root,
-    env: {
-      ...fixture.env,
-      SMOKE_PORT: String(port),
-      SMOKE_TIMEOUT: "30",
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let output = "";
-  smoke.stdout.on("data", (chunk) => { output += chunk; });
-  smoke.stderr.on("data", (chunk) => { output += chunk; });
-
   try {
-    await waitForFile(fixture.readyMarker);
+    await withInterruptibleSmoke(t, fixture, port, async ({ interrupt, finished, output }) => {
+      await waitForFile(fixture.readyMarker);
+      const childPid = (await readFile(fixture.childPidFile, "utf8")).trim();
+      const interruptedAt = Date.now();
+      interrupt();
+      const result = await finished;
+      assert.notEqual(result.status, 0, `${output()}\ninterrupted smoke unexpectedly passed`);
+      assert.equal(result.childSignal, null);
+      assert.ok(Date.now() - interruptedAt < 5_000, "interrupted smoke did not stop within its cleanup deadline");
+      assert.equal(await waitForProcessGone(childPid), true);
+      await assertPortFree(port);
+    });
+  } finally {
+    await rm(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("startup smoke harness cleans owned children and listener after abnormal exits", async (t) => {
+  for (const failure of ["assertion", "cancelled wait"]) {
+    await t.test(failure, async (t) => {
+      const fixture = await createStartupSmokeFixture({ healthStatus: 503 });
+      const port = await findAvailablePort();
+      // A separate listener must not be affected by cleanup of the smoke tree.
+      const unrelated = createServer();
+      await new Promise((resolveListen, reject) => {
+        unrelated.once("error", reject);
+        unrelated.listen(0, "127.0.0.1", resolveListen);
+      });
+      const unrelatedPort = unrelated.address().port;
+      let childPid;
+      let failedAt;
+      try {
+        await assert.rejects(
+          withInterruptibleSmoke(t, fixture, port, async () => {
+            await waitForFile(fixture.readyMarker);
+            childPid = (await readFile(fixture.childPidFile, "utf8")).trim();
+            assert.equal(await processGone(childPid), false);
+            failedAt = Date.now();
+            if (failure === "assertion") {
+              assert.fail("injected harness assertion");
+            }
+            const cancellation = new AbortController();
+            const waiting = sleep(30_000, undefined, { signal: cancellation.signal });
+            cancellation.abort();
+            await waiting;
+          }),
+          failure === "assertion" ? /injected harness assertion/ : { name: "AbortError" },
+        );
+        assert.ok(Date.now() - failedAt < 5_000, "abnormal cleanup exceeded its deadline");
+        assert.equal(await waitForProcessGone(childPid), true, "smoke child survived harness failure");
+        await assertPortFree(port);
+        assert.equal(unrelated.listening, true);
+        await assert.rejects(assertPortFree(unrelatedPort), /remained occupied/);
+      } finally {
+        await new Promise((resolveClose) => unrelated.close(resolveClose));
+        await rm(fixture.directory, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("startup smoke harness after-hook cleans the server when a test times out", async () => {
+  const fixture = await createStartupSmokeFixture({ healthStatus: 503 });
+  const port = await findAvailablePort();
+  const harnessPath = join(fixture.directory, "interrupted-harness.test.mjs");
+  // Exercise the real helper in a separate test runner: an intentionally timed
+  // out subtest would otherwise mark this parent suite as failed too.
+  await writeFile(harnessPath, `
+import assert from "node:assert/strict";
+import test from "node:test";
+import { accessSync, constants, statSync } from "node:fs";
+import { createServer } from "node:net";
+import { delimiter, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { setTimeout as sleep } from "node:timers/promises";
+import { runOwnedProcessGroup } from ${JSON.stringify(new URL("../lib/owned-process-group.mjs", import.meta.url).href)};
+const root = ${JSON.stringify(root)};
+const startupSmokePath = ${JSON.stringify(startupSmokePath)};
+${systemCommand.toString()}
+${assertPortFree.toString()}
+${waitForFile.toString()}
+${withInterruptibleSmoke.toString()}
+test("interrupted harness", { timeout: 5_000 }, async (t) => {
+  await withInterruptibleSmoke(t, {
+    env: {
+      ...process.env,
+      PATH: ${JSON.stringify(fixture.env.PATH)},
+      SMOKE_SERVER_ENTRYPOINT: ${JSON.stringify(fixture.entrypoint)},
+      SMOKE_CHILD_PID_FILE: ${JSON.stringify(fixture.childPidFile)},
+      SMOKE_READY_MARKER: ${JSON.stringify(fixture.readyMarker)},
+    },
+  }, ${port}, async () => {
+    await waitForFile(${JSON.stringify(fixture.readyMarker)});
+    // Keep the wrapper unresolved so only t.after, not finally, can clean up.
+    await new Promise(() => {});
+  });
+});
+`);
+  try {
+    const startedAt = Date.now();
+    const harnessEnv = { ...fixture.env, PATH: process.env.PATH };
+    // Nested runners need their own reporter/IPC context, not the parent's.
+    delete harnessEnv.NODE_TEST_CONTEXT;
+    const deadline = AbortSignal.timeout(10_000);
+    let output = "";
+    const result = await runOwnedProcessGroup(process.execPath, ["--test", harnessPath], {
+      cwd: root,
+      env: harnessEnv,
+      signal: deadline,
+      terminationGraceMs: 2_000,
+      terminationWaitMs: 2_000,
+      onOutput: (chunk) => { output += chunk; },
+    });
+    assert.equal(deadline.aborted, false, "outer safety supervisor had to rescue the timed out harness");
+    assert.equal(result.groupGone, true);
+    assert.notEqual(result.status, 0, `timed out harness unexpectedly passed\n${output}`);
+    assert.match(output, /testTimeoutFailure/);
+    assert.ok(Date.now() - startedAt < 10_000, "test cancellation cleanup exceeded its deadline");
     const childPid = (await readFile(fixture.childPidFile, "utf8")).trim();
-    const interruptedAt = Date.now();
-    smoke.kill("SIGINT");
-    const [code, signal] = await once(smoke, "close");
-    assert.notEqual(code, 0, `${output}\ninterrupted smoke unexpectedly passed`);
-    assert.equal(signal, null);
-    assert.ok(Date.now() - interruptedAt < 5_000, "interrupted smoke did not stop within its cleanup deadline");
+    assert.match(childPid, /^\d+$/, "timeout must occur after the smoke child starts");
     assert.equal(await waitForProcessGone(childPid), true);
     await assertPortFree(port);
   } finally {
-    if (smoke.exitCode === null) smoke.kill("SIGKILL");
     await rm(fixture.directory, { recursive: true, force: true });
   }
 });
