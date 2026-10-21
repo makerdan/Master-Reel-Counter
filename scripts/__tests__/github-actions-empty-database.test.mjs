@@ -29,6 +29,9 @@ const root = resolve(import.meta.dirname, "../..");
 const EXPECTED_DATABASE = "master_reel_counter_test";
 const TEST_OWNER_ID = "github-actions-owner";
 const TEST_OWNER_EMAIL = "github-actions-owner@example.invalid";
+const POSTGRES_CONNECTION_TIMEOUT_MS = 15_000;
+const POSTGRES_QUERY_TIMEOUT_MS = 30_000;
+const POSTGRES_POOL_END_TIMEOUT_MS = 5_000;
 const startupSmokePath = resolve(root, "scripts/startup-smoke.sh");
 
 function quoteIdentifier(identifier) {
@@ -40,6 +43,91 @@ function databaseUrlWithName(databaseUrl, databaseName) {
   url.pathname = `/${databaseName}`;
   url.hash = "";
   return url.toString();
+}
+
+function postgresPoolOptions(connectionString, timeouts = {}) {
+  return {
+    connectionString,
+    max: 1,
+    connectionTimeoutMillis: timeouts.connectionTimeoutMillis ?? POSTGRES_CONNECTION_TIMEOUT_MS,
+    query_timeout: timeouts.queryTimeoutMillis ?? POSTGRES_QUERY_TIMEOUT_MS,
+  };
+}
+
+async function endPoolBounded(pool, timeoutMs = POSTGRES_POOL_END_TIMEOUT_MS) {
+  let timer;
+  try {
+    await Promise.race([
+      pool.end(),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`PostgreSQL pool shutdown exceeded ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function postgresMessage(type, payload = Buffer.alloc(0)) {
+  const message = Buffer.alloc(1 + 4 + payload.length);
+  message.write(type, 0, "ascii");
+  message.writeUInt32BE(payload.length + 4, 1);
+  payload.copy(message, 5);
+  return message;
+}
+
+async function createStalledPostgresServer(stallAt) {
+  const sockets = new Set();
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+    let received = Buffer.alloc(0);
+    let startupComplete = false;
+    let handshakeSent = false;
+    socket.on("data", (chunk) => {
+      received = Buffer.concat([received, chunk]);
+      if (!startupComplete) {
+        if (received.length < 4) return;
+        const startupLength = received.readUInt32BE(0);
+        if (received.length < startupLength) return;
+        startupComplete = true;
+        received = received.subarray(startupLength);
+        if (stallAt === "startup") return;
+      }
+      if (!handshakeSent) {
+        handshakeSent = true;
+        const authOk = Buffer.alloc(4);
+        const backendKey = Buffer.alloc(8);
+        backendKey.writeInt32BE(process.pid, 0);
+        const ready = Buffer.from("I");
+        socket.write(Buffer.concat([
+          postgresMessage("R", authOk),
+          postgresMessage("S", Buffer.from(["server_version", "16.0"].join("\0") + "\0")),
+          postgresMessage("K", backendKey),
+          postgresMessage("Z", ready),
+        ]));
+      }
+      // Deliberately withhold the query response once the client sends its query.
+    });
+  });
+  await new Promise((resolveListen, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolveListen);
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === "object", "stalled PostgreSQL fixture did not bind");
+  return {
+    connectionString: `postgres://postgres@127.0.0.1:${address.port}/postgres`,
+    close: async () => {
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolveClose, reject) => {
+        server.close((error) => error ? reject(error) : resolveClose());
+      });
+    },
+  };
 }
 
 function redact(output) {
@@ -354,6 +442,37 @@ test("PostgreSQL contract parses server version numbers by major version", () =>
     () => postgresMajorVersion("not-a-version"),
     /invalid PostgreSQL server_version_num/,
   );
+});
+
+test("PostgreSQL pool bounds accepted stalled startup and query connections", { timeout: 10_000 }, async (t) => {
+  for (const stallAt of ["startup", "query"]) {
+    await t.test(`stall during ${stallAt}`, async () => {
+      const fixture = await createStalledPostgresServer(stallAt);
+      const pool = new Pool(postgresPoolOptions(fixture.connectionString, {
+        connectionTimeoutMillis: 300,
+        queryTimeoutMillis: 300,
+      }));
+      const startedAt = Date.now();
+      try {
+        await assert.rejects(pool.query("SELECT 1"), stallAt === "startup"
+          ? /connection timeout/i
+          : /query read timeout/i);
+        assert.ok(Date.now() - startedAt < 2_000, `${stallAt} stall exceeded its PostgreSQL deadline`);
+        await endPoolBounded(pool, 1_000);
+      } finally {
+        await fixture.close();
+      }
+    });
+  }
+});
+
+test("PostgreSQL pool shutdown reports an unresponsive end within its cleanup bound", async () => {
+  const startedAt = Date.now();
+  await assert.rejects(
+    endPoolBounded({ end: () => new Promise(() => {}) }, 30),
+    /pool shutdown exceeded 30ms/,
+  );
+  assert.ok(Date.now() - startedAt < 500, "unresponsive pool shutdown exceeded its cleanup reporting bound");
 });
 
 test("command supervision preserves normal exit codes and separate diagnostics", async (t) => {
@@ -874,10 +993,7 @@ test("GitHub Actions boots the app against a blank disposable database", async (
   );
 
   const disposableDatabase = `ci_empty_db_${process.pid}_${randomUUID().replaceAll("-", "")}`;
-  const adminPool = new Pool({
-    connectionString: databaseUrlWithName(databaseUrl, "postgres"),
-    max: 1,
-  });
+  const adminPool = new Pool(postgresPoolOptions(databaseUrlWithName(databaseUrl, "postgres")));
   let server;
   let serverRun;
   let serverOutput = "";
@@ -929,7 +1045,7 @@ test("GitHub Actions boots the app against a blank disposable database", async (
       `schema bootstrap failed (signal ${schema.signal ?? "none"})\n${redact(`${schema.stdout}\n${schema.stderr}`)}`,
     );
 
-    const ownerPool = new Pool({ connectionString: disposableUrl, max: 1 });
+    const ownerPool = new Pool(postgresPoolOptions(disposableUrl));
     try {
       await ownerPool.query(`
         INSERT INTO users (id, email, first_name, approved, rejected, role)
@@ -938,7 +1054,11 @@ test("GitHub Actions boots the app against a blank disposable database", async (
           SET approved = true, rejected = false, role = 'Admin';
       `, [TEST_OWNER_ID, TEST_OWNER_EMAIL]);
     } finally {
-      await ownerPool.end();
+      try {
+        await endPoolBounded(ownerPool);
+      } catch (error) {
+        cleanupErrors.push(`failed to close PostgreSQL owner pool: ${error.message}`);
+      }
     }
 
     const port = await findAvailablePort();
@@ -1010,7 +1130,7 @@ test("GitHub Actions boots the app against a blank disposable database", async (
     }
 
     try {
-      await adminPool.end();
+      await endPoolBounded(adminPool);
     } catch (error) {
       cleanupErrors.push(`failed to close PostgreSQL admin pool: ${error.message}`);
     }
