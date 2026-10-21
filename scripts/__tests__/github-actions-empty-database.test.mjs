@@ -48,21 +48,48 @@ function redact(output) {
     .slice(-4_000);
 }
 
-async function runCommand(command, args, options) {
-  const child = spawn(command, args, {
-    ...options,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+async function runCommand(command, args, { signal, timeoutMs = 60_000, ...options } = {}) {
+  assert.ok(Number.isSafeInteger(timeoutMs) && timeoutMs > 0, "command timeoutMs must be a positive integer");
+  const cancellation = new AbortController();
+  let timedOut = false;
   let stdout = "";
   let stderr = "";
-  child.stdout.on("data", (chunk) => { stdout += chunk; });
-  child.stderr.on("data", (chunk) => { stderr += chunk; });
-
-  const result = await new Promise((resolveResult, reject) => {
-    child.once("error", reject);
-    child.once("close", (code, signal) => resolveResult({ code, signal }));
-  });
-  return { ...result, stdout, stderr };
+  const onAbort = () => cancellation.abort(signal.reason);
+  signal?.addEventListener("abort", onAbort, { once: true });
+  if (signal?.aborted) onAbort();
+  const timer = setTimeout(() => {
+    if (cancellation.signal.aborted) return;
+    timedOut = true;
+    cancellation.abort();
+  }, timeoutMs);
+  try {
+    const owned = await runOwnedProcessGroup(command, args, {
+      ...options,
+      signal: cancellation.signal,
+      terminationGraceMs: 2_000,
+      terminationWaitMs: 2_000,
+      onOutput: (chunk, stream) => {
+        if (stream === "stdout") stdout += chunk;
+        else stderr += chunk;
+      },
+    });
+    const result = { code: owned.status, signal: owned.childSignal, stdout, stderr };
+    if (cancellation.signal.aborted || !owned.groupGone || owned.terminationError) {
+      const error = new Error(
+        `${timedOut ? `command timed out after ${timeoutMs}ms` : cancellation.signal.aborted ? "command cancelled" : "command cleanup failed"}: ${command}\n${redact(`${stdout}\n${stderr}`)}`,
+      );
+      error.name = timedOut ? "CommandTimeoutError" : cancellation.signal.aborted ? "AbortError" : "CommandCleanupError";
+      error.code = timedOut ? "COMMAND_TIMEOUT" : cancellation.signal.aborted ? "ABORT_ERR" : "COMMAND_CLEANUP_FAILED";
+      error.result = result;
+      error.groupGone = owned.groupGone;
+      error.cause = owned.terminationError;
+      throw error;
+    }
+    return result;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
+  }
 }
 
 function systemCommand(command, path = process.env.PATH ?? "") {
@@ -328,8 +355,105 @@ test("PostgreSQL contract parses server version numbers by major version", () =>
   );
 });
 
-test("startup smoke rejects invalid timeout configuration before checking tools", async () => {
+test("command supervision preserves normal exit codes and separate diagnostics", async (t) => {
+  for (const code of [0, 7]) {
+    const result = await runCommand(process.execPath, ["-e", `
+      console.log("ordinary stdout");
+      console.error("ordinary stderr");
+      process.exitCode = ${code};
+    `], { signal: t.signal });
+    assert.equal(result.code, code);
+    assert.equal(result.signal, null);
+    assert.equal(result.stdout, "ordinary stdout\n");
+    assert.equal(result.stderr, "ordinary stderr\n");
+  }
+  await assert.rejects(
+    runCommand("/nonexistent/smoke-command", [], { signal: t.signal }),
+    { code: "ENOENT" },
+  );
+});
+
+test("hung commands stop their owned tree on deadline and test cancellation without killing unrelated processes", { timeout: 30_000 }, async (t) => {
+  for (const mode of ["deadline", "test cancellation"]) {
+    await t.test(mode, async (t) => {
+      const directory = await mkdtemp(join(tmpdir(), "hung-smoke-command-"));
+      const pidFile = join(directory, "pids.json");
+      const unrelatedPidFile = join(directory, "unrelated.pid");
+      const harnessPath = join(directory, "command-harness.test.mjs");
+      const unrelatedCancellation = new AbortController();
+      // A real unrelated OS process, not just a listener in this test process.
+      const unrelated = runOwnedProcessGroup(process.execPath, ["-e", `
+        require("node:fs").writeFileSync(${JSON.stringify(unrelatedPidFile)}, String(process.pid));
+        setInterval(() => {}, 1_000);
+      `], {
+        signal: unrelatedCancellation.signal,
+        stdio: "ignore",
+        terminationGraceMs: 2_000,
+        terminationWaitMs: 2_000,
+      });
+      unrelated.catch(() => {});
+      try {
+        await waitForFile(unrelatedPidFile);
+        const unrelatedPid = (await readFile(unrelatedPidFile, "utf8")).trim();
+        const fixturePath = resolve(root, "scripts/__tests__/fixtures/hung-smoke-command.mjs");
+        // A cancelled Node test is expected to fail, so isolate its runner.
+        await writeFile(harnessPath, `
+import assert from "node:assert/strict";
+import test from "node:test";
+import { runOwnedProcessGroup } from ${JSON.stringify(new URL("../lib/owned-process-group.mjs", import.meta.url).href)};
+${redact.toString()}
+${runCommand.toString()}
+test("hung command ${mode}", { timeout: ${mode === "deadline" ? 8_000 : 1_000} }, async (t) => {
+  try {
+    await runCommand(process.execPath, [${JSON.stringify(fixturePath)}, ${JSON.stringify(pidFile)}], {
+      signal: t.signal,
+      timeoutMs: ${mode === "deadline" ? 1_000 : 30_000},
+    });
+    assert.fail("hung command unexpectedly completed");
+  } catch (error) {
+    assert.equal(error.code, ${JSON.stringify(mode === "deadline" ? "COMMAND_TIMEOUT" : "ABORT_ERR")});
+    assert.equal(error.name, ${JSON.stringify(mode === "deadline" ? "CommandTimeoutError" : "AbortError")});
+    assert.equal(error.groupGone, true);
+    assert.equal(error.result.stdout, "hung-command stdout ready\\n");
+    assert.equal(error.result.stderr, "hung-command stderr ready\\n");
+    assert.match(error.message, /${mode === "deadline" ? "timed out after 1000ms" : "command cancelled"}/);
+    console.log("COMMAND_GUARD_VERIFIED", error.code);
+  }
+});
+`);
+        const harnessEnv = { ...process.env };
+        delete harnessEnv.NODE_TEST_CONTEXT;
+        const startedAt = Date.now();
+        const result = await runCommand(process.execPath, ["--test", harnessPath], {
+          env: harnessEnv,
+          signal: t.signal,
+          timeoutMs: 10_000,
+        });
+        const output = `${result.stdout}\n${result.stderr}`;
+        assert.ok(Date.now() - startedAt < 8_000, `hung command exceeded its cleanup bound\n${output}`);
+        assert.match(output, new RegExp(`COMMAND_GUARD_VERIFIED ${mode === "deadline" ? "COMMAND_TIMEOUT" : "ABORT_ERR"}`));
+        if (mode === "deadline") assert.equal(result.code, 0, output);
+        else {
+          assert.notEqual(result.code, 0, output);
+          assert.match(output, /testTimeoutFailure/);
+        }
+        const pids = JSON.parse(await readFile(pidFile, "utf8"));
+        assert.equal(await waitForProcessGone(pids.parent), true, "hung parent survived");
+        assert.equal(await waitForProcessGone(pids.child), true, "hung child survived");
+        assert.equal(await processGone(unrelatedPid), false, "unrelated process was killed");
+      } finally {
+        unrelatedCancellation.abort();
+        const cleanup = await unrelated;
+        assert.equal(cleanup.groupGone, true, "unrelated fixture cleanup failed");
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("startup smoke rejects invalid timeout configuration before checking tools", async (t) => {
   const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+    signal: t.signal,
     cwd: root,
     env: {
       ...process.env,
@@ -340,11 +464,12 @@ test("startup smoke rejects invalid timeout configuration before checking tools"
   assert.match(result.stderr, /SMOKE_TIMEOUT must be a positive integer/);
 });
 
-test("startup smoke fixture uses the active PATH and reports a missing real timeout prerequisite", async () => {
+test("startup smoke fixture uses the active PATH and reports a missing real timeout prerequisite", async (t) => {
   const fixture = await createStartupSmokeFixture();
   try {
     assert.equal(await readlink(join(fixture.binDirectory, "timeout")), systemCommand("timeout"));
     const result = await runCommand(join(fixture.binDirectory, "timeout"), ["--version"], {
+      signal: t.signal,
       env: fixture.env,
     });
     assert.equal(result.code, 0, result.stderr);
@@ -367,10 +492,11 @@ test("startup smoke fixture uses the active PATH and reports a missing real time
   }
 });
 
-test("startup smoke reports a missing curl prerequisite immediately", async () => {
+test("startup smoke reports a missing curl prerequisite immediately", async (t) => {
   const fixture = await createStartupSmokeFixture({ includeCurl: false });
   try {
     const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      signal: t.signal,
       cwd: root,
       env: fixture.env,
     });
@@ -382,10 +508,11 @@ test("startup smoke reports a missing curl prerequisite immediately", async () =
   }
 });
 
-test("startup smoke reports a missing psql prerequisite immediately", async () => {
+test("startup smoke reports a missing psql prerequisite immediately", async (t) => {
   const fixture = await createStartupSmokeFixture({ includePsql: false });
   try {
     const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      signal: t.signal,
       cwd: root,
       env: fixture.env,
     });
@@ -397,11 +524,12 @@ test("startup smoke reports a missing psql prerequisite immediately", async () =
   }
 });
 
-test("startup smoke bounds a stalled PostgreSQL preflight", async () => {
+test("startup smoke bounds a stalled PostgreSQL preflight", async (t) => {
   const fixture = await createStartupSmokeFixture({ psqlDelaySeconds: 30 });
   const startedAt = Date.now();
   try {
     const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      signal: t.signal,
       cwd: root,
       env: {
         ...fixture.env,
@@ -417,10 +545,11 @@ test("startup smoke bounds a stalled PostgreSQL preflight", async () => {
   }
 });
 
-test("startup smoke rejects an unexpected database identity before launching", async () => {
+test("startup smoke rejects an unexpected database identity before launching", async (t) => {
   const fixture = await createStartupSmokeFixture({ databaseName: "wrong-target" });
   try {
     const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      signal: t.signal,
       cwd: root,
       env: fixture.env,
     });
@@ -455,10 +584,11 @@ test("startup smoke rejects unexpected PostgreSQL address and port identities be
       diagnostic: /PostgreSQL server endpoint port mismatch/,
     },
   ]) {
-    await t.test(scenario.name, async () => {
+    await t.test(scenario.name, async (t) => {
       const fixture = await createStartupSmokeFixture(scenario.fixtureOptions);
       try {
         const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+          signal: t.signal,
           cwd: root,
           env: fixture.env,
         });
@@ -472,11 +602,12 @@ test("startup smoke rejects unexpected PostgreSQL address and port identities be
   }
 });
 
-test("startup smoke removes the complete server group and listener after success", async () => {
+test("startup smoke removes the complete server group and listener after success", async (t) => {
   const fixture = await createStartupSmokeFixture();
   const port = await findAvailablePort();
   try {
     const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      signal: t.signal,
       cwd: root,
       env: {
         ...fixture.env,
@@ -494,11 +625,12 @@ test("startup smoke removes the complete server group and listener after success
   }
 });
 
-test("startup smoke removes the complete server group after readiness failure", async () => {
+test("startup smoke removes the complete server group after readiness failure", async (t) => {
   const fixture = await createStartupSmokeFixture({ healthStatus: 503 });
   const port = await findAvailablePort();
   try {
     const result = await runCommand(systemCommand("bash"), [startupSmokePath], {
+      signal: t.signal,
       cwd: root,
       env: {
         ...fixture.env,
@@ -722,6 +854,7 @@ test("GitHub Actions boots the app against a blank disposable database", async (
       process.execPath,
       [resolve(root, "node_modules/drizzle-kit/bin.cjs"), "push", "--force"],
       {
+        signal: t.signal,
         cwd: root,
         env: bootstrapEnv,
       },

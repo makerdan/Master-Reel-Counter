@@ -224,8 +224,8 @@ export async function runOwnedProcessGroup(
     throw error;
   }
   if (onOutput) {
-    child.stdout.on("data", onOutput);
-    child.stderr.on("data", onOutput);
+    child.stdout.on("data", (chunk) => onOutput(chunk, "stdout"));
+    child.stderr.on("data", (chunk) => onOutput(chunk, "stderr"));
   }
   const processTree = new OwnedProcessTree(processGroupId, processGroupId);
   processTree.observe();
