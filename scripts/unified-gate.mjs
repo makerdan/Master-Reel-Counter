@@ -62,7 +62,8 @@ try {
         tasks: Object.keys(registry.tasks).length, baselines: catalog(root).records.length,
         localHooks: git(root, ["config", "--get", "core.hooksPath"], true).stdout.trim() === ".githooks"
           ? "configured at .githooks" : "not configured in this clone",
-        warnings: baselineWarnings(root), enforcement: "local gate runner; Agent-first native-task preflight is cooperative" };
+        warnings: baselineWarnings(root), enforcement:
+          "local sealed-plan and assigned-tier checks only; Agent tracks native approval, cancellation and scope; platform actions are not intercepted" };
       break;
     }
     default: throw new Error("supported operations: new, amend, guard, restore-plan, cancel, run, classify, merge-guard, baseline-warnings, status");

@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSy
   cpSync, symlinkSync, existsSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join, dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 import { spawnSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
@@ -67,6 +68,37 @@ function cli(root, args, state) {
     env: { PATH: process.env.PATH, ...(state ? { TASK_ID: state.id, TASK_PLAN_FILE: state.planPath } : {}) },
   });
 }
+function exportedRunWithoutHostIntegration(root, state, tier = state.tier) {
+  const executionUrl = pathToFileURL(join(root, "scripts/lib/unified-gate/execution.mjs")).href;
+  const source = `
+    import { run } from ${JSON.stringify(executionUrl)};
+    const root = ${JSON.stringify(root)};
+    const context = ${JSON.stringify({ id: state.id, tier, planFile: state.planPath })};
+    try { console.log(JSON.stringify(await run(root, context))); }
+    catch (error) {
+      console.error(JSON.stringify({ state: "BLOCKED", reason: error.message }));
+      process.exitCode = 2;
+    }
+  `;
+  return spawnSync(process.execPath, ["--input-type=module", "-e", source], {
+    cwd: root, encoding: "utf8", timeout: 6000, env: { PATH: process.env.PATH },
+  });
+}
+function configureDistinctFixtureTiers(root) {
+  const manifestPath = join(root, "docs/validation/manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  manifest.tiers["test-fast"].steps = [{
+    name: "fixture-probe", kind: "test",
+    command: [process.execPath, "-e", "require('fs').writeFileSync('.local/assigned-tier','ran')"],
+  }];
+  for (const tier of TIERS.filter((name) => name !== "test-fast")) {
+    manifest.tiers[tier].steps = [{
+      name: `unassigned-${tier}`, kind: "test",
+      command: [process.execPath, "-e", "require('fs').writeFileSync('.local/unassigned-tier','ran')"],
+    }];
+  }
+  write(root, "docs/validation/manifest.json", manifest);
+}
 
 test("provisioning creates a UUID, permanent reservation, one binding, exact sections and stubs", async (t) => {
   const root = fixture(t);
@@ -94,6 +126,49 @@ test("wrong tier, unknown ID, context mismatch, changed plan and changed stubs b
   write(root, `.local/tasks/${state.id}.stubs.json`, "{}");
   await assert.rejects(run(root, ctx(state)), /stubs/);
   assert.equal(existsSync(join(root, ".local/executed")), false);
+});
+
+test("CLI and exported runner work without native integration and preserve local plan/tier denials", async (t) => {
+  const root = fixture(t);
+  configureDistinctFixtureTiers(root);
+  const state = await provision(root, spec());
+  const status = cli(root, ["status"]);
+  assert.equal(status.status, 0, status.stderr);
+  assert.match(JSON.parse(status.stdout).enforcement, /local sealed-plan and assigned-tier checks only/);
+
+  const cliResult = cli(root, ["run", "--tier", state.tier], state);
+  assert.equal(cliResult.status, 0, cliResult.stderr);
+  const cliRun = JSON.parse(cliResult.stdout);
+  assert.equal(cliRun.state, "PASS");
+  assert.deepEqual(cliRun.observations.map((observation) => observation.name), ["fixture-probe"]);
+  assert.match(readFileSync(join(root, ".local/assigned-tier"), "utf8"), /ran/);
+  assert.equal(existsSync(join(root, ".local/unassigned-tier")), false);
+  assert.doesNotMatch(cliResult.stdout, /native.{0,40}(verified|approved|admitted)/i);
+
+  const exportedResult = exportedRunWithoutHostIntegration(root, state);
+  assert.equal(exportedResult.status, 0, exportedResult.stderr);
+  const exportedRun = JSON.parse(exportedResult.stdout);
+  assert.equal(exportedRun.state, "PASS");
+  assert.deepEqual(exportedRun.observations.map((observation) => observation.name), ["fixture-probe"]);
+  assert.equal(existsSync(join(root, ".local/unassigned-tier")), false);
+  assert.doesNotMatch(exportedResult.stdout, /native.{0,40}(verified|approved|admitted)/i);
+
+  const wrongTierCli = cli(root, ["run", "--tier", "test-heavy"], state);
+  assert.equal(wrongTierCli.status, 2);
+  assert.match(wrongTierCli.stderr, /wrong tier/);
+  const wrongTierExport = exportedRunWithoutHostIntegration(root, state, "test-heavy");
+  assert.equal(wrongTierExport.status, 2);
+  assert.match(wrongTierExport.stderr, /wrong tier/);
+  assert.equal(existsSync(join(root, ".local/unassigned-tier")), false);
+
+  write(root, state.planPath, state.plan + "\nchanged");
+  const stalePlanCli = cli(root, ["run", "--tier", state.tier], state);
+  assert.equal(stalePlanCli.status, 2);
+  assert.match(stalePlanCli.stderr, /sealed plan changed or stale/);
+  const stalePlanExport = exportedRunWithoutHostIntegration(root, state);
+  assert.equal(stalePlanExport.status, 2);
+  assert.match(stalePlanExport.stderr, /sealed plan changed or stale/);
+  assert.equal(existsSync(join(root, ".local/unassigned-tier")), false);
 });
 
 test("invalid or unavailable baseline is never an empty catalog; malformed declarations cannot publish", async (t) => {

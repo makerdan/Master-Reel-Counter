@@ -149,7 +149,7 @@ export function guard(root, { id, tier, planFile }, registry = readRegistry(root
     "required stubs missing or changed");
   invariant(state.workloadHash === digest(tierDefinition(root, tier)), "tier workload changed; use supported amendment");
   invariant(state.approvalHash === digest({ approval: state.spec.approval, planHash: state.planHash }),
-    "approval does not cover this sealed revision");
+    "local approval notes do not match this sealed revision");
   specification(root, state.spec);
   return state;
 }

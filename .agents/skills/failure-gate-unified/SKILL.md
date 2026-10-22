@@ -63,10 +63,11 @@ gate" below.
   its registered tier. All other tiers must block the ID.
 - Every tier change, including escalation or downgrade, must use the project's
   supported plan-and-binding amendment mechanism. Record the old/new tier,
-  rationale and coverage evidence; re-seal, re-guard and satisfy the applicable
-  approval policy before execution. Reject unsupported changes. Never silently
-  switch tiers, lower coverage to avoid a failure/resource limit, or assume
-  that this provision grants permission to downgrade.
+  rationale and coverage evidence; re-seal and re-guard before execution. The
+  Agent remains responsible for ensuring ordinary task approval covers the
+  change; the local gate does not verify host approval. Reject unsupported
+  changes. Never silently switch tiers, lower coverage to avoid a failure/resource
+  limit, or assume that this provision grants permission to downgrade.
 
 ### Baseline source and task metadata
 
@@ -229,75 +230,60 @@ specific to the task.
 
 ## Approval, revisions and amendments
 
-A guard PASS establishes plan validity, not permission to implement. Before
-implementation, verify the project's supported approval policy is satisfied
-for this task and identifiable sealed plan revision. Valid prior authorization
-may suffice when it actually covers that scope and revision; do not invent a
-universal extra owner click, approval service, signature, or receipt format.
+Ordinary task approval under the host's normal workflow authorizes the Agent's
+work. The Agent is responsible for confirming that approval covers the requested
+scope, honoring cancellation or supersession, and tracking material scope changes.
+Do not add a native-host lifecycle, approval, revision or task-association
+integration as a prerequisite for local gate use. The gate does not independently
+verify native task state.
 
-Use the host's supported revision/seal mechanism to keep the task ID, plan
-contents, binding and approval evidence consistent. A path or mutable title
-alone is not a revision. Material scope, validation or baseline-ownership
-changes require a supported amendment, an updated seal and guard result.
-Obtain renewed approval when the change exceeds or invalidates the existing
-authorization under project policy; do not carry approval forward by assumption
-or request it again for unchanged authorized work.
+The local plan may retain an approval reference and scope notes. Those are
+Agent-maintained attribution and applicability notes, not a second approval
+authority or proof that the host approved the work. The gate checks only that
+the local sealed plan and its recorded fields are internally consistent.
+
+Use the gate's local seal and amendment mechanisms to keep its task ID, plan
+contents, binding and recorded notes consistent. A path or mutable title alone
+is not a local revision. Material scope, validation or baseline-ownership
+changes require a supported local amendment, an updated seal and guard result.
+The Agent must obtain renewed task approval when a change exceeds or invalidates
+existing authorization; do not carry approval forward by assumption or request
+it again for unchanged authorized work.
 
 Tier names alone do not establish unchanged coverage. If a tier's actual
 workload materially changes, reassess the plan's coverage rationale and affected
-validation/approval evidence through the supported mechanism before using it.
-A matching alias is not permission to omit required checks. Do not turn
-unrelated changes or purely cosmetic edits into blanket reapproval requirements.
+local plan notes through the supported amendment mechanism before using it. The
+Agent reassesses ordinary task approval when a material change exceeds its scope;
+the gate does not verify that host-side authorization. A matching alias is not
+permission to omit required checks. Do not turn unrelated changes or purely
+cosmetic edits into blanket reapproval requirements.
 
-## Pre-implementation preflight and post-Start amendments
+## Agent responsibility and local gate boundary
 
-For every task governed by this contract, automatically perform a preflight before
-implementation—not merely before tests. Use a verified host pre-dispatch hook when
-available; otherwise make it the executing Agent's first action after Start.
-Read-only inspection and supported plan preparation may precede admission;
-application edits, migrations, provider calls and validation workloads may not.
-Starting a native task or changing its visible description is not gate admission.
+The Agent follows ordinary task approval and is responsible for tracking the
+approved scope, cancellation or supersession, and material changes. If approval
+does not cover a change, or the task is cancelled, the Agent stops affected work
+and follows the host's normal authorization process. A task-description edit
+alone does not amend a local sealed plan.
 
-Inspect actual scope, governing contract and plan revision, eligibility, baseline
-declarations, one adequate registered tier and its workload, approval evidence,
-and Regression Guard applicability/declaration when adopted. Reuse valid plans;
-do not amend just to produce a new revision or demand redundant tests.
+The local gate validates its own sealed plan, exact assigned tier, local task
+eligibility, and bounded execution. It does not look up or independently verify
+native task identity, approval, lifecycle, cancellation, current revision or
+association. It does not intercept the host's Start button, platform actions,
+Agent/editor changes or task completion. No native-host hook or adapter is
+required to use the local gate.
 
-Automatically prepare concrete missing declarations, planned guard tests/assertions
-and the lightest adequate registered tier from inspected evidence. This prepares
-the plan; it does not deliver tests or justify weak coverage. Complete unsealed
-drafts through provisioning. For an existing sealed task, apply a candidate through
-the supported amendment/reseal/binding route when existing authorization covers the
-scope and identifiable revision under project policy. Ask only for genuinely
-uncovered decisions; do not infer that Start universally approves changed scope.
-Record amendment rationale and approval applicability, then rerun admission.
+For an existing local plan, use the supported amendment route when its scope,
+validation or baseline ownership changes. If a gap is found after implementation
+begins, pause affected work and validation, preserve observations and changes,
+and amend the local plan before proceeding. Do not allow concurrent runs against
+a changing local plan/binding. A later amendment cannot retroactively authorize
+edits or certify old results. Assess already-made changes against the approved
+scope and rerun affected checks.
 
-An active task's native Plan may be editable where the host supports it. Keep that
-dispatch description and the authoritative local sealed plan consistent through
-the supported route; editing the description alone changes neither seal nor binding.
-Preserve task identity, consumed IDs, history and ledger guarantees. Never manually
-assign a Unified ID to historical native work that has no supported local binding.
-
-If a gap is found after implementation begins, pause affected implementation and
-validation, preserve observations and changes, and amend before proceeding. No
-concurrent run may continue against a changing plan/binding; wait for verified
-quiescence or use its supported authorized cancellation route. Do not stop unrelated
-work. A later amendment cannot retroactively authorize edits or certify old results.
-Assess already-made changes against the approved scope and rerun affected checks.
-
-Immediately before implementation dispatch, establish agreement among the current
-task, admitted plan revision, binding, lifecycle and approval evidence using the
-host's supported revision/concurrency checks. Reject stale context rather than
-silently continuing after another amendment. Admission remains read-only on sealed
-plans; preparation/amendment is a separate explicit operation with recorded results.
-
-Document actual enforcement coverage. A local runner can deny its own dispatch;
-it does not thereby intercept Replit's Start button or all Agent file edits.
-An Agent-first preflight is cooperative instruction, not platform interception.
-If a supported amendment route is missing, report the exact prerequisite and use
-owner-directed gate repair where applicable—not in-place edits, invented authority
-or a blanket new reviewer/bootstrap requirement. Preserve historical contracts;
-do not automatically retrofit old tasks on Start.
+Record the actual local enforcement boundary. A local runner can deny its own
+workload dispatch but cannot control platform actions or arbitrary edits.
+Preserve historical contracts; do not automatically retrofit old tasks.
 
 ## Bounded execution
 
@@ -309,18 +295,18 @@ export TASK_PLAN_FILE=.local/tasks/<task-id>.md
 ```
 
 Follow the project's documented invocation for the bound validation tier.
-At admission, require agreement among the task ID, supplied plan, current
-sealed/admitted revision, registered tier and applicable approval evidence.
-Reject mismatched or stale context before workload execution. Use the host's
-actual context requirements; setting `TASK_PLAN_FILE` alone is not proof that
-these checks passed. Do not execute a plan for one ID using another ID's binding.
+At local admission, require agreement among the task ID, supplied plan, current
+sealed revision and registered tier. Reject mismatched or changed local context
+before workload execution. The gate does not verify native task approval,
+lifecycle, revision or task association; those remain the Agent's responsibility.
+Setting `TASK_PLAN_FILE` alone is not proof that local checks passed. Do not
+execute a plan for one local ID using another ID's binding.
 
-Check current task eligibility under the host's supported lifecycle before
-implementation or validation. Cancellation, supersession or closure must not
-silently retain permission for ordinary execution. Historical revalidation may
-use an explicitly authorized supported route without reopening the task or
-reassigning its ID. Do not impose universal lifecycle labels or a new approval
-step when existing authorization already covers that operation.
+The local runner checks that its own plan is sealed and locally eligible. The
+Agent must honor known host cancellation, supersession or closure; the local
+runner cannot observe those native states. Historical revalidation may use an
+explicitly authorized supported route without reopening the local task or
+reassigning its ID.
 
 - **Tier lock:** A top-level tier invocation that does not match the ID's bound
   tier must be blocked immediately. Supported workload steps supervised by that

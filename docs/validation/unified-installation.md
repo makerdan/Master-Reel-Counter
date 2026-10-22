@@ -7,8 +7,8 @@ using the canonical ZIP's exact `SKILL.md`, not a runtime mirror. The ZIP's
 separate CloudPainter planning prompt was not this project's installation scope.
 
 - Current/only source: `.agents/skills/failure-gate-unified/SKILL.md`
-- Bytes: **22993**
-- SHA-256 pin: **2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22**
+- Bytes: **21724**
+- SHA-256 pin: **3cc2ed109bed775e188dd4b3db0e17834fd07ef013b03e682de5079d0ae7e937**
 - Pin map: `docs/validation/unified-pin.json`
 - Immutable historical bytes: `docs/validation/unified-revisions/`
 
@@ -120,15 +120,17 @@ Use `npm run gate:new -- --spec /path/to/spec.json` for the next ordinary task,
 not during gate maintenance. A complete input contains:
 
 - `title`, `scope`, one `tier`, `why`, and `coverage` naming an actual tier step;
-- `approval.reference`, `approval.direction`, `approval.applicability`: the
-  attributable owner instruction and why it covers this identifiable revision;
+- `approval.reference`, `approval.direction`, `approval.applicability`: local
+  attribution notes for the Agent's ordinary task approval and its scope;
 - `ignoredBaselines` and `ownedBaselines`: disjoint arrays of exact catalog IDs;
 - `assertions`: nonempty `{requirement, check}` declarations for planned guards.
 
-Approval is the project's cooperative evidence policy, not a new reviewer click,
-cryptographic owner signature or receipt. The Agent must verify the real owner
-instruction; self-asserting a note is not proof that an owner approved the work.
-Start alone does not authorize materially changed scope.
+Ordinary task approval authorizes the Agent's work. The Agent is responsible for
+tracking whether it covers the scope, honoring cancellation or supersession, and
+handling material scope changes. The local approval fields are notes sealed with
+the plan; the gate checks their local consistency, not their truth or native host
+task state. They are not a second approval authority. A task start alone does not
+authorize materially changed scope.
 
 The provisioner reserves a random UUID and permanent tombstone before generating
 files. It renders `.local/tasks/<uuid>.md` and `<uuid>.stubs.json`, completes the
@@ -148,16 +150,23 @@ npm run gate:guard -- --tier <bound-tier>
 npm run gate:run -- --tier <bound-tier>
 ```
 
-The executing Agent runs the first command **before implementation**, and the
-runner checks again immediately before dispatch under the writer lock. Plan
-content, required stubs, identity/context, lifecycle, pin, workload and approval
-must agree. A wrong tier blocks before any workload. No `--allow-no-plan`,
-`--execute`, manifest override or smoke flag bypasses task-context admission.
+The local guard checks the sealed plan and assigned tier; the runner checks them
+again before workload dispatch under the writer lock. Plan content, required
+stubs, local identity/context, local eligibility, pin and workload must agree.
+A wrong tier blocks before any workload. No `--allow-no-plan`, `--execute`,
+manifest override or smoke flag bypasses local task-context checks.
+
+The Agent follows ordinary task approval and tracks host-side scope changes,
+cancellation and supersession. The local gate does not independently verify
+native approval, lifecycle, current revision or task association, and it cannot
+intercept platform actions, Start or arbitrary Agent/editor/shell writes. No
+native-host lifecycle or admission adapter is required to run it.
 
 - `gate:amend -- --id <uuid> --spec <complete-spec.json> --reason <rationale>`
   records a new sealed revision, including old/new binding through immutable
-  history. Supply approval evidence/applicability for that revision; do not
-  infer that old approval covers changed scope. It cannot change a running,
+  history. Record the local approval attribution/applicability notes for that
+  revision; the Agent must obtain renewed task approval if the change exceeds
+  existing authorization. It cannot change a running,
   cancelled or administratively closed task.
 - `gate:restore-plan -- --id <uuid>` restores the exact sealed plan/stubs in a
   fresh task environment, without creating an ID, changing approval or rebinding.
@@ -229,13 +238,17 @@ there is no existing active hook path or non-sample hook to displace. On a fresh
 clone, enable those hooks with the same Git configuration after checking existing
 hooks. Every gate mutation/dispatch also runs the preservation check.
 
-These are local enforcement paths, **not** interception of Replit Start, arbitrary
-Agent/editor/shell writes, remote branch protection or `--no-verify` commits.
-Native-task first-action preflight is cooperative. Independent application CI
-retains its existing scripts and is not task-completion evidence. No CI workflow
-was edited; adding remote merge enforcement requires separate owner approval.
+These are local enforcement paths, **not** interception of Replit Start, platform
+actions, arbitrary Agent/editor/shell writes, remote branch protection or
+`--no-verify` commits. The Agent is responsible for host-side approval,
+cancellation and scope tracking. Independent application CI retains its existing
+scripts and is not task-completion evidence. No CI workflow was edited; adding
+remote merge enforcement requires separate owner approval.
 
-## Setup results
+## Initial installation setup results (historical)
+
+The following records the original installation checks, not current workspace
+readiness. Keep it as historical installation evidence.
 
 Checks are run directly with explicit outer and test-file time bounds, using
 disposable repositories, dummy Node commands and local fixture mutexes only:

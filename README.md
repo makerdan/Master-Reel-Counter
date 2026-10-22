@@ -279,9 +279,12 @@ The **Managed Clerk production release gate** GitHub workflow is a separate read
 ## Contributing / Conventions
 
 Application check workloads remain defined in `docs/validation/manifest.json`.
-The old task-admission tooling is retired; these commands do not authorize
-implementation tasks or decide their completion. Historical records are under
-`docs/validation/archive/legacy-failure-gate/`. The replacement gate is not installed.
+The old task-admission tooling is retired. Failure Gate Unified is installed as
+a local sealed-plan and assigned-tier runner; it does not independently verify
+native task approval, lifecycle, revision or task association, and it does not
+intercept platform actions. The Agent remains responsible for ordinary task
+approval, cancellation and scope changes. Historical records are under
+`docs/validation/archive/legacy-failure-gate/`.
 
 - **Workspace Skills & Mirrors**
   - `scripts/workspace-skill-sync.mjs` implements **Skill Mirror Sync**.
