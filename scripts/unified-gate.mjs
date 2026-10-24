@@ -22,6 +22,22 @@ const id = option("id") ?? process.env.TASK_ID;
 const tier = option("tier");
 const context = { id, tier, planFile: process.env.TASK_PLAN_FILE };
 try {
+  if (operation === "run") {
+    const values = new Set(["id", "tier", "step", "file", "case", "pattern"]);
+    const seen = new Set();
+    for (let i = 0; i < args.length; i++) {
+      const name = args[i].replace(/^--/, "");
+      invariant(args[i].startsWith("--") && (values.has(name) || name === "recover"),
+        `unknown run option: ${args[i]}`);
+      invariant(!seen.has(name), `duplicate run option: --${name}`);
+      seen.add(name);
+      if (values.has(name)) {
+        invariant(typeof args[i + 1] === "string" && !args[i + 1].startsWith("--"),
+          `--${name} requires a value`);
+        i++;
+      }
+    }
+  }
   // This check applies to every gate command, including diagnostics/status.
   const pin = pins(root);
   invariant(!process.env.TASK_ID || !id || process.env.TASK_ID === id, "TASK_ID context mismatch");
@@ -43,6 +59,10 @@ try {
       break;
     case "run": result = await run(root, context, {
       stepName: option("step"), recoverOnly: args.includes("--recover"),
+      ...(["file", "case", "pattern"].some((name) => option(name) !== undefined) ? {
+        selector: Object.fromEntries(["file", "case", "pattern"]
+          .filter((name) => option(name) !== undefined).map((name) => [name, option(name)])),
+      } : {}),
     }); break;
     case "classify": {
       const observation = input("observation");

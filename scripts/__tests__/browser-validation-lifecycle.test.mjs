@@ -120,3 +120,15 @@ test("browser runner refuses temporary database cleanup when the group survives"
   assert.match(runner, /mostRecentProcessGroup && !mostRecentProcessGroup\.groupGone/);
   assert.match(runner, /Refusing to drop .*browser process group .* could not be confirmed stopped/);
 });
+
+test("guarded retry browser selection uses the existing database wrapper after successful compilation", async () => {
+  const compiler = await readFile(resolve(root, "scripts/run-typechecked-playwright.mjs"), "utf8");
+  assert.ok(compiler.indexOf('if (typecheckStatus !== 0) process.exit(typecheckStatus)') <
+    compiler.indexOf('args[0] === "--isolated-database"'));
+  assert.match(compiler, /\[resolve\(root, "scripts\/run-browser-tests\.mjs"\), \.\.\.args\]/);
+  const runner = await readFile(resolve(root, "scripts/run-browser-tests.mjs"), "utf8");
+  assert.match(runner, /prepare-release-test-database\.mjs/);
+  assert.match(runner, /"test", \.\.\.process\.argv\.slice\(2\)/);
+  assert.match(runner, /DATABASE_URL: browserDatabaseUrl/);
+  assert.doesNotMatch(runner, /"--project"/);
+});

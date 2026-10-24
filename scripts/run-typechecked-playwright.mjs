@@ -18,5 +18,12 @@ function run(command, args) {
 const typecheckStatus = run("npm", ["run", "typecheck"]);
 if (typecheckStatus !== 0) process.exit(typecheckStatus);
 
+const args = process.argv.slice(2);
+// Guarded retries need the heavy wrapper's database lifecycle as well as this
+// compiler prerequisite. Ordinary browser commands retain their existing path.
+const isolatedDatabase = args[0] === "--isolated-database";
+if (isolatedDatabase) args.shift();
 const playwrightCli = resolve(root, "node_modules/@playwright/test/cli.js");
-process.exit(run(process.execPath, [playwrightCli, "test", ...process.argv.slice(2)]));
+process.exit(run(process.execPath, isolatedDatabase
+  ? [resolve(root, "scripts/run-browser-tests.mjs"), ...args]
+  : [playwrightCli, "test", ...args]));

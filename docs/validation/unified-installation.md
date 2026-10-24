@@ -179,8 +179,10 @@ native-host lifecycle or admission adapter is required to run it.
 - `gate:restore-plan -- --id <uuid>` restores the exact sealed plan/stubs in a
   fresh task environment, without creating an ID, changing approval or rebinding.
 - `gate:run -- --tier <bound-tier> --step <registered-test-step>` is a supervised
-  isolated diagnostic. It preserves the parent task's binding but ends
+  whole-step diagnostic. It preserves the parent task's binding but ends
   `INCOMPLETE`, never the required full-tier PASS.
+  Add `--file` and optionally `--case` or `--pattern` for the supported
+  [guarded per-test retry](#guarded-per-test-retries) described below.
 - `gate:run -- --tier <bound-tier> --recover` records an interrupted run as
   `INCOMPLETE`, only after the sole writer is free and its independent cleanup
   deadline has elapsed. It runs no tests and cannot certify old work.
@@ -210,6 +212,148 @@ timeouts, unobserved/truncated results and filtered checks cannot produce PASS.
 Diagnostic redaction is pattern-based, not a guarantee against arbitrary secret
 formats: do not make application tests print credentials. No secret environment
 values are read to construct redaction patterns.
+
+## Guarded per-test retries
+
+These are **diagnostic evidence only**, not automatic retries or a replacement for
+required validation. First use the existing admission/preflight for the caller's
+sealed plan. Supply its provisioned `TASK_ID`, exact `TASK_PLAN_FILE`, and **its
+bound tier**; the step must already be a registered `kind: test` in that tier.
+Do not provision/rebind a task, change tiers, or use an unguarded harness to obtain
+isolation. Owner-directed gate maintenance itself remains outside live admission.
+
+Exact implemented syntax (run from the repository root):
+
+```sh
+TASK_ID=<provisioned-uuid> TASK_PLAN_FILE=.local/tasks/<provisioned-uuid>.md \
+  npm run gate:run -- --tier <bound-tier> --step <registered-test-step> \
+  --file <literal-project-relative-test-file> [--case '<exact native name>' | --pattern '<native regex>']
+```
+
+`--id` can repeat the same ID but cannot conflict with `TASK_ID`. There is no
+arbitrary runner-argument passthrough. No `--flag=value` syntax, duplicate flags,
+unknown options, positional arguments, or `--recover` combined with selectors
+is accepted. `--case` and `--pattern` require `--file` and are mutually exclusive.
+Omitting all selectors retains the prior whole-step diagnostic; omitting `--step`
+and all selectors retains the entire bound-tier workload, unchanged.
+
+Working examples using files/steps in the current manifest (substitute the
+caller's actual ID/plan; only use its bound tier):
+
+```sh
+# Node: this file is a member of test:unit; retain its tsx loader.
+TASK_ID=<uuid> TASK_PLAN_FILE=.local/tasks/<uuid>.md npm run gate:run -- \
+  --tier test-standard --step unit-tests \
+  --file scripts/__tests__/playwright-config-coverage.test.mjs \
+  --case 'a package script config cannot bypass compiler coverage'
+
+# Node pattern, including all matches in that one file.
+TASK_ID=<uuid> TASK_PLAN_FILE=.local/tasks/<uuid>.md npm run gate:run -- \
+  --tier test-standard --step unit-tests \
+  --file scripts/__tests__/playwright-config-coverage.test.mjs --pattern 'compiler coverage'
+
+# Browser: keeps the enabled default project matrix and project grep policy.
+TASK_ID=<uuid> TASK_PLAN_FILE=.local/tasks/<uuid>.md npm run gate:run -- \
+  --tier test-heavy --step browser-tests \
+  --file tests/clerk-sign-in-navigation.spec.ts \
+  --pattern 'signed-out Settings entry returns to protected Settings after form sign-in$'
+
+# Browser exact native title: project, file, describe titles, case (and tags if any).
+TASK_ID=<uuid> TASK_PLAN_FILE=.local/tasks/<uuid>.md npm run gate:run -- \
+  --tier test-heavy --step browser-tests \
+  --file tests/clerk-sign-in-navigation.spec.ts \
+  --case 'chromium clerk-sign-in-navigation.spec.ts signed-out Settings entry returns to protected Settings after form sign-in'
+```
+
+Files are literal, canonical project-relative paths, resolved from the project
+root (not from the plan or the current shell directory). Absolute paths, dot
+segments, symlinks, globs, missing files, and files outside the registered workload
+are rejected before dispatch. Exactly one constituent workload must contain a
+Node file; a duplicate across compound commands is ambiguous and rejected.
+Browser files must be default-workload `tests/**/*.spec.ts`, excluding
+`tests/release/**`; custom configs, project flags, line selectors and other
+browser wrappers are not supported by this adapter.
+
+`--case` escapes regex metacharacters and anchors the whole **native matching
+name**; `--pattern` is a JavaScript regex string, not `/pattern/flags` notation,
+and uses native search semantics. Names/patterns are nonempty, bounded to 256
+characters and passed as argument-array values, not shell fragments. For Node,
+matching is precisely `--test-name-pattern`: on the supported Node 20 runtime
+this matches an individual name component (a nested leaf name, not the reported
+space-joined suite/leaf identity). Same-named components in different suites can
+all match; this interface does not promise a unique hierarchical case ID.
+Use a suitable native pattern or retry the file if the runner cannot distinguish
+those cases; do not claim unique isolation. Ancestor traversal, discovery and
+hooks remain runner-controlled. Browser matching is Playwright `--grep` against
+the full native search title, including project/file/describe titles and tags;
+exact matching tolerates Playwright's empty root-title prefix. Project grep and
+grep-invert rules still apply and can select zero tests. Patterns may intentionally
+select multiple cases; this is never equivalent to full-tier validation.
+
+Supported Node adapters understand registered plain `node [loader/value pairs]
+--test <literal files...>` commands and `npm run <script>` aliases, including
+explicit ` && ` chains. The uniquely selected constituent retains its own
+`--import`, `--require`/`-r`, or `--loader` pairs. The existing
+`VITE_HMR_RECOVERY=0|1` alias environment is supported. Other shell syntax,
+globbed operands, custom flags, arbitrary environment assignments and opaque
+custom harnesses are unsupported, not permission to append arguments generically.
+Compound chains run only the selected constituent, not their siblings. Test module
+imports, suite registration, loaders and hooks can still run inside the selected
+file; this does not suppress ordinary module side effects.
+
+Browser retries use `scripts/run-typechecked-playwright.mjs --isolated-database`
+as a supervised internal step: successful `npm run typecheck` precedes the existing
+`run-browser-tests.mjs` database preparation, isolation checks, project policy and
+cleanup. The adapter cannot override the project matrix, config, database target
+or compiler checks. The normal unfiltered heavy workload and its hash are unchanged.
+
+The exported `run(root, context, options)` applies the same selector checks:
+
+```js
+await run(root, { id, tier, planFile }, {
+  stepName: "unit-tests",
+  selector: {
+    file: "scripts/__tests__/playwright-config-coverage.test.mjs",
+    case: "a package script config cannot bypass compiler coverage",
+  },
+});
+// Replace case with pattern for native regex matching; unknown keys are errors.
+```
+
+All retries retain sealed revision/binding guards, writer exclusion, stale-context
+rejection, finite tier budget, independent step supervision, signals, cleanup and
+recovery. Invalid context/unsafe selectors are rejected before dispatch. Valid
+requests for unsupported isolation persist `diagnostic.outcome: UNSUPPORTED`,
+the selector, registered step/command, unsupported runner capability/reason and
+`dispatched: false`; no fallback workload runs.
+
+Results retain task/revision/pin/tier/workload/target, normalized selector,
+registered command, actual internal command and supervision observation.
+`executionEvidencePath` points to structured reporter evidence; the final record
+also embeds its observed file/case outcomes and counts. Node counts exclude
+suite containers. Browser identities include project and attempt; existing CI
+retry policy is retained, and failed attempts are not erased by later passes.
+Counts distinguish observed, selected, executed, passed, failed, skipped,
+cancelled, todo and filtered tests. Playwright may omit filtered-out tests entirely;
+these counts are observed evidence, not a catalog of all possible cases.
+
+`SUCCEEDED` requires completed reporter evidence, observed execution, no failed
+outcomes, zero exit and clean supervision/cleanup. `NO_MATCH`, `NO_EXECUTION`,
+`EVIDENCE_UNAVAILABLE`, `FAILED`, `INTERRUPTED` and `UNSUPPORTED` are unsuccessful
+diagnoses. Exit zero alone is insufficient. Skipped, cancelled, filtered and
+hook-only attempts are not execution proof. A passed runner case establishes
+body execution; for failed attempts the reporters conservatively count only
+execution they can establish (Node test-code failure; browser steps outside
+hooks). If the runner cannot establish body execution, the result remains
+unsuccessful instead of inventing evidence. Missing, oversized, malformed,
+foreign-file or incomplete reporter evidence also cannot succeed.
+
+Even `diagnostic.outcome: SUCCEEDED` leaves the run `state: INCOMPLETE` and CLI
+exit status **1**, never bound-tier PASS (invalid admission/options exit **2**).
+Use the diagnostic field, not the CLI exit code alone, for isolated outcome.
+Earlier full-tier failures remain in history. A passing retry establishes
+intermittency only, **not pre-existing provenance**. The original full bound-tier
+completion requirement remains in force.
 
 ## Classification and baselines
 

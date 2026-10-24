@@ -5,6 +5,7 @@ import { runOwnedProcessGroup } from "../owned-process-group.mjs";
 import { guard, baselineWarnings, classifyFailure } from "./plans.mjs";
 import { invariant, digest, hash, git, tierDefinition, safePath, taskState,
   append, saveRegistry, withWriter } from "./store.mjs";
+import { retryOptions, retryAdapter, retryCommand, readRetryEvidence } from "./retry.mjs";
 
 // Hash source bytes/changes, not host identity. Exclude only gate-owned evidence
 // and environment-local outputs. Ignored build/test outputs do not change it.
@@ -63,6 +64,7 @@ async function boundedStep(root, step, timeoutMs, outerSignal, logPath, context)
     .replace(/(https?:\/\/)[^/@\s]+:[^/@\s]+@/g, "$1[REDACTED]@")
     .slice(-8000);
   const observation = { name: step.name, kind: step.kind, command: step.command,
+    purpose: context.purpose ?? "bound-tier", ...(step.selector ? { selector: step.selector } : {}),
     ...result, durationMs: Date.now() - started, timedOut: timeout,
     interrupted: outerSignal.aborted, truncated, outputBytes: bytes, outputHash: hash(captured), outputExcerpt: excerpt,
     result: result.error || !result.cleanupComplete || timeout || outerSignal.aborted || truncated ? "INCOMPLETE"
@@ -71,7 +73,9 @@ async function boundedStep(root, step, timeoutMs, outerSignal, logPath, context)
   appendFileSync(logPath, JSON.stringify(observation) + "\n");
   return observation;
 }
-export async function run(root, context, { stepName, recoverOnly = false } = {}) {
+export async function run(root, context, options = {}) {
+  const selector = retryOptions(options);
+  const { stepName, recoverOnly = false } = options;
   return withWriter(root, async (registry) => {
     let state = guard(root, context, registry, { allowUnresolvedRun: true }); // Before any workload.
     if (state.runs.at(-1)?.state === "RUNNING") {
@@ -90,17 +94,25 @@ export async function run(root, context, { stepName, recoverOnly = false } = {})
     const definition = tierDefinition(root, state.tier);
     const steps = stepName ? definition.steps.filter((s) => s.name === stepName && s.kind === "test") : definition.steps;
     invariant(steps.length > 0, "diagnostic step is not a registered test in the bound tier");
+    const adapter = selector ? retryAdapter(root, steps[0], selector) : undefined;
     const runId = randomUUID(); // Run identity, not a task ID.
     const evidencePath = `.local/failure-gate-unified/runs/${runId}.jsonl`;
     const path = safePath(root, evidencePath); mkdirSync(dirname(path), { recursive: true });
     const before = target(root);
-    const entry = { id: runId, purpose: stepName ? "diagnostic" : "bound-tier",
+    const entry = { id: runId, taskId: state.id, purpose: stepName ? "diagnostic" : "bound-tier",
       nativeAuthorizationObservation: "NOT_OBSERVED",
       state: "RUNNING", revision: state.revision, pin: state.pin, tier: state.tier,
       planHash: state.planHash, workloadHash: state.workloadHash, target: before,
       startedAt: new Date().toISOString(),
       cleanupDeadline: new Date(Date.now() + definition.timeoutMs + 3000).toISOString(),
       evidencePath, observations: [] };
+    if (stepName) console.log("[DIAGNOSTIC ONLY] Retry evidence cannot satisfy required full-tier validation or establish pre-existing provenance.");
+    if (adapter) {
+      entry.selector = selector;
+      entry.runner = adapter.runner;
+      entry.registeredCommand = adapter.registeredCommand;
+      entry.executionEvidencePath = `.local/failure-gate-unified/runs/${runId}.tests.json`;
+    }
     append(registry, { ...state, runs: [...state.runs, entry] }, "run"); saveRegistry(root, registry);
     const controller = new AbortController();
     const onSignal = () => controller.abort();
@@ -110,9 +122,34 @@ export async function run(root, context, { stepName, recoverOnly = false } = {})
     try {
       for (const warning of baselineWarnings(root)) console.warn("[baseline warning]", JSON.stringify(warning));
       for (const step of steps) {
+        if (adapter?.unsupported) {
+          const observation = { name: step.name, kind: step.kind, command: step.command,
+            purpose: "diagnostic", selector, runner: adapter.runner, result: "BLOCKED", diagnosticOutcome: "UNSUPPORTED",
+            dispatched: false, reason: adapter.unsupported };
+          entry.observations.push(observation);
+          appendFileSync(path, JSON.stringify(observation) + "\n");
+          entry.diagnostic = { outcome: "UNSUPPORTED", reason: adapter.unsupported };
+          break;
+        }
         const left = definition.timeoutMs - (Date.now() - start);
         if (left <= 0 || controller.signal.aborted) break;
-        const result = await boundedStep(root, step, left, controller.signal, path, state);
+        const selectedStep = adapter ? { ...step, selector, command: retryCommand(root, adapter,
+          safePath(root, entry.executionEvidencePath)) } : step;
+        if (adapter) entry.actualCommand = JSON.parse(selectedStep.command.at(-1)).command;
+        const result = await boundedStep(root, selectedStep, left, controller.signal, path,
+          { ...state, purpose: entry.purpose });
+        if (adapter) {
+          entry.diagnostic = readRetryEvidence(root, entry.executionEvidencePath, adapter);
+          // Runner evidence is necessary, not sufficient: timeout, nonzero exit,
+          // cleanup failure, truncation and cancellation retain their meanings.
+          if (result.result === "INCOMPLETE") entry.diagnostic.outcome = "INTERRUPTED";
+          else if (result.result !== "PASS" && entry.diagnostic.outcome === "SUCCEEDED")
+            entry.diagnostic.outcome = "FAILED";
+          else if (result.result === "PASS" && entry.diagnostic.outcome !== "SUCCEEDED") result.result = "INCOMPLETE";
+          result.diagnostic = entry.diagnostic;
+          appendFileSync(path, JSON.stringify({ purpose: "diagnostic", selector,
+            runner: adapter.runner, execution: entry.diagnostic }) + "\n");
+        }
         entry.observations.push(result);
         if (result.result !== "PASS") break;
       }
@@ -130,8 +167,10 @@ export async function run(root, context, { stepName, recoverOnly = false } = {})
       final = changed || entry.observations.some((r) => r.result === "INCOMPLETE") || controller.signal.aborted
         ? "INCOMPLETE" : blocked ? "BLOCKED" : failed ? "FAIL" : incomplete || stepName ? "INCOMPLETE" : "PASS";
       entry.targetAfter = after;
-      entry.reason = stepName ? "filtered diagnostic cannot satisfy full-tier completion"
-        : changed ? "tested source changed during execution" : undefined;
+      entry.reason = changed ? "tested source changed during execution"
+        : stepName ? "filtered diagnostic cannot satisfy full-tier completion; a passing retry establishes intermittency only, not pre-existing provenance"
+        : undefined;
+      if (changed && adapter) entry.diagnostic = { ...entry.diagnostic, outcome: "INCOMPLETE" };
       if (entry.reason === undefined) delete entry.reason;
     } catch (error) {
       final = "BLOCKED"; entry.reason = error.message;

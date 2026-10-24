@@ -196,7 +196,7 @@ run the check or that branch protection requires it.
 
 The previous task-admission tooling has been retired. Historical reports and
 plans are under `docs/validation/archive/legacy-failure-gate/`; they are not
-current instructions. No replacement gate is installed. The workload commands
+current instructions. Unified is the current task-bound gate. The workload commands
 below remain available for explicit independent application diagnostics and CI;
 their results do not establish task admission or task completion. With `TASK_ID`
 or `TASK_PLAN_FILE` context, the same entry point routes through Unified and
@@ -205,6 +205,27 @@ The current Failure Gate contract is
 `.agents/skills/failure-gate-unified/SKILL.md` plus its two required references; see
 [`validation/modular-migration.md`](validation/modular-migration.md) for
 provisioning, sealed-plan preflight, amendments and task-bound validation.
+
+### Task-bound isolated retries
+
+Use the existing guarded route, **not direct runner commands**, to diagnose a
+selected file/case in the task's registered test step:
+
+```sh
+TASK_ID=<uuid> TASK_PLAN_FILE=.local/tasks/<uuid>.md npm run gate:run -- \
+  --tier <bound-tier> --step <registered-test-step> \
+  --file <project-relative-test-file> --pattern '<native test-name regex>'
+```
+
+`--case` selects an exact native name instead of a regex; it cannot be combined
+with `--pattern`. File-only selection is supported. See the full
+[Node/browser examples, runner limitations and evidence contract](validation/unified-installation.md#guarded-per-test-retries).
+Node 20 matches leaf/name components, not unique space-joined hierarchical IDs;
+Playwright matches full search titles and retains project policy. All these
+commands are diagnostic-only, including a successful retry. Zero matches,
+skipped-only execution and missing reporter evidence are explicitly unsuccessful.
+The full bound-tier run is still required, and a passing retry is not proof that a
+failure predates the task.
 ## Canonical validation tiers
 
 The tracked source of truth is `docs/validation/manifest.json`. Each tier is

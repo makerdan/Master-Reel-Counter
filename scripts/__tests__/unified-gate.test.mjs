@@ -429,6 +429,19 @@ test("full bound workload PASS has plan/pin/workload/target evidence; diagnostic
   assert.equal(diagnostic.state, "INCOMPLETE"); assert.equal(diagnostic.purpose, "diagnostic");
 });
 
+test("retry selectors cannot silently become whole-step or full-tier runs through either entry point", async (t) => {
+  const root = fixture(t), state = await provision(root, spec());
+  await assert.rejects(run(root, ctx(state), { file: "unrecognized-option.mjs" }), /unknown run option/);
+  await assert.rejects(run(root, ctx(state), { selector: { file: "probe.mjs" } }), /requires a diagnostic step/);
+  for (const args of [
+    ["run", "--tier", state.tier, "--unknown-filter", "probe"],
+    ["run", "--tier", state.tier, "--step", "fixture-probe", "--file"],
+    ["run", "--tier", state.tier, "--case", "probe"],
+  ]) assert.equal(cli(root, args, state).status, 2);
+  assert.equal(existsSync(join(root, ".local/executed")), false);
+  assert.equal(current(root, state.id).runs.length, 0);
+});
+
 test("failure and skipped later steps are not PASS", async (t) => {
   const root = fixture(t, { command: [process.execPath, "-e", "process.exit(3)"],
     extra: [{ name: "must-not-run", kind: "test", command: [process.execPath, "-e", "process.exit(0)"] }] });

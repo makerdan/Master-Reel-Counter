@@ -195,6 +195,14 @@ function helperScriptLaunchesBrowser(
 
   const source = helperScriptSources.get(scriptPath);
   if (source === undefined) return false;
+  // The shared compiler-gated launcher is a prerequisite boundary for callers,
+  // including guarded diagnostics reached through the generic tier dispatcher.
+  // Config discovery still traverses it independently below. Its actual
+  // compiler-before-browser behavior is exercised by configuration/lifecycle
+  // fixtures; this static check is not a proof of arbitrary JavaScript flow.
+  if (scriptPath === "scripts/run-typechecked-playwright.mjs" &&
+    /const typecheckStatus = run\("npm", \["run", "typecheck"\]\);\s*if \(typecheckStatus !== 0\) process\.exit\(typecheckStatus\);/.test(source))
+    return false;
   if (browserConfigsFromHelperSource(source, scriptPath).length > 0) return true;
 
   for (const { path } of localScriptReferences(source, scriptPath, rootDirectory, true)) {

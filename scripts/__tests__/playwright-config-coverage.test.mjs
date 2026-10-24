@@ -91,6 +91,32 @@ test("a package command cannot hide an untyped Playwright launch in nested helpe
   );
 });
 
+test("transitive guarded retries keep the shared compiler boundary without hiding config discovery", () => {
+  const wrapper = "scripts/run-typechecked-playwright.mjs";
+  const source = readFileSync(new URL("../run-typechecked-playwright.mjs", import.meta.url), "utf8");
+  const coverage = {
+    packageJson: { scripts: { "test:guarded": "node scripts/guarded.mjs" } },
+    manifest: { tiers: {} },
+    compilerProject: { include: ["playwright.config.ts"] },
+    rootConfigFiles: ["playwright.config.ts"],
+    helperScriptSources: {
+      "scripts/guarded.mjs": `import {spawnSync} from 'node:child_process'; spawnSync('node',['${wrapper}']);`,
+      [wrapper]: source,
+    },
+  };
+  assert.doesNotThrow(() => checkPlaywrightConfigCoverage(coverage));
+  assert.throws(() => checkPlaywrightConfigCoverage({
+    ...coverage, helperScriptSources: { ...coverage.helperScriptSources,
+      [wrapper]: source.replace('if (typecheckStatus !== 0) process.exit(typecheckStatus);', '') },
+  }), /must run 'npm run typecheck'/);
+  assert.throws(() => checkPlaywrightConfigCoverage({
+    ...coverage, helperScriptSources: { ...coverage.helperScriptSources,
+      [wrapper]: source.replace('"node_modules/@playwright/test/cli.js"', '"node_modules/@playwright/test/cli.js"') +
+        `\n// Selected config: playwright.extra.config.ts\n` },
+    rootConfigFiles: ["playwright.config.ts", "playwright.extra.config.ts"],
+  }), /outside compiler coverage/);
+});
+
 test("Playwright configs passed by a helper are added to compiler coverage", () => {
   assert.throws(
     () =>
