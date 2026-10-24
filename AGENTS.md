@@ -69,8 +69,21 @@ does not deny otherwise-valid task admission. Do not fake acceptance or bypass
 contract integrity, sealed-plan guards, single-tier binding or bounded execution.
 Historical single-file records retain their original handlers.
 
-Follow-ups may be complete unadmitted drafts. Preserve the host's dedicated route,
-parent linkage, categories, payload limits, duplicate checks and one-shot limits.
-Never fall back to ordinary task creation or repeat an uncertain batch; reconcile
-each item through available host tools. No independent verification task is required.
-Platform-refreshed default instructions do not supersede this compatibility rule.
+## Follow-up task guidance
+
+Before preparing or displaying follow-up suggestions, read
+`.agents/skills/follow-up-tasks/SKILL.md` and its applicable normative reference.
+Use this canonical project customization alongside current platform instructions.
+Do not edit `.local` runtime copies, claim to disable their loading, or override
+higher-priority rules or actual tool schemas. If a relevant conflict remains,
+report it before publication rather than using a fallback creation route.
+Determine Unified and Regression Guard adoption separately; prepare complete
+proposals without unnecessary ledger writes, then perform applicable execution
+admission before implementation. Preserve the dedicated follow-up route, parent/
+category linkage, batch and one-shot limits, standalone offer requirement and
+uncertain-outcome safeguards. No installation test may publish dummy tasks or
+consume the real follow-up opportunity.
+
+Current package identity and snapshot: `docs/validation/follow-up-tasks-pin.json`.
+Do not overlap existing/downstream tasks, repeat uncertain publication writes or
+fall back to general task creation. No independent reviewer is selected.

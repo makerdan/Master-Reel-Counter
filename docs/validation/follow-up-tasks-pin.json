@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "source": ".agents/skills/follow-up-tasks",
+  "safetyPackageSha256": "e8b956730577eddd0dc46d48f5c87b041e4047d5a47c83806ac8c34220e5aafe",
+  "snapshot": "docs/validation/follow-up-tasks-revisions/e8b956730577eddd0dc46d48f5c87b041e4047d5a47c83806ac8c34220e5aafe",
+  "selection": "AGENTS.md Follow-up task guidance; replit.md canonical source pointer",
+  "scope": "canonical definition, policy tests and instruction integration",
+  "hostPublicationVerified": false,
+  "nativeMutationsPerformed": false
+}

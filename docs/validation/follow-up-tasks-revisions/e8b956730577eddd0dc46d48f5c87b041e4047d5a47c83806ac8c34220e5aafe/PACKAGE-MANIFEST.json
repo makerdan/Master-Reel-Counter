@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "skillIdentity": "follow-up-tasks",
+  "revisionLabel": "proposal-completeness-and-canonical-selection",
+  "identityFiles": [
+    "SKILL.md",
+    "reference/installation-contract.md",
+    "tests/policy.test.mjs"
+  ],
+  "safetyPackageSha256": "e8b956730577eddd0dc46d48f5c87b041e4047d5a47c83806ac8c34220e5aafe",
+  "files": [
+    {
+      "path": "README.md",
+      "role": "explanatory",
+      "bytes": 2904,
+      "sha256": "972cb16124fed78c682eb631c50165f5b16a11619c55c2df0a935a4a67a21780"
+    },
+    {
+      "path": "REVISION-NOTES.md",
+      "role": "explanatory",
+      "bytes": 1811,
+      "sha256": "c0391ec7d855a6e7d38bc34e0f33e9cbb0377969e63ca6f7927f33f66bfb98a7"
+    },
+    {
+      "path": "SKILL.md",
+      "role": "normative",
+      "bytes": 15023,
+      "sha256": "514f3af715d7d9253d1efdbfb1226a056f73a1b4cc05e76540042da56a72550e"
+    },
+    {
+      "path": "reference/installation-contract.md",
+      "role": "normative",
+      "bytes": 4316,
+      "sha256": "5d0d86ae14799c9e47a42d1ecadb6c9276c90df826587cded85ae7057b476d5d"
+    },
+    {
+      "path": "tests/policy.test.mjs",
+      "role": "test",
+      "bytes": 7187,
+      "sha256": "86537d5f80cc5abfc4f348abfe5c08eccddba2c64c48c1d18b0dd01b9ddd1125"
+    }
+  ]
+}

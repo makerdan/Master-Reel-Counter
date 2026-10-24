@@ -96,5 +96,9 @@ not a tier PASS. No workspace-identity or machine-bound admission is required.
 Ordinary approval stays with the Agent; no custom native-host admission is allowed.
 Preserve dedicated host follow-up constraints while allowing complete unadmitted
 drafts; never invent payload fields or repeat uncertain publication writes.
+Before preparing follow-ups, read `.agents/skills/follow-up-tasks/SKILL.md` and
+`reference/installation-contract.md` within that package, selected in `AGENTS.md`.
+This customization complements platform guidance; higher-priority rules and live
+callback limits still govern. Never edit `.local` to select it.
 See `AGENTS.md`, `docs/validation/unified-installation.md` and
 `docs/validation/modular-migration.md` for the current runtime acceptance blocker.
