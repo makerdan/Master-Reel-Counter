@@ -41,8 +41,11 @@ import sharp from "sharp";
 import { randomUUID, randomBytes, createHash } from "crypto";
 import path from "path";
 import fs from "fs/promises";
+import { createReadStream } from "node:fs";
 import { PassThrough } from "stream";
-import { cropPhoto } from "./lib/cropPhoto";
+import {
+  acquireLabelScanSlot, LabelScanResourceError, prepareLabelScan, readBoundedScanImage,
+} from "./lib/labelScanResources";
 import ExcelJS from "exceljs";
 import { taskTracker } from "./lib/taskTracker";
 import {
@@ -2717,7 +2720,7 @@ export async function registerRoutes(
 
   const labelResultsCache = new Map<number, { results: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> }>();
 
-  async function loadPhotoBuffer(photoKey: string): Promise<Buffer> {
+  async function loadPhotoBuffer(photoKey: string, maxBytes?: number): Promise<Buffer> {
     const physicalPhotoKey = canonicalPhysicalObjectKey(photoKey);
     const photoFilename = physicalPhotoKey.startsWith("/uploads/") ? physicalPhotoKey.slice("/uploads/".length) : physicalPhotoKey.replace(/^\/+/, "");
     try {
@@ -2727,16 +2730,25 @@ export async function registerRoutes(
         new Promise<[boolean]>(resolve => setTimeout(() => { console.warn("[GCS] exists() timed out for photo key %s — treating as not found", photoKey); resolve([false]); }, 5000)),
       ]);
       if (existsInGcs) {
+        if (maxBytes !== undefined) {
+          return await readBoundedScanImage(gcsFile.createReadStream(), maxBytes);
+        }
         const [downloaded] = await gcsFile.download();
         return downloaded;
       }
-    } catch {}
+    } catch (error) {
+      if (error instanceof LabelScanResourceError) throw error;
+    }
+    if (maxBytes !== undefined) {
+      return readBoundedScanImage(createReadStream(path.join(UPLOADS_DIR, photoFilename)), maxBytes);
+    }
     return fs.readFile(path.join(UPLOADS_DIR, photoFilename));
   }
 
   app.post("/api/photos/:photoId/analyze-labels", isAuthenticated, cropAiRateLimiter, async (req: any, res) => {
     taskTracker.increment();
     let _sid: number | null = null;
+    let releaseScan: (() => void) | undefined;
     try {
       const photoId = parseInt(req.params.photoId);
       const photo = await storage.getPhoto(photoId);
@@ -2755,35 +2767,23 @@ export async function registerRoutes(
         return res.status(400).json({ message: `Too many pins: maximum ${MAX_PINS_PER_CROP_REQUEST} per request.` });
       }
 
-      const photoBuffer = await loadPhotoBuffer(photo.objectStorageKey);
-
-      let orientedBuffer = photoBuffer;
-      const manualRotation = (photo.rotation ?? 0) % 360;
-      let pipeline = sharp(photoBuffer).rotate();
-      if (manualRotation !== 0) {
-        pipeline = pipeline.rotate(manualRotation);
-      }
-      orientedBuffer = await pipeline.toBuffer();
+      releaseScan = acquireLabelScanSlot();
+      const prepared = await prepareLabelScan(
+        photo.sessionId,
+        pinData.map((pin: any) => ({ ...pin, photoId })),
+        async () => photo,
+        loadPhotoBuffer,
+      );
 
       const MAX_BATCH = 20;
       const allResults: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> = [];
-      let anyTruncated = false;
-      let totalSkipped = 0;
+      const anyTruncated = prepared.truncated;
+      const totalSkipped = prepared.skippedCount;
 
       for (let i = 0; i < pinData.length; i += MAX_BATCH) {
         const batch = pinData.slice(i, i + MAX_BATCH);
         try {
-          const { results: crops, truncated: batchTruncated, skippedCount } = await cropPhoto(orientedBuffer, batch.map((p: any) => ({
-            pinId: p.pinId,
-            x: p.x,
-            y: p.y,
-            zoomLevel: p.zoomLevel ?? 1,
-          })));
-          if (batchTruncated) {
-            anyTruncated = true;
-            totalSkipped += skippedCount;
-            console.warn(`[analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}, skipped=${skippedCount}`);
-          }
+          const crops = batch.map((pin: any) => prepared.crops.find((crop) => crop.pinId === pin.pinId)!).filter(Boolean);
 
           const imageMessages = crops.map((crop) => ({
             type: "image_url" as const,
@@ -2851,12 +2851,17 @@ export async function registerRoutes(
 
       res.json({ ...cacheEntry, truncated: anyTruncated, truncatedCount: totalSkipped });
     } catch (error) {
+      if (error instanceof LabelScanResourceError) {
+        if (error.statusCode === 429) res.setHeader("Retry-After", "5");
+        return res.status(error.statusCode).json({ message: error.message });
+      }
       if (error instanceof PoeProviderError) {
         return res.status(error.statusCode).json({ message: "Label analysis is temporarily unavailable", code: error.code });
       }
       console.error("Error analyzing labels:", error instanceof Error ? error.message : "unknown error");
       res.status(500).json({ message: "Failed to analyze labels" });
     } finally {
+      releaseScan?.();
       taskTracker.decrement();
       if (_sid !== null) taskTracker.endSession(_sid, "scan");
     }
@@ -2865,6 +2870,7 @@ export async function registerRoutes(
   app.post("/api/sessions/:sessionId/analyze-labels", isAuthenticated, cropAiRateLimiter, async (req: any, res) => {
     const _sid = parseInt(req.params.sessionId);
     taskTracker.increment();
+    let releaseScan: (() => void) | undefined;
     try {
       const sessionId = parseInt(req.params.sessionId);
       const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
@@ -2880,65 +2886,21 @@ export async function registerRoutes(
         return res.status(400).json({ message: `Too many pins: maximum ${MAX_PINS_PER_CROP_REQUEST} per request.` });
       }
 
-      const uniquePhotoIds = [...new Set(pinData.map((p: any) => p.photoId as number))];
-      const photoBufferMap = new Map<number, Buffer>();
-      for (const photoId of uniquePhotoIds) {
-        const photo = await storage.getPhoto(photoId);
-        if (!photo || photo.sessionId !== sessionId) continue;
-        const raw = await loadPhotoBuffer(photo.objectStorageKey);
-        const manualRotation = (photo.rotation ?? 0) % 360;
-        let pipeline = sharp(raw).rotate();
-        if (manualRotation !== 0) pipeline = pipeline.rotate(manualRotation);
-        photoBufferMap.set(photoId, await pipeline.toBuffer());
-      }
-
-      const allCropRequests: Array<{ photoId: number; pinId: number; pinLabel: string; x: number; y: number; zoomLevel: number }> = [];
-      for (const p of pinData) {
-        if (!photoBufferMap.has(p.photoId)) continue;
-        allCropRequests.push({
-          photoId: p.photoId,
-          pinId: p.pinId,
-          pinLabel: p.pinLabel || `P${String(p.pinId).padStart(3, "0")}`,
-          x: p.x,
-          y: p.y,
-          zoomLevel: p.zoomLevel ?? 1,
-        });
-      }
+      releaseScan = acquireLabelScanSlot();
+      const prepared = await prepareLabelScan(sessionId, pinData, (id) => storage.getPhoto(id), loadPhotoBuffer);
+      const allCropRequests = prepared.requests;
 
       const MAX_BATCH = 20;
       const allResults: Array<{ pinId: number; pinLabel: string; rawText: string | null; readable: boolean }> = [];
       const totalBatches = Math.ceil(allCropRequests.length / MAX_BATCH);
-      let anyTruncated = false;
-      let totalSkipped = 0;
+      const anyTruncated = prepared.truncated;
+      const totalSkipped = prepared.skippedCount;
 
       for (let i = 0; i < allCropRequests.length; i += MAX_BATCH) {
         const batch = allCropRequests.slice(i, i + MAX_BATCH);
         try {
-          const cropsByPhoto = new Map<number, typeof batch>();
-          for (const item of batch) {
-            if (!cropsByPhoto.has(item.photoId)) cropsByPhoto.set(item.photoId, []);
-            cropsByPhoto.get(item.photoId)!.push(item);
-          }
-
-          const crops: Array<{ pinId: number; base64: string }> = [];
-          for (const [photoId, items] of cropsByPhoto) {
-            const buf = photoBufferMap.get(photoId)!;
-            const { results: photoCrops, truncated: photoTruncated, skippedCount } = await cropPhoto(buf, items.map((it) => ({
-              pinId: it.pinId,
-              x: it.x,
-              y: it.y,
-              zoomLevel: it.zoomLevel,
-            })));
-            if (photoTruncated) {
-              anyTruncated = true;
-              totalSkipped += skippedCount;
-              console.warn(`[session-analyze-labels] cropPhoto output truncated at 50 MB for photoId=${photoId}, batch i=${i}, skipped=${skippedCount}`);
-            }
-            crops.push(...photoCrops);
-          }
-
           const cropOrder = batch.map((b) => b.pinId);
-          const orderedCrops = cropOrder.map((pid) => crops.find((c) => c.pinId === pid)!).filter(Boolean);
+          const orderedCrops = cropOrder.map((pid) => prepared.crops.find((c) => c.pinId === pid)!).filter(Boolean);
 
           const imageMessages = orderedCrops.map((crop) => ({
             type: "image_url" as const,
@@ -3004,12 +2966,17 @@ export async function registerRoutes(
 
       res.json({ results: allResults, totalBatches, truncated: anyTruncated, truncatedCount: totalSkipped });
     } catch (error) {
+      if (error instanceof LabelScanResourceError) {
+        if (error.statusCode === 429) res.setHeader("Retry-After", "5");
+        return res.status(error.statusCode).json({ message: error.message });
+      }
       if (error instanceof PoeProviderError) {
         return res.status(error.statusCode).json({ message: "Label analysis is temporarily unavailable", code: error.code });
       }
       console.error("Error analyzing session labels:", error instanceof Error ? error.message : "unknown error");
       res.status(500).json({ message: "Failed to analyze labels" });
     } finally {
+      releaseScan?.();
       taskTracker.decrement();
       taskTracker.endSession(_sid, "scan");
     }

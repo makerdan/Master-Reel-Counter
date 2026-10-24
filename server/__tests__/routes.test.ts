@@ -7,6 +7,154 @@ import
 
 import assert from "node:assert/strict"
 ;
+import sharp from "sharp";
+import { Readable } from "node:stream";
+import {
+  acquireLabelScanSlot,
+  LABEL_SCAN_LIMITS,
+  LabelScanResourceError,
+  prepareLabelScan,
+  readBoundedScanImage,
+} from "../lib/labelScanResources";
+import { cropPhoto } from "../lib/cropPhoto";
+
+describe("label scan resource boundaries", () => {
+  const pin = (photoId: number, pinId = photoId) => ({
+    photoId, pinId, x: 50, y: 50, zoomLevel: 1,
+  });
+  const photo = (id: number) => Promise.resolve({
+    sessionId: 7, objectStorageKey: String(id), rotation: 0,
+  });
+  const isOversized = (error: unknown) =>
+    error instanceof LabelScanResourceError && error.statusCode === 413;
+
+  test("bounded reads accept the exact limit and reject actual overflow without trusting metadata", async () => {
+    const exact = Readable.from([Buffer.alloc(4, 1), Buffer.alloc(4, 2)]);
+    assert.equal((await readBoundedScanImage(exact, 8)).length, 8);
+    assert.equal(exact.destroyed, true);
+    const overflow = Readable.from([Buffer.alloc(4), Buffer.alloc(5), Buffer.alloc(1)]);
+    await assert.rejects(readBoundedScanImage(overflow, 8), isOversized);
+    assert.equal(overflow.destroyed, true);
+    const broken = new Readable({ read() { this.destroy(new Error("download failed")); } });
+    await assert.rejects(readBoundedScanImage(broken, 8), /download failed/);
+    assert.equal(broken.destroyed, true);
+  });
+
+  test("scan slot rejects overlap, releases on error, and stale release cannot unlock another scan", async () => {
+    const release = acquireLabelScanSlot();
+    try {
+      assert.throws(acquireLabelScanSlot, (error: unknown) =>
+        error instanceof LabelScanResourceError && error.statusCode === 429);
+      await assert.rejects((async () => {
+        try {
+          await prepareLabelScan(7, [pin(1)], photo, async () => { throw new Error("failed"); });
+        } finally {
+          release();
+        }
+      })(), /failed/);
+      const nextRelease = acquireLabelScanSlot();
+      try {
+        release();
+        assert.throws(acquireLabelScanSlot, /Another label scan/);
+      } finally {
+        nextRelease();
+      }
+    } finally {
+      release();
+    }
+    acquireLabelScanSlot()();
+  });
+
+  test("normal scans crop sequentially, preserve coordinates and rotation, and exclude foreign/missing photos", async () => {
+    const input = await sharp({
+      create: { width: 80, height: 40, channels: 3, background: "#ffaa00" },
+    }).png().toBuffer();
+    const pins = [pin(2, 20), pin(1, 10), pin(2, 21), pin(3, 30), pin(4, 40)];
+    const loads: string[] = [];
+    const prepared = await prepareLabelScan(7, pins, async (id) => id === 4 ? undefined : ({
+      sessionId: id === 3 ? 8 : 7, objectStorageKey: String(id), rotation: id === 2 ? 90 : 0,
+    }), async (key, remaining) => {
+      loads.push(key);
+      assert.equal(remaining, LABEL_SCAN_LIMITS.inputBytes - (loads.length - 1) * input.length);
+      return input;
+    });
+    assert.deepEqual(loads, ["2", "1"]);
+    assert.deepEqual(prepared.requests.map((item) => item.pinId), [20, 10, 21]);
+    assert.equal(prepared.crops.length, 3);
+    const oriented = await sharp(input).rotate(90).toBuffer();
+    const expected = await cropPhoto(oriented, [pin(2, 20)]);
+    assert.equal(prepared.crops.find((crop) => crop.pinId === 20)?.base64, expected.results[0].base64);
+    const metadata = await sharp(Buffer.from(prepared.crops[0].base64, "base64")).metadata();
+    assert.equal(metadata.width, 40);
+    assert.equal(metadata.height, 80);
+    assert.equal(prepared.truncated, false);
+    assert.equal(prepared.skippedCount, 0);
+  });
+
+  test("pixel bombs are rejected from headers before decoding and before loading subsequent photos", async () => {
+    // SVG headers safely exercise dimensions without allocating a huge raster.
+    const bomb = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200000" height="200000"/>');
+    let loads = 0;
+    await assert.rejects(prepareLabelScan(7, [pin(1), pin(2)], photo, async () => {
+      loads++;
+      return bomb;
+    }), isOversized);
+    assert.equal(loads, 1);
+  });
+
+  test("aggregate pixels are limited even when each individual compressed photo is allowed", async () => {
+    const image = await sharp({
+      create: { width: 4000, height: 3500, channels: 3, background: "#aaa" },
+    }).png().toBuffer();
+    assert.ok(image.length < 1024 * 1024);
+    await assert.rejects(prepareLabelScan(7, [pin(1), pin(2), pin(3)], photo,
+      async () => image), isOversized);
+  });
+
+  test("aggregate actual input bytes are enforced even for small images with large trailing data", async () => {
+    const image = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#aaa" },
+    }).jpeg().toBuffer();
+    const padded = Buffer.alloc(LABEL_SCAN_LIMITS.inputBytes / 2 + 1);
+    image.copy(padded);
+    const budgets: number[] = [];
+    await assert.rejects(prepareLabelScan(7, [pin(1), pin(2)], photo, async (_key, remaining) => {
+      budgets.push(remaining);
+      return padded;
+    }), isOversized);
+    assert.deepEqual(budgets, [LABEL_SCAN_LIMITS.inputBytes, LABEL_SCAN_LIMITS.inputBytes - padded.length]);
+  });
+
+  test("retained AI crops have a separate payload budget", async () => {
+    const image = await sharp(randomBytes(600 * 600 * 3), {
+      raw: { width: 600, height: 600, channels: 3 },
+    }).png().toBuffer();
+    await assert.rejects(prepareLabelScan(7,
+      Array.from({ length: 50 }, (_, index) => pin(1, index)),
+      photo, async () => image), isOversized);
+  });
+
+  test("both production scan routes acquire before preparation, reject resource failures, and always release", () => {
+    const source = readFileSync("server/routes.ts", "utf8");
+    for (const route of ["/api/photos/:photoId/analyze-labels", "/api/sessions/:sessionId/analyze-labels"]) {
+      const start = source.indexOf(`app.post("${route}"`);
+      assert.ok(start > 0);
+      const end = source.indexOf("\n  app.", start + 1);
+      const handler = source.slice(start, end);
+      const slot = handler.indexOf("releaseScan = acquireLabelScanSlot()");
+      const prepare = handler.indexOf("await prepareLabelScan(");
+      const provider = handler.indexOf("getPoeProvider().completeVision(");
+      assert.ok(slot > handler.indexOf("verifySessionAccess("));
+      assert.ok(prepare > slot && provider > prepare);
+      assert.match(handler, /error instanceof LabelScanResourceError/);
+      assert.match(handler, /return res\.status\(error\.statusCode\)/);
+      assert.match(handler, /finally \{\s+releaseScan\?\.\(\);/);
+      assert.doesNotMatch(handler, /photoBufferMap|loadPhotoBuffer\(photo\.objectStorageKey\)/);
+    }
+    assert.match(source, /readBoundedScanImage\(gcsFile\.createReadStream\(\), maxBytes\)/);
+    assert.match(source, /readBoundedScanImage\(createReadStream\(path\.join\(UPLOADS_DIR, photoFilename\)\), maxBytes\)/);
+  });
+});
 
 import 
 {
@@ -15,7 +163,7 @@ import
  from "node:fs"
 ;
 
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import type { TestContext } from "node:test";
 import { execFileSync } from "node:child_process";
 

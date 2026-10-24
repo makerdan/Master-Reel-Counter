@@ -1,0 +1,28 @@
+{
+  "claim": "bounded-session-label-scans",
+  "title": "Bound label scan image resources",
+  "scope": "Assigned security repair: bound actual photo download bytes, image pixels and aggregate session scan resources; prepare crops one photo at a time rather than retaining all oriented photos; share a process-wide nonqueued scan slot across photo and session endpoints; preserve authorization, crop coordinates, AI batching and persistence. No upload or UI changes.",
+  "tier": "test-standard",
+  "why": "Backend image processing and route integration require unit regression coverage plus compiler checks.",
+  "coverage": "docs/validation/manifest.json test-standard typecheck and unit-tests run server/__tests__/routes.test.ts including the image resource boundary tests; existing lint and runtime contracts remain included.",
+  "approval": {
+    "reference": "Assigned task 993 in the active conversation",
+    "direction": "Patch resource exhaustion in session label scanning without new product flows",
+    "applicability": "Security hardening and regression coverage within assigned scope; no independent verification selected"
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {"requirement": "R1 bounded reads", "check": "Stream readers reject actual bytes exceeding the remaining budget and destroy the stream, including missing or inaccurate metadata."},
+    {"requirement": "R2 image and aggregate budgets", "check": "Real Sharp fixtures reject excessive dimensions, aggregate pixels and bytes before provider work; ordinary oriented crops retain order and dimensions."},
+    {"requirement": "R3 lifecycle and integration", "check": "Production scan preparation loads one photo at a time, ignores foreign-session photos, and rejects over-budget scans; shared slot rejects overlap and releases idempotently after errors. Both routes use the protected preparation and release slot in finally."}
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Repairs authenticated denial of service through unbounded retained images and overlapping native processing.",
+    "covers": "R1 unbounded photo reads; R2 decompression and aggregate scan memory; R3 concurrent scans and resource leaks",
+    "testLocation": "server/__tests__/routes.test.ts and server/lib/labelScanResources.ts",
+    "assertion": "Bounded stream fixtures assert rejection and destruction, Sharp image fixtures assert early pixel and aggregate budget failures, production preparation fixtures assert crop ordering and foreign-session exclusion, and slot fixtures assert overlap rejection and release on failure. Route wiring assertions cover both protected endpoints."
+  }
+}

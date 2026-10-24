@@ -53,3 +53,4 @@
 - [Nested Node test runners](nested-node-test-runners.md) — inherited runner context can silently return success without running nested tests; isolate the child context.
 - [Indexed source-map fixtures](indexed-source-map-fixtures.md) — separate offset rejection from indexed-consumer helper quirks when testing valid map serialization.
 - [Process-fixture zombie detection](process-fixture-zombie-detection.md) — on minimal Linux containers, a killed orphan can remain as a zombie; distinguish that from a live process and check its port separately.
+- [Validation document fingerprints](validation-document-fingerprints.md) — finish handoff documents before validation; documentation edits during a run invalidate its target fingerprint.

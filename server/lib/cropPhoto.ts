@@ -23,12 +23,14 @@ const MAX_ZOOM = 1.0;
 const MAX_CROP_PX = 600;
 
 const MAX_OUTPUT_BYTES = 50 * 1024 * 1024;
+// Explicitly cap native decode, including callers outside the session scanner.
+const MAX_INPUT_PIXELS = 20_000_000;
 
 export async function cropPhoto(
   photoBuffer: Buffer,
   pins: CropRequest[]
 ): Promise<CropPhotoResult> {
-  const metadata = await sharp(photoBuffer).metadata();
+  const metadata = await sharp(photoBuffer, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
   const imgWidth = metadata.width!;
   const imgHeight = metadata.height!;
 
@@ -62,9 +64,10 @@ export async function cropPhoto(
     if (left + cropW > imgWidth) left = imgWidth - cropW;
     if (top + cropH > imgHeight) top = imgHeight - cropH;
 
-    const croppedBuffer = await sharp(photoBuffer)
+    const croppedBuffer = await sharp(photoBuffer, { limitInputPixels: MAX_INPUT_PIXELS })
       .extract({ left, top, width: cropW, height: cropH })
       .jpeg({ quality: 85 })
+      .timeout({ seconds: 10 })
       .toBuffer();
 
     accumulatedBytes += croppedBuffer.length;
