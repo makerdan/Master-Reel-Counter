@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { invariant, pins, readRegistry, taskState, tierDefinition, TIERS, mergeGuard, git } from "./lib/unified-gate/store.mjs";
-import { provision, amend, guard, restorePlan, cancel, catalog, baselineWarnings } from "./lib/unified-gate/plans.mjs";
+import { provision, amend, guard, restorePlan, cancel, catalog, baselineWarnings, prepareDraft } from "./lib/unified-gate/plans.mjs";
 import { run, classificationLog } from "./lib/unified-gate/execution.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -26,6 +26,7 @@ try {
   invariant(!process.env.TASK_ID || !id || process.env.TASK_ID === id, "TASK_ID context mismatch");
   let result;
   switch (operation) {
+    case "draft": result = prepareDraft(root, input()); break;
     case "new": result = await provision(root, input(), option("resume")); break;
     case "amend": result = await amend(root, id, input(), option("reason")); break;
     case "guard": {
@@ -53,12 +54,19 @@ try {
     case "status": {
       const registry = readRegistry(root); mergeGuard(root, registry);
       for (const name of TIERS) tierDefinition(root, name);
+      const historicalBlockers = [];
       for (const record of Object.values(registry.tasks)) {
         const state = taskState(record); pins(root, state.pin);
-        if (state.status === "sealed") guard(root,
-          { id: state.id, tier: state.tier, planFile: state.planPath }, registry);
+        if (state.status === "sealed") {
+          try { guard(root, { id: state.id, tier: state.tier, planFile: state.planPath }, registry); }
+          catch (error) { historicalBlockers.push({ id: state.id, reason: error.message }); }
+        }
       }
-      result = { status: "READY", check: "gate setup status, not a tier PASS", pin: pin.current,
+      result = { status: historicalBlockers.length || (pin.schemaVersion === 2 && pin.acceptance?.state !== "OBSERVED") ? "BLOCKED" : "READY",
+        historicalBlockers,
+        runtimeAcceptance: pin.acceptance ?? "historical single-file contract",
+        nativeAuthorizationObservation: "NOT_OBSERVED",
+        check: "gate setup status, not a tier PASS", pin: pin.current,
         tasks: Object.keys(registry.tasks).length, baselines: catalog(root).records.length,
         localHooks: git(root, ["config", "--get", "core.hooksPath"], true).stdout.trim() === ".githooks"
           ? "configured at .githooks" : "not configured in this clone",
@@ -66,10 +74,11 @@ try {
           "local sealed-plan and assigned-tier checks only; Agent tracks native approval, cancellation and scope; platform actions are not intercepted" };
       break;
     }
-    default: throw new Error("supported operations: new, amend, guard, restore-plan, cancel, run, classify, merge-guard, baseline-warnings, status");
+    default: throw new Error("supported operations: draft, new, amend, guard, restore-plan, cancel, run, classify, merge-guard, baseline-warnings, status");
   }
   console.log(JSON.stringify(result, null, 2));
   if (operation === "run" && result.state !== "PASS") process.exitCode = 1;
+  if (operation === "status" && result.status === "BLOCKED") process.exitCode = 2;
 } catch (error) {
   console.error(JSON.stringify({ state: "BLOCKED", check: operation, reason: error.message }));
   process.exitCode = 2;

@@ -10,7 +10,7 @@ import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import { emptyRegistry, readRegistry, taskState, pins, hash, TIERS, compareRegistry,
   mergeGuard, withWriter, validateRegistry, git } from "../lib/unified-gate/store.mjs";
-import { provision, amend, guard, restorePlan, cancel, classifyFailure,
+import { provision, amend, guard, restorePlan, cancel, classifyFailure, prepareDraft,
   baselineWarnings } from "../lib/unified-gate/plans.mjs";
 import { run, classificationLog } from "../lib/unified-gate/execution.mjs";
 
@@ -60,6 +60,89 @@ function spec(tier = "test-fast") {
       applicability: "This approval covers this fixture specification and its selected tier." },
     assertions: [{ requirement: "Reject unauthorized validation", check: "Bound fixture probe and guard assertions" }] };
 }
+function modular(root, observed = true) {
+  const pinPath = "docs/validation/unified-pin.json";
+  const pin = JSON.parse(readFileSync(join(root, pinPath)));
+  const packagePath = ".agents/skills/failure-gate-unified";
+  cpSync(join(project, packagePath), join(root, packagePath), { recursive: true });
+  const current = JSON.parse(readFileSync(join(project, pinPath))).current;
+  const directory = `docs/validation/unified-revisions/${current}`;
+  cpSync(join(project, packagePath), join(root, directory), { recursive: true });
+  write(root, pinPath, { ...pin, schemaVersion: 2, current,
+    acceptance: { state: observed ? "OBSERVED" : "NOT_OBSERVED",
+      evidence: "Disposable fixture only, not actual host acceptance" },
+    revisions: { ...pin.revisions, [current]: { kind: "normative-package", directory } } });
+}
+function modularSpec() {
+  return { ...spec(), claim: "stable-fixture-local-claim",
+    regressionGuard: "Normal: changed reference must block admission; contract tamper fixture asserts rejection before workload." };
+}
+test("modular draft is read-only without approval or admission capability; denied admission consumes no ID", async (t) => {
+  const root = fixture(t);
+  modular(root, false);
+  const before = readFileSync(join(root, "docs/validation/unified-registry.json"), "utf8");
+  const input = modularSpec(); delete input.approval;
+  const draft = prepareDraft(root, input);
+  assert.equal(draft.status, "UNADMITTED_NATIVE_DRAFT");
+  assert.match(draft.plan, /Regression Guard/);
+  assert.doesNotMatch(draft.plan, /strictly bound|TASK_ID=UNADMITTED/);
+  assert.equal(existsSync(join(root, ".local")), false);
+  await assert.rejects(provision(root, modularSpec()), /NOT_OBSERVED/);
+  assert.equal(readFileSync(join(root, "docs/validation/unified-registry.json"), "utf8"), before);
+  assert.equal(existsSync(join(root, ".local")), false);
+});
+test("full modular pin detects core, each reference, and snapshot tampering; historical seals are unchanged", async (t) => {
+  const root = fixture(t);
+  const old = await provision(root, spec());
+  const original = JSON.stringify(readRegistry(root));
+  modular(root);
+  assert.equal(guard(root, ctx(old)).planHash, old.planHash);
+  assert.equal(JSON.stringify(readRegistry(root)), original);
+  const pin = pins(root);
+  for (const name of ["SKILL.md", "references/gate-maintenance.md", "references/planning-and-publication.md"]) {
+    for (const directory of [".agents/skills/failure-gate-unified", pin.revisions[pin.current].directory]) {
+      const path = join(root, directory, name);
+      const bytes = readFileSync(path);
+      writeFileSync(path, Buffer.concat([bytes, Buffer.from("\nchanged")]));
+      assert.throws(() => pins(root), /normative contract mismatch/);
+      writeFileSync(path, bytes);
+    }
+  }
+});
+test("modular local claims reconcile retries without duplicate IDs and run via CLI and exported API without native evidence", async (t) => {
+  const root = fixture(t); modular(root);
+  const input = modularSpec();
+  const state = await provision(root, input);
+  assert.equal((await provision(root, input)).id, state.id);
+  await assert.rejects(provision(root, { ...input, scope: "Different local work" }), /different work/);
+  assert.equal(readRegistry(root).tombstones.length, 1);
+  assert.equal(cli(root, ["run", "--id", state.id, "--tier", state.tier], state).status, 0);
+  assert.equal(exportedRunWithoutHostIntegration(root, state).status, 0);
+  const denied = exportedRunWithoutHostIntegration(root, state, "test-heavy");
+  assert.equal(denied.status, 2);
+  assert.match(denied.stderr, /wrong tier/);
+});
+test("modular interrupted and concurrent claim retries preserve exactly one identity", async (t) => {
+  const root = fixture(t); modular(root);
+  const input = modularSpec();
+  // Controlled generation failure after durable reservation.
+  mkdirSync(join(root, ".local"), { recursive: true });
+  writeFileSync(join(root, ".local/tasks"), "blocks generation");
+  await assert.rejects(provision(root, input));
+  const reserved = readRegistry(root).tombstones[0];
+  rmSync(join(root, ".local/tasks"));
+  const resumed = await provision(root, input);
+  assert.equal(resumed.id, reserved);
+  write(root, "spec.json", input);
+  const launch = () => {
+    const child = spawn(process.execPath, ["scripts/unified-gate.mjs", "new", "--spec", "spec.json"],
+      { cwd: root, env: { PATH: process.env.PATH }, stdio: ["ignore", "pipe", "pipe"] });
+    return once(child, "exit");
+  };
+  const results = await Promise.all([launch(), launch()]);
+  assert.ok(results.every(([code]) => code === 0));
+  assert.equal(readRegistry(root).tombstones.length, 1);
+});
 const ctx = (s) => ({ id: s.id, tier: s.tier, planFile: s.planPath });
 function current(root, id) { return taskState(readRegistry(root).tasks[id]); }
 function cli(root, args, state) {

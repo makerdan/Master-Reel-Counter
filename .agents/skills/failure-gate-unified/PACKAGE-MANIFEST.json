@@ -1,15 +1,46 @@
 {
+  "schemaVersion": 1,
   "skill": "failure-gate-unified",
-  "source": ".agents/skills/failure-gate-unified/SKILL.md",
-  "scope": "Unmodified canonical source available in this conversation; packaging does not install or activate it.",
-  "files": {
-    "SKILL.md": {
-      "bytes": 22993,
-      "sha256": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22"
+  "revision": "modular-core-and-required-references",
+  "sourcePreviewSha256": "a801266bfe3f0bd5db2762340224a4f731208720c68d67adadd5850077addb98",
+  "canonicalSkillSha256": "c71feec63190ee1d729b1e3efa6290ddeb26467b0fd955143a1742ac2e4cf9a2",
+  "normativeFiles": [
+    "SKILL.md",
+    "references/gate-maintenance.md",
+    "references/planning-and-publication.md"
+  ],
+  "normativeContractSha256": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+  "normativeContractEncoding": "UTF-8; sorted relative path + NUL + lowercase file SHA-256 + LF per normative file",
+  "files": [
+    {
+      "path": "README.md",
+      "role": "explanatory",
+      "bytes": 2934,
+      "sha256": "f63d9da4b4a57b0b2af84f60b31aa6c8bbcc249419d5b3d381ceccfe9eb6e5b3"
     },
-    "application-prompt.txt": {
-      "bytes": 2949,
-      "sha256": "d2cd19e771afdfa74d50c0d5e68d1894e5dfb3c2e0423422df1598d04d6bc98d"
+    {
+      "path": "REVISION-NOTES.md",
+      "role": "explanatory",
+      "bytes": 3529,
+      "sha256": "e542e0f0ea149e11079fc2a65d3993797c7490fadc12df1611358191e4d268b3"
+    },
+    {
+      "path": "SKILL.md",
+      "role": "normative",
+      "bytes": 22639,
+      "sha256": "c71feec63190ee1d729b1e3efa6290ddeb26467b0fd955143a1742ac2e4cf9a2"
+    },
+    {
+      "path": "references/gate-maintenance.md",
+      "role": "normative",
+      "bytes": 5183,
+      "sha256": "878a7d9571463248ab25a930b51cc380ad299c48d2e213f2b8eedb763019f8eb"
+    },
+    {
+      "path": "references/planning-and-publication.md",
+      "role": "normative",
+      "bytes": 6296,
+      "sha256": "4fcc07ee9d8ace731bd0ef095fde5475fe24c52093c684a43c014cbbc5fa43e5"
     }
-  }
+  ]
 }

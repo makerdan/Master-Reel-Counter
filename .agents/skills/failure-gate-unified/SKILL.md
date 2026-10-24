@@ -15,19 +15,77 @@ before work is declared complete. It bridges repositories with legacy failures
 and technical debt with disciplined execution: no unmonitored test runs,
 unauthorized validation-tier escalation, or silent failures.
 
-Apply it to every task plan and validation execution in a project that adopts
-Failure Gate Unified. Govern both phases:
+Apply it to task planning and validation in adopting projects:
 
-1. **Plan time:** provision a transactional task ID, inspect the baseline
-   catalog, establish known failures, and bind one validation tier.
-2. **Execution time:** run only the bound tier and classify failures using the
-   catalog and available evidence.
+1. **Proposal:** prepare a complete, explicitly unadmitted native draft without ledger writes.
+2. **Execution admission:** before implementation or validation, provision or reuse
+   the unique local identity, inspect baselines, bind one adequate tier, seal and guard.
+3. **Validation:** run the bound workload and classify failures from available evidence.
 
 If the project's required provisioning, binding, or runner protections are
 missing or broken, do not simulate them manually or claim the gate is enforced.
 Name the exact failing check and the smallest fix. When the gate itself is
 missing, incomplete or broken, follow "Installing, updating and repairing the
 gate" below.
+
+## Required references
+
+The linked references are normative parts of this skill, not optional examples.
+Read each in full when its stated trigger applies. If a required reference is
+missing or unreadable, report the affected operation as blocked rather than
+reconstructing its rules. Core and references form one revisioned contract;
+see Gate maintenance for package-aware revision pinning.
+
+## Project discovery and adaptation
+
+Keep the guarantees in this contract fixed; adapt their implementation to the
+host project rather than copying another project's architecture. Before installation
+or workflow changes, inspect and document these mappings in ordinary project guidance:
+
+- Canonical source and revision pin, baseline catalog and tier definitions.
+- Actual draft-publication, provisioning, guarding, amendment, execution and
+  maintenance routes, including each environment's read/write capabilities.
+- Generated-state locations, retention limits, historical formats and supported recovery.
+- Each tier's real command, coverage, dependencies, availability and finite timeout.
+- Adopted companion skills and any shared validation targets or output resources.
+
+This mapping is implementation documentation, not another approval receipt or
+admission authority. Reuse supported project mechanisms. Script names and invocation
+examples do not require a particular language, package manager, host service or
+remote ledger. Preserve the contract's tier identifiers and baseline declarations;
+workloads, storage mechanisms and supported tool routes are project-specific.
+
+Apply companion requirements when those skills are adopted or otherwise explicitly
+required. Do not automatically install Regression Guard, Port Authority, CI or
+follow-up infrastructure because another project used it. Existing adopted controls
+remain binding. Definition installation, executable enforcement and observed
+acceptance are distinct outcomes; report which was actually delivered.
+
+## Authorization and local enforcement boundary
+
+Ordinary applicable task approval authorizes the Agent's work within its actual
+scope and applicable revision. The Agent respects approval, cancellation, closure,
+supersession and scope changes. Start, a local guard PASS or a workload PASS is
+not independent approval. Stop affected work when actual permission is absent,
+uncertain, withdrawn or exceeded; ask only for genuinely uncovered decisions.
+
+The local gate validates sealed plans and local context and supervises the assigned
+workload. It neither authenticates native task state nor intercepts platform actions.
+Under no circumstances install, integrate, add, restore or enable custom native-host
+admission for Unified, including optional or dormant adapters, hooks, plugins,
+wrappers, callbacks, receipts or indirect dependencies that independently verify
+native lifecycle, approval, revision or association to authorize or veto local work.
+The prohibition follows function, not name or location. Do not propose such an
+integration as an upgrade, repair, compatibility fix or prerequisite. Ordinary Agent
+use of supported native tools, publication bookkeeping and local seal checks remain allowed.
+
+Neither CLI, exported runner nor another supported dispatch route may require that
+integration or return an equivalent native-integration-unavailable denial after valid
+local checks. Do not replace it with an environment override, caller-supplied approved
+flag, fabricated receipt or fixture callback. If a local result includes native
+authorization observation, report NOT_OBSERVED, not an authorization verdict.
+Native references are association/retry metadata, not Unified IDs or approval proof;
+do not require a reference before native creation.
 
 ## Non-negotiable contract
 
@@ -42,7 +100,7 @@ gate" below.
   concurrency. Preserve consumed reservations after partial provisioning
   failures; do not reissue them or expose partially provisioned tasks as
   admitted. A supported retry may finish the same reservation for the same
-  task, but must not assign it to different work. Publish only after generation,
+   task, but must not assign it to different work. Publish admitted plans only after generation,
   single-tier binding, complete declarations and sealed-plan guards succeed.
   The storage and transaction mechanism remain project-specific.
 - Random, collision-resistant IDs (such as UUIDs) satisfy uniqueness without a
@@ -63,11 +121,10 @@ gate" below.
   its registered tier. All other tiers must block the ID.
 - Every tier change, including escalation or downgrade, must use the project's
   supported plan-and-binding amendment mechanism. Record the old/new tier,
-  rationale and coverage evidence; re-seal and re-guard before execution. The
-  Agent remains responsible for ensuring ordinary task approval covers the
-  change; the local gate does not verify host approval. Reject unsupported
-  changes. Never silently switch tiers, lower coverage to avoid a failure/resource
-  limit, or assume that this provision grants permission to downgrade.
+  rationale and coverage evidence; re-seal, re-guard and satisfy the applicable
+  approval policy before execution. Reject unsupported changes. Never silently
+  switch tiers, lower coverage to avoid a failure/resource limit, or assume
+  that this provision grants permission to downgrade.
 
 ### Baseline source and task metadata
 
@@ -104,186 +161,102 @@ run, including isolated task environments when the host uses them.
 
 ## Installing, updating and repairing the gate
 
-The gate cannot admit changes to itself. Installing, completing, updating and
-repairing it is gate work. Gate work is done outside task admission on an
-authentic owner instruction, visible in the active conversation or verifiable
-in project records. No separate specification, reviewer, bootstrap route or
-task is required. All gate work:
-
-- is limited to gate scripts, gate policy and the skill revision pin, tier
-  definitions, the baseline catalog's structure, gate tests, the plan renderer
-  and guards, and gate instructions;
-- does not mint task IDs, edit or drop ledger records, tombstones or tier
-  bindings, reset the ledger, change application code, or add baseline entries
-  without evidence;
-- verifies itself with the gate's own tests, reported as setup or maintenance
-  checks, never as a tier PASS;
-- ends when the provisioner, single-tier binding, plan guards and bound-tier
-  runner work. The next implementation plan uses normal admission.
-
-### Skill revision pin
-
-The project records which revision of this skill is current, using a content
-fingerprint of the canonical skill file (for example, a SHA-256 hash) or an
-equivalent supported mechanism. Gate operations stop when the canonical file
-does not match the pin. Each task records the revision it was sealed under and
-is checked against that revision; a later pin update does not invalidate it.
-New tasks use the current pin. Apply a newer revision to an existing task only
-through a supported amendment.
-
-### Installing or completing the gate
-
-- Install this skill at the project's canonical skill location and record its
-  pin.
-- Retire older Failure Gate skills, instructions, hooks and scripts so exactly
-  one gate is active. Keep old reports and records as history, labelled as not
-  instructions. Do not merge older rules into Unified.
-- Define the four tiers from the project's actual checks. The owner approves
-  the workloads; a tier with no meaningful workload is reported, not invented.
-- Tasks created under an older gate keep their original IDs and records. Do not
-  rebind them; finish, cancel or close them under their original rules or by
-  owner direction.
-
-### Updating this skill
-
-Replace the canonical skill file as a whole and update the pin in the same
-change. In-flight tasks keep the revision they were sealed under.
-
-### Repairing the gate
-
-When admission or a plan guard fails:
-
-1. Find the exact failing check and its cause from current code, policy and
-   records. Retrieve evidence yourself; do not ask for original receipts.
-2. If the cause is task-specific, such as a wrong tier, a changed plan, stale
-   task context or an unmatched baseline, fix it through the supported plan,
-   amendment or retry route.
-3. If the gate's own code, policy, pin, renderer or instructions are missing or
-   defective, repair them as gate work under an owner instruction.
-4. Without that owner instruction, mark the task `BLOCKED`, name the failing
-   check and the smallest fix, and ask once for the instruction. Do not ask
-   again for work already authorized, and do not substitute a generic request
-   to "restore authority."
-
-Record what changed and what was verified in the project's records without
-exposing credentials. Gate work does not rebind tasks, waive a tier or turn
-historical results into a fresh validation PASS.
+Before installing, completing, updating or repairing the gate, read
+[Gate maintenance](references/gate-maintenance.md) in full. It is a required part
+of this contract: it defines owner-directed maintenance outside task admission,
+its limits, revision pinning, historical preservation and the repair decision path.
+The exception does not admit application work included in a mixed request.
 
 ## Plan-time procedure
 
-Preparation and generated stubs are not publication of an implementation task.
-Complete the following before proposing or publishing the plan. Follow the
-supported provisioner's input order, including supplying a tier/specification
-upfront when required; do not impose an impossible "no headings before a plan"
-sequence.
-
-1. **Establish scope and coverage.** Inspect the requested change, current
-   tier definitions and actual workloads. Choose the lightest adequate
-   registered tier and identify its supported invocation. Distinguish tier
-   registration, adequate coverage and current execution availability. An
-   unavailable required tier is not permission to select an inadequate one;
-   record any execution blocker without misrepresenting plan readiness.
-2. **Inspect the baseline catalog.** Read and validate
-   `docs/validation/failure-baseline.json`; look for exact suite, test, and
-   signature matches. Missing, unreadable or malformed data is not an empty
-   catalog and must not be reported as "None known." Resolve that prerequisite
-   through the supported route before declaring baseline admission complete.
-3. **Provision and bind safely.** Use the verified project script to mint the
-   unique ID and generate its plan/stubs with exactly one selected tier bound
-   through the supported mechanism. Do not fabricate an ID or binding.
-4. **Complete baseline declarations.** Include the following section in every plan,
-   including when no failures are known:
-
-   ```markdown
-   ## Pre-existing failures to ignore
-   None known at plan time. Treat every failure as a potential regression.
-
-   **Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.
-   ```
-
-   Replace the default statement with the exact known issues and their required
-   `**Ignored baseline:**` or `**Owned baseline repair:**` labels when
-   applicable. Do not treat a retry, by itself, as proof that a failure
-   predates the task. Use "None known" only after successful catalog inspection
-   establishes no applicable known entries, not when inspection is unavailable.
-5. **Complete, seal and guard.** Fill in scope, baseline declarations and the
-   validation section, then seal through the project's supported mechanism.
-   Run local plan guards against that revision and resolve admission errors.
-
-Before proposing or publishing an implementation task, confirm the provisioner
-generated its unique ID, exactly one adequate registered tier is bound, baseline
-declarations are complete, and the sealed plan passes local plan guards.
-A diagnostic or prerequisite record is not an admitted implementation plan.
-
-Every plan must include this section, naming exactly one authorized tier:
-
-```markdown
-## Validation
-**Command:** `test-standard`
-**Why:** <one-line reason this tier covers the task>
-**Coverage evidence:** <current tier definition/workload reference and supported invocation>
-**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.
-```
-
-Replace `test-standard` with the chosen registered tier. Keep the rationale
-specific to the task.
+Before drafting, publishing, admitting or proposing follow-up work, read
+[Planning and publication](references/planning-and-publication.md) in full.
+It is a required part of this contract, including the exact baseline and tier
+sections, safe provisioning order, unknown-write reconciliation and real host
+follow-up constraints. A complete UNADMITTED_NATIVE_DRAFT may be published;
+implementation and validation must wait for execution admission.
 
 ## Approval, revisions and amendments
 
-Ordinary task approval under the host's normal workflow authorizes the Agent's
-work. The Agent is responsible for confirming that approval covers the requested
-scope, honoring cancellation or supersession, and tracking material scope changes.
-Do not add a native-host lifecycle, approval, revision or task-association
-integration as a prerequisite for local gate use. The gate does not independently
-verify native task state.
+A guard PASS establishes plan validity, not permission to implement. Ordinary
+task approval remains the authorization for the Agent's work on the covered
+scope and revision. The Agent respects that boundary; the gate does not require
+independent native-approval evidence or a second approval mechanism.
 
-The local plan may retain an approval reference and scope notes. Those are
-Agent-maintained attribution and applicability notes, not a second approval
-authority or proof that the host approved the work. The gate checks only that
-the local sealed plan and its recorded fields are internally consistent.
-
-Use the gate's local seal and amendment mechanisms to keep its task ID, plan
-contents, binding and recorded notes consistent. A path or mutable title alone
-is not a local revision. Material scope, validation or baseline-ownership
-changes require a supported local amendment, an updated seal and guard result.
-The Agent must obtain renewed task approval when a change exceeds or invalidates
-existing authorization; do not carry approval forward by assumption or request
-it again for unchanged authorized work.
+Use the project's supported local revision/seal mechanism to keep task ID, plan
+contents and binding consistent with the authorized scope. A path or mutable title
+alone is not a revision. Material scope, validation or baseline-ownership
+changes require a supported amendment, an updated seal and guard result.
+Obtain renewed approval when the change exceeds or invalidates the existing
+authorization under project policy; do not carry approval forward by assumption
+or request it again for unchanged authorized work.
 
 Tier names alone do not establish unchanged coverage. If a tier's actual
 workload materially changes, reassess the plan's coverage rationale and affected
-local plan notes through the supported amendment mechanism before using it. The
-Agent reassesses ordinary task approval when a material change exceeds its scope;
-the gate does not verify that host-side authorization. A matching alias is not
-permission to omit required checks. Do not turn unrelated changes or purely
-cosmetic edits into blanket reapproval requirements.
+validation/approval evidence through the supported mechanism before using it.
+A matching alias is not permission to omit required checks. Do not turn
+unrelated changes or purely cosmetic edits into blanket reapproval requirements.
 
-## Agent responsibility and local gate boundary
+## Pre-implementation preflight and post-Start amendments
 
-The Agent follows ordinary task approval and is responsible for tracking the
-approved scope, cancellation or supersession, and material changes. If approval
-does not cover a change, or the task is cancelled, the Agent stops affected work
-and follows the host's normal authorization process. A task-description edit
-alone does not amend a local sealed plan.
+For every governed task, perform preflight before implementation, not merely before
+tests. Make it the executing Agent's first action after Start; do not add a custom
+native-host admission hook or claim platform interception.
+Read-only inspection and supported plan preparation may precede admission;
+application edits, migrations, state-changing provider calls and validation workloads may not.
+Starting a native task or changing its visible description is not gate admission.
 
-The local gate validates its own sealed plan, exact assigned tier, local task
-eligibility, and bounded execution. It does not look up or independently verify
-native task identity, approval, lifecycle, cancellation, current revision or
-association. It does not intercept the host's Start button, platform actions,
-Agent/editor changes or task completion. No native-host hook or adapter is
-required to use the local gate.
+Inspect actual scope, governing contract and local plan revision, baseline
+declarations, one adequate registered tier and its workload, ordinary authorization,
+and Regression Guard applicability/declaration when adopted. Reuse valid plans;
+do not amend just to produce a new revision or demand redundant tests.
 
-For an existing local plan, use the supported amendment route when its scope,
-validation or baseline ownership changes. If a gap is found after implementation
-begins, pause affected work and validation, preserve observations and changes,
-and amend the local plan before proceeding. Do not allow concurrent runs against
-a changing local plan/binding. A later amendment cannot retroactively authorize
-edits or certify old results. Assess already-made changes against the approved
-scope and rerun affected checks.
+Automatically prepare concrete missing declarations, planned guard tests/assertions
+and the lightest adequate registered tier from inspected evidence. This prepares
+the plan; it does not deliver tests or justify weak coverage. Complete unsealed
+drafts through provisioning in a writable execution environment. Current unadmitted
+native tasks use the same route; native references are retry keys, not Unified IDs.
+Do not bulk-retrofit historical work or imply its earlier activity was admitted.
+Interrupted admission must preserve claims and consumed reservations; inspect them
+before retrying, never silently mint duplicates. Missing write capability blocks
+execution with an actionable prerequisite, not repeated attempts or alternate writes.
+For an existing sealed task, apply a candidate through
+the supported amendment/reseal/binding route when existing authorization covers the
+scope and identifiable revision under project policy. Ask only for genuinely
+uncovered decisions; do not infer that Start universally approves changed scope.
+Record amendment rationale and authorization applicability, then rerun local guards.
 
-Record the actual local enforcement boundary. A local runner can deny its own
-workload dispatch but cannot control platform actions or arbitrary edits.
-Preserve historical contracts; do not automatically retrofit old tasks.
+An active task's native Plan may be editable where the host supports it. Keep that
+dispatch description and the authoritative local sealed plan consistent through
+the supported route; editing the description alone changes neither seal nor binding.
+Preserve task identity, consumed IDs, history and ledger guarantees. Never manually
+assign a Unified ID to historical native work that has no supported local binding.
+
+If a gap is found after implementation begins, pause affected implementation and
+validation, preserve observations and changes, and amend before proceeding. No
+concurrent run may continue against a changing plan/binding; wait for verified
+quiescence or use its supported authorized cancellation route. Do not stop unrelated
+work. A later amendment cannot retroactively authorize edits or certify old results.
+Assess already-made changes against the approved scope and rerun affected checks.
+
+Immediately before local dispatch, establish agreement among task context,
+sealed plan revision and binding using the project's local coordination checks.
+The Agent remains responsible for native cancellation and scope changes.
+Reject stale local context rather than
+silently continuing after another amendment. Admission remains read-only on sealed
+plans; preparation/amendment is a separate explicit operation with recorded results.
+
+Document actual enforcement coverage. A local runner can deny its own dispatch;
+it does not thereby intercept Replit's Start button or all Agent file edits.
+An Agent-first preflight is cooperative instruction, not platform interception.
+The documented CLI and exported runner execute a locally valid plan's bound
+workload without custom native evidence. Recheck local revision and context after
+coordination gaps. Never claim atomic host/editor interception or native approval
+authentication from these checks.
+If a supported amendment route is missing, report the exact prerequisite and use
+owner-directed gate repair where applicable—not in-place edits, invented authority
+or a blanket new reviewer/bootstrap requirement. Preserve historical contracts;
+do not automatically retrofit old tasks on Start.
 
 ## Bounded execution
 
@@ -295,26 +268,30 @@ export TASK_PLAN_FILE=.local/tasks/<task-id>.md
 ```
 
 Follow the project's documented invocation for the bound validation tier.
-At local admission, require agreement among the task ID, supplied plan, current
-sealed revision and registered tier. Reject mismatched or changed local context
-before workload execution. The gate does not verify native task approval,
-lifecycle, revision or task association; those remain the Agent's responsibility.
-Setting `TASK_PLAN_FILE` alone is not proof that local checks passed. Do not
-execute a plan for one local ID using another ID's binding.
+At admission, require agreement among the task ID, supplied plan, current
+sealed revision and registered tier.
+Reject mismatched or stale context before workload execution. Use the host's
+local context requirements; setting `TASK_PLAN_FILE` alone is not proof that
+these checks passed. Do not execute a plan for one ID using another ID's binding.
 
-The local runner checks that its own plan is sealed and locally eligible. The
-Agent must honor known host cancellation, supersession or closure; the local
-runner cannot observe those native states. Historical revalidation may use an
-explicitly authorized supported route without reopening the local task or
-reassigning its ID.
+The executing Agent must respect cancellation, supersession, closure and changed
+scope before implementation or validation. The local gate does not independently
+check native lifecycle. Historical revalidation still needs applicable
+authorization and the original governing rules or a supported amendment; never
+silently move historical seals to the current policy.
 
 - **Tier lock:** A top-level tier invocation that does not match the ID's bound
   tier must be blocked immediately. Supported workload steps supervised by that
   tier are not separate tier assignments.
-- **Bounded processes:** Use clean timeout bounds. Do not leave orphaned
-  daemons, unmanaged child processes, or unmonitored process trees.
-- **Single flight:** Do not start duplicate top-level validation runs
-  concurrently against the same target.
+- **Bounded processes:** Use host-supported supervision with finite timeout and
+  cleanup bounds. Do not leave orphaned daemons or unmanaged/unmonitored process
+  trees. Document actual containment limits rather than claiming control over
+  descendants or host actions the supervisor cannot govern.
+- **Single flight:** Do not start duplicate top-level validation runs concurrently
+  against the same target. A per-task lock protects one task identity; it does not
+  by itself coordinate different tasks writing shared outputs. Use the project's
+  supported resource coordination or isolated outputs for actual conflicts, without
+  serializing independent checks or requiring another skill by default.
 - **Honest reporting:** A command that was skipped, interrupted, timed out, or
   could not be observed to completion is not a passing check.
 
@@ -327,6 +304,8 @@ particular command shape. Supervised steps within the assigned tier remain
 allowed; do not change filters/skip flags to omit required checks or use another
 tier to evade admission. Separately authorized independent checks may inform
 diagnosis, but cannot substitute for assigned-tier validation or establish its PASS.
+No separate reviewer or independent-verifier task is required unless explicitly
+selected or already required by an identifiable applicable requirement.
 
 ## Failure classification and evidence gate
 
@@ -345,7 +324,9 @@ For each test failure, apply these rules in order:
 4. **Pragmatic evidence gate:** An unlisted failure may be self-classified as
    pre-existing only when strong contextual evidence supports that conclusion,
    such as relevant files being untouched by the task's diff or a documented
-   recent pattern. Record a brief agent note that names the observed evidence.
+   recent pattern. Untouched files are contextual evidence, not proof that changed
+   dependencies, configuration or shared state are unrelated. Record the observed
+   evidence and why it supports the classification.
    Use available project and run evidence; do not require the user to produce
    original receipts.
 5. **Insufficient evidence:** Treat any failure that cannot be verified as a
@@ -372,7 +353,10 @@ Conclude every task in exactly one of these states:
 - **INCOMPLETE:** Work is unfinished or the results are untrustworthy.
 
 Report the state with the validation command and its observed result. Do not
-report `PASS` when required checks were skipped, unverified, or failed.
+report `PASS` when required checks were skipped, unverified, or failed. Distinguish
+plan-guard validity, observed workload results, task acceptance and external
+activation. A merged native task or passing package test alone proves none of
+the other outcomes.
 
 Associate validation evidence with its task ID, admitted plan revision, assigned
 tier, applicable workload definition and tested implementation/target through

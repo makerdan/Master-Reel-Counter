@@ -201,9 +201,9 @@ below remain available for explicit independent application diagnostics and CI;
 their results do not establish task admission or task completion. With `TASK_ID`
 or `TASK_PLAN_FILE` context, the same entry point routes through Unified and
 cannot use independent/execute flags to evade the bound-tier guard.
-The only current Failure Gate source is
-`.agents/skills/failure-gate-unified/SKILL.md`; see
-[`validation/unified-installation.md`](validation/unified-installation.md) for
+The current Failure Gate contract is
+`.agents/skills/failure-gate-unified/SKILL.md` plus its two required references; see
+[`validation/modular-migration.md`](validation/modular-migration.md) for
 provisioning, sealed-plan preflight, amendments and task-bound validation.
 ## Canonical validation tiers
 

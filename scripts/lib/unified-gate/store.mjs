@@ -4,6 +4,7 @@ import { existsSync, readFileSync, mkdirSync, openSync, writeFileSync,
 import { resolve, dirname, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
+import { verifyContract } from "./contract.mjs";
 
 export const REGISTRY = "docs/validation/unified-registry.json";
 export const PIN = "docs/validation/unified-pin.json";
@@ -46,15 +47,30 @@ export function atomicWrite(root, path, bytes) {
 
 export function pins(root, sealedPin) {
   const pin = readJson(root, PIN);
-  invariant(pin.schemaVersion === 1 && pin.source === SOURCE &&
+  invariant([1, 2].includes(pin.schemaVersion) && pin.source === SOURCE &&
     /^[a-f0-9]{64}$/.test(pin.current), "invalid skill pin");
-  invariant(hash(readFileSync(safePath(root, SOURCE))) === pin.current,
-    "canonical skill does not match current pin; stop for owner-directed gate repair");
-  for (const required of new Set([pin.current, sealedPin].filter(Boolean))) {
-    invariant(typeof pin.revisions?.[required] === "string", "sealed skill revision unavailable");
-    invariant(hash(readFileSync(safePath(root, pin.revisions[required]))) === required,
-      "historical sealed skill revision hash mismatch");
+  if (pin.schemaVersion === 2) {
+    verifyContract(root, dirname(SOURCE), pin.current, safePath);
+  } else {
+    invariant(hash(readFileSync(safePath(root, SOURCE))) === pin.current,
+      "canonical skill does not match current pin; stop for owner-directed gate repair");
   }
+  for (const required of new Set([pin.current, sealedPin].filter(Boolean))) {
+    const revision = pin.revisions?.[required];
+    if (revision?.kind === "normative-package") {
+      verifyContract(root, revision.directory, required, safePath);
+    } else {
+      invariant(typeof revision === "string", "sealed skill revision unavailable");
+      invariant(hash(readFileSync(safePath(root, revision))) === required,
+        "historical sealed skill revision hash mismatch");
+    }
+  }
+  return pin;
+}
+export function admissionReady(root) {
+  const pin = pins(root);
+  invariant(pin.schemaVersion !== 2 || pin.acceptance?.state === "OBSERVED",
+    "new modular admission BLOCKED: ordinary task-environment and normal workspace-restart acceptance NOT_OBSERVED");
   return pin;
 }
 export function tierDefinition(root, tier) {

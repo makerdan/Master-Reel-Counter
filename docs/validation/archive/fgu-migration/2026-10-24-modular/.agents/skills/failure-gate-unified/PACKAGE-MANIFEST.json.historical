@@ -1,0 +1,15 @@
+{
+  "skill": "failure-gate-unified",
+  "source": ".agents/skills/failure-gate-unified/SKILL.md",
+  "scope": "Unmodified canonical source available in this conversation; packaging does not install or activate it.",
+  "files": {
+    "SKILL.md": {
+      "bytes": 22993,
+      "sha256": "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22"
+    },
+    "application-prompt.txt": {
+      "bytes": 2949,
+      "sha256": "d2cd19e771afdfa74d50c0d5e68d1894e5dfb3c2e0423422df1598d04d6bc98d"
+    }
+  }
+}

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { loadCatalog, maintenanceFindings, isReferenceable } from "../baseline.mjs";
 import { MANIFEST, UUID, invariant, stable, digest, hash, pins, tierDefinition,
-  readRegistry, taskState, safePath, atomicWrite, append, saveRegistry, withWriter } from "./store.mjs";
+  readRegistry, taskState, safePath, atomicWrite, append, saveRegistry, withWriter, admissionReady } from "./store.mjs";
 
 export function catalog(root) {
   return loadCatalog(safePath(root, "docs/validation/failure-baseline.json"));
@@ -14,13 +14,17 @@ function text(value, label) {
     !/\b(TODO|TBD)\b|<[^>]+>/.test(value), `${label} must be a complete declaration`);
   return value.trim();
 }
-export function specification(root, input) {
+export function specification(root, input, { draft = false, modular = false } = {}) {
   const tier = input.tier;
   const definition = tierDefinition(root, tier);
   const spec = {
     title: text(input.title, "title"), scope: text(input.scope, "scope"), tier,
     why: text(input.why, "coverage rationale"), coverage: text(input.coverage, "coverage evidence"),
-    approval: {
+    approval: draft ? {
+      reference: "Not an approval record",
+      direction: "Ordinary authorization is checked by the executing Agent",
+      applicability: "Execution admission is required before implementation or validation",
+    } : {
       reference: text(input.approval?.reference, "attributable approval reference"),
       direction: text(input.approval?.direction, "owner direction"),
       applicability: text(input.approval?.applicability, "approval applicability to this revision"),
@@ -28,6 +32,7 @@ export function specification(root, input) {
     ignoredBaselines: input.ignoredBaselines ?? [], ownedBaselines: input.ownedBaselines ?? [],
     assertions: input.assertions,
   };
+  if (modular) spec.regressionGuard = text(input.regressionGuard, "scope-based Regression Guard declaration");
   invariant(definition.steps.some((step) => spec.coverage.includes(step.name)),
     "coverage evidence must identify a real selected-tier step");
   invariant(Array.isArray(spec.assertions) && spec.assertions.length > 0, "planned guard assertions required");
@@ -81,7 +86,7 @@ ${declarations.length ? declarations.join("\n") : "None known at plan time. Trea
 **Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.
 
 ## Planned guard assertions
-${spec.assertions.map((a) => `- ${a.requirement} — ${a.check}`).join("\n")}
+${spec.assertions.map((a) => `- ${a.requirement} — ${a.check}`).join("\n")}${spec.regressionGuard ? `\n\n## Regression Guard\n${spec.regressionGuard}` : ""}
 `;
 }
 function publish(root, registry, state, spec, reason) {
@@ -101,9 +106,24 @@ function publish(root, registry, state, spec, reason) {
   return next;
 }
 export async function provision(root, input, resumeId) {
-  const spec = specification(root, input);
+  admissionReady(root);
+  const spec = specification(root, input, { modular: pins(root).schemaVersion === 2 });
   return withWriter(root, (registry) => {
+    admissionReady(root);
     let state;
+    // A stable local claim is supplied before any write; it is not host approval.
+    // Reconcile an uncertain successful write or partial reservation under lock.
+    const claim = input.claim ? text(input.claim, "local retry claim") : undefined;
+    if (pins(root).schemaVersion === 2) invariant(claim, "new admission requires a stable local retry claim");
+    if (claim && !resumeId) {
+      const prior = Object.values(registry.tasks).map(taskState).find((s) => s.claim === claim);
+      if (prior) {
+        invariant(prior.specHash === digest(spec), "retry claim already belongs to different work");
+        if (prior.status === "sealed") return guard(root,
+          { id: prior.id, tier: prior.tier, planFile: prior.planPath }, registry);
+        resumeId = prior.id;
+      }
+    }
     if (resumeId) {
       invariant(UUID.test(resumeId) && registry.tasks[resumeId], "resume requires an existing reservation");
       state = taskState(registry.tasks[resumeId]);
@@ -115,6 +135,7 @@ export async function provision(root, input, resumeId) {
       state = { id, createdAt: new Date().toISOString(), status: "reserved", revision: 0,
         tier: spec.tier, pin: pins(root).current, planPath: `.local/tasks/${id}.md`,
         specHash: digest(spec), runs: [] };
+      if (claim) state.claim = claim;
       append(registry, state, "provision");
       saveRegistry(root, registry); // Durable reservation survives generation failure.
     }
@@ -122,8 +143,10 @@ export async function provision(root, input, resumeId) {
   });
 }
 export async function amend(root, id, input, reason) {
-  const spec = specification(root, input);
+  admissionReady(root);
+  const spec = specification(root, input, { modular: pins(root).schemaVersion === 2 });
   return withWriter(root, (registry) => {
+    admissionReady(root);
     invariant(registry.tasks[id], "unknown Unified task ID; do not rebind legacy tasks");
     const state = taskState(registry.tasks[id]);
     invariant(state.status === "sealed" && state.runs.at(-1)?.state !== "RUNNING",
@@ -131,10 +154,24 @@ export async function amend(root, id, input, reason) {
     return publish(root, registry, state, spec, reason);
   });
 }
+export function prepareDraft(root, input) {
+  pins(root);
+  // Pure preparation: no writer, mkdir, reservation, seal or native reference.
+  const spec = specification(root, input, { draft: true, modular: pins(root).schemaVersion === 2 });
+  const state = { spec, id: "UNADMITTED_NATIVE_DRAFT", tier: spec.tier,
+    revision: "NOT_ADMITTED", pin: pins(root).current };
+  const plan = renderPlan(root, state)
+    .replace(/## Task identity[\s\S]*?## Scope/, "## Status\nUNADMITTED_NATIVE_DRAFT — no local identity, seal or tier binding exists.\n\n## Scope")
+    .replace(/; supported invocation:.*\n/, "; intended invocation after execution admission: gate:run with the generated TASK_ID and TASK_PLAN_FILE\n")
+    .replace(/\*\*Do not switch tiers:\*\*.*\n/, "**Intended tier, not bound:** Execution must first provision, seal and guard this tier.\n");
+  return { status: "UNADMITTED_NATIVE_DRAFT", nativeAuthorizationObservation: "NOT_OBSERVED",
+    plan: `${plan}\n## First execution action\nRespect ordinary approval and current scope; reuse the stable local claim with gate:new, then gate:guard before implementation or validation. Missing write capability blocks execution, not this draft.\n` };
+}
 export function guard(root, { id, tier, planFile }, registry = readRegistry(root), { allowUnresolvedRun = false } = {}) {
   invariant(UUID.test(id ?? "") && registry.tasks[id], "unknown/unprovisioned Unified task ID");
   const state = taskState(registry.tasks[id]);
-  pins(root, state.pin);
+  const pin = pins(root, state.pin);
+  if (pin.revisions[state.pin]?.kind === "normative-package") admissionReady(root);
   invariant(state.status === "sealed", "task is not eligible for ordinary execution");
   invariant(allowUnresolvedRun || state.runs.at(-1)?.state !== "RUNNING",
     "previous run is unresolved; use bound-tier run --recover after its bounded deadline");
@@ -150,7 +187,7 @@ export function guard(root, { id, tier, planFile }, registry = readRegistry(root
   invariant(state.workloadHash === digest(tierDefinition(root, tier)), "tier workload changed; use supported amendment");
   invariant(state.approvalHash === digest({ approval: state.spec.approval, planHash: state.planHash }),
     "local approval notes do not match this sealed revision");
-  specification(root, state.spec);
+  specification(root, state.spec, { modular: pin.revisions[state.pin]?.kind === "normative-package" });
   return state;
 }
 export async function restorePlan(root, id) {

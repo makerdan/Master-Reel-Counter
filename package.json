@@ -37,6 +37,7 @@
     "ci": "npm run test-heavy",
     "check-baseline": "node scripts/check-baseline.mjs",
     "gate:new": "node scripts/unified-gate.mjs new",
+    "gate:draft": "node scripts/unified-gate.mjs draft",
     "gate:guard": "node scripts/unified-gate.mjs guard",
     "gate:amend": "node scripts/unified-gate.mjs amend",
     "gate:restore-plan": "node scripts/unified-gate.mjs restore-plan",

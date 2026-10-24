@@ -6,11 +6,13 @@ description: Existing application-check workloads retained for later gate adapta
 # Validation workloads
 
 These describe application-check workloads, not a second task-admission policy.
-The only Failure Gate source is `.agents/skills/failure-gate-unified/SKILL.md`.
+The current Failure Gate authority is `.agents/skills/failure-gate-unified/SKILL.md`
+and its two normative references, pinned as one package.
 Unified reads the approved runtime registry at `docs/validation/manifest.json`.
 The adjacent `tiers.json` is older example data, not Unified's runtime registry.
 No task ID, sealed-plan mechanism, tier binding, or completion permission is
-provided by this document. The replacement gate is not installed.
+provided by this document. See `docs/validation/modular-migration.md` for installed
+integration, actual maintenance results and outstanding runtime acceptance.
 
 `docs/validation/manifest.json` defines the executable runtime steps,
 priorities, resources, and budgets. The adjacent `tiers.json` remains an

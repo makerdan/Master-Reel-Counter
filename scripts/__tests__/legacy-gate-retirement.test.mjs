@@ -102,7 +102,13 @@ test("legacy admission stays absent while only pinned canonical Unified is insta
     assert.ok(read(path).includes(".agents/skills/failure-gate-unified/SKILL.md"));
   }
   const pin = json("docs/validation/unified-pin.json");
-  assert.equal(createHash("sha256").update(read(pin.source)).digest("hex"), pin.current);
+  if (pin.schemaVersion === 1) {
+    assert.equal(createHash("sha256").update(read(pin.source)).digest("hex"), pin.current);
+  } else {
+    const files = ["SKILL.md", "references/gate-maintenance.md", "references/planning-and-publication.md"].sort();
+    const digest = files.map((name) => `${name}\0${createHash("sha256").update(read(`.agents/skills/failure-gate-unified/${name}`)).digest("hex")}\n`).join("");
+    assert.equal(createHash("sha256").update(digest).digest("hex"), pin.current);
+  }
   assert.doesNotMatch(read("scripts/run-tier.mjs"),
     /assertRequestedTier|runPlanGuards|\/proc\/|fstatSync|realpathSync|FAILURE_GATE_PLAN_GUARDS_DONE/);
   const releaseBefore = read(`${archive}/scripts/build-and-verify-release.sh.before-retirement.txt`);

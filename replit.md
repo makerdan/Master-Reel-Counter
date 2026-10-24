@@ -77,8 +77,11 @@ projection implementation defects belong in this repository.
 
 ## Failure Gate Unified
 
-The only Failure Gate source is `.agents/skills/failure-gate-unified/SKILL.md`.
-New plans use the provisioner (`npm run gate:new -- --spec <spec.json>`), exactly
+The current Failure Gate source is `.agents/skills/failure-gate-unified/SKILL.md`
+plus both required references, pinned as one normative contract.
+Reviewable proposals are `UNADMITTED_NATIVE_DRAFT` with no ledger writes
+(`npm run gate:draft -- --spec <spec.json>`). Execution admission uses the
+provisioner (`npm run gate:new -- --spec <spec.json>`), a stable local retry claim, exactly
 one bound tier and sealed plans. Never manufacture an ID or implement an
 unprovisioned task. Legacy tasks keep their original IDs and records and are not
 rebound. Run the sealed plan's `gate:guard` preflight before implementation,
@@ -86,4 +89,8 @@ using `TASK_ID` and `TASK_PLAN_FILE`; use `gate:run` for bound-tier evidence.
 If admission or a plan guard fails, follow the skill's "Installing, updating
 and repairing the gate" section. Owner-directed gate work uses setup checks,
 not a tier PASS. No workspace-identity or machine-bound admission is required.
-See `AGENTS.md` and `docs/validation/unified-installation.md`.
+Ordinary approval stays with the Agent; no custom native-host admission is allowed.
+Preserve dedicated host follow-up constraints while allowing complete unadmitted
+drafts; never invent payload fields or repeat uncertain publication writes.
+See `AGENTS.md`, `docs/validation/unified-installation.md` and
+`docs/validation/modular-migration.md` for the current runtime acceptance blocker.

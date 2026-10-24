@@ -1,3 +1,11 @@
+# Historical installation report
+
+This describes the previous single-file installation, not the current admission
+policy. Historical commands remain compatible where documented, but current
+contract, draft lifecycle, readiness and recovery are in
+`docs/validation/modular-migration.md` and `AGENTS.md`. Do not use this historical
+report to claim current runtime readiness or require pre-publication admission.
+
 # Failure Gate Unified installation
 
 ## Authorization and source

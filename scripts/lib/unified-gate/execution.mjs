@@ -95,6 +95,7 @@ export async function run(root, context, { stepName, recoverOnly = false } = {})
     const path = safePath(root, evidencePath); mkdirSync(dirname(path), { recursive: true });
     const before = target(root);
     const entry = { id: runId, purpose: stepName ? "diagnostic" : "bound-tier",
+      nativeAuthorizationObservation: "NOT_OBSERVED",
       state: "RUNNING", revision: state.revision, pin: state.pin, tier: state.tier,
       planHash: state.planHash, workloadHash: state.workloadHash, target: before,
       startedAt: new Date().toISOString(),
