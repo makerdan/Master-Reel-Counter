@@ -43,6 +43,7 @@
     "gate:restore-plan": "node scripts/unified-gate.mjs restore-plan",
     "gate:cancel": "node scripts/unified-gate.mjs cancel",
     "gate:run": "node scripts/unified-gate.mjs run",
+    "gate:history": "node scripts/unified-gate.mjs history",
     "gate:classify": "node scripts/unified-gate.mjs classify",
     "gate:merge-guard": "node scripts/unified-gate.mjs merge-guard",
     "gate:status": "node scripts/unified-gate.mjs status",

@@ -1,3 +1,10 @@
+# Current reporting extension
+
+For automatic derived local history, safe step-level comparisons, retention,
+read-only `gate:history` examples and limitations, see
+[Local validation summaries](run-summaries.md). This extension does not change
+the historical installation evidence below or claim new installation acceptance.
+
 # Historical installation report
 
 This describes the previous single-file installation, not the current admission

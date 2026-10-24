@@ -13,6 +13,7 @@ import { emptyRegistry, readRegistry, taskState, pins, hash, TIERS, compareRegis
 import { provision, amend, guard, restorePlan, cancel, classifyFailure, prepareDraft,
   baselineWarnings } from "../lib/unified-gate/plans.mjs";
 import { run, classificationLog } from "../lib/unified-gate/execution.mjs";
+import { summaryHistory, eligibility } from "../lib/unified-gate/summaries.mjs";
 
 const project = resolve(import.meta.dirname, "../..");
 function write(root, path, content) {
@@ -553,6 +554,7 @@ test("abrupt runner loss leaves bounded supervision; recovery waits, records INC
   for (let i = 0; i < 100 && !existsSync(join(root, ".local/orphan.pid")); i++) await delay(10);
   assert.ok(existsSync(join(root, ".local/orphan.pid")));
   child.kill("SIGKILL"); await once(child, "exit");
+  assert.equal(summaryHistory(root).records.length, 0, "hard kill must not fabricate a terminal summary");
   await assert.rejects(run(root, ctx(state), { recoverOnly: true }), /deadline/);
   assert.throws(() => guard(root, ctx(state)), /unresolved/);
   await delay(3700);
@@ -560,6 +562,11 @@ test("abrupt runner loss leaves bounded supervision; recovery waits, records INC
   assert.throws(() => process.kill(pid, 0), /ESRCH/);
   const recovered = await run(root, ctx(state), { recoverOnly: true });
   assert.equal(recovered.state, "INCOMPLETE");
+  const summary = summaryHistory(root).records[0];
+  assert.equal(summary.recovered, true);
+  assert.equal(summary.interrupted, true);
+  assert.equal(summary.steps[0].outcome, "NOT_REACHED", "uncommitted observations stay unknown");
+  assert.notEqual(eligibility(summary), null);
   assert.equal(guard(root, ctx(state)).planHash, state.planHash);
 });
 
@@ -577,6 +584,7 @@ test("SIGTERM is propagated, cleans the child and never reports PASS", async (t)
   const [code] = await once(child, "close");
   assert.equal(code, 1);
   assert.equal(current(root, state.id).runs.at(-1).state, "INCOMPLETE");
+  assert.equal(summaryHistory(root).records[0].interrupted, true);
   assert.throws(() => process.kill(Number(readFileSync(join(root, ".local/signal.pid"))), 0), /ESRCH/);
 });
 

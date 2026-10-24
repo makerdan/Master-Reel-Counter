@@ -6,6 +6,7 @@ import { guard, baselineWarnings, classifyFailure } from "./plans.mjs";
 import { invariant, digest, hash, git, tierDefinition, safePath, taskState,
   append, saveRegistry, withWriter } from "./store.mjs";
 import { retryOptions, retryAdapter, retryCommand, readRetryEvidence } from "./retry.mjs";
+import { reportingContext, reportRun } from "./summaries.mjs";
 
 // Hash source bytes/changes, not host identity. Exclude only gate-owned evidence
 // and environment-local outputs. Ignored build/test outputs do not change it.
@@ -87,7 +88,9 @@ export async function run(root, context, options = {}) {
       const runs = structuredClone(state.runs);
       runs.at(-1).state = "INCOMPLETE";
       runs.at(-1).reason = "previous runner stopped without a trustworthy terminal result";
+      runs.at(-1).finishedAt = new Date().toISOString();
       append(registry, { ...state, runs }, "run"); saveRegistry(root, registry);
+      reportRun(root, runs.at(-1), { recovered: true });
       return runs.at(-1);
     }
     invariant(!recoverOnly, "no unresolved run to recover");
@@ -106,6 +109,8 @@ export async function run(root, context, options = {}) {
       startedAt: new Date().toISOString(),
       cleanupDeadline: new Date(Date.now() + definition.timeoutMs + 3000).toISOString(),
       evidencePath, observations: [] };
+    try { entry.reportingContext = reportingContext(root, { ...definition, steps }); }
+    catch { console.warn("[validation reporting warning] Runtime applicability unavailable; summary reporting may be unavailable. Validation is unchanged."); }
     if (stepName) console.log("[DIAGNOSTIC ONLY] Retry evidence cannot satisfy required full-tier validation or establish pre-existing provenance.");
     if (adapter) {
       entry.selector = selector;
@@ -178,7 +183,9 @@ export async function run(root, context, options = {}) {
       process.removeListener("SIGTERM", onSignal); process.removeListener("SIGINT", onSignal);
     }
     entry.state = final; entry.finishedAt = new Date().toISOString();
+    entry.interrupted = controller.signal.aborted;
     append(registry, { ...state, runs: [...state.runs, entry] }, "run"); saveRegistry(root, registry);
+    reportRun(root, entry);
     return entry;
   });
 }

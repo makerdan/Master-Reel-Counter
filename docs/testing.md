@@ -226,6 +226,25 @@ commands are diagnostic-only, including a successful retry. Zero matches,
 skipped-only execution and missing reporter evidence are explicitly unsuccessful.
 The full bound-tier run is still required, and a passing retry is not proof that a
 failure predates the task.
+## Local guarded-run history
+
+Ordinary task-bound gate runs automatically record compact local step summaries
+after committing their authoritative terminal results. Comparisons are printed
+on stderr; existing result JSON/exit meanings are preserved. Read them without
+dispatching tests using `npm run gate:history -- --limit 10` or
+`node scripts/unified-gate.mjs history --run <run-uuid>`.
+
+Only equivalent, stable, trustworthy full-workload observations can be compared.
+A repeated step failure is not an identical failing test or pre-existing-failure
+finding. Later unexecuted steps remain unknown/not reached. Isolated task
+environments normally start without history; no extra baseline run is needed.
+Reports are private, disposable, limited to 100 records/30 days/64 KiB each,
+and separate from authoritative evidence and the failure catalog. Reporting
+warnings cannot turn failed validation into success.
+
+See [Local validation summaries](validation/run-summaries.md) for exact matching,
+runtime-profile limits, recovery, read-only CLI syntax and maintenance coverage.
+
 ## Canonical validation tiers
 
 The tracked source of truth is `docs/validation/manifest.json`. Each tier is

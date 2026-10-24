@@ -6,6 +6,7 @@ import { invariant, pins, readRegistry, taskState, tierDefinition, TIERS, mergeG
 import { provision, amend, guard, restorePlan, cancel, catalog, baselineWarnings, prepareDraft } from "./lib/unified-gate/plans.mjs";
 import { run, classificationLog } from "./lib/unified-gate/execution.mjs";
 import { parseInput } from "./lib/unified-gate/regression.mjs";
+import { summaryHistory } from "./lib/unified-gate/summaries.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const [operation, ...args] = process.argv.slice(2);
@@ -43,6 +44,15 @@ try {
   invariant(!process.env.TASK_ID || !id || process.env.TASK_ID === id, "TASK_ID context mismatch");
   let result;
   switch (operation) {
+    case "history": {
+      invariant(args.every((arg, index) => index % 2
+        ? !arg.startsWith("--") : ["--run", "--limit"].includes(arg)) &&
+        args.length % 2 === 0 && new Set(args.filter((_, i) => i % 2 === 0)).size === args.length / 2,
+      "history accepts only --run <UUID> and --limit <1-100>");
+      result = summaryHistory(root, { runId: option("run"),
+        limit: option("limit") === undefined ? 10 : Number(option("limit")) });
+      break;
+    }
     case "draft": result = prepareDraft(root, input()); break;
     case "new": result = await provision(root, input(), option("resume")); break;
     case "amend": result = await amend(root, id, input(), option("reason")); break;
@@ -95,7 +105,7 @@ try {
           "local sealed-plan and assigned-tier checks only; Agent tracks native approval, cancellation and scope; platform actions are not intercepted" };
       break;
     }
-    default: throw new Error("supported operations: draft, new, amend, guard, restore-plan, cancel, run, classify, merge-guard, baseline-warnings, status");
+    default: throw new Error("supported operations: draft, new, amend, guard, restore-plan, cancel, run, classify, merge-guard, baseline-warnings, status, history");
   }
   console.log(JSON.stringify(result, null, 2));
   if (operation === "run" && result.state !== "PASS") process.exitCode = 1;
