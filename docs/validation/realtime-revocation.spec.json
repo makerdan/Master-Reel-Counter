@@ -1,0 +1,28 @@
+{
+  "claim": "close-revoked-realtime-connections",
+  "title": "Close revoked realtime connections",
+  "scope": "Fix F-003 within the approved task 974 scope: evict every authenticated affected socket including unjoined sockets on rejection or approval removal; require current account admission and a live tracked socket when asynchronous room authorization completes; preserve session permission checks, collaborator removal and unaffected accounts. Add deterministic production-boundary backend fixtures in server/__tests__/routes.test.ts. No Clerk configuration, deployment, frontend or multi-process architecture changes.",
+  "tier": "test-standard",
+  "why": "Backend authorization and lifecycle repair requires deterministic route/socket regression tests and typechecking, without browser or provider provisioning.",
+  "coverage": "docs/validation/manifest.json test-standard: typecheck and unit-tests execute server/__tests__/routes.test.ts through npm run test:unit, plus existing storage, port, release-contract, HMR and manifest checks within 300000ms.",
+  "approval": {
+    "reference": "Assigned task 974 and its approved execution plan in the active conversation",
+    "direction": "Close revoked realtime connections and deliver the stated R1-R3 backend regression coverage",
+    "applicability": "Unchanged assigned scope and test-standard tier; separate review not selected"
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {"requirement": "R1 account eviction", "check": "Joined and unjoined authenticated sockets close with 1008 for rejection and approval removal."},
+    {"requirement": "R2 delayed admission", "check": "Complete a controlled pending production join after eviction or closure; assert no joined acknowledgement, no room membership and no protected broadcast. Current unapproved accounts cannot join."},
+    {"requirement": "R3 isolation and positive behavior", "check": "Unaffected approved users remain in rooms and receive broadcasts; approved owner/collaborator joins and collaborator eviction remain working."}
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Repairs an existing authorization bypass and asynchronous socket lifecycle race.",
+    "covers": "R1 authenticated joined/unjoined sockets surviving rejection or approval removal; R2 delayed joins restoring revoked access; R3 eviction disrupting unrelated users.",
+    "testLocation": "server/__tests__/routes.test.ts",
+    "assertion": "Controlled backend fixtures reach production eviction and join behavior and assert 1008 closure, no joined acknowledgement or room membership after revocation, no protected broadcasts to revoked sockets, and successful approved joins/broadcasts for unaffected users."
+  }
+}

@@ -16,6 +16,7 @@ import
 ;
 
 import { randomUUID } from "node:crypto";
+import type { TestContext } from "node:test";
 import { execFileSync } from "node:child_process";
 
 import http from "node:http"
@@ -90,6 +91,8 @@ import
   PRE_AUTH_WEBSOCKET_LIMITS,
   PreAuthWebSocketBuffer,
   RealtimeAuthorizationTracker,
+  joinRealtimeRoom,
+  broadcastRealtimeRoom,
   registerAuthorizationChangeHandler,
 }
  from "../realtime-authorization.js"
@@ -1134,6 +1137,185 @@ describe("pre-authentication WebSocket message limits", () => {
 });
 
 describe("RealtimeAuthorizationTracker", () => {
+  function fixture(t: TestContext) {
+    const makeSocket = () => ({
+      readyState: 1,
+      messages: [] as any[],
+      closes: [] as Array<{ code: number; reason: string }>,
+      send(data: string) { this.messages.push(JSON.parse(data)); },
+      // Intentionally keep readyState OPEN to exercise the revocation latch
+      // independently of ws.close()'s synchronous transition to CLOSING.
+      close(code: number, reason: string) { this.closes.push({ code, reason }); },
+    });
+    type Socket = ReturnType<typeof makeSocket>;
+    type Info = { sessionId: number | null; userId: string | null; role: string | null; revoked?: boolean };
+    const rooms = new Map<number, Set<Socket>>();
+    const users = new Map<Socket, Info>();
+    const accounts = new Map<string, { approved: boolean; rejected: boolean }>([
+      ["affected", { approved: true, rejected: false }],
+      ["other", { approved: true, rejected: false }],
+    ]);
+    t.mock.method(authStorage, "getUser", async (userId: string) => accounts.get(userId));
+    const options = {
+      sessionRooms: rooms,
+      socketUsers: users,
+      openReadyState: 1,
+      authorization: new RealtimeAuthorizationTracker(),
+      authorizeSession: async (_sessionId: number, _userId: string): Promise<{ role: string } | null> => ({ role: "owner" }),
+      accountOutcome: (userId: string) => getIdentityAuthorizationOutcome({ claims: { sub: userId } }),
+      broadcastPresence: (_sessionId: number) => {},
+    };
+    const connect = (userId = "affected") => {
+      const socket = makeSocket();
+      users.set(socket, { sessionId: null, userId, role: null });
+      return socket;
+    };
+    const broadcast = () => broadcastRealtimeRoom(rooms, 42, { type: "protected-update" }, 1);
+    return { rooms, users, accounts, options, connect, broadcast };
+  }
+
+  for (const outcome of ["account_rejected", "approval_removed"] as const) {
+    test(`${outcome} closes joined and unjoined sockets and excludes later broadcasts without affecting another account`, async (t) => {
+      const f = fixture(t);
+      const joined = f.connect();
+      const unjoined = f.connect();
+      const other = f.connect("other");
+      await joinRealtimeRoom(joined, 42, f.options);
+      await joinRealtimeRoom(other, 42, f.options);
+      f.accounts.set("affected", { approved: false, rejected: outcome === "account_rejected" });
+      evictUserSockets(f.rooms, f.users, "affected", 1, outcome, outcome);
+      for (const socket of [joined, unjoined]) {
+        assert.deepEqual(socket.closes, [{ code: 1008, reason: outcome }]);
+        assert.equal(socket.messages.at(-1)?.outcome, outcome);
+        assert.equal(f.users.get(socket)?.sessionId, null);
+      }
+      await joinRealtimeRoom(unjoined, 42, f.options);
+      f.broadcast();
+      assert.deepEqual([...f.rooms.get(42)!], [other]);
+      assert.equal(unjoined.messages.some(m => m.type === "joined"), false);
+      assert.equal(joined.messages.some(m => m.type === "protected-update"), false);
+      assert.equal(unjoined.messages.some(m => m.type === "protected-update"), false);
+      assert.equal(other.messages.at(-1)?.type, "protected-update");
+      assert.equal(other.closes.length, 0);
+    });
+
+    for (const boundary of ["session", "account"] as const) {
+      test(`${outcome} during delayed ${boundary} authorization cannot restore room access`, async (t) => {
+        const f = fixture(t);
+        const affected = f.connect();
+        const other = f.connect("other");
+        await joinRealtimeRoom(other, 42, f.options);
+        let release!: () => void;
+        let started!: () => void;
+        const pending = new Promise<void>(resolve => { release = resolve; });
+        const entered = new Promise<void>(resolve => { started = resolve; });
+        if (boundary === "session") {
+          f.options.authorizeSession = async () => {
+            started();
+            await pending;
+            return { role: "editor" };
+          };
+        } else {
+          f.options.accountOutcome = async () => {
+            started();
+            await pending;
+            return "approved"; // A stale read must not override local revocation.
+          };
+        }
+        const join = joinRealtimeRoom(affected, 42, f.options);
+        await entered;
+        evictUserSockets(f.rooms, f.users, "affected", 1, outcome, outcome);
+        release();
+        await join;
+        assert.equal(affected.messages.some(m => m.type === "joined"), false);
+        assert.equal(f.users.get(affected)?.sessionId, null);
+        assert.deepEqual([...f.rooms.get(42)!], [other]);
+        f.broadcast();
+        assert.equal(affected.messages.some(m => m.type === "protected-update"), false);
+        assert.equal(other.messages.at(-1)?.type, "protected-update");
+        assert.equal(other.closes.length, 0);
+      });
+    }
+  }
+
+  for (const state of ["pending", "rejected", "missing"] as const) {
+    test(`fresh account admission denies ${state} even when session access allows ownership`, async (t) => {
+      const f = fixture(t);
+      const socket = f.connect();
+      if (state === "missing") f.accounts.delete("affected");
+      else f.accounts.set("affected", { approved: false, rejected: state === "rejected" });
+      await joinRealtimeRoom(socket, 42, f.options);
+      assert.equal(socket.closes[0]?.code, 1008);
+      assert.equal(socket.messages[0]?.outcome, state === "missing" ? "identity_changed" : state);
+      assert.equal(f.rooms.size, 0);
+      assert.equal(socket.messages.some(m => m.type === "joined"), false);
+    });
+  }
+
+  for (const lifecycle of ["closing", "closed", "removed", "replaced"] as const) {
+    test(`a ${lifecycle} socket cannot be inserted after delayed authorization`, async (t) => {
+      const f = fixture(t);
+      const socket = f.connect();
+      let release!: () => void;
+      f.options.authorizeSession = () => new Promise(resolve => {
+        release = () => resolve({ role: "owner" });
+      });
+      const join = joinRealtimeRoom(socket, 42, f.options);
+      if (lifecycle === "closing") socket.readyState = 2;
+      if (lifecycle === "closed") socket.readyState = 3;
+      if (lifecycle === "removed") f.users.delete(socket);
+      if (lifecycle === "replaced") f.users.set(socket, { sessionId: null, userId: "other", role: null });
+      release();
+      await join;
+      assert.equal(f.rooms.size, 0);
+      assert.equal(socket.messages.length, 0);
+    });
+  }
+
+  test("session invalidation during account admission still rechecks collaborator access", async (t) => {
+    const f = fixture(t);
+    const socket = f.connect();
+    let allowed = true;
+    let calls = 0;
+    let release!: () => void;
+    let started!: () => void;
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    f.options.authorizeSession = async () => { calls++; return allowed ? { role: "editor" } : null; };
+    f.options.accountOutcome = async () => { started(); await pending; return "approved"; };
+    const join = joinRealtimeRoom(socket, 42, f.options);
+    await entered;
+    allowed = false;
+    f.options.authorization.invalidate(42);
+    release();
+    await join;
+    assert.equal(calls, 2);
+    assert.equal(socket.messages[0]?.outcome, "denied_join");
+    assert.equal(socket.closes[0]?.code, 1008);
+    assert.equal(f.rooms.size, 0);
+  });
+
+  test("approved owner and collaborator joins preserve room switching and permission denial", async (t) => {
+    const f = fixture(t);
+    const owner = f.connect();
+    const collaborator = f.connect("other");
+    f.options.authorizeSession = async (sessionId, userId) =>
+      sessionId === 99 ? null : { role: userId === "affected" ? "owner" : "viewer" };
+    await joinRealtimeRoom(owner, 41, f.options);
+    await joinRealtimeRoom(owner, 42, f.options);
+    await joinRealtimeRoom(collaborator, 42, f.options);
+    assert.equal(f.rooms.has(41), false);
+    assert.equal(f.users.get(owner)?.role, "owner");
+    assert.equal(f.users.get(collaborator)?.role, "viewer");
+    f.broadcast();
+    assert.equal(owner.messages.at(-1)?.type, "protected-update");
+    assert.equal(collaborator.messages.at(-1)?.type, "protected-update");
+    const denied = f.connect();
+    await joinRealtimeRoom(denied, 99, f.options);
+    assert.equal(denied.messages[0]?.outcome, "denied_join");
+    assert.equal(f.rooms.has(99), false);
+  });
+
   test("evicts every socket for the affected user without removing other collaborators", () => {
     const sent: string[] = [];
     const affected = {

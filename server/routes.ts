@@ -55,6 +55,8 @@ import {
   evictUserSockets as evictUserSocketsFromRooms,
   registerAuthorizationChangeHandler,
   RealtimeAuthorizationTracker,
+  joinRealtimeRoom,
+  broadcastRealtimeRoom,
   PRE_AUTH_WEBSOCKET_LIMITS,
   PreAuthWebSocketBuffer,
   type AuthorizationChangeOutcome,
@@ -204,7 +206,7 @@ function formatPinLabel(label: string): string {
 }
 
 const sessionRooms = new Map<number, Set<WebSocket>>();
-const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null }>();
+const wsUserMap = new Map<WebSocket, { sessionId: number | null; userId: string | null; username: string | null; role: string | null; revoked?: boolean }>();
 const realtimeAuthorization = new RealtimeAuthorizationTracker();
 const encodingToggleInProgress = new Set<string>();
 
@@ -282,14 +284,7 @@ async function acquireSharedEncodingLock(
 }
 
 function broadcastToSession(sessionId: number, message: any, excludeWs?: WebSocket) {
-  const room = sessionRooms.get(sessionId);
-  if (!room) return;
-  const data = JSON.stringify(message);
-  for (const ws of room) {
-    if (ws !== excludeWs && ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
-    }
-  }
+  broadcastRealtimeRoom(sessionRooms, sessionId, message, WebSocket.OPEN, excludeWs);
 }
 
 function broadcastToSessionOwners(sessionId: number, message: any, excludeWs?: WebSocket) {
@@ -6985,37 +6980,15 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
         return;
       }
       if (msg.type === "join" && typeof msg.sessionId === "number") {
-        const info = wsUserMap.get(ws)!;
-        if (!info.userId) {
-          ws.send(JSON.stringify({ type: "error", message: "Authentication required" }));
-          ws.close(1008, "Authentication required");
-          return;
-        }
-        const access = await realtimeAuthorization.authorizeConsistently(
-          msg.sessionId,
-          () => verifySessionAccess(msg.sessionId, info.userId!),
-        );
-        if (!access) {
-          ws.send(JSON.stringify({
-            type: "authorization_changed",
-            outcome: "denied_join",
-            message: "You are not authorized to join this session.",
-          }));
-          ws.close(1008, "Session access denied");
-          return;
-        }
-        const prevSessionId = info.sessionId;
-        if (prevSessionId !== null) {
-          const prev = sessionRooms.get(prevSessionId);
-          if (prev) { prev.delete(ws); if (prev.size === 0) sessionRooms.delete(prevSessionId); }
-          broadcastPresence(prevSessionId);
-        }
-        info.sessionId = msg.sessionId;
-        info.role = access.role;
-        if (!sessionRooms.has(msg.sessionId)) sessionRooms.set(msg.sessionId, new Set());
-        sessionRooms.get(msg.sessionId)!.add(ws);
-        ws.send(JSON.stringify({ type: "joined", sessionId: msg.sessionId }));
-        broadcastPresence(msg.sessionId);
+        await joinRealtimeRoom(ws, msg.sessionId, {
+          sessionRooms,
+          socketUsers: wsUserMap,
+          openReadyState: WebSocket.OPEN,
+          authorization: realtimeAuthorization,
+          authorizeSession: verifySessionAccess,
+          accountOutcome: (userId) => getIdentityAuthorizationOutcome({ claims: { sub: userId } }),
+          broadcastPresence,
+        });
       }
     } catch (err) {
       console.error("processWsMessage error:", err);

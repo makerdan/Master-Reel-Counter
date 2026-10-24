@@ -173,6 +173,7 @@ type SessionSocketInfo = {
   sessionId: number | null;
   userId: string | null;
   role: string | null;
+  revoked?: boolean;
 };
 
 type ClosableSocket = {
@@ -180,6 +181,21 @@ type ClosableSocket = {
   send(data: string): void;
   close(code: number, reason: string): void;
 };
+
+export function broadcastRealtimeRoom<Socket extends ClosableSocket>(
+  sessionRooms: Map<number, Set<Socket>>,
+  sessionId: number,
+  message: unknown,
+  openReadyState: number,
+  excludeSocket?: Socket,
+): void {
+  const room = sessionRooms.get(sessionId);
+  if (!room) return;
+  const data = JSON.stringify(message);
+  for (const socket of room) {
+    if (socket !== excludeSocket && socket.readyState === openReadyState) socket.send(data);
+  }
+}
 
 export function evictSessionUserSockets<Socket extends ClosableSocket>(
   sessionRooms: Map<number, Set<Socket>>,
@@ -222,24 +238,91 @@ export function evictUserSockets<Socket extends ClosableSocket>(
   reason: string,
   outcome: AuthorizationChangeOutcome,
 ): void {
-  const affectedSessionIds = new Set<number>();
-  for (const [, info] of socketUsers) {
-    if (info.userId === userId && info.sessionId !== null) {
-      affectedSessionIds.add(info.sessionId);
+  for (const [socket, info] of socketUsers) {
+    if (info.userId !== userId) continue;
+    // Latch denial before close: pending joins may still hold this info object.
+    info.revoked = true;
+    if (info.sessionId !== null) {
+      const room = sessionRooms.get(info.sessionId);
+      room?.delete(socket);
+      if (room?.size === 0) sessionRooms.delete(info.sessionId);
+    }
+    info.sessionId = null;
+    info.role = null;
+    if (socket.readyState === openReadyState) {
+      try {
+        socket.send(JSON.stringify({
+          type: "authorization_changed",
+          outcome,
+          message: authorizationChangeMessage(outcome),
+        }));
+      } catch {}
+      socket.close(1008, reason);
     }
   }
+}
 
-  for (const sessionId of affectedSessionIds) {
-    evictSessionUserSockets(
-      sessionRooms,
-      socketUsers,
-      sessionId,
-      userId,
-      openReadyState,
-      reason,
-      outcome,
-    );
+/**
+ * Shared production room-admission boundary. No async work may occur between
+ * the final lifecycle check and membership insertion.
+ */
+export async function joinRealtimeRoom<Socket extends ClosableSocket>(
+  socket: Socket,
+  sessionId: number,
+  options: {
+    sessionRooms: Map<number, Set<Socket>>;
+    socketUsers: Map<Socket, SessionSocketInfo>;
+    openReadyState: number;
+    authorization: RealtimeAuthorizationTracker;
+    authorizeSession: (sessionId: number, userId: string) => Promise<{ role: string } | null>;
+    accountOutcome: (userId: string) => Promise<"approved" | AuthorizationChangeOutcome>;
+    broadcastPresence: (sessionId: number) => void;
+  },
+): Promise<void> {
+  const { sessionRooms, socketUsers, openReadyState } = options;
+  const info = socketUsers.get(socket);
+  const isLive = () => Boolean(
+    info?.userId && !info.revoked &&
+    socketUsers.get(socket) === info && socket.readyState === openReadyState,
+  );
+  if (!isLive()) return;
+  const userId = info!.userId!;
+  const { access, outcome } = await options.authorization.authorizeConsistently(
+    sessionId, async () => {
+      const access = await options.authorizeSession(sessionId, userId);
+      const outcome = await options.accountOutcome(userId);
+      return { access, outcome };
+    },
+  );
+  if (!isLive()) return;
+  // Session ownership/collaboration alone does not grant account admission.
+  if (outcome !== "approved") {
+    evictUserSockets(sessionRooms, socketUsers, userId, openReadyState,
+      "Account authorization required", outcome);
+    return;
   }
+  if (!access) {
+    socket.send(JSON.stringify({
+      type: "authorization_changed",
+      outcome: "denied_join",
+      message: authorizationChangeMessage("denied_join"),
+    }));
+    socket.close(1008, "Session access denied");
+    return;
+  }
+  const prevSessionId = info!.sessionId;
+  if (prevSessionId !== null) {
+    const previousRoom = sessionRooms.get(prevSessionId);
+    previousRoom?.delete(socket);
+    if (previousRoom?.size === 0) sessionRooms.delete(prevSessionId);
+    options.broadcastPresence(prevSessionId);
+  }
+  info!.sessionId = sessionId;
+  info!.role = access.role;
+  if (!sessionRooms.has(sessionId)) sessionRooms.set(sessionId, new Set());
+  sessionRooms.get(sessionId)!.add(socket);
+  socket.send(JSON.stringify({ type: "joined", sessionId }));
+  options.broadcastPresence(sessionId);
 }
 
 export function evictAllSessionSockets<Socket extends ClosableSocket>(
