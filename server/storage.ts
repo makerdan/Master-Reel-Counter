@@ -124,7 +124,7 @@ export interface IStorage {
   getSessionEntries(sessionId: number): Promise<Entry[]>;
   getSessionEntriesPaginated(sessionId: number, limit: number, offset: number): Promise<{ entries: Entry[]; total: number }>;
   updateEntry(id: number, data: Partial<Entry>): Promise<Entry | undefined>;
-  deleteEntry(id: number): Promise<void>;
+  deleteEntry(id: number, sessionId: number): Promise<void>;
 
   createPin(pin: InsertPin): Promise<Pin>;
   /**
@@ -664,8 +664,10 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async deleteEntry(id: number): Promise<void> {
-    await db.delete(entries).where(eq(entries.id, id));
+  async deleteEntry(id: number, sessionId: number): Promise<void> {
+    // A pin's entryId may be a legacy cross-session reference. Enforce the
+    // authorized session in the destructive statement, not just at lookup time.
+    await db.delete(entries).where(and(eq(entries.id, id), eq(entries.sessionId, sessionId)));
   }
 
   async createPin(pin: InsertPin): Promise<Pin> {

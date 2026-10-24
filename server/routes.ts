@@ -2383,7 +2383,7 @@ export async function registerRoutes(
         }
       }
 
-      await storage.deleteEntry(entry.id);
+      await storage.deleteEntry(entry.id, entry.sessionId);
       const username = (req as AuthenticatedRequest).user.claims.first_name || (req as AuthenticatedRequest).user.claims.email || userId;
       logActivity(entry.sessionId, userId, username, "entry_deleted", "entry", entry.id);
       broadcastToSession(entry.sessionId, { type: "sync", entity: "entries", sessionId: entry.sessionId });
@@ -2568,6 +2568,12 @@ export async function registerRoutes(
       if (lockMsg) return res.status(403).json({ message: lockMsg });
 
       const data = insertPinSchema.parse({ ...r.body, photoId: photo.id });
+      if (data.entryId != null) {
+        const entry = await storage.getEntry(data.entryId);
+        if (!entry || entry.sessionId !== photo.sessionId) {
+          return res.status(400).json({ message: "Entry does not belong to this session" });
+        }
+      }
 
       // atomicCreatePin enforces (photoId, label) uniqueness at the DB level,
       // preventing duplicates from double-clicks or concurrent collaborator inserts.
@@ -2597,6 +2603,13 @@ export async function registerRoutes(
       const parsedPin = patchPinSchema.safeParse(req.body);
       if (!parsedPin.success) {
         return res.status(400).json({ message: "Invalid pin update data", errors: parsedPin.error.flatten().fieldErrors });
+      }
+
+      if (parsedPin.data.entryId != null) {
+        const entry = await storage.getEntry(parsedPin.data.entryId);
+        if (!entry || entry.sessionId !== photo.sessionId) {
+          return res.status(400).json({ message: "Entry does not belong to this session" });
+        }
       }
 
       const pinToken = parsedPin.data.serverUpdatedAt;
@@ -2640,7 +2653,7 @@ export async function registerRoutes(
       }
 
       if (pin.entryId) {
-        await storage.deleteEntry(pin.entryId);
+        await storage.deleteEntry(pin.entryId, photo.sessionId);
         broadcastToSession(photo.sessionId, { type: "sync", entity: "entries", sessionId: photo.sessionId });
       }
       await storage.deletePin(pin.id);
@@ -3365,7 +3378,7 @@ export async function registerRoutes(
       if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to delete pins" });
       { const lockMsg = checkLocked(access.session, access.role); if (lockMsg) return res.status(403).json({ message: lockMsg }); }
       if (pin.entryId) {
-        await storage.deleteEntry(pin.entryId);
+        await storage.deleteEntry(pin.entryId, photo.sessionId);
         broadcastToSession(photo.sessionId, { type: "sync", entity: "entries", sessionId: photo.sessionId });
       }
       await storage.deletePin(pin.id);

@@ -2443,7 +2443,10 @@ async function createIsolatedPatchTestSchema(): Promise<() => Promise<void>> {
   };
 }
 
-async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext> {
+async function buildProductionPatchRouteContext(
+  useLegacyPinDeleteRoute = false,
+  asEditor = false,
+): Promise<PatchRouteTestContext> {
   const app = express();
   app.use(express.json());
 
@@ -2516,9 +2519,12 @@ async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext
 
     const [session] = await db
       .insert(databaseSchema.countingSessions)
-      .values({ userId, name: `__routes-test-${userId}__` })
+      .values({ userId: asEditor ? `owner-${randomUUID()}` : userId, name: `__routes-test-${userId}__` })
       .returning();
     sessionId = session.id;
+    if (asEditor) {
+      await db.insert(databaseSchema.sessionCollaborators).values({ sessionId, userId, role: "editor" });
+    }
 
     const [photo] = await db
       .insert(databaseSchema.photos)
@@ -2562,6 +2568,15 @@ async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext
 
     server = http.createServer(app);
     await registerRoutes(server, app);
+    if (useLegacyPinDeleteRoute) {
+      // Express normally reaches the first DELETE registration. Remove that
+      // route only in this fixture so the second production handler is tested
+      // through the same real authentication and authorization middleware.
+      const stack = (app as any).router.stack as Array<{ route?: { path: string; methods: { delete?: boolean } } }>;
+      const index = stack.findIndex(layer => layer.route?.path === "/api/pins/:id" && layer.route.methods.delete);
+      assert.notEqual(index, -1);
+      stack.splice(index, 1);
+    }
     const baseUrl = await listenOnLoopback(server);
 
     return {
@@ -2576,6 +2591,144 @@ async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext
     await cleanup();
     throw error;
   }
+}
+
+describe("pin entry links — production authorization boundary", () => {
+  let context: PatchRouteTestContext;
+  let victimEntry: databaseSchema.Entry;
+  let localPhoto: databaseSchema.Photo;
+
+  before(async () => {
+    context = await buildProductionPatchRouteContext(false, true);
+    localPhoto = (await storage.getPhoto(context.photoId))!;
+    const [victimSession] = await db.insert(databaseSchema.countingSessions).values({
+      userId: `victim-${randomUUID()}`, name: "__pin-link-victim__",
+    }).returning();
+    victimEntry = await storage.createEntry({
+      sessionId: victimSession.id, userId: victimSession.userId, aisle: "V", section: "1",
+    });
+  });
+  after(async () => { await context?.cleanup(); });
+
+  const patch = async (body: unknown) => fetch(`${context.baseUrl}/api/pins/${context.pinId}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+
+  test("foreign and missing entry links reject the whole patch without mutation", async () => {
+    const original = await storage.getPin(context.pinId);
+    for (const entryId of [victimEntry.id, 2147483647]) {
+      const response = await patch({ entryId, label: "must-not-be-saved" });
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), { message: "Entry does not belong to this session" });
+      assert.deepEqual(await storage.getPin(context.pinId), original);
+      assert.deepEqual(await storage.getEntry(victimEntry.id), victimEntry);
+    }
+  });
+
+  test("same-session linking, omitted links and explicit null detachment remain supported", async () => {
+    for (const body of [
+      { entryId: context.entryId }, { label: "safe-label" }, { entryId: null },
+    ]) {
+      const response = await patch(body);
+      assert.equal(response.status, 200);
+      const pin = await response.json();
+      assert.equal(pin.entryId, "entryId" in body ? body.entryId : context.entryId);
+    }
+    assert.ok(await storage.getEntry(context.entryId), "detaching does not delete the entry");
+  });
+
+  const create = async (body: unknown) => fetch(`${context.baseUrl}/api/photos/${context.photoId}/pins`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+
+  test("creation and draft promotion reject foreign and missing entry links without mutation", async () => {
+    const draft = await storage.atomicCreatePin({
+      photoId: context.photoId, xPercent: 10, yPercent: 20, label: "security-draft",
+    });
+    const originalPins = await storage.getPhotoPins(context.photoId);
+    for (const label of [undefined, "security-new-pin", draft.label]) {
+      for (const entryId of [victimEntry.id, 2147483647]) {
+        const response = await create({ xPercent: 70, yPercent: 80, label, entryId });
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), { message: "Entry does not belong to this session" });
+        assert.deepEqual(await storage.getPhotoPins(context.photoId), originalPins);
+        assert.deepEqual(await storage.getEntry(victimEntry.id), victimEntry);
+      }
+    }
+  });
+
+  test("same-session creation and draft promotion still succeed, including unlabelled pins", async () => {
+    const draft = await storage.atomicCreatePin({
+      photoId: context.photoId, xPercent: 10, yPercent: 20, label: "safe-draft",
+    });
+    for (const label of [undefined, "safe-new-pin", draft.label]) {
+      const response = await create({ xPercent: 70, yPercent: 80, label, entryId: context.entryId });
+      assert.equal(response.status, 200);
+      const pin = await response.json();
+      assert.equal(pin.entryId, context.entryId);
+      assert.equal(pin.photoId, context.photoId);
+      if (label === draft.label) assert.equal(pin.id, draft.id, "promotes the existing draft row");
+      assert.equal((await storage.getPin(pin.id))!.entryId, context.entryId);
+    }
+    assert.deepEqual(await storage.getEntry(victimEntry.id), victimEntry);
+  });
+
+  test("creation still accepts explicit null and omitted entry links", async () => {
+    for (const body of [{ entryId: null }, {}]) {
+      const response = await create({ xPercent: 10, yPercent: 20, ...body });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).entryId, null);
+    }
+  });
+
+  test("storage deletion predicates on both entry ID and authorized session", async () => {
+    await storage.deleteEntry(victimEntry.id, localPhoto.sessionId);
+    assert.deepEqual(await storage.getEntry(victimEntry.id), victimEntry);
+    await storage.deleteEntry(victimEntry.id, victimEntry.sessionId);
+    assert.equal(await storage.getEntry(victimEntry.id), undefined);
+  });
+});
+
+for (const legacy of [false, true]) {
+  describe(`pin deletion — ${legacy ? "second" : "first"} production handler`, () => {
+    let context: PatchRouteTestContext;
+    let localPhoto: databaseSchema.Photo;
+    let victimEntry: databaseSchema.Entry;
+
+    before(async () => {
+      context = await buildProductionPatchRouteContext(legacy, true);
+      localPhoto = (await storage.getPhoto(context.photoId))!;
+      const [session] = await db.insert(databaseSchema.countingSessions).values({
+        userId: `victim-${randomUUID()}`, name: "__pin-delete-victim__",
+      }).returning();
+      victimEntry = await storage.createEntry({
+        sessionId: session.id, userId: session.userId, aisle: "V", section: "1",
+      });
+    });
+    after(async () => { await context?.cleanup(); });
+
+    test("deleting a pre-existing malformed pin never deletes a foreign entry", async () => {
+      await storage.updatePin(context.pinId, { entryId: victimEntry.id });
+      const response = await fetch(`${context.baseUrl}/api/pins/${context.pinId}`, { method: "DELETE" });
+      assert.equal(response.status, 200);
+      assert.equal(await storage.getPin(context.pinId), undefined);
+      assert.deepEqual(await storage.getEntry(victimEntry.id), victimEntry);
+      assert.ok(await storage.getEntry(context.entryId));
+    });
+
+    test("same-session linked and unlinked pin deletion still succeeds", async () => {
+      for (const entryId of [context.entryId, null]) {
+        const pin = await storage.createPin({
+          photoId: localPhoto.id, xPercent: 10, yPercent: 20, entryId,
+        });
+        const response = await fetch(`${context.baseUrl}/api/pins/${pin.id}`, { method: "DELETE" });
+        assert.equal(response.status, 200);
+        assert.equal(await storage.getPin(pin.id), undefined);
+        if (entryId !== null) assert.equal(await storage.getEntry(entryId), undefined);
+        assert.deepEqual(await storage.getEntry(victimEntry.id), victimEntry);
+      }
+    });
+  });
 }
 
 describe("Detail-shot references — production session isolation", () => {
