@@ -14,3 +14,16 @@ When testing rejection of a truly anonymous API write, do not assume a new Playw
 **Why:** A supposed negative replay check returned 200 under the owner identity when sent from a fresh Playwright request context; the same POST sent by bare Node fetch returned 401. The suite defaults to saved owner storage state, and its authenticated request fixture aliases the live browser context's request client. A misleadingly authenticated "anonymous" assertion can hide missing authorization coverage.
 
 **How to apply:** Check the actual identity of each request source in browser authorization tests; never infer anonymity solely from context creation.
+
+Keep the test hostname consistent with the harness's usual target when diagnosing
+fixture failures. Isolated attempts on literal IPv4 loopback failed before the
+body with “You're already signed in,” while the unchanged owner fixture executed
+on `localhost`. This observation does not establish the authentication root cause
+or explain an endpoint result from a different, missing run.
+
+**Why:** A fixture failure can prevent every intended API probe; treating it as an
+endpoint outcome would misdiagnose application security.
+
+**How to apply:** Distinguish setup-only failures from executed requests, compare
+the supported default hostname on another owned isolated target before changing
+authentication, and retain an independent anonymous probe for public endpoints.

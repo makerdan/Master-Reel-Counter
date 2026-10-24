@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "reportedObservation": {
+    "source": "Assigned investigation plan",
+    "claim": "65 successful pageview responses without a 429",
+    "requestLevelArtifactLocated": false,
+    "classification": "unverified"
+  },
+  "availableSavedReport": {
+    "path": "playwright-report/index.html",
+    "sha256": "dc53be6801ab3a5b9dad7c453d3a94ebd74926cdf0b94850d92450376d7362c1",
+    "format": "Embedded Playwright ZIP, read without exporting raw contents",
+    "metadataKeys": ["actualWorkers"],
+    "optionsKeys": [],
+    "reportStartEpochMs": 1790734743517,
+    "reportDurationMs": 345036.40900000004,
+    "stats": {"total": 69, "expected": 69, "unexpected": 0, "flaky": 0, "skipped": 0, "ok": true},
+    "test": {
+      "file": "pageview-rate-limit.spec.ts",
+      "title": "POST /api/track/pageview returns 429 after threshold",
+      "project": "chromium",
+      "startTime": "2026-09-30T02:22:36.114Z",
+      "durationMs": 1964,
+      "status": "passed",
+      "retry": 0,
+      "requestStep": {
+        "method": "POST",
+        "path": "/api/track/pageview",
+        "count": 65,
+        "startTime": "2026-09-30T02:22:37.564Z",
+        "aggregatedDurationMs": 26068,
+        "note": "Collapsed concurrent step duration is not wall-clock burst duration."
+      }
+    },
+    "missing": [
+      "per-request response status",
+      "response headers and body shape",
+      "server URL and owned process identity",
+      "source commit or content fingerprint",
+      "request identity equivalence and exact limiter window"
+    ],
+    "interpretation": "This older passing report is not the reported all-200 failure. It cannot establish the cause or source/target of that observation.",
+    "privacy": "Only whitelisted metadata retained. Raw report contains provider request data and is not a shareable diagnostic artifact."
+  },
+  "searchedLocations": [
+    "playwright-report/index.html",
+    "test-results/failure-gate",
+    "test-results/playwright-artifacts",
+    "test-results/release-diagnostics",
+    ".local/tasks",
+    ".local/audits",
+    "docs/validation/unified-registry.json retained run excerpts",
+    "docs"
+  ]
+}

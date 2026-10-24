@@ -1,0 +1,2542 @@
+{
+  "schemaVersion": 1,
+  "target": "http://localhost:25187",
+  "candidate": "pageview-investigation-987-localhost",
+  "initial": {
+    "candidateMatched": true,
+    "listener": {
+      "pid": 2441,
+      "startTicks": "127518"
+    }
+  },
+  "sourceHashes": {
+    "server/index.ts": "da7823d52f7460ad27144fdc7e013ad1699e3068bc97be0274724a14a53f7329",
+    "server/routes.ts": "b8a8d7a54f9412fda041ebd73663401e02d35581c6002cc2196c0769ba14cfc2",
+    "server/pageview-tracking.ts": "87098bf60e36b9764e839edeeabf2b4680bf16bcfeedd5f9da1fd668f0eb8430",
+    "tests/pageview-rate-limit.spec.ts": "216dbb62ca5b0d41b8dc4bcb58b7107b57adc23507a52900824c62f20b6bb16a",
+    "tests/support/pageview-diagnostic.ts": "afec3c234aeb0843d4864100398f78b02d8132bc36489ab18110bcd79d262008",
+    "tests/fixtures.ts": "33116d862e402659e2d2b19fb7b31c2610c0627fd30ca08e7db970c815ff0b40",
+    "tests/global-setup.ts": "d2dc6b122ea807ea2528a9916d8bb821bb23e315e2685600709ed5b800d951f4",
+    "playwright.config.ts": "faafa296c98c540dce15adcc3831d08e73febc273c7144a57d0ae894df713131",
+    "scripts/run-browser-tests.mjs": "283e467576af17ce87acd64bc61d99f4acd24d59580d7c2e0f0c555cb0076b8c"
+  },
+  "redirects": "disabled",
+  "transport": "APIRequestContext HTTP; no page route interception",
+  "identityChecks": {
+    "authenticatedStatus": 200,
+    "anonymousStatus": 401
+  },
+  "quietWindowBeforeBurstMs": 0,
+  "bursts": [
+    {
+      "label": "authenticated-existing-fixture",
+      "startedAt": "2026-10-24T23:03:11.795Z",
+      "durationMs": 579.5897439999999,
+      "before": {
+        "candidateMatched": true,
+        "listener": {
+          "pid": 2441,
+          "startTicks": "127518"
+        }
+      },
+      "after": {
+        "candidateMatched": true,
+        "listener": {
+          "pid": 2441,
+          "startTicks": "127518"
+        }
+      },
+      "requests": [
+        {
+          "index": 0,
+          "sentMs": 0.34366300000010597,
+          "receivedMs": 106.95219899999984,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "59",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true
+          }
+        },
+        {
+          "index": 1,
+          "sentMs": 1.435186000000158,
+          "receivedMs": 389.59652300000016,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "56",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 2,
+          "sentMs": 2.365882000000056,
+          "receivedMs": 398.2403509999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "55",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 3,
+          "sentMs": 3.4642730000000483,
+          "receivedMs": 400.9226960000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "54",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 4,
+          "sentMs": 4.392726000000039,
+          "receivedMs": 422.92823899999985,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "53",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 5,
+          "sentMs": 5.376866000000064,
+          "receivedMs": 423.4537909999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "52",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 6,
+          "sentMs": 6.338800999999876,
+          "receivedMs": 423.8854000000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "51",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 7,
+          "sentMs": 7.315614000000096,
+          "receivedMs": 424.2754420000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "50",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 8,
+          "sentMs": 8.111135999999988,
+          "receivedMs": 424.7096980000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "49",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 9,
+          "sentMs": 8.858240000000023,
+          "receivedMs": 425.06246599999986,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "48",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 10,
+          "sentMs": 9.658633000000009,
+          "receivedMs": 430.0348060000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "47",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 11,
+          "sentMs": 10.703101999999944,
+          "receivedMs": 430.489454,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "46",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 12,
+          "sentMs": 11.510333000000173,
+          "receivedMs": 430.9002059999998,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "45",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 13,
+          "sentMs": 13.300568000000112,
+          "receivedMs": 434.66743899999983,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "44",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 14,
+          "sentMs": 14.37857299999996,
+          "receivedMs": 435.8015559999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "43",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 15,
+          "sentMs": 15.612226000000192,
+          "receivedMs": 437.9057029999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "42",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 16,
+          "sentMs": 16.75269900000012,
+          "receivedMs": 450.055472,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "39",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 17,
+          "sentMs": 17.799097000000074,
+          "receivedMs": 445.63838499999974,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "41",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 18,
+          "sentMs": 18.597576000000117,
+          "receivedMs": 447.07171900000003,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "40",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 19,
+          "sentMs": 19.37869099999989,
+          "receivedMs": 451.40157899999986,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "38",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 20,
+          "sentMs": 20.27681900000016,
+          "receivedMs": 453.88691900000003,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "37",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 21,
+          "sentMs": 25.236703000000034,
+          "receivedMs": 456.48602100000016,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "36",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 22,
+          "sentMs": 26.098311000000194,
+          "receivedMs": 459.25659499999983,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "35",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 23,
+          "sentMs": 26.861281999999846,
+          "receivedMs": 462.20486200000005,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "34",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 24,
+          "sentMs": 27.75323100000014,
+          "receivedMs": 465.4107829999998,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "33",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 25,
+          "sentMs": 28.40360899999996,
+          "receivedMs": 467.84479899999997,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "32",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 26,
+          "sentMs": 29.054727000000184,
+          "receivedMs": 471.6165540000002,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "31",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 27,
+          "sentMs": 29.770312999999987,
+          "receivedMs": 474.58367899999985,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "30",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 28,
+          "sentMs": 30.51334399999996,
+          "receivedMs": 477.4016590000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "29",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 29,
+          "sentMs": 31.385537000000113,
+          "receivedMs": 484.17166899999984,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "28",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 30,
+          "sentMs": 32.14572300000009,
+          "receivedMs": 486.7435230000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "27",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 31,
+          "sentMs": 32.94914000000017,
+          "receivedMs": 489.35196799999994,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "26",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 32,
+          "sentMs": 33.76298799999995,
+          "receivedMs": 492.0114859999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "25",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 33,
+          "sentMs": 34.822917999999845,
+          "receivedMs": 494.5830860000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "24",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 34,
+          "sentMs": 35.91114599999992,
+          "receivedMs": 497.03280600000016,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "23",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 35,
+          "sentMs": 36.92904099999987,
+          "receivedMs": 499.61885900000016,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "22",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 36,
+          "sentMs": 37.86892499999976,
+          "receivedMs": 502.03747999999996,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "21",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 37,
+          "sentMs": 38.70936100000017,
+          "receivedMs": 504.72026700000015,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "20",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 38,
+          "sentMs": 39.510855999999876,
+          "receivedMs": 114.80557899999985,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "58",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 39,
+          "sentMs": 40.33727599999975,
+          "receivedMs": 507.7585389999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "19",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 40,
+          "sentMs": 41.01425999999992,
+          "receivedMs": 510.7485059999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "18",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 41,
+          "sentMs": 41.79210699999976,
+          "receivedMs": 513.7674830000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "17",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 42,
+          "sentMs": 42.50063300000011,
+          "receivedMs": 516.782029,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "16",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 43,
+          "sentMs": 43.36027299999978,
+          "receivedMs": 519.9338790000002,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "15",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 44,
+          "sentMs": 44.19549300000017,
+          "receivedMs": 522.8769309999998,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "14",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 45,
+          "sentMs": 49.56915900000013,
+          "receivedMs": 525.929846,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "13",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 46,
+          "sentMs": 50.25400600000012,
+          "receivedMs": 529.1435999999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "12",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 47,
+          "sentMs": 50.982704999999896,
+          "receivedMs": 532.096634,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "11",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 48,
+          "sentMs": 51.72632900000008,
+          "receivedMs": 535.3648429999998,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "10",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 49,
+          "sentMs": 53.07095299999992,
+          "receivedMs": 538.432973,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "9",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 50,
+          "sentMs": 54.009497999999894,
+          "receivedMs": 541.2125120000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "8",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 51,
+          "sentMs": 54.736467000000175,
+          "receivedMs": 544.281903,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "7",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 52,
+          "sentMs": 55.414768000000095,
+          "receivedMs": 550.8333910000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "6",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 53,
+          "sentMs": 56.06719599999997,
+          "receivedMs": 553.481655,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "5",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 54,
+          "sentMs": 56.69662100000005,
+          "receivedMs": 556.2975379999998,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "4",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 55,
+          "sentMs": 57.36162599999989,
+          "receivedMs": 558.8206650000002,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "3",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 56,
+          "sentMs": 58.073461999999836,
+          "receivedMs": 118.90308499999992,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "57",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 57,
+          "sentMs": 58.73627299999998,
+          "receivedMs": 561.5197229999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "2",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 58,
+          "sentMs": 59.434905999999955,
+          "receivedMs": 564.5176200000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "1",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 59,
+          "sentMs": 60.10686600000008,
+          "receivedMs": 566.8585990000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 60,
+          "sentMs": 60.788450999999895,
+          "receivedMs": 569.6155549999999,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        },
+        {
+          "index": 61,
+          "sentMs": 61.37083900000016,
+          "receivedMs": 571.992679,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        },
+        {
+          "index": 62,
+          "sentMs": 61.965220000000045,
+          "receivedMs": 574.341629,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        },
+        {
+          "index": 63,
+          "sentMs": 62.56806000000006,
+          "receivedMs": 576.7971459999999,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        },
+        {
+          "index": 64,
+          "sentMs": 63.145546000000195,
+          "receivedMs": 579.1120209999999,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        }
+      ]
+    },
+    {
+      "label": "anonymous-empty-storage",
+      "startedAt": "2026-10-24T23:04:13.800Z",
+      "durationMs": 583.209646999996,
+      "before": {
+        "candidateMatched": true,
+        "listener": {
+          "pid": 2441,
+          "startTicks": "127518"
+        }
+      },
+      "after": {
+        "candidateMatched": true,
+        "listener": {
+          "pid": 2441,
+          "startTicks": "127518"
+        }
+      },
+      "requests": [
+        {
+          "index": 0,
+          "sentMs": 0.022383000003173947,
+          "receivedMs": 176.4237659999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "59",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true
+          }
+        },
+        {
+          "index": 1,
+          "sentMs": 2.5296390000003157,
+          "receivedMs": 453.9234160000051,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "58",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 2,
+          "sentMs": 6.836682000001019,
+          "receivedMs": 456.2856710000051,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "57",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 3,
+          "sentMs": 8.524750999997195,
+          "receivedMs": 457.04145800000697,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "56",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 4,
+          "sentMs": 10.182142999998177,
+          "receivedMs": 460.5807999999961,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "55",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 5,
+          "sentMs": 13.75858000000153,
+          "receivedMs": 461.2203379999992,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "54",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 6,
+          "sentMs": 14.762197000003653,
+          "receivedMs": 463.9077810000017,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "53",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 7,
+          "sentMs": 16.530423999996856,
+          "receivedMs": 466.86304100000416,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "52",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 8,
+          "sentMs": 19.168831000002683,
+          "receivedMs": 469.2565190000023,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "51",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 9,
+          "sentMs": 20.8371180000031,
+          "receivedMs": 469.7298449999944,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "50",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 10,
+          "sentMs": 23.285585999998148,
+          "receivedMs": 472.11768300000404,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "49",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 11,
+          "sentMs": 25.341223000003083,
+          "receivedMs": 472.5905400000047,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "48",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 12,
+          "sentMs": 27.092679000001226,
+          "receivedMs": 474.8195960000012,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "47",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 13,
+          "sentMs": 29.122400000000198,
+          "receivedMs": 475.7067070000048,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "46",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 14,
+          "sentMs": 29.990998000001127,
+          "receivedMs": 477.15142700000433,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "45",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 15,
+          "sentMs": 31.96777999999904,
+          "receivedMs": 478.89833300000464,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "44",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 16,
+          "sentMs": 32.9793290000016,
+          "receivedMs": 480.49263199999405,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "43",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 17,
+          "sentMs": 34.6612460000033,
+          "receivedMs": 482.3470609999931,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "42",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 18,
+          "sentMs": 36.618978999998944,
+          "receivedMs": 483.9245590000064,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "41",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 19,
+          "sentMs": 37.547490999997535,
+          "receivedMs": 487.2581749999954,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "40",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 20,
+          "sentMs": 38.521512999999686,
+          "receivedMs": 489.6026949999941,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "39",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 21,
+          "sentMs": 42.7577569999994,
+          "receivedMs": 490.6770589999942,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "38",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 22,
+          "sentMs": 43.550021000002744,
+          "receivedMs": 492.25331800000276,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "37",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 23,
+          "sentMs": 44.234557000003406,
+          "receivedMs": 493.80662800000573,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "36",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 24,
+          "sentMs": 46.82132100000308,
+          "receivedMs": 495.58063900000707,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "35",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 25,
+          "sentMs": 47.64035799999692,
+          "receivedMs": 498.4760180000012,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "34",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 26,
+          "sentMs": 48.324454000001424,
+          "receivedMs": 500.22509900000296,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "33",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 27,
+          "sentMs": 49.10780700000032,
+          "receivedMs": 502.288453000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "32",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 28,
+          "sentMs": 49.9763529999982,
+          "receivedMs": 507.02699300000677,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "31",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 29,
+          "sentMs": 51.86489099999744,
+          "receivedMs": 508.171319999994,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "30",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 30,
+          "sentMs": 54.464725999998336,
+          "receivedMs": 512.5736199999956,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "29",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 31,
+          "sentMs": 57.1861229999995,
+          "receivedMs": 517.0093280000001,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "28",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 32,
+          "sentMs": 61.94764700000087,
+          "receivedMs": 518.5265110000037,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "27",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 33,
+          "sentMs": 63.16082499999902,
+          "receivedMs": 520.5586800000019,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "26",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 34,
+          "sentMs": 64.85676300000341,
+          "receivedMs": 522.4045460000052,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "25",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 35,
+          "sentMs": 67.00443200000154,
+          "receivedMs": 524.2267410000059,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "24",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 36,
+          "sentMs": 68.37245200000325,
+          "receivedMs": 526.0990330000059,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "23",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 37,
+          "sentMs": 70.78141000000323,
+          "receivedMs": 528.9715929999948,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "22",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 38,
+          "sentMs": 73.56164200000057,
+          "receivedMs": 529.9989530000021,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "21",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 39,
+          "sentMs": 74.86223700000119,
+          "receivedMs": 532.4572639999969,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "20",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 40,
+          "sentMs": 75.9390029999995,
+          "receivedMs": 533.284845000002,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "19",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 41,
+          "sentMs": 76.72542599999724,
+          "receivedMs": 535.0707830000028,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "18",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 42,
+          "sentMs": 77.58096600000135,
+          "receivedMs": 536.6825959999987,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "17",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 43,
+          "sentMs": 78.77081300000282,
+          "receivedMs": 539.8123539999942,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "16",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 44,
+          "sentMs": 81.32786299999862,
+          "receivedMs": 540.6038709999993,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "15",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 45,
+          "sentMs": 82.46601299999747,
+          "receivedMs": 542.6637659999978,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "14",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 46,
+          "sentMs": 83.12160500000027,
+          "receivedMs": 544.4307759999938,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "13",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 47,
+          "sentMs": 83.77088000000367,
+          "receivedMs": 546.5111109999998,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "12",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 48,
+          "sentMs": 84.43812900000194,
+          "receivedMs": 547.8372430000018,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "11",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 49,
+          "sentMs": 85.65241100000276,
+          "receivedMs": 549.6062530000054,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "10",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 50,
+          "sentMs": 86.83457500000077,
+          "receivedMs": 552.2251329999999,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "9",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 51,
+          "sentMs": 87.92705500000011,
+          "receivedMs": 553.9660640000075,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "8",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 52,
+          "sentMs": 89.20047999999952,
+          "receivedMs": 556.4244480000052,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "7",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 53,
+          "sentMs": 90.88603100000182,
+          "receivedMs": 557.7163460000011,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "6",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 54,
+          "sentMs": 92.05720799999835,
+          "receivedMs": 560.1550859999988,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "5",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 55,
+          "sentMs": 92.9678619999977,
+          "receivedMs": 562.6573659999995,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "4",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 56,
+          "sentMs": 93.98308600000018,
+          "receivedMs": 565.7960040000034,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "3",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 57,
+          "sentMs": 95.12778999999864,
+          "receivedMs": 568.8325960000075,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "2",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 58,
+          "sentMs": 96.17785200000071,
+          "receivedMs": 571.8804970000056,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "1",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 59,
+          "sentMs": 97.35204299999896,
+          "receivedMs": 575.5967649999948,
+          "status": 200,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": null
+          },
+          "bodyShape": {
+            "ok": true,
+            "deduplicated": true
+          }
+        },
+        {
+          "index": 60,
+          "sentMs": 98.88130000000092,
+          "receivedMs": 576.6872410000069,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        },
+        {
+          "index": 61,
+          "sentMs": 102.30619999999908,
+          "receivedMs": 577.10815,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        },
+        {
+          "index": 62,
+          "sentMs": 104.58852299999853,
+          "receivedMs": 580.1864389999973,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        },
+        {
+          "index": 63,
+          "sentMs": 106.83293299999787,
+          "receivedMs": 581.0600509999931,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        },
+        {
+          "index": 64,
+          "sentMs": 108.93473400000221,
+          "receivedMs": 582.7578219999996,
+          "status": 429,
+          "endpointMatched": true,
+          "headers": {
+            "content-type": "application/json; charset=utf-8",
+            "ratelimit-limit": "60",
+            "ratelimit-remaining": "0",
+            "ratelimit-reset": "60",
+            "ratelimit-policy": "60;w=60",
+            "retry-after": "60"
+          },
+          "bodyShape": {
+            "ok": false,
+            "message": "string"
+          }
+        }
+      ]
+    }
+  ]
+}
