@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { invariant, pins, readRegistry, taskState, tierDefinition, TIERS, mergeGuard, git } from "./lib/unified-gate/store.mjs";
 import { provision, amend, guard, restorePlan, cancel, catalog, baselineWarnings, prepareDraft } from "./lib/unified-gate/plans.mjs";
 import { run, classificationLog } from "./lib/unified-gate/execution.mjs";
+import { parseInput } from "./lib/unified-gate/regression.mjs";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const [operation, ...args] = process.argv.slice(2);
@@ -15,7 +16,7 @@ function option(name) {
 function input(name = "spec") {
   const path = option(name);
   invariant(path, `--${name} JSON path required`);
-  return JSON.parse(readFileSync(resolve(process.cwd(), path), "utf8"));
+  return parseInput(readFileSync(resolve(process.cwd(), path), "utf8"));
 }
 const id = option("id") ?? process.env.TASK_ID;
 const tier = option("tier");

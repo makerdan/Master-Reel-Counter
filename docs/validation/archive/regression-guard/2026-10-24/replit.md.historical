@@ -1,0 +1,96 @@
+# Master Reel Counter
+
+## Overview
+Master Reel Counter is a full-stack warehouse wire reel counting application designed to track wire reels across pallet sections. It enables photo annotation, manual category entry with catalog autocomplete, and PDF/CSV export capabilities. The application aims to streamline inventory management by providing a comprehensive solution for tracking wire reels, with features like collaborative sessions, real-time updates, offline capabilities, and AI-powered label scanning.
+
+## User Preferences
+- Industrial/warehouse aesthetic
+- Mobile-first design
+- Monospace font (JetBrains Mono) for data values
+- Orange accent color (#ea580c)
+
+## System Architecture
+The application is built with a React frontend, an Express.js backend, and PostgreSQL as the database. Authentication is handled exclusively by Replit-managed Clerk. PostgreSQL stores approval state, roles, and per-User capabilities.
+
+**UI/UX Decisions:**
+- **Theme:** Copper/industrial warm tones with dark mode support, using shadcn/ui components.
+- **Font:** Monospace font (JetBrains Mono) for data values.
+- **Mobile-first:** Dedicated mobile capture mode for quick photo taking.
+
+**Technical Implementations & Feature Specifications:**
+- **Session Management:** Users can create, duplicate, move, and organize counting sessions. Sessions support soft delete (moved to trash with `deletedAt` timestamp). Trashed sessions can be restored within 30 days or permanently deleted. A background interval auto-purges expired trash hourly. The dashboard includes a "Trash" toggle to view/restore/permanently delete trashed sessions.
+- **Folder Management:** Folders support soft-delete (trash) mirroring the session trash flow. Deleting a folder moves it to trash, removing its sessions to the main list. Trashed folders can be restored or permanently deleted from the existing trash view. Folder `deletedAt` column added to schema; `getUserFolders` filters out soft-deleted folders.
+- **Entry Management:** Manual entry of reel data with category autocomplete, auto-calculation of total footage, and quick entry panels.
+- **Photo Management:** Photo annotation with pin placement, background uploads, offline photo queue (IndexedDB), per-photo pin scaling, notes, and nearby photo viewer. Photos are stored in Replit Object Storage.
+- **Collaboration:** Real-time collaborative sessions with role-based permissions (owner, editor, viewer), multiple invitation methods, and online presence tracking via WebSockets.
+- **Data Export:** PDF export with cover page, clickable Table of Contents, page numbers, enhanced photo captions, and grand totals. Excel (.xlsx) export via ExcelJS with styled tables, wire-type grouping, and audit trails. PDF exports offer full or standard quality options. Photo rotations are persisted and applied to exports.
+- **AI Label Scanner:** A dedicated tab uses OpenAI Vision (gpt-4o) to read wire reel labels from photo crops. It supports batch analysis, client-side fuzzy matching against a wire catalog, and review/editing of results. Draft and committed pins are supported, with real-time sync across collaborators. Includes features like Receiving pooling for batch analysis, a batch mode for viewing all active pins, display of raw AI text, and special aliases for OCR results.
+- **Undo/Redo:** Functionality for entry and pin modifications.
+- **Summary Statistics:** Dashboard for key metrics and activity logs. Enhanced with Data Quality section (flagged pins, flag rate, review response breakdown, dismissed duplicates), AI Scanner Stats (total scans, readable/unreadable rate), Photo Insights (detail shots, regular photos, avg photos per session, photos with linked pins), Wire Breakdown charts (top wire types and gauges with count/footage), Daily Activity Heatmap (last 30 days GitHub-style heatmap), and Session Completion Rate progress bar in Overview.
+- **Security:** Ownership verification on all CRUD routes and optional AES-256-GCM data encryption for sensitive entry fields.
+- **AI Help Chatbot:** The Help menu includes a tabbed layout with "Guide" (existing accordion docs) and "Ask AI" tabs. The AI chatbot uses OpenAI (gpt-4o-mini) with a comprehensive system prompt covering all app features. Supports streaming responses, conversation history within the session, clear chat, and basic markdown rendering.
+- **In-App Feedback:** Users can submit structured feedback (bug reports, feature requests) directly from the application.
+- **Flagged Reels Workflow:** Pins can be flagged for re-shoot/review with notes, and a dedicated tab allows viewing and resolving flagged pins.
+- **Review Tab:** A "Review" tab on the session page assigns entries round-robin to online users for accuracy review. Each entry shows a 60-second sync spinner before revealing its image. AI Scanner entries display a cropped thumbnail at the pin location; other entries display the full section photo. Users can approve or flag entries (with optional reason). Responses are persisted in the `review_responses` table and support upsert (users can change verdicts). A progress indicator shows review completion.
+- **Duplicate Detection:** Identifies potential duplicate pins based on label matching (same label in same aisle/section) and same-reel detection (multiple pins on the same photo for the same physical reel). Dismissed duplicates are persisted to the `dismissed_duplicates` DB table (per session), shared across all users. Undo/Redo supports dismiss/undismiss actions. Old localStorage dismissals are auto-migrated to DB on first load.
+- **Account Access:** Anyone may sign up through managed Clerk. New identities remain pending until an Admin approves them. Approved Users start with assigned-session editing, photo upload, and normal inventory-entry access; Admins can grant additional capabilities.
+- **User Settings:** Comprehensive settings for display (theme, thumbnail size), accessibility, data entry (aisle prefix, section advance), photo capture quality, export defaults, data encryption, and storage usage dashboard.
+- **Storage Usage Dashboard:** Settings page shows per-user cloud storage consumption with a visual progress bar (10 GB limit), photo/session counts, and a collapsible all-users breakdown table. Photo file sizes are stored in the `photos.fileSize` DB column and populated on upload. A backfill endpoint (`POST /api/storage/backfill-sizes`) fetches GCS metadata for existing photos missing sizes.
+- **User Profile Avatar:** Users can upload custom profile photos stored in Replit Object Storage.
+
+**System Design Choices:**
+- **Frontend:** React + Vite with TanStack Query for data fetching and wouter for routing.
+- **Backend:** Express.js.
+- **Database:** PostgreSQL with Drizzle ORM, using transactions for atomic operations.
+- **API:** RESTful API with authentication and session access verification. List endpoints support server-side pagination (limit/offset) with total counts.
+- **Real-time Communication:** WebSockets for collaborative sessions with access verification.
+- **Data Encoding:** AES-256-GCM encryption with key wrapping for sensitive fields.
+- **Cascade Deletion:** Comprehensive cleanup of related data upon deletion of sessions, photos, or entries.
+
+## External Dependencies
+- **Replit-managed Clerk:** Cookie-based authentication for normal web users, with managed development/production keys and the canonical production proxy.
+- **Replit Object Storage:** For storing uploaded photos and user avatars.
+- **PostgreSQL:** Relational database.
+- **Client-side Wire Catalog:** Approximately 180 hardcoded entries for category lookup and autofill.
+- **OpenAI Vision (gpt-4o):** Used for AI label scanning.
+- **ExcelJS:** For generating Excel (.xlsx) exports.
+- **PWA Support:** Web app manifest, service worker (caches app shell and static assets), offline photo/entry queue via IndexedDB, network status indicator with auto-sync on reconnect. Service worker registered in production only. Session data cached in React Query with 30-minute gc time for offline viewing.
+
+## Workspace-managed skill projections
+
+The tracked Skill Mirror Sync capability is implemented by
+`scripts/workspace-skill-sync.mjs`. It requires an explicit `WORKSPACE_SKILLS_SOURCE`
+for every operation; there is no fallback source. Use the discoverable npm
+commands `workspace-skill:refresh`, `workspace-skill:validate`,
+`workspace-skill:audit`, `workspace-skill:load`, and `workspace-skill:status`.
+Refresh generates only `.agents/skills/.workspace-projections/`, which is
+ignored because it can contain private workspace instructions. Validation uses
+recursive SHA-256 manifests and an opaque `.workspace-revision`, and refuses
+stale or partial projections.
+
+`.local/custom_skills` is a platform-owned, disposable runtime mirror. The
+repository never writes it or its `.workspace-skill-metadata.json` sidecars.
+`workspace-skill:status -- --skill <slug>` is read-only and reports only bounded
+`pass`, `mismatch`, `unavailable-source`, or `missing-mirror` outcomes. Mirror
+repair and source publication belong to the workspace owner; only
+projection implementation defects belong in this repository.
+
+## Failure Gate Unified
+
+The current Failure Gate source is `.agents/skills/failure-gate-unified/SKILL.md`
+plus both required references, pinned as one normative contract.
+Reviewable proposals are `UNADMITTED_NATIVE_DRAFT` with no ledger writes
+(`npm run gate:draft -- --spec <spec.json>`). Execution admission uses the
+provisioner (`npm run gate:new -- --spec <spec.json>`), a stable local retry claim, exactly
+one bound tier and sealed plans. Never manufacture an ID or implement an
+unprovisioned task. Legacy tasks keep their original IDs and records and are not
+rebound. Run the sealed plan's `gate:guard` preflight before implementation,
+using `TASK_ID` and `TASK_PLAN_FILE`; use `gate:run` for bound-tier evidence.
+If admission or a plan guard fails, follow the skill's "Installing, updating
+and repairing the gate" section. Owner-directed gate work uses setup checks,
+not a tier PASS. No workspace-identity or machine-bound admission is required.
+Ordinary approval stays with the Agent; no custom native-host admission is allowed.
+Preserve dedicated host follow-up constraints while allowing complete unadmitted
+drafts; never invent payload fields or repeat uncertain publication writes.
+See `AGENTS.md`, `docs/validation/unified-installation.md` and
+`docs/validation/modular-migration.md` for the current runtime acceptance blocker.

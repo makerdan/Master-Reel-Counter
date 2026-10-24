@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "skill": "regression-guard",
+  "revision": "portable-enforcement-and-full-contract-revision",
+  "canonicalSkillSha256": "0382048c3369db9b169aa5d9c8ba1b65794c1e25f93f41491706fb061c617611",
+  "normativeFiles": [
+    "SKILL.md",
+    "reference/delivery-handoff.md",
+    "reference/enforcement-contract.md"
+  ],
+  "normativeContractSha256": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+  "normativeContractEncoding": "UTF-8; sorted relative path + NUL + lowercase file SHA-256 + LF per normative file",
+  "files": [
+    {
+      "path": "README.md",
+      "role": "explanatory",
+      "bytes": 2282,
+      "sha256": "ec05838101ed00f72b748e0eb37bf38076042de40e9c71f4d045c453f299af5c"
+    },
+    {
+      "path": "REVISION-NOTES.md",
+      "role": "explanatory",
+      "bytes": 3139,
+      "sha256": "f20dfb938a89468aebe29353bb01cc16fc382af7b4af1ccf8eac90eb49428037"
+    },
+    {
+      "path": "SKILL.md",
+      "role": "normative",
+      "bytes": 22175,
+      "sha256": "0382048c3369db9b169aa5d9c8ba1b65794c1e25f93f41491706fb061c617611"
+    },
+    {
+      "path": "reference/delivery-handoff.md",
+      "role": "normative",
+      "bytes": 3578,
+      "sha256": "2df6f93305e3757989bff36be1ab1bc7cc9deb3229ad703cec83e3ef1a4c9910"
+    },
+    {
+      "path": "reference/enforcement-contract.md",
+      "role": "normative",
+      "bytes": 11850,
+      "sha256": "b98440311cf220d0536e7c234a78f4c5ca9a287bf2a5b99caed8ba44191d914d"
+    }
+  ]
+}

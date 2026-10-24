@@ -1,0 +1,27 @@
+{
+  "kind": "owner-authorized-guard-maintenance-handoff",
+  "contract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+  "classification": "material enforcement change with normal regression coverage",
+  "maintenance": {
+    "command": "timeout --signal=TERM --kill-after=3s 80s node --test --test-timeout=40000 scripts/__tests__/unified-gate.test.mjs",
+    "passed": 28,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "durationMs": 17228.685835,
+    "state": "PASS"
+  },
+  "sourceHashes": {
+    "scripts/lib/unified-gate/regression.mjs": "2aa74e37953076f0397c7889dcde652b7000bbbde5551f173cb0f12c8de73178",
+    "scripts/lib/unified-gate/plans.mjs": "f01dbf9ae0fa0d530d2a912d8991809ed510de0db78360e7089777337fe298ee",
+    "scripts/lib/unified-gate/store.mjs": "62629a47b04efc920bc4355ed1fb146e7ccaf6eb318bd2f1d58acde5bf3ba591",
+    "scripts/unified-gate.mjs": "d1655f4db49256ad6f567c9c88d95d01ec7d0db46f1173f66d5f59ec06477875",
+    "scripts/__tests__/unified-gate.test.mjs": "112db43cc349d07b5c26e354217af4d970b433da7550e4d7defba422f2235da1"
+  },
+  "requirementMap": "docs/validation/regression-guard-migration.md",
+  "runtimeAcceptance": "BLOCKED: inherited Unified normal task-environment/restart acceptance NOT_OBSERVED; eight historical local plans absent",
+  "deferralCapability": "UNSUPPORTED",
+  "independentVerification": "not selected",
+  "applicationTierPass": false,
+  "liveTaskIdsCreated": 0
+}

@@ -25,8 +25,11 @@ approval authority. Otherwise use the project's verified governing policy.
 Use canonical `.agents` sources and applicable references. Definition authoring
 does not install app enforcement, publish a workspace skill or authorize app work.
 Read [the enforcement and acceptance contract](reference/enforcement-contract.md)
-when implementing, auditing or activating integration. Use
-[the handoff template](reference/delivery-handoff.md) for delivery and verification.
+in full when implementing, auditing, updating or activating integration. Read
+[the handoff contract](reference/delivery-handoff.md) when planning delivery or
+recording it. Both references are normative; their templates adapt to supported
+project records, not an extra ledger or reviewer service. If a required reference
+is unavailable, report the affected operation as blocked; do not invent its rules.
 
 ## 1. Classify the actual work
 
@@ -174,6 +177,13 @@ owns that recurrence and is covered by applicable approval for the deferral.
 Record why it cannot land here, responsibility, dependency/risk disposition and
 retrievable evidence. A pasted "(accepted)" label is not verification.
 
+Deferral is a permitted contract form, not a promise that every project implements
+its admission. Document the actual supported route and its limits. If commitment
+or applicable authorization cannot be established through available supported
+capabilities, keep that deferral unresolved: deliver coverage here or use separately
+authorized integration maintenance. Do not weaken the evidence standard or require
+a new native-host admission service merely to enable ordinary covered work.
+
 Do not mandate numeric platform references, universal status names, a new approval
 service or repeated permission where valid authorization already covers it.
 Recheck deferral eligibility before execution and delivery. Cancellation or scope
@@ -188,7 +198,8 @@ forcing a normal three-field declaration onto N/A or self-satisfying work.
 Draft preparation may generate placeholders, but placeholders cannot pass
 publication or execution admission.
 
-For new/current-contract plans, the shared validation decision must reject:
+For new/current-contract plans, the combined structural checks and accountable
+Planner/executor coverage assessment must reject:
 
 - Missing required, duplicate, mixed, empty, contradictory or placeholder
   declarations; unsupported exclusions, N/A, self-satisfaction or deferral.
@@ -211,17 +222,25 @@ real host mechanism and never mutate admitted/sealed revisions. An amendment
 creates the supported new revision; it does not edit a sealed plan in place.
 
 Mechanical validation checks structure and recorded classification evidence.
-Semantic adequacy still requires Planner/executor review of scope and coverage;
+Semantic adequacy requires the accountable Planner/executor to inspect the actual
+scenario, owning boundary and detecting assertion;
 do not claim that keyword heuristics prove a recurrence is covered. Unresolved
 material contradictions must be resolved before admission, not silently accepted.
 
 ### Pre-implementation preflight, including after Start
 
 Automatically reassess actual scope and the applicable declaration before any
-implementation, not only when validation launches. Use a verified pre-dispatch
-hook where supported; otherwise the executing Agent performs this as its first
-action after Start. Read-only inspection and supported plan preparation are allowed;
-implementation and workloads wait for valid admission and applicable authorization.
+implementation, not only when validation launches. The executing Agent performs
+this as its first action after Start. An existing supported local check may assist;
+do not invent native lifecycle authentication or claim platform interception.
+Read-only inspection and supported draft preparation may precede execution
+admission. When Unified is adopted, complete unadmitted native drafts may be
+published without ledger writes or seals; applicable classification and guard
+declarations are still required before publication. Excluded work does not acquire
+a new recurrence-test obligation from this publication rule.
+Implementation and workloads wait for the governing host's
+applicable admission and ordinary authorization. This skill does not add seals,
+task IDs or Unified to a host whose verified policy does not use them.
 
 If already adequate, reuse the declaration. Otherwise automatically prepare the
 concrete recurrence, appropriate test location and detecting assertion, or justified
@@ -277,6 +296,18 @@ implicit consequence of installing this definition. Respect the host's real rout
 for authorized guard-integration maintenance, including Unified's owner-directed
 gate work where it actually applies. Do not invent bootstrap specifications,
 signed task identities, machine-bound authority or a second approval registry.
+
+
+### Full-contract revision identity
+
+For this package, record and snapshot SKILL.md plus both normative reference
+files as one contract revision using a full-package fingerprint or an equivalent
+supported mechanism. A core-only hash does not detect changed reference rules.
+The manifest's normativeContractSha256 identifies the selected file set, not
+authorization or proof of enforcement. Compare against the independently stored
+applicable project/task pin, not merely a manifest edited beside the source.
+Preserve old single-file identities and snapshots; add new-version compatibility
+through authorized maintenance without reclassifying historical tasks.
 
 ## 5. Execute and hand off actual delivery
 

@@ -18,7 +18,19 @@ Ordinary approval, cancellation and scope are the Agent's responsibility.
 Local notes are not independent native approval evidence. Never add custom
 native-host admission, receipts, callbacks or indirect native authorization checks.
 Use a stable local `claim` to reconcile interrupted/uncertain admission; it is
-not a native task ID. New specs include a scope-based `regressionGuard` declaration.
+not a native task ID. Historical specs retain their original declaration syntax.
+
+Regression Guard now uses structured `regression` input for new specifications:
+`form`, `material`, `rationale`, plus the form's fields documented in
+`docs/validation/regression-guard-migration.md`. The canonical core and BOTH
+references are pinned in `docs/validation/regression-guard-pin.json`.
+Do not supply a caller-selected contract to bypass current rules. The provisioner
+records the selected contract inside the existing seal; historical plans retain
+their recorded policy. Code checks structure, while the Agent must assess actual
+scope, every material boundary, scenario and assertion adequacy before publication,
+implementation and delivery. Deferral is explicitly unsupported here.
+Emit the skill's classification announcement and retain a revision-bound delivery
+handoff outside sealed plans. No independent verifier is required.
 
 If admission or a plan guard fails, follow the canonical skill's
 "Installing, updating and repairing the gate" section. Do not work around it.

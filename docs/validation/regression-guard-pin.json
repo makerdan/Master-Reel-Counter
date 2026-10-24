@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "current": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+  "revisions": {
+    "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3": "docs/validation/regression-guard-revisions/1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3"
+  },
+  "cutover": "Existing sealed records retain their original spec and handler. New specifications record guardContract inside the existing sealed spec; supported amendments adopt the current Guard."
+}

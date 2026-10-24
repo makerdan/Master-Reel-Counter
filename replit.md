@@ -77,6 +77,10 @@ projection implementation defects belong in this repository.
 
 ## Failure Gate Unified
 
+Regression Guard integration and its revision-bound delivery handoff are documented
+in `docs/validation/regression-guard-migration.md`. Its canonical package includes
+both references; current structural checks do not replace Agent coverage assessment.
+
 The current Failure Gate source is `.agents/skills/failure-gate-unified/SKILL.md`
 plus both required references, pinned as one normative contract.
 Reviewable proposals are `UNADMITTED_NATIVE_DRAFT` with no ledger writes

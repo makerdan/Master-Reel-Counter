@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { loadCatalog, maintenanceFindings, isReferenceable } from "../baseline.mjs";
+import { contract as regressionContract, declaration as regressionDeclaration } from "./regression.mjs";
 import { MANIFEST, UUID, invariant, stable, digest, hash, pins, tierDefinition,
   readRegistry, taskState, safePath, atomicWrite, append, saveRegistry, withWriter, admissionReady } from "./store.mjs";
 
@@ -14,7 +15,7 @@ function text(value, label) {
     !/\b(TODO|TBD)\b|<[^>]+>/.test(value), `${label} must be a complete declaration`);
   return value.trim();
 }
-export function specification(root, input, { draft = false, modular = false } = {}) {
+export function specification(root, input, { draft = false, modular = false, historical = false } = {}) {
   const tier = input.tier;
   const definition = tierDefinition(root, tier);
   const spec = {
@@ -32,7 +33,13 @@ export function specification(root, input, { draft = false, modular = false } = 
     ignoredBaselines: input.ignoredBaselines ?? [], ownedBaselines: input.ownedBaselines ?? [],
     assertions: input.assertions,
   };
-  if (modular) spec.regressionGuard = text(input.regressionGuard, "scope-based Regression Guard declaration");
+  const guardPin = historical ? input.guardContract : regressionContract(root, safePath);
+  if (guardPin) {
+    regressionContract(root, safePath, guardPin);
+    spec.guardContract = guardPin;
+    spec.regression = structuredClone(input.regression);
+    spec.regressionGuard = regressionDeclaration(spec.regression);
+  } else if (modular) spec.regressionGuard = text(input.regressionGuard, "scope-based Regression Guard declaration");
   invariant(definition.steps.some((step) => spec.coverage.includes(step.name)),
     "coverage evidence must identify a real selected-tier step");
   invariant(Array.isArray(spec.assertions) && spec.assertions.length > 0, "planned guard assertions required");
@@ -59,7 +66,7 @@ export function renderPlan(root, state) {
       declarations.push(`**${label}:** ${JSON.stringify({ id, suite: record.suite, test: record.test, signature: record.signature })}`);
     }
   }
-  return `# ${spec.title}
+  const plan = `# ${spec.title}
 
 ## Task identity
 **Task ID:** ${id}
@@ -67,7 +74,7 @@ export function renderPlan(root, state) {
 **Skill pin:** ${pin}
 
 ## Scope
-${spec.scope}
+${spec.scope}${spec.guardContract ? `\n\n## Regression classification\n**Guard contract:** ${spec.guardContract}\n**Form:** ${spec.regression.form}\n**Material scope:** ${spec.regression.material}\n**Rationale:** ${spec.regression.rationale}` : ""}
 
 ## Approval evidence
 **Reference:** ${spec.approval.reference}
@@ -88,8 +95,18 @@ ${declarations.length ? declarations.join("\n") : "None known at plan time. Trea
 ## Planned guard assertions
 ${spec.assertions.map((a) => `- ${a.requirement} — ${a.check}`).join("\n")}${spec.regressionGuard ? `\n\n## Regression Guard\n${spec.regressionGuard}` : ""}
 `;
+  if (spec.guardContract) {
+    const sections = plan.match(/^## Regression Guard\s*$/gm) ?? [];
+    invariant(sections.length === (spec.regressionGuard ? 1 : 0),
+      "Regression Guard: duplicate or injected declaration section");
+  }
+  return plan;
 }
 function publish(root, registry, state, spec, reason) {
+  if (spec.guardContract) {
+    regressionContract(root, safePath, spec.guardContract);
+    regressionDeclaration(spec.regression);
+  }
   const next = { ...state, spec, tier: spec.tier, pin: pins(root).current,
     revision: state.revision + 1, status: "sealed",
     workloadHash: digest(tierDefinition(root, spec.tier)), amendmentReason: text(reason, "amendment rationale") };
@@ -187,7 +204,7 @@ export function guard(root, { id, tier, planFile }, registry = readRegistry(root
   invariant(state.workloadHash === digest(tierDefinition(root, tier)), "tier workload changed; use supported amendment");
   invariant(state.approvalHash === digest({ approval: state.spec.approval, planHash: state.planHash }),
     "local approval notes do not match this sealed revision");
-  specification(root, state.spec, { modular: pin.revisions[state.pin]?.kind === "normative-package" });
+  specification(root, state.spec, { modular: pin.revisions[state.pin]?.kind === "normative-package", historical: true });
   return state;
 }
 export async function restorePlan(root, id) {

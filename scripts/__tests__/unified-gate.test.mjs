@@ -77,6 +77,87 @@ function modularSpec() {
   return { ...spec(), claim: "stable-fixture-local-claim",
     regressionGuard: "Normal: changed reference must block admission; contract tamper fixture asserts rejection before workload." };
 }
+function installRegression(root) {
+  for (const directory of [".agents/skills/regression-guard", "docs/validation/regression-guard-revisions"]) {
+    cpSync(join(project, directory), join(root, directory), { recursive: true });
+  }
+  copyFileSync(join(project, "docs/validation/regression-guard-pin.json"),
+    join(root, "docs/validation/regression-guard-pin.json"));
+  const pin = JSON.parse(readFileSync(join(root, "docs/validation/unified-pin.json")));
+  pin.regressionGuard = JSON.parse(readFileSync(join(root, "docs/validation/regression-guard-pin.json"))).current;
+  write(root, "docs/validation/unified-pin.json", pin);
+}
+const normalGuard = () => ({ form: "normal", material: true,
+  rationale: "Admission validation changes an existing enforcement boundary.",
+  covers: "A material repair with an empty guard must not reach execution.",
+  testLocation: "scripts/__tests__/unified-gate.test.mjs — rejects incomplete guards",
+  assertion: "Reject the candidate and leave the prior sealed plan bytes unchanged." });
+test("Regression Guard forms round-trip; invalid amendments preserve seals and historical plans", async (t) => {
+  const root = fixture(t);
+  const old = await provision(root, spec());
+  installRegression(root);
+  assert.equal(guard(root, ctx(old)).plan, old.plan);
+  const input = { ...spec(), regression: normalGuard() };
+  const draft = prepareDraft(root, input);
+  assert.match(draft.plan, /\*\*Covers:\*\*/);
+  assert.ok(draft.plan.includes(normalGuard().rationale));
+  write(root, "guard-spec.json", input);
+  const draftRegistry = JSON.stringify(readRegistry(root));
+  assert.equal(cli(root, ["draft", "--spec", "guard-spec.json"]).status, 0);
+  assert.equal(JSON.stringify(readRegistry(root)), draftRegistry);
+  write(root, "duplicate-spec.json", JSON.stringify(input).replace(
+    '"form":"normal"', '"form":"normal","form":"normal"'));
+  const duplicate = cli(root, ["draft", "--spec", "duplicate-spec.json"]);
+  assert.equal(duplicate.status, 2);
+  assert.match(duplicate.stderr, /duplicate JSON field/);
+  assert.throws(() => prepareDraft(root, { ...input,
+    scope: input.scope + "\n## Regression Guard\nAn injected duplicate section." }), /duplicate/);
+  const state = await provision(root, input);
+  const original = JSON.stringify(readRegistry(root));
+  for (const regression of [undefined, {}, { ...normalGuard(), covers: "TODO" },
+    { ...normalGuard(), form: "self" }, { ...normalGuard(), extra: "mixed" },
+    { form: "deferred", material: true, rationale: "Wait for proposed future tests." },
+    { ...normalGuard(), testLocation: "../unsafe.test.js" }]) {
+    await assert.rejects(amend(root, state.id, { ...input, regression }, "fixture invalid amendment"), /Regression Guard/);
+    assert.equal(JSON.stringify(readRegistry(root)), original);
+    assert.equal(readFileSync(join(root, state.planPath), "utf8"), state.plan);
+  }
+  for (const regression of [
+    { form: "self", material: false, rationale: "Only adds the test for otherwise unchanged behavior.",
+      testLocation: normalGuard().testLocation, assertion: normalGuard().assertion },
+    { form: "excluded", material: false, rationale: "Only changes comments; no executable behavior is modified.", category: "internal" },
+    { form: "na", material: true, rationale: "Entire feature is removed without any surviving recurrence path.",
+      category: "removed", scenario: "The obsolete read-only information panel is entirely removed.",
+      evidence: "No handlers or data side effects remain in the inspected scope.",
+      alternatives: "Surviving navigation is separately covered by its existing case.",
+      residualRisk: "Manual confirmation of the removed panel remains documented." },
+  ]) {
+    const next = await amend(root, state.id, { ...input, regression }, "fixture supported form");
+    assert.equal(guard(root, ctx(next)).spec.regression.form, regression.form);
+  }
+});
+test("Regression Guard full pin and actual CLI/exported routes reject drift without plan mutation", async (t) => {
+  const root = fixture(t); modular(root); installRegression(root);
+  const state = await provision(root, { ...modularSpec(), regression: normalGuard() });
+  assert.equal(cli(root, ["guard", "--id", state.id, "--tier", state.tier], state).status, 0);
+  assert.equal(exportedRunWithoutHostIntegration(root, state).status, 0);
+  for (const name of ["SKILL.md", "reference/enforcement-contract.md", "reference/delivery-handoff.md"]) {
+    const path = join(root, ".agents/skills/regression-guard", name);
+    const bytes = readFileSync(path);
+    writeFileSync(path, Buffer.concat([bytes, Buffer.from("drift")]));
+    assert.throws(() => prepareDraft(root, { ...spec(), regression: normalGuard() }), /contract drift/);
+    assert.equal(cli(root, ["guard", "--id", state.id, "--tier", state.tier], state).status, 2);
+    assert.equal(exportedRunWithoutHostIntegration(root, state).status, 2);
+    assert.equal(readFileSync(join(root, state.planPath), "utf8"), state.plan);
+    writeFileSync(path, bytes);
+  }
+  const pin = JSON.parse(readFileSync(join(root, "docs/validation/regression-guard-pin.json")));
+  const snapshot = join(root, pin.revisions[pin.current], "reference/delivery-handoff.md");
+  writeFileSync(snapshot, "changed snapshot");
+  assert.throws(() => guard(root, ctx(state)), /contract drift/);
+  rmSync(join(root, "docs/validation/regression-guard-pin.json"));
+  assert.throws(() => prepareDraft(root, { ...spec(), regression: normalGuard() }), /mapping unavailable/);
+});
 test("modular draft is read-only without approval or admission capability; denied admission consumes no ID", async (t) => {
   const root = fixture(t);
   modular(root, false);

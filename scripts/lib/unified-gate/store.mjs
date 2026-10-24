@@ -5,6 +5,7 @@ import { resolve, dirname, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
 import { verifyContract } from "./contract.mjs";
+import { contract as regressionContract } from "./regression.mjs";
 
 export const REGISTRY = "docs/validation/unified-registry.json";
 export const PIN = "docs/validation/unified-pin.json";
@@ -193,7 +194,10 @@ export function mergeGuard(root, candidate, staged = false) {
   const merging = git(root, ["rev-parse", "--verify", "MERGE_HEAD"], true);
   if (merging.status === 0) compareRegistry(committedRegistry(root, "MERGE_HEAD"), candidate);
   for (const record of Object.values(candidate.tasks)) {
-    for (const event of record.history) pins(root, event.state.pin);
+    for (const event of record.history) {
+      pins(root, event.state.pin);
+      if (event.state.spec?.guardContract) regressionContract(root, safePath, event.state.spec.guardContract);
+    }
   }
   return candidate;
 }

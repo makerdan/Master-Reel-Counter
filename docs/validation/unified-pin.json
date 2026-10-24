@@ -1,5 +1,6 @@
 {
   "schemaVersion": 2,
+  "regressionGuard": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
   "source": ".agents/skills/failure-gate-unified/SKILL.md",
   "current": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
   "acceptance": {

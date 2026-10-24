@@ -26,8 +26,13 @@ The accountable agent reviews actual scope. Conflicting scope/declaration eviden
 must fail current admission with actionable diagnostics. Do not market human
 review or heuristic warnings as automated semantic proof.
 
-Support normal, N/A, self-satisfying, deferral and excluded paths with their proper
-input shapes. Validate current declarations on provisioning/publication, amendment,
+Support normal, N/A, self-satisfying and excluded paths with their proper input
+shapes. Represent the documented deferral form and its actual capability status:
+admit it only through a route that establishes the required commitment, ownership
+and applicable authorization. If that route is unavailable, reject unsupported
+deferrals explicitly without disabling ordinary covered work. Do not invent a
+receipt service or treat a string field as proof. Validate current declarations
+on supported draft publication, provisioning, amendment,
 explicit plan validation and supported bound execution. Exactly one declaration
 is required for qualifying plans; excluded work may omit it under the host format.
 Present declarations must be valid even if metadata says not-applicable.
@@ -51,17 +56,30 @@ Executor coverage assessment and required validation remain mandatory.
 
 Map preparation/amendment separately from read-only admission and test execution.
 Provisioning and test-run checks alone do not establish pre-implementation coverage.
-Locate a genuine host hook or document the Agent-first cooperative preflight.
+Document Agent-first cooperative preflight and any existing supported local checks.
+Do not add custom native lifecycle/approval admission. Under Unified, preserve
+unadmitted native draft publication followed by execution-time admission.
 Inspect the actual task scope, applicable contract and admitted revision. Prepare
 and, where authorized, apply supported amendments before implementation starts.
-Recheck current revision/identity/binding/approval at implementation dispatch using
-the host's supported concurrency mechanism. A mutable native task description is
+Recheck current local revision/identity/binding at implementation dispatch using
+the project's supported coordination. Ordinary approval and native cancellation/
+scope compliance remain the executing Agent's responsibility; no independent
+native-approval evidence or custom host integration is required. A mutable native task description is
 not proof that a sealed local record was updated.
 
 If a missing declaration is discovered mid-task, pause affected implementation,
 preserve evidence and safely resolve conflicting runs before amendment. Record
 already-made changes and assess them under actual authorization; do not rewrite
 history or turn earlier test results into proof of changed requirements.
+
+## Mechanical and accountable checks
+
+For each rejection case below, identify what code can establish and what the
+Planner/executor must assess. A test path or category field can be checked
+structurally; actual layer, scenario and assertion adequacy need inspection.
+Use deterministic fixtures for machine-enforced rules and concrete scope/test
+examples for accountable assessment. Do not claim that keyword heuristics or a
+JSON schema can prove semantic coverage, and do not add a separate reviewer by default.
 
 ## Acceptance cases for app enforcement
 
@@ -92,7 +110,7 @@ binding and ledger history. Inspect reservation effects under actual transaction
 | Non-material refactor/comment change | Excluded based on evidence, not filename |
 | "Not purely additive" alongside material change | Qualifying; negation cannot trigger additive exemption |
 | Unrelated exclusion in history/examples plus material scope | Qualifying; entire-document keyword escape rejected |
-| Verified accepted follow-up, concrete case and approved deferral | Admit documented deferral, never claim delivered coverage |
+| Verified accepted follow-up, concrete case and approved deferral | Admit only through a supported deferral route; otherwise report that capability unavailable, never claim delivered coverage |
 | Follow-up merely proposed, unverifiable, cancelled or missing scope | Reject unsupported deferral; use supported resolution |
 | Invalid candidate amendment | Old admitted seal, binding and history remain intact |
 | Invalid current declaration at bound execution | Reject before workload sentinel or plan mutation |
@@ -128,3 +146,11 @@ only as an authorized behavior change with its own applicable guard evidence.
 Distinguish package text checks, isolated enforcement fixtures, actual caller
 wiring, executor delivery and separate read-only verification. A passed fixture
 does not establish host activation or control Replit platform completion.
+
+## Package revision acceptance
+
+The adopted identity and historical snapshot cover the core plus both normative
+references. Changing either reference while the core is untouched must invalidate
+new-contract integrity checks. Updating the manifest alone cannot substitute for
+the selected project/task pin. Old single-file contracts retain their original
+identity and applicable handlers. Missing mappings block only dependent work.
