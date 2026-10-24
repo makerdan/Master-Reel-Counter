@@ -162,7 +162,7 @@ export interface IStorage {
   batchKeepPins(sessionId: number, pinIdToKeep: number, pinIdsToDelete: number[]): Promise<{ deletedCount: number }>;
 
   getSessionIncompletePins(sessionId: number): Promise<{ photoId: number; incompleteCount: number }[]>;
-  resolveParentPinForDetailShot(detailPhotoId: number, entryId: number): Promise<void>;
+  resolveParentPinForDetailShot(detailPhotoId: number, entryId: number, sessionId: number): Promise<void>;
   getSessionFlaggedPins(sessionId: number): Promise<Pin[]>;
   getUserSettings(userId: string): Promise<UserSettings | undefined>;
   upsertUserSettings(userId: string, data: Partial<UserSettings>): Promise<UserSettings>;
@@ -913,17 +913,30 @@ export class DatabaseStorage implements IStorage {
     return results.map(r => ({ photoId: r.photoId, incompleteCount: Number(r.incompleteCount) }));
   }
 
-  async resolveParentPinForDetailShot(detailPhotoId: number, entryId: number): Promise<void> {
-    const [detailPhoto] = await db.select().from(photos).where(eq(photos.id, detailPhotoId)).limit(1);
-    if (!detailPhoto?.isDetailShot || !detailPhoto.parentPhotoId || !detailPhoto.linkedPinLabel) return;
+  async resolveParentPinForDetailShot(detailPhotoId: number, entryId: number, sessionId: number): Promise<void> {
+    // Check the entire relationship in the write itself, including legacy bad
+    // links. A route-level photo lookup alone cannot protect the parent's pins.
     await db
       .update(pins)
       .set({ entryId })
       .where(
         and(
-          eq(pins.photoId, detailPhoto.parentPhotoId),
-          eq(pins.label, detailPhoto.linkedPinLabel),
-          isNull(pins.entryId)
+          isNull(pins.entryId),
+          sql`exists (
+            select 1
+            from ${photos} as detail_photo
+            join ${photos} as parent_photo on parent_photo.id = detail_photo.parent_photo_id
+            join ${entries} as linked_entry on linked_entry.id = ${entryId}
+            where detail_photo.id = ${detailPhotoId}
+              and detail_photo.session_id = ${sessionId}
+              and parent_photo.session_id = ${sessionId}
+              and linked_entry.session_id = ${sessionId}
+              and linked_entry.photo_id = detail_photo.id
+              and detail_photo.is_detail_shot = true
+              and detail_photo.linked_pin_label <> ''
+              and ${pins.photoId} = parent_photo.id
+              and ${pins.label} = detail_photo.linked_pin_label
+          )`
         )
       );
   }

@@ -2430,6 +2430,149 @@ async function buildProductionPatchRouteContext(): Promise<PatchRouteTestContext
   }
 }
 
+describe("Detail-shot references — production session isolation", () => {
+  let context: PatchRouteTestContext;
+  let localPhoto: databaseSchema.Photo;
+  let victimParent: databaseSchema.Photo;
+  let victimDetail: databaseSchema.Photo;
+  let victimPin: databaseSchema.Pin;
+  let localDetail: databaseSchema.Photo;
+  let localPin: databaseSchema.Pin;
+  const missingPhotoId = 2147483647;
+
+  before(async () => {
+    context = await buildProductionPatchRouteContext();
+    localPhoto = (await storage.getPhoto(context.photoId))!;
+    const [victimSession] = await db.insert(databaseSchema.countingSessions).values({
+      userId: `victim-${randomUUID()}`, name: "Private victim inventory",
+    }).returning();
+    [victimParent] = await db.insert(databaseSchema.photos).values({
+      sessionId: victimSession.id, userId: victimSession.userId,
+      objectStorageKey: "/uploads/private-parent.jpg", aisle: "PRIVATE", section: "SECRET",
+    }).returning();
+    [victimDetail] = await db.insert(databaseSchema.photos).values({
+      sessionId: victimSession.id, userId: victimSession.userId,
+      objectStorageKey: "/uploads/private-detail.jpg", isDetailShot: true,
+      parentPhotoId: victimParent.id, linkedPinLabel: "target",
+    }).returning();
+    [victimPin] = await db.insert(databaseSchema.pins).values({
+      photoId: victimParent.id, label: "target", xPercent: 10, yPercent: 20,
+    }).returning();
+    [localDetail] = await db.insert(databaseSchema.photos).values({
+      sessionId: localPhoto.sessionId, userId: localPhoto.userId,
+      objectStorageKey: "/uploads/local-detail.jpg", isDetailShot: true,
+      parentPhotoId: localPhoto.id, linkedPinLabel: "target",
+    }).returning();
+    [localPin] = await db.insert(databaseSchema.pins).values({
+      photoId: localPhoto.id, label: "target", xPercent: 10, yPercent: 20,
+    }).returning();
+  });
+  after(async () => { await context?.cleanup(); });
+
+  async function createEntry(photoId?: number | null) {
+    return httpReq(context.baseUrl, "POST", `/api/sessions/${localPhoto.sessionId}/entries`, {
+      body: { aisle: "A", section: "1", ...(photoId === undefined ? {} : { photoId }) },
+    });
+  }
+
+  test("entry POST rejects foreign and missing photos before any writes", async () => {
+    const entriesBefore = await db.select().from(databaseSchema.entries);
+    const pinsBefore = await db.select().from(databaseSchema.pins);
+    for (const photoId of [victimDetail.id, victimParent.id, missingPhotoId]) {
+      const result = await createEntry(photoId);
+      assert.equal(result.status, 404);
+      assert.deepEqual(result.body, { message: "Photo not found" });
+    }
+    assert.deepEqual(await db.select().from(databaseSchema.entries), entriesBefore);
+    assert.deepEqual(await db.select().from(databaseSchema.pins), pinsBefore);
+  });
+
+  test("entry POST rejects malformed photo IDs without inserting entries", async () => {
+    const entriesBefore = await db.select().from(databaseSchema.entries);
+    for (const photoId of ["1", -1, 1.5, {}, []]) {
+      const result = await httpReq(context.baseUrl, "POST", `/api/sessions/${localPhoto.sessionId}/entries`, {
+        body: { aisle: "A", section: "1", photoId },
+      });
+      assert.equal(result.status, 400);
+    }
+    assert.deepEqual(await db.select().from(databaseSchema.entries), entriesBefore);
+  });
+
+  test("photo PATCH rejects foreign and missing parents without changing either session", async () => {
+    const photosBefore = await db.select().from(databaseSchema.photos);
+    const entriesBefore = await db.select().from(databaseSchema.entries);
+    for (const parentPhotoId of [victimParent.id, missingPhotoId]) {
+      const result = await httpReq(context.baseUrl, "PATCH", `/api/photos/${localDetail.id}`, {
+        body: { parentPhotoId, isDetailShot: true, linkedPinLabel: "target", notes: "must not save" },
+      });
+      assert.equal(result.status, 404);
+      assert.deepEqual(result.body, { message: "Photo not found" });
+    }
+    assert.deepEqual(await db.select().from(databaseSchema.photos), photosBefore);
+    assert.deepEqual(await db.select().from(databaseSchema.entries), entriesBefore);
+    assert.equal((await storage.getPin(victimPin.id))!.entryId, null);
+  });
+
+  test("same-session parent updates and explicit unlink still work", async () => {
+    for (const parentPhotoId of [localPhoto.id, null, localPhoto.id]) {
+      const result = await httpReq(context.baseUrl, "PATCH", `/api/photos/${localDetail.id}`, {
+        body: { parentPhotoId },
+      });
+      assert.equal(result.status, 200);
+      assert.equal((await storage.getPhoto(localDetail.id))!.parentPhotoId, parentPhotoId);
+    }
+  });
+
+  test("resolver refuses foreign detail, foreign entry, and legacy foreign parent relationships", async () => {
+    // An attacker's entry referencing a victim detail must never resolve the victim pin.
+    const [badEntry] = await db.insert(databaseSchema.entries).values({
+      sessionId: localPhoto.sessionId, userId: localPhoto.userId,
+      photoId: victimDetail.id, aisle: "A", section: "1",
+    }).returning();
+    await storage.resolveParentPinForDetailShot(victimDetail.id, badEntry.id, localPhoto.sessionId);
+    assert.equal((await storage.getPin(victimPin.id))!.entryId, null);
+    // Even supplying the victim session as the expected session cannot use a foreign entry.
+    await storage.resolveParentPinForDetailShot(victimDetail.id, badEntry.id, victimDetail.sessionId);
+    assert.equal((await storage.getPin(victimPin.id))!.entryId, null);
+
+    const [localEntry] = await db.insert(databaseSchema.entries).values({
+      sessionId: localPhoto.sessionId, userId: localPhoto.userId,
+      photoId: localDetail.id, aisle: "A", section: "1",
+    }).returning();
+    await storage.updatePhoto(localDetail.id, { parentPhotoId: victimParent.id });
+    await storage.resolveParentPinForDetailShot(localDetail.id, localEntry.id, localPhoto.sessionId);
+    assert.equal((await storage.getPin(victimPin.id))!.entryId, null);
+    // The route must also be safe when it encounters an old cross-session parent.
+    const result = await createEntry(localDetail.id);
+    assert.equal(result.status, 200);
+    assert.equal((await storage.getPin(victimPin.id))!.entryId, null);
+    await storage.updatePhoto(localDetail.id, { parentPhotoId: localPhoto.id });
+
+    // Matching sessions alone are insufficient if the entry references another photo.
+    await storage.resolveParentPinForDetailShot(localDetail.id, context.entryId, localPhoto.sessionId);
+    assert.equal((await storage.getPin(localPin.id))!.entryId, null);
+  });
+
+  test("same-session entry creation resolves only the matching uncommitted parent pin", async () => {
+    const result = await createEntry(localDetail.id);
+    assert.equal(result.status, 200);
+    assert.equal((await storage.getPin(localPin.id))!.entryId, result.body.id);
+    assert.equal((await storage.getPin(context.pinId))!.entryId, null, "unlabelled pin is untouched");
+    assert.equal((await storage.getPin(victimPin.id))!.entryId, null);
+    const second = await createEntry(localDetail.id);
+    assert.equal(second.status, 200);
+    assert.equal((await storage.getPin(localPin.id))!.entryId, result.body.id, "committed pin is not relinked");
+  });
+
+  test("entries with regular, null, or omitted photos remain supported", async () => {
+    for (const photoId of [localPhoto.id, null, undefined]) {
+      const result = await createEntry(photoId);
+      assert.equal(result.status, 200);
+      assert.equal(result.body.photoId, photoId ?? null);
+    }
+  });
+});
+
 describe("PATCH production routes — body validation returns 400, not 500", () => {
   let server: http.Server;
   let baseUrl: string;

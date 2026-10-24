@@ -745,7 +745,7 @@ export const patchPhotoSchema = z.object({
   rotation: z.number().optional(),
   notes: z.string().nullable().optional(),
   isDetailShot: z.boolean().optional(),
-  parentPhotoId: z.number().nullable().optional(),
+  parentPhotoId: z.number().int().positive().nullable().optional(),
   pinScale: z.number().optional(),
   linkReason: z.string().nullable().optional(),
   linkedPinLabel: z.string().nullable().optional(),
@@ -1774,6 +1774,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid photo update data", errors: parsedPhoto.error.flatten().fieldErrors });
       }
       const { aisle, section, rotation, notes, isDetailShot, parentPhotoId, pinScale, linkReason, linkedPinLabel } = parsedPhoto.data;
+      // Authorizing the edited photo does not authorize an independent parent ID.
+      if (parentPhotoId !== undefined && parentPhotoId !== null) {
+        const parent = await storage.getPhoto(parentPhotoId);
+        if (!parent || parent.sessionId !== photo.sessionId) {
+          return res.status(404).json({ message: "Photo not found" });
+        }
+      }
       const safeUpdate: Record<string, any> = {};
       if (aisle !== undefined) safeUpdate.aisle = aisle;
       if (section !== undefined) safeUpdate.section = section;
@@ -2100,10 +2107,21 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Idempotency-Key is required to commit an entry pin" });
       }
       const { pinCommit: _pinCommit, ...entryBody } = r.body;
+      const photoReference = z.number().int().positive().nullable().optional().safeParse(entryBody.photoId);
+      if (!photoReference.success) {
+        return res.status(400).json({ message: "Invalid photo reference" });
+      }
 
       const [lk1, lk2] = deriveAdvisoryLockKeys(access.session.userId);
       const { entry, encKey, created, committedPinId } = await db.transaction(async (tx) => {
         await acquireSharedEncodingLock(tx, lk1, lk2);
+        if (photoReference.data !== undefined && photoReference.data !== null) {
+          const [entryPhoto] = await tx.select({ id: photos.id }).from(photos).where(and(
+            eq(photos.id, photoReference.data),
+            eq(photos.sessionId, access.session.id),
+          )).limit(1);
+          if (!entryPhoto) throw new Error("ENTRY_PHOTO_NOT_FOUND");
+        }
         const key = await getEncryptionKey(access.session.userId);
         let entry = operationId
           ? (await tx.select().from(entries).where(and(
@@ -2198,7 +2216,7 @@ export async function registerRoutes(
       });
       if (entry.photoId) {
         try {
-          await storage.resolveParentPinForDetailShot(entry.photoId, entry.id);
+          await storage.resolveParentPinForDetailShot(entry.photoId, entry.id, access.session.id);
         } catch (resolveErr) {
           console.error("Non-fatal: failed to resolve parent pin for detail shot", resolveErr);
         }
@@ -2218,7 +2236,9 @@ export async function registerRoutes(
       if (error instanceof Error && error.message === "ENCODING_TOGGLE_IN_PROGRESS") {
         return res.status(503).json({ message: "Encryption is being reconfigured — please retry in a moment." });
       }
-      if (error instanceof Error && error.message === "ENTRY_PIN_PHOTO_NOT_FOUND") {
+      if (error instanceof Error && (
+        error.message === "ENTRY_PIN_PHOTO_NOT_FOUND" || error.message === "ENTRY_PHOTO_NOT_FOUND"
+      )) {
         return res.status(404).json({ message: "Photo not found" });
       }
       if (error instanceof Error && error.message === "ENTRY_PIN_ALREADY_COMMITTED") {

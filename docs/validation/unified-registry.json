@@ -19277,6 +19277,427 @@
           "digest": "f60e1bc61dcc3d1f8bd9de1e77269790b8d2770e54233e2c675edf6e35c899ea"
         }
       ]
+    },
+    "28d4420c-0cbf-457c-90be-997a3585fab1": {
+      "history": [
+        {
+          "op": "provision",
+          "at": "2026-10-24T22:53:57.074Z",
+          "previous": null,
+          "state": {
+            "id": "28d4420c-0cbf-457c-90be-997a3585fab1",
+            "createdAt": "2026-10-24T22:53:57.073Z",
+            "status": "reserved",
+            "revision": 0,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/28d4420c-0cbf-457c-90be-997a3585fab1.md",
+            "specHash": "505b0d5bcb5e4e87a8208d55d8a6c2a2730963f99b2b9febd22d4005e087573c",
+            "runs": [],
+            "claim": "native-985-detail-shot-session-isolation"
+          },
+          "digest": "ad7fca966308886a61c19c0e7c2c3492e250a276f1e1735d60f071310fabcbfb"
+        },
+        {
+          "op": "amend",
+          "at": "2026-10-24T22:53:58.273Z",
+          "previous": "ad7fca966308886a61c19c0e7c2c3492e250a276f1e1735d60f071310fabcbfb",
+          "state": {
+            "id": "28d4420c-0cbf-457c-90be-997a3585fab1",
+            "createdAt": "2026-10-24T22:53:57.073Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/28d4420c-0cbf-457c-90be-997a3585fab1.md",
+            "specHash": "505b0d5bcb5e4e87a8208d55d8a6c2a2730963f99b2b9febd22d4005e087573c",
+            "runs": [],
+            "claim": "native-985-detail-shot-session-isolation",
+            "spec": {
+              "title": "Scope entry and detail-shot photo references to their session",
+              "scope": "Reject entry creation with missing or foreign photo references, reject photo PATCH with missing or foreign parents, and guard parent pin resolution against mismatched entry, detail and parent sessions. Preserve valid same-session links and unlinking. Add real HTTP and PostgreSQL regression coverage without new features.",
+              "tier": "test-standard",
+              "why": "Backend security repair requires executable production-route and storage coverage alongside compiler and contract checks.",
+              "coverage": "docs/validation/manifest.json test-standard unit-tests runs server/__tests__/routes.test.ts including isolated PostgreSQL and real registered HTTP handlers; typecheck checks server changes.",
+              "approval": {
+                "reference": "Assigned task 985 in the current conversation",
+                "direction": "Fix the specified broken access control without introducing new flows or features",
+                "applicability": "Session scoping and regression tests directly implement the assigned vulnerability repair"
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "Entry photo references belong to the authorized session",
+                  "check": "Real HTTP tests reject foreign and missing photo IDs without inserting entries or changing victim pins; valid local photos still work"
+                },
+                {
+                  "requirement": "Photo parent references remain in the same session",
+                  "check": "Real PATCH rejects foreign and missing parents without mutations and accepts local parent and null unlink"
+                },
+                {
+                  "requirement": "Parent pin resolution never crosses sessions",
+                  "check": "Real database helper tests preserve pins for mismatched entry/detail/parent sessions and resolve only matching uncommitted pins"
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Authorization and data-integrity repair of existing cross-session writes",
+                "covers": "Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session",
+                "testLocation": "server/__tests__/routes.test.ts",
+                "assertion": "Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed"
+              },
+              "regressionGuard": "**Covers:** Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session\n**Test location:** server/__tests__/routes.test.ts\n**What it checks:** Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed"
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Scope entry and detail-shot photo references to their session\n\n## Task identity\n**Task ID:** 28d4420c-0cbf-457c-90be-997a3585fab1\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nReject entry creation with missing or foreign photo references, reject photo PATCH with missing or foreign parents, and guard parent pin resolution against mismatched entry, detail and parent sessions. Preserve valid same-session links and unlinking. Add real HTTP and PostgreSQL regression coverage without new features.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Authorization and data-integrity repair of existing cross-session writes\n\n## Approval evidence\n**Reference:** Assigned task 985 in the current conversation\n**Owner direction:** Fix the specified broken access control without introducing new flows or features\n**Applicability:** Session scoping and regression tests directly implement the assigned vulnerability repair\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** Backend security repair requires executable production-route and storage coverage alongside compiler and contract checks.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard unit-tests runs server/__tests__/routes.test.ts including isolated PostgreSQL and real registered HTTP handlers; typecheck checks server changes.; supported invocation: TASK_ID=28d4420c-0cbf-457c-90be-997a3585fab1 TASK_PLAN_FILE=.local/tasks/28d4420c-0cbf-457c-90be-997a3585fab1.md npm run gate:run -- --id 28d4420c-0cbf-457c-90be-997a3585fab1 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- Entry photo references belong to the authorized session — Real HTTP tests reject foreign and missing photo IDs without inserting entries or changing victim pins; valid local photos still work\n- Photo parent references remain in the same session — Real PATCH rejects foreign and missing parents without mutations and accepts local parent and null unlink\n- Parent pin resolution never crosses sessions — Real database helper tests preserve pins for mismatched entry/detail/parent sessions and resolve only matching uncommitted pins\n\n## Regression Guard\n**Covers:** Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session\n**Test location:** server/__tests__/routes.test.ts\n**What it checks:** Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed\n",
+            "planHash": "4352842147cb8bcedc1218e3923542bfd51decadfd212099d5db421875d3094a",
+            "approvalHash": "dac5459efec2b1b023b3cf14ba6979d0a8e9a17b3188a2ba5c0f3b85511f4baf"
+          },
+          "digest": "fb37b863924d36ca0229d20f77cc510761a93ee97315e242c780b54ae498ba1e"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-24T22:55:23.170Z",
+          "previous": "fb37b863924d36ca0229d20f77cc510761a93ee97315e242c780b54ae498ba1e",
+          "state": {
+            "id": "28d4420c-0cbf-457c-90be-997a3585fab1",
+            "createdAt": "2026-10-24T22:53:57.073Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/28d4420c-0cbf-457c-90be-997a3585fab1.md",
+            "specHash": "505b0d5bcb5e4e87a8208d55d8a6c2a2730963f99b2b9febd22d4005e087573c",
+            "runs": [
+              {
+                "id": "d8b1329c-2171-4e5c-90af-9bfb6abbd761",
+                "taskId": "28d4420c-0cbf-457c-90be-997a3585fab1",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "4352842147cb8bcedc1218e3923542bfd51decadfd212099d5db421875d3094a",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "24573fcb03c2602749d35f778b3a61848d027d8a",
+                  "filesHash": "188a32ff6dfc996b06e8edae18609f59370b5f2d6a064b8baf5c888afe6d4085"
+                },
+                "startedAt": "2026-10-24T22:55:23.170Z",
+                "cleanupDeadline": "2026-10-24T23:00:26.170Z",
+                "evidencePath": ".local/failure-gate-unified/runs/d8b1329c-2171-4e5c-90af-9bfb6abbd761.jsonl",
+                "observations": []
+              }
+            ],
+            "claim": "native-985-detail-shot-session-isolation",
+            "spec": {
+              "title": "Scope entry and detail-shot photo references to their session",
+              "scope": "Reject entry creation with missing or foreign photo references, reject photo PATCH with missing or foreign parents, and guard parent pin resolution against mismatched entry, detail and parent sessions. Preserve valid same-session links and unlinking. Add real HTTP and PostgreSQL regression coverage without new features.",
+              "tier": "test-standard",
+              "why": "Backend security repair requires executable production-route and storage coverage alongside compiler and contract checks.",
+              "coverage": "docs/validation/manifest.json test-standard unit-tests runs server/__tests__/routes.test.ts including isolated PostgreSQL and real registered HTTP handlers; typecheck checks server changes.",
+              "approval": {
+                "reference": "Assigned task 985 in the current conversation",
+                "direction": "Fix the specified broken access control without introducing new flows or features",
+                "applicability": "Session scoping and regression tests directly implement the assigned vulnerability repair"
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "Entry photo references belong to the authorized session",
+                  "check": "Real HTTP tests reject foreign and missing photo IDs without inserting entries or changing victim pins; valid local photos still work"
+                },
+                {
+                  "requirement": "Photo parent references remain in the same session",
+                  "check": "Real PATCH rejects foreign and missing parents without mutations and accepts local parent and null unlink"
+                },
+                {
+                  "requirement": "Parent pin resolution never crosses sessions",
+                  "check": "Real database helper tests preserve pins for mismatched entry/detail/parent sessions and resolve only matching uncommitted pins"
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Authorization and data-integrity repair of existing cross-session writes",
+                "covers": "Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session",
+                "testLocation": "server/__tests__/routes.test.ts",
+                "assertion": "Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed"
+              },
+              "regressionGuard": "**Covers:** Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session\n**Test location:** server/__tests__/routes.test.ts\n**What it checks:** Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed"
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Scope entry and detail-shot photo references to their session\n\n## Task identity\n**Task ID:** 28d4420c-0cbf-457c-90be-997a3585fab1\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nReject entry creation with missing or foreign photo references, reject photo PATCH with missing or foreign parents, and guard parent pin resolution against mismatched entry, detail and parent sessions. Preserve valid same-session links and unlinking. Add real HTTP and PostgreSQL regression coverage without new features.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Authorization and data-integrity repair of existing cross-session writes\n\n## Approval evidence\n**Reference:** Assigned task 985 in the current conversation\n**Owner direction:** Fix the specified broken access control without introducing new flows or features\n**Applicability:** Session scoping and regression tests directly implement the assigned vulnerability repair\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** Backend security repair requires executable production-route and storage coverage alongside compiler and contract checks.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard unit-tests runs server/__tests__/routes.test.ts including isolated PostgreSQL and real registered HTTP handlers; typecheck checks server changes.; supported invocation: TASK_ID=28d4420c-0cbf-457c-90be-997a3585fab1 TASK_PLAN_FILE=.local/tasks/28d4420c-0cbf-457c-90be-997a3585fab1.md npm run gate:run -- --id 28d4420c-0cbf-457c-90be-997a3585fab1 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- Entry photo references belong to the authorized session — Real HTTP tests reject foreign and missing photo IDs without inserting entries or changing victim pins; valid local photos still work\n- Photo parent references remain in the same session — Real PATCH rejects foreign and missing parents without mutations and accepts local parent and null unlink\n- Parent pin resolution never crosses sessions — Real database helper tests preserve pins for mismatched entry/detail/parent sessions and resolve only matching uncommitted pins\n\n## Regression Guard\n**Covers:** Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session\n**Test location:** server/__tests__/routes.test.ts\n**What it checks:** Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed\n",
+            "planHash": "4352842147cb8bcedc1218e3923542bfd51decadfd212099d5db421875d3094a",
+            "approvalHash": "dac5459efec2b1b023b3cf14ba6979d0a8e9a17b3188a2ba5c0f3b85511f4baf"
+          },
+          "digest": "af751649ff6f32e458c4050863023fd5da606a3b0f5fb7e6ebac0822410e09dd"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-24T22:56:35.159Z",
+          "previous": "af751649ff6f32e458c4050863023fd5da606a3b0f5fb7e6ebac0822410e09dd",
+          "state": {
+            "id": "28d4420c-0cbf-457c-90be-997a3585fab1",
+            "createdAt": "2026-10-24T22:53:57.073Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/28d4420c-0cbf-457c-90be-997a3585fab1.md",
+            "specHash": "505b0d5bcb5e4e87a8208d55d8a6c2a2730963f99b2b9febd22d4005e087573c",
+            "runs": [
+              {
+                "id": "d8b1329c-2171-4e5c-90af-9bfb6abbd761",
+                "taskId": "28d4420c-0cbf-457c-90be-997a3585fab1",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "4352842147cb8bcedc1218e3923542bfd51decadfd212099d5db421875d3094a",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "24573fcb03c2602749d35f778b3a61848d027d8a",
+                  "filesHash": "188a32ff6dfc996b06e8edae18609f59370b5f2d6a064b8baf5c888afe6d4085"
+                },
+                "startedAt": "2026-10-24T22:55:23.170Z",
+                "cleanupDeadline": "2026-10-24T23:00:26.170Z",
+                "evidencePath": ".local/failure-gate-unified/runs/d8b1329c-2171-4e5c-90af-9bfb6abbd761.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 19393,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2819,
+                    "outputHash": "bbdedc9f0e7dd380a33724fe5a685970ce528687dbadba87ac6f86b1588cd305",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 71.202956\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.517516\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.454153\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.601994\n  ...\n# Subtest: transitive guarded retries keep the shared compiler boundary without hiding config discovery\nok 5 - transitive guarded retries keep the shared compiler boundary without hiding config discovery\n  ---\n  duration_ms: 5.285028\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 6 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.456195\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 7 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.74177\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 8 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.63339\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 9 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.421643\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 10 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 2.432343\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 11 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.506832\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 12 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.265241\n  ...\n1..12\n# tests 12\n# suites 0\n# pass 12\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 153.105771\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1787,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 302,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "e1a3f3e03bb2db608c64fe281cdfc7b0e40e834b03d6c40627911b1215339236",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 219 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 6646,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3113,
+                    "outputHash": "328098afb2047e8e26b116b3584921245ef7f05a0bf0809bb83b1889be0f559b",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 764.794616\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 628.903562\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 698.726814\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 785.128521\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 765.973398\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 639.153755\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 642.600893\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 653.02209\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 5.452095\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.994015\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.27975\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.465873\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.616672\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.44675\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.718242\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.941364\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6383.187439\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 13829,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 53402,
+                    "outputHash": "16d5dcec9e988d92b749f8c917d277ab12e1e88d22bf3c5990ac497b6e70b206",
+                    "outputExcerpt": "    ...\n    # Subtest: entries with regular, null, or omitted photos remain supported\n    ok 7 - entries with regular, null, or omitted photos remain supported\n      ---\n      duration_ms: 82.561539\n      ...\n    1..7\nok 64 - Detail-shot references — production session isolation\n  ---\n  duration_ms: 2578.228961\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 7.709935\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 4.201464\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 3.160645\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 21.775459\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 4.993403\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 4.931886\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 4.342889\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 10.899549\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 4.161473\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 3.951011\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 4.52717\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 12.50338\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 7.599307\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 3.252368\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 2.915104\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 18.844181\n      ...\n    1..16\nok 65 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 1662.433051\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 12.996945\n      ...\n    1..1\nok 66 - account capability route guard\n  ---\n  duration_ms: 15.599686\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 25.894771\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 7.421208\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 5.268139\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 34.706661\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 33.968397\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.441497\n      ...\n    1..6\nok 67 - authenticated Poe route contracts\n  ---\n  duration_ms: 107.969711\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 0.32792\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.184584\n      ...\n    1..2\nok 68 - Admin AI health route contract\n  ---\n  duration_ms: 0.584998\n  type: 'suite'\n  ...\n# Subtest: page-view persistence receives only coarse labels, not sensitive URL content\nok 69 - page-view persistence receives only coarse labels, not sensitive URL content\n  ---\n  duration_ms: 7.017514\n  ...\n# Subtest: page-view malformed paths never reach the sink\nok 70 - page-view malformed paths never reach the sink\n  ---\n  duration_ms: 2.30135\n  ...\n# Subtest: visitor IDs are domain-separated HMACs using the server key and daily scope\nok 71 - visitor IDs are domain-separated HMACs using the server key and daily scope\n  ---\n  duration_ms: 0.445138\n  ...\n# Subtest: missing or unreadable secret and missing IP fail closed without persistence\nok 72 - missing or unreadable secret and missing IP fail closed without persistence\n  ---\n  duration_ms: 0.301203\n  ...\n# Subtest: dedupe uses minimized routes and preserves the 30-second window\nok 73 - dedupe uses minimized routes and preserves the 30-second window\n  ---\n  duration_ms: 0.476376\n  ...\n# Subtest: stalled, rejecting and synchronously failing sinks cannot block the response\nok 74 - stalled, rejecting and synchronously failing sinks cannot block the response\n  ---\n  duration_ms: 5.77322\n  ...\n# Subtest: installed public collector keeps the limiter and parameterized adapter around the tested handler\nok 75 - installed public collector keeps the limiter and parameterized adapter around the tested handler\n  ---\n  duration_ms: 3.579578\n  ...\n# Subtest: support help is versioned and app-only\nok 76 - support help is versioned and app-only\n  ---\n  duration_ms: 0.233567\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 77 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.304911\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 78 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.852252\n  ...\n1..78\n# tests 229\n# suites 31\n# pass 229\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 13556.768343\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 17285,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17921,
+                    "outputHash": "18241f28d69359faf1910b9163828679876716949e5d18bab736509442c739d5",
+                    "outputExcerpt": "2 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 2.812327\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 4.518178\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 3.710784\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 3.409339\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.65061\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.259444\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 2.700872\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.966287\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 0.490625\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.766597\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 40.683508\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.287764\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.246309\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 115.898652\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 1.202821\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 859.828735\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 8.958909\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 3.861717\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 6.4747\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 0.806552\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.685293\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 106.361311\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 3.782559\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 5.115233\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 2.440033\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 2.008425\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 12.560034\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 4.580236\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.706419\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 8.493195\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 3106.442011\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 16521.885944\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 1.097023\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.289653\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.528979\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.592254\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.827589\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.181034\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 53.742532\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 15.43024\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 2.451344\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 440.244523\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 8398,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2190,
+                    "outputHash": "2b14a62b5bcb69b7fc264e40c3e994567a2af13153ecac2fc5f15594267c13ec",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.450261\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.203592\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.413262\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.747123\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 64.924554\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 1773.569357\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 1667.215525\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1500.696073\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 2414.58602\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 0.268068\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 8128.464235\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "purpose": "bound-tier",
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 97,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "24573fcb03c2602749d35f778b3a61848d027d8a",
+                  "filesHash": "188a32ff6dfc996b06e8edae18609f59370b5f2d6a064b8baf5c888afe6d4085"
+                },
+                "finishedAt": "2026-10-24T22:56:35.159Z"
+              }
+            ],
+            "claim": "native-985-detail-shot-session-isolation",
+            "spec": {
+              "title": "Scope entry and detail-shot photo references to their session",
+              "scope": "Reject entry creation with missing or foreign photo references, reject photo PATCH with missing or foreign parents, and guard parent pin resolution against mismatched entry, detail and parent sessions. Preserve valid same-session links and unlinking. Add real HTTP and PostgreSQL regression coverage without new features.",
+              "tier": "test-standard",
+              "why": "Backend security repair requires executable production-route and storage coverage alongside compiler and contract checks.",
+              "coverage": "docs/validation/manifest.json test-standard unit-tests runs server/__tests__/routes.test.ts including isolated PostgreSQL and real registered HTTP handlers; typecheck checks server changes.",
+              "approval": {
+                "reference": "Assigned task 985 in the current conversation",
+                "direction": "Fix the specified broken access control without introducing new flows or features",
+                "applicability": "Session scoping and regression tests directly implement the assigned vulnerability repair"
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "Entry photo references belong to the authorized session",
+                  "check": "Real HTTP tests reject foreign and missing photo IDs without inserting entries or changing victim pins; valid local photos still work"
+                },
+                {
+                  "requirement": "Photo parent references remain in the same session",
+                  "check": "Real PATCH rejects foreign and missing parents without mutations and accepts local parent and null unlink"
+                },
+                {
+                  "requirement": "Parent pin resolution never crosses sessions",
+                  "check": "Real database helper tests preserve pins for mismatched entry/detail/parent sessions and resolve only matching uncommitted pins"
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Authorization and data-integrity repair of existing cross-session writes",
+                "covers": "Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session",
+                "testLocation": "server/__tests__/routes.test.ts",
+                "assertion": "Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed"
+              },
+              "regressionGuard": "**Covers:** Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session\n**Test location:** server/__tests__/routes.test.ts\n**What it checks:** Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed"
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Scope entry and detail-shot photo references to their session\n\n## Task identity\n**Task ID:** 28d4420c-0cbf-457c-90be-997a3585fab1\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nReject entry creation with missing or foreign photo references, reject photo PATCH with missing or foreign parents, and guard parent pin resolution against mismatched entry, detail and parent sessions. Preserve valid same-session links and unlinking. Add real HTTP and PostgreSQL regression coverage without new features.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Authorization and data-integrity repair of existing cross-session writes\n\n## Approval evidence\n**Reference:** Assigned task 985 in the current conversation\n**Owner direction:** Fix the specified broken access control without introducing new flows or features\n**Applicability:** Session scoping and regression tests directly implement the assigned vulnerability repair\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** Backend security repair requires executable production-route and storage coverage alongside compiler and contract checks.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard unit-tests runs server/__tests__/routes.test.ts including isolated PostgreSQL and real registered HTTP handlers; typecheck checks server changes.; supported invocation: TASK_ID=28d4420c-0cbf-457c-90be-997a3585fab1 TASK_PLAN_FILE=.local/tasks/28d4420c-0cbf-457c-90be-997a3585fab1.md npm run gate:run -- --id 28d4420c-0cbf-457c-90be-997a3585fab1 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- Entry photo references belong to the authorized session — Real HTTP tests reject foreign and missing photo IDs without inserting entries or changing victim pins; valid local photos still work\n- Photo parent references remain in the same session — Real PATCH rejects foreign and missing parents without mutations and accepts local parent and null unlink\n- Parent pin resolution never crosses sessions — Real database helper tests preserve pins for mismatched entry/detail/parent sessions and resolve only matching uncommitted pins\n\n## Regression Guard\n**Covers:** Crafted entry photoId and PATCH parentPhotoId plus pre-existing invalid relationships must not modify another session\n**Test location:** server/__tests__/routes.test.ts\n**What it checks:** Production HTTP requests reject foreign or missing references with no database mutation; the real storage resolver leaves mismatched-session pins unchanged while same-session linking and null unlinking succeed\n",
+            "planHash": "4352842147cb8bcedc1218e3923542bfd51decadfd212099d5db421875d3094a",
+            "approvalHash": "dac5459efec2b1b023b3cf14ba6979d0a8e9a17b3188a2ba5c0f3b85511f4baf"
+          },
+          "digest": "0afff9aeccb7796e4b5bf277b6e4b570d1b4a54be37eac896412aa12655057d0"
+        }
+      ]
     }
   },
   "tombstones": [
@@ -19290,6 +19711,7 @@
     "92db6839-28d1-4983-8040-9330c75e530a",
     "1bc92e1d-057b-4d8b-baa6-e75ab3ca0115",
     "d34e33db-d6c0-4ba1-bacb-405b5005e34c",
-    "3377dcff-a1df-4f30-9439-0707a0a66949"
+    "3377dcff-a1df-4f30-9439-0707a0a66949",
+    "28d4420c-0cbf-457c-90be-997a3585fab1"
   ]
 }
