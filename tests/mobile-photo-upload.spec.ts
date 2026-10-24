@@ -225,13 +225,89 @@ async function queuedPhotoOwners(
 
 async function enterMobileFlow(page: import("@playwright/test").Page): Promise<void> {
   const header = page.locator('[data-testid="header-mobile-flow"]');
-  if (!(await header.isVisible().catch(() => false))) {
-    await page.locator('[data-testid="button-toggle-mobile"]').click();
+  const toggle = page.locator('[data-testid="button-toggle-mobile"]');
+  // The session is still loading when neither mode's controls exist. Wait for
+  // its rendered interface before inspecting the mode (including on reload).
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toBeEnabled();
+  // The text exists even on phones where the label is visually hidden.
+  // "Mobile Flow" explicitly means full mode; "Reel IDs" means capture mode.
+  await expect(toggle).toHaveText(/^(Mobile Flow|Reel IDs)$/);
+  if ((await toggle.textContent())?.trim() === "Mobile Flow") {
+    await toggle.click();
   }
   await expect(header).toBeVisible();
+  await expect(toggle).toHaveText("Reel IDs");
 }
 
 test.describe("Mobile Flow photo queue @mobile-photo-upload", () => {
+  for (const initialMode of ["phone capture", "full mode"] as const) {
+    test(`waits for delayed session readiness from ${initialMode} @mobile-image-orientation`, async ({
+      page,
+      request,
+    }, testInfo) => {
+      expect(testInfo.project.use.isMobile).toBe(true);
+      expect(testInfo.project.use.hasTouch).toBe(true);
+      if (initialMode === "full mode") {
+        // A fresh mount uses the unchanged production desktop-width default.
+        await page.setViewportSize({ width: 1024, height: 900 });
+      }
+      const session = await createSessionViaApi(request, `Readiness ${initialMode} ${Date.now()}`);
+      await page.addInitScript(() => {
+        const clicks: string[] = [];
+        Object.assign(window, { mobileFlowToggleClicks: clicks });
+        document.addEventListener("click", event => {
+          const toggle = (event.target as Element | null)?.closest('[data-testid="button-toggle-mobile"]');
+          if (toggle) clicks.push(toggle.textContent?.trim() ?? "");
+        }, true);
+      });
+
+      let releaseSession!: () => void;
+      const released = new Promise<void>(resolve => { releaseSession = resolve; });
+      let observeRequest!: () => void;
+      const requested = new Promise<void>(resolve => { observeRequest = resolve; });
+      const sessionPath = `/api/sessions/${session.id}`;
+      await page.route(url => url.pathname === sessionPath, async route => {
+        if (route.request().method() !== "GET") return route.continue();
+        observeRequest();
+        await released;
+        // Delay only readiness: preserve the real authenticated server response.
+        await route.continue();
+      });
+      let entering: Promise<void> | undefined;
+      try {
+        await page.goto(`/session/${session.id}`);
+        await requested;
+        await expect(page.locator('[data-testid="header-mobile-flow"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="button-toggle-mobile"]')).toHaveCount(0);
+        entering = enterMobileFlow(page);
+        // Browser round-trip while readiness is held: the old immediate
+        // isVisible probe sees no header and queues its disabling click here.
+        await expect(page.locator('[data-testid="button-toggle-mobile"]')).toHaveCount(0);
+        releaseSession();
+        await entering;
+        await expect(page.locator('[data-testid="text-session-name"]')).toHaveText(session.name);
+        await expect(page.locator('[data-testid="input-mobile-aisle"]')).toBeVisible();
+        const clicks = await page.evaluate(() =>
+          (window as typeof window & { mobileFlowToggleClicks: string[] }).mobileFlowToggleClicks);
+        expect(clicks).toEqual(initialMode === "phone capture" ? [] : ["Mobile Flow"]);
+        // Re-entering an active view is idempotent, not a second toggle attempt.
+        await enterMobileFlow(page);
+        expect(await page.evaluate(() =>
+          (window as typeof window & { mobileFlowToggleClicks: string[] }).mobileFlowToggleClicks)).toEqual(clicks);
+        await testInfo.attach("reconnect-observation", {
+          body: JSON.stringify({
+            reconnectingVisible: await page.locator('[data-testid="text-ws-reconnecting"]').isVisible(),
+          }),
+          contentType: "application/json",
+        });
+      } finally {
+        releaseSession();
+        await entering?.catch(() => {});
+      }
+    });
+  }
+
   test("hands a captured photo to Photos Reel and reloads its protected image @mobile-image-orientation", async ({
     page,
     context,
