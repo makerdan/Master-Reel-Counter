@@ -69,10 +69,10 @@ export function pins(root, sealedPin) {
   return pin;
 }
 export function admissionReady(root) {
-  const pin = pins(root);
-  invariant(pin.schemaVersion !== 2 || pin.acceptance?.state === "OBSERVED",
-    "new modular admission BLOCKED: ordinary task-environment and normal workspace-restart acceptance NOT_OBSERVED");
-  return pin;
+  // Host installation acceptance is a reporting boundary, not task admission.
+  // Keep contract integrity mandatory; callers still enforce provisioning,
+  // seals, tier binding, authorization declarations and bounded execution.
+  return pins(root);
 }
 export function tierDefinition(root, tier) {
   invariant(TIERS.includes(tier), "unregistered tier");

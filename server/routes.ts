@@ -6,6 +6,7 @@ import { attachWebSocketServerAtPath } from "./websocket-upgrade";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage, pinRetryStats, getPinRetryBuckets, InvalidPhotoUploadIntentError } from "./storage";
 import { getTimezoneConsistentStats } from "./activity-statistics";
+import { createPageViewHandler } from "./pageview-tracking";
 import {
   authenticateWebSocketRequest,
   isAuthenticated,
@@ -643,7 +644,6 @@ const pageviewRateLimiter = rateLimit({
   keyGenerator: (req) => ipKeyGenerator(req.ip ?? ""),
   message: { ok: false, message: "Too many pageview requests, please try again later." },
 });
-const recentPageViews = new Map<string, number>();
 
 /**
  * Typed wrapper for Express requests that have been authenticated.
@@ -7771,37 +7771,14 @@ Master Reel Counter helps users photograph pallet sections in warehouses, annota
   });
 
   // Public endpoint: fire-and-forget page view tracking.
-  // Hashes the client IP for privacy-safe visitor counting; never blocks the response.
-  app.post("/api/track/pageview", pageviewRateLimiter, async (req: any, res) => {
-    try {
-      const { path } = req.body ?? {};
-      if (!path || typeof path !== "string" || path.length > 500) {
-        return res.status(400).json({ ok: false });
-      }
-      const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "unknown";
-      const salt = process.env.SESSION_SECRET || "pv-salt";
-      const hash = createHash("sha256").update(ip + salt).digest("hex").slice(0, 16);
-      const dedupeKey = `${hash}:${path.slice(0, 200)}`;
-      const now = Date.now();
-      const previous = recentPageViews.get(dedupeKey);
-      if (previous && now - previous < 30_000) {
-        return res.json({ ok: true, deduplicated: true });
-      }
-      recentPageViews.set(dedupeKey, now);
-      if (recentPageViews.size > 10_000) {
-        for (const [key, timestamp] of recentPageViews) {
-          if (now - timestamp >= 30_000) recentPageViews.delete(key);
-        }
-      }
-      db.execute(sql`
-        INSERT INTO page_views (path, visitor_hash, created_at)
-        VALUES (${path.slice(0, 200)}, ${hash}, NOW())
-      `).catch(() => {});
-      res.json({ ok: true });
-    } catch {
-      res.json({ ok: false });
-    }
-  });
+  // Only coarse route labels and daily-scoped keyed visitor IDs reach storage.
+  app.post("/api/track/pageview", pageviewRateLimiter, createPageViewHandler({
+    secret: () => process.env.SESSION_SECRET,
+    write: ({ path, visitorHash }) => db.execute(sql`
+      INSERT INTO page_views (path, visitor_hash, created_at)
+      VALUES (${path}, ${visitorHash}, NOW())
+    `),
+  }));
 
   // Admin endpoint: high-level aggregate app stats.
   app.get("/api/admin/summary", isAuthenticated, async (req: any, res) => {

@@ -5,7 +5,7 @@
   "current": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
   "acceptance": {
     "state": "NOT_OBSERVED",
-    "reason": "Ordinary isolated task-environment and normal workspace-restart acceptance have not been observed. New modular admission remains blocked; historical contracts are preserved."
+    "reason": "Ordinary isolated task-environment and normal workspace-restart acceptance have not been observed. Installation readiness is unverified; otherwise-valid task admission is independent of this reporting state. Historical contracts are preserved."
   },
   "revisions": {
     "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c": {

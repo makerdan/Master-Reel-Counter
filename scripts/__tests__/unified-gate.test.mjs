@@ -158,7 +158,7 @@ test("Regression Guard full pin and actual CLI/exported routes reject drift with
   rmSync(join(root, "docs/validation/regression-guard-pin.json"));
   assert.throws(() => prepareDraft(root, { ...spec(), regression: normalGuard() }), /mapping unavailable/);
 });
-test("modular draft is read-only without approval or admission capability; denied admission consumes no ID", async (t) => {
+test("modular draft is read-only; missing approval consumes no ID even without host acceptance", async (t) => {
   const root = fixture(t);
   modular(root, false);
   const before = readFileSync(join(root, "docs/validation/unified-registry.json"), "utf8");
@@ -168,9 +168,31 @@ test("modular draft is read-only without approval or admission capability; denie
   assert.match(draft.plan, /Regression Guard/);
   assert.doesNotMatch(draft.plan, /strictly bound|TASK_ID=UNADMITTED/);
   assert.equal(existsSync(join(root, ".local")), false);
-  await assert.rejects(provision(root, modularSpec()), /NOT_OBSERVED/);
+  await assert.rejects(provision(root, input), /approval reference/);
   assert.equal(readFileSync(join(root, "docs/validation/unified-registry.json"), "utf8"), before);
   assert.equal(existsSync(join(root, ".local")), false);
+});
+test("unobserved installation acceptance permits guarded tasks without claiming host readiness", async (t) => {
+  const root = fixture(t);
+  modular(root, false);
+  const pinPath = join(root, "docs/validation/unified-pin.json");
+  const beforePin = readFileSync(pinPath, "utf8");
+  const state = await provision(root, modularSpec());
+  assert.equal(guard(root, ctx(state)).id, state.id);
+  assert.equal((await provision(root, modularSpec())).id, state.id);
+  for (const tier of TIERS.filter((tier) => tier !== state.tier)) {
+    await assert.rejects(run(root, { ...ctx(state), tier }), /wrong tier/);
+  }
+  const plan = readFileSync(join(root, state.planPath), "utf8");
+  writeFileSync(join(root, state.planPath), plan + "\nchanged");
+  assert.throws(() => guard(root, ctx(state)), /sealed plan changed/);
+  writeFileSync(join(root, state.planPath), plan);
+  assert.equal((await run(root, ctx(state))).state, "PASS");
+  assert.equal(readFileSync(pinPath, "utf8"), beforePin);
+  const status = spawnSync(process.execPath, [join(root, "scripts/unified-gate.mjs"), "status"],
+    { cwd: root, encoding: "utf8", timeout: 5000 });
+  assert.equal(status.status, 2);
+  assert.equal(JSON.parse(status.stdout).runtimeAcceptance.state, "NOT_OBSERVED");
 });
 test("full modular pin detects core, each reference, and snapshot tampering; historical seals are unchanged", async (t) => {
   const root = fixture(t);

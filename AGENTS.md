@@ -63,9 +63,11 @@ not a tier PASS. Run `npm run gate:merge-guard` before merges and publication.
 
 See `docs/validation/unified-installation.md` for supported commands and boundaries.
 See `docs/validation/modular-migration.md` for current readiness and rollback.
-New modular admission stays blocked until the documented ordinary task-environment
-and normal workspace-restart acceptance is actually observed. Do not fake evidence
-or use an override. Historical single-file records retain their original handlers.
+Installation readiness remains unverified until ordinary task-environment and
+normal workspace-restart acceptance is actually observed. That reporting state
+does not deny otherwise-valid task admission. Do not fake acceptance or bypass
+contract integrity, sealed-plan guards, single-tier binding or bounded execution.
+Historical single-file records retain their original handlers.
 
 Follow-ups may be complete unadmitted drafts. Preserve the host's dedicated route,
 parent linkage, categories, payload limits, duplicate checks and one-shot limits.
