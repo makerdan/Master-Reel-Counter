@@ -1,95 +1,33 @@
-Create a Remix of this Application as a backup.
+Use the attached complete App Support Ops package as the candidate revision.
+Read the canonical .agents source, compare its obligations with the candidate and
+preserve valid project-specific requirements before replacement. Do not use runtime
+mirrors or older authoring snapshots as active policy.
 
-If this environment cannot create a Remix, tell me exactly that and wait for my
-confirmation that the backup exists before changing the application. Do not
-invent a completed backup or add a separate recovery-exercise prerequisite.
+For an installation-only request, update the definition and its relevant instruction
+references only; do not infer application implementation or Combined mode.
+For an identifiable application request, preserve its explicitly selected modes
+(Help, Admin Analytics, Runtime Safety, or a specified combination). If the requested
+mode cannot be established, ask one focused question before application changes.
 
-Use the attached App Support Ops package as the owner-selected skill revision.
-Inspect the current canonical .agents source and applicable references first.
-Do not edit .local runtime mirrors or consult retired skill variants as policy.
+This prompt does not grant new authorization for workload changes, telemetry,
+providers, contact channels, app data changes, deployments or service disruption.
+Follow actual project backup/retention policy; do not require a Remix universally,
+claim a backup exists, or ask for original receipts.
 
-Update only the App Support Ops canonical instructional file to the attached
-SKILL.md, preserving unrelated source and project state. Compare the existing
-source with this package's B0 baseline; if it differs, reconcile the differences
-and prepare an updated candidate instead of overwriting newer instructions.
-Report any actual source-management integration needed without inventing a new
-approval service, reviewer, receipt, bootstrap specification or platform hook.
-This definition update alone does not activate runtime controls or deploy.
+Read reference/integration-contract.md before planning application or gate changes.
+Map real capabilities and requirement/test/assertion/runner coverage; propose the
+smallest missing workload delta and obtain any uncovered scope decision. Do not add
+tiers, remove checks, change budgets or rewrite sealed/history records silently.
+Use the adopted host's actual preparation, admission, maintenance and amendment
+routes; complete unadmitted drafts are not permission for application execution.
 
-For the App Support Ops implementation scope I already requested, I also
-authorize the smallest necessary addition of its required executable checks
-to appropriate EXISTING validation tiers, including their supported runner
-wiring. First show the concrete proposed workload delta and affected boundaries.
-Do not treat this as permission to add unrelated features or safety controls.
-If there is no identifiable existing implementation request, stop after the
-definition update and read-only coverage assessment; do not infer a Runtime
-Safety or Combined request merely from this installation prompt.
+For runtime scope use applicable canonical Port Authority rules. Missing dependent
+capabilities do not block unrelated Help or Analytics. Do not reclaim listeners,
+delete uncertain leases, signal/restart services, strip production flags or enable
+advanced features under this prompt. A requested outage control additionally needs
+all client, safe-controller, authorization and production-exclusion gates.
 
-Inspect current governing instructions, canonical Failure Gate Unified,
-Regression Guard and Port Authority when adopted, actual workload definitions,
-inheritance, callers and the supported maintenance/provisioning/amendment routes.
-Do not assume a check runs because its file exists or a tier name sounds right.
-
-Map each applicable requirement to a concrete test case, detecting assertion,
-actual executable command or verified discovery rule, prerequisites and intended
-existing tier. Separate already-covered checks from missing ones and genuine
-capability gaps. Define planned new test locations where implementation is still
-needed; do not invent successful runs for tests not yet delivered.
-
-Prefer short deterministic checks in test-fast only if the whole registered
-workload remains inside its approved bounds. Place bounded process/lifecycle,
-service and production-gating tests in test-standard when appropriate. Use
-test-standard-plus or test-heavy only when the required coverage genuinely needs
-their actual capabilities and resources. These are examples, not replacements
-for the project's definitions. Inspect inherited checks and prerequisites.
-
-Do not add a fifth tier, create a parallel runner or bypass a binding. Preserve
-all existing required checks. This authorization does not cover removing checks,
-changing tier inheritance, increasing approved budgets, waiving prerequisites,
-rebinding tasks or activating disruptive controls. If one of those is genuinely
-necessary, prepare its exact delta and ask one specific scope question rather
-than silently applying it or requesting generic execution authority.
-
-If Unified classifies the needed workload-definition change as gate work, apply
-only that authorized gate change through its owner-directed maintenance route,
-separately from application implementation. Use the gate's own bounded tests and
-report them as maintenance results, not a tier PASS. Do not mint application
-task IDs or change application code through the gate-maintenance exception.
-Checks for application behavior not yet implemented remain planned coverage,
-not successful gate-maintenance results.
-
-Preserve historical sealed plans, recorded contract revisions, IDs, tombstones,
-bindings, ledgers, baselines and previous evidence. Assess inherited effects and
-affected active tasks. Use supported amendments and applicable approval if an
-active plan is materially affected; do not rewrite its sealed records or impose
-blanket historical migration. Reuse valid existing authorization where it covers
-the actual scope and identifiable revision.
-
-Then prepare or amend the actual application plan through supported routes.
-Assign exactly one adequate registered tier; include its coverage reference,
-baseline declarations and Regression Guard classification/declaration. Keep a
-native Plan and its authoritative sealed plan consistent where both exist.
-Do not perform implementation or application workloads before valid admission
-and applicable approval.
-
-Deliver the required tests and execution wiring with the application change.
-Use isolated owned-process fixtures for safety assertions. Keep ordinary port
-inventory read-only; do not reclaim existing listeners, erase uncertain leases,
-restart live services, access production, spend provider credits or deploy under
-this prompt. A real outage/restart surface remains conditional on its actual
-capability and authorization gates.
-
-Run through the assigned tier's supported supervised route with real finite
-limits and cleanup. Where activation requires two consecutive acceptance runs,
-obtain both through that route without manual port or lease intervention.
-Do not replace actual activation evidence with package fixtures.
-
-If an amendment or capability remains unavailable, identify the exact dependent
-controls/checks as blocked or not activated and continue independent authorized
-work. Do not weaken required coverage or claim full application/runtime readiness.
-
-Return a concise handoff: canonical revision, selected modes, exact workload
-delta, authorization basis, affected-plan disposition, requirement/test/runner
-map, assigned tier, observed maintenance and application results separately,
-cleanup evidence, and remaining gaps. Do not claim platform-wide task interception
-or request an independent reviewer unless I selected one.
+Deliver only authorized changes with actual required checks and a per-mode handoff.
+Preserve auth/denial, privacy, accessibility and existing data semantics. Identify
+mocked versus real boundaries and actual runtime activation evidence separately.
+Separate review is not selected by this prompt. Do not create a verifier task.

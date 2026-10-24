@@ -20,10 +20,16 @@ the modes merely because the repository could support them.
 
 ## 1. Discover the repository and capabilities first
 
-Before proposing or changing code, inspect the repository's structure,
-instructions, routes or commands, build and deployment boundaries, and tests.
-Identify evidence for each capability below; do not infer it from a familiar
-framework or filename.
+First select the requested mode and operation: definition installation,
+planning/audit, or application implementation. Installing this skill does not
+select an application mode or authorize product changes. For an existing
+integration, preserve its actual owner-selected modes; do not infer Combined.
+
+Before proposing or changing code, inspect relevant repository instructions,
+routes/commands, deployment boundaries and tests. Apply the capability matrix
+only to the selected mode and its real dependencies. Mark other rows not
+applicable rather than auditing unrelated systems. Do not infer capability from
+a familiar framework, filename, installed library or task completion label.
 
 | Area | Discover |
 |---|---|
@@ -57,7 +63,13 @@ Use the host project's native approach and conventions. Read only relevant
 canonical specialist sources under `.agents`, never runtime mirrors or retired
 definitions. For runtime work, use `.agents/skills/port-authority/SKILL.md`
 and its applicable references; locate the actual canonical path if the project
-uses a different layout. No separate companion skill is an ordinary prerequisite.
+uses a different layout. Port Authority owns process/port/lease safety; App Support
+Ops owns the requested support feature, capability gates and coordinated handoff.
+These are complementary responsibilities, not competing choices to ask the user
+to arbitrate. A bare port-conflict request uses the runtime specialist without
+adding Help or Analytics. Missing applicable runtime guidance blocks only the
+dependent runtime work, not independent Help or Analytics. Do not install an
+extra gate or require a separate companion installation merely to use other modes.
 When adopted, Failure Gate Unified governs admission and validation, and
 Regression Guard governs recurrence-prevention declarations and delivery.
 Neither is required merely to use App Support Ops. For server-side AI help,
@@ -85,72 +97,13 @@ skill or the host project.
   mock that hides whether the real authorization, environment, or process
   boundary is enforced.
 
-### Validation coverage and existing-tier amendments
+### Planning, authorization and validation integration
 
-Installing this definition alone does not authorize application implementation,
-runtime activation, workload changes or deployment. When implementation or
-activation is requested, plan its applicable tests and execution wiring together.
-Before publishing the application plan, inspect actual runner commands, tier
-definitions, inheritance, prerequisites and finite budgets. Map each applicable
-requirement to a concrete case/assertion and the route that will actually run it.
-Distinguish existing coverage, planned new coverage, unavailable capability and
-justified non-applicability. A planned test need not exist yet; it must be
-delivered and run before claiming the corresponding requirement verified.
-
-Under Failure Gate Unified, prefer adding missing checks to an appropriate
-existing tier over inventing another tier or a parallel validation authority.
-Each task still receives exactly one adequate assigned tier. Choose placements
-from actual cost, isolation, dependencies and required evidence, not test names:
-
-| Check characteristics | Candidate placement, subject to the project's actual workloads |
-|---|---|
-| Short deterministic scanners, synthetic fixtures and pure unit cases | `test-fast`, if its complete workload remains within approved bounds |
-| Bounded owned-process, allocation/cleanup, API or build/environment-gating checks | `test-standard` when its budgets and capabilities suffice |
-| Checks genuinely requiring disposable data services or broader integration | `test-standard-plus` when its actual prerequisites are available |
-| Browser journeys, larger end-to-end or resource-intensive acceptance | `test-heavy` when its actual prerequisites are available |
-
-These are placement examples, not universal tier definitions. Production exclusion
-can have unit, server and build assertions in different layers; a UI recovery
-journey may additionally need a browser. Do not move lightweight checks into a
-database/browser-dependent tier merely because they concern runtime safety.
-Conversely, fixtures cannot replace required installed-caller or real-boundary
-acceptance. Existing inheritance remains real: an unavailable inherited
-prerequisite is not permission to skip it. A composition change needs its own
-covered scope, not an invented capability or a fifth tier.
-
-If the current workload cannot run the required checks, automatically prepare
-the smallest explicit workload amendment alongside the application-plan draft.
-Specify affected definitions/callers, concrete commands or supported discovery
-rules, requirement coverage, prerequisites, whole-tier and step budgets,
-cleanup and any required repeated acceptance. A label, unused script or test
-file outside the actual runner does not add coverage. Reuse supported automatic
-test discovery when it already includes the new cases; do not demand an amendment
-solely because a new file was added under an already-authorized discovery rule.
-
-Identify which requested scope and project policy cover that amendment. An
-application-safety request is not automatically approval to change gate policy,
-but a prior instruction that demonstrably covers the particular amendment
-requires no duplicate approval. If authorization is missing, present the concrete
-amendment as one scope decision; do not ask vaguely to "restore authority."
-Do not silently change workloads, budgets, prerequisites, bindings or approvals.
-
-Where Unified treats tier-definition changes as gate work, perform the authorized
-gate-only change through its owner-directed maintenance route before normal
-application admission. That route does not authorize application edits, minting
-task IDs or a tier PASS. Verify gate maintenance with its own checks; application
-validation uses the admitted task's assigned-tier route. Otherwise use the
-project's actual supported workload-amendment route. A proposed dependency may
-precede admission, but is not an admitted implementation plan.
-
-Preserve sealed plans, recorded contract revisions, IDs, bindings, ledgers,
-baselines and historical evidence. Materially changed workloads require
-reassessment of affected active plans and their approval/evidence through the
-supported amendment route; never rewrite sealed records or require blanket
-historical migration. Include inherited effects when assessing the change.
-If the required amendment is declined, out of scope or unavailable, identify
-only the dependent controls/checks as blocked or not activated. Continue
-independent authorized work. Do not weaken required checks, waive acceptance,
-use unbound diagnostics as a tier PASS or claim full runtime readiness.
+Read [the integration contract](reference/integration-contract.md) before planning
+application implementation, changing validation wiring, or migrating an existing
+integration. It preserves workload discovery, exact scope authorization, supported
+amendments and historical records. This reference is normative; unavailable guidance
+blocks only work depending on it. Definition-only delivery is not application admission.
 
 ## 3. Help mode
 
@@ -166,7 +119,11 @@ Cover, where applicable:
 1. **First-time guidance:** orient a new user to the main task, essential
    controls, and next step without blocking repeat users. Persist dismissal or
    completion through the existing user/settings mechanism, with a reset or
-   revisit path.
+   revisit path. Scope persisted state to the actual user/profile and content
+   revision as appropriate; switching accounts must not inherit another user's
+   completion. Storage absence, denial, corruption or write failure must not
+   hide guidance or crash navigation. Test the actual failure and revisit path;
+   do not invent a database solely to persist dismissal.
 2. **Feature and workflow examples:** explain concrete tasks in the product's
    vocabulary, prerequisites, expected result, recovery path, and limitations.
    Prefer short contextual help plus a deeper article or command reference.
@@ -182,10 +139,11 @@ Cover, where applicable:
    invent an email, webhook, or external destination. If none is configured,
    state the configuration gap and provide a local/non-delivery fallback only
    when the host supports one.
-5. **Interaction:** for an overlay or floating help surface, support draggable,
-   minimize, and close behavior without trapping content or losing the user's
-   place. Otherwise use the native equivalent (such as command help or a page)
-   and do not introduce pointer-only chrome.
+5. **Interaction:** preserve the selected native Help surface and the user's
+   place. For requested floating/minimizable/draggable interactions, provide
+   accessible non-pointer alternatives and safe close/focus behavior. Do not add
+   dragging or extra chrome merely because the interface supports it. Pages,
+   command help and API guidance need only their actual interaction contracts.
 6. **Device and input adaptation:** make guidance usable on small screens,
    touch, keyboard, assistive technology, and non-pointer inputs. Avoid
    hover-only instructions; preserve focus; provide intentional keyboard
@@ -201,7 +159,12 @@ project.
 
 ## 4. Admin Analytics mode
 
-Establish the requested analytics and the actor allowed to see them. Keep the
+Establish the requested analytics and the actor allowed to see them. Existing
+record aggregates do not require new telemetry, page-view events or visitor IDs.
+Add collection only when explicitly in scope and governed by actual privacy policy.
+Distinguish route/authorization tests from query/persistence evidence: an injected
+aggregate loader does not establish the real query's date bounds or isolation.
+Record that gap rather than inventing a successful database test. Keep the
 capability check server- or service-authoritative for every read, export,
 aggregation, and mutation. A client admin flag, hidden route, or exposed
 administrator identifier is not a security control.
@@ -242,14 +205,22 @@ semantics when both interfaces exist.
 ## 5. Runtime Safety mode
 
 Apply the runtime specialist's relevant contract to the requested controls, then
-adapt it to the host project. Do not activate optional advanced controls merely
-to satisfy an audit. For network services, the minimum contract is:
+adapt it to the host project. Basic hygiene, demonstrated-conflict serialization
+and advanced recovery retain their distinct prerequisites. Do not activate
+optional controls merely to satisfy an audit, assume a missing specialist
+capability exists, or reclassify an unresolved conflict as repaired. Independently
+permitted non-runtime work may continue. For selected network runtime work, apply
+the following relevant feature-side requirements without duplicating or weakening
+Port Authority's ownership, production, recovery or acceptance rules:
 
 1. **Environment-owned ports:** every service reads its listen port from
    environment/platform service configuration. Repository-wide, scan server
    entry points, client dev servers, test URLs, scripts, workflow commands, and
    executable/configuration documentation for hardcoded ports. Ignore examples
-   only when the scanner explicitly distinguishes them.
+   only when the scanner explicitly distinguishes them. An authoritative
+   platform service-port assignment is not an unauthorized runtime literal;
+   distinguish configuration, executable callers, fixtures and examples using
+   narrow evidence, not blanket test/documentation exclusions.
 2. **Regression fixture:** test the scan with a synthetic failing fixture
    containing a representative hardcoded bind or URL and reject it; also test a
    valid environment-driven fixture. Do not weaken the production scan.
@@ -258,16 +229,19 @@ to satisfy an audit. For network services, the minimum contract is:
    readiness, collision handling, cleanup, and artifact-base/service routing
    explicit. Never choose a convenient fixed port without proving it is the
    canonical path.
-4. **Safe cleanup:** for applicable authorized cleanup, use native
-   process/workflow control or a dedicated utility that discovers the exact
-   holder, exempts its own tree, terminates gracefully before escalation,
-   cleans supervising wrappers, confirms the port is free, and logs any
-   permitted forced takeover. Guard against recursion and production execution;
-   never rely on process names alone or kill indiscriminately.
-5. **Repeatable validation:** exercise relevant validation twice without manual
-   port clearing or killing. Preserve lock/reentrancy, stale-holder, timeout,
-   and failed-child cleanup behavior where tests or generated/shared resources
-   are serialized.
+4. **Safe lifecycle and cleanup:** use Port Authority's applicable managed-
+   service, owned-child or advanced reclaim contract. These are distinct scopes,
+   not interchangeable cleanup permissions. Preserve exact ownership, finite
+   termination, observed quiescence, protected unrelated work and uncertain
+   lease retention. Never infer takeover authority from a port, process name,
+   task approval or local flag. A read-only inventory must never become cleanup.
+5. **Repeatable validation:** follow the applicable Port Authority acceptance
+   contract for newly activated runtime controls, including its two consecutive
+   authorized host runs without manual cleanup. Exercise actual affected callers;
+   isolated fixture passes or correct production denials do not prove activation.
+   Do not apply a blanket twice-run rule to definition installation or independent
+   Help/Analytics work. Preserve the host's required workload coverage and actual
+   lock/reentry, timeout, owned-child cleanup and uncertain-state protections.
 
 Cleanup requirements do not grant takeover permission. Under Port Authority,
 ordinary port inventory remains read-only; owned-child cleanup and an exact

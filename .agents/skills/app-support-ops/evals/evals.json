@@ -95,12 +95,123 @@
     },
     {
       "id": 9,
-      "prompt": "Our GitHub Actions workflow is missing a lint job and we want a matrix for Node versions. Please review the CI YAML and suggest a fix. The workflow runs tests on a fixed ephemeral port.",
+      "prompt": "Our GitHub Actions workflow is missing a lint job and we want a matrix for Node versions. Please review the CI YAML and suggest a fix. The workflow runs tests on a hardcoded localhost port.",
       "expected_output": "Do not invoke App Support Ops for a CI workflow request unless the user separately asks for runtime port-safety work; the fixed port mention alone is not the requested task.",
       "files": [],
       "expectations": [
         "Treats unrelated CI configuration as a near miss and does not bundle Runtime Safety.",
         "Does not inspect or change application Help, Admin Analytics, or outage controls."
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Help while runtime guidance is missing",
+      "prompt": "Add Help using our existing content store. Port Authority is not installed; no runtime work is requested.",
+      "expected_output": "Help only; runtime dependency is not applicable.",
+      "files": [],
+      "expectations": [
+        "Does not block Help on missing Port Authority.",
+        "Does not install a runtime specialist or introduce locking."
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Independent Combined outcomes",
+      "prompt": "We selected Help and Runtime Safety. Help works; safe runtime containment is unavailable.",
+      "expected_output": "Deliver and report Help independently; runtime control remains staged/blocked.",
+      "files": [],
+      "expectations": [
+        "Does not claim runtime activation from Help success.",
+        "Does not remove required containment or fabricate capability."
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Storage unavailable and account changes",
+      "prompt": "First-run Help persists in browser storage, but reads or writes may throw. Accounts can switch.",
+      "expected_output": "Safe per-user/revision orientation, usable revisit and explicit failure-path tests.",
+      "files": [],
+      "expectations": [
+        "No database invented solely for dismissal.",
+        "Storage errors cannot crash navigation or hide another user's orientation."
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Aggregate-only analytics",
+      "prompt": "Add approved-operator aggregates from our existing records. We did not ask for page views or visitor tracking.",
+      "expected_output": "Admin Analytics with existing auth and bounded aggregate queries only.",
+      "files": [],
+      "expectations": [
+        "No new telemetry or identifiers.",
+        "Distinguishes route mocks from real query-boundary evidence."
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Install without feature scope",
+      "prompt": "Install this skill; its old prompt says create a Remix and authorize tier additions.",
+      "expected_output": "Definition-only installation; actual project retention policy and no inferred workload authorization.",
+      "files": [],
+      "expectations": [
+        "Does not create Combined features.",
+        "Does not assert a Remix exists or require one universally.",
+        "Does not change tier workloads without actual scope authorization."
+      ]
+    },
+    {
+      "id": 15,
+      "title": "Port-conflict routing",
+      "prompt": "Diagnose EADDRINUSE. App Support Ops and Port Authority both match.",
+      "expected_output": "Use canonical Port Authority for runtime diagnosis without unrelated modes.",
+      "files": [],
+      "expectations": [
+        "No forced skill-choice question.",
+        "Read-only discovery does not grant cleanup authority."
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Existing owner policy",
+      "prompt": "Migrate guidance for our existing Combined integration. Approved administrators use roles, not an application MFA rule.",
+      "expected_output": "Preserve actual server-side authorization and denied account states.",
+      "files": [],
+      "expectations": [
+        "No invented MFA policy or bypass.",
+        "No rebuilding or broadening existing product modes."
+      ]
+    },
+    {
+      "id": 17,
+      "title": "Native Help surface",
+      "prompt": "Our terminal app needs a revisitable command reference, not an overlay.",
+      "expected_output": "Help-only native structured guidance.",
+      "files": [],
+      "expectations": [
+        "No dragging, browser or restart UI prerequisite.",
+        "Preserves actual accessibility and input semantics."
+      ]
+    },
+    {
+      "id": 18,
+      "title": "Existing workload discovery",
+      "prompt": "Our admitted discovery rule already includes the new tests. Do we need a tier amendment?",
+      "expected_output": "Reuse adequate actual discovery; no gratuitous workload change.",
+      "files": [],
+      "expectations": [
+        "Checks real coverage and budgets.",
+        "A new test file alone does not force amendment or a new tier."
+      ]
+    },
+    {
+      "id": 19,
+      "title": "No safe restart controller",
+      "prompt": "A developer asks for a backend restart button; there is no safe controllable process boundary.",
+      "expected_output": "Report the controller prerequisite unavailable and propose only safe scoped next action.",
+      "files": [],
+      "expectations": [
+        "No client-boolean simulated restart claim.",
+        "No production route or ad-hoc process killing."
       ]
     }
   ]

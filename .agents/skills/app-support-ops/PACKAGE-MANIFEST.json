@@ -1,48 +1,50 @@
 {
-  "skillId": "app-support-ops",
-  "revisionLabel": "existing-tier-coverage-clarification",
-  "canonicalBaseline": {
-    "project": "/@makerdantheman/CloudPainter",
-    "path": ".agents/skills/app-support-ops/SKILL.md",
-    "sha256": "de57d054bcd39880e741975f29a9cf0f38c300912f35791511a6b471d4d73983",
-    "sourceRecheckedUnchanged": true
-  },
-  "scope": "Downloadable revision only; not installed or applied to CloudPainter",
+  "schemaVersion": 1,
+  "skillIdentity": "app-support-ops",
+  "revisionLabel": "mode-scoped-specialist-integration",
+  "identityFiles": [
+    "SKILL.md",
+    "application-prompt.txt",
+    "evals/evals.json",
+    "reference/integration-contract.md"
+  ],
+  "safetyPackageSha256": "8781ba01304581db0ec981ea5964762edf07b087ba82298513edf4e16d972b29",
   "files": [
     {
+      "path": "README.md",
+      "role": "explanatory",
+      "bytes": 1686,
+      "sha256": "fa3b737cbd07c221247283bb989000e7b2af84a0b109a5164dbb9053571f039c"
+    },
+    {
       "path": "REVISION-NOTES.md",
-      "bytes": 10391,
-      "sha256": "6bacdbdba65b7a2e1f5c1a5ee18c41433eb512d21053e88390cc4017020c7f21"
+      "role": "explanatory",
+      "bytes": 1395,
+      "sha256": "983e82e9c6638d10038f561168557dcad54986ec567b8c986e57b24e6a5b2c5e"
     },
     {
       "path": "SKILL.md",
-      "bytes": 20351,
-      "sha256": "571805eb3a9bcbce80200d283d59ccf47eba017cb6cd2967b59d9c4aaa82e774"
+      "role": "normative",
+      "bytes": 18930,
+      "sha256": "6e2b4ff9d08005b2415a81deeb663f67efd87d117eb191246c4875cfea1639cd"
     },
     {
       "path": "application-prompt.txt",
-      "bytes": 6008,
-      "sha256": "3929e6d62b41fe8c3cf958ff54e88262eef6f067708834137556d906b538784e"
-    },
-    {
-      "path": "authoring/B0-SKILL.md",
-      "bytes": 14361,
-      "sha256": "de57d054bcd39880e741975f29a9cf0f38c300912f35791511a6b471d4d73983"
-    },
-    {
-      "path": "authoring/CHANGES.diff",
-      "bytes": 9722,
-      "sha256": "1ac3a485d543e01568c7117d8c6d0e53784c34b72872a0a29fc8ddb0b24d0bdd"
-    },
-    {
-      "path": "authoring/TEXT-VERIFICATION.json",
-      "bytes": 623,
-      "sha256": "b237a9a37f9499528baeb0dc99a818b065ea5c4849a2da49b481aa843fe2010d"
+      "role": "normative",
+      "bytes": 2230,
+      "sha256": "187f402bbce9e3ed699e071b4bd208b2924a8247146a28a75a45ce460ff7439b"
     },
     {
       "path": "evals/evals.json",
-      "bytes": 9009,
-      "sha256": "2af729eca0d64dda30879e7eeef9d9bafd907a824730ae097b74f94b8b169204"
+      "role": "test",
+      "bytes": 13675,
+      "sha256": "58fe410b0d225e02b6d5bf7ee8f2852f8e7fa0b0a4b1e7cdfcaac78dd0b503d2"
+    },
+    {
+      "path": "reference/integration-contract.md",
+      "role": "normative",
+      "bytes": 7393,
+      "sha256": "816413745514a4c004d02f2eca8b14204c7938f88f95de3db37c4ed800bae9d9"
     }
   ]
 }

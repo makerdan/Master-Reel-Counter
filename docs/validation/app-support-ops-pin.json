@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "source": ".agents/skills/app-support-ops",
+  "safetyPackageSha256": "8781ba01304581db0ec981ea5964762edf07b087ba82298513edf4e16d972b29",
+  "snapshot": "docs/validation/app-support-ops-revisions/8781ba01304581db0ec981ea5964762edf07b087ba82298513edf4e16d972b29",
+  "scope": "definition-and-instruction-only",
+  "applicationBehaviorChanged": false,
+  "runtimeAcceptanceEstablished": false,
+  "historicalContractsRebound": false
+}

@@ -1,5 +1,19 @@
 # Project instructions
 
+## App Support Ops
+
+Use the complete canonical `.agents/skills/app-support-ops/` package, including
+`reference/integration-contract.md`; its selected identity and snapshot are in
+`docs/validation/app-support-ops-pin.json`. Preserve this project's existing
+Combined integration: identity-scoped Help/onboarding and chat history, native AI
+and persisted feedback, server-side owner analytics, and privacy boundaries.
+Definition installation is not authorization for feature or workload changes.
+Bare runtime work routes to canonical Port Authority and its applicable contract;
+its blocked capabilities do not block independent Help/Analytics. No implicit
+Combined scope, mandatory Remix, new provider, default reviewer or new telemetry.
+Historical bundle reports/prompts retain their old identity, not current authority.
+See `docs/validation/app-support-ops-migration.md` for actual evidence and gaps.
+
 Port Authority's complete capability-scoped package is staged at
 `.agents/skills/port-authority/`, pinned in
 `docs/validation/port-authority-adoption.json`. Current production denial and

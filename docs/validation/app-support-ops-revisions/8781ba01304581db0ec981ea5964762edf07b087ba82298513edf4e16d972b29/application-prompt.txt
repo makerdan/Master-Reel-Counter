@@ -1,0 +1,33 @@
+Use the attached complete App Support Ops package as the candidate revision.
+Read the canonical .agents source, compare its obligations with the candidate and
+preserve valid project-specific requirements before replacement. Do not use runtime
+mirrors or older authoring snapshots as active policy.
+
+For an installation-only request, update the definition and its relevant instruction
+references only; do not infer application implementation or Combined mode.
+For an identifiable application request, preserve its explicitly selected modes
+(Help, Admin Analytics, Runtime Safety, or a specified combination). If the requested
+mode cannot be established, ask one focused question before application changes.
+
+This prompt does not grant new authorization for workload changes, telemetry,
+providers, contact channels, app data changes, deployments or service disruption.
+Follow actual project backup/retention policy; do not require a Remix universally,
+claim a backup exists, or ask for original receipts.
+
+Read reference/integration-contract.md before planning application or gate changes.
+Map real capabilities and requirement/test/assertion/runner coverage; propose the
+smallest missing workload delta and obtain any uncovered scope decision. Do not add
+tiers, remove checks, change budgets or rewrite sealed/history records silently.
+Use the adopted host's actual preparation, admission, maintenance and amendment
+routes; complete unadmitted drafts are not permission for application execution.
+
+For runtime scope use applicable canonical Port Authority rules. Missing dependent
+capabilities do not block unrelated Help or Analytics. Do not reclaim listeners,
+delete uncertain leases, signal/restart services, strip production flags or enable
+advanced features under this prompt. A requested outage control additionally needs
+all client, safe-controller, authorization and production-exclusion gates.
+
+Deliver only authorized changes with actual required checks and a per-mode handoff.
+Preserve auth/denial, privacy, accessibility and existing data semantics. Identify
+mocked versus real boundaries and actual runtime activation evidence separately.
+Separate review is not selected by this prompt. Do not create a verifier task.

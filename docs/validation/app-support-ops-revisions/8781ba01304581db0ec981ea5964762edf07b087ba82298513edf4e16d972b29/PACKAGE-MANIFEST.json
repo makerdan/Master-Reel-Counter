@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "skillIdentity": "app-support-ops",
+  "revisionLabel": "mode-scoped-specialist-integration",
+  "identityFiles": [
+    "SKILL.md",
+    "application-prompt.txt",
+    "evals/evals.json",
+    "reference/integration-contract.md"
+  ],
+  "safetyPackageSha256": "8781ba01304581db0ec981ea5964762edf07b087ba82298513edf4e16d972b29",
+  "files": [
+    {
+      "path": "README.md",
+      "role": "explanatory",
+      "bytes": 1686,
+      "sha256": "fa3b737cbd07c221247283bb989000e7b2af84a0b109a5164dbb9053571f039c"
+    },
+    {
+      "path": "REVISION-NOTES.md",
+      "role": "explanatory",
+      "bytes": 1395,
+      "sha256": "983e82e9c6638d10038f561168557dcad54986ec567b8c986e57b24e6a5b2c5e"
+    },
+    {
+      "path": "SKILL.md",
+      "role": "normative",
+      "bytes": 18930,
+      "sha256": "6e2b4ff9d08005b2415a81deeb663f67efd87d117eb191246c4875cfea1639cd"
+    },
+    {
+      "path": "application-prompt.txt",
+      "role": "normative",
+      "bytes": 2230,
+      "sha256": "187f402bbce9e3ed699e071b4bd208b2924a8247146a28a75a45ce460ff7439b"
+    },
+    {
+      "path": "evals/evals.json",
+      "role": "test",
+      "bytes": 13675,
+      "sha256": "58fe410b0d225e02b6d5bf7ee8f2852f8e7fa0b0a4b1e7cdfcaac78dd0b503d2"
+    },
+    {
+      "path": "reference/integration-contract.md",
+      "role": "normative",
+      "bytes": 7393,
+      "sha256": "816413745514a4c004d02f2eca8b14204c7938f88f95de3db37c4ed800bae9d9"
+    }
+  ]
+}
