@@ -17437,6 +17437,714 @@
             "approvalHash": "e2eb732717d8d5b65fda13deedf30cba6c6643c23ae3ec38f392422f892d8c99"
           },
           "digest": "1c4f6068feea6c04d4173e6c4245e2881d4505db1a1037d636452413213c83ec"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-24T20:05:21.725Z",
+          "previous": "1c4f6068feea6c04d4173e6c4245e2881d4505db1a1037d636452413213c83ec",
+          "state": {
+            "id": "1bc92e1d-057b-4d8b-baa6-e75ab3ca0115",
+            "createdAt": "2026-10-24T19:58:52.588Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/1bc92e1d-057b-4d8b-baa6-e75ab3ca0115.md",
+            "specHash": "a06ae456262b3bd64996c746458967f4c23da2f7bbba9f86ebb480e420498f56",
+            "runs": [
+              {
+                "id": "0dd8f983-b442-499e-8e29-6da1ec43624b",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "INCOMPLETE",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "07d356df5116834c782f6e7072c051f53118c2d77833087b7fbf607008e7b3e9",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "073535a56c5232c4ca407b4b672596b22c42d824",
+                  "filesHash": "a0b5654b2c662af6a49e675548bc33e9c5aadc22a96be09a304197a61f7777ab"
+                },
+                "startedAt": "2026-10-24T20:00:23.671Z",
+                "cleanupDeadline": "2026-10-24T20:05:26.672Z",
+                "evidencePath": ".local/failure-gate-unified/runs/0dd8f983-b442-499e-8e29-6da1ec43624b.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 25938,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2579,
+                    "outputHash": "bbfd001195854811be71b2c350172810ebeaefb57883a4dee3deab1dfcfedbec",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 137.701881\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.550978\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.405453\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.47353\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.198719\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.69716\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.302913\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.480637\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.852885\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.615719\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.236597\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 204.574604\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1757,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 285,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "9ad6f2bb42fd70a888142753aac71f0155656d7d8bd7e79431187542a3eb56f7",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 215 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 6442,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3116,
+                    "outputHash": "962b9e9fc374cb695e19f1d502206dc3595ab977278c2f63c3e29e38d9ecbea4",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 631.820773\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 659.128038\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 823.193691\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 498.478637\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 671.790152\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 887.393418\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 635.994593\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 696.292702\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 3.207012\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 3.378952\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.269656\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.478118\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.475706\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.454132\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.515285\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.863008\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6175.385494\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 14373,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 46087,
+                    "outputHash": "6c5d515401ab7cc948eb7d84206388b7d0caa3b1c8afb17c2b18196b4ee7a991",
+                    "outputExcerpt": "  ...\n    # Subtest: keeps each health failure class distinct and caps aggregate counters\n    ok 7 - keeps each health failure class distinct and caps aggregate counters\n      ---\n      duration_ms: 0.278375\n      ...\n    1..7\nok 60 - production Clerk proxy lifecycle guards\n  ---\n  duration_ms: 129.312777\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 9.493471\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 5.561367\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 4.156179\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 16.789273\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 5.491417\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 20.503368\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 11.386761\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 13.84857\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 7.228936\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 3.903315\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 7.590679\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 11.870355\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 5.961258\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 5.628031\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 3.207346\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 27.519421\n      ...\n    1..16\nok 61 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 1659.771268\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 14.953628\n      ...\n    1..1\nok 62 - account capability route guard\n  ---\n  duration_ms: 18.444737\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 27.173383\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 14.211622\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 13.762202\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 48.022944\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 32.135679\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.713627\n      ...\n    1..6\nok 63 - authenticated Poe route contracts\n  ---\n  duration_ms: 136.396206\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 1.010784\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.301812\n      ...\n    1..2\nok 64 - Admin AI health route contract\n  ---\n  duration_ms: 1.456167\n  type: 'suite'\n  ...\n# Subtest: page-view persistence receives only coarse labels, not sensitive URL content\nok 65 - page-view persistence receives only coarse labels, not sensitive URL content\n  ---\n  duration_ms: 3.006664\n  ...\n# Subtest: page-view malformed paths never reach the sink\nok 66 - page-view malformed paths never reach the sink\n  ---\n  duration_ms: 0.346586\n  ...\n# Subtest: visitor IDs are domain-separated HMACs using the server key and daily scope\nok 67 - visitor IDs are domain-separated HMACs using the server key and daily scope\n  ---\n  duration_ms: 0.457772\n  ...\n# Subtest: missing or unreadable secret and missing IP fail closed without persistence\nok 68 - missing or unreadable secret and missing IP fail closed without persistence\n  ---\n  duration_ms: 0.203362\n  ...\n# Subtest: dedupe uses minimized routes and preserves the 30-second window\nok 69 - dedupe uses minimized routes and preserves the 30-second window\n  ---\n  duration_ms: 0.46632\n  ...\n# Subtest: stalled, rejecting and synchronously failing sinks cannot block the response\nok 70 - stalled, rejecting and synchronously failing sinks cannot block the response\n  ---\n  duration_ms: 4.145009\n  ...\n# Subtest: installed public collector keeps the limiter and parameterized adapter around the tested handler\nok 71 - installed public collector keeps the limiter and parameterized adapter around the tested handler\n  ---\n  duration_ms: 2.454964\n  ...\n# Subtest: support help is versioned and app-only\nok 72 - support help is versioned and app-only\n  ---\n  duration_ms: 0.29213\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 73 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.607704\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 74 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.759293\n  ...\n1..74\n# tests 198\n# suites 30\n# pass 198\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14135.338948\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 15413,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17926,
+                    "outputHash": "d58aa156d00259ed38f7b473fc3c3906c3cb5bfd08b2cb1c04ad0fd345785876",
+                    "outputExcerpt": "42 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 4.137657\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 3.888079\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 5.060095\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 4.20756\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.42912\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.221327\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 1.631504\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.173369\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 0.425373\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.437756\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 36.768254\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.267295\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.318289\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 102.384775\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 1.083794\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 639.769305\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 3.56963\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 2.930882\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 3.433514\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 1.065213\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.354148\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 88.977006\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 2.536828\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 2.981097\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 1.931101\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 1.543717\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 12.690627\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 3.713642\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.797534\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 9.133157\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 2868.622711\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14763.133833\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 1.457922\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.446584\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.823495\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.826631\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.643726\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.188164\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 49.91399\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 16.604079\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 2.682988\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 388.466031\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 16958,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2186,
+                    "outputHash": "9c2c8a5fe62d748dfc133b2492a8948f8176cac932bf5924d8d00eaf691bd23e",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.269585\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.135017\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.4621\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.63149\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 46.826653\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 9748.407172\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 1841.82344\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1772.00231\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 2821.61351\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 1.314829\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 16734.555008\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 110,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "073535a56c5232c4ca407b4b672596b22c42d824",
+                  "filesHash": "4b26e2437ba10c5a9cb1f7ddba759bb27861519271735f251ac9f1304b6f8862"
+                },
+                "reason": "tested source changed during execution",
+                "finishedAt": "2026-10-24T20:01:48.548Z"
+              },
+              {
+                "id": "545083da-4373-49a3-a482-ce88c05f94ac",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "07d356df5116834c782f6e7072c051f53118c2d77833087b7fbf607008e7b3e9",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "3775e653a0752f70fc55221a686b6b59648aefcd",
+                  "filesHash": "4797973982c9ccc659a1ca308c6dbc681a2e00d872a4c245fc191f21bbc07472"
+                },
+                "startedAt": "2026-10-24T20:05:21.722Z",
+                "cleanupDeadline": "2026-10-24T20:10:24.724Z",
+                "evidencePath": ".local/failure-gate-unified/runs/545083da-4373-49a3-a482-ce88c05f94ac.jsonl",
+                "observations": []
+              }
+            ],
+            "claim": "pageview-privacy-approved-2026-10-24",
+            "spec": {
+              "title": "Minimize page-view collection and remove weak visitor identifiers",
+              "scope": "Change only the existing page-view collector and its tests: normalize known routes to coarse labels, discard query/fragment and dynamic identifiers, aggregate unknown local routes as /other, reject malformed input, derive daily-scoped HMAC identifiers from the existing SESSION_SECRET with no fallback, skip collection safely when configuration is unavailable, and preserve rate limits, non-blocking responses and short-window deduplication. Extract the actual handler for injected persistence tests without a new provider or telemetry service. No historical data rewrite, database change, runtime cleanup, deployment or workload change.",
+              "tier": "test-standard",
+              "why": "This server-side privacy fix requires executable handler regression tests and compiler checks, not browser or database mutations. test-fast lacks unit tests. test-standard is the lightest existing tier with the required registered unit-tests step; retain its entire 300000ms workload and inherited checks.",
+              "coverage": "docs/validation/manifest.json test-standard unit-tests executes npm run test:unit, which already includes server/__tests__/support-ops.test.ts; typecheck validates the handler and integration. All other registered test-standard steps remain required, with a whole-tier budget of 300000ms.",
+              "approval": {
+                "reference": "Owner response approving the separate page-view privacy fix in the active conversation",
+                "direction": "Yes—fix collection and add regression tests",
+                "applicability": "Covers this collector-only privacy fix and its recurrence tests; the subsequent gate-only authorization applies separately to the completed admission repair. No existing stored data changes."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "PV-MINIMIZE",
+                  "check": "Actual handler sink receives only coarse route labels, never query/fragment, invite tokens, session IDs or arbitrary private paths."
+                },
+                {
+                  "requirement": "PV-KEYED",
+                  "check": "Assert exact domain-separated HMAC output, key/day separation, no secret or raw IP output and no writes when secret/IP is absent."
+                },
+                {
+                  "requirement": "PV-ISOLATE",
+                  "check": "Invalid inputs are rejected; duplicate events are suppressed; hanging/rejecting/throwing persistence cannot delay navigation or leak input."
+                },
+                {
+                  "requirement": "PV-WIRING",
+                  "check": "Existing public route uses the tested handler, existing limiter, and parameterized persistence adapter; no historical database operations."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Changes a public telemetry data-collection boundary and its missing-configuration and persistence error paths, preventing recurrence of sensitive-path retention and predictable fallback hashing.",
+                "covers": "Sensitive URLs and identifiers must not reach persistence; visitor identifiers require the server secret; failures must not block navigation; duplicate events remain suppressed.",
+                "testLocation": "server/__tests__/support-ops.test.ts",
+                "assertion": "Exercise the same handler installed at /api/track/pageview with recording, rejecting and stalled sinks; assert coarse path and HMAC output, daily/key separation, no persistence without a secret, malformed input denial, immediate responses, and bounded-window deduplication."
+              },
+              "regressionGuard": "**Covers:** Sensitive URLs and identifiers must not reach persistence; visitor identifiers require the server secret; failures must not block navigation; duplicate events remain suppressed.\n**Test location:** server/__tests__/support-ops.test.ts\n**What it checks:** Exercise the same handler installed at /api/track/pageview with recording, rejecting and stalled sinks; assert coarse path and HMAC output, daily/key separation, no persistence without a secret, malformed input denial, immediate responses, and bounded-window deduplication."
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Minimize page-view collection and remove weak visitor identifiers\n\n## Task identity\n**Task ID:** 1bc92e1d-057b-4d8b-baa6-e75ab3ca0115\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nChange only the existing page-view collector and its tests: normalize known routes to coarse labels, discard query/fragment and dynamic identifiers, aggregate unknown local routes as /other, reject malformed input, derive daily-scoped HMAC identifiers from the existing SESSION_SECRET with no fallback, skip collection safely when configuration is unavailable, and preserve rate limits, non-blocking responses and short-window deduplication. Extract the actual handler for injected persistence tests without a new provider or telemetry service. No historical data rewrite, database change, runtime cleanup, deployment or workload change.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Changes a public telemetry data-collection boundary and its missing-configuration and persistence error paths, preventing recurrence of sensitive-path retention and predictable fallback hashing.\n\n## Approval evidence\n**Reference:** Owner response approving the separate page-view privacy fix in the active conversation\n**Owner direction:** Yes—fix collection and add regression tests\n**Applicability:** Covers this collector-only privacy fix and its recurrence tests; the subsequent gate-only authorization applies separately to the completed admission repair. No existing stored data changes.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** This server-side privacy fix requires executable handler regression tests and compiler checks, not browser or database mutations. test-fast lacks unit tests. test-standard is the lightest existing tier with the required registered unit-tests step; retain its entire 300000ms workload and inherited checks.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard unit-tests executes npm run test:unit, which already includes server/__tests__/support-ops.test.ts; typecheck validates the handler and integration. All other registered test-standard steps remain required, with a whole-tier budget of 300000ms.; supported invocation: TASK_ID=1bc92e1d-057b-4d8b-baa6-e75ab3ca0115 TASK_PLAN_FILE=.local/tasks/1bc92e1d-057b-4d8b-baa6-e75ab3ca0115.md npm run gate:run -- --id 1bc92e1d-057b-4d8b-baa6-e75ab3ca0115 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- PV-MINIMIZE — Actual handler sink receives only coarse route labels, never query/fragment, invite tokens, session IDs or arbitrary private paths.\n- PV-KEYED — Assert exact domain-separated HMAC output, key/day separation, no secret or raw IP output and no writes when secret/IP is absent.\n- PV-ISOLATE — Invalid inputs are rejected; duplicate events are suppressed; hanging/rejecting/throwing persistence cannot delay navigation or leak input.\n- PV-WIRING — Existing public route uses the tested handler, existing limiter, and parameterized persistence adapter; no historical database operations.\n\n## Regression Guard\n**Covers:** Sensitive URLs and identifiers must not reach persistence; visitor identifiers require the server secret; failures must not block navigation; duplicate events remain suppressed.\n**Test location:** server/__tests__/support-ops.test.ts\n**What it checks:** Exercise the same handler installed at /api/track/pageview with recording, rejecting and stalled sinks; assert coarse path and HMAC output, daily/key separation, no persistence without a secret, malformed input denial, immediate responses, and bounded-window deduplication.\n",
+            "planHash": "07d356df5116834c782f6e7072c051f53118c2d77833087b7fbf607008e7b3e9",
+            "approvalHash": "e2eb732717d8d5b65fda13deedf30cba6c6643c23ae3ec38f392422f892d8c99"
+          },
+          "digest": "f63d9545c595ba4729cb8f5c613b299ec423ffa20844fc36ff01a2a8b308c83e"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-24T20:06:32.364Z",
+          "previous": "f63d9545c595ba4729cb8f5c613b299ec423ffa20844fc36ff01a2a8b308c83e",
+          "state": {
+            "id": "1bc92e1d-057b-4d8b-baa6-e75ab3ca0115",
+            "createdAt": "2026-10-24T19:58:52.588Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/1bc92e1d-057b-4d8b-baa6-e75ab3ca0115.md",
+            "specHash": "a06ae456262b3bd64996c746458967f4c23da2f7bbba9f86ebb480e420498f56",
+            "runs": [
+              {
+                "id": "0dd8f983-b442-499e-8e29-6da1ec43624b",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "INCOMPLETE",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "07d356df5116834c782f6e7072c051f53118c2d77833087b7fbf607008e7b3e9",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "073535a56c5232c4ca407b4b672596b22c42d824",
+                  "filesHash": "a0b5654b2c662af6a49e675548bc33e9c5aadc22a96be09a304197a61f7777ab"
+                },
+                "startedAt": "2026-10-24T20:00:23.671Z",
+                "cleanupDeadline": "2026-10-24T20:05:26.672Z",
+                "evidencePath": ".local/failure-gate-unified/runs/0dd8f983-b442-499e-8e29-6da1ec43624b.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 25938,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2579,
+                    "outputHash": "bbfd001195854811be71b2c350172810ebeaefb57883a4dee3deab1dfcfedbec",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 137.701881\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.550978\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.405453\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.47353\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.198719\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.69716\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.302913\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.480637\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.852885\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.615719\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.236597\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 204.574604\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1757,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 285,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "9ad6f2bb42fd70a888142753aac71f0155656d7d8bd7e79431187542a3eb56f7",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 215 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 6442,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3116,
+                    "outputHash": "962b9e9fc374cb695e19f1d502206dc3595ab977278c2f63c3e29e38d9ecbea4",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 631.820773\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 659.128038\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 823.193691\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 498.478637\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 671.790152\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 887.393418\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 635.994593\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 696.292702\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 3.207012\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 3.378952\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.269656\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.478118\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.475706\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.454132\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.515285\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 0.863008\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6175.385494\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 14373,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 46087,
+                    "outputHash": "6c5d515401ab7cc948eb7d84206388b7d0caa3b1c8afb17c2b18196b4ee7a991",
+                    "outputExcerpt": "  ...\n    # Subtest: keeps each health failure class distinct and caps aggregate counters\n    ok 7 - keeps each health failure class distinct and caps aggregate counters\n      ---\n      duration_ms: 0.278375\n      ...\n    1..7\nok 60 - production Clerk proxy lifecycle guards\n  ---\n  duration_ms: 129.312777\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 9.493471\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 5.561367\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 4.156179\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 16.789273\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 5.491417\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 20.503368\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 11.386761\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 13.84857\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 7.228936\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 3.903315\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 7.590679\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 11.870355\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 5.961258\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 5.628031\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 3.207346\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 27.519421\n      ...\n    1..16\nok 61 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 1659.771268\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 14.953628\n      ...\n    1..1\nok 62 - account capability route guard\n  ---\n  duration_ms: 18.444737\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 27.173383\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 14.211622\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 13.762202\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 48.022944\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 32.135679\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.713627\n      ...\n    1..6\nok 63 - authenticated Poe route contracts\n  ---\n  duration_ms: 136.396206\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 1.010784\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.301812\n      ...\n    1..2\nok 64 - Admin AI health route contract\n  ---\n  duration_ms: 1.456167\n  type: 'suite'\n  ...\n# Subtest: page-view persistence receives only coarse labels, not sensitive URL content\nok 65 - page-view persistence receives only coarse labels, not sensitive URL content\n  ---\n  duration_ms: 3.006664\n  ...\n# Subtest: page-view malformed paths never reach the sink\nok 66 - page-view malformed paths never reach the sink\n  ---\n  duration_ms: 0.346586\n  ...\n# Subtest: visitor IDs are domain-separated HMACs using the server key and daily scope\nok 67 - visitor IDs are domain-separated HMACs using the server key and daily scope\n  ---\n  duration_ms: 0.457772\n  ...\n# Subtest: missing or unreadable secret and missing IP fail closed without persistence\nok 68 - missing or unreadable secret and missing IP fail closed without persistence\n  ---\n  duration_ms: 0.203362\n  ...\n# Subtest: dedupe uses minimized routes and preserves the 30-second window\nok 69 - dedupe uses minimized routes and preserves the 30-second window\n  ---\n  duration_ms: 0.46632\n  ...\n# Subtest: stalled, rejecting and synchronously failing sinks cannot block the response\nok 70 - stalled, rejecting and synchronously failing sinks cannot block the response\n  ---\n  duration_ms: 4.145009\n  ...\n# Subtest: installed public collector keeps the limiter and parameterized adapter around the tested handler\nok 71 - installed public collector keeps the limiter and parameterized adapter around the tested handler\n  ---\n  duration_ms: 2.454964\n  ...\n# Subtest: support help is versioned and app-only\nok 72 - support help is versioned and app-only\n  ---\n  duration_ms: 0.29213\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 73 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.607704\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 74 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.759293\n  ...\n1..74\n# tests 198\n# suites 30\n# pass 198\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14135.338948\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 15413,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17926,
+                    "outputHash": "d58aa156d00259ed38f7b473fc3c3906c3cb5bfd08b2cb1c04ad0fd345785876",
+                    "outputExcerpt": "42 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 4.137657\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 3.888079\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 5.060095\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 4.20756\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.42912\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.221327\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 1.631504\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.173369\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 0.425373\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.437756\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 36.768254\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.267295\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.318289\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 102.384775\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 1.083794\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 639.769305\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 3.56963\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 2.930882\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 3.433514\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 1.065213\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.354148\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 88.977006\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 2.536828\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 2.981097\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 1.931101\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 1.543717\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 12.690627\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 3.713642\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.797534\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 9.133157\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 2868.622711\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14763.133833\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 1.457922\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.446584\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.823495\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.826631\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.643726\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.188164\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 49.91399\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 16.604079\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 2.682988\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 388.466031\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 16958,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2186,
+                    "outputHash": "9c2c8a5fe62d748dfc133b2492a8948f8176cac932bf5924d8d00eaf691bd23e",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.269585\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.135017\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.4621\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.63149\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 46.826653\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 9748.407172\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 1841.82344\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1772.00231\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 2821.61351\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 1.314829\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 16734.555008\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 110,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "073535a56c5232c4ca407b4b672596b22c42d824",
+                  "filesHash": "4b26e2437ba10c5a9cb1f7ddba759bb27861519271735f251ac9f1304b6f8862"
+                },
+                "reason": "tested source changed during execution",
+                "finishedAt": "2026-10-24T20:01:48.548Z"
+              },
+              {
+                "id": "545083da-4373-49a3-a482-ce88c05f94ac",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "07d356df5116834c782f6e7072c051f53118c2d77833087b7fbf607008e7b3e9",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "3775e653a0752f70fc55221a686b6b59648aefcd",
+                  "filesHash": "4797973982c9ccc659a1ca308c6dbc681a2e00d872a4c245fc191f21bbc07472"
+                },
+                "startedAt": "2026-10-24T20:05:21.722Z",
+                "cleanupDeadline": "2026-10-24T20:10:24.724Z",
+                "evidencePath": ".local/failure-gate-unified/runs/545083da-4373-49a3-a482-ce88c05f94ac.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 14353,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2578,
+                    "outputHash": "532df8f74c3be3667f61d334a0c61e20f157e21313ef6432886117418a39ea5f",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 133.812575\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.46642\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.329681\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.647065\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.234602\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.655803\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.284852\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.362379\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.77984\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.547257\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.310474\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 196.87991\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1343,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 249,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "9ad6f2bb42fd70a888142753aac71f0155656d7d8bd7e79431187542a3eb56f7",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 215 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 5141,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3113,
+                    "outputHash": "2cd06941465e37fe839b01f745e778787d28e61938000c86bce42eccf28097d5",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 498.777493\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 517.463856\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 509.824031\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 603.00299\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 487.901742\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 600.500092\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 670.266076\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 497.35658\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 2.423985\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 1.256757\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.383462\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.495241\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 0.47658\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.380805\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.691638\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 1.125339\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4942.102931\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 14261,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 46075,
+                    "outputHash": "599a1b197e6daf3455db8e2e764d213e123cbfcdf35030e937a56b70fc704712",
+                    "outputExcerpt": "1\n      ...\n    # Subtest: keeps each health failure class distinct and caps aggregate counters\n    ok 7 - keeps each health failure class distinct and caps aggregate counters\n      ---\n      duration_ms: 0.22268\n      ...\n    1..7\nok 60 - production Clerk proxy lifecycle guards\n  ---\n  duration_ms: 130.719392\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 7.799637\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 5.056896\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 4.165304\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 12.97051\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 6.211061\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 10.283234\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 4.808221\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 10.837841\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 4.720325\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 3.892457\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 4.260226\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 10.052586\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 6.061531\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 4.323598\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 4.176694\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 15.979014\n      ...\n    1..16\nok 61 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 1573.810088\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 14.40794\n      ...\n    1..1\nok 62 - account capability route guard\n  ---\n  duration_ms: 17.500007\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 17.312462\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 6.951237\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 5.335551\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 38.937484\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 29.757427\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.366233\n      ...\n    1..6\nok 63 - authenticated Poe route contracts\n  ---\n  duration_ms: 98.89299\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 0.244793\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.154248\n      ...\n    1..2\nok 64 - Admin AI health route contract\n  ---\n  duration_ms: 0.459577\n  type: 'suite'\n  ...\n# Subtest: page-view persistence receives only coarse labels, not sensitive URL content\nok 65 - page-view persistence receives only coarse labels, not sensitive URL content\n  ---\n  duration_ms: 3.260899\n  ...\n# Subtest: page-view malformed paths never reach the sink\nok 66 - page-view malformed paths never reach the sink\n  ---\n  duration_ms: 0.302461\n  ...\n# Subtest: visitor IDs are domain-separated HMACs using the server key and daily scope\nok 67 - visitor IDs are domain-separated HMACs using the server key and daily scope\n  ---\n  duration_ms: 0.366926\n  ...\n# Subtest: missing or unreadable secret and missing IP fail closed without persistence\nok 68 - missing or unreadable secret and missing IP fail closed without persistence\n  ---\n  duration_ms: 0.220118\n  ...\n# Subtest: dedupe uses minimized routes and preserves the 30-second window\nok 69 - dedupe uses minimized routes and preserves the 30-second window\n  ---\n  duration_ms: 0.351489\n  ...\n# Subtest: stalled, rejecting and synchronously failing sinks cannot block the response\nok 70 - stalled, rejecting and synchronously failing sinks cannot block the response\n  ---\n  duration_ms: 6.204769\n  ...\n# Subtest: installed public collector keeps the limiter and parameterized adapter around the tested handler\nok 71 - installed public collector keeps the limiter and parameterized adapter around the tested handler\n  ---\n  duration_ms: 1.650104\n  ...\n# Subtest: support help is versioned and app-only\nok 72 - support help is versioned and app-only\n  ---\n  duration_ms: 0.222456\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 73 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.281371\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 74 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.93876\n  ...\n1..74\n# tests 198\n# suites 30\n# pass 198\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14041.247896\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 16541,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17924,
+                    "outputHash": "11e4fc798b6a4fe02dd13e4c4aed6e5fd204f6c3b1a1470fbaee26c554d39c2e",
+                    "outputExcerpt": "k 42 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 3.196813\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 3.513141\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 3.704446\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 7.859721\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.370884\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.267609\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 2.041028\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.241266\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 0.310162\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.708953\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 40.541881\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.180775\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.228133\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 141.711511\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 1.257157\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 598.079093\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 4.216082\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 3.389948\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 3.216066\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 0.57457\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.26466\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 77.659204\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 2.811773\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 3.148204\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 2.312416\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 1.986206\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 14.319923\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 4.025114\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.588268\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 6.976218\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 3205.506985\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 15910.891269\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 0.801055\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.19666\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.594516\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.792232\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.62218\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.148519\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 49.545687\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 16.847429\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 1.902105\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 357.7318\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 14965,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2191,
+                    "outputHash": "beafb07fa89547cb66bfafe7e215863abc695b8e6e7aba132ef6006a0d2f6867",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.273447\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.173294\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.459984\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.77338\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 58.653093\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 8588.248762\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 2099.194865\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1236.022883\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 2214.992963\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 0.472406\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 14736.391006\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 82,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "3775e653a0752f70fc55221a686b6b59648aefcd",
+                  "filesHash": "4797973982c9ccc659a1ca308c6dbc681a2e00d872a4c245fc191f21bbc07472"
+                },
+                "finishedAt": "2026-10-24T20:06:32.364Z"
+              }
+            ],
+            "claim": "pageview-privacy-approved-2026-10-24",
+            "spec": {
+              "title": "Minimize page-view collection and remove weak visitor identifiers",
+              "scope": "Change only the existing page-view collector and its tests: normalize known routes to coarse labels, discard query/fragment and dynamic identifiers, aggregate unknown local routes as /other, reject malformed input, derive daily-scoped HMAC identifiers from the existing SESSION_SECRET with no fallback, skip collection safely when configuration is unavailable, and preserve rate limits, non-blocking responses and short-window deduplication. Extract the actual handler for injected persistence tests without a new provider or telemetry service. No historical data rewrite, database change, runtime cleanup, deployment or workload change.",
+              "tier": "test-standard",
+              "why": "This server-side privacy fix requires executable handler regression tests and compiler checks, not browser or database mutations. test-fast lacks unit tests. test-standard is the lightest existing tier with the required registered unit-tests step; retain its entire 300000ms workload and inherited checks.",
+              "coverage": "docs/validation/manifest.json test-standard unit-tests executes npm run test:unit, which already includes server/__tests__/support-ops.test.ts; typecheck validates the handler and integration. All other registered test-standard steps remain required, with a whole-tier budget of 300000ms.",
+              "approval": {
+                "reference": "Owner response approving the separate page-view privacy fix in the active conversation",
+                "direction": "Yes—fix collection and add regression tests",
+                "applicability": "Covers this collector-only privacy fix and its recurrence tests; the subsequent gate-only authorization applies separately to the completed admission repair. No existing stored data changes."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "PV-MINIMIZE",
+                  "check": "Actual handler sink receives only coarse route labels, never query/fragment, invite tokens, session IDs or arbitrary private paths."
+                },
+                {
+                  "requirement": "PV-KEYED",
+                  "check": "Assert exact domain-separated HMAC output, key/day separation, no secret or raw IP output and no writes when secret/IP is absent."
+                },
+                {
+                  "requirement": "PV-ISOLATE",
+                  "check": "Invalid inputs are rejected; duplicate events are suppressed; hanging/rejecting/throwing persistence cannot delay navigation or leak input."
+                },
+                {
+                  "requirement": "PV-WIRING",
+                  "check": "Existing public route uses the tested handler, existing limiter, and parameterized persistence adapter; no historical database operations."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Changes a public telemetry data-collection boundary and its missing-configuration and persistence error paths, preventing recurrence of sensitive-path retention and predictable fallback hashing.",
+                "covers": "Sensitive URLs and identifiers must not reach persistence; visitor identifiers require the server secret; failures must not block navigation; duplicate events remain suppressed.",
+                "testLocation": "server/__tests__/support-ops.test.ts",
+                "assertion": "Exercise the same handler installed at /api/track/pageview with recording, rejecting and stalled sinks; assert coarse path and HMAC output, daily/key separation, no persistence without a secret, malformed input denial, immediate responses, and bounded-window deduplication."
+              },
+              "regressionGuard": "**Covers:** Sensitive URLs and identifiers must not reach persistence; visitor identifiers require the server secret; failures must not block navigation; duplicate events remain suppressed.\n**Test location:** server/__tests__/support-ops.test.ts\n**What it checks:** Exercise the same handler installed at /api/track/pageview with recording, rejecting and stalled sinks; assert coarse path and HMAC output, daily/key separation, no persistence without a secret, malformed input denial, immediate responses, and bounded-window deduplication."
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Minimize page-view collection and remove weak visitor identifiers\n\n## Task identity\n**Task ID:** 1bc92e1d-057b-4d8b-baa6-e75ab3ca0115\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nChange only the existing page-view collector and its tests: normalize known routes to coarse labels, discard query/fragment and dynamic identifiers, aggregate unknown local routes as /other, reject malformed input, derive daily-scoped HMAC identifiers from the existing SESSION_SECRET with no fallback, skip collection safely when configuration is unavailable, and preserve rate limits, non-blocking responses and short-window deduplication. Extract the actual handler for injected persistence tests without a new provider or telemetry service. No historical data rewrite, database change, runtime cleanup, deployment or workload change.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Changes a public telemetry data-collection boundary and its missing-configuration and persistence error paths, preventing recurrence of sensitive-path retention and predictable fallback hashing.\n\n## Approval evidence\n**Reference:** Owner response approving the separate page-view privacy fix in the active conversation\n**Owner direction:** Yes—fix collection and add regression tests\n**Applicability:** Covers this collector-only privacy fix and its recurrence tests; the subsequent gate-only authorization applies separately to the completed admission repair. No existing stored data changes.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** This server-side privacy fix requires executable handler regression tests and compiler checks, not browser or database mutations. test-fast lacks unit tests. test-standard is the lightest existing tier with the required registered unit-tests step; retain its entire 300000ms workload and inherited checks.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard unit-tests executes npm run test:unit, which already includes server/__tests__/support-ops.test.ts; typecheck validates the handler and integration. All other registered test-standard steps remain required, with a whole-tier budget of 300000ms.; supported invocation: TASK_ID=1bc92e1d-057b-4d8b-baa6-e75ab3ca0115 TASK_PLAN_FILE=.local/tasks/1bc92e1d-057b-4d8b-baa6-e75ab3ca0115.md npm run gate:run -- --id 1bc92e1d-057b-4d8b-baa6-e75ab3ca0115 --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- PV-MINIMIZE — Actual handler sink receives only coarse route labels, never query/fragment, invite tokens, session IDs or arbitrary private paths.\n- PV-KEYED — Assert exact domain-separated HMAC output, key/day separation, no secret or raw IP output and no writes when secret/IP is absent.\n- PV-ISOLATE — Invalid inputs are rejected; duplicate events are suppressed; hanging/rejecting/throwing persistence cannot delay navigation or leak input.\n- PV-WIRING — Existing public route uses the tested handler, existing limiter, and parameterized persistence adapter; no historical database operations.\n\n## Regression Guard\n**Covers:** Sensitive URLs and identifiers must not reach persistence; visitor identifiers require the server secret; failures must not block navigation; duplicate events remain suppressed.\n**Test location:** server/__tests__/support-ops.test.ts\n**What it checks:** Exercise the same handler installed at /api/track/pageview with recording, rejecting and stalled sinks; assert coarse path and HMAC output, daily/key separation, no persistence without a secret, malformed input denial, immediate responses, and bounded-window deduplication.\n",
+            "planHash": "07d356df5116834c782f6e7072c051f53118c2d77833087b7fbf607008e7b3e9",
+            "approvalHash": "e2eb732717d8d5b65fda13deedf30cba6c6643c23ae3ec38f392422f892d8c99"
+          },
+          "digest": "28141e40b1338efe2b5ed774856d9830b717474bd9d3ed88a7365dcf039ee0a3"
         }
       ]
     }

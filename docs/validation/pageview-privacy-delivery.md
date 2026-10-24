@@ -71,8 +71,18 @@ The observed change was removal of `exposeLocalhost = true` from .replit's 5001
 port entry; this Agent did not edit it and did not revert it. No test failure
 was baseline-waived. Full same-tier retry is required against the current state.
 
-Final bound-tier outcome is recorded in the portable task registry and local
-run evidence; delivery result will be updated when that retry completes.
+Final full bound-tier retry: **PASS**. All eight steps passed with observed
+cleanup, no unreached steps and unchanged tested-source hash. Unit suite:
+198 passed, 0 failed/skipped/cancelled. The run executed from
+2026-10-24T20:05:21.722Z through 2026-10-24T20:06:32.364Z (70.642 seconds).
+Run identity: `545083da-4373-49a3-a482-ce88c05f94ac`;
+local evidence:
+`.local/failure-gate-unified/runs/545083da-4373-49a3-a482-ce88c05f94ac.jsonl`.
+The portable registry retains the outcome, observations and output excerpts.
+Tested source digest:
+`4797973982c9ccc659a1ca308c6dbc681a2e00d872a4c245fc191f21bbc07472`.
+This result update changes documentation only, not the tested implementation.
+The earlier INCOMPLETE run remains recorded and is not relabeled PASS.
 
 Main application was already stopped; no live restart/reclaim is performed
 under this request. Signed-in UI and production traffic were not exercised.
