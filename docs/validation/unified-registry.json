@@ -18147,6 +18147,725 @@
           "digest": "28141e40b1338efe2b5ed774856d9830b717474bd9d3ed88a7365dcf039ee0a3"
         }
       ]
+    },
+    "d34e33db-d6c0-4ba1-bacb-405b5005e34c": {
+      "history": [
+        {
+          "op": "provision",
+          "at": "2026-10-24T20:26:49.942Z",
+          "previous": null,
+          "state": {
+            "id": "d34e33db-d6c0-4ba1-bacb-405b5005e34c",
+            "createdAt": "2026-10-24T20:26:49.941Z",
+            "status": "reserved",
+            "revision": 0,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md",
+            "specHash": "1d2e86a3a75179d52c73d77ebf3a470fbec36377d8d941f189f5b51bcdf387aa",
+            "runs": [],
+            "claim": "native-975-approval-transitions"
+          },
+          "digest": "917af210efa8d206bb5cb101f65dfb38c846118027c45a8c9b9a8e7cf809716f"
+        },
+        {
+          "op": "amend",
+          "at": "2026-10-24T20:26:51.092Z",
+          "previous": "917af210efa8d206bb5cb101f65dfb38c846118027c45a8c9b9a8e7cf809716f",
+          "state": {
+            "id": "d34e33db-d6c0-4ba1-bacb-405b5005e34c",
+            "createdAt": "2026-10-24T20:26:49.941Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md",
+            "specHash": "1d2e86a3a75179d52c73d77ebf3a470fbec36377d8d941f189f5b51bcdf387aa",
+            "runs": [],
+            "claim": "native-975-approval-transitions",
+            "spec": {
+              "title": "Preserve consistent approval transitions",
+              "scope": "Repair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.",
+              "tier": "test-standard",
+              "why": "Backend persistence and API contract changes without browser or schema changes.",
+              "coverage": "docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.",
+              "approval": {
+                "reference": "Assigned native task 975 in current conversation",
+                "direction": "Execute Preserve consistent approval transitions in its entirety.",
+                "applicability": "Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 repeated approval preserves capabilities",
+                  "check": "Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant."
+                },
+                {
+                  "requirement": "R2 rejected approval is an unchanged conflict",
+                  "check": "Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval."
+                },
+                {
+                  "requirement": "R3 defaults and authorization boundaries remain",
+                  "check": "Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.",
+                "covers": "R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.",
+                "testLocation": "server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.",
+                "assertion": "Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+              },
+              "regressionGuard": "**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Preserve consistent approval transitions\n\n## Task identity\n**Task ID:** d34e33db-d6c0-4ba1-bacb-405b5005e34c\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nRepair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.\n\n## Approval evidence\n**Reference:** Assigned native task 975 in current conversation\n**Owner direction:** Execute Preserve consistent approval transitions in its entirety.\n**Applicability:** Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** Backend persistence and API contract changes without browser or schema changes.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.; supported invocation: TASK_ID=d34e33db-d6c0-4ba1-bacb-405b5005e34c TASK_PLAN_FILE=.local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md npm run gate:run -- --id d34e33db-d6c0-4ba1-bacb-405b5005e34c --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 repeated approval preserves capabilities — Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant.\n- R2 rejected approval is an unchanged conflict — Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval.\n- R3 defaults and authorization boundaries remain — Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain.\n\n## Regression Guard\n**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval.\n",
+            "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+            "approvalHash": "4e3fd0f3e94e23150d7c0d08b14a82b5b475c0ba502778382fff238238995e56"
+          },
+          "digest": "dae1a06e6cdbd3c44d70256c2e3ecdfa77646a486077ac094d94087ae5f710f2"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-24T20:28:43.542Z",
+          "previous": "dae1a06e6cdbd3c44d70256c2e3ecdfa77646a486077ac094d94087ae5f710f2",
+          "state": {
+            "id": "d34e33db-d6c0-4ba1-bacb-405b5005e34c",
+            "createdAt": "2026-10-24T20:26:49.941Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md",
+            "specHash": "1d2e86a3a75179d52c73d77ebf3a470fbec36377d8d941f189f5b51bcdf387aa",
+            "runs": [
+              {
+                "id": "5d2feb73-e597-4acd-870e-6f043a4c0b9a",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "dbadfcd1a27cc6fc7e23ebcb00d41dfcd3385bad16edcdaf6e5ed7193ea55534"
+                },
+                "startedAt": "2026-10-24T20:28:43.541Z",
+                "cleanupDeadline": "2026-10-24T20:33:46.541Z",
+                "evidencePath": ".local/failure-gate-unified/runs/5d2feb73-e597-4acd-870e-6f043a4c0b9a.jsonl",
+                "observations": []
+              }
+            ],
+            "claim": "native-975-approval-transitions",
+            "spec": {
+              "title": "Preserve consistent approval transitions",
+              "scope": "Repair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.",
+              "tier": "test-standard",
+              "why": "Backend persistence and API contract changes without browser or schema changes.",
+              "coverage": "docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.",
+              "approval": {
+                "reference": "Assigned native task 975 in current conversation",
+                "direction": "Execute Preserve consistent approval transitions in its entirety.",
+                "applicability": "Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 repeated approval preserves capabilities",
+                  "check": "Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant."
+                },
+                {
+                  "requirement": "R2 rejected approval is an unchanged conflict",
+                  "check": "Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval."
+                },
+                {
+                  "requirement": "R3 defaults and authorization boundaries remain",
+                  "check": "Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.",
+                "covers": "R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.",
+                "testLocation": "server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.",
+                "assertion": "Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+              },
+              "regressionGuard": "**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Preserve consistent approval transitions\n\n## Task identity\n**Task ID:** d34e33db-d6c0-4ba1-bacb-405b5005e34c\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nRepair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.\n\n## Approval evidence\n**Reference:** Assigned native task 975 in current conversation\n**Owner direction:** Execute Preserve consistent approval transitions in its entirety.\n**Applicability:** Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** Backend persistence and API contract changes without browser or schema changes.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.; supported invocation: TASK_ID=d34e33db-d6c0-4ba1-bacb-405b5005e34c TASK_PLAN_FILE=.local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md npm run gate:run -- --id d34e33db-d6c0-4ba1-bacb-405b5005e34c --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 repeated approval preserves capabilities — Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant.\n- R2 rejected approval is an unchanged conflict — Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval.\n- R3 defaults and authorization boundaries remain — Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain.\n\n## Regression Guard\n**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval.\n",
+            "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+            "approvalHash": "4e3fd0f3e94e23150d7c0d08b14a82b5b475c0ba502778382fff238238995e56"
+          },
+          "digest": "6e333533fa7228a28d15ec99d5c4ca0b72b69529d7ed1c7a4f6d151d4b8bec26"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-24T20:29:28.130Z",
+          "previous": "6e333533fa7228a28d15ec99d5c4ca0b72b69529d7ed1c7a4f6d151d4b8bec26",
+          "state": {
+            "id": "d34e33db-d6c0-4ba1-bacb-405b5005e34c",
+            "createdAt": "2026-10-24T20:26:49.941Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md",
+            "specHash": "1d2e86a3a75179d52c73d77ebf3a470fbec36377d8d941f189f5b51bcdf387aa",
+            "runs": [
+              {
+                "id": "5d2feb73-e597-4acd-870e-6f043a4c0b9a",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "INCOMPLETE",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "dbadfcd1a27cc6fc7e23ebcb00d41dfcd3385bad16edcdaf6e5ed7193ea55534"
+                },
+                "startedAt": "2026-10-24T20:28:43.541Z",
+                "cleanupDeadline": "2026-10-24T20:33:46.541Z",
+                "evidencePath": ".local/failure-gate-unified/runs/5d2feb73-e597-4acd-870e-6f043a4c0b9a.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 2,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 38822,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2715,
+                    "outputHash": "aa031821bcce343d78b5ed110c6dcf90e38735c6b868233f707370af1ec12d58",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 130.800623\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.621022\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.55232\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.550825\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.430985\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 2.362686\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.392304\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.508844\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 2.800512\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.758229\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.299896\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 203.890137\nserver/__tests__/routes.test.ts(286,28): error TS2488: Type 'never' must have a '[Symbol.iterator]()' method that returns an iterator.\n",
+                    "result": "FAIL"
+                  }
+                ],
+                "notReached": [
+                  "storage-lint",
+                  "port-reference-scan",
+                  "storage-lint-contract",
+                  "unit-tests",
+                  "clerk-release-contract",
+                  "vite-hmr-tests",
+                  "manifest-parity"
+                ],
+                "targetAfter": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "7ff9b7d31a99f9d76580f9805ba43057c42396650faa16c0d204f723a9a5e547"
+                },
+                "reason": "tested source changed during execution",
+                "finishedAt": "2026-10-24T20:29:28.130Z"
+              }
+            ],
+            "claim": "native-975-approval-transitions",
+            "spec": {
+              "title": "Preserve consistent approval transitions",
+              "scope": "Repair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.",
+              "tier": "test-standard",
+              "why": "Backend persistence and API contract changes without browser or schema changes.",
+              "coverage": "docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.",
+              "approval": {
+                "reference": "Assigned native task 975 in current conversation",
+                "direction": "Execute Preserve consistent approval transitions in its entirety.",
+                "applicability": "Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 repeated approval preserves capabilities",
+                  "check": "Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant."
+                },
+                {
+                  "requirement": "R2 rejected approval is an unchanged conflict",
+                  "check": "Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval."
+                },
+                {
+                  "requirement": "R3 defaults and authorization boundaries remain",
+                  "check": "Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.",
+                "covers": "R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.",
+                "testLocation": "server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.",
+                "assertion": "Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+              },
+              "regressionGuard": "**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Preserve consistent approval transitions\n\n## Task identity\n**Task ID:** d34e33db-d6c0-4ba1-bacb-405b5005e34c\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nRepair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.\n\n## Approval evidence\n**Reference:** Assigned native task 975 in current conversation\n**Owner direction:** Execute Preserve consistent approval transitions in its entirety.\n**Applicability:** Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** Backend persistence and API contract changes without browser or schema changes.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.; supported invocation: TASK_ID=d34e33db-d6c0-4ba1-bacb-405b5005e34c TASK_PLAN_FILE=.local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md npm run gate:run -- --id d34e33db-d6c0-4ba1-bacb-405b5005e34c --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 repeated approval preserves capabilities — Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant.\n- R2 rejected approval is an unchanged conflict — Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval.\n- R3 defaults and authorization boundaries remain — Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain.\n\n## Regression Guard\n**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval.\n",
+            "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+            "approvalHash": "4e3fd0f3e94e23150d7c0d08b14a82b5b475c0ba502778382fff238238995e56"
+          },
+          "digest": "795e75a35de49ea89fa4c2122cc55f6116a6e618565bec0bab8f5d5a2aa51eae"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-24T20:30:00.189Z",
+          "previous": "795e75a35de49ea89fa4c2122cc55f6116a6e618565bec0bab8f5d5a2aa51eae",
+          "state": {
+            "id": "d34e33db-d6c0-4ba1-bacb-405b5005e34c",
+            "createdAt": "2026-10-24T20:26:49.941Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md",
+            "specHash": "1d2e86a3a75179d52c73d77ebf3a470fbec36377d8d941f189f5b51bcdf387aa",
+            "runs": [
+              {
+                "id": "5d2feb73-e597-4acd-870e-6f043a4c0b9a",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "INCOMPLETE",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "dbadfcd1a27cc6fc7e23ebcb00d41dfcd3385bad16edcdaf6e5ed7193ea55534"
+                },
+                "startedAt": "2026-10-24T20:28:43.541Z",
+                "cleanupDeadline": "2026-10-24T20:33:46.541Z",
+                "evidencePath": ".local/failure-gate-unified/runs/5d2feb73-e597-4acd-870e-6f043a4c0b9a.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 2,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 38822,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2715,
+                    "outputHash": "aa031821bcce343d78b5ed110c6dcf90e38735c6b868233f707370af1ec12d58",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 130.800623\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.621022\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.55232\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.550825\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.430985\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 2.362686\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.392304\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.508844\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 2.800512\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.758229\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.299896\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 203.890137\nserver/__tests__/routes.test.ts(286,28): error TS2488: Type 'never' must have a '[Symbol.iterator]()' method that returns an iterator.\n",
+                    "result": "FAIL"
+                  }
+                ],
+                "notReached": [
+                  "storage-lint",
+                  "port-reference-scan",
+                  "storage-lint-contract",
+                  "unit-tests",
+                  "clerk-release-contract",
+                  "vite-hmr-tests",
+                  "manifest-parity"
+                ],
+                "targetAfter": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "7ff9b7d31a99f9d76580f9805ba43057c42396650faa16c0d204f723a9a5e547"
+                },
+                "reason": "tested source changed during execution",
+                "finishedAt": "2026-10-24T20:29:28.130Z"
+              },
+              {
+                "id": "2b6bbca1-abcb-4b5c-956a-51f8bcbd143f",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "RUNNING",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "c0330a74e6aaaa4f4d4433d3aa5b776e334411b5f3d63f4cbbc4c00ae5316bfe"
+                },
+                "startedAt": "2026-10-24T20:30:00.188Z",
+                "cleanupDeadline": "2026-10-24T20:35:03.189Z",
+                "evidencePath": ".local/failure-gate-unified/runs/2b6bbca1-abcb-4b5c-956a-51f8bcbd143f.jsonl",
+                "observations": []
+              }
+            ],
+            "claim": "native-975-approval-transitions",
+            "spec": {
+              "title": "Preserve consistent approval transitions",
+              "scope": "Repair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.",
+              "tier": "test-standard",
+              "why": "Backend persistence and API contract changes without browser or schema changes.",
+              "coverage": "docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.",
+              "approval": {
+                "reference": "Assigned native task 975 in current conversation",
+                "direction": "Execute Preserve consistent approval transitions in its entirety.",
+                "applicability": "Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 repeated approval preserves capabilities",
+                  "check": "Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant."
+                },
+                {
+                  "requirement": "R2 rejected approval is an unchanged conflict",
+                  "check": "Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval."
+                },
+                {
+                  "requirement": "R3 defaults and authorization boundaries remain",
+                  "check": "Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.",
+                "covers": "R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.",
+                "testLocation": "server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.",
+                "assertion": "Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+              },
+              "regressionGuard": "**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Preserve consistent approval transitions\n\n## Task identity\n**Task ID:** d34e33db-d6c0-4ba1-bacb-405b5005e34c\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nRepair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.\n\n## Approval evidence\n**Reference:** Assigned native task 975 in current conversation\n**Owner direction:** Execute Preserve consistent approval transitions in its entirety.\n**Applicability:** Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** Backend persistence and API contract changes without browser or schema changes.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.; supported invocation: TASK_ID=d34e33db-d6c0-4ba1-bacb-405b5005e34c TASK_PLAN_FILE=.local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md npm run gate:run -- --id d34e33db-d6c0-4ba1-bacb-405b5005e34c --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 repeated approval preserves capabilities — Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant.\n- R2 rejected approval is an unchanged conflict — Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval.\n- R3 defaults and authorization boundaries remain — Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain.\n\n## Regression Guard\n**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval.\n",
+            "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+            "approvalHash": "4e3fd0f3e94e23150d7c0d08b14a82b5b475c0ba502778382fff238238995e56"
+          },
+          "digest": "2748210790f0ca78bfc8d32cbb517b4491e70d900351841c55d8a6f3aac23c06"
+        },
+        {
+          "op": "run",
+          "at": "2026-10-24T20:30:58.136Z",
+          "previous": "2748210790f0ca78bfc8d32cbb517b4491e70d900351841c55d8a6f3aac23c06",
+          "state": {
+            "id": "d34e33db-d6c0-4ba1-bacb-405b5005e34c",
+            "createdAt": "2026-10-24T20:26:49.941Z",
+            "status": "sealed",
+            "revision": 1,
+            "tier": "test-standard",
+            "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+            "planPath": ".local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md",
+            "specHash": "1d2e86a3a75179d52c73d77ebf3a470fbec36377d8d941f189f5b51bcdf387aa",
+            "runs": [
+              {
+                "id": "5d2feb73-e597-4acd-870e-6f043a4c0b9a",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "INCOMPLETE",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "dbadfcd1a27cc6fc7e23ebcb00d41dfcd3385bad16edcdaf6e5ed7193ea55534"
+                },
+                "startedAt": "2026-10-24T20:28:43.541Z",
+                "cleanupDeadline": "2026-10-24T20:33:46.541Z",
+                "evidencePath": ".local/failure-gate-unified/runs/5d2feb73-e597-4acd-870e-6f043a4c0b9a.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 2,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 38822,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2715,
+                    "outputHash": "aa031821bcce343d78b5ed110c6dcf90e38735c6b868233f707370af1ec12d58",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 130.800623\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.621022\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.55232\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.550825\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.430985\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 2.362686\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.392304\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.508844\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 2.800512\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.758229\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.299896\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 203.890137\nserver/__tests__/routes.test.ts(286,28): error TS2488: Type 'never' must have a '[Symbol.iterator]()' method that returns an iterator.\n",
+                    "result": "FAIL"
+                  }
+                ],
+                "notReached": [
+                  "storage-lint",
+                  "port-reference-scan",
+                  "storage-lint-contract",
+                  "unit-tests",
+                  "clerk-release-contract",
+                  "vite-hmr-tests",
+                  "manifest-parity"
+                ],
+                "targetAfter": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "7ff9b7d31a99f9d76580f9805ba43057c42396650faa16c0d204f723a9a5e547"
+                },
+                "reason": "tested source changed during execution",
+                "finishedAt": "2026-10-24T20:29:28.130Z"
+              },
+              {
+                "id": "2b6bbca1-abcb-4b5c-956a-51f8bcbd143f",
+                "purpose": "bound-tier",
+                "nativeAuthorizationObservation": "NOT_OBSERVED",
+                "state": "PASS",
+                "revision": 1,
+                "pin": "cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c",
+                "tier": "test-standard",
+                "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+                "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+                "target": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "c0330a74e6aaaa4f4d4433d3aa5b776e334411b5f3d63f4cbbc4c00ae5316bfe"
+                },
+                "startedAt": "2026-10-24T20:30:00.188Z",
+                "cleanupDeadline": "2026-10-24T20:35:03.189Z",
+                "evidencePath": ".local/failure-gate-unified/runs/2b6bbca1-abcb-4b5c-956a-51f8bcbd143f.jsonl",
+                "observations": [
+                  {
+                    "name": "typecheck",
+                    "kind": "typecheck",
+                    "command": [
+                      "npm",
+                      "run",
+                      "typecheck"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 11099,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2580,
+                    "outputHash": "be60282cee9adefc1d342a0a23b5ae60a647962b548dda176d71b6c9e68789e4",
+                    "outputExcerpt": "\n> rest-express@1.0.0 typecheck\n> npm run check:playwright-configs && tsc --noEmit && tsc --project tsconfig.tests.json --noEmit && tsc --project tsconfig.playwright.json --noEmit\n\n\n> rest-express@1.0.0 check:playwright-configs\n> node scripts/check-playwright-config-coverage.mjs && node --test scripts/__tests__/playwright-config-coverage.test.mjs\n\n[playwright-config] PASS: 3 executable TypeScript configuration(s) are compiler-covered.\nTAP version 13\n# Subtest: all current Playwright configurations are compiler-covered\nok 1 - all current Playwright configurations are compiler-covered\n  ---\n  duration_ms: 135.064282\n  ...\n# Subtest: a package script config cannot bypass compiler coverage\nok 2 - a package script config cannot bypass compiler coverage\n  ---\n  duration_ms: 0.55174\n  ...\n# Subtest: a direct Playwright CLI package script config cannot bypass coverage\nok 3 - a direct Playwright CLI package script config cannot bypass coverage\n  ---\n  duration_ms: 0.388786\n  ...\n# Subtest: a package command cannot hide an untyped Playwright launch in nested helpers\nok 4 - a package command cannot hide an untyped Playwright launch in nested helpers\n  ---\n  duration_ms: 0.523046\n  ...\n# Subtest: Playwright configs passed by a helper are added to compiler coverage\nok 5 - Playwright configs passed by a helper are added to compiler coverage\n  ---\n  duration_ms: 0.279896\n  ...\n# Subtest: a tier-invoked config cannot bypass compiler coverage\nok 6 - a tier-invoked config cannot bypass compiler coverage\n  ---\n  duration_ms: 1.621754\n  ...\n# Subtest: browser package scripts must run typecheck before Playwright\nok 7 - browser package scripts must run typecheck before Playwright\n  ---\n  duration_ms: 0.325023\n  ...\n# Subtest: the shared Playwright runner typechecks before launching the browser CLI\nok 8 - the shared Playwright runner typechecks before launching the browser CLI\n  ---\n  duration_ms: 0.385196\n  ...\n# Subtest: browser validation tiers must run typecheck before their browser step\nok 9 - browser validation tiers must run typecheck before their browser step\n  ---\n  duration_ms: 1.847931\n  ...\n# Subtest: documented browser commands use the compiler-gated package script\nok 10 - documented browser commands use the compiler-gated package script\n  ---\n  duration_ms: 0.712725\n  ...\n# Subtest: standard recursive include patterns cover nested configs\nok 11 - standard recursive include patterns cover nested configs\n  ---\n  duration_ms: 0.257917\n  ...\n1..11\n# tests 11\n# suites 0\n# pass 11\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 198.809533\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "lint:storage"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 1358,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 122,
+                    "outputHash": "f9eb26eb369a1530e2e0a39d6565c5c99a89001dfb94c185bc807879bb304d02",
+                    "outputExcerpt": "\n> rest-express@1.0.0 lint:storage\n> node scripts/lint-storage.mjs --strict\n\n\nNo unregistered storage key literals found.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "port-reference-scan",
+                    "kind": "lint",
+                    "command": [
+                      "npm",
+                      "run",
+                      "check:port-references"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 251,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 149,
+                    "outputHash": "9ad6f2bb42fd70a888142753aac71f0155656d7d8bd7e79431187542a3eb56f7",
+                    "outputExcerpt": "\n> rest-express@1.0.0 check:port-references\n> node scripts/port-reference-scan.mjs\n\n[port-reference-scan] PASS: 215 executable source files scanned.\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "storage-lint-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:storage-lint-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 6029,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 3113,
+                    "outputHash": "ee0c83186245a299e122d8826bf8a6140677bbc0812e0da63dc6c68801768985",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:storage-lint-contract\n> node --test scripts/__tests__/lint-storage.test.mjs\n\nTAP version 13\n# Subtest: report-only mode reports direct and multiline executable calls\nok 1 - report-only mode reports direct and multiline executable calls\n  ---\n  duration_ms: 553.17765\n  ...\n# Subtest: strict mode returns a failure when executable calls violate the registry\nok 2 - strict mode returns a failure when executable calls violate the registry\n  ---\n  duration_ms: 627.333675\n  ...\n# Subtest: raw indirect keys and local storage aliases cannot bypass strict mode\nok 3 - raw indirect keys and local storage aliases cannot bypass strict mode\n  ---\n  duration_ms: 698.778232\n  ...\n# Subtest: registry imports, namespace imports, and aliases are accepted\nok 4 - registry imports, namespace imports, and aliases are accepted\n  ---\n  duration_ms: 578.990428\n  ...\n# Subtest: comments, strings, and template contents are not treated as calls\nok 5 - comments, strings, and template contents are not treated as calls\n  ---\n  duration_ms: 603.676133\n  ...\n# Subtest: dash-prefixed raw keys are not a broad exemption\nok 6 - dash-prefixed raw keys are not a broad exemption\n  ---\n  duration_ms: 503.096536\n  ...\n# Subtest: malformed source fails closed without crashing the linter\nok 7 - malformed source fails closed without crashing the linter\n  ---\n  duration_ms: 932.545695\n  ...\n# Subtest: malformed source fails strict mode\nok 8 - malformed source fails strict mode\n  ---\n  duration_ms: 561.626279\n  ...\n# Subtest: accepts multiline registry constants, factories, and local aliases\nok 9 - accepts multiline registry constants, factories, and local aliases\n  ---\n  duration_ms: 7.087869\n  ...\n# Subtest: rejects unknown registry exports and expression-built keys\nok 10 - rejects unknown registry exports and expression-built keys\n  ---\n  duration_ms: 2.30506\n  ...\n# Subtest: accepts only the documented identity-scoped dashboard factory shape\nok 11 - accepts only the documented identity-scoped dashboard factory shape\n  ---\n  duration_ms: 1.516629\n  ...\n# Subtest: does not treat shadowed storage globals as browser storage\nok 12 - does not treat shadowed storage globals as browser storage\n  ---\n  duration_ms: 0.554435\n  ...\n# Subtest: rejects shadowed registry factories and namespace aliases\nok 13 - rejects shadowed registry factories and namespace aliases\n  ---\n  duration_ms: 1.03673\n  ...\n# Subtest: accepts namespace imports and window storage aliases for registry keys\nok 14 - accepts namespace imports and window storage aliases for registry keys\n  ---\n  duration_ms: 0.640341\n  ...\n# Subtest: does not let a shadowed unsafe alias inherit a registered outer key\nok 15 - does not let a shadowed unsafe alias inherit a registered outer key\n  ---\n  duration_ms: 0.479132\n  ...\n# Subtest: rejects multiline literals, indirect literals, and aliased storage objects\nok 16 - rejects multiline literals, indirect literals, and aliased storage objects\n  ---\n  duration_ms: 1.028667\n  ...\n1..16\n# tests 16\n# suites 0\n# pass 16\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 5768.281171\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "unit-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:unit"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 11784,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 47632,
+                    "outputHash": "74910b83b2b19b31f64577263e947cea5120b06c7c5eb16126577e028f903ab1",
+                    "outputExcerpt": "577313\n      ...\n    # Subtest: keeps each health failure class distinct and caps aggregate counters\n    ok 7 - keeps each health failure class distinct and caps aggregate counters\n      ---\n      duration_ms: 0.315432\n      ...\n    1..7\nok 61 - production Clerk proxy lifecycle guards\n  ---\n  duration_ms: 131.736492\n  type: 'suite'\n  ...\n# Subtest: PATCH production routes — body validation returns 400, not 500\n    # Subtest: PATCH /api/photos/:id — no body → 400\n    ok 1 - PATCH /api/photos/:id — no body → 400\n      ---\n      duration_ms: 6.999067\n      ...\n    # Subtest: PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n    ok 2 - PATCH /api/photos/:id — wrong Content-Type (text/plain) → 400\n      ---\n      duration_ms: 5.205494\n      ...\n    # Subtest: PATCH /api/photos/:id — invalid field type → 400\n    ok 3 - PATCH /api/photos/:id — invalid field type → 400\n      ---\n      duration_ms: 3.837762\n      ...\n    # Subtest: PATCH /api/photos/:id — valid partial body → 200\n    ok 4 - PATCH /api/photos/:id — valid partial body → 200\n      ---\n      duration_ms: 11.498974\n      ...\n    # Subtest: PATCH /api/pins/:id — no body → 400\n    ok 5 - PATCH /api/pins/:id — no body → 400\n      ---\n      duration_ms: 5.289664\n      ...\n    # Subtest: PATCH /api/pins/:id — wrong Content-Type → 400\n    ok 6 - PATCH /api/pins/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 5.274569\n      ...\n    # Subtest: PATCH /api/pins/:id — invalid field type → 400\n    ok 7 - PATCH /api/pins/:id — invalid field type → 400\n      ---\n      duration_ms: 9.024218\n      ...\n    # Subtest: PATCH /api/pins/:id — valid partial body → 200\n    ok 8 - PATCH /api/pins/:id — valid partial body → 200\n      ---\n      duration_ms: 13.771668\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — no body → 400\n    ok 9 - PATCH /api/pins/:pinId/flag — no body → 400\n      ---\n      duration_ms: 5.2255\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n    ok 10 - PATCH /api/pins/:pinId/flag — wrong Content-Type → 400\n      ---\n      duration_ms: 3.95626\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n    ok 11 - PATCH /api/pins/:pinId/flag — invalid flagged type → 400\n      ---\n      duration_ms: 4.662628\n      ...\n    # Subtest: PATCH /api/pins/:pinId/flag — valid flag body → 200\n    ok 12 - PATCH /api/pins/:pinId/flag — valid flag body → 200\n      ---\n      duration_ms: 16.199077\n      ...\n    # Subtest: PATCH /api/entries/:id — no body → 400\n    ok 13 - PATCH /api/entries/:id — no body → 400\n      ---\n      duration_ms: 6.324362\n      ...\n    # Subtest: PATCH /api/entries/:id — wrong Content-Type → 400\n    ok 14 - PATCH /api/entries/:id — wrong Content-Type → 400\n      ---\n      duration_ms: 4.850972\n      ...\n    # Subtest: PATCH /api/entries/:id — invalid footage type → 400\n    ok 15 - PATCH /api/entries/:id — invalid footage type → 400\n      ---\n      duration_ms: 4.128417\n      ...\n    # Subtest: PATCH /api/entries/:id — valid partial body → 200\n    ok 16 - PATCH /api/entries/:id — valid partial body → 200\n      ---\n      duration_ms: 18.937322\n      ...\n    1..16\nok 62 - PATCH production routes — body validation returns 400, not 500\n  ---\n  duration_ms: 2032.982185\n  type: 'suite'\n  ...\n# Subtest: account capability route guard\n    # Subtest: requires AI scanning for both label-analysis URLs and photo management for photo writes\n    ok 1 - requires AI scanning for both label-analysis URLs and photo management for photo writes\n      ---\n      duration_ms: 16.504\n      ...\n    1..1\nok 63 - account capability route guard\n  ---\n  duration_ms: 18.816413\n  type: 'suite'\n  ...\n# Attention: Clerk collects telemetry data from its SDKs when connected to development instances.\n# The data collected is used to inform Clerk's product roadmap.\n# To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.\n# Subtest: authenticated Poe route contracts\n    # Subtest: does not invoke the provider through unauthenticated, pending, or viewer gates\n    ok 1 - does not invoke the provider through unauthenticated, pending, or viewer gates\n      ---\n      duration_ms: 17.679547\n      ...\n    # Subtest: streams the existing SSE wire format and terminates with done\n    ok 2 - streams the existing SSE wire format and terminates with done\n      ---\n      duration_ms: 5.763155\n      ...\n# Error in help chat: upstream\n    # Subtest: normalizes an upstream stream failure as an SSE error frame\n    ok 3 - normalizes an upstream stream failure as an SSE error frame\n      ---\n      duration_ms: 5.515262\n      ...\n    # Subtest: does not invoke the provider for a rate-limited request\n    ok 4 - does not invoke the provider for a rate-limited request\n      ---\n      duration_ms: 37.372485\n      ...\n    # Subtest: aborts the provider and does not write a late frame after client disconnect\n    ok 5 - aborts the provider and does not write a late frame after client disconnect\n      ---\n      duration_ms: 29.469793\n      ...\n    # Subtest: rejects malformed scanner output before persistence and preserves pin order\n    ok 6 - rejects malformed scanner output before persistence and preserves pin order\n      ---\n      duration_ms: 0.342409\n      ...\n    1..6\nok 64 - authenticated Poe route contracts\n  ---\n  duration_ms: 96.442567\n  type: 'suite'\n  ...\n# Subtest: Admin AI health route contract\n    # Subtest: returns independent API and exact supported-model health\n    ok 1 - returns independent API and exact supported-model health\n      ---\n      duration_ms: 0.232708\n      ...\n    # Subtest: returns both supported models unavailable when the provider fails\n    ok 2 - returns both supported models unavailable when the provider fails\n      ---\n      duration_ms: 0.223835\n      ...\n    1..2\nok 65 - Admin AI health route contract\n  ---\n  duration_ms: 0.520811\n  type: 'suite'\n  ...\n# Subtest: page-view persistence receives only coarse labels, not sensitive URL content\nok 66 - page-view persistence receives only coarse labels, not sensitive URL content\n  ---\n  duration_ms: 3.155006\n  ...\n# Subtest: page-view malformed paths never reach the sink\nok 67 - page-view malformed paths never reach the sink\n  ---\n  duration_ms: 0.27316\n  ...\n# Subtest: visitor IDs are domain-separated HMACs using the server key and daily scope\nok 68 - visitor IDs are domain-separated HMACs using the server key and daily scope\n  ---\n  duration_ms: 0.39228\n  ...\n# Subtest: missing or unreadable secret and missing IP fail closed without persistence\nok 69 - missing or unreadable secret and missing IP fail closed without persistence\n  ---\n  duration_ms: 0.179647\n  ...\n# Subtest: dedupe uses minimized routes and preserves the 30-second window\nok 70 - dedupe uses minimized routes and preserves the 30-second window\n  ---\n  duration_ms: 0.484957\n  ...\n# Subtest: stalled, rejecting and synchronously failing sinks cannot block the response\nok 71 - stalled, rejecting and synchronously failing sinks cannot block the response\n  ---\n  duration_ms: 6.282249\n  ...\n# Subtest: installed public collector keeps the limiter and parameterized adapter around the tested handler\nok 72 - installed public collector keeps the limiter and parameterized adapter around the tested handler\n  ---\n  duration_ms: 1.996427\n  ...\n# Subtest: support help is versioned and app-only\nok 73 - support help is versioned and app-only\n  ---\n  duration_ms: 0.209568\n  ...\n# Subtest: owner boundary denies missing and non-owner identities without disclosure\nok 74 - owner boundary denies missing and non-owner identities without disclosure\n  ---\n  duration_ms: 0.412944\n  ...\n# Subtest: port scanner rejects fixed service fixtures but allows canonical allocation\nok 75 - port scanner rejects fixed service fixtures but allows canonical allocation\n  ---\n  duration_ms: 0.741799\n  ...\n1..75\n# tests 205\n# suites 30\n# pass 205\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 11531.15932\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "clerk-release-contract",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:managed-clerk-release-contract"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 16233,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 17924,
+                    "outputHash": "bc3e4a9b2382305a8eb26a637d41dfcab8664fe9dbe28a01f8cb88bf402c23ae",
+                    "outputExcerpt": "k 42 - browser diagnostic values fail closed and cannot crowd out log tails\n  ---\n  duration_ms: 3.324225\n  ...\n# Subtest: Google role diagnostics expose bounded safe session transitions\nok 43 - Google role diagnostics expose bounded safe session transitions\n  ---\n  duration_ms: 5.068358\n  ...\n# Subtest: Google role diagnostic input rejects unsafe and oversized values\nok 44 - Google role diagnostic input rejects unsafe and oversized values\n  ---\n  duration_ms: 4.20908\n  ...\n# Subtest: maximum valid diagnostic input preserves every bounded section\nok 45 - maximum valid diagnostic input preserves every bounded section\n  ---\n  duration_ms: 3.931509\n  ...\n# Subtest: smoke proves proxy, cookie-only API, protected pages, and sign-out\nok 46 - smoke proves proxy, cookie-only API, protected pages, and sign-out\n  ---\n  duration_ms: 0.381892\n  ...\n# Subtest: Google role smoke requires an active Clerk session and emits only coarse state\nok 47 - Google role smoke requires an active Clerk session and emits only coarse state\n  ---\n  duration_ms: 0.209425\n  ...\n# Subtest: Clerk-only auth leaves no tester session or password machinery\nok 48 - Clerk-only auth leaves no tester session or password machinery\n  ---\n  duration_ms: 0.829039\n  ...\n# Subtest: legacy reconciliation retains one Admin and removes non-Admin-owned data\nok 49 - legacy reconciliation retains one Admin and removes non-Admin-owned data\n  ---\n  duration_ms: 0.136122\n  ...\n# Subtest: managed Clerk reset retains the selected Admin and removes every other account\nok 50 - managed Clerk reset retains the selected Admin and removes every other account\n  ---\n  duration_ms: 1.177467\n  ...\n# Subtest: managed Clerk object cleanup is retryable, verified, and path-safe\nok 51 - managed Clerk object cleanup is retryable, verified, and path-safe\n  ---\n  duration_ms: 1.979015\n  ...\n# Subtest: managed Clerk reset SQL filters both local and Clerk identity references\nok 52 - managed Clerk reset SQL filters both local and Clerk identity references\n  ---\n  duration_ms: 39.613564\n  ...\n# Subtest: workspace config does not pin Clerk credentials or a tenant\nok 53 - workspace config does not pin Clerk credentials or a tenant\n  ---\n  duration_ms: 0.248264\n  ...\n# Subtest: published release workflow passes protected inputs only through the environment\nok 54 - published release workflow passes protected inputs only through the environment\n  ---\n  duration_ms: 0.235715\n  ...\n# Subtest: post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\nok 55 - post-merge rejects a closed-stdin Drizzle prompt even when push exits 0\n  ---\n  duration_ms: 96.913723\n  ...\n# Subtest: release target identity ignores credentials and equivalent URL spelling\nok 56 - release target identity ignores credentials and equivalent URL spelling\n  ---\n  duration_ms: 1.426968\n  ...\n# Subtest: schema contract rejects a source that Drizzle cannot load\nok 57 - schema contract rejects a source that Drizzle cannot load\n  ---\n  duration_ms: 581.11518\n  ...\n# Subtest: migration contract rejects malformed SQL instead of accepting non-empty text\nok 58 - migration contract rejects malformed SQL instead of accepting non-empty text\n  ---\n  duration_ms: 3.881699\n  ...\n# Subtest: migration contract rejects duplicate journal identities\nok 59 - migration contract rejects duplicate journal identities\n  ---\n  duration_ms: 3.339033\n  ...\n# Subtest: migration contract rejects journal order that moves backward\nok 60 - migration contract rejects journal order that moves backward\n  ---\n  duration_ms: 5.190439\n  ...\n# Subtest: release target fails closed when endpoint aliases cannot be proven distinct\nok 61 - release target fails closed when endpoint aliases cannot be proven distinct\n  ---\n  duration_ms: 0.418531\n  ...\n# Subtest: release target must be explicit, valid, and a different database\nok 62 - release target must be explicit, valid, and a different database\n  ---\n  duration_ms: 0.257919\n  ...\n# Subtest: unsafe release target stops schema preparation before the first DDL command\nok 63 - unsafe release target stops schema preparation before the first DDL command\n  ---\n  duration_ms: 75.600274\n  ...\n# Subtest: schema preflight fails before release fixtures when users.role is absent\nok 64 - schema preflight fails before release fixtures when users.role is absent\n  ---\n  duration_ms: 2.238923\n  ...\n# Subtest: schema preflight fails before release fixtures when durable Clerk identity mapping is absent\nok 65 - schema preflight fails before release fixtures when durable Clerk identity mapping is absent\n  ---\n  duration_ms: 3.236047\n  ...\n# Subtest: schema preflight accepts the reviewed current auth schema\nok 66 - schema preflight accepts the reviewed current auth schema\n  ---\n  duration_ms: 1.920429\n  ...\n# Subtest: schema preflight rejects legacy tester objects and sessions\nok 67 - schema preflight rejects legacy tester objects and sessions\n  ---\n  duration_ms: 1.647827\n  ...\n# Subtest: publishing schema comparison reports structural drift\nok 68 - publishing schema comparison reports structural drift\n  ---\n  duration_ms: 9.77973\n  ...\n# Subtest: publication accepts an already-current schema without a transition\nok 69 - publication accepts an already-current schema without a transition\n  ---\n  duration_ms: 4.065091\n  ...\n# Subtest: publication fingerprint uses canonical index order, not the database collation\nok 70 - publication fingerprint uses canonical index order, not the database collation\n  ---\n  duration_ms: 0.770286\n  ...\n# Subtest: publication accepts only the exact reviewed legacy and candidate pair\nok 71 - publication accepts only the exact reviewed legacy and candidate pair\n  ---\n  duration_ms: 8.091616\n  ...\n# Subtest: release-critical migration SQL executes against an isolated PostgreSQL target\nok 72 - release-critical migration SQL executes against an isolated PostgreSQL target\n  ---\n  duration_ms: 4635.072178\n  ...\n1..72\n# tests 72\n# suites 0\n# pass 72\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 15609.905952\nTAP version 13\n# Subtest: direct preview uses the configured tenant instead of deriving from preview host\nok 1 - direct preview uses the configured tenant instead of deriving from preview host\n  ---\n  duration_ms: 0.947484\n  ...\n# Subtest: production proxy keeps the configured tenant behind the exact bounded path\nok 2 - production proxy keeps the configured tenant behind the exact bounded path\n  ---\n  duration_ms: 0.232573\n  ...\n# Subtest: bootstrap reports missing and malformed fields without values\nok 3 - bootstrap reports missing and malformed fields without values\n  ---\n  duration_ms: 0.482957\n  ...\n# Subtest: server direct and proxy modes use the same environment contract\nok 4 - server direct and proxy modes use the same environment contract\n  ---\n  duration_ms: 0.454474\n  ...\n# Subtest: production proxy and release testing transport share the trusted Clerk origin\nok 5 - production proxy and release testing transport share the trusted Clerk origin\n  ---\n  duration_ms: 0.58313\n  ...\n# Subtest: production proxy and release testing transport share the canonical proxy path\nok 6 - production proxy and release testing transport share the canonical proxy path\n  ---\n  duration_ms: 0.089339\n  ...\n# Subtest: controlled upstream contract verifies Clerk path, headers, response, and streaming\nok 7 - controlled upstream contract verifies Clerk path, headers, response, and streaming\n  ---\n  duration_ms: 48.940161\n  ...\n# Subtest: testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\nok 8 - testing-token transport covers the Clerk sign-in and client-trust sequence through the canonical candidate\n  ---\n  duration_ms: 15.417411\n  ...\n# Subtest: secret fill failures do not retain the supplied value\nok 9 - secret fill failures do not retain the supplied value\n  ---\n  duration_ms: 1.919561\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 356.473735\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "vite-hmr-tests",
+                    "kind": "test",
+                    "command": [
+                      "npm",
+                      "run",
+                      "test:vite-hmr"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 7441,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 2189,
+                    "outputHash": "4ea9a49ca09fca8692c8f916bc2808ce3d100c29deb01d1091278e07dfaed5ff",
+                    "outputExcerpt": "\n> rest-express@1.0.0 test:vite-hmr\n> node --import tsx/esm --test server/__tests__/vite.test.ts\n\nTAP version 13\n# Subtest: uses the secure public HMR endpoint in a Replit preview\nok 1 - uses the secure public HMR endpoint in a Replit preview\n  ---\n  duration_ms: 1.119397\n  ...\n# Subtest: keeps Vite's inferred connection settings for direct local preview\nok 2 - keeps Vite's inferred connection settings for direct local preview\n  ---\n  duration_ms: 0.12722\n  ...\n# Subtest: the application WebSocket server leaves Vite HMR upgrades unclaimed\nok 3 - the application WebSocket server leaves Vite HMR upgrades unclaimed\n  ---\n  duration_ms: 0.340198\n  ...\n# Subtest: recognized WebSocket upgrades reserve capacity before allocating a connection\nok 4 - recognized WebSocket upgrades reserve capacity before allocating a connection\n  ---\n  duration_ms: 0.601783\n  ...\n# Subtest: concurrent unknown upgrades are rejected before admission without blocking the API\nok 5 - concurrent unknown upgrades are rejected before admission without blocking the API\n  ---\n  duration_ms: 56.802611\n  ...\n# Subtest: a real browser client receives a live Vite module update\nok 6 - a real browser client receives a live Vite module update\n  ---\n  duration_ms: 1715.55383\n  ...\n# Subtest: a browser connected through the Replit preview origin receives a live Vite update\nok 7 - a browser connected through the Replit preview origin receives a live Vite update\n  ---\n  duration_ms: 1598.103941\n  ...\n# Subtest: a failed Replit preview check removes its owned process group and fixture\nok 8 - a failed Replit preview check removes its owned process group and fixture\n  ---\n  duration_ms: 1392.330328\n  ...\n# Subtest: an interrupted live preview check cleans its owned server process group\nok 9 - an interrupted live preview check cleans its owned server process group\n  ---\n  duration_ms: 1909.885914\n  ...\n# Subtest: the same browser client reconnects to a new supervised Vite process\nok 10 - the same browser client reconnects to a new supervised Vite process # SKIP\n  ---\n  duration_ms: 0.295647\n  ...\n1..10\n# tests 10\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 7194.314634\n",
+                    "result": "PASS"
+                  },
+                  {
+                    "name": "manifest-parity",
+                    "kind": "lint",
+                    "command": [
+                      "node",
+                      "scripts/validate-validation-manifest.mjs"
+                    ],
+                    "code": 0,
+                    "signal": null,
+                    "cleanupComplete": true,
+                    "durationMs": 79,
+                    "timedOut": false,
+                    "interrupted": false,
+                    "truncated": false,
+                    "outputBytes": 72,
+                    "outputHash": "cd96f8238b586100aead650c3a3fbd512953e88c19c3ae0304ea95801dd0eacc",
+                    "outputExcerpt": "[validation-manifest] PASS: 4 tiers and package-script parity verified.\n",
+                    "result": "PASS"
+                  }
+                ],
+                "notReached": [],
+                "targetAfter": {
+                  "head": "621fc2b7dc34bf25a5d4f26b52f198ec5866de74",
+                  "filesHash": "c0330a74e6aaaa4f4d4433d3aa5b776e334411b5f3d63f4cbbc4c00ae5316bfe"
+                },
+                "finishedAt": "2026-10-24T20:30:58.136Z"
+              }
+            ],
+            "claim": "native-975-approval-transitions",
+            "spec": {
+              "title": "Preserve consistent approval transitions",
+              "scope": "Repair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.",
+              "tier": "test-standard",
+              "why": "Backend persistence and API contract changes without browser or schema changes.",
+              "coverage": "docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.",
+              "approval": {
+                "reference": "Assigned native task 975 in current conversation",
+                "direction": "Execute Preserve consistent approval transitions in its entirety.",
+                "applicability": "Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope."
+              },
+              "ignoredBaselines": [],
+              "ownedBaselines": [],
+              "assertions": [
+                {
+                  "requirement": "R1 repeated approval preserves capabilities",
+                  "check": "Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant."
+                },
+                {
+                  "requirement": "R2 rejected approval is an unchanged conflict",
+                  "check": "Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval."
+                },
+                {
+                  "requirement": "R3 defaults and authorization boundaries remain",
+                  "check": "Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain."
+                }
+              ],
+              "guardContract": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
+              "regression": {
+                "form": "normal",
+                "material": true,
+                "rationale": "Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.",
+                "covers": "R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.",
+                "testLocation": "server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.",
+                "assertion": "Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+              },
+              "regressionGuard": "**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval."
+            },
+            "workloadHash": "78b73575d338b3a1d7b39a33d624d29bbb3c763bb3161366731a5fcb10fe9675",
+            "amendmentReason": "initial complete plan and binding",
+            "plan": "# Preserve consistent approval transitions\n\n## Task identity\n**Task ID:** d34e33db-d6c0-4ba1-bacb-405b5005e34c\n**Revision:** 1\n**Skill pin:** cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c\n\n## Scope\nRepair repeated approval resetting custom capabilities and approval of rejected accounts reporting unusable success. Serialize transition decisions with persistence, retain restricted defaults on genuine approvals, explicit clear-rejected recovery, reduction notifications, Admin and self-protection boundaries. Add isolated PostgreSQL persistence and mounted route regressions in server/__tests__/routes.test.ts including controlled interleavings. No promotion features, final-Admin concurrency policy, schema, Clerk, deployment or realtime eviction changes.\n\n## Regression classification\n**Guard contract:** 1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3\n**Form:** normal\n**Material scope:** true\n**Rationale:** Existing approval API changes authorization state and capability persistence; race safety and error contracts materially affect account access.\n\n## Approval evidence\n**Reference:** Assigned native task 975 in current conversation\n**Owner direction:** Execute Preserve consistent approval transitions in its entirety.\n**Applicability:** Same approved R1-R3 scope and intended test-standard tier; local execution admission completes the draft without widening scope.\n\n## Pre-existing failures to ignore\nNone known at plan time. Treat every failure as a potential regression.\n\n**Flaky-test rule:** A passing retry establishes intermittency, not pre-existing provenance.\n\n## Validation\n**Command:** `test-standard`\n**Why:** Backend persistence and API contract changes without browser or schema changes.\n**Coverage evidence:** docs/validation/manifest.json; docs/validation/manifest.json test-standard typecheck and unit-tests include server/__tests__/routes.test.ts with PostgreSQL fixtures; bound gate:run supervises all registered steps within 300000ms.; supported invocation: TASK_ID=d34e33db-d6c0-4ba1-bacb-405b5005e34c TASK_PLAN_FILE=.local/tasks/d34e33db-d6c0-4ba1-bacb-405b5005e34c.md npm run gate:run -- --id d34e33db-d6c0-4ba1-bacb-405b5005e34c --tier test-standard\n**Do not switch tiers:** This task ID is strictly bound to this tier. Other tiers will block execution; changes require a supported amendment.\n\n## Planned guard assertions\n- R1 repeated approval preserves capabilities — Approve pending User, grant custom capability through supported endpoint, approve again and reread persisted capabilities; controlled blocked transition must preserve a newer grant.\n- R2 rejected approval is an unchanged conflict — Reject then approve returns HTTP 409 and unchanged stored row; clear rejection then approve succeeds. Controlled intervening rejection cannot be overwritten by stale approval.\n- R3 defaults and authorization boundaries remain — Genuine approval stores restricted defaults; missing, non-admin, pending, rejected and self-targeting identities stay denied; approval removal resets capabilities and notifies authorization change; Admin protections remain.\n\n## Regression Guard\n**Covers:** R1 repeated approval erases custom grants; R2 rejected approval reports success with unusable access; R3 changes defaults or weakens authorization and notification boundaries, including stale-write races.\n**Test location:** server/__tests__/routes.test.ts isolated AuthStorage PostgreSQL transition cases and mounted auth approval routes.\n**What it checks:** Assert real stored capabilities and admission, HTTP 409 with byte-equivalent rejected state, successful clear-rejected recovery, denial status codes and notification events. Use controlled database row locks to order competing rejection and capability updates ahead of approval.\n",
+            "planHash": "0aa8ef0d4e070432207bbb4de7b502a08c5627696e03f4d864281db063de2c37",
+            "approvalHash": "4e3fd0f3e94e23150d7c0d08b14a82b5b475c0ba502778382fff238238995e56"
+          },
+          "digest": "d089701cdb531ab153a6681a6988dcdfb7c2b74c95479d0149413bd5a7dc4f31"
+        }
+      ]
     }
   },
   "tombstones": [
@@ -18158,6 +18877,7 @@
     "fdd8da6e-7ac7-4aa2-9477-53f8b6215ec6",
     "9f6ba563-0544-401f-8c22-74e8ba1e26bc",
     "92db6839-28d1-4983-8040-9330c75e530a",
-    "1bc92e1d-057b-4d8b-baa6-e75ab3ca0115"
+    "1bc92e1d-057b-4d8b-baa6-e75ab3ca0115",
+    "d34e33db-d6c0-4ba1-bacb-405b5005e34c"
   ]
 }

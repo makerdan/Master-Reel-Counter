@@ -184,9 +184,15 @@ export function registerAuthRoutes(app: Express): void {
         if (!approved && !(await authStorage.canRemoveAdmin(targetId))) {
           return res.status(409).json({ message: "Cannot disable the final Admin" });
         }
-        const updatedUser = await authStorage.setUserApproved(targetId, approved);
+        const transition = await authStorage.setUserApproved(targetId, approved);
+        if (transition.kind === "not_found") {
+          return res.status(404).json({ message: "User not found" });
+        }
+        if (transition.kind === "rejected") {
+          return res.status(409).json({ message: "Clear rejection before approving this account" });
+        }
         if (!approved) notifyAuthorizationChange(targetId, "approval_removed");
-        return res.json(updatedUser);
+        return res.json(transition.user);
       } catch (error) {
         console.error("Error updating user approval:", error);
         return res.status(500).json({ message: "Failed to update user approval" });

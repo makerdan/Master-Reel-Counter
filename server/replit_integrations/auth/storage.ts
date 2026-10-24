@@ -8,6 +8,11 @@ import {
 import { db } from "../../db";
 import { and, eq, isNull, ne, count, or, sql } from "drizzle-orm";
 
+export type ApprovalTransitionResult =
+  | { kind: "updated"; user: User }
+  | { kind: "not_found" }
+  | { kind: "rejected" };
+
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByClerkUserId(clerkUserId: string): Promise<User | undefined>;
@@ -18,7 +23,7 @@ export interface IAuthStorage {
   updateUserAvatar(id: string, customAvatarKey: string | null): Promise<User>;
   getAllUsers(): Promise<User[]>;
   getRejectedCount(): Promise<number>;
-  setUserApproved(id: string, approved: boolean): Promise<User>;
+  setUserApproved(id: string, approved: boolean): Promise<ApprovalTransitionResult>;
   setUserCapabilities(id: string, capabilities: UserCapabilities): Promise<User | undefined>;
   rejectUser(id: string): Promise<User>;
   clearAllRejected(): Promise<string[]>;
@@ -138,17 +143,23 @@ export class AuthStorage implements IAuthStorage {
     return row?.value ?? 0;
   }
 
-  async setUserApproved(id: string, approved: boolean): Promise<User> {
-    const [user] = await this.database
-      .update(users)
-      .set({
+  async setUserApproved(id: string, approved: boolean): Promise<ApprovalTransitionResult> {
+    return this.database.transaction(async (tx) => {
+      // Decide from the locked row, not the route's earlier existence check.
+      // Rejection and capability writes must finish before this read or wait
+      // until this transition commits.
+      const [current] = await tx.select().from(users).where(eq(users.id, id)).for("update");
+      if (!current) return { kind: "not_found" };
+      if (approved && current.rejected) return { kind: "rejected" };
+      if (approved && current.approved) return { kind: "updated", user: current };
+
+      const [user] = await tx.update(users).set({
         approved,
-        capabilities: approved ? { ...RESTRICTED_USER_CAPABILITIES } : RESTRICTED_USER_CAPABILITIES,
+        capabilities: { ...RESTRICTED_USER_CAPABILITIES },
         updatedAt: new Date(),
-      })
-      .where(eq(users.id, id))
-      .returning();
-    return user;
+      }).where(eq(users.id, id)).returning();
+      return { kind: "updated", user };
+    });
   }
 
   async setUserCapabilities(id: string, capabilities: UserCapabilities): Promise<User | undefined> {

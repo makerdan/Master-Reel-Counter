@@ -90,6 +90,7 @@ import
   PRE_AUTH_WEBSOCKET_LIMITS,
   PreAuthWebSocketBuffer,
   RealtimeAuthorizationTracker,
+  registerAuthorizationChangeHandler,
 }
  from "../realtime-authorization.js"
 ;
@@ -120,11 +121,13 @@ import
   getIdentityAuthorizationOutcome,
   isAdminIdentity,
   isWebSocketIdentityAuthorized,
+  registerAuthRoutes,
 }
  from "../replit_integrations/auth/routes.js"
 ;
 
 import { buildSignInPath, getSafeReturnPath } from "../../shared/auth-routing.js";
+import { RESTRICTED_USER_CAPABILITIES } from "@shared/models/auth";
 import { SESSION_VALIDATION_ERROR_CODE } from "@shared/schema";
 
 import 
@@ -166,6 +169,211 @@ import
 // after all assertions have passed.
 after(async () => {
   await pool.end().catch(() => {});
+});
+
+test("approval transitions — persisted state and mounted HTTP boundaries", { timeout: 30000 }, async (t) => {
+  const schema = `approval_${process.pid}_${randomUUID().replaceAll("-", "")}`;
+  const setup = await pool.connect();
+  let isolatedPool: pg.Pool | undefined;
+  let server: http.Server | undefined;
+  const events: Array<[string, string]> = [];
+  const methods = [
+    "getUser", "getUserByClerkUserId", "setUserApproved", "setUserCapabilities",
+    "rejectUser", "clearAllRejected", "canRemoveAdmin",
+  ] as const;
+  const originals = methods.map((name) => [name, authStorage[name]] as const);
+  t.after(async () => {
+    if (server?.listening) await closeHttpServer(server);
+    for (const [name, original] of originals) (authStorage as any)[name] = original;
+    registerAuthorizationChangeHandler(() => {});
+    await isolatedPool?.end();
+    try {
+      await setup.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    } finally {
+      setup.release();
+    }
+  });
+  await setup.query(`CREATE SCHEMA "${schema}"`);
+  await setup.query(`
+    CREATE TABLE "${schema}".users (
+      id varchar PRIMARY KEY, clerk_user_id varchar UNIQUE, email varchar,
+      first_name varchar, last_name varchar, profile_image_url varchar,
+      custom_avatar_key varchar, approved boolean NOT NULL DEFAULT false,
+      rejected boolean NOT NULL DEFAULT false, role text NOT NULL DEFAULT 'User',
+      capabilities jsonb NOT NULL DEFAULT '${JSON.stringify(RESTRICTED_USER_CAPABILITIES)}',
+      created_at timestamp DEFAULT now(), updated_at timestamp DEFAULT now()
+    )
+  `);
+  isolatedPool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    options: `-c search_path=${schema} -c statement_timeout=10000 -c lock_timeout=8000`,
+    application_name: schema,
+    connectionTimeoutMillis: 5000,
+  });
+  const isolated = new AuthStorage(drizzle(isolatedPool, { schema: databaseSchema }));
+  for (const name of methods) (authStorage as any)[name] = isolated[name].bind(isolated);
+  for (const user of [
+    { id: "admin", role: "Admin" as const, approved: true },
+    { id: "ordinary", approved: true },
+    { id: "pending" },
+    { id: "rejected-actor", rejected: true },
+    { id: "target" },
+  ]) {
+    await isolated.createUserForClerkIdentity(user, user.id);
+  }
+  registerAuthorizationChangeHandler((id, outcome) => events.push([id, outcome]));
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    const userId = req.headers["x-test-identity"] as string | undefined;
+    (req as any).auth = Object.assign(
+      () => ({
+        userId: userId ?? null,
+        sessionClaims: userId ? { sub: userId } : null,
+        tokenType: "session_token",
+      }),
+      { [Symbol.for("@clerk/express.auth")]: true },
+    );
+    next();
+  });
+  registerAuthRoutes(app);
+  server = http.createServer(app);
+  const baseUrl = await listenOnLoopback(server);
+  const request = async (
+    path: string, method = "PATCH", body: unknown = { approved: true },
+    actor: string | null = "admin",
+  ) => {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: { "Content-Type": "application/json", ...(actor ? { "x-test-identity": actor } : {}) },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(12000),
+    });
+    return { status: response.status, body: await response.json() };
+  };
+  const approvalPath = "/api/admin/users/target/approval";
+  const readTarget = async () => {
+    const user = await isolated.getUser("target");
+    assert.ok(user);
+    return user;
+  };
+
+  await t.test("R1 genuine approval restricts defaults; repeat approval preserves a custom HTTP grant", async () => {
+    await isolated.setUserCapabilities("target", { ...RESTRICTED_USER_CAPABILITIES, exports: true });
+    assert.equal((await request(approvalPath)).status, 200);
+    assert.deepEqual((await readTarget()).capabilities, RESTRICTED_USER_CAPABILITIES);
+    assert.equal((await request("/api/admin/users/target/capabilities", "PATCH", { exports: true })).status, 200);
+    const before = await readTarget();
+    events.length = 0;
+    const response = await request(approvalPath);
+    assert.equal(response.status, 200);
+    assert.equal(response.body.capabilities.exports, true);
+    assert.deepEqual(await readTarget(), before, "unchanged approval must not write or reset a grant");
+    assert.deepEqual(events.slice(), [], "unchanged approval does not reduce authorization");
+  });
+
+  await t.test("R2 rejected approval conflicts without writes; explicit clear then approve recovers", async () => {
+    assert.equal((await request("/api/admin/users/target", "DELETE", {})).status, 200);
+    assert.deepEqual(events.slice(), [["target", "account_rejected"]]);
+    const rejected = await readTarget();
+    events.length = 0;
+    const response = await request(approvalPath);
+    assert.equal(response.status, 409);
+    assert.match(response.body.message, /clear rejection/i);
+    assert.deepEqual(await readTarget(), rejected);
+    assert.deepEqual(events.slice(), []);
+    assert.equal((await request("/api/admin/users/clear-rejected", "POST", {})).status, 200);
+    assert.ok(events.some(([id, outcome]) => id === "target" && outcome === "rejected_users_cleared"));
+    assert.equal((await readTarget()).approved, false);
+    assert.equal((await request(approvalPath)).status, 200);
+    const restored = await readTarget();
+    assert.equal(restored.approved, true);
+    assert.equal(restored.rejected, false);
+    assert.deepEqual(restored.capabilities, RESTRICTED_USER_CAPABILITIES);
+  });
+
+  await t.test("R3 guards reject unauthorized, self-targeted, malformed and missing-target requests", async () => {
+    const before = await readTarget();
+    for (const [actor, status] of [[null, 401], ["ordinary", 403], ["pending", 403], ["rejected-actor", 403]] as const) {
+      // Reapply rejection because clear-rejected is intentionally a bulk recovery action.
+      if (actor === "rejected-actor") await isolated.rejectUser(actor);
+      assert.equal((await request(approvalPath, "PATCH", { approved: true }, actor)).status, status);
+    }
+    assert.equal((await request("/api/admin/users/admin/approval", "PATCH", { approved: false })).status, 400);
+    assert.equal((await request("/api/admin/users/admin/approval")).status, 400);
+    assert.equal((await request(approvalPath, "PATCH", { approved: "true" })).status, 400);
+    assert.equal((await request("/api/admin/users/absent/approval")).status, 404);
+    assert.deepEqual(await isolated.setUserApproved("absent", true), { kind: "not_found" });
+    assert.deepEqual(await readTarget(), before);
+    await isolated.createUserForClerkIdentity({ id: "disabled-admin", role: "Admin" }, "disabled-admin");
+    assert.equal((await request("/api/admin/users/admin/approval", "PATCH", { approved: false }, "disabled-admin")).status, 403);
+    // A distinct approved Admin remains subject to the final-Admin guard.
+    await isolatedPool!.query(`UPDATE users SET role = 'User' WHERE id = 'admin'`);
+    await isolatedPool!.query(`UPDATE users SET approved = true WHERE id = 'disabled-admin'`);
+    assert.equal((await request("/api/admin/users/disabled-admin/approval", "PATCH", { approved: false }, "ordinary")).status, 403);
+    assert.equal(await isolated.canRemoveAdmin("disabled-admin"), false);
+    await isolatedPool!.query(`UPDATE users SET role = 'Admin' WHERE id = 'admin'`);
+  });
+
+  await t.test("R3 admission removal resets capabilities and emits authorization reduction", async () => {
+    await isolated.setUserCapabilities("target", { ...RESTRICTED_USER_CAPABILITIES, exports: true });
+    events.length = 0;
+    const response = await request(approvalPath, "PATCH", { approved: false });
+    assert.equal(response.status, 200);
+    assert.equal((await readTarget()).approved, false);
+    assert.deepEqual((await readTarget()).capabilities, RESTRICTED_USER_CAPABILITIES);
+    assert.deepEqual(events.slice(), [["target", "approval_removed"]]);
+  });
+
+  // Hold an uncommitted competing write while the HTTP handler reads the old
+  // committed row. Observe its database lock wait before committing the writer.
+  // This reproduces the stale-read window deterministically, not by a sleep.
+  const withInterveningWrite = async (update: string) => {
+    const writer = await isolatedPool!.connect();
+    let pending: ReturnType<typeof request> | undefined;
+    try {
+      await writer.query("BEGIN");
+      await writer.query(update);
+      pending = request(approvalPath);
+      let waiting = false;
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        const result = await setup.query(
+          "SELECT 1 FROM pg_stat_activity WHERE application_name = $1 AND wait_event_type = 'Lock'",
+          [schema],
+        );
+        if (result.rowCount) { waiting = true; break; }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.ok(waiting, "approval must reach the competing row lock before the writer commits");
+      await writer.query("COMMIT");
+      return await pending;
+    } finally {
+      await writer.query("ROLLBACK");
+      writer.release();
+      if (pending) await pending;
+    }
+  };
+  await t.test("R1 blocked repeated approval rereads a newer capability grant", async () => {
+    await isolated.setUserApproved("target", true);
+    const response = await withInterveningWrite(
+      `UPDATE users SET capabilities = capabilities || '{"exports":true}'::jsonb WHERE id = 'target'`,
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.body.capabilities.exports, true);
+    assert.equal((await readTarget()).capabilities.exports, true);
+  });
+  await t.test("R2 blocked approval cannot overwrite an intervening rejection", async () => {
+    const before = await readTarget();
+    events.length = 0;
+    const response = await withInterveningWrite(
+      "UPDATE users SET approved = false, rejected = true WHERE id = 'target'",
+    );
+    assert.equal(response.status, 409);
+    const after = await readTarget();
+    assert.deepEqual(after, { ...before, approved: false, rejected: true });
+    assert.deepEqual(events.slice(), []);
+  });
 });
 
 describe("Clerk identity and approval regression guard", () => {
