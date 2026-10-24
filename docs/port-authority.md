@@ -1,3 +1,11 @@
+# Current migration status
+
+The older implementation described below remains wired for compatibility, but its
+historical “verified” labels do not certify the capability-scoped revision.
+See `docs/validation/port-authority-migration.md`. The replacement package is
+STAGED; do not invoke legacy cleanup merely to test the replacement, silently
+replace it with inventory, add advanced flags or clear uncertain leases.
+
 # Port Authority Runtime Hygiene
 
 ## Audit record

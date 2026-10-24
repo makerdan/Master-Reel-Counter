@@ -23,7 +23,7 @@ Port Authority or create a second execution authority. Unknown governing policy
 blocks dependent execution, not independently permitted read-only discovery.
 No named companion skill is an ordinary prerequisite.
 
-When Unified governs a task, use its provisioned ID, sealed approved plan and exactly
+When Unified governs execution, use its provisioned ID, sealed approved plan and exactly
 one adequate assigned tier. Run applicable Port Authority checks through that tier's
 supported supervised steps; do not introduce another tier, bypass admission or create
 another approval system. Port Authority control-readiness labels are not Unified task
@@ -31,6 +31,8 @@ completion states, and package checks alone never establish a task's tier PASS.
 
 Use the adopted pre-implementation preflight and supported amendment routes;
 Port Authority adds no Start interceptor, plan editor or admission authority.
+Complete unadmitted proposals may follow the governing draft-publication route;
+runtime process identities and capability checks are not planning-admission tokens.
 An adequate authorized plan needs no gratuitous amendment. A post-Start change
 uses the host's actual revision/seal/binding route, not an in-place sealed edit.
 Pause affected work when a gap is found; establish safe quiescence or use the
@@ -51,6 +53,29 @@ do not treat a runtime mirror, alternate definition or remembered prompt as auth
 Choose routine programming methods within approved boundaries without a coding diary.
 Material scope, safety, permissions, budgets, acceptance or protected-plan changes
 require their actual amendment route and affected-evidence renewal.
+
+
+## Capability selection — choose only applicable controls
+
+This is one skill, not three installations or validation tiers:
+
+| Capability group | Selection rule | What can block it |
+|---|---|---|
+| Basic runtime hygiene | Relevant read-only discovery, managed lifecycle guidance and actual health contract | Unknown ownership/routing, denied tool access or unsupported platform |
+| Conflict serialization | Demonstrated shared mutable resource or scarce-resource conflict | Missing finite containment, incompatible lease state or unsupported host admission |
+| Advanced controls/recovery | Explicit feature scope and genuine required capabilities | Missing exact reclaim authority, attestation, reentry/resource support or safe recovery |
+
+Record selected controls and their real dependencies before implementing. A blocker
+propagates only to dependent work. A requested conflict cannot be marked resolved
+merely by deselecting serialization. Independent basic controls may still be delivered.
+Installing a definition or reviewing scope does not require host acceptance runs.
+
+The bundled Linux engine is one implementation, not a portable host API. Discover
+Node/Linux/proc/filesystem/supervision support before selecting it. Reuse an actual
+audited host equivalent only when it meets the applicable outcomes. Do not weaken
+the outcomes, invent a provider, strip production flags or assume a wrapper supplies
+containment. A template-denied inventory stays denied; separately permitted host
+read-only inspection can report observations without claiming the template passed.
 
 ## 2. Audit the affected boundary
 
@@ -166,7 +191,13 @@ Record raw results separately from assessment; a correct expected denial/nonzero
 can pass its case but cannot satisfy a missing implementation or runtime capability.
 Keep owned repairs and adopted failure policy intact.
 
-Per control/caller, report **STAGED**, **CORE_VERIFIED**, **ADVANCED_VERIFIED** or
+Design timeout tests around observed stages, not assumed startup speed. Replacement
+fixtures need finite queue headroom for the predecessor's execution, termination and
+release; preserve exact denial/cleanup assertions and uncertain fixture lease state.
+Correcting fixture limits does not authorize changing host or assigned-tier budgets.
+
+Report each selected control and caller separately; there is no blanket project
+verification inferred from one passing suite. Per control/caller, report **STAGED**, **CORE_VERIFIED**, **ADVANCED_VERIFIED** or
 **LIVE_RECLAIM_ENABLED** only for the evidenced scope. Independently report failed,
 blocked, not-run and justified-not-applicable checks. Staging and isolated tests
 do not prove host activation, validation completion or independent acceptance.
@@ -204,3 +235,42 @@ Report the actual source revision, affected controls, changes, caller mapping,
 effective limits, tested snapshot, expected/actual results and exact remaining action.
 Keep definition delivery, app implementation, independent acceptance and runtime
 readiness separate. No automatic skill publication, migration, merge or deployment.
+
+
+## 7. Adoption identity and capability handoff
+
+Track the full normative contract and executable resources through the actual
+project's supported revision mechanism. The package manifest distinguishes normative
+instructions, runtime modules, test resources and explanatory material. A core-only
+hash cannot identify changed references or engines. The selected content fingerprint
+is not authorization, host activation, or evidence of a successful test run.
+Preserve earlier snapshots, historical plans, lease formats and recovery dispositions;
+a definition revision never grants permission to rewrite live state.
+
+For each selected control record: caller/service, actual shared resource or symptom,
+implementation/host capability, governing revision, effective remaining budgets,
+expected positive/negative outcomes, observed results, readiness and unresolved action.
+Map all transitive conflicting callers before cutover. A staged descriptor is not
+installed wiring. Independent health/inventory must not inherit an unrelated lease.
+
+Two consecutive authorized host acceptance runs remain required for newly activated
+controls. They must exercise actual participating callers and applicable outcomes
+against the same delivered snapshot without manual cleanup between runs. They are
+not two additional whole-project tiers or two reviewer approvals. Reuse already
+obtained qualifying runs while their relevant inputs remain unchanged. Package
+fixture passes, correct production denials and merged task state do not replace
+positive activation evidence. Retain the governing host's required workload coverage.
+
+If old callers reclaim processes or use named locks, priorities or reentry, stage
+the replacement separately. Choose an authorized core redesign or explicitly
+supported advanced migration, with acceptance for that choice. Do not silently
+convert cleanup into inventory, hide its failed startup result, or prepend an
+advanced flag. Cut over only quiescent approved callers; do not reset leases,
+stop services or delete uncertain state as an installation step.
+
+
+This wording revision leaves bundled runtime and test bytes unchanged. It does not
+resolve ConduitCount's recorded production-denial or outer-containment blockers.
+Where no supported equivalent exists, retain the affected staged/blocked status and
+name the actual capability needed; no separate approval service or independent
+reviewer is a default remedy.

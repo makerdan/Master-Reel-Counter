@@ -1,17 +1,9 @@
-Create a Remix of this Application as a code recovery point through the supported host interface before app edits. If you cannot create it, say so and ask me to create it; do not claim it exists. A Remix is not proof of database, external-resource or browser-local data backup.
-
-Prepare to apply the canonical port-authority skill using its core-default contract and the app's actual supported planning/execution routes.
-
-Read the complete canonical core contract, discover actual host capabilities and adopted validation policy, and pin applicable outcomes C01–C12 before implementation. Do not install Failure Gate Unified or new validation tiers just to use Port Authority. When Unified is adopted, each implementation or verification task uses its own provisioned ID, sealed approved plan and exactly one adequate assigned tier through supported supervised routes. Do not bypass admission or introduce another approval system.
-
-Inspect current wiring and propose only the missing scoped implementation through actual supported task interfaces. Preserve complete plans and actual revision/binding/approval evidence. This prompt requests a plan, not permission to start implementation, disrupt services or create an independent verification task. Use paired orchestration only if explicitly selected or actually required by an identifiable already-approved requirement.
-
-Implement real app wiring: read-only port inventory, managed service/port configuration and health, and a single outer local lease only where actual callers conflict. Preserve finite supervision, owned-tree termination, raw outcomes and retained uncertain leases. Keep independent validation work independent.
-
-Default scope excludes pre-existing-process reclaim, development-context exceptions, priorities, named-resource/reentry features, automatic hooks, remote CI, merge and deployment. If an actual dependency requires an advanced feature, surface the smallest explicit scope/capability decision rather than silently enable it or remove the dependency.
-
-Separate review is not selected by this prompt. If no identifiable already-approved requirement calls for it, record it as not selected, not pending or blocked. Keep an evidence handoff available. If review is selected/required later, a read-only verifier inspects actual delivery and reports gaps without edits, workloads or task-state changes. Repair authority is not implied. Fixture passes are not host acceptance; report staging, delivery, runtime evidence and any selected separate review distinctly.
-
-Obtain two consecutive authorized acceptance runs for newly activated controls through the assigned tier's supported route. These are control-activation evidence, not two extra approvals or a blocker for unrelated plan publication. Preserve runtime process/lease identity safeguards without turning them into machine-bound Unified task authorization. Unified gate-maintenance permission does not authorize lease deletion, pre-existing-process reclaim or service disruption; use the actual supported authorized recovery route. Missing optional reclaim capability must not block independent planning, inventory or checks without that dependency.
-
-Use the adopted pre-implementation preflight and supported post-Start amendment route; add no Port Authority Start interceptor or plan editor. An amendment does not authorize service disruption or lease recovery. Pause affected work and establish safe quiescence or use supported authorized cancellation before changing an active run's plan/binding/limits/shared-resource configuration. Preserve evidence and uncertain leases, do not stop unrelated work, and do not claim retroactive authorization.
+Plan a scoped application of the attached canonical Port Authority package.
+Inspect current project policy, actual runtime controls, callers and capabilities.
+Select basic hygiene, proven-conflict serialization and advanced features separately.
+Do not activate advanced recovery or signal processes without exact authorization.
+Preserve historical leases and records. Do not invent a gate, host approval adapter,
+extra validation tier or independent reviewer. Use the matching migration-kit plan.
+Separate review is not selected by this prompt.
+Definition installation is not live cutover; obtain any uncovered disruption consent.
+Report actual selected controls, prerequisites, tests and acceptance limits.

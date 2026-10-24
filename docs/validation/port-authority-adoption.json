@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "source": ".agents/skills/port-authority",
+  "safetyPackageSha256": "eed2f79de206ef073f333ad26d541d1096919d3bd445a8fd7b672723f245bc2e",
+  "snapshot": "docs/validation/port-authority-revisions/eed2f79de206ef073f333ad26d541d1096919d3bd445a8fd7b672723f245bc2e",
+  "state": "STAGED",
+  "activeLegacyCallersChanged": false,
+  "hostActivation": "BLOCKED",
+  "controls": {
+    "basicInventory": "STAGED: template production denial observed twice, exit 2",
+    "managedLifecycle": "UNCHANGED: no restart or live caller cutover authorized",
+    "serialization": "STAGED: existing callers use named resources, priorities and reentry; no core cutover",
+    "advanced": "NOT_SELECTED",
+    "liveReclaim": "NOT_ENABLED"
+  },
+  "fixtureRuns": [
+    {"tests": 79, "passed": 79, "failed": 0, "skipped": 0, "durationMs": 120003.032949, "rawExitCode": 0, "workloadStopped": true},
+    {"tests": 79, "passed": 79, "failed": 0, "skipped": 0, "durationMs": 120933.99858, "rawExitCode": 0, "workloadStopped": true}
+  ],
+  "fixtureCommand": "timeout --signal=TERM --kill-after=10s 210s node .agents/skills/port-authority/tests/hardening.test.mjs --supervised",
+  "independentReview": "not selected",
+  "applicationTierPass": false
+}

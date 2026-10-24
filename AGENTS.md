@@ -1,5 +1,15 @@
 # Project instructions
 
+Port Authority's complete capability-scoped package is staged at
+`.agents/skills/port-authority/`, pinned in
+`docs/validation/port-authority-adoption.json`. Current production denial and
+legacy caller/lease compatibility block live cutover; see
+`docs/validation/port-authority-migration.md`. Do not strip production indicators,
+automatically enable advanced controls, signal pre-existing processes, restart
+services or delete uncertain leases to finish installation. Existing active
+cleanup and serial-lock callers remain unchanged until coordinated authorization.
+Package fixture passes are not two positive host activation runs.
+
 The current Failure Gate authority is `.agents/skills/failure-gate-unified/SKILL.md`
 and both normative references in that package. Read the applicable references;
 verify the full-contract pin, not only the core hash, before gate operations.

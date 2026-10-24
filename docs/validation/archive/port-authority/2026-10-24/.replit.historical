@@ -1,0 +1,125 @@
+modules = ["nodejs-20", "web", "python-3.11", "postgresql-16"]
+run = "npm run dev"
+hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+
+[nix]
+channel = "stable-24_05"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3003
+exposeLocalhost = true
+
+[[ports]]
+localPort = 23636
+externalPort = 3000
+
+[[ports]]
+localPort = 23637
+externalPort = 3001
+
+[[ports]]
+localPort = 23638
+externalPort = 3002
+
+[env]
+PORT = "5000"
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "./dist/index.cjs"]
+build = ["npm", "run", "release:build"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-fast"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-standard"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-standard-plus"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test-heavy"
+
+[[workflows.workflow]]
+name = "test-fast"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test-fast"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "test-standard"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test-standard"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "test-standard-plus"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test-standard-plus"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "test-heavy"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run test-heavy"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[agent]
+integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0", "github:1.0.0"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000
+
+[objectStorage]
+defaultBucketID = "replit-objstore-4e5979e6-bf5f-4c8c-9726-3bbe98fce901"

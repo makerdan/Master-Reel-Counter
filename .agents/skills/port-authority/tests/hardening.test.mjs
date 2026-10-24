@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import {
   mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync,
-  chmodSync, symlinkSync, linkSync, realpathSync, copyFileSync,
+  chmodSync, symlinkSync, linkSync, realpathSync, copyFileSync, lstatSync, unlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve, join } from "node:path";
@@ -28,6 +28,19 @@ function identity(pid) {
 function isAlive(p) {
   const actual = identity(p.pid);
   return actual?.startTime === p.startTime && !["Z", "X"].includes(actual.state);
+}
+function removeReleasedFixture(dir, leaseFile) {
+  // A test's owned-child teardown does not resolve an uncertain retained lease.
+  // Preserve its state for diagnosis instead of erasing exclusion/recovery evidence.
+  let retained = true;
+  try { lstatSync(leaseFile); }
+  catch (error) { if (error.code === "ENOENT") retained = false; }
+  if (retained) {
+    console.log(JSON.stringify({ incident: "private-lease-retained", stateDirectory: dir }));
+    return false;
+  }
+  rmSync(dir, { recursive: true, force: true });
+  return true;
 }
 async function until(fn, timeout = 5000) {
   const end = Date.now() + timeout;
@@ -165,7 +178,7 @@ function setup(t, { host = true } = {}) {
     for (const task of jobs) if (!task.closed) task.child.kill("SIGKILL");
     for (const p of extras) if (isAlive(p)) process.kill(p.pid, "SIGKILL");
     await Promise.allSettled([...jobs].map(j => j.done));
-    rmSync(dir, { recursive: true, force: true });
+    removeReleasedFixture(dir, env.VALIDATION_LOCK_FILE);
   }, { timeout: HOOK_TIMEOUT_MS });
   return { dir, env, launch, run, wrapped, extras, hostState, scripts };
 }
@@ -282,6 +295,29 @@ if (process.argv.includes("--supervised")) {
 // Default-profile behavior is tested separately; retained advanced runtime cases
 // below use private explicit-profile shims, never shipped authority integrations.
 await import("./core.test.mjs");
+
+test("fixture cleanup preserves retained lease evidence until release", () => {
+  // Synthetic files only: this case creates no process or live resource lease.
+  const dir = mkdtempSync(join(tmpdir(), "pa-cleanup-contract-"));
+  const leaseFile = join(dir, "lease"), evidenceFile = join(dir, "evidence");
+  try {
+    writeFileSync(leaseFile, "synthetic-uncertain-state");
+    writeFileSync(evidenceFile, "synthetic-recovery-evidence");
+    assert.equal(removeReleasedFixture(dir, leaseFile), false);
+    assert.equal(readFileSync(leaseFile, "utf8"), "synthetic-uncertain-state");
+    assert.equal(readFileSync(evidenceFile, "utf8"), "synthetic-recovery-evidence");
+    rmSync(leaseFile); // Remove only this test's inert synthetic file.
+    symlinkSync("synthetic-missing-target", leaseFile);
+    assert.equal(removeReleasedFixture(dir, leaseFile), false);
+    assert.equal(lstatSync(leaseFile).isSymbolicLink(), true);
+    assert.equal(readFileSync(evidenceFile, "utf8"), "synthetic-recovery-evidence");
+    unlinkSync(leaseFile); // Unlink the synthetic dangling symlink itself.
+    assert.equal(removeReleasedFixture(dir, leaseFile), true);
+    assert.equal(existsSync(dir), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("contract: one identity, reduced defaults and explicit optional features", () => {
   const skill = readFileSync(join(root, "SKILL.md"), "utf8");
@@ -894,7 +930,7 @@ test("execution budget stops owned work before replacement", async t => {
   s.extras.push(p);
   const next = s.wrapped(`try {const f=require('node:fs').readFileSync('/proc/${p.pid}/stat','utf8').split(') ')[1].split(' ');
     if(f[19]===${JSON.stringify(p.startTime)}&&!['Z','X'].includes(f[0]))throw new Error('OVERLAP');
-    }catch(e){if(e.message==='OVERLAP')throw e;}`);
+    }catch(e){if(e.message==='OVERLAP')throw e;}`, { VALIDATION_LOCK_TIMEOUT_MS: "8000" });
   const [a, b] = await Promise.all([first.done, next.done]);
   assert.equal(a.code, 1, a.text); assert.match(a.text, /execution-budget/);
   assert.equal(b.code, 0, b.text); assert(!isAlive(p));

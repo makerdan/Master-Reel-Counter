@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "skillIdentity": "port-authority",
+  "revisionLabel": "capability-scoped-adoption",
+  "files": [
+    {
+      "path": "README.md",
+      "role": "explanatory",
+      "bytes": 2040,
+      "sha256": "ae80914ca5b4a0648f80cef1ad6b27e21f25faf9d2ec5253791bc87b40507790"
+    },
+    {
+      "path": "REVISION-NOTES.md",
+      "role": "explanatory",
+      "bytes": 1202,
+      "sha256": "2d8d3e30f30514749a25842cdeebfc66a4af06e50e61dc06e2b918297067a075"
+    },
+    {
+      "path": "SKILL.md",
+      "role": "normative",
+      "bytes": 17704,
+      "sha256": "a92f249079ddb0ba5f4d2bde9c17ddf87811100b3d937bfa111e138b5f30db5a"
+    },
+    {
+      "path": "reference/advanced-controls.md",
+      "role": "normative",
+      "bytes": 11295,
+      "sha256": "bd1875817e5a64338bb9453c763b58208e16fd2b469a564eb03d7d97183b58ef"
+    },
+    {
+      "path": "reference/runtime-contract.md",
+      "role": "normative",
+      "bytes": 15271,
+      "sha256": "54add04e390790299e03bebf8c9e83768037476a1cdddc636629b177e71e69da"
+    },
+    {
+      "path": "reference/symptom-guidance.md",
+      "role": "normative",
+      "bytes": 2365,
+      "sha256": "5d5479363dd0c04c53fbc4b7b48e2c8df4e7548863cc32f531c89d2966d4d322"
+    },
+    {
+      "path": "scripts/free-ports.mjs",
+      "role": "runtime",
+      "bytes": 15180,
+      "sha256": "1fb47e7278228055b7ecfb3cc10cccdca88e3526cd3c986aa8190d1704375c74"
+    },
+    {
+      "path": "scripts/host-capabilities.mjs",
+      "role": "runtime",
+      "bytes": 1707,
+      "sha256": "5cfc85eb2fa283037d4f1f4c01b6b5c28973fc255661f8227caab5697bc939cc"
+    },
+    {
+      "path": "scripts/runtime-environment.mjs",
+      "role": "runtime",
+      "bytes": 6558,
+      "sha256": "530e8a18d6dbd50ef764ee4b276319f0cfa4307e1c6889f43f1686af95bae9b6"
+    },
+    {
+      "path": "scripts/validation-lock.mjs",
+      "role": "runtime",
+      "bytes": 30755,
+      "sha256": "7d1ac732db42a85bfc6c5a747e24fa293dd398ed9ca4499cd549a751e99bdfe2"
+    },
+    {
+      "path": "tests/core.test.mjs",
+      "role": "test",
+      "bytes": 10503,
+      "sha256": "2590751747ebc92f10eab53f6ccca429cd05fd3cee113a51e1d3d31c605c1a56"
+    },
+    {
+      "path": "tests/hardening.test.mjs",
+      "role": "test",
+      "bytes": 83933,
+      "sha256": "6482b2aa3277a99d40404e404363d8afac790a9e510803ff17bb37ec9a0f3ddc"
+    },
+    {
+      "path": "usage-prompt.txt",
+      "role": "explanatory",
+      "bytes": 708,
+      "sha256": "2b5aaf40b53431176b4227c963d108832254f156f5f0a031727da538b5e18958"
+    }
+  ],
+  "identityFiles": [
+    "SKILL.md",
+    "reference/advanced-controls.md",
+    "reference/runtime-contract.md",
+    "reference/symptom-guidance.md",
+    "scripts/free-ports.mjs",
+    "scripts/host-capabilities.mjs",
+    "scripts/runtime-environment.mjs",
+    "scripts/validation-lock.mjs",
+    "tests/core.test.mjs",
+    "tests/hardening.test.mjs"
+  ],
+  "safetyPackageSha256": "eed2f79de206ef073f333ad26d541d1096919d3bd445a8fd7b672723f245bc2e"
+}

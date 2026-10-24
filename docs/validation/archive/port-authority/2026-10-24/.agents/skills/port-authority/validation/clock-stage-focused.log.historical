@@ -1,0 +1,15 @@
+{"scope":"isolated-bundle-fixture-only","testTimeoutMs":30000,"fixtureHookTimeoutMs":5000,"executionLimitMs":180000,"hostActivationEvidence":false,"stateDirectory":"/tmp/port-authority-regression-p5XoCL"}
+{"tool":"validation-lock","state":"ACQUIRED","resource":"global","nested":false,"token":"5afc9663-8638-43c5-ae1a-7da456e4f826","queueWaitMs":108,"queueLimitMs":5000,"executionLimitMs":180000,"stopGraceMs":3000,"stopVerificationMs":5000,"clock":"monotonic","authority":"local-supervision-not-checked-approval"}
+{"incident":"independent-watchdog-registered","pid":6108,"startTime":"769866"}
+✔ wall-clock reversal: expiry before dispatch returns 4 and retains the unfinalized lease (565.619567ms)
+✔ wall-clock reversal: confirmed dispatched work times out with exit 1 and verified cleanup (5409.908408ms)
+✔ wall-clock reversal: queue expiry returns 3 without dispatch or changing the live owner's lease (834.810642ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6938.242882
+{"tool":"validation-lock","state":"FINISHED","rawExitCode":0,"signal":null,"reason":null,"workloadStopped":true,"commandOutcome":{"exitCode":0,"signal":null},"token":"5afc9663-8638-43c5-ae1a-7da456e4f826"}

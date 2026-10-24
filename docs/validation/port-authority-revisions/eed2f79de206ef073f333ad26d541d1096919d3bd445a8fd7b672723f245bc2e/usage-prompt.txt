@@ -1,0 +1,9 @@
+Plan a scoped application of the attached canonical Port Authority package.
+Inspect current project policy, actual runtime controls, callers and capabilities.
+Select basic hygiene, proven-conflict serialization and advanced features separately.
+Do not activate advanced recovery or signal processes without exact authorization.
+Preserve historical leases and records. Do not invent a gate, host approval adapter,
+extra validation tier or independent reviewer. Use the matching migration-kit plan.
+Separate review is not selected by this prompt.
+Definition installation is not live cutover; obtain any uncovered disruption consent.
+Report actual selected controls, prerequisites, tests and acceptance limits.

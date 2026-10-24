@@ -1,0 +1,17 @@
+{"scope":"isolated-bundle-fixture-only","testTimeoutMs":30000,"fixtureHookTimeoutMs":5000,"executionLimitMs":180000,"hostActivationEvidence":false,"stateDirectory":"/tmp/port-authority-regression-zflt2S"}
+{"tool":"validation-lock","state":"ACQUIRED","resource":"global","nested":false,"token":"7b7c45ff-6f6c-4a36-950e-4c7dd4020a8f","queueWaitMs":24,"queueLimitMs":5000,"executionLimitMs":180000,"stopGraceMs":3000,"stopVerificationMs":5000,"clock":"monotonic","authority":"local-supervision-not-checked-approval"}
+{"incident":"independent-watchdog-registered","pid":15219,"startTime":"1012937"}
+✔ execution budget stops owned work before replacement (5877.311507ms)
+✔ direct package-script dispatcher fixture cannot bypass outer execution deadline (5538.114394ms)
+✔ async test and hanging hook report finite timeout; outer wrapper stops remaining handles (10668.478712ms)
+✔ outer supervisor stops synchronous test despite its blocked per-test timer (5419.315724ms)
+✔ descendant spawned on SIGTERM is discovered and receives termination (5741.286035ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33366.359835
+{"tool":"validation-lock","state":"FINISHED","rawExitCode":0,"signal":null,"reason":null,"workloadStopped":true,"commandOutcome":{"exitCode":0,"signal":null},"token":"7b7c45ff-6f6c-4a36-950e-4c7dd4020a8f"}

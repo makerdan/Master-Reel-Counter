@@ -171,6 +171,15 @@ outcome, actual clock reversal, no unauthorized dispatch, owned-work cleanup and
 correct retained/released lease state. Do not assume startup finishes in 200 ms
 or make a queue assertion dependent on an earlier execution assertion passing.
 
+For serialized replacement fixtures, give the waiting successor a finite queue
+window that covers the predecessor's remaining execution plus bounded termination
+and release overhead. Do not assert successful replacement under a queue deadline
+that can correctly expire first. This is fixture design, not permission to raise
+host budgets, weaken exact exits, assume startup timing or retry until passing.
+Test cleanup must preserve a retained uncertain lease and its state directory;
+stopping recorded test children alone does not resolve that lease. Use inert
+synthetic state to test preservation, never delete a real uncertain lease to prove it.
+
 For host activation, map these outcomes from actual evidence to adapted callers and
 their transitive hooks. Obtain two consecutive authorized host runs without manual
 cleanup between them. Test expected negative cases safely; never stop a live service
@@ -206,3 +215,23 @@ any repair/run permission is separately scoped, not implied by review.
 Definition-only confirmation, resource verification and app integration are distinct.
 If a paired workflow is selected, follow its actual canonical full-plan/readback,
 dependency/readiness and uncertainty protocol instead of duplicating it here.
+
+
+## Applying the contract by capability
+
+Map C01–C12 by selected control and actual dependency. Discovery/health without a
+shared resource does not activate C05 lease coordination. Selected serialization
+must satisfy C05–C09 and applicable authority/activation outcomes; it cannot waive
+descendant cleanup or outer supervision by calling itself basic hygiene.
+Record specific justified non-applicability, never blanket exemptions.
+
+A read-only host inventory capability distinct from the bundled template may be
+used when actually permitted, but is not proof that template admission succeeded.
+Keep production flags and the template's denial unchanged. Unsupported hosts may
+use an authorized equivalent only with evidence for the same applicable outcomes.
+
+For host acceptance, identify the actual participating callers and test the selected
+control, not just its descriptor or isolated fixture. Two qualifying consecutive
+runs at the same delivered snapshot may be reused; they do not create new tiers,
+approvals or independent review. Missing positive activation evidence remains a
+scoped blocker even if the negative denial cases pass.
