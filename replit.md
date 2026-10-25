@@ -107,3 +107,13 @@ admission blockers; explicit owner-selected obligations and dependent safeguards
 remain binding. Main changes do not refresh isolated task copies. Authorized
 handoff needs one executor, preserved records and destination admission. Native
 task-status reconciliation is separate from local completion; no invented API.
+
+The prospective bounded-recovery contract and maintenance evidence are in
+`docs/validation/unified-bounded-recovery-update.md`. Diagnose the actual failing
+executor before comparing destinations. An idle task executor does not require
+unrelated development services to stop. Bound missing-state recovery to accessible
+relevant evidence; do not repeat searches without new evidence, initialize from
+partial history, or treat future-operation authorization as restoration.
+Keep delivery, check outcomes, acceptance, activation and native status separate.
+Deferred acceptance does not mean PASS or authorize activation; keep existing
+capability states, dependent safeguards and explicit owner obligations unchanged.

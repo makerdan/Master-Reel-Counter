@@ -64,6 +64,20 @@ not a tier PASS. Run `npm run gate:merge-guard` before merges and publication.
 See `docs/validation/unified-installation.md` for supported commands and boundaries.
 See `docs/validation/unified-host-portable-update.md` for current scoped readiness
 and rollback; `modular-migration.md` retains its historical installation evidence.
+The prospective bounded-recovery update and its actual maintenance evidence are
+in `docs/validation/unified-bounded-recovery-update.md`. Diagnose the failing
+executor's policy, selected full contract, runner and dependency outputs first;
+compare destination evidence separately. Inaccessible workers do not establish
+main's state or prevent source-only maintenance preserving their old contracts.
+Task-executor idleness is not whole-workspace shutdown: unrelated development
+services may remain running unless they conflict with task resources or safety.
+Bound missing-state searches to accessible relevant evidence; do not repeat one
+without new evidence or initialize authority from a partial snapshot. Future
+operation after acknowledged loss needs separate authorization, not a ledger reset.
+Report maintenance delivery, checks, acceptance, activation and native task status
+separately. Deferred acceptance is not PASS or permission to activate. Preserve
+existing capability states and explicit obligations; do not disable unrelated
+accepted capabilities or invent a generic readiness flag.
 Check the actual executing checkout's full contract, runner, policy and dependency
 outputs; `gate:status` reports local availability, not admission or host acceptance.
 Fresh process, isolated task-worker, workspace restart and restore are distinct

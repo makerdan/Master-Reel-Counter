@@ -87,6 +87,38 @@ function modularSpec() {
   return { ...spec(), claim: "stable-fixture-local-claim",
     regressionGuard: "Normal: changed reference must block admission; contract tamper fixture asserts rejection before workload." };
 }
+test("selected maintenance package verifies all six files and preserves recovery decision boundaries", () => {
+  const directory = join(project, ".agents/skills/failure-gate-unified");
+  const manifest = JSON.parse(readFileSync(join(directory, "PACKAGE-MANIFEST.json")));
+  const selected = pins(project);
+  assert.equal(manifest.normativeContractSha256, selected.current);
+  assert.deepEqual(manifest.files.map(({ path }) => path).sort(),
+    ["README.md", "REVISION-NOTES.md", "SKILL.md",
+      "references/gate-maintenance.md", "references/planning-and-publication.md"].sort());
+  assert.deepEqual(manifest.normativeFiles.slice().sort(),
+    manifest.files.filter(({ role }) => role === "normative").map(({ path }) => path).sort());
+  for (const file of manifest.files) {
+    const bytes = readFileSync(join(directory, file.path));
+    assert.equal(bytes.length, file.bytes, file.path);
+    assert.equal(hash(bytes), file.sha256, file.path);
+    assert.deepEqual(bytes, readFileSync(join(project,
+      selected.revisions[selected.current].directory, file.path)), file.path);
+  }
+  const previous = selected.revisions[manifest.previousNormativeContractSha256].directory;
+  assert.deepEqual(readFileSync(join(directory, "SKILL.md")),
+    readFileSync(join(project, previous, "SKILL.md")));
+  const maintenance = readFileSync(join(directory, "references/gate-maintenance.md"), "utf8");
+  for (const boundary of [
+    "Establish where the failure occurs first",
+    "Unrelated development services may remain running",
+    "bounded search of accessible recovery sources",
+    "stop repeating the restoration request",
+    "Future operation after acknowledged state loss is not restoration",
+    "Implementation delivered; acceptance deferred; activation disabled",
+    "Deferral does not waive a",
+    "Do not disable unrelated, already accepted capabilities",
+  ]) assert.ok(maintenance.includes(boundary), boundary);
+});
 function installRegression(root) {
   for (const directory of [".agents/skills/regression-guard", "docs/validation/regression-guard-revisions"]) {
     cpSync(join(project, directory), join(root, directory), { recursive: true });
@@ -250,7 +282,29 @@ test("new modular admissions preserve old bindings and task-specific restart obl
   input.scope += " Owner-selected workspace restart acceptance remains required for this fixture task.";
   const old = await provision(root, input);
   const before = JSON.stringify(readRegistry(root).tasks[old.id]);
+  const policyBefore = pins(root);
+  const referencePath = join(root,
+    ".agents/skills/failure-gate-unified/references/gate-maintenance.md");
+  const oldReference = readFileSync(referencePath);
+  // The core is byte-identical: checking only its hash would accept this
+  // unsupported reference replacement under the old policy.
+  assert.deepEqual(readFileSync(join(root, ".agents/skills/failure-gate-unified/SKILL.md")),
+    readFileSync(join(project, ".agents/skills/failure-gate-unified/SKILL.md")));
+  try {
+    writeFileSync(referencePath, readFileSync(join(project,
+      ".agents/skills/failure-gate-unified/references/gate-maintenance.md")));
+    assert.throws(() => guard(root, ctx(old)), /normative contract mismatch/);
+    assert.equal(existsSync(join(root, ".local/executed")), false);
+    assert.equal(JSON.stringify(readRegistry(root).tasks[old.id]), before);
+  } finally {
+    writeFileSync(referencePath, oldReference);
+  }
   modular(root, false);
+  const policyAfter = pins(root);
+  assert.deepEqual(policyAfter.acceptance, policyBefore.acceptance);
+  for (const [revision, descriptor] of Object.entries(policyBefore.revisions)) {
+    assert.deepEqual(policyAfter.revisions[revision], descriptor);
+  }
   const next = await provision(root, modularSpec());
   assert.notEqual(next.pin, old.pin);
   assert.equal(guard(root, ctx(old)).pin, old.pin);

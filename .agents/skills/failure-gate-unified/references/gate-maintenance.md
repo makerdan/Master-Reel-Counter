@@ -16,8 +16,8 @@ included in a mixed request; admit that application work separately. All gate wo
 - verifies itself with the gate's own tests, reported as setup or maintenance
   checks, never as an ordinary task-tier PASS. Disposable fixture identities may
   exercise lifecycle behavior but must not enter the live ledger or imply task approval;
-- ends when the provisioner, single-tier binding, plan guards and bound-tier
-  runner work. The next implementation plan uses normal admission.
+- reports delivery, acceptance and activation separately as described below.
+  The next implementation plan still uses normal admission.
 
 The no-ID rule concerns admitting this maintenance task into the live ledger;
 it does not forbid disposable fixture records used by gate tests.
@@ -80,6 +80,23 @@ that limit and retain the reconciliation rule in durable project guidance.
 
 When admission or a plan guard fails:
 
+**Establish where the failure occurs first.** Read the failing executor's actual
+policy, selected contract, runner and required dependency outputs. When a destination
+environment is relevant, compare its current state separately. Main's successful
+repair does not establish worker propagation; a worker's disabled policy does not
+establish that main needs repair. Disclose inaccessible environments rather than
+guessing their state.
+
+Distinguish stale source or dependencies, task-specific admission problems, missing
+authoritative state and actual gate defects. Use the smallest supported remedy.
+Do not repeat project-wide activation maintenance for a stale worker or request
+authorization already given for the same work. Follow the core's
+[execution handoff rules](../SKILL.md#stale-task-environments-and-execution-handoff).
+An execution handoff requires the prior task executor to remain idle and conflicting
+operations to be reconciled. Unrelated development services may remain running unless
+they interfere with the task's resources or safety guarantees. Do not require
+whole-workspace shutdown merely to establish task-executor idleness.
+
 1. Find the exact failing check and its cause from current code, policy and
    records. Retrieve evidence yourself; do not ask for original receipts.
 2. If the cause is task-specific, such as a wrong tier, a changed plan, stale
@@ -96,3 +113,47 @@ Record what changed and what was verified in the project's records without
 exposing credentials. Gate work does not rebind tasks, waive a tier or turn
 historical results into a fresh validation PASS.
 
+### Missing authoritative state
+
+Conduct a bounded search of accessible recovery sources and relevant task/delivery
+records. Distinguish a complete recoverable checkpoint, partial historical evidence
+and inaccessible environments. Missing files in the current environment do not prove
+that other copies were destroyed.
+
+If no complete candidate is accessible, stop repeating the restoration request.
+Explain what is missing and present the smallest applicable decision: defer affected
+work, restore from a newly identified valid source, or authorize a project-local
+design for future operation with explicitly incomplete history.
+
+Future operation after acknowledged state loss is not restoration. It requires
+explicit authorization and must preserve known records and identity claims, prevent
+identity reuse, retain unresolved obligations, and address the storage and concurrency
+guarantees needed by the selected execution scope. It must not fabricate missing
+history, reset an old ledger, silently rebind existing work or declare historical
+acceptance. A partial snapshot is not proof of all previously consumed identities.
+
+Do not prescribe a database, central allocator, identity format, remote journal or
+worker-transfer system universally. Reuse supported project capabilities. Main-only
+operation may be selected without implementing isolated-worker operation; unsupported
+execution modes remain unavailable. This decision path does not authorize
+implementation or activation by itself.
+
+### Maintenance delivery, acceptance and stopping
+
+Maintenance may conclude with verified readiness, or stop at the owner's direction
+with delivered changes and explicit unresolved acceptance. Report implementation
+delivery, maintenance-check results, activation state and native task status separately.
+
+"Implementation delivered; acceptance deferred; activation disabled" is a valid scoped
+delivery outcome, not a validation PASS or permission for ordinary execution. Preserve
+failed and incomplete results and identify what must be resolved before the affected
+capability is enabled. Do not disable unrelated, already accepted capabilities merely
+because a separately scoped change is deferred.
+
+Do not expand maintenance indefinitely merely to obtain a clean completion label.
+Additional work must remain within the authorized scope. Deferral does not waive a
+required check or satisfy an original acceptance criterion.
+
+Use supported native closure actions honestly. Administrative archival is not a
+successful validation result, and a board-status limitation does not require duplicate
+implementation or resuming a stale executor.

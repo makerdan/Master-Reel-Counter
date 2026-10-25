@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "skill": "failure-gate-unified",
+  "revision": "bounded-recovery-and-maintenance-acceptance",
+  "canonicalSkillSha256": "5a6f9d37b404108c19768969f7607e188a9b17c9cc80a595020f2b4eed2c6681",
+  "normativeFiles": [
+    "SKILL.md",
+    "references/gate-maintenance.md",
+    "references/planning-and-publication.md"
+  ],
+  "normativeContractSha256": "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b",
+  "normativeContractEncoding": "UTF-8; sorted relative path + NUL + lowercase file SHA-256 + LF per normative file",
+  "files": [
+    {
+      "path": "README.md",
+      "role": "explanatory",
+      "bytes": 2934,
+      "sha256": "f63d9da4b4a57b0b2af84f60b31aa6c8bbcc249419d5b3d381ceccfe9eb6e5b3"
+    },
+    {
+      "path": "REVISION-NOTES.md",
+      "role": "explanatory",
+      "bytes": 1277,
+      "sha256": "0fd231ceb7c12b5a0534778b33f2175edfdde43d6c717e5d176b479b0076c023"
+    },
+    {
+      "path": "SKILL.md",
+      "role": "normative",
+      "bytes": 26440,
+      "sha256": "5a6f9d37b404108c19768969f7607e188a9b17c9cc80a595020f2b4eed2c6681"
+    },
+    {
+      "path": "references/gate-maintenance.md",
+      "role": "normative",
+      "bytes": 9519,
+      "sha256": "2a4bbeabf8405739d4102fcb916da1b9e5f2b3af7a748fdc6005087f703a840e"
+    },
+    {
+      "path": "references/planning-and-publication.md",
+      "role": "normative",
+      "bytes": 6296,
+      "sha256": "4fcc07ee9d8ace731bd0ef095fde5475fe24c52093c684a43c014cbbc5fa43e5"
+    }
+  ],
+  "previousNormativeContractSha256": "1c473ac807c45b104d7ca36fd94163ae3d0d4d4e97dbb5dd71bc8a81b98a6736"
+}

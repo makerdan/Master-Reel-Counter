@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "regressionGuard": "1e19c766f4eb453d7a123df93a10ea43925dc520a10f6fa078b9143d1d2bf4a3",
   "source": ".agents/skills/failure-gate-unified/SKILL.md",
-  "current": "1c473ac807c45b104d7ca36fd94163ae3d0d4d4e97dbb5dd71bc8a81b98a6736",
+  "current": "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b",
   "acceptance": {
     "state": "NOT_OBSERVED",
     "reason": "Task-worker, workspace-restart and host-restore observations remain unverified. Current-checkout operational checks and bounded lifecycle fixtures are reported separately in docs/validation/unified-host-portable-update.md. No universal restart prerequisite or host acceptance is inferred; explicit owner-selected obligations and historical contracts remain binding."
@@ -17,6 +17,10 @@
       "directory": "docs/validation/unified-revisions/cc3b6bf33682701a17e89288bc1afe64d6440ac7856d0b5d6eb1ba5a2dfff15c"
     },
     "2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22": "docs/validation/unified-revisions/2025d914d570b364dea2e7b8bd9dda35881a9b60ccaca67d9d904060b37f6c22.txt",
-    "3cc2ed109bed775e188dd4b3db0e17834fd07ef013b03e682de5079d0ae7e937": "docs/validation/unified-revisions/3cc2ed109bed775e188dd4b3db0e17834fd07ef013b03e682de5079d0ae7e937.txt"
+    "3cc2ed109bed775e188dd4b3db0e17834fd07ef013b03e682de5079d0ae7e937": "docs/validation/unified-revisions/3cc2ed109bed775e188dd4b3db0e17834fd07ef013b03e682de5079d0ae7e937.txt",
+    "5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b": {
+      "kind": "normative-package",
+      "directory": "docs/validation/unified-revisions/5ea3dd706f5b8ab94ab7d9a2ce95365ed678d8acccb7f64cc7b78e178bd0323b"
+    }
   }
 }
