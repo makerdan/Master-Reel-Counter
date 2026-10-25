@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync, existsSync, mkdtempSync, copyFileSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import http from "node:http";
 import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
+import { PassThrough } from "node:stream";
 import express from "express";
+import multer from "multer";
 import sharp from "sharp";
 import { cropPhoto } from "../lib/cropPhoto";
 import { createImageUpload, IMAGE_UPLOAD_MAX_BYTES } from "../lib/imageUpload";
@@ -40,6 +43,53 @@ function assertPatched(name: string, version: string, minimum: string) {
     `${name} requires >=${minimum}; found ${version}`);
 }
 
+function assertInstalledMulterCopies(directory: string): number {
+  let copies = 0;
+  if (!existsSync(directory)) return copies;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    const path = join(directory, entry.name);
+    if (entry.name.startsWith("@")) {
+      copies += assertInstalledMulterCopies(path);
+      continue;
+    }
+    if (entry.name === "multer") {
+      const metadata = JSON.parse(readFileSync(join(path, "package.json"), "utf8"));
+      // @types/multer shares the directory basename, but is not the parser.
+      if (metadata.name === "multer") {
+        assertPatched("multer", metadata.version, requirements.multer);
+        copies++;
+      }
+    }
+    copies += assertInstalledMulterCopies(join(path, "node_modules"));
+  }
+  return copies;
+}
+
+test("portable locked install resolves only patched Multer copies", { timeout: 180_000 }, () => {
+  const directory = mkdtempSync(join(tmpdir(), "multer-locked-install-"));
+  try {
+    for (const name of ["package.json", "package-lock.json"]) {
+      copyFileSync(new URL(`../../${name}`, import.meta.url), join(directory, name));
+    }
+    const lock = JSON.parse(readFileSync(join(directory, "package-lock.json"), "utf8"));
+    assert.equal(lock.packages["node_modules/multer"].resolved,
+      `https://registry.npmjs.org/multer/-/multer-${lock.packages["node_modules/multer"].version}.tgz`);
+    // Resolution-only clean install; native build compatibility is covered by
+    // the existing sharp and full app/browser tests in the installed workspace.
+    const installed = spawnSync("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], {
+      cwd: directory, encoding: "utf8", timeout: 150_000, maxBuffer: 2 * 1024 * 1024,
+    });
+    assert.ifError(installed.error);
+    assert.equal(installed.status, 0, installed.stderr);
+    const cleanConsumer = createRequire(join(directory, "consumer.cjs"));
+    assertPatched("multer", cleanConsumer("multer/package.json").version, requirements.multer);
+    assert.ok(assertInstalledMulterCopies(join(directory, "node_modules")) > 0);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 function multipart(bytes: Buffer, mime = "image/png", field = "file") {
   return Buffer.concat([
     Buffer.from(`--fixture\r\nContent-Disposition: form-data; name="${field}"; filename="exact-original.png"\r\nContent-Type: ${mime}\r\n\r\n`),
@@ -48,10 +98,11 @@ function multipart(bytes: Buffer, mime = "image/png", field = "file") {
 }
 
 type Outcome = { status: number; body: any };
-async function post(url: string, body: Buffer, contentType = "multipart/form-data; boundary=fixture"): Promise<Outcome> {
+async function post(url: string, body: Buffer, contentType = "multipart/form-data; boundary=fixture", authenticated = true): Promise<Outcome> {
   return new Promise((resolve, reject) => {
     const req = http.request(url, {
-      method: "POST", headers: { "content-type": contentType, "content-length": body.length },
+      method: "POST", headers: { "content-type": contentType, "content-length": body.length,
+        ...(authenticated ? { authorization: "Bearer isolated-test-user" } : {}) },
     }, res => {
       const chunks: Buffer[] = [];
       res.on("data", chunk => chunks.push(chunk));
@@ -64,6 +115,17 @@ async function post(url: string, body: Buffer, contentType = "multipart/form-dat
   });
 }
 
+async function deadline<T>(promise: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([promise, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("upload resources did not settle")), 2_000);
+    })]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Uses the production parser/policy and public error handler. Storage is a
 // disposable in-memory sink, never the application's database or object bucket.
 async function withUploadFixture(run: (fixture: {
@@ -74,7 +136,10 @@ async function withUploadFixture(run: (fixture: {
   removals: () => number;
   startedFile: Promise<void>;
   closedFile: Promise<void>;
-}) => Promise<void>) {
+  releaseFilter: () => void;
+  filterStarted: Promise<void>;
+  parserClosed: Promise<void>;
+}) => Promise<void>, pendingFilter = false) {
   const app = express();
   const upload = createImageUpload(1_024);
   let callbacks = 0;
@@ -82,6 +147,24 @@ async function withUploadFixture(run: (fixture: {
   const blobs = new Map<string, Buffer>();
   const rows: string[] = [];
   const memory = (upload as any).storage;
+  let releaseFilter = () => {};
+  let filterStarted!: () => void;
+  let parserClosed!: () => void;
+  const filterStartedPromise = new Promise<void>(resolve => { filterStarted = resolve; });
+  const parserClosedPromise = new Promise<void>(resolve => { parserClosed = resolve; });
+  if (pendingFilter) {
+    const originalFilter = (upload as any).fileFilter;
+    (upload as any).fileFilter = (req: any, file: any, cb: any) => {
+      // Only the first request parks; later requests use the real MIME policy.
+      (upload as any).fileFilter = originalFilter;
+      releaseFilter = () => originalFilter(req, file, cb);
+      filterStarted();
+    };
+    (upload as any).streamHandler = (req: any, parser: any) => {
+      parser.once("close", parserClosed);
+      req.pipe(parser);
+    };
+  }
   let started!: () => void;
   let closed!: () => void;
   const startedFile = new Promise<void>(resolve => { started = resolve; });
@@ -97,6 +180,12 @@ async function withUploadFixture(run: (fixture: {
     removals++;
     remove(req, file, cb);
   };
+  // Isolated fixture identity, not a replacement for real Clerk/browser coverage.
+  app.use((req, res, next) => {
+    if (req.headers.authorization !== "Bearer isolated-test-user") {
+      res.status(401).json({ message: "Unauthorized" });
+    } else next();
+  });
   app.post("/", upload.single("file"), async (req: any, res) => {
     callbacks++;
     if (!req.file) return res.status(400).json({ rejected: req._rejectedMimetype ?? "missing" });
@@ -118,7 +207,8 @@ async function withUploadFixture(run: (fixture: {
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
   try {
     await run({ url, blobs, rows, callbacks: () => callbacks, removals: () => removals,
-      startedFile, closedFile });
+      startedFile, closedFile, releaseFilter: () => releaseFilter(),
+      filterStarted: filterStartedPromise, parserClosed: parserClosedPromise });
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
@@ -143,12 +233,21 @@ describe("image dependency security and compatibility", { timeout: 20_000 }, () 
     }
     assert.equal(sharp.versions.sharp, installedVersion("sharp"));
     assert.ok(sharp.versions.vips, "native image library must load");
+    assert.ok(assertInstalledMulterCopies(join(process.cwd(), "node_modules")) > 0,
+      "include nested or extraneous installed copies, not only lockfile entries");
+    const sandbox = JSON.parse(readFileSync(new URL("../../artifacts/mockup-sandbox/package-lock.json", import.meta.url), "utf8"));
+    for (const [key, metadata] of Object.entries(sandbox.packages)) {
+      if (key.endsWith("node_modules/multer")) {
+        assertPatched("multer", (metadata as { version: string }).version, requirements.multer);
+      }
+    }
+    assertInstalledMulterCopies(join(process.cwd(), "artifacts/mockup-sandbox/node_modules"));
   });
 
   test("version guard rejects the affected releases without installing them", () => {
     assert.throws(() => assertPatched("sharp", "0.35.4", requirements.sharp), /requires >=0.35.5/);
-    for (const version of ["2.3.0", "2.4.0"]) {
-      assert.throws(() => assertPatched("multer", version, requirements.multer), /requires >=2.5.0/);
+    for (const affected of ["2.0.0", "2.3.0", "2.4.0"]) {
+      assert.throws(() => assertPatched("multer", affected, requirements.multer), /requires >=2.5.0/);
     }
     assert.throws(() => assertPatched("sharp", "0.35.5-rc.1", requirements.sharp), /stable/);
   });
@@ -169,6 +268,99 @@ describe("image dependency security and compatibility", { timeout: 20_000 }, () 
     assert.equal(IMAGE_UPLOAD_MAX_BYTES, 50 * 1024 * 1024);
     assert.equal((createImageUpload() as any).limits.fileSize, IMAGE_UPLOAD_MAX_BYTES);
     assert.equal((createImageUpload() as any).storage.constructor.name, "MemoryStorage");
+  });
+
+  test("pending asynchronous filter resumed after teardown cannot emit an unhandled parser error", async () => {
+    // Reproduces upstream 80a2d9d ordering: a truncated second part rejects
+    // while the first filter parks busboy's write. Do not attach an error
+    // listener: doing so would hide the exact pre-2.5.0 crash.
+    const req = new PassThrough() as PassThrough & { headers: Record<string, string | number>; files?: unknown[] };
+    const rejected = new Error("file rejected");
+    let release!: multer.FileFilterCallback;
+    let parser: any;
+    let nextCalls = 0;
+    let storageCalls = 0;
+    const streams: any[] = [];
+    const body = [
+      "--fixture", 'Content-Disposition: form-data; name="first"; filename="first.png"',
+      "Content-Type: image/png", "", "a", "--fixture",
+      'Content-Disposition: form-data; name="second"; filename="second.png"',
+      "Content-Type: image/png", "", "b",
+    ].join("\r\n");
+    req.headers = { "content-type": "multipart/form-data; boundary=fixture", "content-length": Buffer.byteLength(body) };
+    const upload = multer({
+      fileHwm: 1,
+      storage: {
+        _handleFile() { storageCalls++; },
+        _removeFile(_req: any, _file: any, cb: any) { cb(null); },
+      },
+      streamHandler(request: any, busboy: any) {
+        parser = busboy;
+        parser.on("file", (_name: string, stream: any) => streams.push(stream));
+        request.pipe(parser);
+      },
+      fileFilter(_req: any, file: any, cb: multer.FileFilterCallback) {
+        if (file.fieldname === "first") release = cb;
+        else req.once("end", () => setImmediate(() => cb(rejected)));
+      },
+    } as any).any();
+    try {
+      await deadline(new Promise<void>((resolve, reject) => {
+        upload(req as any, null as any, error => {
+          nextCalls++;
+          try { assert.equal(error, rejected); } catch (err) { reject(err); return; }
+          setImmediate(() => {
+            parser.once("close", resolve);
+            release(null, true);
+          });
+        });
+        req.end(body);
+      }));
+      await new Promise<void>(resolve => setImmediate(resolve));
+      assert.equal(nextCalls, 1);
+      assert.equal(storageCalls, 0, "late callback must never enter storage");
+      assert.deepEqual(req.files, [], "no temporary file placeholders remain");
+      assert.equal(parser.destroyed, true);
+      assert.equal(streams.length, 2);
+      assert.ok(streams.every(stream => stream.destroyed), "all owned streams closed");
+    } finally {
+      req.destroy();
+      parser?.destroy();
+    }
+  });
+
+  test("client teardown during a pending filter releases resources and allows a later authenticated upload", async () => {
+    await withUploadFixture(async fixture => {
+      const request = http.request(fixture.url, { method: "POST", headers: {
+        authorization: "Bearer isolated-test-user",
+        "content-type": "multipart/form-data; boundary=fixture", "content-length": 4096,
+      } });
+      const closed = new Promise<void>((resolve, reject) => {
+        request.once("close", resolve);
+        request.on("error", error => {
+          if ((error as NodeJS.ErrnoException).code !== "ECONNRESET") reject(error);
+        });
+      });
+      try {
+        request.write(multipart(Buffer.alloc(128)).subarray(0, -17));
+        await deadline(fixture.filterStarted);
+        request.destroy();
+        await deadline(Promise.all([closed, fixture.parserClosed]));
+        fixture.releaseFilter();
+        await new Promise<void>(resolve => setImmediate(resolve));
+        assert.equal(fixture.callbacks(), 0);
+        assert.equal(fixture.blobs.size, 0);
+        assert.deepEqual(fixture.rows, []);
+        const png = await sharp({ create: { width: 4, height: 3, channels: 3, background: "red" } }).png().toBuffer();
+        assert.equal((await post(fixture.url, multipart(png), undefined, false)).status, 401);
+        assert.equal(fixture.blobs.size, 0);
+        assert.equal((await post(fixture.url, multipart(png))).status, 200);
+        assert.equal(fixture.blobs.size, 1);
+        assert.deepEqual(fixture.rows, ["exact-original.png"]);
+      } finally {
+        request.destroy();
+      }
+    }, true);
   });
 
   for (const format of ["jpeg", "png", "webp"] as const) {
@@ -297,7 +489,8 @@ describe("image dependency security and compatibility", { timeout: 20_000 }, () 
       await new Promise<void>((resolve, reject) => {
         const req = http.request(fixture.url, {
           method: "POST",
-          headers: { "content-type": "multipart/form-data; boundary=fixture", "content-length": 4_096 },
+          headers: { authorization: "Bearer isolated-test-user",
+            "content-type": "multipart/form-data; boundary=fixture", "content-length": 4_096 },
         });
         req.on("error", error => {
           if ((error as NodeJS.ErrnoException).code !== "ECONNRESET") reject(error);

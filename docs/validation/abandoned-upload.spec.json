@@ -1,0 +1,29 @@
+{
+  "claim": "task-1006-abandoned-upload-multer",
+  "title": "Prevent abandoned uploads from keeping server resources busy",
+  "scope": "Upgrade Multer to upstream-compatible 2.5.0 or later in major 2 to remove GHSA-q7qp-rjg7-q26m from installed and locked graphs. Preserve multipart architecture, synchronous production image filter, authentication, 50 MiB production limit, filenames, image decoding and protected storage. Add controlled pending asynchronous fileFilter teardown coverage, finite cleanup assertions and late-callback safety in server/__tests__/dependency-media-security.test.ts, retaining real HTTP compatibility and existing browser upload tests. Verify consumer resolution and disposable locked installation. No chunk protocol, storage redesign, audit waivers, production-data changes or deployment. Security scan task 1004 has no local task archive available; current tracked dependency-security reports and graph were inspected for overlap. Separate verification is not selected.",
+  "tier": "test-heavy",
+  "why": "The heavy tier alone includes security-audit and browser-tests alongside typecheck and unit-tests required for this dependency and upload lifecycle repair.",
+  "coverage": "docs/validation/manifest.json test-heavy has a 900000 ms bound; security-audit runs npm audit --audit-level=high, unit-tests includes server/__tests__/dependency-media-security.test.ts, typecheck checks source and tests, browser-tests runs scripts/run-browser-tests.mjs. Use guarded step diagnostics for diagnosis, never instead of full bound execution. Empty baseline catalog grants no waivers.",
+  "approval": {
+    "reference": "User assignment task 1006",
+    "direction": "Repair the exact Multer advisory using a compatible upstream fix and regression coverage without upload architecture changes or deployment.",
+    "applicability": "This revision implements the assigned dependency repair and scoped lifecycle tests only; independent verification is not selected."
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Security and resource lifecycle repair to an existing multipart parser dependency.",
+    "covers": "GHSA-q7qp-rjg7-q26m pending asynchronous fileFilter resuming after teardown; dependency downgrade and upload compatibility regressions.",
+    "testLocation": "server/__tests__/dependency-media-security.test.ts — version floors, pending asynchronous filter teardown, real HTTP abort and compatibility; existing upload cases in tests/mobile-photo-upload.spec.ts",
+    "assertion": "Reject every affected locked and installed Multer copy. Assert parser/file streams close within finite deadlines, no late storage writes, temporary data or unhandled errors survive teardown, completion fires once, and subsequent authenticated valid upload works. Retain MIME, oversize and unauthorized rejection coverage."
+  },
+  "assertions": [
+    { "requirement": "R1 patched dependency graph", "check": "Consumer resolution and all installed/locked Multer copies require stable major 2 version at least 2.5.0; disposable npm ci resolves the same safe graph." },
+    { "requirement": "R2 teardown lifecycle", "check": "Controlled pending asynchronous filter resumes after teardown without unhandled error, duplicate completion, retained file stream or late storage writes; real HTTP client abort releases resources within a deadline." },
+    { "requirement": "R3 unchanged upload contract", "check": "Existing production parser HTTP cases and browser upload cases preserve filenames, allowed types, size limits, protected storage and auth; later authenticated upload succeeds after teardown." },
+    { "requirement": "R4 honest validation", "check": "Run the full bound test-heavy and retain outcomes and remaining advisories separately in a revision-bound delivery handoff; no ignored baseline or waiver." }
+  ]
+}
