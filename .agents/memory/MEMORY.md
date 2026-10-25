@@ -1,3 +1,4 @@
+- [Explicit rebase during Git sync](git-sync-explicit-rebase.md) — inspect reflog and current operation state; explicit --rebase can replay already-merged history despite local pull defaults.
 - [Global isApproved middleware](global-isapproved-middleware.md) — all /api/* routes pass through isApproved; exempt public endpoints in the skipPaths array in routes.ts.
 - [Storage lint registry trust](storage-lint-registry-trust.md) — storage lint must trust only verified key exports and shape-checked identity factories, never every import from the registry module.
 - [E2E test auth — run as Admin](e2e-owner-auth.md) — global setup must use a real Clerk account with persisted Admin role for full CRUD browser coverage.
