@@ -2297,7 +2297,7 @@ export class DatabaseStorage implements IStorage {
   }[]> {
     const ownedSessions = await db.select({ id: countingSessions.id, name: countingSessions.name, ownerId: countingSessions.userId })
       .from(countingSessions)
-      .where(eq(countingSessions.userId, userId));
+      .where(and(eq(countingSessions.userId, userId), isNull(countingSessions.deletedAt)));
 
     const collabRows = await db.select({
       sessionId: sessionCollaborators.sessionId,
@@ -2309,7 +2309,7 @@ export class DatabaseStorage implements IStorage {
     if (collabSessionIds.length > 0) {
       const rows = await db.select({ id: countingSessions.id, name: countingSessions.name, ownerId: countingSessions.userId })
         .from(countingSessions)
-        .where(inArray(countingSessions.id, collabSessionIds));
+        .where(and(inArray(countingSessions.id, collabSessionIds), isNull(countingSessions.deletedAt)));
       collabSessions = rows;
     }
 
@@ -2457,7 +2457,7 @@ export class DatabaseStorage implements IStorage {
 
     const ownedSessions = await db.select({ id: countingSessions.id, ownerId: countingSessions.userId })
       .from(countingSessions)
-      .where(eq(countingSessions.userId, userId));
+      .where(and(eq(countingSessions.userId, userId), isNull(countingSessions.deletedAt)));
 
     const collabRows = await db.select({ sessionId: sessionCollaborators.sessionId })
       .from(sessionCollaborators)
@@ -2468,7 +2468,7 @@ export class DatabaseStorage implements IStorage {
     if (collabSessionIds.length > 0) {
       collabSessions = await db.select({ id: countingSessions.id, ownerId: countingSessions.userId })
         .from(countingSessions)
-        .where(inArray(countingSessions.id, collabSessionIds));
+        .where(and(inArray(countingSessions.id, collabSessionIds), isNull(countingSessions.deletedAt)));
     }
 
     const allSessionMap = new Map<number, { id: number; ownerId: string }>();

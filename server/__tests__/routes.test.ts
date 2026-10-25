@@ -17,6 +17,7 @@ import {
   readBoundedScanImage,
 } from "../lib/labelScanResources";
 import { cropPhoto } from "../lib/cropPhoto";
+import { registerSessionAuthorizationTests } from "./session-authorization-cases";
 
 test("permanent folder deletion promotes descendants in an isolated database", { timeout: 30000 }, async (t) => {
   const schema = `folder_lifecycle_${process.pid}_${randomUUID().replaceAll("-", "")}`;
@@ -2759,6 +2760,8 @@ async function buildProductionPatchRouteContext(
     throw error;
   }
 }
+
+registerSessionAuthorizationTests(() => buildProductionPatchRouteContext(false, true));
 
 describe("pin entry links — production authorization boundary", () => {
   let context: PatchRouteTestContext;

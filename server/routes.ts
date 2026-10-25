@@ -3246,6 +3246,7 @@ export async function registerRoutes(
       const sessionId = parseInt(req.params.id);
       const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to anchor the review cohort" });
 
       // If already anchored, return the existing cohort.
       if (access.session.reviewCohort) {
@@ -3293,6 +3294,7 @@ export async function registerRoutes(
       const sessionId = parseInt(req.params.id);
       const access = await verifySessionAccess(sessionId, (req as AuthenticatedRequest).user.claims.sub, getTesterOwner(req as AuthenticatedRequest));
       if (!access) return res.status(404).json({ message: "Session not found" });
+      if (!canEdit(access.role)) return res.status(403).json({ message: "You don't have permission to submit review responses" });
       const { entryId, verdict, flagReason } = (req.body ?? {}) as any;
       if (!entryId || !verdict || !["approved", "flagged"].includes(verdict)) {
         return res.status(400).json({ message: "entryId and verdict (approved|flagged) are required" });
