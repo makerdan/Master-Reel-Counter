@@ -18,6 +18,7 @@ import {
 } from "../lib/labelScanResources";
 import { cropPhoto } from "../lib/cropPhoto";
 import { registerSessionAuthorizationTests } from "./session-authorization-cases";
+import { registerBoundedResourceTests } from "./bounded-resource-cases";
 import { authorizeLabelScanPins } from "../lib/labelScanAuthorization";
 
 test("label scan identifiers reject malformed and duplicate inputs before lookups", async () => {
@@ -2546,6 +2547,8 @@ type PatchRouteTestContext = {
   entryId: number;
   cleanup: () => Promise<void>;
 };
+
+registerBoundedResourceTests(buildProductionPatchRouteContext);
 
 type ConfigurablePoolOptions = {
   max?: number;

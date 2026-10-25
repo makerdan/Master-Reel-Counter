@@ -58,4 +58,5 @@
 - [Task checkout merge visibility](task-checkout-merge-visibility.md) — merged-task notifications do not prove the assigned checkout includes those fixes; inspect source and lockfile before retrying.
 - [Gate history read errors](gate-history-read-errors.md) — a generic Git show failure can be buffered-output exhaustion, not damaged history; preserve records when diagnosing.
 - [Duplicate managed services](duplicate-managed-services.md) — a named stop can leave another instance alive; verify listeners before restarting.
+- [Bounded maintenance progress](bounded-maintenance-progress.md) — advance past failed attempts without losing retryability; batch success is not global completion.
 - [Bounded diagnostic reporters](bounded-diagnostic-reporters.md) — case summaries and output tails can omit assertion details; inspect failure artifacts before inferring a cause.

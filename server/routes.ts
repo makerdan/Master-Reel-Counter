@@ -33,6 +33,10 @@ import { registerImageRoutes } from "./replit_integrations/image";
 import { z } from "zod";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "./db";
+import {
+  aggregateSections, sectionKey, createResourceProtection, loadBoundedExcelData,
+  selectBackfillBatch, ExportWorkLimitError, RESOURCE_WORK_LIMITS,
+} from "./lib/boundedResourceWork";
 import { authorizeLabelScanPins } from "./lib/labelScanAuthorization";
 import { generateSalt, generateDataKey, deriveKEK, wrapKey, unwrapKey, encryptEntry, decryptEntry, UNREADABLE_SENTINEL } from "./encryption";
 import { createImageUpload } from "./lib/imageUpload";
@@ -615,6 +619,9 @@ const resourceRateLimiter = rateLimit({
     process.env.NODE_ENV !== "production"
     && req.get("x-replit-e2e") === "1",
 });
+
+const excelProtection = createResourceProtection(resolveUserId, 5, 2);
+const backfillProtection = createResourceProtection(resolveUserId, 2, 2);
 
 const MAX_PINS_PER_CROP_REQUEST = 50;
 
@@ -5532,7 +5539,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/sessions/:id/export/excel", isAuthenticated, async (req: any, res) => {
+  app.get("/api/sessions/:id/export/excel", isAuthenticated, excelProtection.limiter, excelProtection.wrap(async (req: any, res) => {
     const _sid = parseInt(req.params.id);
     taskTracker.increment();
     try {
@@ -5541,11 +5548,10 @@ export async function registerRoutes(
       if (!access) return res.status(404).json({ message: "Session not found" });
       taskTracker.startSession(_sid, "excel");
       const session = access.session;
-      const rawEntries = await storage.getSessionEntries(session.id);
+      const { rawEntries, sessionPhotos, sessionPins } = await loadBoundedExcelData(db, session.id);
       const key = await getEncryptionKey(userId);
       const sessionEntries = correctEntryFootage(key ? rawEntries.map(e => decryptEntry(e, key, { strict: false }) as any) : rawEntries);
-      const sessionPhotos = await storage.getSessionPhotos(session.id);
-      const allFlaggedPins = await storage.getSessionFlaggedPins(session.id);
+      const allFlaggedPins = sessionPins.filter(p => p.flagged && p.entryId == null);
       const flaggedEntryIds = new Set<number>(
         allFlaggedPins.filter((p: any) => p.entryId != null).map((p: any) => p.entryId as number)
       );
@@ -5575,10 +5581,11 @@ export async function registerRoutes(
       };
 
       const allPinsByPhoto = new Map<number, any[]>();
-      for (const p of sessionPhotos) {
-        const photoPins = await storage.getPhotoPins(p.id);
-        const committed = photoPins.filter((pin: any) => pin.entryId != null);
-        if (committed.length > 0) allPinsByPhoto.set(p.id, committed);
+      for (const pin of sessionPins) {
+        if (pin.entryId == null) continue;
+        const committed = allPinsByPhoto.get(pin.photoId) ?? [];
+        committed.push(pin);
+        allPinsByPhoto.set(pin.photoId, committed);
       }
       const entryPinMap = new Map<number, any>();
       for (const [, pins] of allPinsByPhoto) {
@@ -5824,15 +5831,14 @@ export async function registerRoutes(
       };
 
       const sortedActive = sortEntries(activeEntries);
+      const sectionTotals = aggregateSections(sortedActive);
       let lastSecKey = "";
       let altIdx = 0;
       for (const e of sortedActive) {
-        const secKey = `${e.aisle || ""}|||${e.section || ""}`;
+        const secKey = sectionKey(e.aisle, e.section);
         if (secKey !== lastSecKey) {
-          const secEntries = sortedActive.filter((x: any) => `${x.aisle || ""}|||${x.section || ""}` === secKey);
-          const secReels = secEntries.reduce((s: number, x: any) => s + (x.reelCount || 1), 0);
-          const secFt = secEntries.reduce((s: number, x: any) => s + (x.footage || 0), 0);
-          writeSectionBand(e.aisle || "", e.section || "", secEntries.length, secReels, secFt);
+          const totals = sectionTotals.get(secKey)!;
+          writeSectionBand(e.aisle || "", e.section || "", totals.entries, totals.reels, totals.footage);
           lastSecKey = secKey;
           altIdx = 0;
         }
@@ -6084,13 +6090,16 @@ export async function registerRoutes(
       logActivity(session.id, userId, (req as AuthenticatedRequest).user?.claims?.username, "exported_excel", "session", session.id);
       res.send(buffer);
     } catch (error) {
+      if (error instanceof ExportWorkLimitError) {
+        return res.status(413).json({ message: error.message });
+      }
       console.error("Error generating Excel:", error);
       if (!res.headersSent) res.status(500).json({ message: "Failed to generate Excel report" });
     } finally {
       taskTracker.decrement();
       taskTracker.endSession(_sid, "excel");
     }
-  });
+  }));
 
   // Update user profile name
   app.patch("/api/user/profile", isAuthenticated, async (req: any, res) => {
@@ -6219,29 +6228,45 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/storage/backfill-sizes", isAuthenticated, async (req: any, res) => {
+  app.post("/api/storage/backfill-sizes", isAuthenticated, backfillProtection.limiter, backfillProtection.wrap(async (req: any, res) => {
     try {
       const userId = resolveUserId(req as AuthenticatedRequest);
-      const { sessions: userSessions } = await storage.getUserSessions(userId);
-      const userSessionIds = userSessions.map(s => s.id);
-      if (userSessionIds.length === 0) {
-        return res.json({ total: 0, updated: 0, failed: 0 });
+      const afterPhotoId = req.body?.afterPhotoId ?? 0;
+      if (!Number.isSafeInteger(afterPhotoId) || afterPhotoId < 0 || afterPhotoId > 2_147_483_647) {
+        return res.status(400).json({ message: "afterPhotoId must be a non-negative photo ID." });
       }
-      const photosWithoutSize = await db.select({ id: photos.id, objectStorageKey: photos.objectStorageKey })
-        .from(photos)
-        .where(sql`${photos.fileSize} IS NULL AND ${photos.sessionId} IN (${sql.join(userSessionIds.map(id => sql`${id}`), sql`, `)})`);
+      const photosWithoutSize = await selectBackfillBatch(db, userId, afterPhotoId);
 
       let updated = 0;
       let failed = 0;
-      for (const photo of photosWithoutSize) {
+      let processed = 0;
+      let lastPhotoId = afterPhotoId;
+      const deadline = Date.now() + RESOURCE_WORK_LIMITS.backfillBudgetMs;
+      for (const photo of photosWithoutSize.slice(0, RESOURCE_WORK_LIMITS.backfillPhotos)) {
+        if (Date.now() >= deadline || req.aborted || res.destroyed) break;
+        processed++;
+        // Advance even on failure. A new pass from zero can retry failures,
+        // while this pass must reach later valid photos.
+        lastPhotoId = photo.id;
         try {
           const objectName = toStorageObjectName(photo.objectStorageKey);
           const gcsFile = objectStorageClient.bucket(BUCKET_NAME).file(objectName);
+          // File-local request options: bound actual HTTP work and disable
+          // automatic retries without changing the shared client's policy.
+          gcsFile.interceptors.push({
+            request: options => ({
+              ...options,
+              uri: "uri" in options ? options.uri : options.url,
+              timeout: RESOURCE_WORK_LIMITS.metadataTimeoutMs, maxRetries: 0,
+            }),
+          });
           const [metadata] = await gcsFile.getMetadata();
           const size = parseInt(String(metadata.size || "0"), 10);
           if (size > 0) {
             await db.update(photos).set({ fileSize: size }).where(eq(photos.id, photo.id));
             updated++;
+          } else {
+            failed++;
           }
         } catch {
           const localPath = path.join(UPLOADS_DIR, path.basename(photo.objectStorageKey));
@@ -6254,12 +6279,16 @@ export async function registerRoutes(
           }
         }
       }
-      res.json({ total: photosWithoutSize.length, updated, failed });
+      const hasMore = photosWithoutSize.length > processed;
+      res.json({
+        total: processed, updated, failed, hasMore,
+        nextCursor: hasMore ? lastPhotoId : null,
+      });
     } catch (error) {
       console.error("Error backfilling photo sizes:", error);
       res.status(500).json({ message: "Failed to backfill photo sizes" });
     }
-  });
+  }));
 
   // One-time cleanup: remove duplicate pins created by network-retry double-submission.
   // Keeps the lowest-id pin for each (photo_id, label) pair within sessions the

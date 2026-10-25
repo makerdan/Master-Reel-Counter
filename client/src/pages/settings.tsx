@@ -38,6 +38,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SWEEP_MIN_AGE_DAYS_KEY, readKey, writeKey, clearKey, helpGuideStateKey } from "@/lib/storageKeys";
 import HelpMenu from "@/components/HelpMenu";
 import { useAuth } from "@/hooks/use-auth";
+import { backfillProgress, type BackfillBatchResult } from "@shared/backfill-progress";
 import { useTheme } from "@/lib/theme-provider";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { LogoutGuardDialog } from "@/components/LogoutGuardDialog";
@@ -577,14 +578,20 @@ export default function SettingsPage() {
     },
   });
 
+  const [backfillCursor, setBackfillCursor] = useState<number | null>(null);
+  useEffect(() => setBackfillCursor(null), [identityId]);
   const backfillSizes = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/storage/backfill-sizes");
-      return res.json();
+      const res = await apiRequest("POST", "/api/storage/backfill-sizes", {
+        afterPhotoId: backfillCursor ?? 0,
+      });
+      return res.json() as Promise<BackfillBatchResult>;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/storage/usage"] });
-      toast({ title: "Backfill complete", description: `Updated ${data.updated} of ${data.total} photos${data.failed ? ` (${data.failed} failed)` : ""}` });
+      const progress = backfillProgress(data);
+      setBackfillCursor(progress.nextCursor);
+      toast({ title: progress.title, description: progress.description });
     },
     onError: () => {
       toast({ title: "Backfill failed", variant: "destructive" });
@@ -993,7 +1000,7 @@ export default function SettingsPage() {
                             ) : (
                               <RefreshCw className="h-3 w-3 mr-1" />
                             )}
-                            Calculate
+                            {backfillCursor === null ? "Calculate" : "Continue"}
                           </Button>
                         </div>
                       )}
