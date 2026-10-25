@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -24,6 +24,21 @@ const consumers = [
   ["source-map-js", "1.2.2", postcss],
   ["source-map-js", "1.2.2", tailwind],
 ];
+const sandbox = createRequire(new URL("artifacts/mockup-sandbox/package.json", root));
+// Root-only CI installs do not install the independent artifact. Its lockfile
+// must always be checked; installed-consumer/build checks run when it is present.
+const sandboxInstalled = existsSync(new URL("artifacts/mockup-sandbox/node_modules", root));
+const sandboxOptions = {
+  skip: sandboxInstalled ? false : "sandbox not installed; both lockfile guards still run",
+};
+const floors = new Map([
+  ["vite", "7.3.7"],
+  ["postcss", "8.5.28"],
+  ["source-map-js", "1.2.2"],
+  ["brace-expansion", "5.0.12"],
+  ["browserslist", "4.28.9"],
+  ["follow-redirects", "1.16.1"],
+]);
 
 function patched(version, minimum) {
   assert.match(version, /^\d+\.\d+\.\d+$/, "require a stable release");
@@ -80,9 +95,50 @@ test("tooling consumers and every installed lockfile copy exclude affected versi
 });
 
 test("version guards reject the previously installed vulnerable versions", () => {
-  for (const [old, minimum] of [["7.3.6", "7.3.7"], ["5.0.9", "5.0.12"], ["1.2.1", "1.2.2"]]) {
+  for (const [old, minimum] of [
+    ["7.3.1", "7.3.7"], ["7.3.6", "7.3.7"], ["5.0.9", "5.0.12"],
+    ["1.2.1", "1.2.2"], ["8.5.8", "8.5.28"], ["4.28.1", "4.28.9"],
+    ["1.16.0", "1.16.1"],
+  ]) {
     assert.throws(() => patched(old, minimum), /require .*found/);
     assert.doesNotThrow(() => patched(minimum, minimum));
+  }
+});
+
+for (const base of ["", "artifacts/mockup-sandbox/"]) {
+  test(`${base || "root/"} lockfile and installed copies exclude all assigned vulnerabilities`, () => {
+    const lock = JSON.parse(readFileSync(new URL(`${base}package-lock.json`, root), "utf8"));
+    const seen = new Set();
+    for (const [path, pkg] of Object.entries(lock.packages)) {
+      const name = path.split("node_modules/").at(-1);
+      if (!floors.has(name)) continue;
+      seen.add(name);
+      patched(pkg.version, floors.get(name));
+      if (!base || sandboxInstalled) {
+        const installed = JSON.parse(readFileSync(new URL(`${base}${path}/package.json`, root), "utf8"));
+        assert.equal(installed.version, pkg.version, `installed/locked mismatch: ${base}${path}`);
+      }
+    }
+    for (const name of base ? ["vite", "postcss", "source-map-js", "browserslist"] : floors.keys()) {
+      assert.ok(seen.has(name), `missing ${name} from ${base || "root/"} lockfile`);
+    }
+  });
+}
+
+test("sandbox Vite, CSS and Babel consumers resolve patched dependencies", sandboxOptions, () => {
+  const css = from(from(sandbox, "vite"), "postcss");
+  const node = from(from(sandbox, "@tailwindcss/vite"), "@tailwindcss/node");
+  const babel = from(from(sandbox, "@vitejs/plugin-react"), "@babel/core");
+  for (const [name, consumer] of [
+    ["vite", sandbox],
+    ["vite", from(sandbox, "@vitejs/plugin-react")],
+    ["vite", from(sandbox, "@tailwindcss/vite")],
+    ["postcss", from(sandbox, "vite")],
+    ["source-map-js", css],
+    ["source-map-js", node],
+    ["browserslist", from(babel, "@babel/helper-compilation-targets")],
+  ]) {
+    patched(metadata(consumer.resolve(name), name).version, floors.get(name));
   }
 });
 
@@ -193,6 +249,29 @@ test("patched Vite produces the application's production client and server", { t
     assert.equal(result.groupGone, true, "build must not leave processes behind");
     assert.match(readFileSync(new URL("dist/public/index.html", root), "utf8"), /\/assets\//);
     assert.ok(readFileSync(new URL("dist/index.cjs", root)).length > 0);
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
+test("patched sandbox tooling typechecks and builds its preview", { ...sandboxOptions, timeout: 65_000 }, async () => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  const env = { ...process.env, PORT: "5000", BASE_PATH: "/__mockup/" };
+  delete env.NODE_TEST_CONTEXT;
+  try {
+    for (const script of ["typecheck", "build"]) {
+      let output = "";
+      const result = await runOwnedProcessGroup("npm", ["run", script], {
+        cwd: new URL("artifacts/mockup-sandbox/", root), env, signal: controller.signal,
+        terminationGraceMs: 250, terminationWaitMs: 1500,
+        onOutput(chunk) { output = (output + chunk.toString()).slice(-64 * 1024); },
+      });
+      assert.equal(controller.signal.aborted, false, `sandbox ${script} deadline`);
+      assert.equal(result.status, 0, output);
+      assert.equal(result.groupGone, true, "sandbox tooling must not leave processes behind");
+    }
+    assert.match(readFileSync(new URL("artifacts/mockup-sandbox/dist/index.html", root), "utf8"), /\/assets\//);
   } finally {
     clearTimeout(timer);
   }

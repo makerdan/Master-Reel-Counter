@@ -54,3 +54,4 @@
 - [Indexed source-map fixtures](indexed-source-map-fixtures.md) — separate offset rejection from indexed-consumer helper quirks when testing valid map serialization.
 - [Process-fixture zombie detection](process-fixture-zombie-detection.md) — on minimal Linux containers, a killed orphan can remain as a zombie; distinguish that from a live process and check its port separately.
 - [Validation document fingerprints](validation-document-fingerprints.md) — finish handoff documents before validation; documentation edits during a run invalidate its target fingerprint.
+- [Validation cancellation](validation-cancellation.md) — stopping a background shell may leave its validation record unresolved; respect the recorded cleanup deadline and recovery route.

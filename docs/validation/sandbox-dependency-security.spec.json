@@ -1,0 +1,27 @@
+{
+  "claim": "sandbox-dependency-security",
+  "title": "Fix remaining vulnerable sandbox tooling dependencies",
+  "scope": "Resolve the seven assigned dependency vulnerability records across root and Mockup Sandbox manifests and locks. Preserve already patched root consumers; update compatible sandbox tooling and add regression checks covering both lockfiles and actual consumers. No product behavior or gate changes.",
+  "tier": "test-heavy",
+  "why": "Dependency security requires the registered audit, production build/startup and existing runtime regression coverage.",
+  "coverage": "docs/validation/manifest.json test-heavy includes unit-tests (dependency-tooling-security.test.mjs), dependency-audit, startup smoke, compiler checks and browser coverage.",
+  "approval": {
+    "reference": "Assigned task 998 in active conversation",
+    "direction": "Fix the seven specified dependency vulnerability records",
+    "applicability": "Compatible dependency updates and recurrence guards only"
+  },
+  "ignoredBaselines": [],
+  "ownedBaselines": [],
+  "assertions": [
+    {"requirement": "R1 patched dependency graphs", "check": "Both committed lockfiles and actual installed consumers reject every listed affected version and require compatible patched releases."},
+    {"requirement": "R2 tooling compatibility", "check": "Existing tooling behavior fixtures, production build/startup and browser workload remain passing after dependency resolution changes."}
+  ],
+  "regression": {
+    "form": "normal",
+    "material": true,
+    "rationale": "Repairs vulnerable development toolchain dependencies while preserving supported tooling consumers.",
+    "covers": "R1 vulnerable dependencies recurring in root or sandbox; R2 patched tooling breaking existing compilation or runtime",
+    "testLocation": "scripts/__tests__/dependency-tooling-security.test.mjs",
+    "assertion": "Require patched stable versions in each lockfile and consumer resolution, reject vulnerable versions with negative controls, and retain existing bounded parser/source map and build fixtures."
+  }
+}
